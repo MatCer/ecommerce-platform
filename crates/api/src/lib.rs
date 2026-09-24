@@ -1,10 +1,17 @@
-//! HTTP API (spec §8). Routers for storefront/admin/internal arrive in later WPs; WP0 ships the
-//! shell: health, readiness, OpenAPI, Swagger UI (dev only) and the shared middleware stack.
+//! HTTP API (spec §8): health, readiness, OpenAPI, Swagger UI (dev only), the Admin API
+//! (`/admin/v1`, staff JWT) and the Internal API (`/internal/v1`, service token).
+
+pub mod admin;
+pub mod auth;
+pub mod cli;
+pub mod internal;
+
+use std::sync::Arc;
 
 use axum::Router;
 use axum::body::{Bytes, HttpBody};
 use axum::extract::{Request, State};
-use axum::http::{HeaderName, StatusCode, header};
+use axum::http::{HeaderName, HeaderValue, Method, StatusCode, header};
 use axum::middleware::{map_request, map_response};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
@@ -17,12 +24,14 @@ use reqwest::Url;
 use serde::Serialize;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use tracing::Level;
 use utoipa::openapi::OpenApi as OpenApiSpec;
-use utoipa::{OpenApi, ToSchema};
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use utoipa_swagger_ui::SwaggerUi;
@@ -38,26 +47,84 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub meili_url: Url,
     pub storage: Storage,
+    pub staff_auth: Arc<auth::StaffAuth>,
+    pub internal_token: auth::ServiceToken,
+    /// The admin SPA origin, the only one CORS allows on `/admin/v1` (A9).
+    pub admin_origin: HeaderValue,
 }
 
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Commerce Platform API", version = "0.1.0"),
     components(schemas(platform::Problem)),
-    tags((name = "health", description = "Liveness and readiness"))
+    modifiers(&SecuritySchemes),
+    tags(
+        (name = "health", description = "Liveness and readiness"),
+        (name = "admin", description = "Admin API: staff JWT from the auth service + X-Tenant-Id"),
+        (name = "internal", description = "Internal API for platform services (service token)")
+    )
 )]
 struct ApiDoc;
+
+struct SecuritySchemes;
+
+impl Modify for SecuritySchemes {
+    fn modify(&self, spec: &mut OpenApiSpec) {
+        let components = spec.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "staff_jwt",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .description(Some(
+                        "EdDSA JWT from the auth service (`GET /api/auth/token`), aud=admin-api",
+                    ))
+                    .build(),
+            ),
+        );
+        components.add_security_scheme(
+            "service_token",
+            SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Bearer).build()),
+        );
+    }
+}
 
 fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
     OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(healthz))
         .routes(routes!(readyz))
+        .merge(admin::routes())
+        .merge(internal::routes())
         .split_for_parts()
 }
 
 /// The OpenAPI document, as served at `/openapi.json`.
 pub fn openapi() -> OpenApiSpec {
     documented_routes().1
+}
+
+/// CORS for the admin SPA (A9): one exact origin, bearer tokens (no cookies to this API).
+/// Applied to the whole router (a per-route layer would lose preflights to the 405 fallback);
+/// nothing else is meant for browsers: storefront traffic goes through the edge (A4).
+fn admin_cors(origin: HeaderValue) -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin([origin])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+        ])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            HeaderName::from_static(auth::TENANT_HEADER),
+            HeaderName::from_static("idempotency-key"),
+        ])
+        .expose_headers([REQUEST_ID, admin::REPLAYED])
+        .max_age(std::time::Duration::from_secs(600))
 }
 
 /// The full application. `docs` mounts Swagger UI at `/docs` (dev only).
@@ -103,6 +170,7 @@ pub fn app(state: AppState, docs: bool) -> Router {
                 .layer(map_response(problem_for_body_limit))
                 .layer(RequestBodyLimitLayer::new(BODY_LIMIT_BYTES)),
         )
+        .layer(admin_cors(state.admin_origin.clone()))
         // Outermost, so invalid ids are gone before `SetRequestIdLayer` looks at them.
         .layer(map_request(drop_invalid_request_id))
         .with_state(state)

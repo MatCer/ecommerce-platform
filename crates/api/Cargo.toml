@@ -9,9 +9,15 @@ publish.workspace = true
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+chrono.workspace = true
+clap.workspace = true
+commerce.workspace = true
+jsonwebtoken.workspace = true
 platform.workspace = true
 reqwest.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 tower.workspace = true
@@ -20,10 +26,10 @@ tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true
-serde_json.workspace = true
 testkit.workspace = true
 
 [lints]

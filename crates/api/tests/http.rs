@@ -22,6 +22,13 @@ fn state(db: PgPool) -> AppState {
         http: reqwest::Client::new(),
         meili_url: DEAD_MEILI.parse().unwrap(),
         storage: testkit::memory_storage(),
+        staff_auth: std::sync::Arc::new(api::auth::StaffAuth::new(
+            reqwest::Client::new(),
+            "http://127.0.0.1:1/jwks".parse().unwrap(),
+            "http://auth.localhost",
+        )),
+        internal_token: api::auth::ServiceToken::new("unused-in-these-tests"),
+        admin_origin: axum::http::HeaderValue::from_static("http://admin.localhost:8080"),
     }
 }
 
