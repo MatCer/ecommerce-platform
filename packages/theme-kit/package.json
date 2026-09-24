@@ -11,9 +11,13 @@
     "theme-kit": "./src/cli.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "measure": "node src/measure.ts"
   },
   "devDependencies": {
-    "@platform/config": "workspace:*"
+    "@platform/config": "workspace:*",
+    "@axe-core/playwright": "catalog:",
+    "lighthouse": "catalog:",
+    "playwright": "catalog:"
   }
 }
