@@ -127,6 +127,82 @@ impl DbConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct WorkerConfig {
+    /// `WORKER_CONCURRENCY`: parallel job loops, defaults to 4 (spec §13).
+    pub concurrency: usize,
+}
+
+impl WorkerConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let concurrency = parsed(lookup, "WORKER_CONCURRENCY", 4)?;
+        if !(1..=64).contains(&concurrency) {
+            return Err(ConfigError::Invalid {
+                name: "WORKER_CONCURRENCY",
+                reason: "must be between 1 and 64".into(),
+            });
+        }
+        Ok(Self { concurrency })
+    }
+}
+
+/// Staff authentication (spec A9): JWTs issued by the Better Auth service.
+#[derive(Debug, Clone)]
+pub struct StaffAuthConfig {
+    /// `AUTH_JWKS_URL`, e.g. `http://auth:3000/api/auth/jwks`.
+    pub jwks_url: Url,
+    /// `AUTH_ISSUER`, defaults to `http://auth.localhost` (the `iss` claim, A9).
+    pub issuer: String,
+    /// `ADMIN_ORIGIN`: the only CORS origin for `/admin/v1`, e.g. `http://admin.localhost:8080`.
+    pub admin_origin: String,
+}
+
+impl StaffAuthConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let admin_origin = url(lookup, "ADMIN_ORIGIN")?;
+        Ok(Self {
+            jwks_url: url(lookup, "AUTH_JWKS_URL")?,
+            issuer: get(lookup, "AUTH_ISSUER").unwrap_or_else(|| "http://auth.localhost".into()),
+            // Origin form: scheme://host[:port], no path or trailing slash.
+            admin_origin: admin_origin.origin().ascii_serialization(),
+        })
+    }
+}
+
+/// Not `Debug`: holds a secret.
+#[derive(Clone)]
+pub struct ServiceTokenConfig {
+    /// `INTERNAL_API_TOKEN`: bearer token for `/internal/v1` (edge), at least 32 characters.
+    pub internal_api_token: String,
+}
+
+impl ServiceTokenConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let token = required(lookup, "INTERNAL_API_TOKEN")?;
+        if token.len() < 32 {
+            return Err(ConfigError::Invalid {
+                name: "INTERNAL_API_TOKEN",
+                reason: "must be at least 32 characters".into(),
+            });
+        }
+        Ok(Self {
+            internal_api_token: token,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MeiliConfig {
     /// `MEILI_URL`
     pub url: Url,
@@ -230,6 +306,35 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn staff_auth_normalizes_origin_and_defaults_issuer() {
+        let cfg = StaffAuthConfig::from_lookup(&env(&[
+            ("AUTH_JWKS_URL", "http://auth:3000/api/auth/jwks"),
+            ("ADMIN_ORIGIN", "http://admin.localhost:8180/"),
+        ]))
+        .expect("valid");
+        assert_eq!(cfg.admin_origin, "http://admin.localhost:8180");
+        assert_eq!(cfg.issuer, "http://auth.localhost");
+    }
+
+    #[test]
+    fn service_token_must_be_long() {
+        let err = ServiceTokenConfig::from_lookup(&env(&[("INTERNAL_API_TOKEN", "short")])).err();
+        assert!(matches!(
+            err,
+            Some(ConfigError::Invalid {
+                name: "INTERNAL_API_TOKEN",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn worker_concurrency_is_bounded() {
+        assert_eq!(WorkerConfig::from_lookup(&env(&[])).unwrap().concurrency, 4);
+        assert!(WorkerConfig::from_lookup(&env(&[("WORKER_CONCURRENCY", "0")])).is_err());
     }
 
     #[test]

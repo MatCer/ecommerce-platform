@@ -1,31 +1,36 @@
-//! Background worker. WP0 skeleton: connects to the database and logs a heartbeat until
-//! SIGTERM. The job runner, outbox dispatcher and cron leader arrive in WP1 (spec §13).
-
 use std::time::Duration;
 
 use anyhow::anyhow;
-use platform::config::DbConfig;
-
-const HEARTBEAT: Duration = Duration::from_secs(30);
+use platform::config::{DbConfig, WorkerConfig};
+use worker::runner::RunnerConfig;
+use worker::{cron, handlers, outbox, runner};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))?;
+    let cfg = WorkerConfig::from_env()?;
     let db = platform::db::pool(&DbConfig::from_env()?)?;
-    tracing::info!("worker started");
 
-    let shutdown = platform::shutdown::signal();
-    tokio::pin!(shutdown);
-    let mut tick = tokio::time::interval(HEARTBEAT);
-    loop {
-        tokio::select! {
-            () = &mut shutdown => break,
-            _ = tick.tick() => match platform::db::ping(&db).await {
-                Ok(()) => tracing::info!(database = "ok", "heartbeat"),
-                Err(e) => tracing::warn!(database = "fail", error = %e, "heartbeat"),
-            },
-        }
-    }
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    tokio::spawn(async move {
+        platform::shutdown::signal().await;
+        let _ = stop.send(true);
+    });
+
+    let host = std::env::var("HOSTNAME").unwrap_or_else(|_| "worker".into());
+    let owner = format!("{host}:{}", std::process::id());
+    tracing::info!(%owner, concurrency = cfg.concurrency, "worker started");
+
+    tokio::join!(
+        runner::run(
+            db.clone(),
+            handlers::all(),
+            RunnerConfig::new(owner, cfg.concurrency),
+            shutdown.clone(),
+        ),
+        outbox::run(db.clone(), Duration::from_millis(500), shutdown.clone()),
+        cron::run(db.clone(), Duration::from_secs(30), shutdown),
+    );
 
     db.close().await;
     tracing::info!("worker stopped");

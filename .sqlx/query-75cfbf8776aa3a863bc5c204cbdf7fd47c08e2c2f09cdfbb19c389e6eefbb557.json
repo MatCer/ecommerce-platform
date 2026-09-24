@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE markets SET is_default = false WHERE is_default",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "75cfbf8776aa3a863bc5c204cbdf7fd47c08e2c2f09cdfbb19c389e6eefbb557"
+}

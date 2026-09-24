@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO platform.domains (hostname, tenant_id, market_id, is_primary, verified_at)\n         VALUES ($1, $2, $3, true, now())",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7350746beae9c5714dec2b47a54a19a7fe68e75dcd88be531e2a804c0c69b8e6"
+}
