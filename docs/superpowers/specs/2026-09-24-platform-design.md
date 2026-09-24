@@ -611,49 +611,51 @@ Field targets for prod (RUM): LCP p75 < 1.5 s, INP p75 < 100 ms, CLS p75 < 0.05.
 
 ---
 
-## 17. Milestones and work packages
+## 17. Milestones and work packages (revised after Astra review, supersedes the original list)
 
-Each WP = one branch + PR, implemented by an Opus agent in a worktree, reviewed by Astra, then fixed and squash-merged. Where noted, WPs may run two at a time (disjoint files).
+Each WP = one branch + PR: an Opus agent implements it in a worktree, Astra reviews, the findings get fixed, then it is squash-merged. Every WP lists prerequisites and must be acceptance-testable at merge time. Security tests belong to the WP that owns the code.
 
-### M1: first pilot client live (locally complete)
-| WP | Content |
-|---|---|
-| WP0 Foundation | workspace scaffolding, Biome/rustfmt/clippy, docker compose (all infra + caddy + mocks skeleton), Makefile, config, errors (problem+json), tracing, health, OpenAPI pipeline + TS client generation, CI |
-| WP1 Tenancy + auth | tenants/domains/markets, RLS roles + `tenant_tx` + negative tests, Better Auth service, JWT/JWKS verification, staff roles, superadmin CLI (`api admin create-tenant`), audit log, outbox + jobs + worker skeleton with cron leader |
-| WP2 Catalog + media | products/variants/options/parameters/categories/translations/GPSR/unit price, price lists + price history, inventory, assets upload (presigned) + image variants job, Admin API CRUD |
-| WP3 Admin app shell + catalog UI | Solid SPA, login via Better Auth, tenant switcher, i18n, layout, products/categories/media/parameters/prices/inventory screens |
-| WP4 Storefront | storefront API page models, SDK, edge (Miniflare), checkout app skeleton, default theme (full design), SEO/JSON-LD/sitemaps/llms.txt/redirects, theme revision #1 build script, perf/a11y CI (`make perf`) |
-| WP5 Search | Meilisearch projection, cs/sk normalizer + fixtures, variant-correct facets, category facets + search page + typeahead |
-| WP6 Pricing, promotions, cart | money/VAT/OSS/rounding engine, sales/coupons, Omnibus labels, cart API + mini cart island |
-| WP7 Checkout, customers, payments, shipping | checkout app (one-page), customer accounts, consent banner, shipping methods (Packeta widget/home, PPL), payments (Stripe Connect + fake, SPAYD/PAY by square QR, COD), place-order, payment timeouts |
-| WP8 Orders, invoicing, email | admin orders UI, status machines, manual orders/edits, packing slips, labels (mocks), refunds, withdrawals, bank statement import + matching, ČNB rates, invoices/credit notes (Typst), transactional emails (mrml → Mailpit) |
-| WP9 Content, import, feeds | CMS pages/blog/menus/legal templates, redirects admin, Heureka/Google feed import + CSV import + old-URL redirects, feed exports (Google/Heureka/Zboží), tenant data export |
-| WP10 Analytics, webhooks, ops | beacon + server events, consent records, rollups + dashboard, Web Vitals RUM, outbound webhooks, `/metrics`, runbook |
-| WP11 M1 acceptance | full M1 e2e suite green, `make perf` green, seed polish, README/runbook, fix-ups |
+"M1 = local pilot acceptance" (everything verified locally against mocks). Real-provider validation (Stripe live test mode, Packeta/PPL sandboxes, SES, bank scans of QR codes) is a separate pre-launch checklist in `docs/runbook.md`.
 
-Parallelizable pairs: WP3 ∥ WP2-late (after the WP2 API lands), WP5 ∥ WP6, WP9 ∥ WP10.
+### M1
+| WP | Content | Prereqs |
+|---|---|---|
+| WP0 Foundation | workspace, Docker stack, Makefile, config, problem+json, tracing, health, OpenAPI → TS clients, CI | none |
+| WP1 Identity, tenancy, jobs | tenants/domains/markets, roles + grants + RLS + `tenant_tx`, membership bootstrap (A8), Better Auth + JWT contract (A9), staff roles, audit log, superadmin CLI, local domain verification stub, outbox + leased jobs + cron leader (A14), idempotency store (A12) | WP0 |
+| WP2 Runtime + trust-boundary spike | Astro/adapter/Miniflare/workerd version matrix and artifact contract (A22), edge gateway prototype with the origin split (A1), cache policy (A2), restricted theme binding (A7), a full-island product page measured against the budget (A26), AI-edit feasibility on 10 real prompts against the theme contract. Outputs: `docs/decisions/runtime-contract.md` + reusable edge/SDK skeleton code | WP0 |
+| WP3 Catalog + media | products/variants/options/parameters/categories/translations/GPSR/unit price, per-country tax categories (A3), assets (public/private split, A21) + image variants job, Admin API CRUD | WP1 |
+| WP4 Money, tax, pricing, promotions, inventory | money, VAT liability config (A3), pricing algorithm (A15), sales/coupons, effective-price intervals + Omnibus (A18), stock movements (A13), cash rounding (A16). Pure domain + tables + Admin API | WP3 |
+| WP5 Admin shell + catalog UI | Solid SPA, login, tenant switcher, i18n, catalog/media/prices/inventory/tax screens | WP3 (WP4 API for price screens) |
+| WP6 Storefront runtime | production-quality edge gateway (origin split, cache allowlist, header stripping), Storefront API page models + authorization matrix (A4), SDK, checkout-origin app skeleton, one shared default artifact (A30), SEO basics, redirects | WP2, WP3, WP4 |
+| WP7 Search | per-variant documents (A23), cs/sk normalizer + fixtures, facets, search/category/typeahead endpoints, degraded-mode readiness (A30) | WP3, WP4 |
+| WP8 Default theme | the full polished design (frontend-design), mini-cart island via the cart capability, search UI, GPSR display, Omnibus labels, consent banner, RUM beacon, JSON-LD, perf + a11y gate green (`make perf`) | WP6, WP7 |
+| WP9 Customers, consent, mail core | customer accounts on the checkout origin (A5), sessions, consent model (A20), order/payment/fulfillment state machines (A13), email infra with send states + suppression (A14, A29), transactional templates skeleton | WP6 |
+| WP10 Checkout + order placement | one-page checkout on the checkout origin, cart handoff (A1), shipping method selection (Packeta widget, PPL, home), payment method selection, idempotent place-order, stock reservation, fake payment adapter, order confirmation | WP9, WP4 |
+| WP11 Payment adapters | payment attempts + provider events (A10, A11), Stripe Connect direct charges, bank transfer (SPAYD, PAY by square 1.2.0 with golden vectors, A25) + statement import/matching, COD tender/collector/remittance (A16), payment timeouts + late-payment exceptions | WP10 |
+| WP12 Fulfillment, invoicing, returns | admin orders UI, labels (Packeta/PPL mocks), shipment → stock commit, invoice scenarios (A17) with Typst, credit notes, ČNB rates, refunds, withdrawal flow (A19), packing slips | WP11 |
+| WP13 Content, import, feeds, privacy | CMS pages/blog/menus, legal templates + go-live validation, redirects admin, feed import with mappings (A28), CSV import, channel serializers (Google/Heureka/Zboží), tenant data export, customer access/erasure with retention exceptions (A29) | WP3, WP12 |
+| WP14 Analytics, webhooks, ops | server counters + consented events (A20), rollups, dashboard, Web Vitals RUM, outbound webhooks (SSRF-safe, A21), `/metrics`, local backup + restore drill (A29), runbook incl. real-provider checklist | WP10 |
+| WP15 M1 acceptance | full M1 e2e suite, perf/a11y gates, manual keyboard checks (A26), seed polish, README/runbook | all M1 |
 
-### M2: marketing
-| WP | Content |
-|---|---|
-| WP12 Email marketing | subscribers + double opt-in, segments (rule builder → SQL), campaigns + block editor + batch sending, one-click unsubscribe, suppression |
-| WP13 Flows | flow engine, abandoned cart, watchdog, review invites, dev test clock |
-| WP14 Reviews | reviews + moderation + verified flag + JSON-LD + Omnibus disclosure + theme integration |
-| WP15 Recommendations | rollups, strategies, storefront slots, newsletter personalized block |
-| WP16 Ad-platform tracking | Meta CAPI, GA4 MP, Google Ads, Sklik forwarders with consent + mocks + admin settings |
-| WP17 M2 acceptance | M2 e2e suite, perf re-check |
+Parallelizable (disjoint files): WP2 ∥ WP1; WP5 ∥ WP4; WP7 ∥ WP6 (after both prereqs); WP13 ∥ WP14.
 
-Parallelizable: WP14 ∥ WP15, WP16 ∥ WP13.
+### M2
+| WP | Content | Prereqs |
+|---|---|---|
+| WP16 Reviews | review storage, review tokens, moderation, verified flag, JSON-LD, Omnibus disclosure, theme integration | WP12 |
+| WP17 Recommendations | rollups, strategies, storefront slots, consent-gated personalization | WP14 |
+| WP18 Email marketing | subscribers + double opt-in, segments, campaigns + block editor incl. personalized product block, one-click unsubscribe | WP17, WP9 |
+| WP19 Flows | flow engine, abandoned cart, watchdog, review invites, dev test clock | WP16, WP18 |
+| WP20 Ad-platform forwarders | Meta CAPI, GA4 MP, Google Ads, Sklik with `ads` consent + mocks + settings | WP14 |
+| WP21 M2 acceptance | M2 e2e suite, perf re-check | all M2 |
 
-### M3: AI
-| WP | Content |
-|---|---|
-| WP18 AI gateway + admin helpers | Anthropic client + fake, quotas/metering, descriptions/SEO/translations, bulk edit change plans + preview + apply, AI labels |
-| WP19 Theme builder pipeline | theme-builder service, revisions, gates (check/build/budget/Lighthouse/axe/Playwright/screenshots), preview hosts, publish/rollback, reset-to-default |
-| WP20 AI theme editing | agent loop with tools, prompt UX in admin, diff view, check report UI |
-| WP21 M3 acceptance | M3 e2e suite, final docs, security review pass |
-
----
+### M3
+| WP | Content | Prereqs |
+|---|---|---|
+| WP22 AI gateway + admin helpers | Anthropic client + fake, quotas/metering, descriptions/SEO/translations, bulk-edit change plans + preview + apply, AI labels | WP5 |
+| WP23 Theme builder pipeline | sandboxed per-revision builds (A6), revisions, gates, preview authorization (A21), publish/rollback/reset | WP8 |
+| WP24 AI theme editing | agent loop (outside the sandbox), prompt UX, diff, check report | WP23, WP22 |
+| WP25 M3 acceptance | M3 e2e suite, final security review, docs | all |
 
 ## 18. Risks and mitigations
 1. **Miniflare can't faithfully host Astro Worker bundles** → WP4 validates it first; fallback: workerd config generation.
@@ -665,3 +667,230 @@ Parallelizable: WP14 ∥ WP15, WP16 ∥ WP13.
 
 ## 19. Deferred (explicitly out of M1–M3)
 B2B (price lists per customer, net terms, VIES, company accounts, quick order), AI chat assistant, MCP/ACP/UCP/AP2, auth.md, Comgate/GoPay, more carriers, Ecomail/Fakturoid/Pohoda integrations, Heureka Ověřeno zákazníky, Shopify/Woo API importers, EET 2.0, SK e-invoicing, self-signup + billing automation, social login, extra themes, ML recommendations, A/B testing, gift cards, loyalty, digital/subscription products, multiple warehouses, app marketplace/WASM, production provisioning.
+
+---
+
+## 20. Amendments after Astra review (binding; override conflicting text in §1–§16)
+
+Numbering A1–A30 matches the review findings (`docs/research/spec-review-astra.md`).
+
+**A1: Origin split.**
+- Theme code (untrusted) runs on the shop origin (`demo.localhost`, prod `shop.cz`).
+- Checkout, account, withdrawal and consent preferences run on a separate **checkout origin** `checkout.<shop-host>` (`checkout.demo.localhost`), served by the platform-owned checkout app.
+- The customer session cookie (`sid`) exists only on the checkout origin (host-only).
+- The shop origin holds only the `cart` capability cookie (HttpOnly, host-only, `Path=/_p/cart`).
+- **Checkout handoff:**
+  - `POST /_p/checkout/start` on the shop origin (edge-owned) mints a single-use handoff token (60 s, hashed at rest)
+  - it 303-redirects to `checkout.<host>/start?h=<token>`
+  - that endpoint exchanges the token for a checkout-origin cart cookie and redirects to `/`
+- No credentialed CORS between origins. Until the WP23 sandbox exists, only platform-reviewed theme code is deployed (true for M1/M2: only the default theme exists).
+
+**A2: Cache policy (edge-owned, themes can't override it upward).**
+- Cache only `GET`/`HEAD` of an explicit allowlist: theme page routes (`/`, `/c/*`, `/p/*`, `/pages/*`, `/blog*`, `/search` without personalization) and immutable assets.
+- Never cache:
+  - anything on the checkout origin, `/_p/*`, previews
+  - URLs containing capability tokens (`token`, `h`, `sig` query params)
+  - responses with `Set-Cookie`, `Cache-Control: private|no-store`, or requests with `Authorization`
+- The edge strips client-supplied `X-Tenant`, `X-Market`, `X-Storefront-*`, `X-Forwarded-*` before resolving.
+
+**A3: VAT liability.**
+- The tenant tax profile holds:
+  - `establishment_country`, `vat_payer` bool, `vat_id` (DIČ), `sk_ic_dph` (separate field)
+  - `distance_sales_mode`: `origin_threshold` (the merchant confirms eligibility for the EU €10k exception; stored with the confirmation timestamp) or `destination` (OSS or local registration)
+- Each market lists allowed ship-to countries. Checkout blocks countries not covered by the profile.
+- Tax categories are per country: `tax_categories(country, code, rate, valid_from)`. Products map to a category per country (`product_tax_categories`), defaulting to `standard`.
+- A non-VAT-payer charges no VAT and issues invoices without VAT.
+- Gross prices stay constant across the destination rate (unchanged policy).
+- The docs flag that the setup must be confirmed by the merchant's accountant.
+
+**A4: Storefront authorization matrix.**
+- Browsers never call `api.localhost` directly. Only through the edge gateway on the same origin.
+
+| Operation | Where | Credential |
+|---|---|---|
+| Public catalog/page reads | theme SSR via the restricted binding; islands via `/_p/public/*` | tenant context injected by the edge |
+| Cart read/write | shop origin `/_p/cart/*` | `cart` capability cookie (opaque, 256-bit, hashed at rest, rotated on checkout handoff) |
+| Checkout, account, withdrawal | checkout origin | checkout cart cookie + `sid` session |
+| Order status page | checkout origin `/o/<token>` | order capability token (read-only, 90 days) |
+
+- Cart → account merge happens on login on the checkout origin (the cart is attached to the customer; lines merged by variant).
+
+**A5: Customer credentials.**
+- Setting or changing a password requires a verified-email magic link consumed within the last 10 minutes, or the current password.
+- Password reset = magic link. Tokens are single-use, consumed atomically (`UPDATE … WHERE used_at IS NULL RETURNING`).
+- A password change revokes all other sessions.
+- Guest orders are linked to an account only after that email is verified via a magic link.
+- Redirect targets after login: relative paths on the checkout origin only.
+
+**A6: Theme build sandbox (WP23).**
+- Each build runs as a disposable container (`docker run --network none --read-only`, a writable tmpfs work dir, read-only `node_modules` volume, `--pids-limit`, CPU/memory/time limits, no credentials, non-root).
+- The AI controller runs outside the sandbox and only exchanges files.
+- Archives are validated (no absolute paths, no `..`, no symlinks, expanded size ≤ 50 MB).
+- Design tokens are schema-validated `theme.tokens.json`, not TS.
+
+**A7: Restricted theme binding.**
+- Theme workers get exactly one binding, `STOREFRONT`: a platform wrapper worker that exposes only the public page-model/catalog operations. It injects the immutable tenant/market and rejects any request carrying credentials.
+- Global outbound fetch is denied.
+- The checkout app has a separate binding with checkout capabilities.
+- The edge purge endpoint and builder callbacks use distinct service tokens.
+
+**A8: RLS bootstrap and queues.**
+- Membership lookup uses a `SECURITY DEFINER` function `platform.staff_membership(user_id, tenant_id) returns role` owned by `app_owner`. No business access happens before it succeeds.
+- `outbox` and `jobs` live in schema `queue`, with no RLS. They're accessible only via `SECURITY DEFINER` functions (`queue.enqueue`, `queue.claim`, `queue.complete`, `queue.fail`, `queue.heartbeat`) granted to `app_runtime`.
+- Handlers then run tenant work inside `tenant_tx`.
+- Code review rule: tenant tables are never queried outside `tenant_tx`. The runtime role without context fails closed.
+- Tests cover connection reuse after commit, rollback and task cancellation.
+
+**A9: Staff JWT contract.**
+- Better Auth JWT plugin: `iss=http://auth.localhost`, `aud=admin-api`, `exp=5m`, EdDSA (Ed25519). The JWKS is fetched by Rust with a 10-minute cache and a forced refresh on unknown `kid` (at most once per 30 s).
+- The JWT lives in SPA memory only.
+- JWTs are issued only after email verification, and after 2FA if the user enabled it.
+- Rust re-checks membership on every request.
+- Sensitive operations (staff management, payment/tax settings, exports, theme publish) require `auth_time` within 15 minutes, otherwise `401 reauth_required`.
+- CORS: `admin.localhost` only, with credentials, for the auth origin.
+
+**A10: Payment attempts.**
+- `place-order` commits the order + a `payment_attempts` row + an outbox event.
+- Right after commit, the API creates the provider intent with idempotency key = attempt ID, stores `provider_ref`/`client_secret_ref`, and returns it.
+- If that fails, the client retries via `POST /checkout/orders/{id}/payment-attempts/{attempt}/init` (idempotent). A failed payment → a new attempt on the same order.
+- Status endpoint: `GET /checkout/orders/{id}/payment`.
+- A payment succeeding after timeout/cancellation → an order `exception` flag + a refund task. Stock is never silently restored.
+
+**A11: Stripe webhooks.**
+- The raw event is persisted in `provider_events(provider, event_id unique, account, payload, processed_at)` before the 200.
+- It's processed asynchronously. The event must match the tenant's connected account, livemode flag, provider object, currency and expected amount.
+- Only `payment_intent.succeeded` confirms. Out-of-order events never regress `paid`.
+- Refunds via API with an idempotency key.
+- Application fee refund policy: refund the fee proportionally (`refund_application_fee=true`).
+- `account.updated` capability loss disables Stripe at checkout.
+
+**A12: Idempotency.**
+- `idempotency_keys(tenant_id, operation, key, request_hash, response jsonb, status, created_at)`, unique `(tenant_id, operation, key)`. The same key with a different hash → `409 idempotency_conflict`. Retention 24 h.
+- One order per cart: unique `orders.cart_id`.
+- Place-order locks the cart row (`FOR UPDATE`), checks the cart `version`, stock rows, coupon usage and refundable balance, all in one transaction.
+
+**A13: Inventory and lifecycle.**
+- `stock_movements(variant_id, quantity, kind reserve|release|commit|restock|adjust, ref_type, ref_id)` with a unique `(kind, ref_type, ref_id, variant_id)`.
+- `inventory_levels` is updated in the same transaction.
+- Reservation on placement; release on cancel/expiry; commit on shipment; restock on return receipt (merchant-confirmed).
+- COD orders are `confirmed` on placement.
+- Returns are per line and quantity (`return_lines`); the order status derives from the line states (no terminal `partially_returned`).
+- M1: no financial edits after payment. Use cancel/refund + a replacement order. Non-financial edits (address before label, notes) are allowed.
+
+**A14: Jobs and email delivery.**
+- Claim sets `lease_owner`, `lease_token`, `locked_until` (60 s). The claim query also reclaims `running` jobs with expired leases.
+- `heartbeat` extends the lease. `complete`/`fail` require a matching `lease_token` (fencing).
+- The outbox dispatcher inserts fan-out jobs and sets `dispatched_at` in the same transaction.
+- Email sends: `email_messages(status pending|sending|accepted|uncertain|failed)`, set to `accepted` only after the SMTP 250. A crash while `sending` → `uncertain` → retried once for transactional mail (duplicates tolerated), never for marketing.
+
+**A15: Pricing algorithm (ordered, persisted).**
+1. Line base gross = effective unit price × qty.
+2. Automatic sales are already in the effective price.
+3. Coupon discounts are allocated to eligible lines proportionally to line gross, using the largest-remainder method in minor units.
+4. VAT per line on the discounted line gross: `round_half_up(gross × r/(100+r))`.
+5. Shipping and payment fees are ancillary: their gross is split across the VAT rates of the goods proportionally to the goods' discounted gross per rate (largest remainder), and VAT is computed per portion.
+6. Cash rounding is applied last as a separate line. Tax treatment is per jurisdiction config, default outside the VAT base (flagged for accountant confirmation).
+
+- The allocation results are persisted on `order_lines`/`order_charges`.
+- Refunds reverse the original allocations proportionally. The residual goes to the last line. Historical orders are never re-priced.
+
+**A16: COD.**
+- `payments` records `tender` (cash|card|unknown) and `collector` (carrier|merchant).
+- Cash rounding applies only when tender = cash:
+  - CZK to whole koruna
+  - EUR (SK) to €0.05 per SK rules
+- States: `delivered` → `collected` (carrier report or manual) → `remitted` (carrier payout import or manual confirmation with an audit entry).
+
+**A17: Invoice scenarios (VAT payer, CZ/SK).**
+1. Prepaid (card or bank transfer): payment received before dispatch → one tax document on the payment date (DUZP = payment date) that also serves as the final invoice. If goods are not shipped, a credit note.
+2. COD: invoice on dispatch (DUZP = dispatch date).
+3. Non-VAT-payer: invoice without VAT, no recap.
+4. Partial return/cancellation: a credit note referencing the original allocations.
+
+- Proformas are not tax documents.
+- ČNB rate: the latest published fixing on or before the DUZP (weekends/holidays → the previous business day). If unavailable → issuing is retried and the admin warns.
+- SK uses DIČ and IČ DPH as separate fields.
+- Document currency and the statutory CZK recap are stored separately.
+- The docs state "templates require accountant approval before real use".
+
+**A18: Omnibus.**
+- `price_intervals(variant_id, price_list_id, amount_minor, valid_from, valid_to, cause base|sale|tax)` materialized, including **future scheduled** sale start/end (written when a sale is created or changed).
+- The reference price = the minimum over the intervals overlapping `[reduction_start − 30 d, reduction_start)`.
+- A progressive (chained) reduction keeps the reference from before the first reduction in the chain.
+- A product younger than 30 days → the minimum since launch.
+- The storefront discount % and strikethrough are computed only against the reference price. `compare_at` is never shown as a reduction basis.
+- Imported products without 30 days of history show no reduction claims until history exists.
+- Coupons available to all customers (published codes) count as price reductions for the reference.
+
+**A19: Withdrawal.**
+- A public page `checkout.<host>/withdraw`, linked from the footer, order emails and the account: order number + email → an emailed confirmation link (proves control) → shows the lines → an explicit "Confirm withdrawal" step → an immediate durable receipt (email containing the full declaration, stored as a document).
+- Tracked separately: `delivered_at`, `declared_at`, `goods_received_at` / `return_proof_at`, `refund_due_at` (declared + 14 d).
+- The refund may wait for goods or proof of dispatch.
+- The refund covers the standard outbound shipping and uses the original payment method (bank refunds use the IBAN from the form).
+
+**A20: Consent.**
+- Purposes: `analytics`, `ads`, `personalization`, `email_marketing`, `review_invites`. Recorded per tenant (controller) and subject.
+- The server resolves consent from `consent_records` at execution time (sending, forwarding, enrollment steps). Beacon-supplied purposes are never trusted.
+- Before consent: only server-side minimized counters (the edge counts page requests per route template/day, without identifiers). No device storage.
+- "Recently viewed" requires `personalization`.
+- Dashboard funnel metrics are labelled "consented sessions".
+
+**A21: SSRF and artifacts.**
+- The `safe_client`:
+  - resolves DNS itself and connects only to public unicast IPs (v4+v6)
+  - re-validates every redirect (max 3)
+  - strips credentials/cookies
+  - caps response size and decompression (20 MB)
+  - 10 s timeout
+- Buckets:
+  - `public` holds only re-encoded media
+  - `private` holds invoices, labels, exports, theme sources/bundles, and is served via short-lived (5 min) presigned URLs after authorization
+- Preview access is an HMAC-signed token bound to tenant + revision + expiry (1 h). The admin iframe is `sandbox="allow-scripts allow-same-origin allow-forms"` on the preview origin only.
+
+**A22: Runtime contract first.** WP2 pins the Astro / `@astrojs/cloudflare` / Miniflare / workerd versions, and documents the module manifest, compatibility flags and asset binding. Assets are served content-addressed under `/_astro/` (theme) and are retained across revisions. Tested: restart, eviction, publish, rollback.
+
+**A23: Search documents.**
+- One Meilisearch document per sellable variant (`product_id`, variant options as facet fields, `price_<market>`, `in_stock`, `active_in_markets`). `distinctAttribute = product_id` at query time.
+- Facet counts are **not displayed** in M1. Facet values with zero matches are shown disabled.
+- Results are rehydrated from Postgres (current price/stock) before responding.
+- WP5/WP7 adversarial fixtures: cross-variant false matches, three options, unavailable variants, market prices, multi-select filters.
+
+**A25: Bank transfer.**
+- PAY by square is **v1.2.0**, implemented per the official spec (field order, CRC32, LZMA raw params, header, base32hex). Golden vectors come from the reference `bysquare` npm library (generated once, committed), plus a manual bank-app scan item on the pre-launch checklist.
+- SPAYD: escaping per the spec (`*` → `%2A`), `ACC` IBAN(+BIC).
+- VS: numeric order number ≤ 10 digits, unique per tenant and receiving account.
+- Statement lines are identified by bank transaction ID (duplicate imports are ignored).
+- Matching is scoped to tenant + receiving account.
+
+**A26: Performance measurement.**
+- "JS budget" = all executable JS transferred until network idle, **plus** the deferred islands triggered by scrolling the full page (measured by a Playwright script).
+- Speculation rules are delivered via the `Speculation-Rules` response header (external JSON), so there's no inline script.
+- CSP uses hashes for any unavoidable inline script.
+- Lab TBT and field INP are reported separately.
+- Manual keyboard/focus checks of checkout (including pickup-point and payment selection) are part of WP15.
+
+**A27: Meilisearch ops.**
+- Index names use the full tenant UUID (`t_<uuid>_<locale>`). The image is pinned by digest.
+- Separate keys: the search-only key for the API query path, the admin key for the worker.
+- Indexing events carry a version; stale versions are dropped.
+- Readiness: search is reported as a degraded component, not a core-readiness failure.
+
+**A28: Feeds.**
+- Separate serializers per channel (Google, Heureka, Zboží) with semantic fixtures.
+- Imports use `import_mappings(tenant_id, source, external_id, entity_type, entity_id)`, default to `draft`, report missing fields, never invent price history.
+- Redirect collisions are reported (first wins).
+- Imported historical orders are `archived` and never trigger payments, stock movements or emails.
+
+**A29: M1 acceptance owners.**
+- GPSR display (WP8)
+- Legal-content go-live validation (WP13)
+- Customer access/erasure (WP13)
+- Transactional suppression (WP9)
+- Domain verification stub (WP1)
+- Local backup + restore drill (WP14)
+
+**A30: Simplify M1.**
+- One shared immutable default-theme artifact. Tenants point to it via a revision row until their code diverges in M3.
+- No Miniflare instance LRU beyond "one instance per distinct artifact".
+- Per-tenant job fairness is deferred: a simple global queue, `ponytail:` noted.
+- Search is out of core readiness.
