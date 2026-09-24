@@ -1,0 +1,29 @@
+# Local reverse proxy (spec §3.2). Plain HTTP on *.localhost, which browsers and curl resolve
+# to loopback without /etc/hosts edits. Host port: HTTP_PORT (default 8080).
+{
+	auto_https off
+	admin off
+}
+
+http://api.localhost {
+	reverse_proxy api:8000
+}
+
+http://mail.localhost {
+	reverse_proxy mailpit:8025
+}
+
+http://s3.localhost {
+	reverse_proxy minio:9000
+}
+
+# Placeholders until their work packages land: auth (WP1), admin SPA (later WP).
+http://admin.localhost, http://auth.localhost {
+	respond "{host} is not available yet" 502
+}
+
+# Everything else is a storefront host for the edge (WP2/WP6): <shop>.localhost,
+# checkout.<shop>.localhost (spec A1), preview-<rev>--<shop>.localhost.
+:80 {
+	respond "storefront edge is not available yet" 502
+}
