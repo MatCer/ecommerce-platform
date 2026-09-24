@@ -4,6 +4,61 @@
  */
 
 export interface paths {
+    "/admin/v1/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tenant's audit log, newest first (owner/admin). */
+        get: operations["audit_log"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/markets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_markets"];
+        put?: never;
+        /**
+         * Creates a market (owner/admin). Honors `Idempotency-Key`: a retry with the same key and
+         *     body returns the original response with `Idempotent-Replayed: true`; the same key with a
+         *     different body is `409 idempotency_conflict`.
+         */
+        post: operations["create_market"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in staff user and their tenants. Needs no `X-Tenant-Id`. */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -13,6 +68,23 @@ export interface paths {
         };
         /** Liveness: the process serves HTTP. Never touches dependencies. */
         get: operations["healthz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hostname -> tenant and market, for verified domains of active tenants. */
+        get: operations["resolve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -42,6 +114,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AuditEntry: {
+            action: string;
+            /** @description Better Auth user id, or `platform` for superadmin operations. */
+            actor: string;
+            /** Format: date-time */
+            at: string;
+            diff: unknown;
+            entity: string;
+            entity_id?: string | null;
+            /** Format: uuid */
+            id: string;
+        };
+        AuditPage: {
+            items: components["schemas"]["AuditEntry"][];
+            /**
+             * Format: uuid
+             * @description Pass as `cursor` for the next (older) page; absent on the last page.
+             */
+            next_cursor?: string | null;
+        };
         /** @enum {string} */
         CheckStatus: "ok" | "fail";
         Checks: {
@@ -51,6 +143,69 @@ export interface components {
         };
         Health: {
             status: components["schemas"]["CheckStatus"];
+        };
+        Market: {
+            code: string;
+            country_codes: string[];
+            /** Format: date-time */
+            created_at: string;
+            currency: string;
+            default_locale: string;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            locales: string[];
+            name: string;
+            tax_mode: components["schemas"]["TaxMode"];
+        };
+        MarketList: {
+            items: components["schemas"]["Market"][];
+        };
+        Me: {
+            email: string;
+            /** @description Tenants the user can act in (send one as `X-Tenant-Id`). */
+            memberships: components["schemas"]["Membership"][];
+            user_id: string;
+        };
+        Membership: {
+            name: string;
+            role: components["schemas"]["Role"];
+            slug: string;
+            /** Format: uuid */
+            tenant_id: string;
+        };
+        NewMarket: {
+            /**
+             * @description Lowercase identifier, unique per tenant, e.g. `sk`.
+             * @example sk
+             */
+            code: string;
+            /**
+             * @description ISO 3166-1 alpha-2 ship-to countries.
+             * @example [
+             *       "SK"
+             *     ]
+             */
+            country_codes: string[];
+            /**
+             * @description ISO 4217 code.
+             * @example EUR
+             */
+            currency: string;
+            /** @example sk */
+            default_locale: string;
+            /** @description Makes this the tenant's default market (the previous default loses the flag). */
+            is_default?: boolean;
+            /**
+             * @example [
+             *       "sk",
+             *       "en"
+             *     ]
+             */
+            locales: string[];
+            /** @example Slovensko */
+            name: string;
+            tax_mode?: components["schemas"]["TaxMode"];
         };
         /** @description RFC 9457 problem details body. */
         Problem: {
@@ -71,6 +226,31 @@ export interface components {
              */
             status: components["schemas"]["CheckStatus"];
         };
+        /** @description What the edge needs to serve a hostname (spec §5.1, `GET /internal/v1/resolve`). */
+        Resolved: {
+            country_codes: string[];
+            currency: string;
+            default_locale: string;
+            hostname: string;
+            locales: string[];
+            market_code: string;
+            /** Format: uuid */
+            market_id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            tenant_slug: string;
+        };
+        /**
+         * @description Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
+         *     management or exports.
+         * @enum {string}
+         */
+        Role: "staff" | "admin" | "owner";
+        /**
+         * @description Whether prices are entered gross (B2C, default) or net.
+         * @enum {string}
+         */
+        TaxMode: "gross" | "net";
     };
     responses: never;
     parameters: never;
@@ -80,6 +260,174 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    audit_log: {
+        parameters: {
+            query?: {
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_markets: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketList"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_market: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewMarket"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Market"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     healthz: {
         parameters: {
             query?: never;
@@ -96,6 +444,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    resolve: {
+        parameters: {
+            query: {
+                /** @description Request hostname, optionally with a port (`demo.localhost:8080`). */
+                host: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Resolved"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

@@ -10,6 +10,262 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/audit-log": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "The tenant's audit log, newest first (owner/admin).",
+        "operationId": "audit_log",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/markets": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "list_markets",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Creates a market (owner/admin). Honors `Idempotency-Key`: a retry with the same key and\nbody returns the original response with `Idempotent-Replayed: true`; the same key with a\ndifferent body is `409 idempotency_conflict`.",
+        "operationId": "create_market",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMarket"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Market"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/me": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "The signed-in staff user and their tenants. Needs no `X-Tenant-Id`.",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -29,6 +285,60 @@
             }
           }
         }
+      }
+    },
+    "/internal/v1/resolve": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Hostname -> tenant and market, for verified domains of active tenants.",
+        "operationId": "resolve",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "query",
+            "description": "Request hostname, optionally with a port (`demo.localhost:8080`).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resolved"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "service_token": []
+          }
+        ]
       }
     },
     "/readyz": {
@@ -65,6 +375,66 @@
   },
   "components": {
     "schemas": {
+      "AuditEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "actor",
+          "action",
+          "entity",
+          "diff",
+          "at"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string",
+            "description": "Better Auth user id, or `platform` for superadmin operations."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "diff": {},
+          "entity": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AuditPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next (older) page; absent on the last page."
+          }
+        }
+      },
       "CheckStatus": {
         "type": "string",
         "enum": [
@@ -101,6 +471,181 @@
             "$ref": "#/components/schemas/CheckStatus"
           }
         }
+      },
+      "Market": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "country_codes",
+          "currency",
+          "default_locale",
+          "locales",
+          "tax_mode",
+          "is_default",
+          "created_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "country_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "default_locale": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "tax_mode": {
+            "$ref": "#/components/schemas/TaxMode"
+          }
+        }
+      },
+      "MarketList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Market"
+            }
+          }
+        }
+      },
+      "Me": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "memberships"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Membership"
+            },
+            "description": "Tenants the user can act in (send one as `X-Tenant-Id`)."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "Membership": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "slug",
+          "name",
+          "role"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "NewMarket": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "country_codes",
+          "currency",
+          "default_locale",
+          "locales"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Lowercase identifier, unique per tenant, e.g. `sk`.",
+            "example": "sk"
+          },
+          "country_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "ISO 3166-1 alpha-2 ship-to countries.",
+            "example": [
+              "SK"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code.",
+            "example": "EUR"
+          },
+          "default_locale": {
+            "type": "string",
+            "example": "sk"
+          },
+          "is_default": {
+            "type": "boolean",
+            "description": "Makes this the tenant's default market (the previous default loses the flag)."
+          },
+          "locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "sk",
+              "en"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "example": "Slovensko"
+          },
+          "tax_mode": {
+            "$ref": "#/components/schemas/TaxMode"
+          }
+        },
+        "additionalProperties": false
       },
       "Problem": {
         "type": "object",
@@ -151,6 +696,87 @@
             "description": "`ok` when the core dependencies (database, storage) are `ok`. Meilisearch is reported\nbut not required: search degrades, the shop keeps working (spec A30)."
           }
         }
+      },
+      "Resolved": {
+        "type": "object",
+        "description": "What the edge needs to serve a hostname (spec §5.1, `GET /internal/v1/resolve`).",
+        "required": [
+          "hostname",
+          "tenant_id",
+          "tenant_slug",
+          "market_id",
+          "market_code",
+          "currency",
+          "default_locale",
+          "locales",
+          "country_codes"
+        ],
+        "properties": {
+          "country_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "currency": {
+            "type": "string"
+          },
+          "default_locale": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "market_code": {
+            "type": "string"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_slug": {
+            "type": "string"
+          }
+        }
+      },
+      "Role": {
+        "type": "string",
+        "description": "Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff\nmanagement or exports.",
+        "enum": [
+          "staff",
+          "admin",
+          "owner"
+        ]
+      },
+      "TaxMode": {
+        "type": "string",
+        "description": "Whether prices are entered gross (B2C, default) or net.",
+        "enum": [
+          "gross",
+          "net"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "service_token": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "staff_jwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "EdDSA JWT from the auth service (`GET /api/auth/token`), aud=admin-api"
       }
     }
   },
@@ -158,6 +784,14 @@
     {
       "name": "health",
       "description": "Liveness and readiness"
+    },
+    {
+      "name": "admin",
+      "description": "Admin API: staff JWT from the auth service + X-Tenant-Id"
+    },
+    {
+      "name": "internal",
+      "description": "Internal API for platform services (service token)"
     }
   ]
 }
