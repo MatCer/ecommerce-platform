@@ -2,7 +2,7 @@
 
 You implement one work package (WP) of the platform described in
 `docs/superpowers/specs/2026-09-24-platform-design.md` (the spec, §17 lists the WPs).
-Also read `docs/scope.md`. The spec is authoritative; if a spec detail is wrong or
+Also read `docs/scope.md`. The binding amendments in spec §20 override earlier spec sections. The spec is authoritative; if a spec detail is wrong or
 infeasible, choose the best-practice alternative, record it in the PR under
 "Deviations from spec", and continue. Never stop to ask questions: decide, document, proceed.
 
@@ -25,11 +25,19 @@ infeasible, choose the best-practice alternative, record it in the PR under
    (`make up` / `make dev-infra` once they exist), exercise the flow (curl, Playwright, psql),
    and run the full check suite (`make lint test` + e2e/perf where the WP touches them).
    Bring your compose stack down when finished (`docker compose -p <project> down`).
-6. Push the branch and open a PR against `main` with `gh pr create`. PR body sections:
+6. Independent review before the PR: run an Astra review yourself via Codex, read-only:
+   `codex exec -m gpt-6-astra -s read-only --skip-git-repo-check -C <worktree> -o /tmp/<wp>-review.md "<prompt>"`
+   (prompt: review `git diff origin/main...HEAD` against the spec incl. §20 amendments; ranked findings
+   with file:line and fixes; verdict). Before launching, check no other `codex exec` started in the
+   last 60 s (`ps -eo etimes,args | grep -E 'codex(\.js)? exec' | grep -v grep`); if one did, wait
+   (concurrent Codex startups corrupt the login). Run it in the background and poll; it takes 5-30 min.
+   Fix every blocker/high/medium finding (with tests), reasonable lows too; list what you fixed and
+   anything you consciously declined (with reason) in the PR body under "Review".
+7. Push the branch and open a PR against `main` with `gh pr create`. PR body sections:
    Summary, What was verified (commands + outcomes, briefly), Deviations from spec,
    Follow-ups / known gaps. End the body with:
    `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
-7. Final message to the orchestrator: PR URL, 10-20 line summary, verification evidence,
+8. Final message to the orchestrator: PR URL, 10-20 line summary, verification evidence,
    deviations, known gaps. Do not paste large logs.
 
 ## Engineering rules (mandatory)
