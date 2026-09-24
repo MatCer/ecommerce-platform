@@ -1,18 +1,45 @@
 packages:
   - apps/*
   - packages/*
+  - themes/*
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: true
 
 # Single source of truth for shared dependency versions (exact pins).
 catalog:
   "@biomejs/biome": 2.5.14
+  "@astrojs/check": 0.9.10
+  "@astrojs/cloudflare": 14.3.3
+  "@astrojs/solid-js": 7.0.2
+  "@axe-core/playwright": 4.13.0
   "@hono/node-server": 2.1.1
+  "@playwright/test": 1.63.0
+  "@tailwindcss/vite": 4.3.3
+  astro: 7.3.5
   "@types/node": 24.13.6
   hono: 4.13.8
+  lighthouse: 13.5.0
+  # Pinned to the exact miniflare/workerd that wrangler 4.137.0 and @cloudflare/vite-plugin 1.58.0 (used by the Astro adapter) ship, so dev (wrangler) and
+  # the edge run the same runtime. Miniflare 5 is published under the "latest" tag with an
+  # -alpha suffix; it is the version wrangler itself depends on.
+  miniflare: 5.20260921.0-alpha
   openapi-fetch: 0.17.0
   # openapi-typescript 7 needs the TypeScript 5 compiler API (TS 7 is the native port without it).
   openapi-typescript: 7.13.0
+  solid-js: 1.9.15
+  tailwindcss: 4.3.3
   typescript: 5.9.3
   vite: 8.3.0
   vitest: 5.0.1
+  web-vitals: 6.2.2
+  wrangler: 4.137.0
+
+minimumReleaseAgeExclude:
+  - astro@7.3.5
+  - miniflare@5.20260923.0-alpha
+  - wrangler@4.139.0
 
 saveExact: true

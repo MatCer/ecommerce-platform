@@ -1,0 +1,19 @@
+{
+  "name": "@platform/theme-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "bin": {
+    "theme-kit": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*"
+  }
+}

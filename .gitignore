@@ -12,3 +12,14 @@ dist/
 .env
 docker-compose.override.yml
 *.tmp
+
+# Astro / Wrangler / theme builds
+.astro/
+.wrangler/
+/.artifacts/
+.vitest/
+
+# Playwright / Lighthouse output
+test-results/
+playwright-report/
+/.perf/
