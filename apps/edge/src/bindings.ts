@@ -18,6 +18,8 @@ export interface RequestContext {
   tags: Set<string>;
   anyPrivate: boolean;
   minMaxAge: number | null;
+  /** Binding calls made by this render (fan-out budget, see MAX_SUBREQUESTS). */
+  subrequests: number;
 }
 
 /**
@@ -35,6 +37,7 @@ export class ContextRegistry {
       tags: new Set(),
       anyPrivate: false,
       minMaxAge: null,
+      subrequests: 0,
       ...extra,
     });
     return id;
@@ -55,6 +58,9 @@ export class ContextRegistry {
 }
 
 export type Upstream = (request: Request) => Promise<Response>;
+
+/** Per-render binding call budget (Cloudflare Workers allow 50 subrequests on the free plan). */
+export const MAX_SUBREQUESTS = 50;
 
 /** Anything that authenticates or selects a tenant. Workers must never send these (A7). */
 const CREDENTIAL_HEADERS = [
@@ -122,6 +128,14 @@ export function restrictedBinding(opts: {
     const ctx = opts.registry.get(request.headers.get(CTX_HEADER), opts.artifactId);
     if (!ctx)
       return problem(403, "no_request_context", `${opts.name}: missing or unknown request context`);
+    // Workers cap subrequests per invocation; so do we, so N+1 page-model fan-out fails loudly.
+    if (++ctx.subrequests > MAX_SUBREQUESTS) {
+      return problem(
+        429,
+        "too_many_subrequests",
+        `${opts.name}: over ${MAX_SUBREQUESTS} calls in one render`,
+      );
+    }
 
     const url = new URL(request.url);
     if (SMUGGLING.test(url.pathname) || url.search.length > 2048) {

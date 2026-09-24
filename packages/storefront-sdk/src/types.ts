@@ -140,6 +140,12 @@ export interface HomePage {
   cache: CacheHints;
 }
 
+/** `GET /recommendations?context=` (M2 fills it with real strategies; private if personalized). */
+export interface Recommendations {
+  products: ProductCard[];
+  cache: CacheHints;
+}
+
 export interface SearchSuggest {
   query: string;
   products: { slug: string; name: string; image: Image; price: Money }[];

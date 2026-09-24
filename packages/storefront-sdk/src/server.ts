@@ -1,4 +1,11 @@
-import type { CategoryPage, HomePage, ProductPage, SearchSuggest, ShopModel } from "./types.ts";
+import type {
+  CategoryPage,
+  HomePage,
+  ProductPage,
+  Recommendations,
+  SearchSuggest,
+  ShopModel,
+} from "./types.ts";
 
 /** The `STOREFRONT` service binding the platform injects into theme workers (spec A7). */
 export interface StorefrontBinding {
@@ -79,6 +86,9 @@ export function createStorefront({
     product: (slug: string) => get<ProductPage>(`/pages/product/${segment(slug)}`),
     search: (query: Query) => required<CategoryPage>(`/pages/search${qs(query)}`),
     suggest: (q: string) => required<SearchSuggest>(`/search/suggest${qs({ q })}`),
+    /** Product recommendations; `context` is `product:<id>`, `cart` or `home` (spec §8.2). */
+    recommendations: (context: string) =>
+      required<Recommendations>(`/recommendations${qs({ context })}`),
   };
 }
 

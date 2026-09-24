@@ -217,6 +217,7 @@ export function createGateway(opts: GatewayOptions) {
         body,
         pageModels: { anyPrivate: ctx?.anyPrivate ?? false, minMaxAge: ctx?.minMaxAge ?? null },
         tags: [...(ctx?.tags ?? [])],
+        subrequests: ctx?.subrequests ?? 0,
       };
     } finally {
       registry.close(ctxId);
@@ -263,12 +264,15 @@ export function createGateway(opts: GatewayOptions) {
       body: Uint8Array<ArrayBuffer> | null,
       cacheState: string,
       cacheable: boolean,
+      subrequests?: number,
     ) => {
       const h = new Headers(headers);
       for (const [k, v] of Object.entries(themeHeaders(m, site, port))) h.set(k, v);
       // The edge holds the shared copy; browsers always revalidate so a purge takes effect at once.
       h.set("cache-control", cacheable ? "public, max-age=0, must-revalidate" : "no-store");
       h.set("x-edge-cache", cacheState);
+      // Page-model fan-out of this render (read by the gates as an N+1 signal).
+      if (subrequests !== undefined) h.set("x-edge-subrequests", String(subrequests));
       return new Response(req.method === "HEAD" ? null : body, { status, headers: h });
     };
 
@@ -313,7 +317,14 @@ export function createGateway(opts: GatewayOptions) {
       }
     }
     const { r, cacheable } = await store();
-    return respond(r.status, r.headers, r.body, verdict.cache ? "MISS" : "BYPASS", cacheable);
+    return respond(
+      r.status,
+      r.headers,
+      r.body,
+      verdict.cache ? "MISS" : "BYPASS",
+      cacheable,
+      r.subrequests,
+    );
   }
 
   // --- platform routes (/_p/*) ---------------------------------------------------------------

@@ -31,6 +31,11 @@ export default {
       case "/p/theme-no-store": return html("x", { "cache-control": "no-store" });
       case "/p/sets-cookie": return html("x", { "set-cookie": "evil=1; Domain=.demo.localhost; Path=/" });
       case "/c/slow": { await new Promise((r) => setTimeout(r, 5000)); return html("slow"); }
+      case "/c/fanout": {
+        const statuses = [];
+        for (let i = 0; i < 52; i++) statuses.push((await sf("/shop")).status);
+        return Response.json({ ok: statuses.filter((s) => s === 200).length, last: statuses.at(-1) });
+      }
       case "/pages/headers": return Response.json({ headers: [...request.headers], url: request.url });
       case "/probe": {
         return Response.json({
@@ -159,6 +164,11 @@ export function fakeApi() {
       return Response.json({ token_seen: req.headers.get("x-cart-token"), lines: [{ id: "l1" }] });
     if (p === "/cart/checkout-token") return Response.json({ token: "checkouttoken_000000000001" });
     if (p === "/events") return new Response(null, { status: 202 });
+    if (p === "/newsletter/subscribe")
+      return Response.json(
+        { tenant, body: JSON.parse(calls.at(-1)?.body || "null") },
+        { status: 202 },
+      );
     return Response.json({ code: "not_found" }, { status: 404 });
   };
   return { fn, calls };

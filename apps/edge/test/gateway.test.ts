@@ -180,6 +180,12 @@ describe("header hygiene (A2)", () => {
     );
   });
 
+  test("page-model fan-out is counted and capped at 50 calls per render", async () => {
+    const res = await get("http://demo.localhost/c/fanout");
+    expect(await res.json()).toEqual({ ok: 50, last: 429 });
+    expect(res.headers.get("x-edge-subrequests")).toBe("52");
+  });
+
   test("a hanging render times out with 504", async () => {
     expect((await get("http://demo.localhost/c/slow")).status).toBe(504);
   });
@@ -404,6 +410,50 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
   test("checkout origin serves tenant tokens as CSS and is never cached", async () => {
     const css = await get("http://checkout.demo.localhost/_p/tokens.css");
     expect(await css.text()).toContain("--color-brand:#123456;");
+  });
+
+  test("newsletter sign-up is same-origin JSON only, tenant injected by the edge", async () => {
+    const body = JSON.stringify({ email: "jana@example.cz" });
+    const ok = await get(
+      `${shop}/_p/newsletter`,
+      { ...origin, "content-type": "application/json", "x-tenant": "t-other" },
+      { method: "POST", body },
+    );
+    expect(ok.status).toBe(202);
+    expect(await ok.json()).toEqual({ tenant: "t-demo", body: { email: "jana@example.cz" } });
+    expect(
+      (
+        await get(
+          `${shop}/_p/newsletter`,
+          { "content-type": "application/json" },
+          { method: "POST", body },
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await get(
+          `${shop}/_p/newsletter`,
+          { ...origin, "content-type": "text/plain" },
+          { method: "POST", body },
+        )
+      ).status,
+    ).toBe(415);
+  });
+
+  test("local http mode also accepts the https origin of the same host (Caddy tls internal)", async () => {
+    const res = await get(
+      `${shop}/_p/cart/lines`,
+      { origin: "https://demo.localhost:8280", "content-type": "application/json" },
+      { method: "POST", body: JSON.stringify({ variant_id: "v1" }) },
+    );
+    expect(res.status).toBe(200);
+    const other = await get(
+      `${shop}/_p/cart/lines`,
+      { origin: "https://evil.localhost:8280", "content-type": "application/json" },
+      { method: "POST", body: "{}" },
+    );
+    expect(other.status).toBe(403);
   });
 
   test("handoff without a cart goes back to the shop", async () => {
