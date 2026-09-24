@@ -1,1 +1,13 @@
 .claude/worktrees/
+
+# Rust
+/target/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local env and machine-specific compose tweaks
+.env
+docker-compose.override.yml
