@@ -1,0 +1,12 @@
+---
+import Base from "../layouts/Base.astro";
+import { storefront } from "../lib/storefront";
+
+const shop = await storefront(Astro.request).shop();
+Astro.response.status = 404;
+---
+
+<Base shop={shop} seo={{ title: "Stránka nenalezena", description: "", canonical: Astro.url.href, alternates: [], json_ld: [], robots: "noindex" }}>
+  <h1 class="font-display text-2xl font-bold">Tuto stránku jsme nenašli</h1>
+  <p class="mt-2"><a href="/" class="text-identity-ink underline">Zpět na úvod</a></p>
+</Base>

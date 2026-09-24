@@ -1,0 +1,34 @@
+---
+import type { Link } from "@platform/storefront-sdk/types";
+import { jsonLd } from "../lib/storefront";
+
+interface Props {
+  items: Link[];
+  base: string;
+}
+const { items, base } = Astro.props;
+const ld = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: items.map((b, i) => ({
+    "@type": "ListItem",
+    position: i + 1,
+    name: b.label,
+    item: new URL(b.href, base).href,
+  })),
+};
+---
+
+<nav aria-label="Drobečková navigace" class="mb-4 text-sm text-muted-foreground">
+  <ol class="flex flex-wrap gap-1">
+    {
+      items.map((b, i) => (
+        <li class="flex gap-1">
+          {i > 0 && <span aria-hidden="true">/</span>}
+          {i === items.length - 1 ? <span aria-current="page">{b.label}</span> : <a href={b.href} class="hover:underline">{b.label}</a>}
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+<script type="application/ld+json" set:html={jsonLd(ld)} />

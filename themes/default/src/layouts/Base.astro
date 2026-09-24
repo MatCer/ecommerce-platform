@@ -1,0 +1,89 @@
+---
+import { srcset } from "@platform/storefront-sdk/format";
+import type { Image, Seo, ShopModel } from "@platform/storefront-sdk/types";
+import "virtual:theme-tokens.css";
+import "../styles/global.css";
+import archivo from "../fonts/archivo-latin-ext.woff2?url";
+import ConsentBanner from "../islands/ConsentBanner";
+import MiniCart from "../islands/MiniCart";
+import Newsletter from "../islands/Newsletter";
+import Rum from "../islands/Rum";
+import SearchBox from "../islands/SearchBox";
+import { jsonLd } from "../lib/storefront";
+
+interface Props {
+  shop: ShopModel;
+  seo: Seo;
+  /** LCP image: preloaded AVIF with fetchpriority=high (spec §9.6). */
+  lcp?: { image: Image; sizes: string };
+  q?: string;
+}
+const { shop, seo, lcp, q } = Astro.props;
+---
+
+<!doctype html>
+<html lang={shop.locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{seo.title}</title>
+    <meta name="description" content={seo.description} />
+    <link rel="canonical" href={seo.canonical} />
+    {seo.robots && <meta name="robots" content={seo.robots} />}
+    {seo.alternates.map((a) => <link rel="alternate" hreflang={a.locale} href={a.href} />)}
+    <meta property="og:title" content={seo.title} />
+    <meta property="og:description" content={seo.description} />
+    <meta property="og:url" content={seo.canonical} />
+    {
+      lcp && (
+        <link rel="preload" as="image" type="image/avif" imagesrcset={srcset(lcp.image)} imagesizes={lcp.sizes} fetchpriority="high" />
+      )
+    }
+    <link rel="preload" href={archivo} as="font" type="font/woff2" crossorigin />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {seo.json_ld.map((d) => <script type="application/ld+json" set:html={jsonLd(d)} />)}
+  </head>
+  <body class="min-h-dvh">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:p-3">
+      Přeskočit na obsah
+    </a>
+    <header class="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur">
+      <div class="container-shop flex h-16 items-center gap-3 md:gap-6">
+        <a href="/" class="font-display text-lg font-extrabold tracking-tight whitespace-nowrap">{shop.name}</a>
+        <div class="flex-1"><SearchBox client:idle q={q} /></div>
+        <MiniCart client:idle />
+      </div>
+      <nav aria-label="Kategorie" class="container-shop -mt-1 flex gap-5 overflow-x-auto pb-2 text-sm font-semibold">
+        {shop.menus.main.map((m) => <a href={m.href} class="py-1 whitespace-nowrap hover:text-identity-ink">{m.label}</a>)}
+      </nav>
+    </header>
+
+    <main id="main" class="container-shop py-4 md:py-8">
+      <slot />
+    </main>
+
+    <footer class="mt-12 bg-panel text-card">
+      <div class="container-shop grid gap-8 py-10 md:grid-cols-3">
+        <section aria-labelledby="nl">
+          <h2 id="nl" class="mb-3 font-display text-lg font-bold">Novinky e-mailem</h2>
+          <Newsletter client:visible />
+        </section>
+        <nav aria-label="Zákaznický servis">
+          <ul class="grid gap-2 text-sm">
+            {shop.menus.footer.map((m) => <li><a href={m.href} class="underline-offset-4 hover:underline">{m.label}</a></li>)}
+          </ul>
+        </nav>
+        <div class="text-sm text-card/80">
+          <p>{shop.trust.delivery}</p>
+          <p>{shop.trust.returns}</p>
+          <p class="mt-2">{shop.trust.payments.join(" · ")}</p>
+          <ul class="mt-4 grid gap-1">
+            {shop.legal_pages.map((m) => <li><a href={m.href} class="underline">{m.label}</a></li>)}
+          </ul>
+        </div>
+      </div>
+    </footer>
+    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} />
+    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} />
+  </body>
+</html>
