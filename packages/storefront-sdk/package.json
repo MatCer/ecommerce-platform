@@ -1,0 +1,19 @@
+{
+  "name": "@platform/storefront-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "openapi:generate": "openapi-typescript ../../openapi.json --output src/schema.d.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "openapi-fetch": "catalog:"
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*"
+  }
+}

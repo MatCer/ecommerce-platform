@@ -1,0 +1,18 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Single source of truth for shared dependency versions (exact pins).
+catalog:
+  "@biomejs/biome": 2.5.14
+  "@hono/node-server": 2.1.1
+  "@types/node": 24.13.6
+  hono: 4.13.8
+  openapi-fetch: 0.17.0
+  # openapi-typescript 7 needs the TypeScript 5 compiler API (TS 7 is the native port without it).
+  openapi-typescript: 7.13.0
+  typescript: 5.9.3
+  vite: 8.3.0
+  vitest: 5.0.1
+
+saveExact: true

@@ -1,0 +1,16 @@
+/*
+ * Shared design tokens as a Tailwind 4 theme (CSS-first config, no JS preset).
+ * Usage in an app stylesheet:
+ *   @import "tailwindcss";
+ *   @import "@platform/config/tailwind/theme.css";
+ * Stub: the real palette and type scale arrive with the first UI work package.
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: oklch(0.97 0.02 250);
+  --color-brand-500: oklch(0.55 0.18 250);
+  --color-brand-900: oklch(0.28 0.09 250);
+
+  --radius-control: 0.5rem;
+}

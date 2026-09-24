@@ -1,0 +1,176 @@
+# Local stack (spec §3, §15). Use the Makefile:
+#   make up          everything (profile "full")
+#   make dev-infra   dependencies only (profile "infra"); run api/worker natively against them
+# Host ports and credentials come from .env (see .env.example); defaults below match it.
+# Published ports bind to 127.0.0.1 only; set HOST_BIND=0.0.0.0 in .env to expose them on the LAN.
+
+x-infra: &infra
+  profiles: [infra, full]
+  restart: unless-stopped
+
+x-rust-app: &rust-app
+  profiles: [full]
+  build:
+    context: .
+    dockerfile: docker/rust.Dockerfile
+  image: ${COMPOSE_PROJECT_NAME:-ecommerce}-rust:local
+  restart: unless-stopped
+
+x-runtime-db: &runtime-db
+  DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:-app-runtime-local}@postgres:5432/app
+  APP_ENV: ${APP_ENV:-dev}
+  RUST_LOG: ${RUST_LOG:-info}
+
+services:
+  postgres:
+    <<: *infra
+    image: postgres:17.11
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:-app-owner-local}
+      APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-app-runtime-local}
+    ports: ["${HOST_BIND:-127.0.0.1}:${PG_PORT:-55432}:5432"]
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
+    healthcheck:
+      # TCP, not the socket: the socket is up during init, TCP only once init has finished.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "app"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  meilisearch:
+    <<: *infra
+    image: getmeili/meilisearch:v1.54.0@sha256:0bf32debcbfa8ba4e418679025f4935884972171513c92f0584689ff994a61df # pinned by digest (spec A27)
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-meili-local-master-key-0123456789}
+      MEILI_NO_ANALYTICS: "true"
+    ports: ["${HOST_BIND:-127.0.0.1}:${MEILI_PORT:-57700}:7700"]
+    volumes: [meili-data:/meili_data]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7700/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Upstream MinIO no longer publishes images; pgsty/minio is the maintained community build.
+  minio:
+    <<: *infra
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-local-password}
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${MINIO_PORT:-59000}:9000"
+      - "${HOST_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-59001}:9001"
+    volumes: [minio-data:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # One-shot: buckets (spec A21: `public` read-only for anonymous, `private`) and an app user
+  # limited to object read/write, so the app never runs with MinIO root credentials.
+  minio-init:
+    profiles: [infra, full]
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-local-password}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-app-local}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing local/public local/private
+        mc anonymous set download local/public
+        mc anonymous set none local/private
+        mc admin user add local "$$S3_ACCESS_KEY_ID" "$$S3_SECRET_ACCESS_KEY"
+        mc admin policy attach local readwrite --user "$$S3_ACCESS_KEY_ID"
+    restart: "no"
+
+  mailpit:
+    <<: *infra
+    image: axllent/mailpit:v1.31.2
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${MAILPIT_SMTP_PORT:-51025}:1025"
+      - "${HOST_BIND:-127.0.0.1}:${MAILPIT_UI_PORT:-58025}:8025"
+
+  stripe-mock:
+    <<: *infra
+    image: stripe/stripe-mock:v0.203.0
+    ports: ["${HOST_BIND:-127.0.0.1}:${STRIPE_MOCK_PORT:-12111}:12111"]
+
+  mocks:
+    <<: *infra
+    build:
+      context: .
+      dockerfile: apps/mocks/Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-ecommerce}-mocks:local
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4010/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  caddy:
+    <<: *infra
+    image: caddy:2.11.4-alpine
+    ports: ["${HOST_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"]
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+  # Applies migrations as the owner role, then exits. api and worker wait for it.
+  migrate:
+    <<: *rust-app
+    command: ["/usr/local/bin/api", "migrate"]
+    environment:
+      DATABASE_URL: postgres://app_owner:${APP_OWNER_PASSWORD:-app-owner-local}@postgres:5432/app
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    <<: *rust-app
+    command: ["/usr/local/bin/api"]
+    environment:
+      <<: *runtime-db
+      API_BIND: 0.0.0.0:8000
+      MEILI_URL: http://meilisearch:7700
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-app-local}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
+      S3_BUCKET_PUBLIC: public
+      S3_BUCKET_PRIVATE: private
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
+      meilisearch: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/api", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    <<: *rust-app
+    command: ["/usr/local/bin/worker"]
+    environment:
+      <<: *runtime-db
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  pg-data:
+  meili-data:
+  minio-data:
+  caddy-data:

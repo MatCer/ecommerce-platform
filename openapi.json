@@ -1,0 +1,163 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Commerce Platform API",
+    "description": "",
+    "license": {
+      "name": "UNLICENSED",
+      "identifier": "UNLICENSED"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness: the process serves HTTP. Never touches dependencies.",
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness: database, Meilisearch and object storage are reachable.",
+        "operationId": "readyz",
+        "responses": {
+          "200": {
+            "description": "All dependencies reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "At least one dependency is unreachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Readiness"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CheckStatus": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "fail"
+        ]
+      },
+      "Checks": {
+        "type": "object",
+        "required": [
+          "database",
+          "meilisearch",
+          "storage"
+        ],
+        "properties": {
+          "database": {
+            "$ref": "#/components/schemas/CheckStatus"
+          },
+          "meilisearch": {
+            "$ref": "#/components/schemas/CheckStatus"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/CheckStatus"
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus"
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 9457 problem details body.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code, e.g. `not_found`."
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Always `about:blank`; `code` carries the specific error kind."
+          }
+        }
+      },
+      "Readiness": {
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "$ref": "#/components/schemas/Checks"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CheckStatus",
+            "description": "`ok` when the core dependencies (database, storage) are `ok`. Meilisearch is reported\nbut not required: search degrades, the shop keeps working (spec A30)."
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness and readiness"
+    }
+  ]
+}

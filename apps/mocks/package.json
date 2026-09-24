@@ -1,0 +1,17 @@
+{
+  "name": "@platform/mocks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*"
+  }
+}
