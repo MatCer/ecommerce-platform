@@ -7,6 +7,8 @@ export const BUDGET = {
   jsGzip: { home: 35 * 1024, default: 30 * 1024 },
   thirdPartyOrigins: 0,
   axeSeriousOrCritical: 0,
+  /** Storefront binding calls per page render (N+1 guard; the edge caps a render at 50). */
+  maxSubrequests: 10,
 } as const;
 
 export interface PageResult {
@@ -22,6 +24,8 @@ export interface PageResult {
   thirdPartyOrigins: string[];
   axe: { id: string; impact: string; nodes: number }[];
   cspViolations: string[];
+  /** Page-model calls of an uncached render (`x-edge-subrequests`). */
+  subrequests: number;
 }
 
 export function judge(r: PageResult): string[] {
@@ -37,6 +41,8 @@ export function judge(r: PageResult): string[] {
   if (serious.length > BUDGET.axeSeriousOrCritical)
     fails.push(`axe: ${serious.map((v) => v.id).join(", ")}`);
   if (r.cspViolations.length) fails.push(`CSP violations: ${r.cspViolations.length}`);
+  if (r.subrequests > BUDGET.maxSubrequests)
+    fails.push(`${r.subrequests} storefront calls per render > ${BUDGET.maxSubrequests}`);
   return fails;
 }
 

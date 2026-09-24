@@ -97,6 +97,9 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
   });
 
   await page.goto(url, { waitUntil: "networkidle" });
+  // An Authorization header makes the edge bypass its HTML cache (A2): a fresh render to count.
+  const fresh = await ctx.request.get(url, { headers: { authorization: "Bearer measure" } });
+  const subrequests = Number(fresh.headers()["x-edge-subrequests"] ?? Number.NaN);
   await settle(ctx);
   // A26: scroll the full page so every client:visible island is triggered.
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -133,6 +136,7 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
     transfer: files.reduce((n, f) => n + f.transfer, 0),
     thirdParty: [...origins].filter((o) => o !== base.origin && !o.startsWith("data:")),
     axe,
+    subrequests,
     csp,
   };
 }
@@ -201,6 +205,7 @@ for (const p of pages) {
     jsGzip: js.gzip,
     jsTransfer: js.transfer,
     jsGzipWithRum: rum.gzip,
+    subrequests: js.subrequests,
     thirdPartyOrigins: js.thirdParty,
     axe: js.axe,
     cspViolations: [...js.csp, ...rum.csp],
@@ -221,6 +226,7 @@ console.log(
   "JS gz kB".padStart(9),
   "+RUM kB".padStart(8),
   "xfer kB".padStart(8),
+  "calls".padStart(6),
   " result",
 );
 for (const r of results) {
@@ -234,6 +240,7 @@ for (const r of results) {
     (r.jsGzip / 1024).toFixed(1).padStart(9),
     (r.jsGzipWithRum / 1024).toFixed(1).padStart(8),
     (r.jsTransfer / 1024).toFixed(1).padStart(8),
+    String(r.subrequests).padStart(6),
     fails.length ? ` FAIL: ${fails.join("; ")}` : " ok",
   );
 }
