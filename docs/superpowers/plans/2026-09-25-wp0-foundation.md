@@ -39,6 +39,9 @@ readiness and OpenAPI, TS clients are generated from that OpenAPI, and CI enforc
   same migrations through a one-shot `migrate` service (`api migrate`, embedded `sqlx::migrate!`), so
   `make up` needs no host tooling.
 - **Container health:** `api healthcheck` subcommand (distroless image has no shell/curl).
+- **Spec amendments (§20):** buckets are `public` + `private` (A21); Meilisearch is reported by
+  `/readyz` but does not fail it (A30); Caddy's catch-all sends every other host, including
+  `checkout.<shop>.localhost` (A1), to the edge placeholder.
 
 ## Tasks
 
