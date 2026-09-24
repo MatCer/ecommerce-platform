@@ -13,6 +13,13 @@ interface SessionLike {
 }
 
 /**
+ * One-factor sign-in paths. Better Auth's two-factor plugin only challenges password sign-in,
+ * so a user with 2FA enabled must not get a session from these (spec A9: tokens only after
+ * 2FA). They sign in with password + TOTP instead.
+ */
+export const ONE_FACTOR_SESSION_PATHS = new Set(["/magic-link/verify", "/verify-email"]);
+
+/**
  * Claims of a staff JWT (spec A9). Better Auth adds `iss`, `aud`, `exp`, `iat` and `sub`
  * (the user id). Tokens are refused to users whose email is not verified; users with 2FA
  * enabled only get a session (and so a token) after the second factor.
@@ -38,6 +45,22 @@ export function createAuth(cfg: Config, database: BetterAuthOptions["database"],
     database,
     trustedOrigins: [cfg.adminOrigin],
     telemetry: { enabled: false },
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session, ctx) => {
+            if (!ctx || !ONE_FACTOR_SESSION_PATHS.has(ctx.path)) return;
+            const user = await ctx.context.internalAdapter.findUserById(session.userId);
+            // Added to the user model by the two-factor plugin.
+            if ((user as { twoFactorEnabled?: boolean } | null)?.twoFactorEnabled) {
+              throw new APIError("FORBIDDEN", {
+                message: "Two-factor authentication is enabled: sign in with password and code",
+              });
+            }
+          },
+        },
+      },
+    },
     // Staff are invited by the platform (`api admin create-tenant`); there is no self sign-up.
     emailAndPassword: {
       enabled: true,

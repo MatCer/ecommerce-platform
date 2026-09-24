@@ -19,11 +19,31 @@ const cfg: Config = {
 
 function setup() {
   const outbox: Mail[] = [];
-  const db = { user: [], session: [], account: [], verification: [], twoFactor: [], jwks: [] };
+  const db: Record<string, Record<string, unknown>[]> = {
+    user: [],
+    session: [],
+    account: [],
+    verification: [],
+    twoFactor: [],
+    jwks: [],
+  };
   const auth = createAuth(cfg, memoryAdapter(db), async (mail) => {
     outbox.push(mail);
   });
-  return { app: createApp(auth, cfg), outbox };
+  return { app: createApp(auth, cfg), outbox, db };
+}
+
+/** Creates a user, invites them and returns the magic link path from the email. */
+async function inviteLink(app: ReturnType<typeof setup>["app"], outbox: Mail[], address: string) {
+  const create = internal("/internal/users", { email: address });
+  const { id } = (await (await app.request(create.path, create.init)).json()) as { id: string };
+  const invite = internal("/internal/users/invite", {
+    email: address,
+    callback_url: cfg.adminOrigin,
+  });
+  expect((await app.request(invite.path, invite.init)).status).toBe(202);
+  const link = new URL(outbox.at(-1)?.text.match(/https?:\/\/\S+/)?.[0] ?? "");
+  return { id, path: link.pathname + link.search };
 }
 
 const internal = (path: string, payload: unknown, token = cfg.internalToken) => ({
@@ -109,6 +129,17 @@ describe("staff sign-in", () => {
       crv: "Ed25519",
       kid: claims.header && (claims.header as { kid: string }).kid,
     });
+  });
+
+  test("users with 2FA enabled get no session from a magic link", async () => {
+    const { app, outbox, db } = setup();
+    const { id, path } = await inviteLink(app, outbox, "secure@example.test");
+    const user = db.user?.find((u) => u.id === id);
+    if (!user) throw new Error("user not stored");
+    user.twoFactorEnabled = true;
+    const res = await app.request(path);
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("session_token=");
+    expect(db.session).toHaveLength(0);
   });
 
   test("public sign-up is disabled and tokens need a session", async () => {
