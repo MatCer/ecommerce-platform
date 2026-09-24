@@ -5,6 +5,7 @@
 //! tenant transaction (spec A8).
 
 pub mod audit;
+pub mod catalog;
 pub mod id;
 pub mod idempotency;
 pub mod markets;

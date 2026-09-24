@@ -13,6 +13,7 @@ commerce = { path = "crates/commerce" }
 platform = { path = "crates/platform" }
 testkit = { path = "crates/testkit" }
 
+ammonia = "4.2.0"
 anyhow = "1.0.104"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
@@ -22,6 +23,9 @@ rand = "0.10.3"
 sha2 = "0.11.0"
 axum = "0.8.9"
 http-body-util = "0.1.5"
+# Image pipeline (commerce::media): pure-Rust decoders, JPEG/PNG encoders, AVIF via ravif/rav1e.
+image = { version = "0.25.10", default-features = false, features = ["avif", "gif", "jpeg", "png", "webp"] }
+infer = "0.22.0"
 object_store = { version = "0.14.2", default-features = false, features = ["aws"] }
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
@@ -37,6 +41,8 @@ utoipa = { version = "6.0.0", features = ["chrono", "uuid"] }
 utoipa-axum = "0.3.0"
 utoipa-swagger-ui = { version = "10.0.1", default-features = false, features = ["axum", "vendored"] }
 uuid = { version = "1.26.1", features = ["v7", "serde"] }
+# Lossy WebP (libwebp); `image` only encodes lossless WebP.
+webp = { version = "0.3.1", default-features = false }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
