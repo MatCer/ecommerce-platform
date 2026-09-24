@@ -1,0 +1,526 @@
+diff -ruN themes/default/src/components/Listing.astro /tmp/wp2-scratch/theme/src/components/Listing.astro
+--- themes/default/src/components/Listing.astro	2026-09-25 01:13:26.358075697 +0200
++++ /tmp/wp2-scratch/theme/src/components/Listing.astro	2026-09-25 01:40:47.283981384 +0200
+@@ -7,8 +7,9 @@
+ interface Props {
+   page: CategoryPage;
+   action: string;
++  locale: string;
+ }
+-const { page, action } = Astro.props;
++const { page, action, locale } = Astro.props;
+ ---
+ 
+ <Breadcrumbs items={page.breadcrumbs} base={page.seo.canonical} />
+@@ -26,7 +27,7 @@
+     <ul class="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] md:gap-4">
+       {page.products.map((p, i) => (
+         <li class="flex">
+-          <ProductCard product={p} eager={i < 2} priority={i === 0} />
++          <ProductCard product={p} eager={i < 2} priority={i === 0} locale={locale} />
+         </li>
+       ))}
+     </ul>
+diff -ruN themes/default/src/components/ProductCard.astro /tmp/wp2-scratch/theme/src/components/ProductCard.astro
+--- themes/default/src/components/ProductCard.astro	2026-09-25 01:13:26.356104331 +0200
++++ /tmp/wp2-scratch/theme/src/components/ProductCard.astro	2026-09-25 01:40:47.283885534 +0200
+@@ -1,21 +1,24 @@
+ ---
+ import { imageAttrs } from "@platform/storefront-sdk/format";
+ import type { ProductCard } from "@platform/storefront-sdk/types";
++import { t } from "../lib/i18n";
+ 
+ interface Props {
+   product: ProductCard;
+   /** Above-the-fold cards load eagerly; only the first one gets fetchpriority=high. */
+   eager?: boolean;
+   priority?: boolean;
++  locale: string;
+ }
+-const { product: p, eager = false, priority = false } = Astro.props;
++const { product: p, eager = false, priority = false, locale } = Astro.props;
++const m = t(locale);
+ // sizes must match the real slot: a 50vw guess at DPR 1.75 rounds up to the next (4× heavier) variant.
+ const SIZES = "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)";
+ const img = imageAttrs(p.image, { sizes: SIZES, priority, width: 360 });
+ const stock = {
+-  in_stock: ["Skladem", "text-stock-in"],
+-  low_stock: ["Poslední kusy", "text-stock-low"],
+-  out_of_stock: ["Vyprodáno", "text-subtle"],
++  in_stock: [m.inStock, "text-stock-in"],
++  low_stock: [m.lowStock, "text-stock-low"],
++  out_of_stock: [m.soldOut, "text-subtle"],
+ }[p.stock];
+ ---
+ 
+@@ -36,7 +39,7 @@
+     </h3>
+     <p class="mt-auto flex flex-wrap items-baseline gap-x-2">
+       <span class={`price text-lg ${p.reference_price ? "text-sale" : ""}`}>{p.price.formatted}</span>
+-      {p.reference_price && <s class="price text-xs font-semibold text-subtle"><span class="sr-only">Původní cena </span>{p.reference_price.formatted}</s>}
++      {p.reference_price && <s class="price text-xs font-semibold text-subtle"><span class="sr-only">{m.originalPrice} </span>{p.reference_price.formatted}</s>}
+     </p>
+     <p class={`flex items-center gap-1.5 text-xs font-semibold ${stock?.[1]}`}>
+       <span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>{stock?.[0]}
+diff -ruN themes/default/src/islands/BuyBox.tsx /tmp/wp2-scratch/theme/src/islands/BuyBox.tsx
+--- themes/default/src/islands/BuyBox.tsx	2026-09-25 01:34:12.098538899 +0200
++++ /tmp/wp2-scratch/theme/src/islands/BuyBox.tsx	2026-09-25 01:40:35.154879322 +0200
+@@ -1,20 +1,24 @@
+ import type { ProductPage, Variant } from "@platform/storefront-sdk/types";
+ import { createMemo, createSignal, For, Show } from "solid-js";
+ import { addToCart, setOpen } from "../lib/cart-store";
++import { t } from "../lib/i18n";
+ 
+ type Props = {
+   options: ProductPage["product"]["options"];
+   variants: Variant[];
++  locale: string;
+ };
+ 
+-const STOCK = {
+-  in_stock: { label: "Skladem", cls: "text-stock-in" },
+-  low_stock: { label: "Poslední kusy", cls: "text-stock-low" },
+-  out_of_stock: { label: "Vyprodáno", cls: "text-subtle" },
+-} as const;
++
+ 
+ /** Variant picker + price + add to cart (spec §9.1 islands; sticky on mobile, §9.2). */
+ export default function BuyBox(props: Props) {
++  const m = t(props.locale);
++  const STOCK = {
++    in_stock: { label: m.inStock, cls: "text-stock-in" },
++    low_stock: { label: m.lowStock, cls: "text-stock-low" },
++    out_of_stock: { label: m.soldOut, cls: "text-subtle" },
++  } as const;
+   const first = props.variants.find((v) => v.stock !== "out_of_stock") ?? props.variants[0];
+   const [selected, setSelected] = createSignal<Record<string, string>>({
+     ...(first?.options ?? {}),
+@@ -58,7 +62,7 @@
+           <Show when={variant()?.reference_price}>
+             {(ref) => (
+               <span class="text-sm text-muted-foreground">
+-                <span class="sr-only">Původní cena </span>
++                <span class="sr-only">{m.originalPrice} </span>
+                 <s class="price text-base font-semibold text-subtle">{ref().formatted}</s>
+                 <span class="ml-2 rounded-sm bg-sale-wash px-1.5 py-0.5 text-xs font-bold text-sale">
+                   −{variant()?.discount_percent} %
+@@ -70,11 +74,11 @@
+         <Show when={variant()?.reference_price}>
+           {(ref) => (
+             <p class="mt-1 text-xs text-muted-foreground">
+-              Nejnižší cena za 30 dní před slevou: {ref().formatted}
++              {m.lowest30} {ref().formatted}
+             </p>
+           )}
+         </Show>
+-        <p class="mt-1 text-xs text-muted-foreground">Cena včetně DPH</p>
++        <p class="mt-1 text-xs text-muted-foreground">{m.vatIncluded}</p>
+       </div>
+ 
+       <For each={props.options}>
+@@ -103,7 +107,7 @@
+                     />
+                     {value}
+                     <Show when={!available(opt.name, value)}>
+-                      <span class="sr-only"> (nedostupné)</span>
++                      <span class="sr-only"> {m.unavailable}</span>
+                     </Show>
+                   </label>
+                 )}
+@@ -130,16 +134,16 @@
+           aria-live="polite"
+         >
+           {state() === "added"
+-            ? "✓ Přidáno do košíku"
++            ? m.added
+             : state() === "busy"
+-              ? "Přidávám…"
++              ? m.adding
+               : variant()?.stock === "out_of_stock"
+-                ? "Vyprodáno"
+-                : "Přidat do košíku"}
++                ? m.soldOut
++                : m.addToCart}
+         </button>
+         <Show when={state() === "error"}>
+           <p role="alert" class="mt-2 text-sm text-sale">
+-            Nepodařilo se přidat do košíku. Zkuste to prosím znovu.
++            {m.addFailed}
+           </p>
+         </Show>
+       </div>
+diff -ruN themes/default/src/islands/ConsentBanner.tsx /tmp/wp2-scratch/theme/src/islands/ConsentBanner.tsx
+--- themes/default/src/islands/ConsentBanner.tsx	2026-09-25 01:34:12.096538922 +0200
++++ /tmp/wp2-scratch/theme/src/islands/ConsentBanner.tsx	2026-09-25 01:40:35.155175730 +0200
+@@ -1,6 +1,7 @@
+ import { readConsent, writeConsent } from "@platform/storefront-sdk/client";
+ import type { ConsentPurpose } from "@platform/storefront-sdk/types";
+ import { createSignal, For, onMount, Show } from "solid-js";
++import { t } from "../lib/i18n";
+ 
+ const LABELS: Record<ConsentPurpose, string> = {
+   analytics: "Měření návštěvnosti",
+@@ -14,7 +15,8 @@
+  * Consent banner (A20). Rendered hidden on the server so cached HTML is identical for everyone;
+  * shown after hydration only when no choice is stored. Fixed position: no layout shift.
+  */
+-export default function ConsentBanner(props: { purposes: ConsentPurpose[]; policyUrl: string }) {
++export default function ConsentBanner(props: { purposes: ConsentPurpose[]; policyUrl: string; locale: string }) {
++  const m = t(props.locale);
+   const [show, setShow] = createSignal(false);
+   const [custom, setCustom] = createSignal(false);
+   const [chosen, setChosen] = createSignal<ConsentPurpose[]>([]);
+@@ -31,9 +33,9 @@
+         class="fixed inset-x-2 bottom-2 z-30 mx-auto max-w-2xl rounded-xl border border-border bg-card p-4 text-sm shadow-xl md:bottom-4"
+       >
+         <p class="mb-3">
+-          Cookies pro měření a reklamu použijeme jen s vaším souhlasem.{" "}
++          {m.cookieText}{" "}
+           <a href={props.policyUrl} class="text-identity-ink underline">
+-            Více informací
++            {m.moreInfo}
+           </a>
+         </p>
+         <Show when={custom()}>
+@@ -64,21 +66,21 @@
+             class="h-10 rounded-md bg-identity px-4 font-semibold text-card"
+             onClick={() => save(props.purposes)}
+           >
+-            Přijmout vše
++            {m.acceptAll}
+           </button>
+           <button
+             type="button"
+             class="h-10 rounded-md border border-border px-4 font-semibold"
+             onClick={() => save([])}
+           >
+-            Odmítnout
++            {m.reject}
+           </button>
+           <button
+             type="button"
+             class="h-10 rounded-md px-4 underline"
+             onClick={() => (custom() ? save(chosen()) : setCustom(true))}
+           >
+-            {custom() ? "Uložit výběr" : "Nastavení"}
++            {custom() ? m.saveChoice : m.settings}
+           </button>
+         </div>
+       </section>
+diff -ruN themes/default/src/islands/MiniCart.tsx /tmp/wp2-scratch/theme/src/islands/MiniCart.tsx
+--- themes/default/src/islands/MiniCart.tsx	2026-09-25 01:34:47.951140707 +0200
++++ /tmp/wp2-scratch/theme/src/islands/MiniCart.tsx	2026-09-25 01:40:35.155019021 +0200
+@@ -1,9 +1,11 @@
+ import { imageUrl } from "@platform/storefront-sdk/format";
+ import { createEffect, For, onMount, Show } from "solid-js";
+ import { cart, loadCart, open, setOpen, updateLine } from "../lib/cart-store";
++import { t } from "../lib/i18n";
+ 
+ /** Header cart button + drawer with free-shipping progress and the checkout handoff form (A1). */
+-export default function MiniCart() {
++export default function MiniCart(props: { locale: string }) {
++  const m = t(props.locale);
+   let dialog: HTMLDialogElement | undefined;
+   onMount(() => void loadCart());
+   createEffect(() => {
+@@ -33,10 +35,10 @@
+           <circle cx="10" cy="20" r="1.3" />
+           <circle cx="17" cy="20" r="1.3" />
+         </svg>
+-        <span class="sr-only md:not-sr-only">Košík</span>
++        <span class="sr-only md:not-sr-only">{m.cart}</span>
+         <span class="grid min-w-5 place-items-center rounded-full bg-identity px-1 text-xs text-card tabular-nums">
+           {count()}
+-          <span class="sr-only"> položek</span>
++          <span class="sr-only"> {m.items}</span>
+         </span>
+       </button>
+ 
+@@ -44,34 +46,34 @@
+         ref={dialog}
+         onClose={() => setOpen(false)}
+         class="ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground backdrop:bg-foreground/40"
+-        aria-label="Košík"
++        aria-label={m.cart}
+       >
+         <div class="flex h-full flex-col">
+           <header class="flex items-center justify-between border-b border-border p-4">
+-            <h2 class="font-display text-lg font-bold">Košík</h2>
++            <h2 class="font-display text-lg font-bold">{m.cart}</h2>
+             <button
+               type="button"
+               class="rounded-md px-2 py-1 text-sm underline"
+               onClick={() => setOpen(false)}
+             >
+-              Zavřít
++              {m.close}
+             </button>
+           </header>
+           <Show
+             when={cart()?.lines.length}
+-            fallback={<p class="p-4 text-muted-foreground">Košík je prázdný.</p>}
++            fallback={<p class="p-4 text-muted-foreground">{m.cartEmpty}</p>}
+           >
+             <Show
+               when={cart()?.free_shipping_remaining}
+               fallback={
+                 <p class="bg-identity-wash p-4 text-sm font-semibold text-identity-ink">
+-                  Doprava zdarma ✓
++                  {m.freeShipping}
+                 </p>
+               }
+             >
+               {(rest) => (
+                 <p class="bg-identity-wash p-4 text-sm text-identity-ink">
+-                  Do dopravy zdarma zbývá {rest().formatted}
++                  {m.freeShippingLeft} {rest().formatted}
+                 </p>
+               )}
+             </Show>
+@@ -94,7 +96,7 @@
+                         <button
+                           type="button"
+                           class="size-7 rounded-sm border border-border"
+-                          aria-label="Ubrat"
++                          aria-label={m.less}
+                           onClick={() => updateLine(line.id, line.quantity - 1)}
+                         >
+                           −
+@@ -103,7 +105,7 @@
+                         <button
+                           type="button"
+                           class="size-7 rounded-sm border border-border"
+-                          aria-label="Přidat"
++                          aria-label={m.more}
+                           onClick={() => updateLine(line.id, line.quantity + 1)}
+                         >
+                           +
+@@ -117,7 +119,7 @@
+             </ul>
+             <footer class="border-t border-border p-4">
+               <p class="mb-3 flex justify-between text-sm">
+-                <span>Mezisoučet</span>
++                <span>{m.subtotal}</span>
+                 <span class="price text-lg">{cart()?.subtotal?.formatted}</span>
+               </p>
+               {/* Edge-owned handoff: mints a one-time token and redirects to checkout.<host>. */}
+@@ -126,7 +128,7 @@
+                   type="submit"
+                   class="h-12 w-full rounded-md bg-buy font-display font-bold text-foreground hover:bg-buy-hover"
+                 >
+-                  Pokračovat k pokladně
++                  {m.toCheckout}
+                 </button>
+               </form>
+             </footer>
+diff -ruN themes/default/src/islands/SearchBox.tsx /tmp/wp2-scratch/theme/src/islands/SearchBox.tsx
+--- themes/default/src/islands/SearchBox.tsx	2026-09-25 01:35:18.891418394 +0200
++++ /tmp/wp2-scratch/theme/src/islands/SearchBox.tsx	2026-09-25 01:40:35.155102411 +0200
+@@ -2,12 +2,14 @@
+ import { imageUrl } from "@platform/storefront-sdk/format";
+ import type { SearchSuggest } from "@platform/storefront-sdk/types";
+ import { createSignal, For, onCleanup, Show } from "solid-js";
++import { t } from "../lib/i18n";
+ 
+ /**
+  * Search typeahead (ARIA combobox). Without JS it is a plain GET form to /search, so the
+  * server-rendered markup is fully functional before hydration.
+  */
+-export default function SearchBox(props: { q?: string }) {
++export default function SearchBox(props: { q?: string; locale: string }) {
++  const m = t(props.locale);
+   const [q, setQ] = createSignal(props.q ?? "");
+   const [result, setResult] = createSignal<SearchSuggest | null>(null);
+   const [active, setActive] = createSignal(-1);
+@@ -59,7 +61,7 @@
+           name="q"
+           type="search"
+           autocomplete="off"
+-          placeholder="Hledat trička, mikiny…"
++          placeholder={m.searchPlaceholder}
+           value={q()}
+           onInput={(e) => onInput(e.currentTarget.value)}
+           onKeyDown={onKeyDown}
+diff -ruN themes/default/src/layouts/Base.astro /tmp/wp2-scratch/theme/src/layouts/Base.astro
+--- themes/default/src/layouts/Base.astro	2026-09-25 01:13:56.894372923 +0200
++++ /tmp/wp2-scratch/theme/src/layouts/Base.astro	2026-09-25 01:40:35.155557058 +0200
+@@ -9,6 +9,7 @@
+ import Newsletter from "../islands/Newsletter";
+ import Rum from "../islands/Rum";
+ import SearchBox from "../islands/SearchBox";
++import { t } from "../lib/i18n";
+ import { jsonLd } from "../lib/storefront";
+ 
+ interface Props {
+@@ -19,6 +20,7 @@
+   q?: string;
+ }
+ const { shop, seo, lcp, q } = Astro.props;
++const m = t(shop.locale);
+ ---
+ 
+ <!doctype html>
+@@ -45,15 +47,15 @@
+   </head>
+   <body class="min-h-dvh">
+     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:p-3">
+-      Přeskočit na obsah
++      {m.skip}
+     </a>
+     <header class="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur">
+       <div class="container-shop flex h-16 items-center gap-3 md:gap-6">
+         <a href="/" class="font-display text-lg font-extrabold tracking-tight whitespace-nowrap">{shop.name}</a>
+-        <div class="flex-1"><SearchBox client:idle q={q} /></div>
+-        <MiniCart client:idle />
++        <div class="flex-1"><SearchBox client:idle q={q} locale={shop.locale} /></div>
++        <MiniCart client:idle locale={shop.locale} />
+       </div>
+-      <nav aria-label="Kategorie" class="container-shop -mt-1 flex gap-5 overflow-x-auto pb-2 text-sm font-semibold">
++      <nav aria-label={m.categories} class="container-shop -mt-1 flex gap-5 overflow-x-auto pb-2 text-sm font-semibold">
+         {shop.menus.main.map((m) => <a href={m.href} class="py-1 whitespace-nowrap hover:text-identity-ink">{m.label}</a>)}
+       </nav>
+     </header>
+@@ -65,10 +67,10 @@
+     <footer class="mt-12 bg-panel text-card">
+       <div class="container-shop grid gap-8 py-10 md:grid-cols-3">
+         <section aria-labelledby="nl">
+-          <h2 id="nl" class="mb-3 font-display text-lg font-bold">Novinky e-mailem</h2>
++          <h2 id="nl" class="mb-3 font-display text-lg font-bold">{m.newsletter}</h2>
+           <Newsletter client:visible />
+         </section>
+-        <nav aria-label="Zákaznický servis">
++        <nav aria-label={m.customerService}>
+           <ul class="grid gap-2 text-sm">
+             {shop.menus.footer.map((m) => <li><a href={m.href} class="underline-offset-4 hover:underline">{m.label}</a></li>)}
+           </ul>
+@@ -83,7 +85,7 @@
+         </div>
+       </div>
+     </footer>
+-    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} />
++    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} locale={shop.locale} />
+     <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} />
+   </body>
+ </html>
+diff -ruN themes/default/src/lib/i18n.ts /tmp/wp2-scratch/theme/src/lib/i18n.ts
+--- themes/default/src/lib/i18n.ts	1970-01-01 01:00:00.000000000 +0100
++++ /tmp/wp2-scratch/theme/src/lib/i18n.ts	2026-09-25 01:40:17.829231111 +0200
+@@ -0,0 +1,75 @@
++/** Theme UI strings per market locale (shop.locale). Content itself comes translated from the API. */
++const cs = {
++  skip: "Přeskočit na obsah",
++  categories: "Kategorie",
++  cart: "Košík",
++  items: "položek",
++  close: "Zavřít",
++  cartEmpty: "Košík je prázdný.",
++  freeShipping: "Doprava zdarma ✓",
++  freeShippingLeft: "Do dopravy zdarma zbývá",
++  subtotal: "Mezisoučet",
++  toCheckout: "Pokračovat k pokladně",
++  less: "Ubrat",
++  more: "Přidat",
++  inStock: "Skladem",
++  lowStock: "Poslední kusy",
++  soldOut: "Vyprodáno",
++  originalPrice: "Původní cena",
++  lowest30: "Nejnižší cena za 30 dní před slevou:",
++  vatIncluded: "Cena včetně DPH",
++  addToCart: "Přidat do košíku",
++  adding: "Přidávám…",
++  added: "✓ Přidáno do košíku",
++  addFailed: "Nepodařilo se přidat do košíku. Zkuste to prosím znovu.",
++  unavailable: "(nedostupné)",
++  search: "Hledat",
++  searchPlaceholder: "Hledat trička, mikiny…",
++  cookieText: "Cookies pro měření a reklamu použijeme jen s vaším souhlasem.",
++  moreInfo: "Více informací",
++  acceptAll: "Přijmout vše",
++  reject: "Odmítnout",
++  settings: "Nastavení",
++  saveChoice: "Uložit výběr",
++  newsletter: "Novinky e-mailem",
++  customerService: "Zákaznický servis",
++};
++
++const sk: typeof cs = {
++  skip: "Preskočiť na obsah",
++  categories: "Kategórie",
++  cart: "Košík",
++  items: "položiek",
++  close: "Zavrieť",
++  cartEmpty: "Košík je prázdny.",
++  freeShipping: "Doprava zadarmo ✓",
++  freeShippingLeft: "Do dopravy zadarmo zostáva",
++  subtotal: "Medzisúčet",
++  toCheckout: "Pokračovať k pokladni",
++  less: "Ubrať",
++  more: "Pridať",
++  inStock: "Skladom",
++  lowStock: "Posledné kusy",
++  soldOut: "Vypredané",
++  originalPrice: "Pôvodná cena",
++  lowest30: "Najnižšia cena za 30 dní pred zľavou:",
++  vatIncluded: "Cena vrátane DPH",
++  addToCart: "Pridať do košíka",
++  adding: "Pridávam…",
++  added: "✓ Pridané do košíka",
++  addFailed: "Nepodarilo sa pridať do košíka. Skúste to prosím znova.",
++  unavailable: "(nedostupné)",
++  search: "Hľadať",
++  searchPlaceholder: "Hľadať tričká, mikiny…",
++  cookieText: "Cookies na meranie a reklamu použijeme len s vaším súhlasom.",
++  moreInfo: "Viac informácií",
++  acceptAll: "Prijať všetko",
++  reject: "Odmietnuť",
++  settings: "Nastavenia",
++  saveChoice: "Uložiť výber",
++  newsletter: "Novinky e-mailom",
++  customerService: "Zákaznícky servis",
++};
++
++export type Messages = typeof cs;
++export const t = (locale: string | undefined): Messages => (locale?.startsWith("sk") ? sk : cs);
+diff -ruN themes/default/src/pages/c/[...slug].astro /tmp/wp2-scratch/theme/src/pages/c/[...slug].astro
+--- themes/default/src/pages/c/[...slug].astro	2026-09-25 01:13:26.359390052 +0200
++++ /tmp/wp2-scratch/theme/src/pages/c/[...slug].astro	2026-09-25 01:40:47.284054253 +0200
+@@ -13,5 +13,5 @@
+ ---
+ 
+ <Base shop={shop} seo={page.seo} lcp={first && { image: first.image, sizes: "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)" }}>
+-  <Listing page={page} action={Astro.url.pathname} />
++  <Listing page={page} action={Astro.url.pathname} locale={shop.locale} />
+ </Base>
+diff -ruN themes/default/src/pages/index.astro /tmp/wp2-scratch/theme/src/pages/index.astro
+--- themes/default/src/pages/index.astro	2026-09-25 01:18:07.627930552 +0200
++++ /tmp/wp2-scratch/theme/src/pages/index.astro	2026-09-25 01:40:47.284155443 +0200
+@@ -24,6 +24,6 @@
+   </section>
+   <h2 class="mb-4 font-display text-xl font-bold">Doporučujeme</h2>
+   <ul class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+-    {home.featured.map((p, i) => <li class="flex"><ProductCard product={p} eager={i < 2} priority={i === 0} /></li>)}
++    {home.featured.map((p, i) => <li class="flex"><ProductCard product={p} eager={i < 2} priority={i === 0} locale={shop.locale} /></li>)}
+   </ul>
+ </Base>
+diff -ruN themes/default/src/pages/p/[slug].astro /tmp/wp2-scratch/theme/src/pages/p/[slug].astro
+--- themes/default/src/pages/p/[slug].astro	2026-09-25 01:34:12.093538957 +0200
++++ /tmp/wp2-scratch/theme/src/pages/p/[slug].astro	2026-09-25 01:40:35.155641617 +0200
+@@ -23,7 +23,7 @@
+         {p.brand && <p class="text-sm text-muted-foreground">{p.brand}</p>}
+         <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{p.name}</h1>
+       </div>
+-      <BuyBox client:idle options={p.options} variants={p.variants} />
++      <BuyBox client:idle options={p.options} variants={p.variants} locale={shop.locale} />
+       <ul class="grid gap-2 border-y border-border py-4 text-sm text-muted-foreground">
+         <li>🚚 Doručení {fmt(page.delivery_estimate.from)}–{fmt(page.delivery_estimate.to)}, zdarma od {shop.free_shipping_threshold?.formatted}</li>
+         <li>↩︎ {shop.trust.returns}</li>
+diff -ruN themes/default/src/pages/search.astro /tmp/wp2-scratch/theme/src/pages/search.astro
+--- themes/default/src/pages/search.astro	2026-09-25 01:03:43.495618514 +0200
++++ /tmp/wp2-scratch/theme/src/pages/search.astro	2026-09-25 01:40:47.284104033 +0200
+@@ -11,5 +11,5 @@
+ ---
+ 
+ <Base shop={shop} seo={{ ...page.seo, robots: "noindex,follow" }} q={Astro.url.searchParams.get("q") ?? ""}>
+-  <Listing page={page} action="/search" />
++  <Listing page={page} action="/search" locale={shop.locale} />
+ </Base>

@@ -1,0 +1,97 @@
+diff -ruN themes/default/src/islands/SizeGuide.tsx /tmp/wp2-scratch/theme/src/islands/SizeGuide.tsx
+--- themes/default/src/islands/SizeGuide.tsx	1970-01-01 01:00:00.000000000 +0100
++++ /tmp/wp2-scratch/theme/src/islands/SizeGuide.tsx	2026-09-25 01:37:42.546065622 +0200
+@@ -0,0 +1,74 @@
++import { createSignal, For } from "solid-js";
++
++const ROWS = [
++  ["XS", "86–90", "70–74", "68"],
++  ["S", "90–96", "74–80", "70"],
++  ["M", "96–102", "80–86", "72"],
++  ["L", "102–108", "86–92", "74"],
++  ["XL", "108–116", "92–100", "76"],
++];
++
++/** Size guide in a side drawer (native <dialog>: focus trap + Esc for free). */
++export default function SizeGuide() {
++  let dialog: HTMLDialogElement | undefined;
++  const [open, setOpen] = createSignal(false);
++  return (
++    <>
++      <button
++        type="button"
++        class="text-sm font-semibold text-identity-ink underline underline-offset-4"
++        aria-haspopup="dialog"
++        aria-expanded={open()}
++        onClick={() => {
++          dialog?.showModal();
++          setOpen(true);
++        }}
++      >
++        Tabulka velikostí
++      </button>
++      <dialog
++        ref={dialog}
++        onClose={() => setOpen(false)}
++        aria-labelledby="size-guide-title"
++        class="ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground backdrop:bg-foreground/40"
++      >
++        <div class="flex items-center justify-between border-b border-border p-4">
++          <h2 id="size-guide-title" class="font-display text-lg font-bold">
++            Tabulka velikostí
++          </h2>
++          <button type="button" class="rounded-md px-2 py-1 text-sm underline" onClick={() => dialog?.close()}>
++            Zavřít
++          </button>
++        </div>
++        <div class="p-4">
++          <table class="w-full text-left text-sm tabular-nums">
++            <caption class="mb-2 text-left text-muted-foreground">Rozměry těla v centimetrech</caption>
++            <thead>
++              <tr class="border-b border-border">
++                <th scope="col" class="py-2">Velikost</th>
++                <th scope="col">Hrudník</th>
++                <th scope="col">Pas</th>
++                <th scope="col">Délka</th>
++              </tr>
++            </thead>
++            <tbody>
++              <For each={ROWS}>
++                {(r) => (
++                  <tr class="border-b border-border">
++                    <th scope="row" class="py-2 font-semibold">
++                      {r[0]}
++                    </th>
++                    <td>{r[1]}</td>
++                    <td>{r[2]}</td>
++                    <td>{r[3]}</td>
++                  </tr>
++                )}
++              </For>
++            </tbody>
++          </table>
++          <p class="mt-4 text-sm text-muted-foreground">Mezi dvěma velikostmi? Vyberte větší, bavlna se po vyprání mírně srazí.</p>
++        </div>
++      </dialog>
++    </>
++  );
++}
+diff -ruN themes/default/src/pages/p/[slug].astro /tmp/wp2-scratch/theme/src/pages/p/[slug].astro
+--- themes/default/src/pages/p/[slug].astro	2026-09-25 01:34:12.093538957 +0200
++++ /tmp/wp2-scratch/theme/src/pages/p/[slug].astro	2026-09-25 01:37:46.678780920 +0200
+@@ -2,6 +2,7 @@
+ import Breadcrumbs from "../../components/Breadcrumbs.astro";
+ import BuyBox from "../../islands/BuyBox";
+ import Gallery from "../../islands/Gallery";
++import SizeGuide from "../../islands/SizeGuide";
+ import Base from "../../layouts/Base.astro";
+ import { storefront } from "../../lib/storefront";
+ 
+@@ -24,6 +25,7 @@
+         <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{p.name}</h1>
+       </div>
+       <BuyBox client:idle options={p.options} variants={p.variants} />
++      {p.options.some((o) => o.name === "Velikost") && <SizeGuide client:visible />}
+       <ul class="grid gap-2 border-y border-border py-4 text-sm text-muted-foreground">
+         <li>🚚 Doručení {fmt(page.delivery_estimate.from)}–{fmt(page.delivery_estimate.to)}, zdarma od {shop.free_shipping_threshold?.formatted}</li>
+         <li>↩︎ {shop.trust.returns}</li>

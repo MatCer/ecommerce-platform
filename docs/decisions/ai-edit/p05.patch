@@ -1,0 +1,41 @@
+diff -ruN themes/default/src/layouts/Base.astro /tmp/wp2-scratch/theme/src/layouts/Base.astro
+--- themes/default/src/layouts/Base.astro	2026-09-25 01:13:56.894372923 +0200
++++ /tmp/wp2-scratch/theme/src/layouts/Base.astro	2026-09-25 01:41:52.527607608 +0200
+@@ -47,6 +47,13 @@
+     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:p-3">
+       Přeskočit na obsah
+     </a>
++    {
++      shop.free_shipping_threshold && (
++        <p class="bg-panel py-2 text-center text-sm font-semibold text-card">
++          Doprava zdarma při nákupu nad {shop.free_shipping_threshold.formatted}
++        </p>
++      )
++    }
+     <header class="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur">
+       <div class="container-shop flex h-16 items-center gap-3 md:gap-6">
+         <a href="/" class="font-display text-lg font-extrabold tracking-tight whitespace-nowrap">{shop.name}</a>
+diff -ruN themes/default/src/pages/index.astro /tmp/wp2-scratch/theme/src/pages/index.astro
+--- themes/default/src/pages/index.astro	2026-09-25 01:18:07.627930552 +0200
++++ /tmp/wp2-scratch/theme/src/pages/index.astro	2026-09-25 01:41:52.527708268 +0200
+@@ -12,6 +12,20 @@
+ 
+ <Base shop={shop} seo={home.seo} lcp={home.featured[0] && { image: home.featured[0].image, sizes: CARD_SIZES }}>
+   <h1 class="sr-only">{shop.name}</h1>
++  <ul class="mb-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3" aria-label="Proč nakoupit u nás">
++    {
++      [
++        ["🚚", shop.trust.delivery],
++        ["↩︎", shop.trust.returns],
++        ["💳", shop.trust.payments.join(" · ")],
++      ].map(([icon, text]) => (
++        <li class="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
++          <span aria-hidden="true">{icon}</span>
++          {text}
++        </li>
++      ))
++    }
++  </ul>
+   <section aria-label="Kategorie" class="mb-8 grid grid-cols-3 gap-3">
+     {
+       home.categories.map((c) => (

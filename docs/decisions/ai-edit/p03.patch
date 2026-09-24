@@ -1,0 +1,75 @@
+diff -ruN themes/default/src/islands/DispatchCountdown.tsx /tmp/wp2-scratch/theme/src/islands/DispatchCountdown.tsx
+--- themes/default/src/islands/DispatchCountdown.tsx	1970-01-01 01:00:00.000000000 +0100
++++ /tmp/wp2-scratch/theme/src/islands/DispatchCountdown.tsx	2026-09-25 01:38:53.143232421 +0200
+@@ -0,0 +1,52 @@
++import { createSignal, onCleanup, onMount, Show } from "solid-js";
++
++const CUTOFF_HOUR = 14; // merchant's daily dispatch cutoff, Europe/Prague
++
++/** Prague wall-clock parts for `now`. */
++function prague(now: Date) {
++  const parts = Object.fromEntries(
++    new Intl.DateTimeFormat("en-GB", {
++      timeZone: "Europe/Prague",
++      weekday: "short",
++      hour: "2-digit",
++      minute: "2-digit",
++      hourCycle: "h23",
++    })
++      .formatToParts(now)
++      .map((p) => [p.type, p.value]),
++  );
++  return { weekday: parts.weekday ?? "", minutes: Number(parts.hour) * 60 + Number(parts.minute) };
++}
++
++/**
++ * "Order within 2 h 15 min and we ship today." Computed in the browser because the HTML is
++ * edge-cached; renders nothing on the server (no stale countdown in cached pages).
++ */
++export default function DispatchCountdown() {
++  const [text, setText] = createSignal<string | null>(null);
++  const tick = () => {
++    const { weekday, minutes } = prague(new Date());
++    const left = CUTOFF_HOUR * 60 - minutes;
++    const workday = !["Sat", "Sun"].includes(weekday);
++    if (workday && left > 0) {
++      const h = Math.floor(left / 60);
++      const m = left % 60;
++      setText(`Objednejte do ${h > 0 ? `${h} h ` : ""}${m} min a odešleme ještě dnes.`);
++    } else {
++      setText(weekday === "Fri" || weekday === "Sat" ? "Odešleme v pondělí." : "Odešleme zítra.");
++    }
++  };
++  let timer: ReturnType<typeof setInterval> | undefined;
++  onMount(() => {
++    tick();
++    timer = setInterval(tick, 30_000);
++  });
++  onCleanup(() => clearInterval(timer));
++  return (
++    <Show when={text()}>
++      <p class="text-sm font-semibold text-stock-in" aria-live="polite">
++        {text()}
++      </p>
++    </Show>
++  );
++}
+diff -ruN themes/default/src/pages/p/[slug].astro /tmp/wp2-scratch/theme/src/pages/p/[slug].astro
+--- themes/default/src/pages/p/[slug].astro	2026-09-25 01:34:12.093538957 +0200
++++ /tmp/wp2-scratch/theme/src/pages/p/[slug].astro	2026-09-25 01:39:01.149321205 +0200
+@@ -1,6 +1,7 @@
+ ---
+ import Breadcrumbs from "../../components/Breadcrumbs.astro";
+ import BuyBox from "../../islands/BuyBox";
++import DispatchCountdown from "../../islands/DispatchCountdown";
+ import Gallery from "../../islands/Gallery";
+ import Base from "../../layouts/Base.astro";
+ import { storefront } from "../../lib/storefront";
+@@ -24,6 +25,7 @@
+         <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{p.name}</h1>
+       </div>
+       <BuyBox client:idle options={p.options} variants={p.variants} />
++      <DispatchCountdown client:idle />
+       <ul class="grid gap-2 border-y border-border py-4 text-sm text-muted-foreground">
+         <li>🚚 Doručení {fmt(page.delivery_estimate.from)}–{fmt(page.delivery_estimate.to)}, zdarma od {shop.free_shipping_threshold?.formatted}</li>
+         <li>↩︎ {shop.trust.returns}</li>
