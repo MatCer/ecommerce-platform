@@ -4,14 +4,19 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./format": "./src/format.ts",
+    "./types": "./src/types.ts"
   },
   "scripts": {
     "openapi:generate": "openapi-typescript ../../openapi.json --output src/schema.d.ts",
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "openapi-fetch": "catalog:"
+    "openapi-fetch": "catalog:",
+    "web-vitals": "catalog:"
   },
   "devDependencies": {
     "@platform/config": "workspace:*"
