@@ -29,6 +29,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
       APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:-app-owner-local}
       APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-app-runtime-local}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth-service-local}
     ports: ["${HOST_BIND:-127.0.0.1}:${PG_PORT:-55432}:5432"]
     volumes:
       - pg-data:/var/lib/postgresql/data

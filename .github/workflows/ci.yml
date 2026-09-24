@@ -45,6 +45,7 @@ jobs:
           POSTGRES_USER: postgres
           APP_OWNER_PASSWORD: app-owner-ci
           APP_RUNTIME_PASSWORD: app-runtime-ci
+          AUTH_DB_PASSWORD: auth-service-ci
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked

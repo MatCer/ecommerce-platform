@@ -18,7 +18,7 @@ TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_P
 COMPOSE_FULL := COMPOSE_PROFILES=full docker compose
 COMPOSE_INFRA := COMPOSE_PROFILES=infra docker compose
 
-.PHONY: help up down dev-infra migrate test test-rust test-ts lint fmt openapi openapi-check logs ps
+.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts lint fmt openapi openapi-check logs ps
 
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -34,6 +34,9 @@ dev-infra: .env ## Start dependencies only; run api/worker natively against them
 
 migrate: ## Apply migrations as app_owner (needs sqlx-cli)
 	sqlx migrate run --source migrations --database-url "$(OWNER_DATABASE_URL)"
+
+sqlx-prepare: ## Refresh .sqlx/ (offline query data) after SQL changes; needs `make migrate` first
+	SQLX_OFFLINE=false DATABASE_URL="$(OWNER_DATABASE_URL)" cargo sqlx prepare --workspace -- --all-targets
 
 test: test-rust test-ts ## Rust + TS tests (Rust integration tests need `make dev-infra`)
 
