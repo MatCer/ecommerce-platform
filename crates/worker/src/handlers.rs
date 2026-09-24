@@ -28,8 +28,11 @@ async fn events_log(_ctx: Ctx, job: Job) -> Result<(), JobError> {
     // Ids only: payloads may carry personal data.
     tracing::info!(
         event_type,
-        event_id = job.payload.get("event_id").and_then(serde_json::Value::as_i64),
-        tenant_id = ?job.tenant_id,
+        event_id = job
+            .payload
+            .get("event_id")
+            .and_then(serde_json::Value::as_i64),
+        tenant_id = job.tenant_id.map(tracing::field::display),
         "event"
     );
     Ok(())

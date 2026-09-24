@@ -110,10 +110,10 @@ impl StaffAuth {
     async fn key(&self, kid: &str) -> Result<DecodingKey, Error> {
         {
             let cache = self.cache.read().await;
-            if is_fresh(cache.fetched_at, self.ttl) {
-                if let Some(key) = cache.keys.get(kid) {
-                    return Ok(key.clone());
-                }
+            if is_fresh(cache.fetched_at, self.ttl)
+                && let Some(key) = cache.keys.get(kid)
+            {
+                return Ok(key.clone());
             }
         }
 

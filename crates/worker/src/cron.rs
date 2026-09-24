@@ -69,12 +69,12 @@ pub async fn run(db: PgPool, tick: Duration, mut shutdown: watch::Receiver<bool>
                 Err(e) => tracing::warn!(error = %e, "cron leader election failed"),
             }
         }
-        if let Some(conn) = leader.as_mut() {
-            if let Err(e) = enqueue_due(conn, SCHEDULES, Utc::now()).await {
-                // Drop the connection (and with it the lock); re-elect on the next tick.
-                tracing::warn!(error = %e, "cron enqueue failed, giving up leadership");
-                leader = None;
-            }
+        if let Some(conn) = leader.as_mut()
+            && let Err(e) = enqueue_due(conn, SCHEDULES, Utc::now()).await
+        {
+            // Drop the connection (and with it the lock); re-elect on the next tick.
+            tracing::warn!(error = %e, "cron enqueue failed, giving up leadership");
+            leader = None;
         }
         tokio::select! {
             _ = shutdown.changed() => {}
