@@ -11,3 +11,4 @@ dist/
 # Local env and machine-specific compose tweaks
 .env
 docker-compose.override.yml
+*.tmp
