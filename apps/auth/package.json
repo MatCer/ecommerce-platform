@@ -1,0 +1,22 @@
+{
+  "name": "@platform/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "better-auth": "1.7.5",
+    "hono": "catalog:",
+    "nodemailer": "10.0.10",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*",
+    "@types/nodemailer": "8.0.2",
+    "@types/pg": "8.23.1"
+  }
+}

@@ -5,8 +5,15 @@
 	admin off
 }
 
+# Service-to-service endpoints stay on the compose network: /internal/* is never proxied.
 http://api.localhost {
+	respond /internal/* "not found" 404
 	reverse_proxy api:8000
+}
+
+http://auth.localhost {
+	respond /internal/* "not found" 404
+	reverse_proxy auth:3000
 }
 
 http://mail.localhost {
@@ -17,8 +24,8 @@ http://s3.localhost {
 	reverse_proxy minio:9000
 }
 
-# Placeholders until their work packages land: auth (WP1), admin SPA (later WP).
-http://admin.localhost, http://auth.localhost {
+# Placeholder until the admin SPA work package lands.
+http://admin.localhost {
 	respond "{host} is not available yet" 502
 }
 
