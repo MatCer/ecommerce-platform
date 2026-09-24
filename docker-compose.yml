@@ -2,6 +2,7 @@
 #   make up          everything (profile "full")
 #   make dev-infra   dependencies only (profile "infra"); run api/worker natively against them
 # Host ports and credentials come from .env (see .env.example); defaults below match it.
+# Published ports bind to 127.0.0.1 only; set HOST_BIND=0.0.0.0 in .env to expose them on the LAN.
 
 x-infra: &infra
   profiles: [infra, full]
@@ -28,7 +29,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
       APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:-app-owner-local}
       APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-app-runtime-local}
-    ports: ["${PG_PORT:-55432}:5432"]
+    ports: ["${HOST_BIND:-127.0.0.1}:${PG_PORT:-55432}:5432"]
     volumes:
       - pg-data:/var/lib/postgresql/data
       - ./docker/postgres/init-roles.sh:/docker-entrypoint-initdb.d/10-init-roles.sh:ro
@@ -41,12 +42,12 @@ services:
 
   meilisearch:
     <<: *infra
-    image: getmeili/meilisearch:v1.54.0
+    image: getmeili/meilisearch:v1.54.0@sha256:0bf32debcbfa8ba4e418679025f4935884972171513c92f0584689ff994a61df # pinned by digest (spec A27)
     environment:
       MEILI_ENV: development
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-meili-local-master-key-0123456789}
       MEILI_NO_ANALYTICS: "true"
-    ports: ["${MEILI_PORT:-57700}:7700"]
+    ports: ["${HOST_BIND:-127.0.0.1}:${MEILI_PORT:-57700}:7700"]
     volumes: [meili-data:/meili_data]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7700/health"]
@@ -63,8 +64,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-local}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-local-password}
     ports:
-      - "${MINIO_PORT:-59000}:9000"
-      - "${MINIO_CONSOLE_PORT:-59001}:9001"
+      - "${HOST_BIND:-127.0.0.1}:${MINIO_PORT:-59000}:9000"
+      - "${HOST_BIND:-127.0.0.1}:${MINIO_CONSOLE_PORT:-59001}:9001"
     volumes: [minio-data:/data]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/minio/health/live"]
@@ -99,13 +100,13 @@ services:
     <<: *infra
     image: axllent/mailpit:v1.31.2
     ports:
-      - "${MAILPIT_SMTP_PORT:-51025}:1025"
-      - "${MAILPIT_UI_PORT:-58025}:8025"
+      - "${HOST_BIND:-127.0.0.1}:${MAILPIT_SMTP_PORT:-51025}:1025"
+      - "${HOST_BIND:-127.0.0.1}:${MAILPIT_UI_PORT:-58025}:8025"
 
   stripe-mock:
     <<: *infra
     image: stripe/stripe-mock:v0.203.0
-    ports: ["${STRIPE_MOCK_PORT:-12111}:12111"]
+    ports: ["${HOST_BIND:-127.0.0.1}:${STRIPE_MOCK_PORT:-12111}:12111"]
 
   mocks:
     <<: *infra
@@ -122,7 +123,7 @@ services:
   caddy:
     <<: *infra
     image: caddy:2.11.4-alpine
-    ports: ["${HTTP_PORT:-8080}:80"]
+    ports: ["${HOST_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"]
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

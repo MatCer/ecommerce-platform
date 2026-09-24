@@ -55,6 +55,11 @@ make down
 answer 502 until their work packages land. Every host port is configurable in `.env`
 (see `.env.example`).
 
+All published ports bind to `127.0.0.1` only, because the stack runs with well-known local
+credentials. To reach it from another machine (a phone on your LAN, a VM), set
+`HOST_BIND=0.0.0.0` (or one LAN IP) in `.env` and run `make up` again. Do that only on a
+trusted network.
+
 ## Common commands
 
 | Command | What it does |
