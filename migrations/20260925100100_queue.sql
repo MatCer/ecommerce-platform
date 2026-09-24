@@ -96,11 +96,18 @@ LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-    UPDATE queue.jobs
+    -- SKIP LOCKED: a row another claimer holds must not stall this claim.
+    UPDATE queue.jobs j
     SET status = 'dead', last_error = 'lease expired on the final attempt',
         lease_owner = NULL, lease_token = NULL, locked_until = NULL, finished_at = now()
-    WHERE status = 'running' AND locked_until < now() AND attempts >= max_attempts
-      AND queue = ANY (p_queues);
+    FROM (
+        SELECT d.id FROM queue.jobs d
+        WHERE d.status = 'running' AND d.locked_until < now() AND d.attempts >= d.max_attempts
+          AND d.queue = ANY (p_queues)
+        LIMIT 100
+        FOR UPDATE SKIP LOCKED
+    ) expired
+    WHERE j.id = expired.id;
 
     RETURN QUERY
     WITH picked AS (

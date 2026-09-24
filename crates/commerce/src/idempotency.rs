@@ -44,31 +44,42 @@ pub async fn begin(
 ) -> Result<Option<Stored>, Error> {
     validate_key(key)?;
     let tenant_id = tx.tenant_id();
-    let inserted = sqlx::query_scalar!(
-        r#"INSERT INTO idempotency_keys (tenant_id, operation, key, request_hash, status)
-           VALUES ($1, $2, $3, $4, 'in_progress')
-           ON CONFLICT (tenant_id, operation, key) DO NOTHING
-           RETURNING true AS "inserted!""#,
-        tenant_id,
-        operation,
-        key,
-        hash
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
-    if inserted.is_some() {
-        return Ok(None);
+    // Two rounds: the retention purge may delete an expired row between our conflicting
+    // insert and the lookup; the second insert then succeeds.
+    let mut found = None;
+    for _ in 0..2 {
+        let inserted = sqlx::query_scalar!(
+            r#"INSERT INTO idempotency_keys (tenant_id, operation, key, request_hash, status)
+               VALUES ($1, $2, $3, $4, 'in_progress')
+               ON CONFLICT (tenant_id, operation, key) DO NOTHING
+               RETURNING true AS "inserted!""#,
+            tenant_id,
+            operation,
+            key,
+            hash
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if inserted.is_some() {
+            return Ok(None);
+        }
+        found = sqlx::query!(
+            "SELECT request_hash, status, response FROM idempotency_keys
+             WHERE tenant_id = $1 AND operation = $2 AND key = $3",
+            tenant_id,
+            operation,
+            key
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if found.is_some() {
+            break;
+        }
     }
-
-    let existing = sqlx::query!(
-        "SELECT request_hash, status, response FROM idempotency_keys
-         WHERE tenant_id = $1 AND operation = $2 AND key = $3",
-        tenant_id,
-        operation,
-        key
-    )
-    .fetch_one(&mut **tx)
-    .await?;
+    let existing = found.ok_or_else(|| Error::Conflict {
+        code: "idempotency_in_progress",
+        detail: "a request with this Idempotency-Key is still in progress".into(),
+    })?;
     if existing.request_hash != hash {
         return Err(Error::Conflict {
             code: "idempotency_conflict",

@@ -10,7 +10,7 @@ use api::auth::StaffAuth;
 use api::{AppState, app};
 use axum::body::Body;
 use axum::http::{HeaderValue, Request, StatusCode, header};
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use http_body_util::BodyExt;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde_json::{Value, json};
@@ -48,7 +48,12 @@ async fn jwks_server(keys: Value) -> Jwks {
             let (k, h) = (k.clone(), h.clone());
             async move {
                 h.fetch_add(1, Ordering::SeqCst);
-                axum::Json(json!({ "keys": *k.read().await }))
+                let keys = k.read().await.clone();
+                // `null` keys simulate an auth service outage.
+                if keys.is_null() {
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+                axum::Json(json!({ "keys": keys })).into_response()
             }
         }),
     );
@@ -332,6 +337,22 @@ async fn tenant_access_requires_membership_and_role(db: PgPool) {
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(market["currency"], "EUR");
 
+    // Tax settings need a recent login (A9): a token from a 16-minute-old session is refused.
+    let mut stale = claims("owner-a");
+    stale["auth_time"] = json!(now() - 16 * 60);
+    let mut hu = sk_market();
+    hu["code"] = json!("hu");
+    let (status, body, res) = Call::post("/admin/v1/markets", hu)
+        .token(&sign(&stale))
+        .tenant(a)
+        .send(&s)
+        .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::UNAUTHORIZED, Some("reauth_required"))
+    );
+    assert_eq!(res.headers()[header::WWW_AUTHENTICATE], "Bearer");
+
     let (status, log, _) = Call::get("/admin/v1/audit-log?limit=10")
         .token(&owner_a)
         .tenant(a)
@@ -448,7 +469,9 @@ async fn jwks_refreshes_on_unknown_kid_at_most_once_per_interval(db: PgPool) {
         .0);
     assert_eq!(jwks.hits.load(Ordering::SeqCst), 1, "cached");
 
-    // Key rotation: a token with a new kid forces one refresh.
+    // Key rotation: a token with a new kid forces one refresh (once the minimum interval
+    // since the last fetch has passed).
+    tokio::time::sleep(Duration::from_millis(350)).await;
     *jwks.keys.write().await = json!([jwk("a", X_A), jwk("b", X_B)]);
     let rotated = sign_with("b", KEY_B, &claims("u"));
     ok(Call::get("/admin/v1/me").token(&rotated).send(&s).await.0);
@@ -476,6 +499,56 @@ async fn jwks_refreshes_on_unknown_kid_at_most_once_per_interval(db: PgPool) {
         3,
         "one refresh per interval"
     );
+}
+
+#[tokio::test]
+async fn jwks_outage_is_throttled_and_known_keys_keep_working() {
+    let jwks = jwks_server(json!([jwk("a", X_A)])).await;
+    let interval = Duration::from_millis(200);
+    let auth = StaffAuth::with_timing(
+        reqwest::Client::new(),
+        jwks.url.parse().unwrap(),
+        ISSUER,
+        interval,
+        interval,
+    );
+    let good = sign(&claims("u"));
+    let unknown = sign_with("zzz", KEY_B, &claims("u"));
+    auth.verify(&good).await.unwrap();
+    assert_eq!(jwks.hits.load(Ordering::SeqCst), 1);
+
+    // Outage: the stale key set is refreshed once (failing) and keeps verifying known keys;
+    // unknown kids get 503 without further fetches until the interval has passed.
+    *jwks.keys.write().await = Value::Null;
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    auth.verify(&good).await.unwrap();
+    for _ in 0..5 {
+        assert_eq!(
+            auth.verify(&unknown).await.unwrap_err().code(),
+            "service_unavailable"
+        );
+        auth.verify(&good).await.unwrap();
+    }
+    assert_eq!(jwks.hits.load(Ordering::SeqCst), 2);
+    tokio::time::sleep(Duration::from_millis(250)).await;
+    assert!(auth.verify(&unknown).await.is_err());
+    assert_eq!(jwks.hits.load(Ordering::SeqCst), 3);
+
+    // Starting during an outage: one attempt, then throttled.
+    let cold = StaffAuth::with_timing(
+        reqwest::Client::new(),
+        jwks.url.parse().unwrap(),
+        ISSUER,
+        interval,
+        interval,
+    );
+    for _ in 0..3 {
+        assert_eq!(
+            cold.verify(&good).await.unwrap_err().code(),
+            "service_unavailable"
+        );
+    }
+    assert_eq!(jwks.hits.load(Ordering::SeqCst), 4);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

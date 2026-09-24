@@ -142,7 +142,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Creates a market (owner/admin). Honors `Idempotency-Key`: a retry with the same key and\nbody returns the original response with `Idempotent-Replayed: true`; the same key with a\ndifferent body is `409 idempotency_conflict`.",
+        "summary": "Creates a market (owner/admin; login at most 15 minutes old, else `401 reauth_required`).\nHonors `Idempotency-Key`: a retry with the same key and body returns the original response\nwith `Idempotent-Replayed: true`; the same key with a different body is\n`409 idempotency_conflict`.",
         "operationId": "create_market",
         "parameters": [
           {

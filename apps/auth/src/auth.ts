@@ -46,6 +46,18 @@ export function createAuth(cfg: Config, database: BetterAuthOptions["database"],
     trustedOrigins: [cfg.adminOrigin],
     telemetry: { enabled: false },
     databaseHooks: {
+      user: {
+        update: {
+          // Turning 2FA on ends every existing session (they were created with one factor);
+          // the enrolling device gets a fresh session from the two-factor plugin right after.
+          before: async (data, ctx) => {
+            const userId = ctx?.context.session?.user.id;
+            if (data.twoFactorEnabled === true && ctx && userId) {
+              await ctx.context.internalAdapter.deleteUserSessions(userId);
+            }
+          },
+        },
+      },
       session: {
         create: {
           before: async (session, ctx) => {

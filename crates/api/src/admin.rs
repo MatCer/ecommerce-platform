@@ -88,9 +88,10 @@ async fn list_markets(
 
 const CREATE_MARKET: &str = "POST /admin/v1/markets";
 
-/// Creates a market (owner/admin). Honors `Idempotency-Key`: a retry with the same key and
-/// body returns the original response with `Idempotent-Replayed: true`; the same key with a
-/// different body is `409 idempotency_conflict`.
+/// Creates a market (owner/admin; login at most 15 minutes old, else `401 reauth_required`).
+/// Honors `Idempotency-Key`: a retry with the same key and body returns the original response
+/// with `Idempotent-Replayed: true`; the same key with a different body is
+/// `409 idempotency_conflict`.
 #[utoipa::path(
     post,
     path = "/admin/v1/markets",
@@ -113,6 +114,8 @@ async fn create_market(
     body: Bytes,
 ) -> Result<Response, Error> {
     staff.require(Role::Admin)?;
+    // Markets carry tax settings (`tax_mode`), a sensitive operation under A9.
+    staff.require_fresh_auth()?;
     let input: NewMarket = parse_json(&body)?;
     let key = idempotency_key(&headers)?;
 

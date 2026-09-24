@@ -2,8 +2,9 @@
 //! `/internal/v1` (spec §8.4).
 //!
 //! Staff JWTs come from the Better Auth service (EdDSA, `iss`, `aud=admin-api`, 5 min). The
-//! JWKS is cached for 10 minutes; an unknown `kid` forces a refresh at most every 30 s, so a
-//! stream of forged kids cannot hammer the auth service. Membership in the tenant named by
+//! JWKS is cached for 10 minutes; an unknown `kid` forces a refresh, but fetches (including
+//! failed ones) happen at most every 30 s, so forged kids or an auth outage cannot hammer the
+//! auth service or stall requests. Membership in the tenant named by
 //! `X-Tenant-Id` is re-checked on every request through `platform.staff_membership`.
 
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ pub const FRESH_AUTH: Duration = Duration::from_secs(15 * 60);
 pub const TENANT_HEADER: &str = "x-tenant-id";
 
 const JWKS_TTL: Duration = Duration::from_secs(10 * 60);
-const FORCED_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+const MIN_FETCH_INTERVAL: Duration = Duration::from_secs(30);
 
 fn invalid_token() -> Error {
     Error::Unauthorized {
@@ -42,8 +43,11 @@ fn invalid_token() -> Error {
 #[derive(Default)]
 struct KeyCache {
     keys: HashMap<String, DecodingKey>,
+    /// Last successful fetch.
     fetched_at: Option<Instant>,
-    last_forced: Option<Instant>,
+    /// Last fetch attempt, successful or not.
+    last_attempt: Option<Instant>,
+    last_failed: bool,
 }
 
 /// Verifies staff JWTs against the auth service's JWKS.
@@ -52,7 +56,7 @@ pub struct StaffAuth {
     jwks_url: Url,
     validation: Validation,
     ttl: Duration,
-    forced_interval: Duration,
+    retry_interval: Duration,
     cache: RwLock<KeyCache>,
     /// Single flight: one JWKS fetch at a time.
     refresh: Mutex<()>,
@@ -60,16 +64,17 @@ pub struct StaffAuth {
 
 impl StaffAuth {
     pub fn new(http: reqwest::Client, jwks_url: Url, issuer: &str) -> Self {
-        Self::with_timing(http, jwks_url, issuer, JWKS_TTL, FORCED_REFRESH_INTERVAL)
+        Self::with_timing(http, jwks_url, issuer, JWKS_TTL, MIN_FETCH_INTERVAL)
     }
 
-    /// Custom cache timings (tests).
+    /// Custom cache timings (tests): `ttl` of a good key set, minimum `retry_interval`
+    /// between fetches.
     pub fn with_timing(
         http: reqwest::Client,
         jwks_url: Url,
         issuer: &str,
         ttl: Duration,
-        forced_interval: Duration,
+        retry_interval: Duration,
     ) -> Self {
         let mut validation = Validation::new(Algorithm::EdDSA);
         validation.set_issuer(&[issuer]);
@@ -81,7 +86,7 @@ impl StaffAuth {
             jwks_url,
             validation,
             ttl,
-            forced_interval,
+            retry_interval,
             cache: RwLock::new(KeyCache::default()),
             refresh: Mutex::new(()),
         }
@@ -118,37 +123,38 @@ impl StaffAuth {
         }
 
         let _single_flight = self.refresh.lock().await;
-        let (stale, known, may_force) = {
-            let cache = self.cache.read().await;
-            (
-                !is_fresh(cache.fetched_at, self.ttl),
-                cache.keys.contains_key(kid),
-                !is_fresh(cache.last_forced, self.forced_interval),
-            )
+        // Every fetch, successful or not, counts against the throttle: neither unknown kids
+        // nor an auth outage can make each request wait on a JWKS fetch.
+        let fetch = {
+            let mut cache = self.cache.write().await;
+            let wanted = !is_fresh(cache.fetched_at, self.ttl) || !cache.keys.contains_key(kid);
+            let allowed = !is_fresh(cache.last_attempt, self.retry_interval);
+            if wanted && allowed {
+                cache.last_attempt = Some(Instant::now());
+            }
+            wanted && allowed
         };
-        let mut fetch_failed = false;
-        if stale || (!known && may_force) {
+        if fetch {
+            // No cache lock held here: requests with known, fresh keys are not blocked.
             let fetched = self.fetch().await;
             let mut cache = self.cache.write().await;
-            if !known && !stale {
-                cache.last_forced = Some(Instant::now());
-            }
             match fetched {
                 Ok(keys) => {
                     cache.keys = keys;
                     cache.fetched_at = Some(Instant::now());
+                    cache.last_failed = false;
                 }
                 Err(e) => {
                     // Keep serving known keys while the auth service is unreachable.
                     tracing::warn!(error = %e, "JWKS refresh failed");
-                    fetch_failed = true;
+                    cache.last_failed = true;
                 }
             }
         }
         let cache = self.cache.read().await;
         match cache.keys.get(kid) {
             Some(key) => Ok(key.clone()),
-            None if fetch_failed => Err(Error::Unavailable("JWKS unavailable".into())),
+            None if cache.last_failed => Err(Error::Unavailable("JWKS unavailable".into())),
             None => Err(invalid_token()),
         }
     }

@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, test } from "vitest";
 import { createApp } from "./app.ts";
@@ -30,7 +31,27 @@ function setup() {
   const auth = createAuth(cfg, memoryAdapter(db), async (mail) => {
     outbox.push(mail);
   });
-  return { app: createApp(auth, cfg), outbox, db };
+  return { app: createApp(auth, cfg), outbox, db, auth };
+}
+
+/** RFC 6238 TOTP (SHA-1, 6 digits, 30 s) for a base32 secret, as an authenticator app. */
+function totp(base32: string): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const c of base32.replace(/=+$/, "").toUpperCase()) {
+    bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  }
+  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => Number.parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
+  const mac = createHmac("sha1", key).update(counter).digest();
+  const offset = (mac.at(-1) ?? 0) & 0xf;
+  return String((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+async function signInWithLink(app: ReturnType<typeof setup>["app"], path: string) {
+  const res = await app.request(path);
+  return res.headers.get("set-cookie")?.split(";")[0] ?? "";
 }
 
 /** Creates a user, invites them and returns the magic link path from the email. */
@@ -140,6 +161,44 @@ describe("staff sign-in", () => {
     const res = await app.request(path);
     expect(res.headers.get("set-cookie") ?? "").not.toContain("session_token=");
     expect(db.session).toHaveLength(0);
+  });
+
+  test("enabling 2FA ends the sessions created with one factor", async () => {
+    const { app, outbox, auth } = setup();
+    const address = "twofa@example.test";
+    const first = await inviteLink(app, outbox, address);
+    const enrolling = await signInWithLink(app, first.path);
+    const second = await inviteLink(app, outbox, address);
+    const other = await signInWithLink(app, second.path);
+    expect((await app.request("/api/auth/token", { headers: { cookie: other } })).status).toBe(200);
+
+    const password = "a-long-password-for-2fa";
+    const ctx = await auth.$context;
+    await ctx.internalAdapter.linkAccount({
+      providerId: "credential",
+      accountId: first.id,
+      userId: first.id,
+      password: await ctx.password.hash(password),
+    });
+    const post = (path: string, cookie: string, payload: unknown) =>
+      app.request(path, {
+        method: "POST",
+        headers: { cookie, origin: cfg.adminOrigin, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    const enable = await post("/api/auth/two-factor/enable", enrolling, { password });
+    expect(enable.status).toBe(200);
+    const { totpURI } = (await enable.json()) as { totpURI: string };
+    const secret = new URL(totpURI).searchParams.get("secret") ?? "";
+    const verified = await post("/api/auth/two-factor/verify-totp", enrolling, {
+      code: totp(secret),
+    });
+    expect(verified.status).toBe(200);
+    const fresh = verified.headers.get("set-cookie")?.split(";")[0] ?? "";
+
+    // The other one-factor session is gone; the enrolling device holds a new one.
+    expect((await app.request("/api/auth/token", { headers: { cookie: other } })).status).toBe(401);
+    expect((await app.request("/api/auth/token", { headers: { cookie: fresh } })).status).toBe(200);
   });
 
   test("public sign-up is disabled and tokens need a session", async () => {

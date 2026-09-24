@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO idempotency_keys (tenant_id, operation, key, request_hash, status)\n           VALUES ($1, $2, $3, $4, 'in_progress')\n           ON CONFLICT (tenant_id, operation, key) DO NOTHING\n           RETURNING true AS \"inserted!\"",
+  "query": "INSERT INTO idempotency_keys (tenant_id, operation, key, request_hash, status)\n               VALUES ($1, $2, $3, $4, 'in_progress')\n               ON CONFLICT (tenant_id, operation, key) DO NOTHING\n               RETURNING true AS \"inserted!\"",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       null
     ]
   },
-  "hash": "bbbb731802823ef2be7859b760467b398bbb218fcf1304259eb1afdc821c22f7"
+  "hash": "d6b0683074d4c85ec827fa2cc76f29d78678720093c6eb5924aa87fcdacee277"
 }

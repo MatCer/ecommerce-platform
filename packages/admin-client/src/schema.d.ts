@@ -31,9 +31,10 @@ export interface paths {
         get: operations["list_markets"];
         put?: never;
         /**
-         * Creates a market (owner/admin). Honors `Idempotency-Key`: a retry with the same key and
-         *     body returns the original response with `Idempotent-Replayed: true`; the same key with a
-         *     different body is `409 idempotency_conflict`.
+         * Creates a market (owner/admin; login at most 15 minutes old, else `401 reauth_required`).
+         *     Honors `Idempotency-Key`: a retry with the same key and body returns the original response
+         *     with `Idempotent-Replayed: true`; the same key with a different body is
+         *     `409 idempotency_conflict`.
          */
         post: operations["create_market"];
         delete?: never;

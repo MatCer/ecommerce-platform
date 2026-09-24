@@ -136,6 +136,37 @@ async fn lease_expiring_on_final_attempt_kills_the_job(db: PgPool) {
     assert_eq!(status(&db, id).await, ("dead".into(), 1));
 }
 
+/// A row locked by another transaction (e.g. a concurrent claimer) must not stall claims.
+#[sqlx::test(migrations = "../../migrations")]
+async fn locked_expired_job_does_not_block_other_claims(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let mut last = NewJob::new("demo", json!({}));
+    last.max_attempts = 1;
+    let stuck = queue::enqueue(&runtime, &last).await.unwrap();
+    claim_one(&runtime, "w").await.unwrap();
+    expire_lease(&db, stuck).await;
+
+    let mut holder = db.begin().await.unwrap();
+    sqlx::query("SELECT 1 FROM queue.jobs WHERE id = $1 FOR UPDATE")
+        .bind(stuck)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    let ready = queue::enqueue(&runtime, &NewJob::new("demo", json!({})))
+        .await
+        .unwrap();
+    let claimed = tokio::time::timeout(Duration::from_secs(2), claim_one(&runtime, "w2"))
+        .await
+        .expect("claim must not wait for the locked row")
+        .unwrap();
+    assert_eq!(claimed.id, ready);
+    holder.rollback().await.unwrap();
+
+    // Once unlocked, the expired final attempt is marked dead by the next claim.
+    assert!(claim_one(&runtime, "w3").await.is_none());
+    assert_eq!(status(&db, stuck).await, ("dead".into(), 1));
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn idempotency_key_prevents_duplicate_jobs(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 1).await;
