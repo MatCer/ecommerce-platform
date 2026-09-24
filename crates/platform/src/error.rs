@@ -14,6 +14,10 @@ pub const PROBLEM_CONTENT_TYPE: &str = "application/problem+json";
 pub enum Error {
     #[error("resource not found")]
     NotFound,
+    #[error("method not allowed")]
+    MethodNotAllowed,
+    #[error("request body too large")]
+    PayloadTooLarge,
     /// Input failed validation. `code` is a stable snake_case identifier.
     #[error("{detail}")]
     Validation { code: &'static str, detail: String },
@@ -31,6 +35,8 @@ impl Error {
     pub fn status(&self) -> StatusCode {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
+            Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
+            Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             Self::Validation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Database(_) | Self::Storage(_) | Self::Internal(_) => {
@@ -42,6 +48,8 @@ impl Error {
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound => "not_found",
+            Self::MethodNotAllowed => "method_not_allowed",
+            Self::PayloadTooLarge => "payload_too_large",
             Self::Validation { code, .. } => code,
             Self::Unavailable(_) => "service_unavailable",
             Self::Database(_) | Self::Storage(_) | Self::Internal(_) => "internal_error",
@@ -51,7 +59,7 @@ impl Error {
     /// Detail safe to show to clients. Server-side failures expose nothing.
     fn public_detail(&self) -> Option<String> {
         match self {
-            Self::NotFound => None,
+            Self::NotFound | Self::MethodNotAllowed | Self::PayloadTooLarge => None,
             Self::Validation { detail, .. } => Some(detail.clone()),
             Self::Unavailable(_) | Self::Database(_) | Self::Storage(_) | Self::Internal(_) => None,
         }

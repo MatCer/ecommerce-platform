@@ -1,12 +1,16 @@
 //! HTTP API (spec §8). Routers for storefront/admin/internal arrive in later WPs; WP0 ships the
 //! shell: health, readiness, OpenAPI, Swagger UI (dev only) and the shared middleware stack.
 
-use axum::Json;
 use axum::Router;
+use axum::body::{Bytes, HttpBody};
 use axum::extract::{Request, State};
-use axum::http::{HeaderName, StatusCode};
+use axum::http::{HeaderName, StatusCode, header};
+use axum::middleware::{map_request, map_response};
+use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::{BoxError, Json};
 use platform::Error;
+use platform::error::PROBLEM_CONTENT_TYPE;
 use platform::health::{CheckStatus, Readiness};
 use platform::storage::Storage;
 use reqwest::Url;
@@ -73,6 +77,7 @@ pub fn app(state: AppState, docs: bool) -> Router {
 
     router
         .fallback(|| async { Error::NotFound })
+        .method_not_allowed_fallback(|| async { Error::MethodNotAllowed })
         .layer(
             ServiceBuilder::new()
                 .layer(SetRequestIdLayer::new(REQUEST_ID, MakeRequestUuid))
@@ -95,9 +100,46 @@ pub fn app(state: AppState, docs: bool) -> Router {
                         .on_response(DefaultOnResponse::new().level(Level::INFO)),
                 )
                 .layer(PropagateRequestIdLayer::new(REQUEST_ID))
+                .layer(map_response(problem_for_body_limit))
                 .layer(RequestBodyLimitLayer::new(BODY_LIMIT_BYTES)),
         )
+        // Outermost, so invalid ids are gone before `SetRequestIdLayer` looks at them.
+        .layer(map_request(drop_invalid_request_id))
         .with_state(state)
+}
+
+/// Client-supplied request ids are echoed and logged, so only short, plain ids are kept;
+/// anything else is dropped and `SetRequestIdLayer` generates a fresh UUID.
+async fn drop_invalid_request_id(mut req: Request) -> Request {
+    let valid = req.headers().get(&REQUEST_ID).is_none_or(|v| {
+        let b = v.as_bytes();
+        !b.is_empty()
+            && b.len() <= 64
+            && b.iter()
+                .all(|c| c.is_ascii_alphanumeric() || *c == b'-' || *c == b'_')
+    });
+    if !valid {
+        req.headers_mut().remove(&REQUEST_ID);
+    }
+    req
+}
+
+/// `RequestBodyLimitLayer` and axum's body extractors answer 413 in plain text; render it as
+/// problem+json like every other error.
+async fn problem_for_body_limit<B>(res: Response<B>) -> Response
+where
+    B: HttpBody<Data = Bytes> + Send + 'static,
+    B::Error: Into<BoxError>,
+{
+    let is_problem = res
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .is_some_and(|ct| ct == PROBLEM_CONTENT_TYPE);
+    if res.status() == StatusCode::PAYLOAD_TOO_LARGE && !is_problem {
+        Error::PayloadTooLarge.into_response()
+    } else {
+        res.into_response()
+    }
 }
 
 #[derive(Serialize, ToSchema)]

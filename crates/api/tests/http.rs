@@ -81,21 +81,62 @@ async fn request_id_is_generated_and_propagated() {
     assert_eq!(id.len(), 36, "uuid expected, got {id}");
 
     let req = Request::get("/healthz")
-        .header("x-request-id", "abc-123")
+        .header("x-request-id", "abc_123-XYZ")
         .body(Body::empty())
         .unwrap();
     let res = send(app(state(dead_db()), false), req).await;
-    assert_eq!(res.headers()["x-request-id"], "abc-123");
+    assert_eq!(res.headers()["x-request-id"], "abc_123-XYZ");
 }
 
 #[tokio::test]
-async fn oversized_body_is_rejected() {
+async fn invalid_request_id_is_replaced() {
+    for bad in ["has space", "semi;colon", &"a".repeat(65)] {
+        let req = Request::get("/healthz")
+            .header("x-request-id", bad)
+            .body(Body::empty())
+            .unwrap();
+        let res = send(app(state(dead_db()), false), req).await;
+        let id = res.headers()["x-request-id"].to_str().unwrap();
+        assert_ne!(id, bad);
+        assert_eq!(id.len(), 36, "uuid expected for {bad:?}, got {id}");
+    }
+    let ok64 = "a".repeat(64);
+    let req = Request::get("/healthz")
+        .header("x-request-id", &ok64)
+        .body(Body::empty())
+        .unwrap();
+    let res = send(app(state(dead_db()), false), req).await;
+    assert_eq!(res.headers()["x-request-id"], ok64.as_str());
+}
+
+async fn assert_problem(res: Response, status: StatusCode, code: &str) {
+    assert_eq!(res.status(), status);
+    assert_eq!(
+        res.headers()[header::CONTENT_TYPE],
+        "application/problem+json"
+    );
+    let body = json(res).await;
+    assert_eq!(body["status"], status.as_u16());
+    assert_eq!(body["code"], code);
+}
+
+#[tokio::test]
+async fn oversized_body_is_problem_json() {
     let req = Request::post("/healthz")
         .header(header::CONTENT_LENGTH, BODY_LIMIT_BYTES + 1)
         .body(Body::from(vec![0u8; BODY_LIMIT_BYTES + 1]))
         .unwrap();
     let res = send(app(state(dead_db()), false), req).await;
-    assert_eq!(res.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(res.headers().contains_key("x-request-id"));
+    assert_problem(res, StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large").await;
+}
+
+#[tokio::test]
+async fn wrong_method_is_problem_json() {
+    let req = Request::delete("/healthz").body(Body::empty()).unwrap();
+    let res = send(app(state(dead_db()), false), req).await;
+    assert_eq!(res.headers()[header::ALLOW], "GET,HEAD");
+    assert_problem(res, StatusCode::METHOD_NOT_ALLOWED, "method_not_allowed").await;
 }
 
 #[tokio::test]
