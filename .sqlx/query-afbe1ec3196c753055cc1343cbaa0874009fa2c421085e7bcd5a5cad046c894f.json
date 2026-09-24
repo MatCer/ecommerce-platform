@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE platform.domains SET verified_at = now() WHERE hostname = $1 AND verified_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "afbe1ec3196c753055cc1343cbaa0874009fa2c421085e7bcd5a5cad046c894f"
+}

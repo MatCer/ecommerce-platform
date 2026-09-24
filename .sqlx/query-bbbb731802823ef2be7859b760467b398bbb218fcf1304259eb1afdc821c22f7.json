@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO idempotency_keys (tenant_id, operation, key, request_hash, status)\n           VALUES ($1, $2, $3, $4, 'in_progress')\n           ON CONFLICT (tenant_id, operation, key) DO NOTHING\n           RETURNING true AS \"inserted!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inserted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bbbb731802823ef2be7859b760467b398bbb218fcf1304259eb1afdc821c22f7"
+}

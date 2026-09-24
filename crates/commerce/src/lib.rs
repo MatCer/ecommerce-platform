@@ -1,4 +1,17 @@
-//! Business modules (spec §6). No HTTP and no framework types: this crate must run anywhere.
-//! Modules are folders inside this crate, never separate crates.
+//! Business modules (spec §6). No HTTP routing here: this crate must run anywhere.
+//! Modules are folders (or files) inside this crate, never separate crates.
+//!
+//! Tenant-scoped functions take `&mut platform::db::TenantTx`, so they cannot run outside a
+//! tenant transaction (spec A8).
 
+pub mod audit;
 pub mod id;
+pub mod idempotency;
+pub mod markets;
+pub mod tenancy;
+
+/// Postgres `unique_violation` (23505).
+fn unique_violation(e: &sqlx::Error) -> bool {
+    e.as_database_error()
+        .is_some_and(|d| d.code().as_deref() == Some("23505"))
+}

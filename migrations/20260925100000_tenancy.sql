@@ -108,7 +108,7 @@ CREATE TABLE audit_log (
     diff      jsonb NOT NULL DEFAULT '{}',
     at        timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX audit_log_tenant_at ON audit_log (tenant_id, at DESC, id DESC);
+CREATE INDEX audit_log_tenant_id ON audit_log (tenant_id, id DESC);
 
 -- A12. Retention 24 h (purged by the worker's maintenance job).
 CREATE TABLE idempotency_keys (

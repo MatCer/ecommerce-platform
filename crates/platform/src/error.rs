@@ -82,7 +82,8 @@ impl Error {
             Self::NotFound
             | Self::MethodNotAllowed
             | Self::PayloadTooLarge
-            | Self::Unauthorized { .. } | Self::Forbidden { .. } => None,
+            | Self::Unauthorized { .. }
+            | Self::Forbidden { .. } => None,
             Self::BadRequest { detail, .. }
             | Self::Conflict { detail, .. }
             | Self::Validation { detail, .. } => Some(detail.clone()),

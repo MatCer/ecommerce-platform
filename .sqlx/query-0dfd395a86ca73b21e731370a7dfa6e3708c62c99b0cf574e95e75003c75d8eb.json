@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE idempotency_keys SET status = 'completed', response = $4\n         WHERE tenant_id = $1 AND operation = $2 AND key = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0dfd395a86ca73b21e731370a7dfa6e3708c62c99b0cf574e95e75003c75d8eb"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO markets (tenant_id, code, name, country_codes, currency, default_locale, locales, is_default)\n         VALUES ($1, 'cz', 'Česko', '{CZ}', 'CZK', 'cs', '{cs}', true)\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7cf7897c93bddaf44e57cbf29d99330c50a8a80998e908c84227e66c49078c7d"
+}
