@@ -127,6 +127,29 @@ impl DbConfig {
 }
 
 #[derive(Debug, Clone)]
+pub struct WorkerConfig {
+    /// `WORKER_CONCURRENCY`: parallel job loops, defaults to 4 (spec §13).
+    pub concurrency: usize,
+}
+
+impl WorkerConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let concurrency = parsed(lookup, "WORKER_CONCURRENCY", 4)?;
+        if !(1..=64).contains(&concurrency) {
+            return Err(ConfigError::Invalid {
+                name: "WORKER_CONCURRENCY",
+                reason: "must be between 1 and 64".into(),
+            });
+        }
+        Ok(Self { concurrency })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MeiliConfig {
     /// `MEILI_URL`
     pub url: Url,

@@ -2869,9 +2869,15 @@ name = "worker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "platform",
+ "serde_json",
+ "sqlx",
+ "testkit",
+ "thiserror",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
