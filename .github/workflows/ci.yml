@@ -83,6 +83,15 @@ jobs:
           load: true
           cache-from: type=gha,scope=mocks
           cache-to: type=gha,scope=mocks,mode=max
+      # Built only: the auth service needs Postgres to start (it migrates its schema).
+      - name: Build auth image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/auth/Dockerfile
+          tags: ecommerce-auth:ci
+          cache-from: type=gha,scope=auth
+          cache-to: type=gha,scope=auth,mode=max
       - run: scripts/smoke-images.sh ecommerce-rust:ci ecommerce-mocks:ci
 
   ts:
