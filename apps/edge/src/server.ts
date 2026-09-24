@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
 import { createGateway } from "./gateway.ts";
-import { StaticResolver } from "./sites.ts";
+import { ChannelResolver, readChannel, StaticResolver } from "./sites.ts";
 
 function required(name: string): string {
   const v = process.env[name];
@@ -8,11 +8,15 @@ function required(name: string): string {
   return v;
 }
 
+const artifactRoot = required("ARTIFACT_ROOT");
 const gateway = createGateway({
-  artifactRoot: required("ARTIFACT_ROOT"),
+  artifactRoot,
   // ponytail: static host map until WP6 serves GET /internal/v1/resolve (same Site shape).
-  resolver: await StaticResolver.fromFile(required("SITES_FILE")),
-  checkoutArtifact: required("CHECKOUT_ARTIFACT"),
+  resolver: new ChannelResolver(
+    await StaticResolver.fromFile(required("SITES_FILE")),
+    artifactRoot,
+  ),
+  checkoutArtifact: await readChannel(artifactRoot, process.env.CHECKOUT_ARTIFACT ?? "@checkout"),
   apiOrigin: required("API_ORIGIN"),
   mediaOrigin: process.env.MEDIA_ORIGIN ?? required("API_ORIGIN"),
   scheme: process.env.PUBLIC_SCHEME === "http" ? "http" : "https",

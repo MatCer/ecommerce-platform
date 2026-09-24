@@ -320,7 +320,13 @@ export function createGateway(opts: GatewayOptions) {
 
   function sameOrigin(req: Request, host: string, port: string) {
     const origin = req.headers.get("origin");
-    if (origin) return origin === `${scheme}://${host}${port}`;
+    // Local dev also serves the shops over https (Caddy tls internal) while the canonical scheme
+    // stays http; production is https-only, so this only ever widens http → https.
+    if (origin)
+      return (
+        origin === `${scheme}://${host}${port}` ||
+        (scheme === "http" && origin === `https://${host}${port}`)
+      );
     return req.headers.get("sec-fetch-site") === "same-origin";
   }
 
@@ -362,7 +368,7 @@ export function createGateway(opts: GatewayOptions) {
     if (!token) {
       if (req.method === "GET")
         return Response.json(
-          { id: null, lines: [], item_count: 0 },
+          { id: null, lines: [], item_count: 0, subtotal: null, free_shipping_remaining: null },
           { headers: { "cache-control": "no-store" } },
         );
       // First write creates the cart; the API mints the 256-bit capability and stores its hash.
@@ -478,6 +484,33 @@ export function createGateway(opts: GatewayOptions) {
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   }
 
+  /** Newsletter sign-up: same-origin JSON only; double opt-in is the API's job (§11.5). */
+  async function newsletter(
+    site: Site,
+    req: Request,
+    host: string,
+    port: string,
+  ): Promise<Response> {
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    const body = await readJsonBody(req, MAX_JSON_BODY);
+    if (body instanceof Response) return body;
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/newsletter/subscribe`, {
+        method: "POST",
+        headers: apiHeaders(site, { "content-type": "application/json" }),
+        body,
+      }),
+    );
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   // --- origins -------------------------------------------------------------------------------
 
   async function shop(
@@ -494,6 +527,7 @@ export function createGateway(opts: GatewayOptions) {
     if (p.startsWith("/_p/public/"))
       return publicProxy(site, req, url, p.slice("/_p/public".length));
     if (p === "/_p/e") return events(site, req, host, port);
+    if (p === "/_p/newsletter") return newsletter(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {
       return new Response(SPECULATION_RULES, {
         headers: {

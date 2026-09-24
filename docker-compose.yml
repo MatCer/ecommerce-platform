@@ -120,10 +120,36 @@ services:
       timeout: 3s
       retries: 30
 
+  # Storefront edge (spec §9.3, WP2): Node + Miniflare running the default-theme and checkout
+  # artifacts baked into the image. Until WP6 its Storefront API upstream is the stub in `mocks`.
+  # Port 8788 (purge/health) stays internal: Caddy only routes to 8787.
+  edge:
+    <<: *infra
+    build:
+      context: .
+      dockerfile: apps/edge/Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-ecommerce}-edge:local
+    environment:
+      API_ORIGIN: http://mocks:4010
+      MEDIA_ORIGIN: http://mocks:4010
+      PUBLIC_SCHEME: http
+      EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+    depends_on:
+      mocks: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/_edge/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   caddy:
     <<: *infra
     image: caddy:2.11.4-alpine
-    ports: ["${HOST_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"]
+    depends_on:
+      edge: { condition: service_started }
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+      - "${HOST_BIND:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

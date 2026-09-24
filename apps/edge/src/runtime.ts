@@ -57,7 +57,7 @@ const DENY_WORKER = `export default {
 
 async function createInstance(opts: PoolOptions, id: string): Promise<Instance> {
   const manifest = await readManifest(opts.artifactRoot, id);
-  const serverDir = path.join(opts.artifactRoot, id, "server");
+  const serverDir = path.resolve(opts.artifactRoot, id, "server");
   // Explicit module map from the manifest: nothing outside it can be imported.
   const modules: Record<string, { type: "esm"; contents: string }> = {};
   for (const p of manifest.runtime.modules) {

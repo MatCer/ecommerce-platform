@@ -66,6 +66,31 @@ export class StaticResolver implements SiteResolver {
   }
 }
 
+/**
+ * Local-dev glue: `theme_artifact: "@default-theme"` points at `<artifactRoot>/channels/default-theme`
+ * (written by `theme-kit pack --channel`), so a rebuilt theme is "published" by re-packing and
+ * purging. This mirrors A30 (tenants point at one shared default artifact). WP6 resolves from the DB.
+ */
+export class ChannelResolver implements SiteResolver {
+  readonly #inner: SiteResolver;
+  readonly #root: string;
+  constructor(inner: SiteResolver, artifactRoot: string) {
+    this.#inner = inner;
+    this.#root = artifactRoot;
+  }
+  async resolve(shopHost: string) {
+    const site = await this.#inner.resolve(shopHost);
+    if (!site) return null;
+    return { ...site, theme_artifact: await readChannel(this.#root, site.theme_artifact) };
+  }
+}
+
+/** `@name` → content of `<root>/channels/<name>`; anything else is returned unchanged. */
+export async function readChannel(root: string, ref: string): Promise<string> {
+  const m = /^@([a-z0-9-]{1,64})$/.exec(ref);
+  return m ? (await readFile(`${root}/channels/${m[1]}`, "utf8")).trim() : ref;
+}
+
 /** 60 s cache in front of the resolver (spec §9.3.1), purged by `/_edge/purge`. */
 export class CachedResolver implements SiteResolver {
   readonly #inner: SiteResolver;

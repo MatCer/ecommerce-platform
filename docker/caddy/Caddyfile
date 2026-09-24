@@ -1,7 +1,9 @@
 # Local reverse proxy (spec §3.2). Plain HTTP on *.localhost, which browsers and curl resolve
 # to loopback without /etc/hosts edits. Host port: HTTP_PORT (default 8080).
 {
-	auto_https off
+	# Plain-HTTP sites stay HTTP (explicit http://); only the tls-internal block below gets certs.
+	auto_https disable_redirects
+	skip_install_trust
 	admin off
 }
 
@@ -23,7 +25,19 @@ http://admin.localhost, http://auth.localhost {
 }
 
 # Everything else is a storefront host for the edge (WP2/WP6): <shop>.localhost,
-# checkout.<shop>.localhost (spec A1), preview-<rev>--<shop>.localhost.
+# checkout.<shop>.localhost (spec A1), preview-<rev>--<shop>.localhost. The edge resolves the
+# tenant from Host and strips client-supplied X-Forwarded-*/X-Tenant headers itself (A2).
+# gzip matches how the §9.6 JS budget is defined (prod: Cloudflare compresses).
 :80 {
-	respond "storefront edge is not available yet" 502
+	encode gzip
+	reverse_proxy edge:8787
+}
+
+# The same shops over TLS + HTTP/2 (local CA, `tls internal`), used by the performance gate:
+# production is served over h2/h3, and measuring over plain HTTP/1.1 penalises island pages
+# (6-connection limit, a TCP handshake per extra connection) by ~300-400 ms of simulated LCP.
+https://demo.localhost, https://demo-sk.localhost, https://checkout.demo.localhost, https://checkout.demo-sk.localhost {
+	tls internal
+	encode gzip
+	reverse_proxy edge:8787
 }
