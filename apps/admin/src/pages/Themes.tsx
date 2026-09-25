@@ -10,6 +10,7 @@ import {
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
+import { RevisionChanges, ThemeAiEditor } from "../components/ThemeAiEditor.tsx";
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
 import { ApiError, api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
@@ -39,7 +40,7 @@ function reasons(e: unknown): string {
 /**
  * Themes (WP23, spec §12.3): the shop's theme revisions, their gate reports, a sandboxed preview
  * (A21), publish and rollback, reset to the default theme, archive upload/download for power
- * users, and the design-token editor (a token-only revision, fast-path gates).
+ * users, the design-token editor (a token-only revision, fast-path gates) and AI edits (WP24).
  */
 export default function Themes() {
   const qc = useQueryClient();
@@ -330,6 +331,13 @@ export default function Themes() {
                 </section>
               )}
             </Show>
+            <ThemeAiEditor
+              canEdit={can("admin")}
+              onShowRevision={(id) => {
+                setSelected(id);
+                document.getElementById("revisions-h")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            />
             <Show when={can("admin")}>
               <TokenEditor
                 tokens={activeTokens.data?.tokens}
@@ -381,6 +389,9 @@ function Report(props: { detail: Schemas["RevisionDetail"] }) {
         <p role="status" class="text-sm text-muted-foreground">
           {t("themes.running")}
         </p>
+      </Show>
+      <Show when={r().parent_id && r().has_source}>
+        <RevisionChanges id={r().id} />
       </Show>
       <Show when={report().failures.length}>
         <div

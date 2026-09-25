@@ -3,14 +3,18 @@
 //!
 //! Staff may look and preview; creating revisions and downloading sources needs Admin;
 //! publishing (and rolling back) needs Admin with a login at most 15 minutes old (A9).
+//!
+//! AI theme edits (WP24): Admin starts, cancels, accepts or discards a run; staff may follow
+//! it. An AI revision is publishable only after its run was accepted.
 
 use axum::Json;
-use axum::body::Body;
+use axum::body::{Body, Bytes};
 use axum::extract::rejection::PathRejection;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use commerce::tenancy::Role;
+use commerce::themes::ai_edit::{self, NewRun, RevisionDiff, RunDetail, RunSummary};
 use commerce::themes::{
     self, Download, PreviewLink, RevisionDetail, RevisionSummary, ThemeKeys, TokensInput,
 };
@@ -36,6 +40,12 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(source))
         .routes(routes!(preview))
         .routes(routes!(publish))
+        .routes(routes!(revision_diff))
+        .routes(routes!(list_runs, start_run))
+        .routes(routes!(get_run))
+        .routes(routes!(cancel_run))
+        .routes(routes!(accept_run))
+        .routes(routes!(discard_run))
 }
 
 fn keys(s: &AppState) -> Result<&ThemeKeys, Error> {
@@ -277,7 +287,7 @@ async fn preview(
         (status = 401, description = "reauth_required", body = platform::Problem, content_type = "application/problem+json"),
         (status = 403, body = platform::Problem, content_type = "application/problem+json"),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
-        (status = 409, description = "not_publishable", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "not_publishable | ai_run_not_accepted", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn publish(
@@ -295,4 +305,209 @@ async fn publish(
     .await?;
     s.edge.tenant(staff.tenant_id).await;
     Ok(Json(rev))
+}
+
+/// What a revision changed compared to its parent: a unified diff of the sources.
+#[utoipa::path(
+    get,
+    path = "/admin/v1/themes/revisions/{id}/diff",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, IdParam),
+    responses(
+        (status = 200, body = RevisionDiff),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn revision_diff(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    id: Result<Path<Uuid>, PathRejection>,
+) -> Result<Json<RevisionDiff>, Error> {
+    let id = path_id(id)?;
+    let storage = s.storage.clone();
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            ai_edit::revision_diff(tx, &storage, id).await
+        })
+        .await?,
+    ))
+}
+
+#[derive(Serialize, ToSchema)]
+#[schema(as = AiThemeRunList)]
+pub struct RunList {
+    pub items: Vec<RunSummary>,
+    /// `anthropic`, `fake` (the scripted demo agent, no key configured) or `disabled`.
+    pub provider: String,
+}
+
+/// AI theme edits, newest first (at most 50).
+#[utoipa::path(
+    get,
+    path = "/admin/v1/themes/ai-runs",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader),
+    responses((status = 200, body = RunList))
+)]
+async fn list_runs(staff: TenantStaff, State(s): State<AppState>) -> Result<Json<RunList>, Error> {
+    let items = in_tx(&s, staff.tenant_id, async |tx| ai_edit::list(tx).await).await?;
+    Ok(Json(RunList {
+        items,
+        provider: s.ai.provider().into(),
+    }))
+}
+
+/// Starts an AI theme edit from a prompt (a job): the agent edits a copy of the base revision
+/// (default: the active one), writes a functional check and runs the builder's gates, with at
+/// most 25 turns and 3 repairs. Poll `GET /themes/ai-runs/{id}`.
+#[utoipa::path(
+    post,
+    path = "/admin/v1/themes/ai-runs",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader),
+    request_body = NewRun,
+    responses(
+        (status = 202, body = RunSummary),
+        (status = 402, description = "ai_quota_exceeded", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "ai_run_in_progress | base_not_validated | ai_run_not_accepted", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 503, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn start_run(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    body: Bytes,
+) -> Result<Response, Error> {
+    staff.require(Role::Admin)?;
+    let input: NewRun = parse_json(&body)?;
+    let actor = staff.user.user_id.clone();
+    let run = in_tx(&s, staff.tenant_id, async |tx| {
+        ai_edit::start(tx, &s.ai, &actor, &input).await
+    })
+    .await?;
+    Ok((StatusCode::ACCEPTED, Json(run)).into_response())
+}
+
+/// One AI theme edit: progress (tool steps, turns, checks), the agent's summary, the diff
+/// against the base revision and the last check report.
+#[utoipa::path(
+    get,
+    path = "/admin/v1/themes/ai-runs/{id}",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, IdParam),
+    responses(
+        (status = 200, body = RunDetail),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn get_run(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    id: Result<Path<Uuid>, PathRejection>,
+) -> Result<Json<RunDetail>, Error> {
+    let id = path_id(id)?;
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            ai_edit::detail(tx, id).await
+        })
+        .await?,
+    ))
+}
+
+/// Cancels a queued run at once, a running one at its next step.
+#[utoipa::path(
+    post,
+    path = "/admin/v1/themes/ai-runs/{id}/cancel",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, IdParam),
+    responses(
+        (status = 200, body = RunSummary),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "invalid_transition", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn cancel_run(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    id: Result<Path<Uuid>, PathRejection>,
+) -> Result<Json<RunSummary>, Error> {
+    staff.require(Role::Admin)?;
+    let id = path_id(id)?;
+    let actor = staff.user.user_id.clone();
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            ai_edit::cancel(tx, &actor, id).await
+        })
+        .await?,
+    ))
+}
+
+/// Accepts a succeeded run after review: its final revision may then be previewed and
+/// published like any other (publishing still needs a fresh login).
+#[utoipa::path(
+    post,
+    path = "/admin/v1/themes/ai-runs/{id}/accept",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, IdParam),
+    responses(
+        (status = 200, body = RunSummary),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "invalid_transition | revision_not_ready", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn accept_run(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    id: Result<Path<Uuid>, PathRejection>,
+) -> Result<Json<RunSummary>, Error> {
+    staff.require(Role::Admin)?;
+    let id = path_id(id)?;
+    let actor = staff.user.user_id.clone();
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            ai_edit::accept(tx, &actor, id).await
+        })
+        .await?,
+    ))
+}
+
+/// Discards a succeeded run: its revisions stay unpublishable.
+#[utoipa::path(
+    post,
+    path = "/admin/v1/themes/ai-runs/{id}/discard",
+    tag = "themes",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, IdParam),
+    responses(
+        (status = 200, body = RunSummary),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "invalid_transition", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn discard_run(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    id: Result<Path<Uuid>, PathRejection>,
+) -> Result<Json<RunSummary>, Error> {
+    staff.require(Role::Admin)?;
+    let id = path_id(id)?;
+    let actor = staff.user.user_id.clone();
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            ai_edit::discard(tx, &actor, id).await
+        })
+        .await?,
+    ))
 }

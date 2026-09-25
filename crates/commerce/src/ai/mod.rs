@@ -47,12 +47,24 @@ const FIXTURES: &[(&str, &str)] = &[
     (BULK_PLAN, include_str!("fixtures/bulk_plan.j2")),
 ];
 
+/// The fake provider: helper fixtures and the scripted theme-editing agent.
+fn fake_provider() -> Result<platform::ai::Fake, AiError> {
+    Ok(
+        platform::ai::Fake::new(FIXTURES.iter().copied())?.with_agent(
+            crate::themes::ai_edit::FEATURE,
+            Arc::new(crate::themes::ai_edit::fake_agent),
+        ),
+    )
+}
+
 /// The AI services of a process (API or worker).
 #[derive(Clone)]
 pub struct Ai {
     /// `None`: disabled (production without a key).
-    client: Option<Client>,
+    pub(crate) client: Option<Client>,
     pub helper_model: String,
+    /// AI theme editing (WP24).
+    pub theme_model: String,
     prices: Arc<PriceTable>,
     plan_quotas: Arc<BTreeMap<String, i64>>,
 }
@@ -69,14 +81,13 @@ impl Ai {
                 )
                 .map_err(|e| AiError::Rejected(e.to_string()))?,
             ))),
-            AiProvider::Fake => Some(Client::Fake(Arc::new(platform::ai::Fake::new(
-                FIXTURES.iter().copied(),
-            )?))),
+            AiProvider::Fake => Some(Client::Fake(Arc::new(fake_provider()?))),
             AiProvider::Disabled => None,
         };
         Ok(Self {
             client,
             helper_model: cfg.helper_model.clone(),
+            theme_model: cfg.theme_model.clone(),
             prices: Arc::new(cfg.prices.clone()),
             plan_quotas: Arc::new(cfg.plan_quotas.clone()),
         })
@@ -84,11 +95,7 @@ impl Ai {
 
     /// The fake provider with default models and quotas (tests, tools).
     pub fn fake() -> Self {
-        Self::fake_with_client(
-            platform::ai::Fake::new(FIXTURES.iter().copied())
-                .map(|f| Client::Fake(Arc::new(f)))
-                .ok(),
-        )
+        Self::fake_with_client(fake_provider().map(|f| Client::Fake(Arc::new(f))).ok())
     }
 
     /// Default models and quotas around any client (tests with a stub API).
@@ -96,6 +103,7 @@ impl Ai {
         Self {
             client,
             helper_model: "claude-sonnet-5".into(),
+            theme_model: "claude-opus-5-5".into(),
             prices: Arc::new(PriceTable::default()),
             plan_quotas: Arc::new(BTreeMap::from([("standard".to_owned(), 2_000_000)])),
         }
@@ -108,6 +116,11 @@ impl Ai {
             Some(Client::Fake(_)) => "fake",
             None => "disabled",
         }
+    }
+
+    /// List price of a model (USD micros per million tokens), if known.
+    pub(crate) fn price(&self, model: &str) -> Option<platform::ai::ModelPrice> {
+        self.prices.0.get(model).copied()
     }
 
     fn quota_for(&self, plan: &str, overridden: Option<i64>) -> i64 {
@@ -164,7 +177,7 @@ pub fn month_start(now: DateTime<Utc>) -> DateTime<Utc> {
         .unwrap_or(now)
 }
 
-async fn quota_state(tx: &mut TenantTx, ai: &Ai) -> Result<(i64, i64, i64), Error> {
+pub(crate) async fn quota_state(tx: &mut TenantTx, ai: &Ai) -> Result<(i64, i64, i64), Error> {
     let tenant = sqlx::query!(
         "SELECT plan, ai_monthly_tokens FROM platform.tenants WHERE id = $1",
         tx.tenant_id()
@@ -317,33 +330,12 @@ pub(crate) async fn call(
         Ok(done) => (done.usage, done.model.clone()),
         Err(Failure { usage, model, .. }) => (*usage, model.clone()),
     };
-    if usage.total() > 0 {
-        let model = if model.is_empty() {
-            ai.helper_model.clone()
-        } else {
-            model
-        };
-        let cost = ai.prices.cost_micros(&model, &usage);
-        let n = |v: u64| i64::try_from(v).unwrap_or(i64::MAX);
-        let mut tx = tenant_tx(db, tenant).await?;
-        sqlx::query!(
-            "INSERT INTO ai_usage (tenant_id, feature, model, input_tokens, output_tokens,
-                                   cache_read_tokens, cache_write_tokens, cost_micros, actor)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-            tenant,
-            c.feature,
-            model,
-            n(usage.input_tokens),
-            n(usage.output_tokens),
-            n(usage.cache_read_input_tokens),
-            n(usage.cache_creation_input_tokens),
-            n(cost),
-            actor
-        )
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-    }
+    let model = if model.is_empty() {
+        ai.helper_model.clone()
+    } else {
+        model
+    };
+    record_usage(db, ai, tenant, actor, c.feature, &model, &usage).await?;
     match result {
         Ok(done) => Ok((done.output, done.model)),
         Err(f) => Err(match f.error {
@@ -363,6 +355,42 @@ pub(crate) async fn call(
             AiError::InvalidOutput(detail) => CallError::output(detail),
         }),
     }
+}
+
+/// Writes the `ai_usage` row of a call that consumed tokens; returns its cost (USD micros).
+pub(crate) async fn record_usage(
+    db: &PgPool,
+    ai: &Ai,
+    tenant: Uuid,
+    actor: &str,
+    feature: &str,
+    model: &str,
+    usage: &platform::ai::Usage,
+) -> Result<i64, Error> {
+    if usage.total() == 0 {
+        return Ok(0);
+    }
+    let n = |v: u64| i64::try_from(v).unwrap_or(i64::MAX);
+    let cost = n(ai.prices.cost_micros(model, usage));
+    let mut tx = tenant_tx(db, tenant).await?;
+    sqlx::query!(
+        "INSERT INTO ai_usage (tenant_id, feature, model, input_tokens, output_tokens,
+                               cache_read_tokens, cache_write_tokens, cost_micros, actor)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        tenant,
+        feature,
+        model,
+        n(usage.input_tokens),
+        n(usage.output_tokens),
+        n(usage.cache_read_input_tokens),
+        n(usage.cache_creation_input_tokens),
+        cost,
+        actor
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(cost)
 }
 
 /// Deserializes the model output into `T` (unknown fields rejected).

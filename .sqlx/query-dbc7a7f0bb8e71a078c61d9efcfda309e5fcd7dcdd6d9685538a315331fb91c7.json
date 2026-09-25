@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_theme_runs SET transcript = $2, steps = $3, turns = $4, tokens = $5,\n                    cost_micros = $6, model = $7, updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Int4",
+        "Int8",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dbc7a7f0bb8e71a078c61d9efcfda309e5fcd7dcdd6d9685538a315331fb91c7"
+}

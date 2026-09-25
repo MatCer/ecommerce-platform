@@ -12822,6 +12822,421 @@
         ]
       }
     },
+    "/admin/v1/themes/ai-runs": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "AI theme edits, newest first (at most 50).",
+        "operationId": "list_runs",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiThemeRunList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Starts an AI theme edit from a prompt (a job): the agent edits a copy of the base revision\n(default: the active one), writes a functional check and runs the builder's gates, with at\nmost 25 turns and 3 repairs. Poll `GET /themes/ai-runs/{id}`.",
+        "operationId": "start_run",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiThemeNewRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiThemeRunSummary"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "ai_quota_exceeded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ai_run_in_progress | base_not_validated | ai_run_not_accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/ai-runs/{id}": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "One AI theme edit: progress (tool steps, turns, checks), the agent's summary, the diff\nagainst the base revision and the last check report.",
+        "operationId": "get_run",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiThemeRunDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/ai-runs/{id}/accept": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Accepts a succeeded run after review: its final revision may then be previewed and\npublished like any other (publishing still needs a fresh login).",
+        "operationId": "accept_run",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiThemeRunSummary"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition | revision_not_ready",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/ai-runs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Cancels a queued run at once, a running one at its next step.",
+        "operationId": "cancel_run",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiThemeRunSummary"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/ai-runs/{id}/discard": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Discards a succeeded run: its revisions stay unpublishable.",
+        "operationId": "discard_run",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiThemeRunSummary"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/themes/revisions": {
       "get": {
         "tags": [
@@ -13154,6 +13569,61 @@
         ]
       }
     },
+    "/admin/v1/themes/revisions/{id}/diff": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "What a revision changed compared to its parent: a unified diff of the sources.",
+        "operationId": "revision_diff",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDiff"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/themes/revisions/{id}/preview": {
       "post": {
         "tags": [
@@ -13295,7 +13765,7 @@
             }
           },
           "409": {
-            "description": "not_publishable",
+            "description": "not_publishable | ai_run_not_accepted",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -21787,6 +22257,237 @@
             "items": {
               "$ref": "#/components/schemas/AiMark"
             }
+          }
+        }
+      },
+      "AiThemeNewRun": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "base_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The revision to start from; default: the active one. Must have passed the checks."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "What the merchant wants changed (1–4000 characters)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AiThemeRunDetail": {
+        "type": "object",
+        "required": [
+          "run",
+          "steps",
+          "limits"
+        ],
+        "properties": {
+          "diff": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Unified diff from the base revision's source to the run's result."
+          },
+          "limits": {
+            "$ref": "#/components/schemas/AiThemeRunLimits"
+          },
+          "report": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "The builder's report of the last check (`steps`, `failures`, …)."
+          },
+          "run": {
+            "$ref": "#/components/schemas/AiThemeRunSummary"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiThemeStep"
+            }
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The agent's closing message for the merchant."
+          }
+        }
+      },
+      "AiThemeRunLimits": {
+        "type": "object",
+        "required": [
+          "max_turns",
+          "max_checks"
+        ],
+        "properties": {
+          "max_checks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max_turns": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AiThemeRunList": {
+        "type": "object",
+        "required": [
+          "items",
+          "provider"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiThemeRunSummary"
+            }
+          },
+          "provider": {
+            "type": "string",
+            "description": "`anthropic`, `fake` (the scripted demo agent, no key configured) or `disabled`."
+          }
+        }
+      },
+      "AiThemeRunSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt",
+          "status",
+          "cancel_requested",
+          "base_revision_id",
+          "turns",
+          "checks_run",
+          "tokens",
+          "cost_micros",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "base_revision_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cancel_requested": {
+            "type": "boolean"
+          },
+          "checks_run": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the run failed (`turn_limit: …`, `checks_failed: …`), empty otherwise."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The latest checked revision (the one accept makes publishable)."
+          },
+          "revision_number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "`queued`, `running`, `succeeded`, `failed`, `cancelled`, `accepted` or `discarded`."
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "turns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AiThemeStep": {
+        "type": "object",
+        "description": "One tool call of the agent, as shown in the admin.",
+        "required": [
+          "at",
+          "tool",
+          "ok",
+          "detail"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tool": {
+            "type": "string",
+            "description": "`list_files`, `read_file`, `write_file`, `delete_file` or `run_checks`."
           }
         }
       },
@@ -32991,6 +33692,25 @@
             "propertyNames": {
               "type": "string"
             }
+          }
+        }
+      },
+      "RevisionDiff": {
+        "type": "object",
+        "required": [
+          "diff"
+        ],
+        "properties": {
+          "base_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The revision compared against (the parent), if any."
+          },
+          "diff": {
+            "type": "string"
           }
         }
       },

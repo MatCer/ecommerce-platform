@@ -55,8 +55,8 @@
 | WP23 | Sandboxes run under runc on the app host; prod should use gVisor/Firecracker on dedicated build hosts (the proxy would pin `Runtime`) | pre-launch |
 | WP23 | Builder queue is in memory (concurrency 1): a builder restart drops queued builds; they fail after 30 min and must be re-created (no retry button yet) | later |
 | WP23 | Theme source archives and screenshots of old revisions are never deleted (small; artifacts are GC'd) | later (ops) |
-| WP23 | The WP2 lint ideas not built: `client:visible` on an island whose server render can be empty, stale preloads; no image-bytes budget or desktop CLS run in the gates | WP24 |
-| WP23 | No diff view between revisions and no "rebuild" action (a new token edit/upload/reset creates a new revision) | WP24 |
+| WP23 | ~~`client:visible` lint~~ done in WP24 (`client-visible`, every use in `.astro`); still open: stale-preload lint, image-bytes budget, desktop CLS run in the gates | later |
+| WP23 | ~~No diff view between revisions~~ done in WP24 (`GET /themes/revisions/{id}/diff`, "Show changes" in the report); no "rebuild" action (a new token edit/upload/reset creates a new revision) | later |
 | WP20/WP22 | Full e2e with 4 workers: checkout handoff `/start` timeouts in 2 specs + shared demo-owner sign-ins hit the auth rate limit; make the suite reliable (per-spec users, IP-aware auth limits from WP12) | WP15 |
 | WP12 | Packeta/PPL are built from public docs and exercised only against `apps/mocks` (request shapes, home-delivery carrier ids, COD rounding rules); carrier-side cancellation of a voided label and an unanswered shipment announcement (`label_in_progress`) are reconciled by hand in the carrier portal | pre-launch checklist |
 | WP12 | Carrier-specific COD payout imports (Packeta/PPL report formats) are not built; payouts go through the generic CSV (`POST /admin/v1/cod-reports`) | WP15 |
@@ -69,6 +69,12 @@
 | WP18 | The marketing rate is one platform constant (500 messages per tenant and minute) and limits how fast campaign messages are queued, not SMTP itself (a backlog after an outage drains faster); per-tenant quotas, a delivery-time rate limit | later |
 | WP18 | ~~Subscriber import (CSV)~~ done in WP13b; the AI copy assist per segment (§11.5) | M3 |
 | WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
+| WP24 | The agent loop was exercised only with the scripted fake agent; run the manual smoke with a real `ANTHROPIC_API_KEY` (runbook §6d) and record pass rate, turns, repairs, tokens and cost per prompt (the `ai-edit-prompts.md` table) | pre-launch / WP25 |
+| WP24 | AI runs have their own queue with 2 loops per worker process (constant); more concurrent runs wait queued. Make it configurable / a separate worker when many shops edit at once | later (scale-out) |
+| WP24 | A refused or cut-off (`max_tokens`) model response is metered but its content is not kept in the transcript | later |
+| WP24 | `ai_theme_runs` transcripts (the full API history, can be MBs) are kept indefinitely; add a retention rule to `ops.sweep` | later (ops) |
+| WP24 | No "retry" or "continue with feedback" on a failed/finished run (the merchant starts a new run with a refined prompt) | later |
+| WP24 | The agent cannot add storefront message-catalog keys (platform-owned): new copy is written in the shop's locale directly in markup, so multi-locale shops get one language for AI-added strings | later (theme-owned catalog overrides) |
 | WP13b | `audit_log` is append-only: diffs written by earlier staff edits may still quote an erased customer's email or address; erasure cannot scrub them (the erasure entry itself holds counts only) | later (privacy) |
 | WP13b | Backups (`make backup`) keep erased data until they rotate out; document the retention in the privacy policy template or re-apply erasures after a restore | pre-launch |
 | WP13b | Data exports have no automatic expiry (a new erasure deletes all of them); add a retention sweep (e.g. 7 days) to `ops.sweep` | later (ops) |

@@ -2746,6 +2746,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/themes/ai-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** AI theme edits, newest first (at most 50). */
+        get: operations["list_runs"];
+        put?: never;
+        /**
+         * Starts an AI theme edit from a prompt (a job): the agent edits a copy of the base revision
+         *     (default: the active one), writes a functional check and runs the builder's gates, with at
+         *     most 25 turns and 3 repairs. Poll `GET /themes/ai-runs/{id}`.
+         */
+        post: operations["start_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/ai-runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One AI theme edit: progress (tool steps, turns, checks), the agent's summary, the diff
+         *     against the base revision and the last check report.
+         */
+        get: operations["get_run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/ai-runs/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accepts a succeeded run after review: its final revision may then be previewed and
+         *     published like any other (publishing still needs a fresh login).
+         */
+        post: operations["accept_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/ai-runs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancels a queued run at once, a running one at its next step. */
+        post: operations["cancel_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/ai-runs/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discards a succeeded run: its revisions stay unpublishable. */
+        post: operations["discard_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/themes/revisions": {
         parameters: {
             query?: never;
@@ -2852,6 +2948,23 @@ export interface paths {
          *     and screenshots (presigned, 5 minutes).
          */
         get: operations["get_revision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/{id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a revision changed compared to its parent: a unified diff of the sources. */
+        get: operations["revision_diff"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4723,6 +4836,82 @@ export interface components {
         };
         AiMarkList: {
             items: components["schemas"]["AiMark"][];
+        };
+        AiThemeNewRun: {
+            /**
+             * Format: uuid
+             * @description The revision to start from; default: the active one. Must have passed the checks.
+             */
+            base_revision_id?: string | null;
+            /** @description What the merchant wants changed (1–4000 characters). */
+            prompt: string;
+        };
+        AiThemeRunDetail: {
+            /** @description Unified diff from the base revision's source to the run's result. */
+            diff?: string | null;
+            limits: components["schemas"]["AiThemeRunLimits"];
+            /** @description The builder's report of the last check (`steps`, `failures`, …). */
+            report?: Record<string, never> | null;
+            run: components["schemas"]["AiThemeRunSummary"];
+            steps: components["schemas"]["AiThemeStep"][];
+            /** @description The agent's closing message for the merchant. */
+            summary?: string | null;
+        };
+        AiThemeRunLimits: {
+            /** Format: int32 */
+            max_checks: number;
+            /** Format: int32 */
+            max_turns: number;
+        };
+        AiThemeRunList: {
+            items: components["schemas"]["AiThemeRunSummary"][];
+            /** @description `anthropic`, `fake` (the scripted demo agent, no key configured) or `disabled`. */
+            provider: string;
+        };
+        AiThemeRunSummary: {
+            /** Format: uuid */
+            base_revision_id: string;
+            cancel_requested: boolean;
+            /** Format: int32 */
+            checks_run: number;
+            /** Format: int64 */
+            cost_micros: number;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            /** @description Why the run failed (`turn_limit: …`, `checks_failed: …`), empty otherwise. */
+            error?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            model?: string | null;
+            prompt: string;
+            /**
+             * Format: uuid
+             * @description The latest checked revision (the one accept makes publishable).
+             */
+            revision_id?: string | null;
+            /** Format: int32 */
+            revision_number?: number | null;
+            /** @description `queued`, `running`, `succeeded`, `failed`, `cancelled`, `accepted` or `discarded`. */
+            status: string;
+            /** Format: int64 */
+            tokens: number;
+            /** Format: int32 */
+            turns: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description One tool call of the agent, as shown in the admin. */
+        AiThemeStep: {
+            /** Format: date-time */
+            at: string;
+            detail: string;
+            ok: boolean;
+            path?: string | null;
+            /** @description `list_files`, `read_file`, `write_file`, `delete_file` or `run_checks`. */
+            tool: string;
         };
         Alternate: {
             href: string;
@@ -8180,6 +8369,14 @@ export interface components {
                     [key: string]: string;
                 };
             } | null;
+        };
+        RevisionDiff: {
+            /**
+             * Format: uuid
+             * @description The revision compared against (the parent), if any.
+             */
+            base_revision_id?: string | null;
+            diff: string;
         };
         RevisionList: {
             items: components["schemas"]["RevisionSummary"][];
@@ -16989,6 +17186,283 @@ export interface operations {
             };
         };
     };
+    list_runs: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiThemeRunList"];
+                };
+            };
+        };
+    };
+    start_run: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiThemeNewRun"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
+                };
+            };
+            /** @description ai_quota_exceeded */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description ai_run_in_progress | base_not_validated | ai_run_not_accepted */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_run: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiThemeRunDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    accept_run: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition | revision_not_ready */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancel_run: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    discard_run: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_revisions: {
         parameters: {
             query?: never;
@@ -17199,6 +17673,38 @@ export interface operations {
             };
         };
     };
+    revision_diff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDiff"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     preview: {
         parameters: {
             query?: never;
@@ -17295,7 +17801,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description not_publishable */
+            /** @description not_publishable | ai_run_not_accepted */
             409: {
                 headers: {
                     [name: string]: unknown;

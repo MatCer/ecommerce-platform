@@ -16,6 +16,7 @@ chrono.workspace = true
 crc32fast.workspace = true
 csv.workspace = true
 flate2.workspace = true
+similar.workspace = true
 hex.workspace = true
 hmac.workspace = true
 image.workspace = true

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_theme_runs SET status = 'discarded', updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f65c7d4b5109e3603cffd197e22f9c8c85d0b9de6e48665175af9d3c4092c212"
+}
