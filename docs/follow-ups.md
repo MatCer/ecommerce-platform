@@ -55,6 +55,6 @@
 | WP20/WP22 | Full e2e with 4 workers: checkout handoff `/start` timeouts in 2 specs + shared demo-owner sign-ins hit the auth rate limit; make the suite reliable (per-spec users, IP-aware auth limits from WP12) | WP15 |
 | WP18 | No open tracking at all (privacy default); the optional consented tracking pixel of §11.5 is not built | later (only if merchants ask) |
 | WP18 | Marketing message bodies stay in `email_messages` indefinitely (one row per recipient); add a retention rule to `ops.sweep` (e.g. drop bodies of final marketing mail after 30 days) | later (ops) |
-| WP18 | The marketing rate is one platform constant (500 messages per tenant and minute); per-tenant sending quotas | later |
+| WP18 | The marketing rate is one platform constant (500 messages per tenant and minute) and limits how fast campaign messages are queued, not SMTP itself (a backlog after an outage drains faster); per-tenant quotas, a delivery-time rate limit | later |
 | WP18 | Subscriber import (CSV) and the AI copy assist per segment (§11.5) | WP13b / M3 |
 | WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
