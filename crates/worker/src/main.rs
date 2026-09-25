@@ -51,13 +51,17 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("SECRETS_KEY is not configured: webhook deliveries stay queued until it is");
     }
     // Event partitions exist before the first event of a new month even if the nightly job
-    // has not run yet (e.g. after downtime).
-    if let Err(e) = sqlx::query("SELECT platform.ensure_event_partitions(2)")
-        .execute(&db)
-        .await
-    {
-        tracing::warn!(error = %e, "ensuring event partitions failed");
-    }
+    // has not run yet (e.g. after downtime). In the background: startup (and SIGTERM
+    // handling) must not wait for a database that is down.
+    let partitions_db = db.clone();
+    tokio::spawn(async move {
+        if let Err(e) = sqlx::query("SELECT platform.ensure_event_partitions(2)")
+            .execute(&partitions_db)
+            .await
+        {
+            tracing::warn!(error = %e, "ensuring event partitions failed");
+        }
+    });
     // Edge purges and public URLs (export feeds); the SSRF-safe client for imports and
     // webhooks (A21).
     let sf = StorefrontConfig::from_env()?;
