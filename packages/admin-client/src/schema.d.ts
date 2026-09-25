@@ -219,7 +219,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Regenerates the export feeds now (they also refresh hourly and after catalog changes). */
+        /**
+         * Regenerates the export feeds now (owner/admin; they also refresh hourly and after catalog
+         *     changes).
+         */
         post: operations["regenerate_feeds"];
         delete?: never;
         options?: never;

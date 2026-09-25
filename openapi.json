@@ -1155,7 +1155,7 @@
         "tags": [
           "feeds"
         ],
-        "summary": "Regenerates the export feeds now (they also refresh hourly and after catalog changes).",
+        "summary": "Regenerates the export feeds now (owner/admin; they also refresh hourly and after catalog\nchanges).",
         "operationId": "regenerate_feeds",
         "parameters": [
           {
