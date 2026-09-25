@@ -118,6 +118,11 @@ impl Ai {
         }
     }
 
+    /// List price of a model (USD micros per million tokens), if known.
+    pub(crate) fn price(&self, model: &str) -> Option<platform::ai::ModelPrice> {
+        self.prices.0.get(model).copied()
+    }
+
     fn quota_for(&self, plan: &str, overridden: Option<i64>) -> i64 {
         overridden
             .or_else(|| self.plan_quotas.get(plan).copied())

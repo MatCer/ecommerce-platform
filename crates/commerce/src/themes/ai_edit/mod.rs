@@ -42,6 +42,11 @@ use crate::markets::invalid;
 
 /// Worker job: run the agent loop of `{run_id}` (tenant job).
 pub const JOB: &str = "themes.ai_edit";
+/// The queue AI runs are claimed from (the worker runs [`WORKER_LOOPS`] loops for it).
+pub const QUEUE: &str = "themes-ai";
+/// Concurrent AI runs per worker process. ponytail: a constant; make it configurable when
+/// many shops edit at once.
+pub const WORKER_LOOPS: usize = 2;
 /// Metering key (`ai_usage.feature`) and fake-agent name.
 pub const FEATURE: &str = "theme_edit";
 const SYSTEM: &str = include_str!("system.md");
@@ -246,22 +251,12 @@ pub async fn start(
         })?,
     };
     ensure_validated_base(tx, base).await?;
-    let busy = sqlx::query_scalar!(
-        r#"SELECT EXISTS (SELECT 1 FROM ai_theme_runs WHERE status IN ('queued', 'running'))
-           AS "busy!""#
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-    if busy {
-        return Err(Error::Conflict {
-            code: "ai_run_in_progress",
-            detail: "an AI edit is already running for this shop; wait for it or cancel it".into(),
-        });
-    }
     let id = Uuid::now_v7();
-    sqlx::query!(
+    // One active run per tenant: the partial unique index decides, also for concurrent starts.
+    let inserted = sqlx::query!(
         "INSERT INTO ai_theme_runs (id, tenant_id, base_revision_id, prompt, created_by)
-         VALUES ($1, $2, $3, $4, $5)",
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (tenant_id) WHERE status IN ('queued', 'running') DO NOTHING",
         id,
         tx.tenant_id(),
         base,
@@ -269,8 +264,18 @@ pub async fn start(
         actor
     )
     .execute(&mut **tx)
-    .await?;
+    .await?
+    .rows_affected();
+    if inserted == 0 {
+        return Err(Error::Conflict {
+            code: "ai_run_in_progress",
+            detail: "an AI edit is already running for this shop; wait for it or cancel it".into(),
+        });
+    }
     let mut job = NewJob::new(JOB, json!({ "run_id": id }));
+    // Own queue with its own worker loops: a run waits minutes for builds, which run on the
+    // default queue, so runs must never hold the slots those builds need.
+    job.queue = QUEUE;
     job.tenant_id = Some(tx.tenant_id());
     // A second attempt only marks a run whose worker died as interrupted (never re-spends).
     job.max_attempts = 2;
@@ -693,17 +698,32 @@ impl Agent<'_> {
                     ));
                 }
             }
-            let result = client
-                .converse(&Conversation {
-                    feature: FEATURE,
-                    model: &self.ai.theme_model,
-                    system: SYSTEM,
-                    tools: &tool_defs,
-                    messages: &self.messages,
-                    max_tokens: self.limits.max_output_tokens,
-                    effort: "high",
-                })
-                .await;
+            // Reserve the worst case of this call (estimated input + the output allowance) within
+            // the remaining token and cost budget; shrink the allowance to fit.
+            let Some(max_tokens) = self.output_allowance(&tool_defs) else {
+                return Ok(End::Failed(
+                    "budget",
+                    "the run used its token/cost budget".into(),
+                ));
+            };
+            let conversation = Conversation {
+                feature: FEATURE,
+                model: &self.ai.theme_model,
+                system: SYSTEM,
+                tools: &tool_defs,
+                messages: &self.messages,
+                max_tokens,
+                effort: "high",
+            };
+            // The call is bounded by the run's deadline and stops on cancellation.
+            let result = tokio::select! {
+                r = client.converse(&conversation) => r,
+                end = self.watch() => {
+                    let end = end?;
+                    self.save().await?;
+                    return Ok(end);
+                }
+            };
             let (usage, model) = match &result {
                 Ok(t) => (t.usage, t.model.clone()),
                 Err(Failure { usage, model, .. }) => (*usage, model.clone()),
@@ -735,9 +755,16 @@ impl Agent<'_> {
             };
             self.messages
                 .push(json!({ "role": "assistant", "content": turn.content }));
+            // Checkpoint before any side effect: a crash keeps the evidence.
+            self.save().await?;
+            if self.tokens > self.limits.max_tokens || self.cost > self.limits.max_cost_micros {
+                return Ok(End::Failed(
+                    "budget",
+                    "the run used its token/cost budget".into(),
+                ));
+            }
             let calls: Vec<Value> = turn.tool_uses().cloned().collect();
             if turn.stop_reason != "tool_use" || calls.is_empty() {
-                self.save().await?;
                 return Ok(End::Stopped(turn.text()));
             }
             // Every tool_use gets its result, all in one user message.
@@ -798,6 +825,44 @@ impl Agent<'_> {
                 ));
             }
         }
+    }
+
+    /// Resolves once the run is cancelled or out of time (polled every `limits.poll`).
+    async fn watch(&self) -> Result<End, Error> {
+        loop {
+            tokio::time::sleep(self.limits.poll).await;
+            if let Some(end) = self.interrupted().await? {
+                return Ok(end);
+            }
+        }
+    }
+
+    /// The output allowance of the next call: the remaining token and cost budget minus a
+    /// conservative estimate of the input (about 3 characters per token, all of it uncached),
+    /// at most `limits.max_output_tokens`. `None`: too little left for a useful turn.
+    fn output_allowance(&self, tool_defs: &Value) -> Option<u32> {
+        const MIN_OUTPUT: i64 = 2_000;
+        let chars = SYSTEM.len()
+            + tool_defs.to_string().len()
+            + self
+                .messages
+                .iter()
+                .map(|m| m.to_string().len())
+                .sum::<usize>();
+        let input = i64::try_from(chars / 3).unwrap_or(i64::MAX);
+        let mut allowance = i64::from(self.limits.max_output_tokens)
+            .min(self.limits.max_tokens - self.tokens - input);
+        if let Some(price) = self.ai.price(&self.ai.theme_model) {
+            let per_million =
+                |tokens: i64, micros: u64| i128::from(tokens) * i128::from(micros) / 1_000_000;
+            let left = i128::from(self.limits.max_cost_micros - self.cost)
+                - per_million(input, price.input);
+            if price.output > 0 {
+                let by_cost = left * 1_000_000 / i128::from(price.output);
+                allowance = allowance.min(i64::try_from(by_cost).unwrap_or(i64::MAX));
+            }
+        }
+        (allowance >= MIN_OUTPUT).then(|| u32::try_from(allowance).unwrap_or(u32::MAX))
     }
 
     /// Cancellation or the wall clock.
@@ -925,6 +990,18 @@ impl Agent<'_> {
             } else {
                 tools::Outcome::err(content)
             };
+            // The evidence of this check is stored at once (a crash later keeps it).
+            let snapshot = diff(&self.base, &self.files);
+            let mut tx = tenant_tx(self.db, self.tenant).await?;
+            sqlx::query!(
+                "UPDATE ai_theme_runs SET report = $2, diff = $3, updated_at = now() WHERE id = $1",
+                self.id,
+                r.checks,
+                snapshot
+            )
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
             self.last_check = Some(Checked {
                 files: self.files.clone(),
                 ready,
@@ -993,8 +1070,11 @@ impl Agent<'_> {
         self.save().await?;
         let mut tx = tenant_tx(self.db, self.tenant).await?;
         sqlx::query!(
-            "UPDATE ai_theme_runs SET status = $2, summary = $3, error = $4, diff = $5, report = $6,
-                    finished_at = now(), updated_at = now() WHERE id = $1",
+            "UPDATE ai_theme_runs
+             SET status = CASE WHEN cancel_requested AND $2 = 'succeeded' THEN 'cancelled' ELSE $2 END,
+                 summary = $3, error = $4, diff = $5, report = $6,
+                 finished_at = now(), updated_at = now()
+             WHERE id = $1",
             self.id,
             status,
             summary.map(|s| cap(&s, 4_000)),

@@ -1048,7 +1048,7 @@ pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, 
             "UPDATE ai_theme_runs
              SET status = 'failed', finished_at = now(), updated_at = now(),
                  error = 'interrupted: the run stopped making progress; start it again'
-             WHERE status IN ('queued', 'running')
+             WHERE status = 'running'
                AND updated_at < now() - make_interval(mins => $1)",
             AI_RUN_STUCK_AFTER_MINUTES
         )

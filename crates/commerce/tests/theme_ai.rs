@@ -508,11 +508,11 @@ async fn limits_end_runs(db: PgPool) {
     );
     assert_eq!((d.run.checks_run, d.run.turns), (2, 2));
 
-    // Budget: a run over its token budget stops before the next call.
+    // Budget: a call whose worst case does not fit the remaining budget is never made.
     let ai = scripted(|_| tool_turn(&[("list_files", json!({"prefix": ""}))]));
     let run = start(&runtime, &ai, shop.tenant, "budget").await.unwrap();
     let limits = Limits {
-        max_tokens: 1,
+        max_tokens: 5_000,
         ..fast()
     };
     ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, limits)
@@ -524,7 +524,59 @@ async fn limits_end_runs(db: PgPool) {
         "{:?}",
         d.run.error
     );
-    assert_eq!(d.run.turns, 1);
+    assert_eq!(d.run.turns, 0);
+
+    // A response that overshoots the budget (the input estimate was low) ends the run before
+    // its tools run, even a final answer after passing checks.
+    let ai = scripted(|messages| {
+        let turn = messages.iter().filter(|m| m["role"] == "assistant").count();
+        match turn {
+            0 => tool_turn(&[
+                (
+                    "write_file",
+                    json!({"path": "src/z.astro", "content": "<p>z</p>\n"}),
+                ),
+                (
+                    "write_file",
+                    json!({"path": "checks/z.spec.ts", "content": "// z\n"}),
+                ),
+                ("run_checks", json!({})),
+            ]),
+            _ => json!({
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": "Done."}],
+                "usage": {"input_tokens": 10_000_000, "output_tokens": 10}
+            }),
+        }
+    });
+    // (A large monthly allowance, so the overshoot does not block the next runs.)
+    sqlx::query("UPDATE platform.tenants SET ai_monthly_tokens = 1000000000 WHERE id = $1")
+        .bind(shop.tenant)
+        .execute(&db)
+        .await
+        .unwrap();
+    let passing = spawn_builder(
+        runtime.clone(),
+        storage.clone(),
+        shop.tenant,
+        Arc::new(|_, _| true),
+    );
+    let run = start(&runtime, &ai, shop.tenant, "overshoot")
+        .await
+        .unwrap();
+    ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, fast())
+        .await
+        .unwrap();
+    passing.abort();
+    let d = detail(&runtime, shop.tenant, run.id).await;
+    assert_eq!(d.run.status, "failed");
+    assert!(
+        d.run.error.as_deref().unwrap().starts_with("budget"),
+        "{:?}",
+        d.run.error
+    );
+    // The check evidence was stored when the check finished.
+    assert!(d.report.is_some() && d.diff.unwrap().contains("src/z.astro"));
 
     // run_checks without a functional check or without changes is refused, not built; the
     // model then stops, leaving nothing verified.
@@ -778,4 +830,119 @@ async fn maintenance_fails_runs_whose_worker_died(db: PgPool) {
     assert_eq!(d.run.status, "failed");
     assert!(d.run.error.unwrap().starts_with("interrupted"));
     start(&runtime, &ai, shop.tenant, "next").await.unwrap();
+}
+
+/// A stub Messages API that answers after a delay and records the request bodies.
+async fn slow_anthropic(delay: Duration) -> (reqwest::Url, Arc<std::sync::Mutex<Vec<Value>>>) {
+    use axum::routing::post;
+    let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let app = axum::Router::new().route(
+        "/v1/messages",
+        post(move |axum::Json(body): axum::Json<Value>| {
+            let log = log.clone();
+            async move {
+                log.lock().unwrap().push(body);
+                tokio::time::sleep(delay).await;
+                axum::Json(json!({
+                    "model": "claude-opus-5-5", "stop_reason": "tool_use",
+                    "content": [{"type": "tool_use", "id": "t1", "name": "list_files", "input": {"prefix": ""}}],
+                    "usage": {"input_tokens": 100, "output_tokens": 10}
+                }))
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    (format!("http://{addr}/").parse().unwrap(), seen)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_slow_model_call_stops_on_cancel_and_deadline(db: PgPool) {
+    let (runtime, storage, shop) = setup(&db).await;
+    let (url, seen) = slow_anthropic(Duration::from_secs(30)).await;
+    let client =
+        platform::ai::Anthropic::new(&url, "sk-test".into(), Duration::from_secs(60), 0).unwrap();
+    let ai = Ai::fake_with_client(Some(Client::Anthropic(Arc::new(client))));
+
+    // Cancelled while the model is still answering.
+    let run = start(&runtime, &ai, shop.tenant, "slow").await.unwrap();
+    let task = {
+        let (runtime, storage, ai) = (runtime.clone(), storage.clone(), ai.clone());
+        tokio::spawn(async move {
+            ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, fast()).await
+        })
+    };
+    while seen.lock().unwrap().is_empty() {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    as_tenant(
+        &runtime,
+        shop.tenant,
+        "UPDATE ai_theme_runs SET cancel_requested = true WHERE id = $1",
+        run.id,
+    )
+    .await;
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        detail(&runtime, shop.tenant, run.id).await.run.status,
+        "cancelled"
+    );
+
+    // The request: cached system prompt and history, tools, effort, no forced tool choice.
+    let body = seen.lock().unwrap()[0].clone();
+    assert_eq!(body["model"], "claude-opus-5-5");
+    assert_eq!(body["cache_control"]["type"], "ephemeral");
+    assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
+    let names: Vec<&str> = body["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "list_files",
+            "read_file",
+            "write_file",
+            "delete_file",
+            "run_checks"
+        ]
+    );
+    assert!(body.get("tool_choice").is_none() && body.get("thinking").is_none());
+    assert!(body["max_tokens"].as_u64().unwrap() <= 32_000);
+    assert!(
+        body["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("<data>")
+    );
+
+    // Out of time while the model is still answering.
+    let run = start(&runtime, &ai, shop.tenant, "slow again")
+        .await
+        .unwrap();
+    let limits = Limits {
+        timeout: Duration::from_millis(300),
+        ..fast()
+    };
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, limits),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let d = detail(&runtime, shop.tenant, run.id).await;
+    assert!(
+        d.run.error.as_deref().unwrap().starts_with("timeout"),
+        "{:?}",
+        d.run.error
+    );
 }

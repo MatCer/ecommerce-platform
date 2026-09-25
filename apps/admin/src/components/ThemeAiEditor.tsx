@@ -12,7 +12,7 @@ import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
 import { ApiError, api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 import { diffLines, parseReport, RUN_ACTIVE, runTone } from "../lib/themes.ts";
-import { Th, tableClass, tdClass } from "./Page.tsx";
+import { QueryState, Th, tableClass, tdClass } from "./Page.tsx";
 
 type Run = Schemas["AiThemeRunSummary"];
 
@@ -60,15 +60,17 @@ export function RevisionChanges(props: { id: string }) {
         {t("themes.ai.showChanges")}
       </summary>
       <div class="mt-2">
-        <Show when={diff.data} fallback={<Spinner size="sm" />}>
-          {(d) => (
-            <Show
-              when={d().diff}
-              fallback={<p class="text-muted-foreground">{t("themes.ai.noDiff")}</p>}
-            >
-              <DiffView diff={d().diff} label={t("themes.ai.diff")} />
-            </Show>
-          )}
+        <Show when={open()}>
+          <QueryState query={diff}>
+            {(d) => (
+              <Show
+                when={d.diff}
+                fallback={<p class="text-muted-foreground">{t("themes.ai.noDiff")}</p>}
+              >
+                <DiffView diff={d.diff} label={t("themes.ai.diff")} />
+              </Show>
+            )}
+          </QueryState>
         </Show>
       </div>
     </details>
@@ -201,6 +203,8 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
           </Show>
         </div>
       </Show>
+      <QueryState query={runs}>
+        {() => (
       <Show when={items().length}>
         <table class={tableClass}>
           <caption class="mb-1 text-left text-xs text-muted-foreground">
@@ -239,16 +243,22 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
           </tbody>
         </table>
       </Show>
-      <Show when={detail.data}>
-        {(d) => (
-          <RunView
-            detail={d()}
-            canEdit={props.canEdit}
-            pending={act.isPending}
-            onAction={(action) => act.mutate({ id: d().run.id, action })}
-            onShowRevision={props.onShowRevision}
-          />
         )}
+      </QueryState>
+      <Show when={current()}>
+        <div class="mt-6">
+          <QueryState query={detail}>
+            {(d) => (
+              <RunView
+                detail={d}
+                canEdit={props.canEdit}
+                pending={act.isPending}
+                onAction={(action) => act.mutate({ id: d.run.id, action })}
+                onShowRevision={props.onShowRevision}
+              />
+            )}
+          </QueryState>
+        </div>
       </Show>
     </section>
   );
@@ -265,7 +275,7 @@ function RunView(props: {
   const report = createMemo(() => parseReport(props.detail.report ?? {}));
   const active = () => RUN_ACTIVE.has(run().status);
   return (
-    <article aria-labelledby="ai-run-h" class="mt-6 flex flex-col gap-4">
+    <article aria-labelledby="ai-run-h" class="flex flex-col gap-4">
       <h3 id="ai-run-h" class="flex flex-wrap items-center gap-2 text-sm font-semibold">
         <span class="break-words">{run().prompt}</span>
         <Badge tone={runTone(run().status)}>

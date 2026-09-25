@@ -70,7 +70,8 @@
 | WP18 | Subscriber import (CSV) and the AI copy assist per segment (§11.5) | WP13b / M3 |
 | WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
 | WP24 | The agent loop was exercised only with the scripted fake agent; run the manual smoke with a real `ANTHROPIC_API_KEY` (runbook §6c) and record pass rate, turns, repairs, tokens and cost per prompt (the `ai-edit-prompts.md` table) | pre-launch / WP25 |
-| WP24 | An AI run occupies one worker job loop for up to 45 minutes (one active run per tenant); a dedicated queue/worker if many shops edit at once | later (scale-out) |
+| WP24 | AI runs have their own queue with 2 loops per worker process (constant); more concurrent runs wait queued. Make it configurable / a separate worker when many shops edit at once | later (scale-out) |
+| WP24 | A refused or cut-off (`max_tokens`) model response is metered but its content is not kept in the transcript | later |
 | WP24 | `ai_theme_runs` transcripts (the full API history, can be MBs) are kept indefinitely; add a retention rule to `ops.sweep` | later (ops) |
 | WP24 | No "retry" or "continue with feedback" on a failed/finished run (the merchant starts a new run with a refined prompt) | later |
 | WP24 | The agent cannot add storefront message-catalog keys (platform-owned): new copy is written in the shop's locale directly in markup, so multi-locale shops get one language for AI-added strings | later (theme-owned catalog overrides) |

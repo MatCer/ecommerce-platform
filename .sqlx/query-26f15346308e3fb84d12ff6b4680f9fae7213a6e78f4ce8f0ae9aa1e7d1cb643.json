@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_theme_runs\n             SET status = CASE WHEN cancel_requested AND $2 = 'succeeded' THEN 'cancelled' ELSE $2 END,\n                 summary = $3, error = $4, diff = $5, report = $6,\n                 finished_at = now(), updated_at = now()\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "26f15346308e3fb84d12ff6b4680f9fae7213a6e78f4ce8f0ae9aa1e7d1cb643"
+}

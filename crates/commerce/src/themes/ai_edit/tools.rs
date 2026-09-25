@@ -183,6 +183,24 @@ fn list(files: &BTreeMap<String, Vec<u8>>, prefix: &str) -> Outcome {
     Outcome::ok(out)
 }
 
+/// Binary or oversized files are opaque to the agent: it can neither read, replace nor delete
+/// them (it could not inspect what it destroys).
+fn opaque(path: &str, bytes: &[u8]) -> Option<Outcome> {
+    if bytes.len() > MAX_FILE_BYTES {
+        return Some(Outcome::err(format!(
+            "{path}: {} bytes, larger than the 256 kB limit",
+            bytes.len()
+        )));
+    }
+    match std::str::from_utf8(bytes) {
+        Ok(text) if !text.contains('\0') => None,
+        _ => Some(Outcome::err(format!(
+            "{path}: binary file ({} bytes), cannot be read or changed",
+            bytes.len()
+        ))),
+    }
+}
+
 fn read(files: &BTreeMap<String, Vec<u8>>, path: &str) -> Outcome {
     if let Err(e) = check_path(path) {
         return Outcome::err(e);
@@ -190,19 +208,7 @@ fn read(files: &BTreeMap<String, Vec<u8>>, path: &str) -> Outcome {
     let Some(bytes) = files.get(path) else {
         return Outcome::err(format!("{path}: no such file"));
     };
-    if bytes.len() > MAX_FILE_BYTES {
-        return Outcome::err(format!(
-            "{path}: {} bytes, larger than the 256 kB limit",
-            bytes.len()
-        ));
-    }
-    match std::str::from_utf8(bytes) {
-        Ok(text) if !text.contains('\0') => Outcome::ok(text),
-        _ => Outcome::err(format!(
-            "{path}: binary file ({} bytes), cannot be read",
-            bytes.len()
-        )),
-    }
+    opaque(path, bytes).unwrap_or_else(|| Outcome::ok(String::from_utf8_lossy(bytes)))
 }
 
 fn write(files: &mut BTreeMap<String, Vec<u8>>, path: &str, content: String) -> Outcome {
@@ -217,6 +223,9 @@ fn write(files: &mut BTreeMap<String, Vec<u8>>, path: &str, content: String) -> 
     }
     if content.contains('\0') {
         return Outcome::err(format!("{path}: binary content is not allowed"));
+    }
+    if let Some(refused) = files.get(path).and_then(|b| opaque(path, b)) {
+        return refused;
     }
     if path == TOKENS_FILE
         && let Err(e) = archive::parse_tokens(content.as_bytes())
@@ -257,10 +266,14 @@ fn delete(files: &mut BTreeMap<String, Vec<u8>>, path: &str) -> Outcome {
     if let Err(e) = check_path(path) {
         return Outcome::err(e);
     }
-    match files.remove(path) {
-        Some(_) => Outcome::ok(format!("deleted {path}")),
-        None => Outcome::err(format!("{path}: no such file")),
+    let Some(bytes) = files.get(path) else {
+        return Outcome::err(format!("{path}: no such file"));
+    };
+    if let Some(refused) = opaque(path, bytes) {
+        return refused;
     }
+    files.remove(path);
+    Outcome::ok(format!("deleted {path}"))
 }
 
 #[cfg(test)]
@@ -420,6 +433,25 @@ mod tests {
         assert!(!f.contains_key("src/pages/index.astro"));
         assert!(call(&mut f, "delete_file", json!({"path": "package.json"})).is_error);
         assert!(call(&mut f, "delete_file", json!({"path": "src/none"})).is_error);
+        // Binary and oversized files cannot be replaced or deleted either.
+        assert!(call(&mut f, "delete_file", json!({"path": "src/fonts/a.woff2"})).is_error);
+        let r = call(
+            &mut f,
+            "write_file",
+            json!({"path": "src/fonts/a.woff2", "content": "x"}),
+        );
+        assert!(r.is_error && r.content.contains("binary"), "{r:?}");
+        f.insert("src/big.txt".into(), vec![b'a'; MAX_FILE_BYTES + 1]);
+        assert!(call(&mut f, "delete_file", json!({"path": "src/big.txt"})).is_error);
+        assert!(
+            call(
+                &mut f,
+                "write_file",
+                json!({"path": "src/big.txt", "content": "x"})
+            )
+            .is_error
+        );
+        assert_eq!(f.get("src/fonts/a.woff2").map(Vec::len), Some(6));
         assert!(call(&mut f, "rm_rf", json!({})).is_error);
     }
 }

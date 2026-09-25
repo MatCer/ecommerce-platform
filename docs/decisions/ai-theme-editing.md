@@ -41,6 +41,7 @@ Everything the model sends is untrusted input.
 | Tool | Rules |
 |---|---|
 | `list_files {prefix}` | editable files only, ≤ 1000 entries |
+| (all file tools) | binary or oversized existing files are opaque: they cannot be read, replaced or deleted |
 | `read_file {path}` | path rules below; UTF-8 text without NUL only (fonts/images refused), ≤ 256 kB |
 | `write_file {path, content}` | path rules; ≤ 256 kB, no NUL; `theme.tokens.json` must pass the token schema (A6); no file/directory clashes; the whole source stays within A6 limits (50 MB, 5000 files) |
 | `delete_file {path}` | path rules |
@@ -67,12 +68,18 @@ model can react to. Every `tool_use` of a turn gets its result in one user messa
 | Wall clock | 45 min, builds included | `failed: timeout` |
 | Tenant monthly quota (WP22) | checked at start (402) and before every call | `failed: ai_quota_exceeded` |
 | Concurrency | one queued/running run per tenant (unique partial index) | `409 ai_run_in_progress` |
-| Output per turn | 32k tokens | `failed: ai_truncated` |
+| Output per turn | 32k tokens, shrunk so the call's worst case (estimated input at ~3 characters per token, uncached, plus the output allowance) fits the remaining token and cost budget | `failed: ai_truncated` |
 
-Cancellation (`POST …/cancel`) stops a queued run at once and a running one before its next
-turn or while it waits for a build. A job retry of a run that already started marks it
+The budget is also checked after every response, before its tools run (a response that
+overshoots ends the run, even a final answer). Cancellation (`POST …/cancel`) stops a queued
+run at once and a running one within seconds: it is polled while the model answers (the call
+is abandoned) and while a build runs, and the final status write turns a success into
+`cancelled` if the cancellation raced the end. The deadline bounds model calls the same way.
+Each response is saved before its tools run, and each check's report and diff snapshot are
+saved when the check finishes, so a crash keeps the evidence. A job retry of a run that already started marks it
 `interrupted` instead of resuming (never spends twice); the hourly `themes.maintenance` fails
-runs silent for 60 minutes (a dead worker would otherwise block the tenant's next run).
+runs `running` but silent for 60 minutes (a dead worker would otherwise block the tenant's
+next run).
 
 When the model stops with changes it never checked, one final check runs if a check run is
 left; otherwise the run fails as `unverified`. A run succeeds only if the last check of the
@@ -116,8 +123,9 @@ contract will do worse on cross-cutting requests).
   `theme.tokens.json`.
 - "3 check-repair cycles" is read as 4 builds (the first check + 3 repairs).
 - Budgets are constants, not configuration (no requirement to tune them per tenant yet).
-- The loop occupies one worker job loop for the whole run (≤ 45 min). ponytail: fine with
-  one active run per tenant; move it to a dedicated queue when many shops edit at once.
+- Runs are claimed from their own queue (`themes-ai`) by 2 dedicated loops per worker
+  process, so a run waiting for its build never holds a slot of the default queue the build
+  job needs. More concurrent runs than loops wait `queued` (cancellable at once).
 - AI check revisions count towards the WP23 GC of "ready beyond the newest 5".
 - The `client-visible` lint flags every `client:visible` in `.astro` files (over-approximation
   of "an island whose server render can be empty").
