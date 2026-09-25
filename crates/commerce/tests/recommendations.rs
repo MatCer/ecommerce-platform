@@ -284,6 +284,13 @@ async fn bestsellers_decay_and_popularity_is_debounced(db: PgPool) {
             .unwrap();
     tx.commit().await.unwrap();
     assert!(before > 20, "3 units ~ 28 points: {before}");
+    // The search documents carry it (closes the WP7 placeholder).
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let docs = commerce::search::documents::load_products(&mut tx, &[fresh.0], now)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(docs[0].popularity, before);
     order(
         &runtime,
         &shop,
@@ -722,10 +729,11 @@ async fn recommendation_tables_are_tenant_isolated(db: PgPool) {
     for t in tables {
         let count = async |tenant| {
             let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
-            let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {t}")))
-                .fetch_one(&mut *tx)
-                .await
-                .unwrap();
+            let n: i64 =
+                sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {t}")))
+                    .fetch_one(&mut *tx)
+                    .await
+                    .unwrap();
             tx.commit().await.unwrap();
             n
         };

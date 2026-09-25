@@ -47,6 +47,11 @@ pub const SCHEDULES: &[Schedule] = &[
         every: Duration::from_secs(3600),
     },
     Schedule {
+        name: "recommendations.rollup",
+        kind: handlers::RECOMMENDATIONS_ROLLUP,
+        every: Duration::from_secs(3600),
+    },
+    Schedule {
         name: "analytics.partitions",
         kind: handlers::PARTITIONS_JOB,
         every: Duration::from_secs(86_400),

@@ -806,3 +806,50 @@ async fn catalog_events_purge_the_edge_and_debounce_feed_exports(db: PgPool) {
         "{bodies:?}"
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn recommendations_rollup_reindexes_changed_popularity(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "reco-job").await;
+    for _ in 0..3 {
+        testkit::storefront::raw_order(&runtime, &shop, shop.cz, "CZK", 12_900, 2, "confirmed")
+            .await;
+    }
+    let mut job = NewJob::new("recommendations.rollup", json!({ "backfill": true }));
+    job.tenant_id = Some(shop.tenant);
+    let id = queue::enqueue(&runtime, &job).await.unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    wait_for_status(&db, id, "done").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let popularity: i32 =
+        sqlx::query_scalar("SELECT popularity FROM product_popularity WHERE product_id = $1")
+            .bind(shop.product)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert!(popularity > 0);
+    let reindex: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM queue.jobs
+         WHERE kind = 'search.index_product' AND payload->>'product_id' = $1::text",
+    )
+    .bind(shop.product)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(reindex, 1);
+}
