@@ -20,7 +20,11 @@ interface NavItem {
 const groups: { label: () => string; items: NavItem[] }[] = [
   {
     label: () => t("orders.title"),
-    items: [{ href: "/orders", label: () => t("orders.title"), min: "staff" }],
+    items: [
+      { href: "/orders", label: () => t("orders.title"), min: "staff" },
+      { href: "/payments/exceptions", label: () => t("nav.exceptions"), min: "staff" },
+      { href: "/payments/bank", label: () => t("nav.bank"), min: "staff" },
+    ],
   },
   {
     label: () => t("nav.catalog"),
@@ -30,6 +34,7 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/parameters", label: () => t("nav.parameters"), min: "staff" },
       { href: "/inventory", label: () => t("nav.inventory"), min: "staff" },
       { href: "/collections", label: () => t("nav.collections"), min: "staff" },
+      { href: "/ai/bulk-edit", label: () => t("nav.aiBulk"), min: "staff" },
     ],
   },
   {
@@ -66,6 +71,7 @@ const groups: { label: () => string; items: NavItem[] }[] = [
         label: () => t("nav.recommendations"),
         min: "staff",
       },
+      { href: "/settings/ai", label: () => t("nav.aiSettings"), min: "staff" },
       { href: "/markets", label: () => t("nav.markets"), min: "staff" },
       { href: "/settings/shipping", label: () => t("shipping.title"), min: "staff" },
       { href: "/settings/payments", label: () => t("payments.title"), min: "staff" },

@@ -4,6 +4,188 @@
  */
 
 export interface paths {
+    "/admin/v1/ai/bulk-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts planning a bulk edit from the staff's request (a job): poll
+         *     `GET /ai/bulk-plans/{id}`; a `ready` plan carries the target count and a preview (the dry
+         *     run). Nothing changes until the plan is applied.
+         */
+        post: operations["create_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirms a `ready` plan and applies it in the background (progress on the plan). Plans that
+         *     change prices need a sign-in at most 15 minutes old (`401 reauth_required`, A9). Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["apply_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/glossary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Terms translations must keep (brand names) or translate one fixed way. */
+        get: operations["get_glossary"];
+        /** Replaces the glossary (at most 500 terms). Audited. */
+        put: operations["put_glossary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fields of an entity whose current text was written by AI (AI Act transparency labels). */
+        get: operations["list_marks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts generating a proposal (a job): poll `GET /ai/proposals/{id}` until it is `ready`
+         *     or `failed`. `402 ai_quota_exceeded` when the monthly allowance is used up.
+         */
+        post: operations["create_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_proposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Writes the chosen fields through the entity's service (audited) and labels them as
+         *     AI-generated. `409 proposal_stale` when a field changed since the proposal was made.
+         */
+        post: operations["accept_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["discard_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This month's AI usage of the shop, its token allowance and the provider in use. */
+        get: operations["usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/analytics/dashboard": {
         parameters: {
             query?: never;
@@ -120,6 +302,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/bank-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every receiving account, active ones first (retired accounts still import statements). */
+        get: operations["list_bank_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/bank-accounts/{id}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Imports a bank statement (the raw file as the body, at most 1 MB) into the account and
+         *     matches the new credits (A25): lines already imported (same bank transaction id) are
+         *     ignored; exact VS + amount + currency matches pay their order; the rest waits in the
+         *     exceptions queue. `422 statement_account_mismatch` when the file names another account.
+         */
+        post: operations["upload_statement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/bank-transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Imported bank transactions, newest first, with their match status. */
+        get: operations["list_bank_transactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/bank-transactions/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolves an open bank transaction (audited): `accept` a partial/over payment as the
+         *     order's payment, `assign` it to an order by number, or `dismiss` it with a note.
+         */
+        post: operations["resolve_bank_transaction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/categories": {
         parameters: {
             query?: never;
@@ -166,6 +424,27 @@ export interface paths {
         put?: never;
         /** Moves a category with its subtree. Into its own subtree: `422 category_cycle`. */
         post: operations["move_category"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/cod-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Imports a carrier COD report (CSV body `order_number;amount;tender;event`, `event` =
+         *     `collected` or `remitted`). Each row applies on its own; mismatched amounts are reported,
+         *     never applied.
+         */
+        post: operations["cod_report"];
         delete?: never;
         options?: never;
         head?: never;
@@ -517,6 +796,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/markets/{id}/bank-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The market's receiving bank account (`404` when none is set). */
+        get: operations["get_bank_account"];
+        /**
+         * Sets the market's receiving account for bank transfers (IBAN check digits verified). The
+         *     optional Fio API token is stored encrypted and never returned. Payment settings: admin
+         *     role and a login within the last 15 minutes (`401 reauth_required`, A9).
+         */
+        put: operations["put_bank_account"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/markets/{id}/payment-methods": {
         parameters: {
             query?: never;
@@ -641,6 +942,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/orders/{id}/cod/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The money was collected: tender (`cash` is rounded as a separate charge, A16) and
+         *     collector are recorded, the order becomes paid (audited).
+         */
+        post: operations["cod_collect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/cod/deliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The parcel was delivered (COD `pending → delivered`, audited). */
+        post: operations["cod_deliver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/cod/remit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The carrier paid the collected money out (COD `collected → remitted`, audited). */
+        post: operations["cod_remit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/exception/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Marks an order's exception (late or duplicate payment) as settled (audited); it leaves the
+         *     queue. `409 no_open_exception` otherwise.
+         */
+        post: operations["resolve_order_exception"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/pages": {
         parameters: {
             query?: never;
@@ -710,6 +1085,93 @@ export interface paths {
         post?: never;
         /** Deletes the parameter and its values on all products. */
         delete: operations["delete_parameter"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/payment-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_exceptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/payments/stripe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The platform's Stripe mode and the shop's connected account (capabilities, A11). */
+        get: operations["stripe_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/payments/stripe/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts or continues Stripe-hosted onboarding of the shop's connected account (created on
+         *     first use). Payment settings: admin role and a fresh login (A9).
+         */
+        post: operations["stripe_onboarding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/payments/stripe/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-reads the connected account from Stripe (after returning from onboarding). */
+        post: operations["stripe_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/payments/stripe/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Simulator only (`404` otherwise): emits a signed `account.updated` for the shop's account. */
+        post: operations["stripe_simulate"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1992,6 +2454,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The "Stripe test simulator" (local mode without a real Stripe key; `404` otherwise): makes
+         *     the API sign a Stripe-shaped `payment_intent.succeeded` / `payment_intent.payment_failed`
+         *     event with the webhook secret and receive it like Stripe's, so verification, storage and
+         *     asynchronous processing run for real. Needs the right to pay. Answers `202` with the
+         *     payment as it is now; the order page polls until the event is processed.
+         */
+        post: operations["simulate_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/pages/blog": {
         parameters: {
             query?: never;
@@ -2230,10 +2715,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/webhooks/stripe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stripe Connect webhook endpoint (A11). `Stripe-Signature` (HMAC-SHA256 over
+         *     `"<t>.<raw body>"` with the endpoint secret, 5 minutes tolerance) is verified before
+         *     anything else; the event is stored (deduplicated by id) and its processing enqueued before
+         *     the 200, so a crash afterwards loses nothing and a redelivery changes nothing. `404` when
+         *     Stripe is not configured.
+         */
+        post: operations["stripe_webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptProposal: {
+            /**
+             * @description The fields to write (a subset of `changes`). Creating a translation always includes
+             *     its name/title and slug.
+             */
+            fields: components["schemas"]["FieldRef"][];
+        };
         Address: {
             city: string;
             company?: string | null;
@@ -2288,6 +2803,12 @@ export interface components {
             /** Format: uuid */
             customer_id?: string | null;
             events: components["schemas"]["OrderEventView"][];
+            exception_note?: string | null;
+            /**
+             * Format: date-time
+             * @description When a person settled the exception (it then leaves the work list), and how.
+             */
+            exception_resolved_at?: string | null;
             /** Format: uuid */
             market_id: string;
             order: components["schemas"]["OrderView"];
@@ -2308,10 +2829,32 @@ export interface components {
             /** Format: double */
             score: number;
         };
+        AiMark: {
+            /** Format: date-time */
+            ai_generated_at: string;
+            feature: string;
+            field: string;
+            locale: string;
+            model: string;
+        };
+        AiMarkList: {
+            items: components["schemas"]["AiMark"][];
+        };
         Alternate: {
             href: string;
             /** @description hreflang value (`cs-CZ`, `x-default`). */
             locale: string;
+        };
+        ApplyProgress: {
+            /** Format: int64 */
+            done?: number;
+            /**
+             * Format: int64
+             * @description Products deleted meanwhile or no longer valid for a change.
+             */
+            skipped?: number;
+            /** Format: int64 */
+            total?: number;
         };
         Asset: {
             /** Format: int64 */
@@ -2357,6 +2900,8 @@ export interface components {
         Attempt: {
             /** Format: int64 */
             amount_minor: number;
+            cod_status?: components["schemas"]["CodStatus"] | null;
+            collector?: components["schemas"]["Collector"] | null;
             /** Format: date-time */
             completed_at?: string | null;
             /** Format: date-time */
@@ -2372,6 +2917,9 @@ export interface components {
             /** @description Set once the provider knows the attempt (after `init`). */
             provider_ref?: string | null;
             status: components["schemas"]["AttemptStatus"];
+            tender?: components["schemas"]["Tender"] | null;
+            /** @description Bank transfer: the variable symbol (A25). */
+            variable_symbol?: string | null;
         };
         /** @enum {string} */
         AttemptStatus: "pending" | "succeeded" | "failed" | "expired";
@@ -2407,6 +2955,92 @@ export interface components {
         };
         /** @enum {string} */
         Badge: "sale" | "new";
+        BankAccount: {
+            account_name: string;
+            /** @description The market's current account; retired ones still import and match statements. */
+            active: boolean;
+            bic?: string | null;
+            currency: string;
+            /** @description A Fio API token is stored (encrypted; never returned). */
+            fio_connected: boolean;
+            /** Format: date-time */
+            fio_synced_at?: string | null;
+            iban: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            market_id: string;
+        };
+        BankAccountInput: {
+            /** @description The account holder (shown to customers, PAY by square beneficiary), 1-70 characters. */
+            account_name: string;
+            bic?: string | null;
+            /** @description Removes the stored Fio API token. */
+            clear_fio_token?: boolean;
+            /** @description Sets the Fio API token (write-only, stored encrypted); omit to keep the current one. */
+            fio_token?: string | null;
+            /** @description Spaces are ignored; the check digits are verified. */
+            iban: string;
+        };
+        BankAccountList: {
+            items: components["schemas"]["BankAccount"][];
+        };
+        BankTransaction: {
+            /** Format: int64 */
+            amount_minor: number;
+            /** Format: uuid */
+            bank_account_id: string;
+            bank_tx_id: string;
+            /** Format: date */
+            booked_on: string;
+            counterparty?: string | null;
+            counterparty_name?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            currency: string;
+            /**
+             * Format: int64
+             * @description What the order expected (for partial and over payments).
+             */
+            expected_minor?: number | null;
+            /** Format: uuid */
+            id: string;
+            message?: string | null;
+            note?: string | null;
+            /**
+             * Format: uuid
+             * @description The order the money went to (matched, or the candidate of a partial/over payment).
+             */
+            order_id?: string | null;
+            order_number?: string | null;
+            reason?: components["schemas"]["TxReason"] | null;
+            /** Format: date-time */
+            resolved_at?: string | null;
+            resolved_by?: string | null;
+            source: string;
+            status: components["schemas"]["TxStatus"];
+            variable_symbol?: string | null;
+        };
+        BankTransactionPage: {
+            items: components["schemas"]["BankTransaction"][];
+            /**
+             * Format: uuid
+             * @description Pass as `cursor` for the next page; `null` on the last page.
+             */
+            next_cursor?: string | null;
+        };
+        /** @description The payment instructions of a bank-transfer order, as the customer sees them. */
+        BankTransferView: {
+            account_name: string;
+            amount: components["schemas"]["MoneyView"];
+            bic?: string | null;
+            iban: string;
+            message: string;
+            qr_kind?: components["schemas"]["QrKind"] | null;
+            /** @description The QR code as an inline SVG element (server-generated; contains no script). */
+            qr_svg?: string | null;
+            variable_symbol: string;
+        };
         /** @description One block of a page. `type` selects the variant. */
         Block: {
             /** Format: int32 */
@@ -2495,6 +3129,32 @@ export interface components {
             /** Format: date-time */
             published_at: string;
             title: string;
+        };
+        BulkPlan: {
+            /** Format: date-time */
+            applied_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Why the plan was rejected (or failed). */
+            errors: string[];
+            /** Format: uuid */
+            id: string;
+            model?: string | null;
+            /** @description Confirming needs a sign-in at most 15 minutes old (price changes, A9). */
+            needs_fresh_auth: boolean;
+            plan?: components["schemas"]["Plan"] | null;
+            progress: components["schemas"]["ApplyProgress"];
+            prompt: string;
+            /** @description Before/after of the first products. */
+            sample: components["schemas"]["SampleRow"][];
+            status: components["schemas"]["PlanStatus"];
+            /**
+             * Format: int32
+             * @description Matching products (frozen at preview; the apply changes exactly these).
+             */
+            target_count: number;
+            /** Format: date-time */
+            updated_at: string;
         };
         /** @description Cache hints the edge reads from every page model (spec §8.2, A2). */
         CacheHints: {
@@ -2645,6 +3305,19 @@ export interface components {
          * @enum {string}
          */
         Cause: "base" | "sale" | "tax";
+        /** @description One proposed field value. */
+        Change: {
+            /** @description The proposed value: text, or the block/label list. */
+            after: unknown;
+            /** @description The value when the proposal was generated (`null`: none yet). */
+            before?: unknown;
+            /**
+             * @description `name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`
+             *     for a menu's labels: `[{path, label}]`).
+             */
+            field: string;
+            locale: string;
+        };
         /** @enum {string} */
         Channel: "google" | "heureka" | "zbozi";
         /** @enum {string} */
@@ -2703,6 +3376,33 @@ export interface components {
             seo: components["schemas"]["Seo"];
             title: string;
         };
+        CodReport: {
+            /** Format: int32 */
+            applied: number;
+            /** Format: int32 */
+            errors: number;
+            rows: components["schemas"]["CodReportRow"][];
+            /** Format: int32 */
+            skipped: number;
+        };
+        CodReportRow: {
+            detail?: string | null;
+            /**
+             * Format: int32
+             * @description 1-based line number in the file.
+             */
+            line: number;
+            order_number: string;
+            /** @description `applied`, `skipped` (already in that state) or `error`. */
+            result: string;
+        };
+        /** @enum {string} */
+        CodStatus: "pending" | "delivered" | "collected" | "remitted";
+        CollectInput: {
+            collector: components["schemas"]["Collector"];
+            /** @description `cash` (rounded, A16) or `card`. */
+            tender: components["schemas"]["Tender"];
+        };
         Collection: {
             /** @description Open now (inside its window, or unscheduled). */
             active: boolean;
@@ -2750,6 +3450,8 @@ export interface components {
         CollectionList: {
             items: components["schemas"]["Collection"][];
         };
+        /** @enum {string} */
+        Collector: "carrier" | "merchant";
         Collision: {
             item_id: string;
             /**
@@ -2983,6 +3685,8 @@ export interface components {
         };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
+        /** @enum {string} */
+        EntityType: "product" | "category" | "page" | "menu";
         Explained: {
             /** @description The strategies tried, in order. */
             chain: components["schemas"]["Strategy"][];
@@ -3063,6 +3767,15 @@ export interface components {
             answer_html: string;
             question: string;
         };
+        FeatureUsage: {
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            cost_micros: number;
+            feature: string;
+            /** Format: int64 */
+            tokens: number;
+        };
         FeedFile: {
             /** Format: int64 */
             bytes?: number | null;
@@ -3080,6 +3793,10 @@ export interface components {
         FeedFileList: {
             items: components["schemas"]["FeedFile"][];
         };
+        FieldRef: {
+            field: string;
+            locale: string;
+        };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
         FunnelStep: {
@@ -3090,6 +3807,20 @@ export interface components {
             sessions: number;
             /** @description `sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`. */
             step: string;
+        };
+        Glossary: {
+            entries: components["schemas"]["GlossaryEntry"][];
+        };
+        GlossaryEntry: {
+            /**
+             * @description The term as written in the source text, e.g. `Lnen & Co.`.
+             * @example Lnen & Co.
+             */
+            term: string;
+            /** @description Locale -> the fixed translation; locales not listed keep the term unchanged. */
+            translations?: {
+                [key: string]: string;
+            };
         };
         GoLiveCheck: {
             code: components["schemas"]["CheckCode"];
@@ -3406,6 +4137,8 @@ export interface components {
          * @enum {string}
          */
         LegalType: "terms" | "privacy" | "cookies" | "withdrawal" | "complaints" | "reviews";
+        /** @enum {string} */
+        Length: "short" | "medium" | "long";
         Level: {
             /** @description Sell below zero. */
             allow_backorder: boolean;
@@ -3676,6 +4409,13 @@ export interface components {
             name: string;
             tax_mode?: components["schemas"]["TaxMode"];
         };
+        NewPlan: {
+            /**
+             * @description What to change, in the staff's words (1-2000 characters).
+             * @example Raise prices of T-shirts by 5 % in SK
+             */
+            prompt: string;
+        };
         NewPriceList: {
             /**
              * @description Lowercase identifier, unique per tenant.
@@ -3688,6 +4428,23 @@ export interface components {
             market_ids?: string[];
             /** @example Česko – maloobchod */
             name: string;
+        };
+        NewProposal: {
+            /** @description The entity's id (a menu's handle). */
+            entity_id: string;
+            entity_type: components["schemas"]["EntityType"];
+            kind: components["schemas"]["ProposalKind"];
+            /** @description Descriptions only. */
+            length?: components["schemas"]["Length"];
+            /**
+             * @description Language of the text to write; the source language for `translate`.
+             * @example cs
+             */
+            locale: string;
+            /** @description `translate` only: 1-5 languages to translate into. */
+            target_locales?: string[];
+            /** @description Descriptions only. */
+            tone?: components["schemas"]["Tone"];
         };
         NewSubscription: {
             active?: boolean;
@@ -3728,6 +4485,19 @@ export interface components {
         } | {
             /** @enum {string} */
             type: "none";
+        } | {
+            account_id: string;
+            client_secret: string;
+            publishable_key: string;
+            /** @enum {string} */
+            type: "stripe";
+        } | {
+            /** @enum {string} */
+            type: "stripe_simulator";
+        };
+        NoteInput: {
+            /** @description What was done (e.g. "refunded to the customer's account"), 1-500 characters. */
+            note: string;
         };
         Omnibus: {
             /** @description Whether the storefront may show a reduction (strikethrough + percent) at all. */
@@ -3754,6 +4524,56 @@ export interface components {
              * @description Lowest price in the 30 days before `reduction_started_at`.
              */
             reference_minor?: number | null;
+        };
+        OnboardingLink: {
+            /**
+             * @description Stripe-hosted onboarding (single use, expires in minutes); in simulator mode the admin
+             *     page itself (the account becomes ready through a simulated `account.updated`).
+             */
+            url: string;
+        };
+        /** @description The allowlisted operations; anything else fails to parse. */
+        Operation: {
+            field: components["schemas"]["PlanField"];
+            /** @description Required for translated fields, `null` for `brand`. */
+            locale?: string | null;
+            /** @enum {string} */
+            op: "set_field";
+            value: string;
+        } | {
+            /**
+             * Format: int64
+             * @description Fixed change in minor units; exclusive with `percent`.
+             */
+            amount_minor?: number | null;
+            /** @description Market code or price list code. */
+            market: string;
+            /** @enum {string} */
+            op: "adjust_price";
+            /**
+             * Format: double
+             * @description Percent change (5 = +5 %); exclusive with `amount_minor`.
+             */
+            percent?: number | null;
+        } | {
+            category: string;
+            /** @enum {string} */
+            op: "add_category";
+        } | {
+            category: string;
+            /** @enum {string} */
+            op: "remove_category";
+        } | {
+            /** @description Text parameters: one locale, or `null` for every shop locale. */
+            locale?: string | null;
+            /** @enum {string} */
+            op: "set_parameter";
+            parameter: string;
+            value: string;
+        } | {
+            /** @enum {string} */
+            op: "set_status";
+            status: components["schemas"]["ProductStatus"];
         };
         OptionValue: {
             /** @example red */
@@ -3980,6 +4800,11 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        ParameterFilter: {
+            /** @description Parameter key. */
+            parameter: string;
+            value: string;
+        };
         ParameterInput: {
             filterable?: boolean;
             /**
@@ -4023,11 +4848,19 @@ export interface components {
             password: string;
             redirect?: string | null;
         };
+        /**
+         * @description The payment exceptions queue: bank transactions waiting for a person (unmatched, partial,
+         *     over) and orders holding money they cannot keep (late or duplicate payments, A10).
+         */
+        PaymentExceptions: {
+            bank_transactions: components["schemas"]["BankTransaction"][];
+            orders: components["schemas"]["OrderSummary"][];
+        };
         PaymentInput: {
             method: components["schemas"]["MethodKind"];
         };
         PaymentMethod: {
-            /** @description Whether the platform can take payments with it yet (adapter present and configured). */
+            /** @description Whether the shop can take payments with it now (adapter present and configured). */
             available: boolean;
             enabled: boolean;
             kind: components["schemas"]["MethodKind"];
@@ -4042,6 +4875,12 @@ export interface components {
              * @description Payment window for unpaid orders; `null` = the method's default.
              */
             timeout_minutes?: number | null;
+            /**
+             * @description Why not: `not_configured` (no platform adapter), `no_bank_account` (bank transfer
+             *     needs the market's receiving account), `stripe_onboarding` (the connected account
+             *     cannot take card payments yet or lost the capability, A11).
+             */
+            unavailable_reason?: string | null;
         };
         PaymentMethodInput: {
             enabled: boolean;
@@ -4075,6 +4914,7 @@ export interface components {
         PaymentStatus: "unpaid" | "authorized" | "paid" | "partially_refunded" | "refunded" | "failed" | "expired";
         PaymentView: {
             attempt?: components["schemas"]["AttemptView"] | null;
+            bank_transfer?: components["schemas"]["BankTransferView"] | null;
             /**
              * @description Whether this viewer may start or continue payments: the order token alone is read-only
              *     (A4); the browser that placed the order or its signed-in customer may pay.
@@ -4130,11 +4970,32 @@ export interface components {
             order_id: string;
             payment: components["schemas"]["PaymentStart"];
         };
+        Plan: {
+            /** @description The model's summary for the staff (plain text). */
+            explanation: string;
+            operations: components["schemas"]["Operation"][];
+            selector: components["schemas"]["Selector"];
+        };
+        /**
+         * @description Text fields a plan may set.
+         * @enum {string}
+         */
+        PlanField: "brand" | "short_description" | "seo_title" | "seo_description";
+        /** @enum {string} */
+        PlanStatus: "pending" | "ready" | "rejected" | "applying" | "applied" | "failed";
         /**
          * @description Why the base prices change (recorded on the price intervals).
          * @enum {string}
          */
         PriceChangeReason: "base" | "tax";
+        PriceFilter: {
+            /** @description Market code or price list code. */
+            market: string;
+            /** Format: int64 */
+            max_minor?: number | null;
+            /** Format: int64 */
+            min_minor?: number | null;
+        };
         PriceHistory: {
             items: components["schemas"]["VariantPriceHistory"][];
         };
@@ -4366,6 +5227,37 @@ export interface components {
             /** Format: int32 */
             updated: number;
         };
+        Proposal: {
+            changes: components["schemas"]["Change"][];
+            /** Format: date-time */
+            created_at: string;
+            entity_id: string;
+            entity_type: components["schemas"]["EntityType"];
+            /**
+             * @description Failure code: `ai_quota_exceeded`, `ai_unavailable`, `ai_refused`,
+             *     `ai_invalid_output`, `entity_missing`, `nothing_to_translate`.
+             */
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ProposalKind"];
+            length: components["schemas"]["Length"];
+            locale: string;
+            /** @description The model that wrote it (`fake` for the demo provider). */
+            model?: string | null;
+            progress: components["schemas"]["Progress"];
+            status: components["schemas"]["ProposalStatus"];
+            target_locales: string[];
+            tone: components["schemas"]["Tone"];
+            /** Format: date-time */
+            updated_at: string;
+            /** @description Things to check before accepting (e.g. a glossary term not kept). */
+            warnings: string[];
+        };
+        /** @enum {string} */
+        ProposalKind: "product_description" | "seo" | "category_description" | "translate";
+        /** @enum {string} */
+        ProposalStatus: "pending" | "ready" | "failed" | "accepted" | "discarded";
         /** @description Per-purpose choices: `None` = not asked (or not part of this choice). */
         Purposes: {
             ads?: boolean | null;
@@ -4374,6 +5266,8 @@ export interface components {
             personalization?: boolean | null;
             review_invites?: boolean | null;
         };
+        /** @enum {string} */
+        QrKind: "spayd" | "pay_by_square";
         QueryCount: {
             /** Format: int64 */
             count: number;
@@ -4391,6 +5285,11 @@ export interface components {
         RebuildQueued: {
             /** Format: int64 */
             job_id: number;
+        };
+        Received: {
+            /** @description `false` for a redelivery of an event already stored (a no-op). */
+            new: boolean;
+            received: boolean;
         };
         RecommendationExplain: {
             affinity?: components["schemas"]["Affinity"] | null;
@@ -4455,6 +5354,19 @@ export interface components {
             items: components["schemas"]["Redirect"][];
             /** Format: uuid */
             next_cursor?: string | null;
+        };
+        RemitInput: {
+            /** @description E.g. the carrier's payout reference, at most 500 characters. */
+            note?: string | null;
+        };
+        /** @enum {string} */
+        ResolveAction: "accept" | "assign" | "dismiss";
+        ResolveInput: {
+            action: components["schemas"]["ResolveAction"];
+            /** @description Why (required for `dismiss`), at most 500 characters. */
+            note?: string | null;
+            /** @description The order number, for `assign`. */
+            order_number?: string | null;
         };
         /** @description What the edge needs to serve a hostname (spec §5.1, `GET /internal/v1/resolve`). */
         Resolved: {
@@ -4568,6 +5480,21 @@ export interface components {
              */
             revenue_minor: number;
         };
+        SampleChange: {
+            after: string;
+            before: string;
+            /**
+             * @description `brand`, `seo_title (cs)`, `price TS-M (EUR)`, `category`, `parameter material`,
+             *     `status`.
+             */
+            what: string;
+        };
+        SampleRow: {
+            changes: components["schemas"]["SampleChange"][];
+            name: string;
+            /** Format: uuid */
+            product_id: string;
+        };
         SearchHit: {
             brand?: string | null;
             /** @description The first product image, in the list-sized variants (up to 640 px). */
@@ -4605,6 +5532,16 @@ export interface components {
         SearchStatus: {
             /** @description One index per locale the tenant's markets sell in. */
             indexes: components["schemas"]["IndexStatus"][];
+        };
+        /** @description Which products change: every non-empty condition must hold. */
+        Selector: {
+            /** @description Brand names (case-insensitive). */
+            brands?: string[];
+            /** @description Category slugs (any locale); subcategories included. */
+            categories?: string[];
+            parameters?: components["schemas"]["ParameterFilter"][];
+            price?: components["schemas"]["PriceFilter"] | null;
+            statuses?: components["schemas"]["ProductStatus"][];
         };
         Seo: {
             alternates: components["schemas"]["Alternate"][];
@@ -4739,6 +5676,16 @@ export interface components {
             /** @description Relative path on the checkout origin to continue to. */
             redirect: string;
         };
+        SimulateAccountInput: {
+            /**
+             * @description `true`: onboarding completed (charges enabled, card payments active); `false`: the
+             *     card_payments capability is lost (Stripe disappears from checkout, A11).
+             */
+            enabled: boolean;
+        };
+        SimulateInput: {
+            outcome: components["schemas"]["Outcome"];
+        };
         /** @enum {string} */
         SkipReason: "current" | "in_cart" | "excluded" | "duplicate" | "not_sold" | "out_of_stock";
         Skipped: {
@@ -4772,6 +5719,33 @@ export interface components {
             role: components["schemas"]["Role"];
             user_id: string;
         };
+        StatementImport: {
+            /**
+             * Format: int32
+             * @description Debits (outgoing payments) are not stored.
+             */
+            debits: number;
+            /**
+             * Format: int32
+             * @description Lines already imported earlier (same bank transaction id): ignored.
+             */
+            duplicates: number;
+            /**
+             * Format: int32
+             * @description New lines waiting in the exceptions queue.
+             */
+            exceptions: number;
+            /**
+             * Format: int32
+             * @description New credit lines stored.
+             */
+            imported: number;
+            /**
+             * Format: int32
+             * @description New lines that paid an order.
+             */
+            matched: number;
+        };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
         StorefrontToken: {
@@ -4786,6 +5760,25 @@ export interface components {
          * @enum {string}
          */
         Strategy: "bought_together" | "bestsellers" | "seasonal" | "collection" | "recently_viewed" | "personalized" | "newest";
+        StripeAccount: {
+            account_id: string;
+            /** @description `active`, `inactive` or `pending`. */
+            card_payments: string;
+            charges_enabled: boolean;
+            details_submitted: boolean;
+            disabled_reason?: string | null;
+            livemode: boolean;
+            /** @description Stripe is offered at checkout (charges enabled and card payments active). */
+            ready: boolean;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @enum {string} */
+        StripePlatformMode: "live" | "test" | "simulator";
+        StripeStatus: {
+            account?: components["schemas"]["StripeAccount"] | null;
+            mode?: components["schemas"]["StripePlatformMode"] | null;
+        };
         Subscription: {
             active: boolean;
             /** Format: date-time */
@@ -4907,6 +5900,13 @@ export interface components {
             requests: number;
             template: string;
         };
+        /** @enum {string} */
+        Tender: "cash" | "card" | "unknown";
+        /**
+         * @description Voice of generated descriptions.
+         * @enum {string}
+         */
+        Tone: "neutral" | "friendly" | "premium" | "technical" | "playful";
         TopProduct: {
             currency: string;
             name: string;
@@ -4955,6 +5955,10 @@ export interface components {
             payments: string[];
             returns: string;
         };
+        /** @enum {string} */
+        TxReason: "no_variable_symbol" | "unknown_variable_symbol" | "currency_mismatch" | "already_paid" | "amount_short" | "amount_over" | "manual";
+        /** @enum {string} */
+        TxStatus: "matched" | "unmatched" | "partial" | "overpaid" | "dismissed";
         /**
          * @description Basis of the unit price shown next to the price (per kg, per l, ...).
          * @enum {string}
@@ -4981,6 +5985,32 @@ export interface components {
             /** @example PUT */
             method: string;
             url: string;
+        };
+        UsageSummary: {
+            by_feature: components["schemas"]["FeatureUsage"][];
+            /**
+             * Format: int64
+             * @description USD micros this month at the configured list prices.
+             */
+            cost_micros: number;
+            model: string;
+            /**
+             * Format: date-time
+             * @description Start of the metered calendar month (UTC).
+             */
+            month_start: string;
+            /** @description `anthropic`, `fake` (demo fixtures, no key configured) or `disabled`. */
+            provider: string;
+            /**
+             * Format: int64
+             * @description Monthly allowance: the plan default or a superadmin override.
+             */
+            tokens_quota: number;
+            /**
+             * Format: int64
+             * @description Tokens used this month (input incl. cache reads/writes + output).
+             */
+            tokens_used: number;
         };
         Variant: {
             ean?: string | null;
@@ -5107,6 +6137,432 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    create_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPlan"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    apply_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_glossary: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+        };
+    };
+    put_glossary: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Glossary"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_marks: {
+        parameters: {
+            query: {
+                entity_type: components["schemas"]["EntityType"];
+                /** @description The entity's id (a menu's handle). */
+                entity_id: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiMarkList"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProposal"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    accept_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptProposal"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    discard_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    usage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+        };
+    };
     analytics_dashboard: {
         parameters: {
             query: {
@@ -5396,6 +6852,175 @@ export interface operations {
             };
         };
     };
+    list_bank_accounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankAccountList"];
+                };
+            };
+        };
+    };
+    upload_statement: {
+        parameters: {
+            query: {
+                /** @description `camt053` (ISO 20022 XML), `fio_csv` or `gpc` (ABO). */
+                format: "camt053" | "fio_csv" | "gpc";
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": number[];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatementImport"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_statement | statement_account_mismatch */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_bank_transactions: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["TxStatus"];
+                bank_account_id?: string;
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankTransactionPage"];
+                };
+            };
+        };
+    };
+    resolve_bank_transaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankTransaction"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description transaction_resolved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_resolution */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     category_tree: {
         parameters: {
             query?: never;
@@ -5619,6 +7244,49 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cod_report: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "text/csv": number[];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodReport"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_cod_report */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -6586,6 +8254,108 @@ export interface operations {
             };
         };
     };
+    get_bank_account: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankAccount"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    put_bank_account: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankAccountInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankAccount"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_bank_account */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description SECRETS_KEY missing for a Fio token */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_payment_methods: {
         parameters: {
             query?: never;
@@ -6842,6 +8612,221 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cod_collect: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attempt"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition | not_cash_on_delivery | order_cancelled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_collection */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cod_deliver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attempt"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition | not_cash_on_delivery | order_cancelled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cod_remit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemitInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attempt"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    resolve_order_exception: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description no_open_exception */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7221,6 +9206,174 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_exceptions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentExceptions"];
+                };
+            };
+        };
+    };
+    stripe_status: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StripeStatus"];
+                };
+            };
+        };
+    };
+    stripe_onboarding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingLink"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    stripe_refresh: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StripeStatus"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    stripe_simulate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateAccountInput"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             404: {
                 headers: {
@@ -11191,6 +13344,70 @@ export interface operations {
             };
         };
     };
+    simulate_attempt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+                attempt: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateInput"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentView"];
+                };
+            };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description attempt_not_initialized */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     blog_index: {
         parameters: {
             query?: never;
@@ -11754,6 +13971,58 @@ export interface operations {
                 };
             };
             /** @description event_mismatch */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    stripe_webhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "Stripe-Signature": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A Stripe event */
+        requestBody: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Received"];
+                };
+            };
+            /** @description invalid_signature */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_event */
             422: {
                 headers: {
                     [name: string]: unknown;

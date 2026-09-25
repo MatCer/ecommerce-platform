@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_bulk_plans SET status = 'failed', errors = $2, progress = $3,\n                        updated_at = now()\n                 WHERE id = $1 AND status = 'applying'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8f6b163863fa94fda1d4e6c00717519ddaa6262e498b78a6a8362a60ff4408dd"
+}

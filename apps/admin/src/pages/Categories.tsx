@@ -10,6 +10,7 @@ import {
 } from "@platform/ui";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
+import { AiPanel } from "../components/AiPanel.tsx";
 import { PageHeader, QueryState } from "../components/Page.tsx";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
 import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
@@ -103,6 +104,10 @@ export default function Categories() {
   const [formError, setFormError] = createSignal<string>();
 
   const refresh = () => qc.invalidateQueries({ queryKey: tenantKey("categories") });
+  const editedId = () => {
+    const ed = editing();
+    return ed?.kind === "edit" ? ed.node.id : undefined;
+  };
   const close = () => {
     setEditing(null);
     setFormError(undefined);
@@ -356,6 +361,19 @@ export default function Categories() {
             />
           </Show>
           <NamesFields names={names()} onChange={setNames} />
+          <Show when={editedId()}>
+            {(id) => (
+              <AiPanel
+                entityType="category"
+                entityId={id()}
+                onAccepted={() => {
+                  void refresh();
+                  close();
+                }}
+                acceptHint={t("ai.dialogHint")}
+              />
+            )}
+          </Show>
           <Show when={formError()}>
             <p role="alert" class="text-xs font-medium text-error-700">
               {formError()}

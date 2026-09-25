@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ai_marks (tenant_id, entity_type, entity_id, locale, field, value_sha256,\n                               feature, model, proposal_id, accepted_by)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n         ON CONFLICT (tenant_id, entity_type, entity_id, locale, field) DO UPDATE SET\n             value_sha256 = EXCLUDED.value_sha256, feature = EXCLUDED.feature,\n             model = EXCLUDED.model, proposal_id = EXCLUDED.proposal_id,\n             accepted_by = EXCLUDED.accepted_by, ai_generated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "659c9a4890f8fb105c5be41efbfa73e5637c11e16e9095f154c258fd860caf7f"
+}

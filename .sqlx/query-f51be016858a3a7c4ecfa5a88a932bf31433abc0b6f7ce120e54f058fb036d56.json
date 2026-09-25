@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bank_transactions SET status = $2, reason = $3, attempt_id = $4 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f51be016858a3a7c4ecfa5a88a932bf31433abc0b6f7ce120e54f058fb036d56"
+}

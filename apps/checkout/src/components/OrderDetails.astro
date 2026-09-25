@@ -10,6 +10,7 @@ interface Props {
 const { order: o, m } = Astro.props;
 const charge = (kind: string) => o.charges.find((c) => c.kind === kind);
 const payment = charge("payment_fee");
+const rounding = charge("rounding");
 const addresses = [
   { key: "order.billing_address", a: o.billing_address },
   { key: "order.shipping_address", a: o.shipping_address },
@@ -47,6 +48,11 @@ const card = "rounded-lg border border-border bg-card p-4";
       {
         payment && (
           <div class="flex justify-between"><dt>{t(m, "checkout.payment_fee")}</dt><dd class="tabular-nums">{payment.total.formatted}</dd></div>
+        )
+      }
+      {
+        rounding && (
+          <div class="flex justify-between"><dt>{t(m, "order.rounding")}</dt><dd class="tabular-nums">{rounding.total.formatted}</dd></div>
         )
       }
       {

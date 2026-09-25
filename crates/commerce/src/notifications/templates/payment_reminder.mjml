@@ -1,0 +1,11 @@
+{% extends "order.mjml" %}
+{% block heading %}{{ t("payment_reminder.heading", number=order.number) }}{% endblock %}
+{% block intro %}
+        <mj-text>{{ t("payment_reminder.intro", shop=brand.shop_name) }}</mj-text>
+{% endblock %}
+{% block after_summary %}
+{%- if bank %}
+{% include "bank_transfer.mjml" %}
+{%- endif %}
+        <mj-text>{{ t("payment_reminder.cancel_note") }}</mj-text>
+{% endblock %}

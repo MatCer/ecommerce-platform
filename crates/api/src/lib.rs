@@ -3,6 +3,7 @@
 //! edge) and the Internal API (`/internal/v1`, service token).
 
 pub mod admin;
+pub mod admin_ai;
 pub mod admin_analytics;
 pub mod admin_catalog;
 pub mod admin_content;
@@ -10,6 +11,7 @@ pub mod admin_feeds;
 pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_orders;
+pub mod admin_payments;
 pub mod admin_platform;
 pub mod admin_pricing;
 pub mod admin_promotions;
@@ -81,6 +83,8 @@ pub struct AppState {
     pub edge: edge::EdgePurge,
     /// Payment gateways and the pickup-point widget (WP10).
     pub checkout: Arc<commerce::checkout::Settings>,
+    /// AI helpers (WP22): Anthropic, the fake provider, or disabled.
+    pub ai: commerce::ai::Ai,
     /// Webhook secrets + SSRF-safe client; `None` without `SECRETS_KEY` (webhooks answer 503).
     pub webhooks: Option<commerce::webhooks::Webhooks>,
     /// Storefront API rate limits (§8.1).
@@ -107,6 +111,8 @@ pub struct AppState {
         (name = "feeds", description = "Admin API: feed imports (Heureka, Google) and export feeds"),
         (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
+        (name = "ai", description = "Admin API: AI helpers (proposals, glossary, bulk edit by prompt, usage)"),
+        (name = "payments", description = "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"),
         (name = "analytics", description = "Admin API: the analytics dashboard"),
         (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
         (name = "platform", description = "Admin API for platform superadmins: the job queue"),
@@ -158,6 +164,8 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_content::routes())
         .merge(admin_feeds::routes())
         .merge(admin_orders::routes())
+        .merge(admin_ai::routes())
+        .merge(admin_payments::routes())
         .merge(admin_analytics::routes())
         .merge(admin_webhooks::routes())
         .merge(admin_platform::routes())

@@ -36,8 +36,13 @@ jobs:
           MEILI_MASTER_KEY: meili-local-master-key-0123456789
           MEILI_NO_ANALYTICS: "true"
         ports: ["7700:7700"]
+      # WP11: Stripe API stand-in for the Stripe adapter tests (same image as compose).
+      stripe-mock:
+        image: stripe/stripe-mock:v0.203.0
+        ports: ["12111:12111"]
     env:
       DATABASE_URL: postgres://app_owner:app-owner-ci@localhost:5432/app_test
+      STRIPE_MOCK_URL: http://localhost:12111
       # The .env.example keys (derived from the master key above), created like meili-init does.
       MEILI_URL: http://localhost:7700
       MEILI_SEARCH_KEY: 2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918

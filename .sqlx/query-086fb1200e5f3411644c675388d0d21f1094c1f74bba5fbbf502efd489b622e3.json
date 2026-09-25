@@ -1,0 +1,98 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT account_id, livemode, charges_enabled, details_submitted, card_payments,\n                disabled_reason, updated_at\n         FROM stripe_accounts",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "livemode",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "livemode"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "charges_enabled",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "charges_enabled"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "details_submitted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "details_submitted"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "card_payments",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "card_payments"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "disabled_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "disabled_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stripe_accounts",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "086fb1200e5f3411644c675388d0d21f1094c1f74bba5fbbf502efd489b622e3"
+}

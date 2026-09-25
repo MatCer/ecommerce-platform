@@ -46,6 +46,11 @@ export function contentSecurityPolicy(
     checkoutOrigin?: string;
     /** Origin of the pickup-point widget (checkout only): Packeta's or the local mock. */
     widgetOrigin?: string;
+    /**
+     * Stripe.js and the Payment Element (checkout only): allowed only on the pages that can
+     * pay (the checkout and the order page), never on account pages (WP11).
+     */
+    stripe?: boolean;
   },
 ): string {
   const hashes = (h: string[]) => h.map((x) => ` '${x}'`).join("");
@@ -71,11 +76,12 @@ export function contentSecurityPolicy(
     ].join("; ");
   }
   const widget = opts.widgetOrigin ?? "https://widget.packeta.com";
+  const stripeScript = opts.stripe ? " https://js.stripe.com https://*.js.stripe.com" : "";
   return [
-    ...common.map((d) => (d.startsWith("script-src") ? `${d} https://js.stripe.com ${widget}` : d)),
-    "connect-src 'self' https://api.stripe.com",
+    ...common.map((d) => (d.startsWith("script-src") ? `${d}${stripeScript} ${widget}` : d)),
+    `connect-src 'self'${opts.stripe ? " https://api.stripe.com" : ""}`,
     // Pickup-point widget and Stripe Payment Element (spec §9.4), loaded on interaction only.
-    `frame-src https://js.stripe.com https://hooks.stripe.com ${widget}`,
+    `frame-src${opts.stripe ? " https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com" : ""} ${widget}`,
     "form-action 'self'",
   ].join("; ");
 }

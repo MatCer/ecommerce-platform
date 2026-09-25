@@ -10,6 +10,693 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/ai/bulk-plans": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Starts planning a bulk edit from the staff's request (a job): poll\n`GET /ai/bulk-plans/{id}`; a `ready` plan carries the target count and a preview (the dry\nrun). Nothing changes until the plan is applied.",
+        "operationId": "create_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPlan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans/{id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "get_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans/{id}/apply": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Confirms a `ready` plan and applies it in the background (progress on the plan). Plans that\nchange prices need a sign-in at most 15 minutes old (`401 reauth_required`, A9). Honors\n`Idempotency-Key`.",
+        "operationId": "apply_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/glossary": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Terms translations must keep (brand names) or translate one fixed way.",
+        "operationId": "get_glossary",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Glossary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Replaces the glossary (at most 500 terms). Audited.",
+        "operationId": "put_glossary",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Glossary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Glossary"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/marks": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Fields of an entity whose current text was written by AI (AI Act transparency labels).",
+        "operationId": "list_marks",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityType"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "description": "The entity's id (a menu's handle).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiMarkList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Starts generating a proposal (a job): poll `GET /ai/proposals/{id}` until it is `ready`\nor `failed`. `402 ai_quota_exceeded` when the monthly allowance is used up.",
+        "operationId": "create_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "get_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}/accept": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Writes the chosen fields through the entity's service (audited) and labels them as\nAI-generated. `409 proposal_stale` when a field changed since the proposal was made.",
+        "operationId": "accept_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}/discard": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "discard_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/usage": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "This month's AI usage of the shop, its token allowance and the provider in use.",
+        "operationId": "usage",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/analytics/dashboard": {
       "get": {
         "tags": [
@@ -507,6 +1194,314 @@
         ]
       }
     },
+    "/admin/v1/bank-accounts": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Every receiving account, active ones first (retired accounts still import statements).",
+        "operationId": "list_bank_accounts",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccountList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/bank-accounts/{id}/statements": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Imports a bank statement (the raw file as the body, at most 1 MB) into the account and\nmatches the new credits (A25): lines already imported (same bank transaction id) are\nignored; exact VS + amount + currency matches pay their order; the rest waits in the\nexceptions queue. `422 statement_account_mismatch` when the file names another account.",
+        "operationId": "upload_statement",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "`camt053` (ISO 20022 XML), `fio_csv` or `gpc` (ABO).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "camt053",
+                "fio_csv",
+                "gpc"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementImport"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_statement | statement_account_mismatch",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/bank-transactions": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Imported bank transactions, newest first, with their match status.",
+        "operationId": "list_bank_transactions",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TxStatus"
+            }
+          },
+          {
+            "name": "bank_account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankTransactionPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/bank-transactions/{id}/resolve": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Resolves an open bank transaction (audited): `accept` a partial/over payment as the\norder's payment, `assign` it to an order by number, or `dismiss` it with a note.",
+        "operationId": "resolve_bank_transaction",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankTransaction"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "transaction_resolved",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_resolution",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/categories": {
       "get": {
         "tags": [
@@ -867,6 +1862,77 @@
             }
           },
           "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/cod-reports": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Imports a carrier COD report (CSV body `order_number;amount;tender;event`, `event` =\n`collected` or `remitted`). Each row applies on its own; mismatched amounts are reported,\nnever applied.",
+        "operationId": "cod_report",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodReport"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_cod_report",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2488,6 +3554,162 @@
         ]
       }
     },
+    "/admin/v1/markets/{id}/bank-account": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The market's receiving bank account (`404` when none is set).",
+        "operationId": "get_bank_account",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccount"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Sets the market's receiving account for bank transfers (IBAN check digits verified). The\noptional Fio API token is stored encrypted and never returned. Payment settings: admin\nrole and a login within the last 15 minutes (`401 reauth_required`, A9).",
+        "operationId": "put_bank_account",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankAccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_bank_account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRETS_KEY missing for a Fio token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/markets/{id}/payment-methods": {
       "get": {
         "tags": [
@@ -2936,6 +4158,334 @@
             }
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/cod/collect": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The money was collected: tender (`cash` is rounded as a separate charge, A16) and\ncollector are recorded, the order becomes paid (audited).",
+        "operationId": "cod_collect",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempt"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition | not_cash_on_delivery | order_cancelled",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_collection",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/cod/deliver": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The parcel was delivered (COD `pending → delivered`, audited).",
+        "operationId": "cod_deliver",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempt"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition | not_cash_on_delivery | order_cancelled",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/cod/remit": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The carrier paid the collected money out (COD `collected → remitted`, audited).",
+        "operationId": "cod_remit",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemitInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempt"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/exception/resolve": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Marks an order's exception (late or duplicate payment) as settled (audited); it leaves the\nqueue. `409 no_open_exception` otherwise.",
+        "operationId": "resolve_order_exception",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "no_open_exception",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3577,6 +5127,255 @@
         "responses": {
           "204": {
             "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payment-exceptions": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "operationId": "list_exceptions",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentExceptions"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The platform's Stripe mode and the shop's connected account (capabilities, A11).",
+        "operationId": "stripe_status",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe/onboarding": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Starts or continues Stripe-hosted onboarding of the shop's connected account (created on\nfirst use). Payment settings: admin role and a fresh login (A9).",
+        "operationId": "stripe_onboarding",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe/refresh": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Re-reads the connected account from Stripe (after returning from onboarding).",
+        "operationId": "stripe_refresh",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe/simulate": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Simulator only (`404` otherwise): emits a signed `account.updated` for the shop's account.",
+        "operationId": "stripe_simulate",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateAccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {},
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -10670,6 +12469,140 @@
         }
       }
     },
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/simulate": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The \"Stripe test simulator\" (local mode without a real Stripe key; `404` otherwise): makes\nthe API sign a Stripe-shaped `payment_intent.succeeded` / `payment_intent.payment_failed`\nevent with the webhook secret and receive it like Stripe's, so verification, storage and\nasynchronous processing run for real. Needs the right to pay. Answers `202` with the\npayment as it is now; the order page polls until the event is processed.",
+        "operationId": "simulate_attempt",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "attempt_not_initialized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/pages/blog": {
       "get": {
         "tags": [
@@ -11773,10 +13706,96 @@
           }
         }
       }
+    },
+    "/webhooks/stripe": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Stripe Connect webhook endpoint (A11). `Stripe-Signature` (HMAC-SHA256 over\n`\"<t>.<raw body>\"` with the endpoint secret, 5 minutes tolerance) is verified before\nanything else; the event is stored (deduplicated by id) and its processing enqueued before\nthe 200, so a crash afterwards loses nothing and a redelivery changes nothing. `404` when\nStripe is not configured.",
+        "operationId": "stripe_webhook",
+        "parameters": [
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "A Stripe event",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Received"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_signature",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_event",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AcceptProposal": {
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldRef"
+            },
+            "description": "The fields to write (a subset of `changes`). Creating a translation always includes\nits name/title and slug."
+          }
+        },
+        "additionalProperties": false
+      },
       "Address": {
         "type": "object",
         "required": [
@@ -11980,6 +13999,20 @@
               "$ref": "#/components/schemas/OrderEventView"
             }
           },
+          "exception_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exception_resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a person settled the exception (it then leaves the work list), and how."
+          },
           "market_id": {
             "type": "string",
             "format": "uuid"
@@ -12044,6 +14077,48 @@
           }
         }
       },
+      "AiMark": {
+        "type": "object",
+        "required": [
+          "locale",
+          "field",
+          "feature",
+          "model",
+          "ai_generated_at"
+        ],
+        "properties": {
+          "ai_generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        }
+      },
+      "AiMarkList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiMark"
+            }
+          }
+        }
+      },
       "Alternate": {
         "type": "object",
         "required": [
@@ -12057,6 +14132,24 @@
           "locale": {
             "type": "string",
             "description": "hreflang value (`cs-CZ`, `x-default`)."
+          }
+        }
+      },
+      "ApplyProgress": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Products deleted meanwhile or no longer valid for a change."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -12221,6 +14314,27 @@
             "type": "integer",
             "format": "int64"
           },
+          "cod_status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CodStatus",
+                "description": "Cash on delivery (A16): where the money is."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "collector": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Collector"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "completed_at": {
             "type": [
               "string",
@@ -12262,6 +14376,23 @@
           },
           "status": {
             "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "tender": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Tender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variable_symbol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bank transfer: the variable symbol (A25)."
           }
         }
       },
@@ -12370,6 +14501,304 @@
           "sale",
           "new"
         ]
+      },
+      "BankAccount": {
+        "type": "object",
+        "required": [
+          "id",
+          "market_id",
+          "currency",
+          "iban",
+          "account_name",
+          "active",
+          "fio_connected"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "The market's current account; retired ones still import and match statements."
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "fio_connected": {
+            "type": "boolean",
+            "description": "A Fio API token is stored (encrypted; never returned)."
+          },
+          "fio_synced_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BankAccountInput": {
+        "type": "object",
+        "required": [
+          "iban",
+          "account_name"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string",
+            "description": "The account holder (shown to customers, PAY by square beneficiary), 1-70 characters."
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clear_fio_token": {
+            "type": "boolean",
+            "description": "Removes the stored Fio API token."
+          },
+          "fio_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sets the Fio API token (write-only, stored encrypted); omit to keep the current one."
+          },
+          "iban": {
+            "type": "string",
+            "description": "Spaces are ignored; the check digits are verified."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BankAccountList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankAccount"
+            }
+          }
+        }
+      },
+      "BankTransaction": {
+        "type": "object",
+        "required": [
+          "id",
+          "bank_account_id",
+          "bank_tx_id",
+          "booked_on",
+          "amount_minor",
+          "currency",
+          "source",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bank_account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bank_tx_id": {
+            "type": "string"
+          },
+          "booked_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "counterparty": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "counterparty_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expected_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "What the order expected (for partial and over payments)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The order the money went to (matched, or the candidate of a partial/over payment)."
+          },
+          "order_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TxReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resolved_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TxStatus"
+          },
+          "variable_symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BankTransactionPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankTransaction"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next page; `null` on the last page."
+          }
+        }
+      },
+      "BankTransferView": {
+        "type": "object",
+        "description": "The payment instructions of a bank-transfer order, as the customer sees them.",
+        "required": [
+          "iban",
+          "account_name",
+          "variable_symbol",
+          "amount",
+          "message"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "iban": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "qr_kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QrKind",
+                "description": "`spayd` (CZK) or `pay_by_square` (EUR); `null` when the currency has no QR standard."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qr_svg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The QR code as an inline SVG element (server-generated; contains no script)."
+          },
+          "variable_symbol": {
+            "type": "string"
+          }
+        }
       },
       "Block": {
         "oneOf": [
@@ -12762,6 +15191,90 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "BulkPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt",
+          "status",
+          "errors",
+          "target_count",
+          "sample",
+          "progress",
+          "needs_fresh_auth",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "applied_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why the plan was rejected (or failed)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "needs_fresh_auth": {
+            "type": "boolean",
+            "description": "Confirming needs a sign-in at most 15 minutes old (price changes, A9)."
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Plan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/ApplyProgress"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleRow"
+            },
+            "description": "Before/after of the first products."
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "target_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Matching products (frozen at preview; the apply changes exactly these)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -13240,6 +15753,30 @@
           "tax"
         ]
       },
+      "Change": {
+        "type": "object",
+        "description": "One proposed field value.",
+        "required": [
+          "locale",
+          "field",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "description": "The proposed value: text, or the block/label list."
+          },
+          "before": {
+            "description": "The value when the proposal was generated (`null`: none yet)."
+          },
+          "field": {
+            "type": "string",
+            "description": "`name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`\nfor a menu's labels: `[{path, label}]`)."
+          },
+          "locale": {
+            "type": "string"
+          }
+        }
+      },
       "Channel": {
         "type": "string",
         "enum": [
@@ -13497,6 +16034,93 @@
           }
         }
       },
+      "CodReport": {
+        "type": "object",
+        "required": [
+          "applied",
+          "skipped",
+          "errors",
+          "rows"
+        ],
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "errors": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodReportRow"
+            }
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "CodReportRow": {
+        "type": "object",
+        "required": [
+          "line",
+          "order_number",
+          "result"
+        ],
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based line number in the file.",
+            "minimum": 0
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string",
+            "description": "`applied`, `skipped` (already in that state) or `error`."
+          }
+        }
+      },
+      "CodStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "delivered",
+          "collected",
+          "remitted"
+        ]
+      },
+      "CollectInput": {
+        "type": "object",
+        "required": [
+          "tender",
+          "collector"
+        ],
+        "properties": {
+          "collector": {
+            "$ref": "#/components/schemas/Collector"
+          },
+          "tender": {
+            "$ref": "#/components/schemas/Tender",
+            "description": "`cash` (rounded, A16) or `card`."
+          }
+        },
+        "additionalProperties": false
+      },
       "Collection": {
         "type": "object",
         "required": [
@@ -13637,6 +16261,13 @@
             }
           }
         }
+      },
+      "Collector": {
+        "type": "string",
+        "enum": [
+          "carrier",
+          "merchant"
+        ]
       },
       "Collision": {
         "type": "object",
@@ -14370,6 +17001,15 @@
           "destination"
         ]
       },
+      "EntityType": {
+        "type": "string",
+        "enum": [
+          "product",
+          "category",
+          "page",
+          "menu"
+        ]
+      },
       "Explained": {
         "type": "object",
         "required": [
@@ -14639,6 +17279,32 @@
         },
         "additionalProperties": false
       },
+      "FeatureUsage": {
+        "type": "object",
+        "required": [
+          "feature",
+          "calls",
+          "tokens",
+          "cost_micros"
+        ],
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "FeedFile": {
         "type": "object",
         "required": [
@@ -14701,6 +17367,22 @@
           }
         }
       },
+      "FieldRef": {
+        "type": "object",
+        "required": [
+          "locale",
+          "field"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "FulfillmentStatus": {
         "type": "string",
         "enum": [
@@ -14728,6 +17410,45 @@
             "description": "`sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`."
           }
         }
+      },
+      "Glossary": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlossaryEntry"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlossaryEntry": {
+        "type": "object",
+        "required": [
+          "term"
+        ],
+        "properties": {
+          "term": {
+            "type": "string",
+            "description": "The term as written in the source text, e.g. `Lnen & Co.`.",
+            "example": "Lnen & Co."
+          },
+          "translations": {
+            "type": "object",
+            "description": "Locale -> the fixed translation; locales not listed keep the term unchanged.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "GoLiveCheck": {
         "type": "object",
@@ -15654,6 +18375,14 @@
           "reviews"
         ]
       },
+      "Length": {
+        "type": "string",
+        "enum": [
+          "short",
+          "medium",
+          "long"
+        ]
+      },
       "Level": {
         "type": "object",
         "required": [
@@ -16528,6 +19257,20 @@
         },
         "additionalProperties": false
       },
+      "NewPlan": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "What to change, in the staff's words (1-2000 characters).",
+            "example": "Raise prices of T-shirts by 5 % in SK"
+          }
+        },
+        "additionalProperties": false
+      },
       "NewPriceList": {
         "type": "object",
         "required": [
@@ -16556,6 +19299,48 @@
           "name": {
             "type": "string",
             "example": "Česko – maloobchod"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewProposal": {
+        "type": "object",
+        "required": [
+          "kind",
+          "entity_type",
+          "entity_id",
+          "locale"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "The entity's id (a menu's handle)."
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "length": {
+            "$ref": "#/components/schemas/Length",
+            "description": "Descriptions only."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Language of the text to write; the source language for `translate`.",
+            "example": "cs"
+          },
+          "target_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`translate` only: 1-5 languages to translate into."
+          },
+          "tone": {
+            "$ref": "#/components/schemas/Tone",
+            "description": "Descriptions only."
           }
         },
         "additionalProperties": false
@@ -16661,7 +19446,7 @@
           },
           {
             "type": "object",
-            "description": "Nothing to pay now (cash on delivery).",
+            "description": "Nothing to pay online now: cash on delivery, or a bank transfer (the order page shows\nthe instructions and the QR code).",
             "required": [
               "type"
             ],
@@ -16673,9 +19458,64 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "Stripe's Payment Element on the order page (loaded only for this action): the intent\nlives on the shop's connected account.",
+            "required": [
+              "publishable_key",
+              "account_id",
+              "client_secret",
+              "type"
+            ],
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "client_secret": {
+                "type": "string"
+              },
+              "publishable_key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stripe"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Local mode: no real Stripe key. The order page offers the \"Stripe test simulator\",\nwhose buttons make the API emit signed webhook events.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stripe_simulator"
+                ]
+              }
+            }
           }
         ],
         "description": "What the customer does next."
+      },
+      "NoteInput": {
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "What was done (e.g. \"refunded to the customer's account\"), 1-500 characters."
+          }
+        },
+        "additionalProperties": false
       },
       "Omnibus": {
         "type": "object",
@@ -16726,6 +19566,170 @@
             "description": "Lowest price in the 30 days before `reduction_started_at`."
           }
         }
+      },
+      "OnboardingLink": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Stripe-hosted onboarding (single use, expires in minutes); in simulator mode the admin\npage itself (the account becomes ready through a simulated `account.updated`)."
+          }
+        }
+      },
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "field",
+              "value",
+              "op"
+            ],
+            "properties": {
+              "field": {
+                "$ref": "#/components/schemas/PlanField"
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Required for translated fields, `null` for `brand`."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_field"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "market",
+              "op"
+            ],
+            "properties": {
+              "amount_minor": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "Fixed change in minor units; exclusive with `percent`."
+              },
+              "market": {
+                "type": "string",
+                "description": "Market code or price list code."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "adjust_price"
+                ]
+              },
+              "percent": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "format": "double",
+                "description": "Percent change (5 = +5 %); exclusive with `amount_minor`."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "category",
+              "op"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "add_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "category",
+              "op"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "remove_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "parameter",
+              "value",
+              "op"
+            ],
+            "properties": {
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Text parameters: one locale, or `null` for every shop locale."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_parameter"
+                ]
+              },
+              "parameter": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "status",
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_status"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/ProductStatus"
+              }
+            }
+          }
+        ],
+        "description": "The allowlisted operations; anything else fails to parse."
       },
       "OptionValue": {
         "type": "object",
@@ -17522,6 +20526,23 @@
           }
         }
       },
+      "ParameterFilter": {
+        "type": "object",
+        "required": [
+          "parameter",
+          "value"
+        ],
+        "properties": {
+          "parameter": {
+            "type": "string",
+            "description": "Parameter key."
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ParameterInput": {
         "type": "object",
         "required": [
@@ -17668,6 +20689,28 @@
         },
         "additionalProperties": false
       },
+      "PaymentExceptions": {
+        "type": "object",
+        "description": "The payment exceptions queue: bank transactions waiting for a person (unmatched, partial,\nover) and orders holding money they cannot keep (late or duplicate payments, A10).",
+        "required": [
+          "bank_transactions",
+          "orders"
+        ],
+        "properties": {
+          "bank_transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankTransaction"
+            }
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderSummary"
+            }
+          }
+        }
+      },
       "PaymentInput": {
         "type": "object",
         "required": [
@@ -17693,7 +20736,7 @@
         "properties": {
           "available": {
             "type": "boolean",
-            "description": "Whether the platform can take payments with it yet (adapter present and configured)."
+            "description": "Whether the shop can take payments with it now (adapter present and configured)."
           },
           "enabled": {
             "type": "boolean"
@@ -17720,6 +20763,13 @@
             ],
             "format": "int32",
             "description": "Payment window for unpaid orders; `null` = the method's default."
+          },
+          "unavailable_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why not: `not_configured` (no platform adapter), `no_bank_account` (bank transfer\nneeds the market's receiving account), `stripe_onboarding` (the connected account\ncannot take card payments yet or lost the capability, A11)."
           }
         }
       },
@@ -17839,6 +20889,17 @@
               {
                 "$ref": "#/components/schemas/AttemptView",
                 "description": "The latest attempt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bank_transfer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BankTransferView",
+                "description": "Bank transfer: account, variable symbol, amount and the QR code (A25)."
               },
               {
                 "type": "null"
@@ -17973,6 +21034,51 @@
           }
         }
       },
+      "Plan": {
+        "type": "object",
+        "required": [
+          "explanation",
+          "selector",
+          "operations"
+        ],
+        "properties": {
+          "explanation": {
+            "type": "string",
+            "description": "The model's summary for the staff (plain text)."
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          },
+          "selector": {
+            "$ref": "#/components/schemas/Selector"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlanField": {
+        "type": "string",
+        "description": "Text fields a plan may set.",
+        "enum": [
+          "brand",
+          "short_description",
+          "seo_title",
+          "seo_description"
+        ]
+      },
+      "PlanStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "rejected",
+          "applying",
+          "applied",
+          "failed"
+        ]
+      },
       "PriceChangeReason": {
         "type": "string",
         "description": "Why the base prices change (recorded on the price intervals).",
@@ -17980,6 +21086,33 @@
           "base",
           "tax"
         ]
+      },
+      "PriceFilter": {
+        "type": "object",
+        "required": [
+          "market"
+        ],
+        "properties": {
+          "market": {
+            "type": "string",
+            "description": "Market code or price list code."
+          },
+          "max_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "min_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
       },
       "PriceHistory": {
         "type": "object",
@@ -18795,6 +21928,115 @@
           }
         }
       },
+      "Proposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "entity_type",
+          "entity_id",
+          "locale",
+          "target_locales",
+          "tone",
+          "length",
+          "status",
+          "progress",
+          "changes",
+          "warnings",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Failure code: `ai_quota_exceeded`, `ai_unavailable`, `ai_refused`,\n`ai_invalid_output`, `entity_missing`, `nothing_to_translate`."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "length": {
+            "$ref": "#/components/schemas/Length"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model that wrote it (`fake` for the demo provider)."
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "target_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tone": {
+            "$ref": "#/components/schemas/Tone"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Things to check before accepting (e.g. a glossary term not kept)."
+          }
+        }
+      },
+      "ProposalKind": {
+        "type": "string",
+        "enum": [
+          "product_description",
+          "seo",
+          "category_description",
+          "translate"
+        ]
+      },
+      "ProposalStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed",
+          "accepted",
+          "discarded"
+        ]
+      },
       "Purposes": {
         "type": "object",
         "description": "Per-purpose choices: `None` = not asked (or not part of this choice).",
@@ -18831,6 +22073,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "QrKind": {
+        "type": "string",
+        "enum": [
+          "spayd",
+          "pay_by_square"
+        ]
       },
       "QueryCount": {
         "type": "object",
@@ -18873,6 +22122,22 @@
           "job_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "Received": {
+        "type": "object",
+        "required": [
+          "received",
+          "new"
+        ],
+        "properties": {
+          "new": {
+            "type": "boolean",
+            "description": "`false` for a redelivery of an event already stored (a no-op)."
+          },
+          "received": {
+            "type": "boolean"
           }
         }
       },
@@ -19070,6 +22335,53 @@
             "format": "uuid"
           }
         }
+      },
+      "RemitInput": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "E.g. the carrier's payout reference, at most 500 characters."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolveAction": {
+        "type": "string",
+        "enum": [
+          "accept",
+          "assign",
+          "dismiss"
+        ]
+      },
+      "ResolveInput": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ResolveAction"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why (required for `dismiss`), at most 500 characters."
+          },
+          "order_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order number, for `assign`."
+          }
+        },
+        "additionalProperties": false
       },
       "Resolved": {
         "type": "object",
@@ -19407,6 +22719,49 @@
           }
         }
       },
+      "SampleChange": {
+        "type": "object",
+        "required": [
+          "what",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string",
+            "description": "`brand`, `seo_title (cs)`, `price TS-M (EUR)`, `category`, `parameter material`,\n`status`."
+          }
+        }
+      },
+      "SampleRow": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "name",
+          "changes"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleChange"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SearchHit": {
         "type": "object",
         "required": [
@@ -19528,6 +22883,49 @@
             "description": "One index per locale the tenant's markets sell in."
           }
         }
+      },
+      "Selector": {
+        "type": "object",
+        "description": "Which products change: every non-empty condition must hold.",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand names (case-insensitive)."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Category slugs (any locale); subcategories included."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterFilter"
+            }
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PriceFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStatus"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "Seo": {
         "type": "object",
@@ -19944,6 +23342,31 @@
           }
         }
       },
+      "SimulateAccountInput": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "`true`: onboarding completed (charges enabled, card payments active); `false`: the\ncard_payments capability is lost (Stripe disappears from checkout, A11)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SimulateInput": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "SkipReason": {
         "type": "string",
         "enum": [
@@ -20058,6 +23481,48 @@
           }
         }
       },
+      "StatementImport": {
+        "type": "object",
+        "required": [
+          "imported",
+          "duplicates",
+          "debits",
+          "matched",
+          "exceptions"
+        ],
+        "properties": {
+          "debits": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Debits (outgoing payments) are not stored.",
+            "minimum": 0
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines already imported earlier (same bank transaction id): ignored.",
+            "minimum": 0
+          },
+          "exceptions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New lines waiting in the exceptions queue.",
+            "minimum": 0
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New credit lines stored.",
+            "minimum": 0
+          },
+          "matched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New lines that paid an order.",
+            "minimum": 0
+          }
+        }
+      },
       "StockState": {
         "type": "string",
         "enum": [
@@ -20091,6 +23556,85 @@
           "personalized",
           "newest"
         ]
+      },
+      "StripeAccount": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "livemode",
+          "charges_enabled",
+          "details_submitted",
+          "card_payments",
+          "ready",
+          "updated_at"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "card_payments": {
+            "type": "string",
+            "description": "`active`, `inactive` or `pending`."
+          },
+          "charges_enabled": {
+            "type": "boolean"
+          },
+          "details_submitted": {
+            "type": "boolean"
+          },
+          "disabled_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "livemode": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "Stripe is offered at checkout (charges enabled and card payments active)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StripePlatformMode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "test",
+          "simulator"
+        ]
+      },
+      "StripeStatus": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StripeAccount",
+                "description": "The shop's connected account, once onboarding started."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StripePlatformMode",
+                "description": "`null`: the platform has no Stripe configuration (Stripe cannot be offered)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "Subscription": {
         "type": "object",
@@ -20443,6 +23987,25 @@
           }
         }
       },
+      "Tender": {
+        "type": "string",
+        "enum": [
+          "cash",
+          "card",
+          "unknown"
+        ]
+      },
+      "Tone": {
+        "type": "string",
+        "description": "Voice of generated descriptions.",
+        "enum": [
+          "neutral",
+          "friendly",
+          "premium",
+          "technical",
+          "playful"
+        ]
+      },
       "TopProduct": {
         "type": "object",
         "required": [
@@ -20593,6 +24156,28 @@
           }
         }
       },
+      "TxReason": {
+        "type": "string",
+        "enum": [
+          "no_variable_symbol",
+          "unknown_variable_symbol",
+          "currency_mismatch",
+          "already_paid",
+          "amount_short",
+          "amount_over",
+          "manual"
+        ]
+      },
+      "TxStatus": {
+        "type": "string",
+        "enum": [
+          "matched",
+          "unmatched",
+          "partial",
+          "overpaid",
+          "dismissed"
+        ]
+      },
       "UnitMeasure": {
         "type": "string",
         "description": "Basis of the unit price shown next to the price (per kg, per l, ...).",
@@ -20666,6 +24251,53 @@
           },
           "url": {
             "type": "string"
+          }
+        }
+      },
+      "UsageSummary": {
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "month_start",
+          "tokens_used",
+          "tokens_quota",
+          "cost_micros",
+          "by_feature"
+        ],
+        "properties": {
+          "by_feature": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureUsage"
+            }
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64",
+            "description": "USD micros this month at the configured list prices."
+          },
+          "model": {
+            "type": "string"
+          },
+          "month_start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the metered calendar month (UTC)."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`anthropic`, `fake` (demo fixtures, no key configured) or `disabled`."
+          },
+          "tokens_quota": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monthly allowance: the plan default or a superadmin override."
+          },
+          "tokens_used": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Tokens used this month (input incl. cache reads/writes + output)."
           }
         }
       },
@@ -21072,6 +24704,14 @@
     {
       "name": "checkout",
       "description": "Admin API: shipping and payment methods, orders"
+    },
+    {
+      "name": "ai",
+      "description": "Admin API: AI helpers (proposals, glossary, bulk edit by prompt, usage)"
+    },
+    {
+      "name": "payments",
+      "description": "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"
     },
     {
       "name": "analytics",

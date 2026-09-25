@@ -440,6 +440,115 @@ impl CheckoutConfig {
     }
 }
 
+/// How the platform talks to Stripe (WP11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StripeMode {
+    /// `sk_live_…`: real money.
+    Live,
+    /// `sk_test_…`: Stripe's test mode (the real Payment Element with test cards).
+    Test,
+    /// No key: API calls go to stripe-mock and the checkout offers a signed-event simulator
+    /// (local and CI only, refused with `APP_ENV=prod`).
+    Simulator,
+}
+
+/// Stripe Connect settings. Not `Debug`: it holds the secret key and the webhook secret.
+#[derive(Clone, PartialEq, Eq)]
+pub struct StripeConfig {
+    pub mode: StripeMode,
+    /// `https://api.stripe.com`, `STRIPE_API_URL` to override, or `STRIPE_MOCK_URL`.
+    pub api_url: Url,
+    pub secret_key: String,
+    /// `STRIPE_PUBLISHABLE_KEY` (real modes only): the Payment Element's key.
+    pub publishable_key: Option<String>,
+    /// `STRIPE_WEBHOOK_SECRET` (`whsec_…`): the Connect webhook endpoint's signing secret.
+    pub webhook_secret: String,
+}
+
+/// Payment providers (WP11). Not `Debug`: secrets.
+#[derive(Clone, PartialEq, Eq)]
+pub struct PaymentsConfig {
+    /// `None`: Stripe is not offered.
+    pub stripe: Option<StripeConfig>,
+    /// `FIO_API_URL`: the Fio banka API (`https://fioapi.fio.cz`, the local mock in compose).
+    pub fio_api_url: Url,
+}
+
+impl PaymentsConfig {
+    pub fn from_env(env: AppEnv) -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env, env)
+    }
+
+    pub fn from_lookup(lookup: Lookup, env: AppEnv) -> Result<Self, ConfigError> {
+        let invalid = |name, reason: &str| ConfigError::Invalid {
+            name,
+            reason: reason.into(),
+        };
+        let fio_api_url = match get(lookup, "FIO_API_URL") {
+            Some(_) => url(lookup, "FIO_API_URL")?,
+            None => Url::parse("https://fioapi.fio.cz/")
+                .map_err(|e| invalid("FIO_API_URL", &e.to_string()))?,
+        };
+        let webhook_secret = get(lookup, "STRIPE_WEBHOOK_SECRET");
+        if webhook_secret.as_ref().is_some_and(|s| s.len() < 16) {
+            return Err(invalid(
+                "STRIPE_WEBHOOK_SECRET",
+                "must be at least 16 characters",
+            ));
+        }
+        let stripe = if let Some(key) = get(lookup, "STRIPE_SECRET_KEY") {
+            let mode = match key.split('_').take(2).collect::<Vec<_>>()[..] {
+                ["sk" | "rk", "live"] => StripeMode::Live,
+                ["sk" | "rk", "test"] => StripeMode::Test,
+                _ => {
+                    return Err(invalid(
+                        "STRIPE_SECRET_KEY",
+                        "expected sk_live_… or sk_test_…",
+                    ));
+                }
+            };
+            let publishable_key = required(lookup, "STRIPE_PUBLISHABLE_KEY")?;
+            if !publishable_key.starts_with("pk_") {
+                return Err(invalid("STRIPE_PUBLISHABLE_KEY", "expected pk_…"));
+            }
+            Some(StripeConfig {
+                mode,
+                api_url: match get(lookup, "STRIPE_API_URL") {
+                    Some(_) => url(lookup, "STRIPE_API_URL")?,
+                    None => Url::parse("https://api.stripe.com/")
+                        .map_err(|e| invalid("STRIPE_API_URL", &e.to_string()))?,
+                },
+                secret_key: key,
+                publishable_key: Some(publishable_key),
+                webhook_secret: webhook_secret
+                    .ok_or(ConfigError::Missing("STRIPE_WEBHOOK_SECRET"))?,
+            })
+        } else if get(lookup, "STRIPE_MOCK_URL").is_some() {
+            if env == AppEnv::Prod {
+                return Err(invalid(
+                    "STRIPE_MOCK_URL",
+                    "the Stripe simulator is refused with APP_ENV=prod",
+                ));
+            }
+            Some(StripeConfig {
+                mode: StripeMode::Simulator,
+                api_url: url(lookup, "STRIPE_MOCK_URL")?,
+                // stripe-mock accepts any test key.
+                secret_key: "sk_test_simulator".into(),
+                publishable_key: None,
+                webhook_secret: webhook_secret
+                    .ok_or(ConfigError::Missing("STRIPE_WEBHOOK_SECRET"))?,
+            })
+        } else {
+            None
+        };
+        Ok(Self {
+            stripe,
+            fio_api_url,
+        })
+    }
+}
+
 /// Operations and integrations shared by api and worker (WP14). Not `Debug`: holds the
 /// secrets key.
 #[derive(Clone)]
@@ -448,7 +557,8 @@ pub struct OpsConfig {
     /// is a separate port that the public proxy never routes; unset = no metrics endpoint.
     pub metrics_bind: Option<SocketAddr>,
     /// `SECRETS_KEY`: 64 hex characters (AES-256 key) encrypting stored integration secrets
-    /// (webhook signing secrets). Unset = webhook subscriptions are unavailable.
+    /// (webhook signing secrets, Fio API tokens). Unset = webhook subscriptions are unavailable
+    /// and Fio tokens cannot be stored or used.
     pub secrets_key: Option<[u8; 32]>,
     /// `STOREFRONT_RATE_PER_SECOND` (default 20) and `STOREFRONT_RATE_BURST` (default 120):
     /// Storefront API requests per storefront token + client IP (spec §8.1).
@@ -502,6 +612,66 @@ impl OpsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn payments(vars: &[(&str, &str)], env: AppEnv) -> Result<PaymentsConfig, ConfigError> {
+        let vars: Vec<(String, String)> = vars
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let lookup = move |name: &str| vars.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone());
+        PaymentsConfig::from_lookup(&lookup, env)
+    }
+
+    #[test]
+    fn payments_config_modes() {
+        let none = payments(&[], AppEnv::Dev).unwrap();
+        assert!(none.stripe.is_none());
+        assert_eq!(none.fio_api_url.as_str(), "https://fioapi.fio.cz/");
+
+        let sim = payments(
+            &[
+                ("STRIPE_MOCK_URL", "http://stripe-mock:12111"),
+                ("STRIPE_WEBHOOK_SECRET", "whsec_local_0123456789"),
+            ],
+            AppEnv::Dev,
+        )
+        .unwrap()
+        .stripe
+        .unwrap();
+        assert_eq!(sim.mode, StripeMode::Simulator);
+        assert_eq!(sim.api_url.as_str(), "http://stripe-mock:12111/");
+        assert!(
+            payments(
+                &[
+                    ("STRIPE_MOCK_URL", "http://stripe-mock:12111"),
+                    ("STRIPE_WEBHOOK_SECRET", "whsec_local_0123456789"),
+                ],
+                AppEnv::Prod,
+            )
+            .is_err(),
+            "no simulator in prod"
+        );
+
+        let real = payments(
+            &[
+                ("STRIPE_SECRET_KEY", "sk_live_abc"),
+                ("STRIPE_PUBLISHABLE_KEY", "pk_live_abc"),
+                ("STRIPE_WEBHOOK_SECRET", "whsec_0123456789abcdef"),
+                ("STRIPE_MOCK_URL", "http://ignored"),
+            ],
+            AppEnv::Prod,
+        )
+        .unwrap()
+        .stripe
+        .unwrap();
+        assert_eq!(real.mode, StripeMode::Live);
+        assert_eq!(real.api_url.as_str(), "https://api.stripe.com/");
+        assert!(
+            payments(&[("STRIPE_SECRET_KEY", "sk_test_abc")], AppEnv::Dev).is_err(),
+            "a real key needs the publishable key and the webhook secret"
+        );
+        assert!(payments(&[("STRIPE_SECRET_KEY", "pk_test_abc")], AppEnv::Dev).is_err());
+    }
     use std::collections::HashMap;
 
     #[test]
@@ -752,5 +922,150 @@ mod auth_service_config_tests {
             AuthServiceConfig::optional_from_lookup(&full),
             Ok(Some(_))
         ));
+    }
+}
+
+/// Which model provider serves the AI helpers.
+#[derive(Clone, PartialEq, Eq)]
+pub enum AiProvider {
+    /// The Anthropic Messages API with this key.
+    Anthropic { api_key: String },
+    /// Deterministic fixtures (tests, local stacks without a key; never with `APP_ENV=prod`).
+    Fake,
+    /// No key in production: AI endpoints answer `503 ai_unavailable`.
+    Disabled,
+}
+
+/// AI gateway (spec D21, §12.1). Not `Debug`: holds the API key.
+#[derive(Clone)]
+pub struct AiConfig {
+    /// `ANTHROPIC_API_KEY` set: Anthropic. Unset: the fake provider, or `Disabled` with
+    /// `APP_ENV=prod` (fixture text must never reach a real shop).
+    pub provider: AiProvider,
+    /// `ANTHROPIC_BASE_URL`, default `https://api.anthropic.com/`.
+    pub base_url: Url,
+    /// `AI_HELPER_MODEL`, default `claude-sonnet-5` (admin helpers, bulk plans).
+    pub helper_model: String,
+    /// `AI_THEME_MODEL`, default `claude-opus-5-5` (AI theme editing, WP24).
+    pub theme_model: String,
+    /// `AI_TIMEOUT_SECS` per attempt, default 90.
+    pub timeout: std::time::Duration,
+    /// `AI_MAX_RETRIES` on 408/429/5xx/529 and network errors, default 2.
+    pub max_retries: u32,
+    /// `AI_PRICES`: `model=input:output;...` USD per MTok over the built-in list prices.
+    pub prices: crate::ai::PriceTable,
+    /// `AI_PLAN_QUOTAS`: `plan=tokens;...` monthly tokens per tenant plan, default
+    /// `standard=2000000`. Plans not listed get the `standard` quota.
+    pub plan_quotas: std::collections::BTreeMap<String, i64>,
+}
+
+impl AiConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let env: AppEnv = parsed(lookup, "APP_ENV", AppEnv::Prod)?;
+        let provider = match get(lookup, "ANTHROPIC_API_KEY") {
+            Some(api_key) => AiProvider::Anthropic {
+                api_key: api_key.trim().to_owned(),
+            },
+            None if env == AppEnv::Prod => AiProvider::Disabled,
+            None => AiProvider::Fake,
+        };
+        let base_url = match get(lookup, "ANTHROPIC_BASE_URL") {
+            None => Url::parse("https://api.anthropic.com/").map_err(|e| ConfigError::Invalid {
+                name: "ANTHROPIC_BASE_URL",
+                reason: e.to_string(),
+            })?,
+            Some(_) => {
+                let mut u = url(lookup, "ANTHROPIC_BASE_URL")?;
+                if !u.path().ends_with('/') {
+                    u.set_path(&format!("{}/", u.path()));
+                }
+                u
+            }
+        };
+        let prices = match get(lookup, "AI_PRICES") {
+            None => crate::ai::PriceTable::default(),
+            Some(spec) => {
+                crate::ai::PriceTable::parse(&spec).map_err(|reason| ConfigError::Invalid {
+                    name: "AI_PRICES",
+                    reason,
+                })?
+            }
+        };
+        let mut plan_quotas =
+            std::collections::BTreeMap::from([("standard".to_owned(), 2_000_000)]);
+        for entry in get(lookup, "AI_PLAN_QUOTAS")
+            .unwrap_or_default()
+            .split(';')
+            .map(str::trim)
+            .filter(|e| !e.is_empty())
+        {
+            let invalid = || ConfigError::Invalid {
+                name: "AI_PLAN_QUOTAS",
+                reason: format!("{entry:?}: expected plan=tokens"),
+            };
+            let (plan, tokens) = entry.split_once('=').ok_or_else(invalid)?;
+            let tokens: i64 = tokens.trim().parse().map_err(|_| invalid())?;
+            if tokens < 0 {
+                return Err(invalid());
+            }
+            plan_quotas.insert(plan.trim().to_owned(), tokens);
+        }
+        let model = |name: &'static str, default: &str| {
+            let m = get(lookup, name).unwrap_or_else(|| default.into());
+            let ok = (1..=100).contains(&m.len())
+                && m.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b':'));
+            ok.then_some(m).ok_or(ConfigError::Invalid {
+                name,
+                reason: "expected a model id".into(),
+            })
+        };
+        Ok(Self {
+            provider,
+            base_url,
+            helper_model: model("AI_HELPER_MODEL", "claude-sonnet-5")?,
+            theme_model: model("AI_THEME_MODEL", "claude-opus-5-5")?,
+            timeout: std::time::Duration::from_secs(parsed(lookup, "AI_TIMEOUT_SECS", 90u64)?),
+            max_retries: parsed(lookup, "AI_MAX_RETRIES", 2u32)?,
+            prices,
+            plan_quotas,
+        })
+    }
+}
+
+#[cfg(test)]
+mod ai_config_tests {
+    use super::*;
+
+    #[test]
+    fn provider_follows_key_and_environment() {
+        let dev = |k: &str| (k == "APP_ENV").then(|| "dev".to_owned());
+        let cfg = AiConfig::from_lookup(&dev).unwrap();
+        assert!(cfg.provider == AiProvider::Fake);
+        assert_eq!(cfg.helper_model, "claude-sonnet-5");
+        assert_eq!(cfg.theme_model, "claude-opus-5-5");
+        assert_eq!(cfg.plan_quotas["standard"], 2_000_000);
+        assert_eq!(cfg.base_url.as_str(), "https://api.anthropic.com/");
+        // Production without a key never falls back to fixtures.
+        assert!(AiConfig::from_lookup(&|_| None).unwrap().provider == AiProvider::Disabled);
+        let keyed = |k: &str| match k {
+            "ANTHROPIC_API_KEY" => Some("sk-test".into()),
+            "AI_PLAN_QUOTAS" => Some("pro=9000000; free=0".into()),
+            "ANTHROPIC_BASE_URL" => Some("http://127.0.0.1:9/base".into()),
+            _ => None,
+        };
+        let cfg = AiConfig::from_lookup(&keyed).unwrap();
+        assert!(matches!(cfg.provider, AiProvider::Anthropic { .. }));
+        assert_eq!(cfg.plan_quotas["pro"], 9_000_000);
+        assert_eq!(cfg.plan_quotas["free"], 0);
+        assert_eq!(cfg.base_url.as_str(), "http://127.0.0.1:9/base/");
+        let bad = |k: &str| (k == "AI_PLAN_QUOTAS").then(|| "pro=lots".to_owned());
+        assert!(AiConfig::from_lookup(&bad).is_err());
+        let bad_model = |k: &str| (k == "AI_HELPER_MODEL").then(|| "a b".to_owned());
+        assert!(AiConfig::from_lookup(&bad_model).is_err());
     }
 }

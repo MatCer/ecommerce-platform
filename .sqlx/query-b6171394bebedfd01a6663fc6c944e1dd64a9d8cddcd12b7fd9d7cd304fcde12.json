@@ -1,0 +1,172 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, kind, entity_type, entity_id, params, status, progress, changes, warnings,\n                error, model, created_at, updated_at\n         FROM ai_proposals WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "entity_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "entity_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "params",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "params"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "progress",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "progress"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "changes",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "changes"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "warnings",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "warnings"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "error",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "model",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "model"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ai_proposals",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "b6171394bebedfd01a6663fc6c944e1dd64a9d8cddcd12b7fd9d7cd304fcde12"
+}

@@ -1,0 +1,17 @@
+{#- Bank-transfer instructions (A25), included by order emails. `bank`: {iban, bic, account_name,
+    variable_symbol, amount, message, qr_svg, due}; `qr_svg` is server-generated SVG. -#}
+        <mj-text font-weight="700" padding="12px 0 0">{{ t("bank_transfer.heading") }}</mj-text>
+        <mj-table font-size="14px" color="{{ brand.colors.ink }}" padding="0 0 6px" cellpadding="4px">
+          <tr><td>{{ t("bank_transfer.account") }}</td><td style="font-weight: 700;">{{ bank.iban }}{% if bank.bic %} ({{ bank.bic }}){% endif %}</td></tr>
+          <tr><td>{{ t("bank_transfer.account_name") }}</td><td>{{ bank.account_name }}</td></tr>
+          <tr><td>{{ t("bank_transfer.variable_symbol") }}</td><td style="font-weight: 700;">{{ bank.variable_symbol }}</td></tr>
+          <tr><td>{{ t("bank_transfer.amount") }}</td><td style="font-weight: 700;">{{ bank.amount }}</td></tr>
+          <tr><td>{{ t("bank_transfer.message") }}</td><td>{{ bank.message }}</td></tr>
+{%- if bank.due %}
+          <tr><td>{{ t("bank_transfer.due") }}</td><td>{{ bank.due }}</td></tr>
+{%- endif %}
+        </mj-table>
+{%- if bank.qr_svg %}
+        <mj-text>{{ t("bank_transfer.qr_hint") }}</mj-text>
+        <mj-text align="center">{{ bank.qr_svg|safe }}</mj-text>
+{%- endif %}

@@ -1013,7 +1013,22 @@ pub async fn place_order(
         .await?;
     }
 
-    // Payment attempt (A10).
+    // Payment attempt (A10); a bank transfer gets its account, variable symbol and QR (A25).
+    let bank = if kind == MethodKind::BankTransfer {
+        Some(
+            payments::bank::prepare(
+                tx,
+                ctx.market.id,
+                number,
+                full.total_minor,
+                ctx.market.currency.code(),
+                &ctx.shop_name,
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
     let attempt_id = payments::create_attempt(
         tx,
         order_id,
@@ -1021,6 +1036,7 @@ pub async fn place_order(
         full.total_minor,
         ctx.market.currency.code(),
         expires_at,
+        bank.as_ref(),
     )
     .await?;
 
@@ -1115,15 +1131,8 @@ fn mail_text(locale: &str, key: &str) -> String {
     notifications::label(locale, key)
 }
 
-/// The order confirmation (lines, totals, VAT recap, delivery, payment), in the order's
-/// locale. `sensitive`: the body carries the order capability link, so it is dropped once the
-/// message is final (like sign-in links).
-async fn send_confirmation(
-    tx: &mut TenantTx,
-    ctx: &Context,
-    o: &OrderView,
-    token: &str,
-) -> Result<(), Error> {
+/// The order summary every order email shows (`order.mjml`).
+fn order_vars(o: &OrderView, url: String) -> Value {
     let l = o.locale.as_str();
     let mut totals = vec![
         json!({ "label": mail_text(l, "order_confirmation.subtotal"), "amount": o.subtotal.formatted }),
@@ -1135,6 +1144,47 @@ async fn send_confirmation(
     if o.payment_fee.amount_minor != 0 {
         totals.push(json!({ "label": mail_text(l, "order_confirmation.payment_fee"), "amount": o.payment_fee.formatted }));
     }
+    if o.rounding.amount_minor != 0 {
+        totals.push(json!({ "label": mail_text(l, "order_confirmation.rounding"), "amount": o.rounding.formatted }));
+    }
+    json!({
+        "number": o.number,
+        "lines": o.lines.iter().map(|x| json!({
+            "name": x.name, "detail": x.options_label, "quantity": x.quantity,
+            "total": x.total.formatted,
+        })).collect::<Vec<_>>(),
+        "totals": totals,
+        "total": o.total.formatted,
+        "url": url,
+    })
+}
+
+/// Bank-transfer instructions for `bank_transfer.mjml` (null for other methods).
+fn bank_vars(o: &OrderView) -> Value {
+    let Some(b) = &o.payment.bank_transfer else {
+        return Value::Null;
+    };
+    let due = o.payment.expires_at.map(|d| match o.locale.as_str() {
+        "en" => d.format("%Y-%m-%d").to_string(),
+        _ => d.format("%-d. %-m. %Y").to_string(),
+    });
+    json!({
+        "iban": b.iban, "bic": b.bic, "account_name": b.account_name,
+        "variable_symbol": b.variable_symbol, "amount": b.amount.formatted,
+        "message": b.message, "qr_svg": b.qr_svg, "due": due,
+    })
+}
+
+/// The order confirmation (lines, totals, VAT recap, delivery, payment), in the order's
+/// locale. `sensitive`: the body carries the order capability link, so it is dropped once the
+/// message is final (like sign-in links).
+async fn send_confirmation(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    o: &OrderView,
+    token: &str,
+) -> Result<(), Error> {
+    let l = o.locale.as_str();
     let point = o
         .shipping
         .pickup_point
@@ -1151,16 +1201,7 @@ async fn send_confirmation(
             )
         });
     let vars = json!({
-        "order": {
-            "number": o.number,
-            "lines": o.lines.iter().map(|x| json!({
-                "name": x.name, "detail": x.options_label, "quantity": x.quantity,
-                "total": x.total.formatted,
-            })).collect::<Vec<_>>(),
-            "totals": totals,
-            "total": o.total.formatted,
-            "url": ctx.checkout_url(&format!("/o/{token}")),
-        },
+        "order": order_vars(o, ctx.checkout_url(&format!("/o/{token}"))),
         "vat": o.vat.iter().map(|r| json!({
             "rate": r.rate, "net": r.net.formatted, "vat": r.vat.formatted,
         })).collect::<Vec<_>>(),
@@ -1174,6 +1215,7 @@ async fn send_confirmation(
             "bank_transfer": o.payment.method == MethodKind::BankTransfer,
             "cod": o.payment.method == MethodKind::Cod,
         },
+        "bank": bank_vars(o),
     });
     let brand = Brand::load(tx, ctx.base_url.clone()).await?;
     notifications::enqueue(
@@ -1191,6 +1233,54 @@ async fn send_confirmation(
     )
     .await?;
     Ok(())
+}
+
+/// Bank-transfer reminders (spec §10.3: day 3 and day 6 of the default 7-day window): each
+/// due reminder is claimed under the order lock and its email enqueued in the same
+/// transaction, with a fresh order link. Returns how many were sent.
+pub async fn send_payment_reminders(
+    db: &sqlx::PgPool,
+    urls: &crate::storefront::PublicUrls,
+    max: i32,
+) -> Result<usize, Error> {
+    let mut sent = 0;
+    for due in payments::bank::due_reminders(db, max).await? {
+        let mut tx = platform::db::tenant_tx(db, due.tenant_id).await?;
+        let Some((order_id, n)) =
+            payments::bank::claim_reminder(&mut tx, due.attempt_id, Utc::now()).await?
+        else {
+            continue;
+        };
+        let o = orders::view(&mut tx, order_id).await?;
+        let market = sqlx::query_scalar!("SELECT market_id FROM orders WHERE id = $1", order_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        let ctx =
+            crate::storefront::context(&mut tx, urls, market, Some(&o.locale), Utc::now()).await?;
+        let token = orders::issue_token(&mut tx, order_id).await?;
+        let brand = Brand::load(&mut tx, ctx.base_url.clone()).await?;
+        notifications::enqueue(
+            &mut tx,
+            &brand,
+            Email {
+                template: Template::PaymentReminder,
+                stream: Stream::Transactional,
+                to: &o.email,
+                locale: &o.locale,
+                vars: json!({
+                    "order": order_vars(&o, ctx.checkout_url(&format!("/o/{token}"))),
+                    "bank": bank_vars(&o),
+                    "reminder": n,
+                }),
+                idempotency_key: format!("payment_reminder:{}:{n}", due.attempt_id),
+                sensitive: true,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        sent += 1;
+    }
+    Ok(sent)
 }
 
 /// The order behind a capability token (the `/o/<token>` page).

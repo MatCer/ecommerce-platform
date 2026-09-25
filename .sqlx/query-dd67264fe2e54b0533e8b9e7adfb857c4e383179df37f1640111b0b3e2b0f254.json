@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.paid_attempt_id IS NOT DISTINCT FROM a.id AS \"retained!\"\n           FROM payment_attempts a JOIN orders o ON o.id = a.order_id WHERE a.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "retained!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "dd67264fe2e54b0533e8b9e7adfb857c4e383179df37f1640111b0b3e2b0f254"
+}

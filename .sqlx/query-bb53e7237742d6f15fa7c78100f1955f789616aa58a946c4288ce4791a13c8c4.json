@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_proposals SET status = 'failed', error = $2, updated_at = now()\n         WHERE id = $1 AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb53e7237742d6f15fa7c78100f1955f789616aa58a946c4288ce4791a13c8c4"
+}

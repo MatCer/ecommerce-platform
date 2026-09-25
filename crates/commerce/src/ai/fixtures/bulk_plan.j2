@@ -1,0 +1,33 @@
+{#- Fake provider: a tiny rule-based planner. Understands "<category> ... N % ... <market>"
+    price changes (raise/lower) and archiving; everything else yields an empty plan. -#}
+{%- set p = " " ~ (data.prompt | lower) ~ " " -%}
+{%- set words = p | replace(",", " ") | replace(".", " ") | replace("?", " ") | replace("!", " ") | split -%}
+{%- set ns = namespace(cats=[], market=none, pct=none) -%}
+{%- set tee = "t-shirt" in p or "tshirt" in p or "tričk" in p or "trick" in p -%}
+{%- for c in data.catalog.categories -%}
+  {%- set ns2 = namespace(hit=false) -%}
+  {%- for s in c.slugs %}{% if (" " ~ s ~ " ") in p or (tee and s in ["trika", "tricka", "t-shirts", "tricko"]) %}{% set ns2.hit = true %}{% endif %}{% endfor -%}
+  {%- for n in c.names %}{% if (n | lower) in p %}{% set ns2.hit = true %}{% endif %}{% endfor -%}
+  {%- if ns2.hit %}{% set ns.cats = ns.cats + [c.slugs[0]] %}{% endif -%}
+{%- endfor -%}
+{%- for m in data.catalog.markets -%}
+  {%- if ns.market is none and m.code in words %}{% set ns.market = m.code %}{% endif -%}
+  {%- for c in m.countries %}{% if ns.market is none and (c | lower) in words %}{% set ns.market = m.code %}{% endif %}{% endfor -%}
+{%- endfor -%}
+{%- for w in words -%}
+  {%- if w == "%" and loop.previtem is defined %}{% set ns.pct = loop.previtem %}
+  {%- elif w | length > 1 and w[-1:] == "%" %}{% set ns.pct = w[:-1] %}{% endif -%}
+{%- endfor -%}
+{%- set down = "lower" in p or "reduce" in p or "decrease" in p or "sniž" in p or "zlevn" in p or "zníž" in p -%}
+{%- set ops = [] -%}
+{%- if ns.pct is not none -%}
+  {%- set value = ns.pct | replace(",", ".") | float -%}
+  {%- set ops = ops + [{"op": "adjust_price", "market": (ns.market if ns.market is not none else data.catalog.markets[0].code), "percent": (0 - value if down else value), "amount_minor": none}] -%}
+{%- endif -%}
+{%- if "archiv" in p -%}
+  {%- set ops = ops + [{"op": "set_status", "status": "archived"}] -%}
+{%- endif -%}
+{%- set explanation = ("Demo AI plan: " ~ (ops | length) ~ " operation(s) for the matched products.") if ops else "The demo AI provider only understands price changes by percent and archiving." -%}
+{"explanation": {{ explanation | tojson }},
+ "selector": {"categories": {{ ns.cats | tojson }}, "brands": [], "statuses": [], "parameters": [], "price": null},
+ "operations": {{ ops | tojson }}}

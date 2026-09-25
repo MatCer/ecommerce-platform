@@ -5,7 +5,7 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, OpsConfig, S3Config,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, OpsConfig, PaymentsConfig, S3Config,
     ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
@@ -65,8 +65,12 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Payment gateways and the pickup-point widget from `CheckoutConfig`.
-fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
+/// Payment gateways and the pickup-point widget from `CheckoutConfig` and `PaymentsConfig`.
+fn checkout_settings(
+    c: &CheckoutConfig,
+    p: &PaymentsConfig,
+    ops: &OpsConfig,
+) -> anyhow::Result<commerce::checkout::Settings> {
     let fake = c.payments_fake.then(|| {
         tracing::warn!("PAYMENTS_FAKE=1: the fake payment gateway is enabled (local/e2e only)");
         let secret = c
@@ -86,10 +90,48 @@ fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
             None
         }
     };
-    commerce::checkout::Settings {
-        payments: commerce::payments::Payments { fake },
-        packeta,
+    let stripe = match &p.stripe {
+        Some(cfg) => {
+            if cfg.mode == platform::config::StripeMode::Simulator {
+                tracing::warn!(
+                    "no STRIPE_SECRET_KEY: Stripe runs against stripe-mock with the test simulator"
+                );
+            }
+            let http = reqwest::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .build()?;
+            Some(commerce::payments::stripe::Stripe::new(cfg, http))
+        }
+        None => {
+            tracing::warn!("Stripe is not configured (STRIPE_SECRET_KEY or STRIPE_MOCK_URL)");
+            None
+        }
+    };
+    let secrets = ops
+        .secrets_key
+        .map(|k| Arc::new(platform::crypto::SecretBox::new(&k)));
+    if secrets.is_none() {
+        tracing::warn!("SECRETS_KEY not set: Fio API tokens cannot be stored");
     }
+    Ok(commerce::checkout::Settings {
+        payments: commerce::payments::Payments {
+            fake,
+            stripe,
+            secrets,
+        },
+        packeta,
+    })
+}
+
+/// AI helpers from `AiConfig` (Anthropic with a key, else the fake provider; off in prod).
+fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
+    let ai = commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?;
+    match ai.provider() {
+        "fake" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers use the fake provider"),
+        "disabled" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers are disabled"),
+        _ => tracing::info!(model = %ai.helper_model, "AI helpers use the Anthropic API"),
+    }
+    Ok(ai)
 }
 
 fn init_tracing() -> anyhow::Result<()> {
@@ -147,12 +189,17 @@ async fn serve() -> anyhow::Result<()> {
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
-        checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
+        checkout: Arc::new(checkout_settings(
+            &CheckoutConfig::from_env(cfg.env)?,
+            &PaymentsConfig::from_env(cfg.env)?,
+            &ops,
+        )?),
         webhooks: webhooks(&ops, cfg.env)?,
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
             ops.storefront_rate_per_second,
             ops.storefront_rate_burst,
         )),
+        ai: ai_helpers()?,
     };
     let limiter = state.rate_limit.clone();
     tokio::spawn(async move {

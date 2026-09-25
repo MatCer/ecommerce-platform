@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
+import { fioRoutes } from "./fio.ts";
 import { packetaRoutes } from "./packeta.ts";
 import { webhookRoutes } from "./webhooks.ts";
 
@@ -12,6 +13,7 @@ export const app = new Hono();
 app.get("/healthz", (c) => c.json({ status: "ok" }));
 
 packetaRoutes(app);
+fioRoutes(app);
 webhookRoutes(app);
 
 /**

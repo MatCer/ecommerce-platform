@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ai_glossaries (tenant_id, entries) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET entries = EXCLUDED.entries, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "84fc0f61b266e76d0398b4e0a69c8f3e3a9baa575c341966a9767de0ed51022e"
+}
