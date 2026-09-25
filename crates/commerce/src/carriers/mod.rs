@@ -63,6 +63,9 @@ impl CarrierKind {
     }
 }
 
+/// PPL access tokens per client id, with their expiry.
+type TokenCache = HashMap<String, (String, DateTime<Utc>)>;
+
 /// Endpoints and shared state (the PPL token cache).
 #[derive(Clone)]
 pub struct Carriers {
@@ -72,7 +75,7 @@ pub struct Carriers {
     pub ppl_url: String,
     /// `SECRETS_KEY`; without it no credentials can be stored or used.
     pub secrets: Option<Arc<SecretBox>>,
-    ppl_tokens: Arc<Mutex<HashMap<String, (String, DateTime<Utc>)>>>,
+    ppl_tokens: Arc<Mutex<TokenCache>>,
 }
 
 impl std::fmt::Debug for Carriers {

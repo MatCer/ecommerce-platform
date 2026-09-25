@@ -31,26 +31,41 @@ fn home_carrier(country: &str) -> Option<&'static str> {
     }
 }
 
-/// The first element named `tag` in `xml`, as text (unescaped).
+/// The text of the first element named `tag` in `xml` (entities resolved). DOCTYPEs are
+/// refused (no entity expansion from the response).
 fn text_of(xml: &str, tag: &str) -> Option<String> {
+    use quick_xml::events::Event;
     let mut reader = quick_xml::Reader::from_str(xml);
-    let mut inside = false;
+    let mut text: Option<String> = None;
     loop {
         match reader.read_event().ok()? {
-            quick_xml::events::Event::Start(e) if e.name().as_ref() == tag.as_bytes() => {
-                inside = true;
+            Event::Start(e) if text.is_none() && e.name().as_ref() == tag.as_bytes() => {
+                text = Some(String::new());
             }
-            quick_xml::events::Event::Text(t) if inside => {
-                return t.decode().ok().map(|s| {
-                    quick_xml::escape::unescape(&s)
-                        .map(|u| u.into_owned())
-                        .unwrap_or_else(|_| s.into_owned())
-                });
+            Event::Text(t) => {
+                if let Some(buf) = text.as_mut() {
+                    buf.push_str(&t.decode().ok()?);
+                }
             }
-            quick_xml::events::Event::End(e) if inside && e.name().as_ref() == tag.as_bytes() => {
-                return Some(String::new());
+            Event::GeneralRef(r) => {
+                if let Some(buf) = text.as_mut() {
+                    match r.resolve_char_ref().ok()? {
+                        Some(c) => buf.push(c),
+                        None => buf.push_str(match r.decode().ok()?.as_ref() {
+                            "amp" => "&",
+                            "lt" => "<",
+                            "gt" => ">",
+                            "quot" => "\"",
+                            "apos" => "'",
+                            _ => return None,
+                        }),
+                    }
+                }
             }
-            quick_xml::events::Event::Eof => return None,
+            Event::End(e) if text.is_some() && e.name().as_ref() == tag.as_bytes() => {
+                return text;
+            }
+            Event::DocType(_) | Event::Eof => return None,
             _ => {}
         }
     }
