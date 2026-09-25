@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO customers (tenant_id, email, locale) VALUES ($1, $2, $3)\n         ON CONFLICT ON CONSTRAINT customers_email_unique DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "aea8c8bd12104e38c5b57c5ef7bb27feb9c6eceeed5e2d0aa92014263fca2b77"
+}

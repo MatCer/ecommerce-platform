@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT stream, to_email, subject, html, body_text, status, uncertain_count\n         FROM email_messages WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "to_email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "to_email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "html",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "html"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "body_text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "body_text"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "uncertain_count",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "uncertain_count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "918e5d6e6565244e74ac117d3ec52b817a03fa4c8a8bfa259775e8d42e71650a"
+}

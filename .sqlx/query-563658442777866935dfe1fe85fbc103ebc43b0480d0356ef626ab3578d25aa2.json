@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted,\n                                      text_version, source, ip_hash)\n         SELECT a.tenant_id, 'customer', $2, a.purpose, a.granted, a.text_version, 'linked', NULL\n         FROM (SELECT DISTINCT ON (purpose) tenant_id, purpose, granted, text_version, at\n               FROM consent_records WHERE subject_type = 'anon' AND subject_id = $1\n               ORDER BY purpose, at DESC, id DESC) a\n         WHERE NOT EXISTS (\n             SELECT 1 FROM consent_records c\n             WHERE c.subject_type = 'customer' AND c.subject_id = $2 AND c.purpose = a.purpose\n               AND c.at >= a.at)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "563658442777866935dfe1fe85fbc103ebc43b0480d0356ef626ab3578d25aa2"
+}

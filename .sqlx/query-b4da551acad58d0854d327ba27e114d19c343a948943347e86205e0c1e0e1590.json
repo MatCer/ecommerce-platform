@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE email_messages SET status = $2, last_error = coalesce($3, last_error),\n             accepted_at = CASE WHEN $2 = 'accepted' THEN now() ELSE accepted_at END,\n             html = CASE WHEN sensitive THEN NULL ELSE html END,\n             body_text = CASE WHEN sensitive THEN NULL ELSE body_text END,\n             updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b4da551acad58d0854d327ba27e114d19c343a948943347e86205e0c1e0e1590"
+}

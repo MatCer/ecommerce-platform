@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO cart_lines (tenant_id, cart_id, variant_id, quantity)\n             SELECT o.tenant_id, $1, o.variant_id, o.quantity FROM cart_lines o\n             WHERE o.cart_id = $2\n               AND NOT EXISTS (SELECT 1 FROM cart_lines l WHERE l.cart_id = $1 AND l.variant_id = o.variant_id)\n             ORDER BY o.created_at\n             LIMIT greatest($3 - (SELECT count(*) FROM cart_lines WHERE cart_id = $1), 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6c5c6207e470ff080b57eade2ca3ffffba4aa2794b77e84e14c64897c1fd3fde"
+}

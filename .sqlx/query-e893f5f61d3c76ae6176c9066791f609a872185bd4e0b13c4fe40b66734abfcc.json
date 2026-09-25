@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM customer_addresses WHERE id = $1 AND customer_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e893f5f61d3c76ae6176c9066791f609a872185bd4e0b13c4fe40b66734abfcc"
+}

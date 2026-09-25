@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted,\n                                      text_version, source, ip_hash)\n         SELECT $1, $2, $3, p, g, $6, $7, $8 FROM unnest($4::text[], $5::bool[]) AS c(p, g)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "TextArray",
+        "BoolArray",
+        "Text",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d7e1ef2acb44354c4279b29b3498fe3e3bc7375e50d94a50460ccb119d61ba89"
+}

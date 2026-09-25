@@ -905,6 +905,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The current choice: the signed-in customer's (checkout origin), else the anonymous
+         *     subject's. `text_version: null` means no choice yet.
+         */
+        get: operations["get_consent"];
+        put?: never;
+        /**
+         * Records a choice for the anonymous subject (minted on the first choice) and, when signed in
+         *     on the checkout origin, for the customer. Answers the anonymous subject's new state.
+         */
+        post: operations["post_consent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_addresses"];
+        put?: never;
+        post: operations["add_address"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/addresses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["update_address"];
+        post?: never;
+        delete: operations["delete_address"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/magic-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["request_magic_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/magic-link/consume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["consume_magic_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sets or changes the password (A5). Every other session is signed out; a notice is emailed. */
+        post: operations["set_password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/events": {
         parameters: {
             query?: never;
@@ -1124,6 +1277,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Address: {
+            city: string;
+            company?: string | null;
+            /** @description ISO 3166-1 alpha-2 (`CZ`). */
+            country: string;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            name: string;
+            phone?: string | null;
+            postal_code: string;
+            street: string;
+        };
+        AddressInput: {
+            city: string;
+            company?: string | null;
+            country: string;
+            is_default?: boolean;
+            name: string;
+            phone?: string | null;
+            postal_code: string;
+            street: string;
+        };
+        AddressList: {
+            items: components["schemas"]["Address"][];
+        };
         Adjustment: {
             /**
              * Format: int32
@@ -1371,13 +1550,31 @@ export interface components {
             meilisearch: components["schemas"]["CheckStatus"];
             storage: components["schemas"]["CheckStatus"];
         };
+        /** @description A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`). */
+        ConsentChoice: {
+            purposes: components["schemas"]["Purposes"];
+            /** @description `banner` (default) or `preferences`. */
+            source?: components["schemas"]["Source"];
+            /** @description The consent text version the person saw (`GET /shop` → `consent.text_version`). */
+            text_version: string;
+        };
         ConsentConfig: {
             policy_url: string;
-            /** @description Purposes the banner asks for (placeholder until WP9's consent model, A20). */
+            /** @description The preferences page on the checkout origin. */
+            preferences_url: string;
+            /** @description Purposes the banner asks for (A20). */
             purposes: components["schemas"]["ConsentPurpose"][];
+            /** @description Version of the consent texts; post it back with the choice (`POST /_p/consent`). */
+            text_version: string;
         };
         /** @enum {string} */
         ConsentPurpose: "analytics" | "ads" | "personalization" | "email_marketing" | "review_invites";
+        /** @description Current consent of a subject. */
+        ConsentState: {
+            purposes: components["schemas"]["Purposes"];
+            /** @description Text version of the latest choice; `None` = no choice yet (show the banner). */
+            text_version?: string | null;
+        };
         Coupon: {
             /** @example PODZIM10 */
             code: string;
@@ -1455,6 +1652,21 @@ export interface components {
          * @enum {string}
          */
         Currency: "BGN" | "CZK" | "DKK" | "EUR" | "HUF" | "PLN" | "RON" | "SEK";
+        CustomerView: {
+            email: string;
+            email_verified: boolean;
+            has_password: boolean;
+            /** Format: uuid */
+            id: string;
+            locale: string;
+            name?: string | null;
+            phone?: string | null;
+            /**
+             * @description A password can be set without the current one right now (A5: signed in with an email
+             *     link within the last 10 minutes).
+             */
+            recently_verified: boolean;
+        };
         DeliveryEstimate: {
             /** Format: date */
             from: string;
@@ -1663,6 +1875,14 @@ export interface components {
             title: string;
             /** Format: int32 */
             total: number;
+        };
+        MagicLinkRequest: {
+            email: string;
+            /** @description Relative path on the checkout origin to land on after sign-in (default `/account`). */
+            redirect?: string | null;
+        };
+        MagicLinkToken: {
+            token: string;
         };
         Market: {
             code: string;
@@ -1934,6 +2154,16 @@ export interface components {
             name: string;
             value: string;
         };
+        PasswordChange: {
+            /** @description Required unless the session signed in with an email link within the last 10 minutes. */
+            current_password?: string | null;
+            new_password: string;
+        };
+        PasswordLogin: {
+            email: string;
+            password: string;
+            redirect?: string | null;
+        };
         /**
          * @description Why the base prices change (recorded on the price intervals).
          * @enum {string}
@@ -2148,6 +2378,14 @@ export interface components {
              * @example tricko-basic
              */
             slug: string;
+        };
+        /** @description Per-purpose choices: `None` = not asked (or not part of this choice). */
+        Purposes: {
+            ads?: boolean | null;
+            analytics?: boolean | null;
+            email_marketing?: boolean | null;
+            personalization?: boolean | null;
+            review_invites?: boolean | null;
         };
         Readiness: {
             checks: components["schemas"]["Checks"];
@@ -2369,6 +2607,11 @@ export interface components {
             tracking: components["schemas"]["Tracking"];
             trust: components["schemas"]["Trust"];
         };
+        SignInResult: {
+            customer: components["schemas"]["CustomerView"];
+            /** @description Relative path on the checkout origin to continue to. */
+            redirect: string;
+        };
         /** @enum {string} */
         Sort: "recommended" | "price_asc" | "price_desc" | "newest";
         SortOption: {
@@ -2377,6 +2620,11 @@ export interface components {
             selected: boolean;
             value: components["schemas"]["Sort"];
         };
+        /**
+         * @description Where a choice was made.
+         * @enum {string}
+         */
+        Source: "banner" | "preferences" | "checkout" | "linked";
         StaffList: {
             items: components["schemas"]["StaffMember"][];
         };
@@ -5592,6 +5840,558 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_consent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Anonymous subject id from the consent cookie (32 hex characters). */
+                "X-Consent-Subject"?: string | null;
+                /** @description Checkout origin only: the signed-in customer's session. */
+                "X-Customer-Session"?: string | null;
+                /** @description The client's IP (stored as a salted hash with the record). */
+                "X-Client-Ip"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentState"];
+                };
+            };
+        };
+    };
+    post_consent: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Anonymous subject id from the consent cookie (32 hex characters). */
+                "X-Consent-Subject"?: string | null;
+                /** @description Checkout origin only: the signed-in customer's session. */
+                "X-Customer-Session"?: string | null;
+                /** @description The client's IP (stored as a salted hash with the record). */
+                "X-Client-Ip"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentChoice"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description The anonymous subject id (for the edge's cookie) */
+                    "X-Consent-Subject"?: string;
+                    /** @description `<text_version>.<mask>` for the script-readable cookie */
+                    "X-Consent-Summary"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentState"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_addresses: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddressList"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_address: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Address"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_address: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Address"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_address: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Checkout cart capability (`__Host-cart`): the cart is attached to the customer (A4). */
+                "X-Cart-Token"?: string | null;
+                /** @description Anonymous consent subject (consent cookie): its choices move to the customer (A20). */
+                "X-Consent-Subject"?: string | null;
+                /** @description The client's IP (rate limits; stored only as a salted hash). */
+                "X-Client-Ip"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordLogin"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description New session (for the edge only) */
+                    "X-Session-Token"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInResult"];
+                };
+            };
+            /** @description invalid_credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too_many_attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    /** @description The edge deletes the cookie */
+                    "X-Session-Clear"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    request_magic_link: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Checkout cart capability (`__Host-cart`): the cart is attached to the customer (A4). */
+                "X-Cart-Token"?: string | null;
+                /** @description Anonymous consent subject (consent cookie): its choices move to the customer (A20). */
+                "X-Consent-Subject"?: string | null;
+                /** @description The client's IP (rate limits; stored only as a salted hash). */
+                "X-Client-Ip"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MagicLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Sent if the address can receive mail (same answer for every address) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too_many_attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    consume_magic_link: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Checkout cart capability (`__Host-cart`): the cart is attached to the customer (A4). */
+                "X-Cart-Token"?: string | null;
+                /** @description Anonymous consent subject (consent cookie): its choices move to the customer (A20). */
+                "X-Consent-Subject"?: string | null;
+                /** @description The client's IP (rate limits; stored only as a salted hash). */
+                "X-Client-Ip"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MagicLinkToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    /** @description New session (for the edge only) */
+                    "X-Session-Token"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignInResult"];
+                };
+            };
+            /** @description invalid_magic_link */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerView"];
+                };
+            };
+            /** @description not_signed_in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_password: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChange"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_signed_in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description reauth_required | invalid_current_password */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description weak_password */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too_many_attempts */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

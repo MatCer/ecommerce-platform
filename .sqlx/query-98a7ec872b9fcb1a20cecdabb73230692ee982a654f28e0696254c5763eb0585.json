@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE customer_magic_links SET used_at = now()\n         WHERE token_hash = $1 AND market_id = $2 AND used_at IS NULL AND expires_at > now()\n         RETURNING email, locale, redirect",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_magic_links",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_magic_links",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "redirect",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_magic_links",
+            "name": "redirect"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "98a7ec872b9fcb1a20cecdabb73230692ee982a654f28e0696254c5763eb0585"
+}

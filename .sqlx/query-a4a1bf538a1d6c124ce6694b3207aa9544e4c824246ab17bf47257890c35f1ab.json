@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) FILTER (WHERE email = $2) AS \"email!\",\n                count(*) FILTER (WHERE ip_hash = $3) AS \"ip!\"\n         FROM customer_auth_attempts\n         WHERE kind = $1 AND at > now() - make_interval(mins => $4)\n           AND (email = $2 OR ip_hash = $3)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "ip!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "a4a1bf538a1d6c124ce6694b3207aa9544e4c824246ab17bf47257890c35f1ab"
+}

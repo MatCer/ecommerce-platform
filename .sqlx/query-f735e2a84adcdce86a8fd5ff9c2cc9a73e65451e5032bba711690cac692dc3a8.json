@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE email_messages SET status = 'uncertain', uncertain_count = $2,\n                     last_error = 'worker stopped while sending', updated_at = now()\n                 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f735e2a84adcdce86a8fd5ff9c2cc9a73e65451e5032bba711690cac692dc3a8"
+}
