@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT to_jsonb(s) - 'confirm_token_hash' - 'request_ip_hash' - 'confirm_ip_hash'\n                  AS \"v!\"\n           FROM subscribers s WHERE s.email = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "161830d888b48e7519f688a5380084ab212f6e8bac1ab230242ed5c1815487c3"
+}

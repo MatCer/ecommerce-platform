@@ -116,7 +116,15 @@ unwanted change (the review is the control); the model's quality (the WP2 study 
 prompts pass within 3 repairs with full repository knowledge; a 25-turn loop with only the
 contract will do worse on cross-cutting requests).
 
-## 6. Deviations and follow-ups
+## 6. Data portability and GDPR (WP13b)
+
+`ai_theme_runs` is included in the tenant export (every RLS-forced table, WP13b) with all
+columns: prompts, transcripts, diffs and reports are the merchant's own data and hold no
+secrets (the API key is a request header, never stored). Customer erasure does not touch it:
+runs are written by staff about theme code and carry no shopper data (like `ai_proposals`);
+`created_by` is a staff user id.
+
+## 7. Deviations and follow-ups
 
 - Tool scope includes `checks/<name>.spec.ts` (the WP23 functional-check hook the spec asks the
   agent to write); the spec's list names `theme.config.ts`, which A6 replaced with

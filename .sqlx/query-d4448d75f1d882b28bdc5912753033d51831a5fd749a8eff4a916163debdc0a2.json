@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_imports SET status = 'analyzed', report = $2, error = NULL,\n                    updated_at = now()\n             WHERE id = $1 AND status = 'analyzing'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d4448d75f1d882b28bdc5912753033d51831a5fd749a8eff4a916163debdc0a2"
+}

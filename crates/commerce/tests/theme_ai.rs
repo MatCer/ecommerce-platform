@@ -946,3 +946,21 @@ async fn a_slow_model_call_stops_on_cancel_and_deadline(db: PgPool) {
         d.run.error
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn runs_are_part_of_the_tenant_export(db: PgPool) {
+    // WP13b exports every RLS-forced tenant table: AI runs (prompt, transcript, diff, report)
+    // are the tenant's own data and hold no secrets (the API key never enters a request body
+    // that is stored), so they are included whole.
+    let (runtime, _storage, shop) = setup(&db).await;
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let tables = commerce::portability::export::tables(&mut tx)
+        .await
+        .unwrap();
+    let runs = tables
+        .iter()
+        .find(|t| t.name == "ai_theme_runs")
+        .expect("exported");
+    assert!(runs.dropped.is_empty(), "{:?}", runs.dropped);
+    assert!(!commerce::portability::export::SKIPPED_TABLES.contains(&"ai_theme_runs"));
+}

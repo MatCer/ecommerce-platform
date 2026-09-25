@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(jsonb_build_object('type', e.type, 'at', e.at,\n                   'props', e.props) ORDER BY e.at), '[]') AS \"v!\"\n           FROM events e WHERE e.customer_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8b10199fcde0106770a87618c3677ab5dba39ed91c2b904b8aa25a5c9889f4a0"
+}

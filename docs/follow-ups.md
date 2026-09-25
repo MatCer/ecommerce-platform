@@ -35,7 +35,7 @@
 | WP14 | Every webhook-type outbox event gets a fan-out job even for tenants without subscriptions | later (perf) |
 | WP13a | Feed import applies product by product and feeds render in memory per market; batch/stream for 100k-item catalogs | later (perf) |
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
-| WP13a | Orders/customers CSV import, tenant data export, customer access/erasure (A29) | WP13b |
+| WP13a | ~~Orders/customers CSV import, tenant data export, customer access/erasure (A29)~~ done in WP13b | done |
 | WP17 | The hourly rollup recomputes the tenant's co-purchases, scores and customer affinity in full (stats for the last 2 days; the nightly run recomputes all 400 retained days so late cancellations leave every result); fine for demo-sized shops, narrow it to changed orders for large catalogs/order books | later (perf) |
 | WP11 | `payments::refund(attempt)` (Stripe with `refund_application_fee` and the refund id as idempotency key, bank/COD recorded) and `payments::retry_refund` have no admin screen yet; a Stripe refund whose outcome is unknown stays `pending` until retried or reconciled by `refund.*` webhooks; WP12 wires them into returns/withdrawals and a pending-refund list | WP12 |
 | WP11 | COD `delivered` is set by hand (or the carrier CSV stub `POST /admin/v1/cod-reports`); carrier tracking and real COD payout imports (Packeta/PPL) | WP12 |
@@ -67,16 +67,24 @@
 | WP18 | No open tracking at all (privacy default); the optional consented tracking pixel of §11.5 is not built | later (only if merchants ask) |
 | WP18 | Marketing message bodies stay in `email_messages` indefinitely (one row per recipient); add a retention rule to `ops.sweep` (e.g. drop bodies of final marketing mail after 30 days) | later (ops) |
 | WP18 | The marketing rate is one platform constant (500 messages per tenant and minute) and limits how fast campaign messages are queued, not SMTP itself (a backlog after an outage drains faster); per-tenant quotas, a delivery-time rate limit | later |
-| WP18 | Subscriber import (CSV) and the AI copy assist per segment (§11.5) | WP13b / M3 |
+| WP18 | ~~Subscriber import (CSV)~~ done in WP13b; the AI copy assist per segment (§11.5) | M3 |
 | WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
-| WP24 | The agent loop was exercised only with the scripted fake agent; run the manual smoke with a real `ANTHROPIC_API_KEY` (runbook §6c) and record pass rate, turns, repairs, tokens and cost per prompt (the `ai-edit-prompts.md` table) | pre-launch / WP25 |
+| WP24 | The agent loop was exercised only with the scripted fake agent; run the manual smoke with a real `ANTHROPIC_API_KEY` (runbook §6d) and record pass rate, turns, repairs, tokens and cost per prompt (the `ai-edit-prompts.md` table) | pre-launch / WP25 |
 | WP24 | AI runs have their own queue with 2 loops per worker process (constant); more concurrent runs wait queued. Make it configurable / a separate worker when many shops edit at once | later (scale-out) |
 | WP24 | A refused or cut-off (`max_tokens`) model response is metered but its content is not kept in the transcript | later |
 | WP24 | `ai_theme_runs` transcripts (the full API history, can be MBs) are kept indefinitely; add a retention rule to `ops.sweep` | later (ops) |
 | WP24 | No "retry" or "continue with feedback" on a failed/finished run (the merchant starts a new run with a refined prompt) | later |
 | WP24 | The agent cannot add storefront message-catalog keys (platform-owned): new copy is written in the shop's locale directly in markup, so multi-locale shops get one language for AI-added strings | later (theme-owned catalog overrides) |
+| WP13b | `audit_log` is append-only: diffs written by earlier staff edits may still quote an erased customer's email or address; erasure cannot scrub them (the erasure entry itself holds counts only) | later (privacy) |
+| WP13b | Backups (`make backup`) keep erased data until they rotate out; document the retention in the privacy policy template or re-apply erasures after a restore | pre-launch |
+| WP13b | Data exports have no automatic expiry (a new erasure deletes all of them); add a retention sweep (e.g. 7 days) to `ops.sweep` | later (ops) |
+| WP13b | The export's assets manifest lists public image variants only; merchant-uploaded originals and invoice PDFs (private bucket) are not in the zip | later |
+| WP13b | Any later module holding customer data (WP19 flows, watchdogs) must be added to `privacy::access`/`erase` (a new FK to `customers` without `ON DELETE` would make erasure fail) | WP19 |
+| WP13b | Re-importing an old CSV after an erasure brings the person back; the import cannot know (no tombstones by design) | later (privacy) |
+| WP13b | The admin has no customer list yet: imported customers are visible through the GDPR access export, subscribers, archived orders and orders | WP15 |
+| WP13b | The import UI maps columns only when a run is created; re-checking with a new mapping is API-only (`analyze` takes `mapping`) | later |
 | WP16 | Review invites: after delivery (default 7 days) and only with the `review_invites` consent, call `commerce::reviews::issue_tokens(tx, order_id, now)` and mail one `reviews::review_url(ctx, token)` per product (the e2e writes its token via SQL until then) | WP19 |
-| WP16 | GDPR erasure/export must cover `reviews` (reviewer name, text, `ip_hash`) and `review_tokens`; erasing an order line keeps the review but drops its link (`order_line_id` → NULL) | WP13b |
+| WP16 | ~~GDPR erasure/export must cover `reviews` and `review_tokens`~~ done in WP13b | done |
 | WP16 | The product page shows the 20 newest published reviews (summary and JSON-LD cover all); no pagination, sorting or filtering by rating yet | later |
 | WP16 | Tokens are issued per order, not per returned/withdrawn line: a line returned after delivery can still be reviewed while its token lives | later |
 | WP16 | Seeded demos keep the old "reviews" legal page text (templates install only missing pages); re-install or edit it | WP15 (seed polish) |

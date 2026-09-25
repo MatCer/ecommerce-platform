@@ -71,6 +71,9 @@ regex = "1.13.1"
 base64 = "0.23.1"
 # WP24 unified diffs of theme sources (AI runs, revision diff view).
 similar = "3.2.0"
+csv = "1.4.0"
+tempfile = "3.27.0"
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

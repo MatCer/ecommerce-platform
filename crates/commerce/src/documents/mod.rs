@@ -385,14 +385,22 @@ pub async fn render(
                 .private
                 .put(&object_store::path::Path::from(key.as_str()), pdf.into())
                 .await?;
-            sqlx::query!(
+            let published = sqlx::query!(
                 "UPDATE documents SET status = 'ready', object_key = $2, updated_at = now()
-                 WHERE id = $1",
+                 WHERE id = $1 AND status = 'pending'",
                 id,
                 key
             )
             .execute(&mut *tx)
-            .await?;
+            .await?
+            .rows_affected();
+            if published == 0 {
+                // Withdrawn while rendering (a personal-data erasure): the file must not stay.
+                storage
+                    .private
+                    .delete(&object_store::path::Path::from(key.as_str()))
+                    .await?;
+            }
         }
         Err(e) => {
             sqlx::query!(

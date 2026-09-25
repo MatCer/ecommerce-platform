@@ -1,0 +1,199 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, number, placed_at, email, customer_id, name, phone, currency, total_minor,\n                status_label, address, lines, import_id, created_at, updated_at\n         FROM archived_orders a\n         WHERE ($1::text IS NULL OR a.number = $1 OR a.email LIKE $2)\n           AND ($3::uuid IS NULL OR (a.placed_at, a.id) <\n                (SELECT c.placed_at, c.id FROM archived_orders c WHERE c.id = $3))\n         ORDER BY a.placed_at DESC, a.id DESC LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "number",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "placed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "phone",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "phone"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "total_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "total_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "status_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "status_label"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "address",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "lines",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "lines"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "import_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "import_id"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "e28c9a16a050ea9592b5fef7608947f33e755134d21aa01fe944cd301a94037c"
+}

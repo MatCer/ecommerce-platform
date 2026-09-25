@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers SET status = 'subscribed', confirmed_at = $2, text_version = $3,\n             consent_evidence = $4, confirm_token_hash = NULL, confirm_expires_at = NULL,\n             unsubscribed_at = NULL, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6253427d4c561c831503e7003d33b22773d7ad2e0d231a9238f6c494f022332d"
+}

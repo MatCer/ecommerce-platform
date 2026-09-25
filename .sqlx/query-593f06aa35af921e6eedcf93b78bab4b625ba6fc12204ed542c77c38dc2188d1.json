@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_exports SET status = 'running', updated_at = now()\n         WHERE id = $1 AND status IN ('pending', 'running')\n         RETURNING object_key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "object_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "data_exports",
+            "name": "object_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "593f06aa35af921e6eedcf93b78bab4b625ba6fc12204ed542c77c38dc2188d1"
+}

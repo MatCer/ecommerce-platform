@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE order_addresses SET name = $2, company = NULL, street = $2, city = $2,\n             postal_code = '-', phone = NULL\n         WHERE order_id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4df69da5cf2a7033eb1fe27ba0b98ff3f158f6ecdd8c61d6b9d451e6c80c4e32"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM unnest($1::text[]) AS e(email)\n           WHERE EXISTS (SELECT 1 FROM customers c WHERE c.email = e.email)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1980ec2689618479886f2b81f286cdc0c7e81fb4ce4b3f9280dd3814b232c136"
+}
