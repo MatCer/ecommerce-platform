@@ -135,6 +135,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const ORDER_PAGE_RE = /^\/o\/[0-9a-f]{64}$/;
 
 const MAX_JSON_BODY = 16 * 1024;
+/** A review form: 4000 characters of body, URL-encoded (up to 6 bytes per character). */
+const MAX_REVIEW_FORM = 64 * 1024;
 const MAX_EVENTS_BODY = 64 * 1024;
 /** Context, limit and up to 12 recently viewed ids fit well under this. */
 const MAX_RECOMMENDATIONS_QUERY = 1024;
@@ -1153,6 +1155,54 @@ ${
     return problem(404, "not_found", "unknown platform route");
   }
 
+  /**
+   * Review form on the checkout origin (WP16): `POST /_p/reviews` (same-origin, plain HTML
+   * form, works without JS) → the API → 303 back to `/review` with the outcome. The token is
+   * a capability from a review link (single use); it goes back into the page URL only when
+   * the submission failed and the link still works.
+   */
+  async function reviewSubmit(
+    site: Site,
+    req: Request,
+    host: string,
+    port: string,
+  ): Promise<Response> {
+    const noStore = { "cache-control": "no-store", "referrer-policy": "no-referrer" };
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    const raw = await readCapped(req.body, MAX_REVIEW_FORM).catch(() => null);
+    if (!raw) return problem(413, "payload_too_large", `body over ${MAX_REVIEW_FORM} bytes`);
+    const form = new URLSearchParams(new TextDecoder().decode(raw));
+    const token = form.get("token") ?? "";
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/reviews`, {
+        method: "POST",
+        headers: apiHeaders(site, { "content-type": "application/json" }),
+        body: JSON.stringify({
+          token,
+          rating: Number(form.get("rating") ?? 0),
+          name: form.get("name") ?? "",
+          title: form.get("title") ?? "",
+          body: form.get("body") ?? "",
+        }),
+      }),
+    );
+    let location = "/review?done=1";
+    if (res.status === 404 || !/^[0-9a-f]{64}$/.test(token)) location = "/review";
+    else if (!res.ok) {
+      const code =
+        res.status === 429
+          ? "too_many_reviews"
+          : res.status === 422
+            ? (((await res.json().catch(() => null)) as { code?: unknown } | null)?.code ?? "")
+            : "";
+      const safe = typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? code : "failed";
+      location = `/review?token=${token}&error=${safe}`;
+    }
+    await res.body?.cancel().catch(() => undefined);
+    return new Response(null, { status: 303, headers: { location, ...noStore } });
+  }
+
   // --- origins -------------------------------------------------------------------------------
 
   async function shop(
@@ -1273,6 +1323,7 @@ ${
       return fakePay(site, req, url, p.slice("/_p/fake-pay/".length), host, port);
     if (p === "/_p/consent")
       return consentProxy(site, req, host, port, clientIp, capabilityCookie(req, SESSION_COOKIE));
+    if (p === "/_p/reviews") return reviewSubmit(site, req, host, port);
     const nl = /^\/_p\/newsletter\/(confirm|unsubscribe|resubscribe|click)$/.exec(p);
     if (nl?.[1]) return newsletterLinks(site, req, url, nl[1], host, port);
     if (p === "/start") {
@@ -1365,7 +1416,12 @@ ${
     // leak its capability through Referer.
     // Newsletter pages (WP18) post their forms to this origin: `same-origin` keeps the token
     // from other sites while the browser still sends a real Origin (not `null`) with the form.
-    if (url.pathname === "/newsletter" || url.pathname.startsWith("/newsletter/"))
+    // So does the review form (WP16).
+    if (
+      url.pathname === "/newsletter" ||
+      url.pathname.startsWith("/newsletter/") ||
+      url.pathname === "/review"
+    )
       headers.set("referrer-policy", "same-origin");
     else if (
       url.searchParams.has("token") ||

@@ -130,6 +130,8 @@ export const CHECKOUT_OPERATIONS: Operation[] = [
   { method: "GET", path: /^\/customer\/orders\/[0-9a-f-]{36}$/ },
   // WP18: the newsletter confirmation and preference pages (token in the query).
   { method: "GET", path: /^\/newsletter\/(confirmation|preferences)$/ },
+  // WP16: the review form (review link token in the query).
+  { method: "GET", path: /^\/reviews\/invitation$/ },
 ];
 
 /**
