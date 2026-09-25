@@ -251,13 +251,23 @@ async fn undecodable_originals_fail_and_used_assets_cannot_be_deleted(db: PgPool
     let failed = media::get(&mut tx, &storage, up.asset.id).await.unwrap();
     assert_eq!(failed.status, AssetStatus::Failed);
     assert!(failed.error.is_some());
+    // `complete` on a failed asset runs processing again from the kept original.
+    let retried = media::complete(&mut tx, &storage, "u1", up.asset.id)
+        .await
+        .unwrap();
     assert_eq!(
-        media::complete(&mut tx, &storage, "u1", up.asset.id)
-            .await
-            .unwrap_err()
-            .code(),
-        "asset_failed"
+        (retried.status, retried.error),
+        (AssetStatus::Processing, None)
     );
+    tx.commit().await.unwrap();
+    assert_eq!(jobs(&db, media::PROCESS_JOB).await.len(), 2);
+    assert_eq!(
+        media::process(&runtime, &storage, tenant, up.asset.id)
+            .await
+            .unwrap(),
+        Processed::Failed
+    );
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
 
     // Referenced by a product: 409.
     sqlx::query(
@@ -358,12 +368,13 @@ async fn deleting_an_asset_keeps_an_identical_one_intact(db: PgPool) {
     let kept = media::get(&mut tx, &storage, b).await.unwrap();
     media::delete(&mut tx, &storage, "u1", a).await.unwrap();
     tx.commit().await.unwrap();
-    let purge: serde_json::Value =
-        sqlx::query_scalar("SELECT payload FROM queue.jobs WHERE kind = $1")
-            .bind(media::PURGE_JOB)
-            .fetch_one(&db)
-            .await
-            .unwrap();
+    let purge: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload FROM queue.jobs WHERE kind = $1 ORDER BY id DESC LIMIT 1",
+    )
+    .bind(media::PURGE_JOB)
+    .fetch_one(&db)
+    .await
+    .unwrap();
     let keys = |k: &str| -> Vec<String> { serde_json::from_value(purge[k].clone()).unwrap() };
     media::purge(&storage, &keys("private"), &keys("public"))
         .await
@@ -379,4 +390,31 @@ async fn deleting_an_asset_keeps_an_identical_one_intact(db: PgPool) {
             v.key
         );
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_rolled_back_complete_can_be_retried(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let storage = testkit::memory_storage();
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let photo = jpeg(40, 20);
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let up = media::create_upload(&mut tx, &storage, "u1", &upload(photo.len()))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    put(&storage, tenant, up.asset.id, photo).await;
+
+    // E.g. the database fails after verification: nothing is lost.
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    media::complete(&mut tx, &storage, "u1", up.asset.id)
+        .await
+        .unwrap();
+    tx.rollback().await.unwrap();
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let done = media::complete(&mut tx, &storage, "u1", up.asset.id)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(done.status, AssetStatus::Processing);
 }

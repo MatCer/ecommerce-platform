@@ -334,7 +334,7 @@ async fn media_jobs_process_and_purge_assets(db: PgPool) {
     let job_id = |kind: &'static str| {
         let db = db.clone();
         async move {
-            sqlx::query_scalar::<_, i64>("SELECT id FROM queue.jobs WHERE kind = $1")
+            sqlx::query_scalar::<_, i64>("SELECT max(id) FROM queue.jobs WHERE kind = $1")
                 .bind(kind)
                 .fetch_one(&db)
                 .await

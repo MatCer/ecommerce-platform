@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT status, key, sha256 FROM assets WHERE id = $1",
+  "query": "SELECT status, key, sha256 FROM assets WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -48,5 +48,5 @@
       true
     ]
   },
-  "hash": "893fc86751a859b2ffa9e6af3df43bc0d200afbb4f73d38b050c5757b1706ff7"
+  "hash": "739add6949ca2ef60798eead25d7a188490d62e27d2cadf0da6d9d04d08ff825"
 }

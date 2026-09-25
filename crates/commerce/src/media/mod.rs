@@ -246,11 +246,27 @@ pub async fn complete(
     .ok_or(Error::NotFound)?;
     match AssetStatus::parse(&row.status) {
         AssetStatus::Pending => {}
+        // The verified original is kept: processing can simply run again.
         AssetStatus::Failed => {
-            return Err(Error::Conflict {
-                code: "asset_failed",
-                detail: "processing failed; upload the file as a new asset".into(),
-            });
+            sqlx::query!(
+                "UPDATE assets SET status = 'processing', error = NULL, updated_at = now()
+                 WHERE id = $1",
+                id
+            )
+            .execute(&mut **tx)
+            .await?;
+            queue_processing(tx, id).await?;
+            let asset = get(tx, storage, id).await?;
+            audit::record(
+                tx,
+                actor,
+                "asset.retried",
+                "asset",
+                Some(&id.to_string()),
+                &json!({ "after": asset }),
+            )
+            .await?;
+            return Ok(asset);
         }
         AssetStatus::Processing | AssetStatus::Ready => return get(tx, storage, id).await,
     }
@@ -299,7 +315,6 @@ pub async fn complete(
         .private
         .put(&original, PutPayload::from(bytes))
         .await?;
-    storage.private.delete(&key).await?;
     sqlx::query!(
         "UPDATE assets SET status = 'processing', key = $6, mime = $2, width = $3, height = $4,
                 sha256 = $5, updated_at = now()
@@ -313,11 +328,15 @@ pub async fn complete(
     )
     .execute(&mut **tx)
     .await?;
-    let mut job = NewJob::new(PROCESS_JOB, json!({ "asset_id": id }));
-    job.tenant_id = Some(tx.tenant_id());
-    job.max_attempts = 5;
-    job.idempotency_key = Some(format!("{PROCESS_JOB}:{id}"));
-    queue::enqueue(&mut **tx, &job).await?;
+    queue_processing(tx, id).await?;
+    // The staging upload goes only once this transaction commits (a rollback keeps it, so
+    // `complete` can be retried).
+    let mut purge_upload = NewJob::new(
+        PURGE_JOB,
+        json!({ "private": [key.as_ref()], "public": [] }),
+    );
+    purge_upload.tenant_id = Some(tx.tenant_id());
+    queue::enqueue(&mut **tx, &purge_upload).await?;
     let asset = get(tx, storage, id).await?;
     audit::record(
         tx,
@@ -331,6 +350,17 @@ pub async fn complete(
     Ok(asset)
 }
 
+/// Queues [`PROCESS_JOB`]. The caller holds the asset row lock and has checked the status,
+/// so each call is a deliberate new run (first completion or a retry after failure).
+async fn queue_processing(tx: &mut TenantTx, id: Uuid) -> Result<(), Error> {
+    let mut job = NewJob::new(PROCESS_JOB, json!({ "asset_id": id }));
+    job.tenant_id = Some(tx.tenant_id());
+    job.max_attempts = 5;
+    job.idempotency_key = Some(format!("{PROCESS_JOB}:{id}:{}", crate::id::new_id()));
+    queue::enqueue(&mut **tx, &job).await?;
+    Ok(())
+}
+
 /// Outcome of [`process`] for the job runner.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Processed {
@@ -342,9 +372,11 @@ pub enum Processed {
 }
 
 /// Worker step: re-encodes the verified original into public variants. Idempotent: keys are
-/// content-addressed, and only a `processing` asset is updated. Storage and database errors
-/// are returned for a retry (see [`mark_failed`] for the last attempt). CPU-heavy work runs
-/// on a blocking thread; callers bound how many run at once.
+/// content-addressed and only a `processing` asset is touched. The asset row stays locked for
+/// the whole run, so a duplicate run waits and then skips, and a concurrent delete waits until
+/// the variants are recorded (its purge then removes them). Storage and database errors are
+/// returned for a retry, after removing what this run wrote (see [`mark_failed`] for the last
+/// attempt). CPU-heavy work runs on a blocking thread; callers bound how many run at once.
 pub async fn process(
     db: &PgPool,
     storage: &Storage,
@@ -352,41 +384,66 @@ pub async fn process(
     id: Uuid,
 ) -> Result<Processed, Error> {
     let mut tx = tenant_tx(db, tenant_id).await?;
-    let row = sqlx::query!("SELECT status, key, sha256 FROM assets WHERE id = $1", id)
-        .fetch_optional(&mut *tx)
-        .await?;
-    tx.commit().await?;
+    let row = sqlx::query!(
+        "SELECT status, key, sha256 FROM assets WHERE id = $1 FOR UPDATE",
+        id
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
     let Some(row) = row.filter(|r| r.status == "processing") else {
         return Ok(Processed::Skipped);
     };
     let key = Path::from(row.key);
     // Bounded download of the verified original, checked against the digest from `complete`.
     let size = storage.private.head(&key).await?.size;
-    if size > encode::MAX_BYTES {
-        mark_failed(db, tenant_id, id, &encode::Rejected::TooLarge.detail()).await?;
-        return Ok(Processed::Failed);
-    }
-    let original = storage.private.get_range(&key, 0..size).await?;
-    let expected = row.sha256.unwrap_or_default();
-    let rendered = tokio::task::spawn_blocking(move || {
-        if hex::encode(Sha256::digest(&original)) != expected {
-            return Err(encode::Rejected::Corrupt(
-                "the original changed after verification".into(),
-            ));
-        }
-        encode::render(&original)
-    })
-    .await
-    .map_err(internal)?;
+    let rendered = if size > encode::MAX_BYTES {
+        Err(encode::Rejected::TooLarge)
+    } else {
+        let original = storage.private.get_range(&key, 0..size).await?;
+        let expected = row.sha256.unwrap_or_default();
+        tokio::task::spawn_blocking(move || {
+            if hex::encode(Sha256::digest(&original)) != expected {
+                return Err(encode::Rejected::Corrupt(
+                    "the original changed after verification".into(),
+                ));
+            }
+            encode::render(&original)
+        })
+        .await
+        .map_err(internal)?
+    };
     let encoded = match rendered {
         Ok(e) => e,
         Err(rejected) => {
-            mark_failed(db, tenant_id, id, &rejected.detail()).await?;
+            set_failed(&mut tx, id, &rejected.detail()).await?;
+            tx.commit().await?;
             return Ok(Processed::Failed);
         }
     };
 
     let mut variants = Vec::with_capacity(encoded.len());
+    let stored = store_variants(storage, tenant_id, id, encoded, &mut variants).await;
+    let recorded = match stored {
+        Ok(()) => record_ready(tx, id, &variants).await,
+        Err(e) => Err(e),
+    };
+    if let Err(e) = recorded {
+        let keys: Vec<String> = variants.into_iter().map(|v| v.key).collect();
+        if let Err(cleanup) = purge(storage, &[], &keys).await {
+            tracing::warn!(asset = %id, error = %cleanup, "removing partial variants failed");
+        }
+        return Err(e);
+    }
+    Ok(Processed::Ready)
+}
+
+async fn store_variants(
+    storage: &Storage,
+    tenant_id: Uuid,
+    id: Uuid,
+    encoded: Vec<encode::Encoded>,
+    variants: &mut Vec<AssetVariant>,
+) -> Result<(), Error> {
     for e in encoded {
         let key = format!(
             "media/{tenant_id}/{id}/{}.{}",
@@ -398,10 +455,19 @@ pub async fn process(
             (Attribute::CacheControl, IMMUTABLE),
         ]);
         let bytes = u64::try_from(e.bytes.len()).map_err(internal)?;
+        // Listed before the write, so a failed write is cleaned up too.
+        variants.push(AssetVariant {
+            width: e.width,
+            height: e.height,
+            format: e.format.name().into(),
+            key: key.clone(),
+            bytes,
+            url: String::new(),
+        });
         storage
             .public
             .put_opts(
-                &Path::from(key.clone()),
+                &Path::from(key),
                 PutPayload::from(e.bytes),
                 PutOptions {
                     attributes,
@@ -409,38 +475,34 @@ pub async fn process(
                 },
             )
             .await?;
-        variants.push(AssetVariant {
-            width: e.width,
-            height: e.height,
-            format: e.format.name().into(),
-            key,
-            bytes,
-            url: String::new(),
-        });
     }
+    Ok(())
+}
 
-    let mut tx = tenant_tx(db, tenant_id).await?;
-    let updated = sqlx::query!(
+async fn record_ready(mut tx: TenantTx, id: Uuid, variants: &[AssetVariant]) -> Result<(), Error> {
+    sqlx::query!(
         "UPDATE assets SET status = 'ready', variants = $2, error = NULL, updated_at = now()
-         WHERE id = $1 AND status = 'processing'",
+         WHERE id = $1",
         id,
-        serde_json::to_value(&variants).map_err(internal)?
+        serde_json::to_value(variants).map_err(internal)?
     )
     .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    if updated == 1 {
-        queue::publish(&mut *tx, "asset.ready", &json!({ "asset_id": id })).await?;
-    }
+    .await?;
+    queue::publish(&mut *tx, "asset.ready", &json!({ "asset_id": id })).await?;
     tx.commit().await?;
-    if updated == 1 {
-        return Ok(Processed::Ready);
-    }
-    // Deleted (or failed) while encoding: its purge may already have run, so remove what
-    // this run wrote.
-    let keys: Vec<String> = variants.into_iter().map(|v| v.key).collect();
-    purge(storage, &[], &keys).await?;
-    Ok(Processed::Skipped)
+    Ok(())
+}
+
+async fn set_failed(tx: &mut TenantTx, id: Uuid, reason: &str) -> Result<(), Error> {
+    sqlx::query!(
+        "UPDATE assets SET status = 'failed', error = $2, updated_at = now()
+         WHERE id = $1 AND status = 'processing'",
+        id,
+        reason
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 /// Marks a `processing` asset as failed with a client-safe reason (undecodable image, or the
@@ -452,14 +514,7 @@ pub async fn mark_failed(
     reason: &str,
 ) -> Result<(), Error> {
     let mut tx = tenant_tx(db, tenant_id).await?;
-    sqlx::query!(
-        "UPDATE assets SET status = 'failed', error = $2, updated_at = now()
-         WHERE id = $1 AND status = 'processing'",
-        id,
-        reason
-    )
-    .execute(&mut *tx)
-    .await?;
+    set_failed(&mut tx, id, reason).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -473,10 +528,12 @@ pub async fn delete(
     actor: &str,
     id: Uuid,
 ) -> Result<(), Error> {
-    let before = get(tx, storage, id).await?;
+    // Lock first: a running `process` finishes and records its variants before we read them.
     sqlx::query!("SELECT id FROM assets WHERE id = $1 FOR UPDATE", id)
-        .fetch_one(&mut **tx)
-        .await?;
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let before = get(tx, storage, id).await?;
     sqlx::query!("DELETE FROM assets WHERE id = $1", id)
         .execute(&mut **tx)
         .await
