@@ -65,14 +65,18 @@ if [[ -n $builder_image ]]; then
     -e API_ORIGIN=http://127.0.0.1:1 -e THEME_BUILDER_TOKEN=smoke-builder-token-0123456789abcdef0123 \
     -e DOCKER_PROXY_URL=http://127.0.0.1:1 "$builder_image" >/dev/null
   docker run -d --name "$proxy" -p 127.0.0.1::2375 "${sandbox_env[@]}" \
-    -e DOCKER_SOCKET=/nonexistent.sock "$builder_image" node apps/theme-builder/src/proxy.ts >/dev/null
+    -e PORT=2375 -e DOCKER_SOCKET=/nonexistent.sock "$builder_image" node apps/theme-builder/src/proxy.ts >/dev/null
   builder_url="http://$(docker port "$builder" 4020/tcp)"
   proxy_url="http://$(docker port "$proxy" 2375/tcp)"
   curl -fsS --retry 30 --retry-delay 1 --retry-all-errors "$builder_url/healthz" >/dev/null || fail "builder /healthz"
   status=$(curl -s -o /dev/null -w '%{http_code}' "$builder_url/readyz")
   [[ $status == 503 ]] || fail "builder /readyz expected 503 without the sandbox proxy, got $status"
-  curl -s --retry 30 --retry-delay 1 --retry-all-errors -o /dev/null "$proxy_url/_ping" || fail "proxy not listening"
-  status=$(curl -s -o /dev/null -w '%{http_code}' "$proxy_url/_ping")
+  # 502 is the expected answer (no socket), so wait for any HTTP answer rather than a 2xx.
+  for _ in $(seq 30); do
+    status=$(curl -s -o /dev/null -w '%{http_code}' "$proxy_url/_ping" || true)
+    [[ $status != 000 ]] && break
+    sleep 1
+  done
   [[ $status == 502 ]] || fail "proxy /_ping expected 502 without a socket, got $status"
   status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$proxy_url/containers/x/exec")
   [[ $status == 403 ]] || fail "proxy exec expected 403, got $status"

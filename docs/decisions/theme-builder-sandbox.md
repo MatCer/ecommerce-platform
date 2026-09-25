@@ -80,8 +80,9 @@ The token fast path is only granted on a base revision that passed the full gate
 
 `ready` needs every gate; failures are stored as readable reasons in `checks.failures`
 (`lint: src/x.astro:2 foreign-fetch: …`, `budget /p/x: JS 58.6 kB gz > 30`, build log tail).
-Measured on the local stack: a full pipeline takes ~45 s (static 4.5 s, build 2.4 s, check
-31 s with three Lighthouse runs per page), a token-only one ~15 s.
+Measured on the local stack (fresh, seeded demo shop): a full pipeline takes ~95 s (static 5.6 s
+incl. `astro check`, build 2.8 s, check 86 s with three Lighthouse runs per page, JS/axe runs,
+smoke and six screenshots); a token-only one ~35 s (check 31 s).
 
 ## 4. Revisions, publish, rollback, reset, GC
 
