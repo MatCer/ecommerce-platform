@@ -38,8 +38,10 @@ test("staff curate a seasonal collection, preview it and see why products are re
   await dialog.getByLabel("Starts").fill(local(start));
   await dialog.getByLabel("Ends").fill(local(new Date(start.getTime() + 20 * 86_400_000)));
   await dialog.getByLabel("Find products").fill("Merino");
-  await dialog.getByRole("checkbox", { name: "Čepice Merino" }).check();
-  await dialog.getByRole("checkbox", { name: "Mikina Merino" }).check();
+  // Kobalte checkboxes: click the label, like a user.
+  await dialog.getByText("Čepice Merino", { exact: true }).click();
+  await dialog.getByText("Mikina Merino", { exact: true }).click();
+  await expect(dialog.getByRole("checkbox", { name: "Čepice Merino" })).toBeChecked();
   await expect(dialog.getByText("2 products selected")).toBeVisible();
   await expectAccessible(page, "collection dialog");
   await dialog.getByRole("button", { name: "Create" }).click();
@@ -47,7 +49,7 @@ test("staff curate a seasonal collection, preview it and see why products are re
 
   const row = page.getByRole("row", { name: new RegExp(name) });
   await expect(row.getByText("Scheduled")).toBeVisible();
-  await row.getByRole("button", { name: `Preview: ${name}` }).click();
+  await row.getByRole("button", { name: new RegExp(`^Preview.*${name}`) }).click();
   const preview = page.getByRole("dialog", { name: `Preview: ${name}` });
   await expect(preview.getByRole("cell", { name: "Čepice Merino" })).toBeVisible();
   await expect(preview.getByRole("cell", { name: "Mikina Merino" })).toBeVisible();
@@ -58,11 +60,13 @@ test("staff curate a seasonal collection, preview it and see why products are re
   await page.getByRole("link", { name: "Recommendations" }).click();
   await expect(page.getByRole("heading", { name: "Recommendations", level: 1 })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /Bought together/ })).toBeChecked();
-  await page.getByLabel("Recommend for").selectOption("product");
-  await page.getByLabel("Find products").fill("Tričko Basic");
-  await page.getByRole("checkbox", { name: "Tričko Basic", exact: true }).check();
-  await page.getByRole("button", { name: "Show" }).click();
-  const results = page.getByRole("table", { name: "Recommended products" });
+  const why = page.getByRole("region", { name: "Why recommended" });
+  await why.getByLabel("Recommend for").selectOption("product");
+  await why.getByLabel("Find products").fill("Tričko Basic");
+  await why.getByText("Tričko Basic", { exact: true }).click();
+  await expect(why.getByRole("checkbox", { name: "Tričko Basic", exact: true })).toBeChecked();
+  await why.getByRole("button", { name: "Show" }).click();
+  const results = why.getByRole("table", { name: "Recommended products" });
   await expect(results.getByRole("cell", { name: "Kšiltovka Classic" })).toBeVisible();
   await expect(results.getByText("Bought together").first()).toBeVisible();
   await expectAccessible(page, "recommendations settings");
@@ -71,8 +75,8 @@ test("staff curate a seasonal collection, preview it and see why products are re
   await page.getByRole("link", { name: "Collections" }).click();
   await page
     .getByRole("row", { name: new RegExp(name) })
-    .getByRole("button", { name: `Delete: ${name}` })
+    .getByRole("button", { name: new RegExp(`^Delete.*${name}`) })
     .click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByRole("row", { name: new RegExp(name) })).toHaveCount(0);
 });

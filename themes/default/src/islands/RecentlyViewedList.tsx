@@ -1,5 +1,6 @@
-import { consentStorage, recentlyViewed } from "@platform/storefront-sdk/client";
+import { consentStorage } from "@platform/storefront-sdk/client";
 import type { Messages } from "@platform/storefront-sdk/format";
+import { recentlyViewed } from "@platform/storefront-sdk/recommendations";
 import type { ProductCard } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import MiniCard from "../lib/MiniCard";

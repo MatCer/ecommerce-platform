@@ -1,5 +1,5 @@
-import { recommendations } from "@platform/storefront-sdk/client";
 import { imageUrl, type Messages, t, tn } from "@platform/storefront-sdk/format";
+import { recommendations } from "@platform/storefront-sdk/recommendations";
 import type { CartLine, Money, ProductCard } from "@platform/storefront-sdk/types";
 import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { cart, open, setOpen, updateLine } from "../lib/cart-store";
@@ -145,7 +145,13 @@ export default function CartDrawer(props: {
               <For each={lines()}>
                 {(line) => (
                   <li class="flex gap-4 py-4">
-                    <a href={`${props.base}/p/${line.slug}`} class="shrink-0" tabIndex={-1}>
+                    {/* The photo repeats the name link next to it: hidden from assistive tech. */}
+                    <a
+                      href={`${props.base}/p/${line.slug}`}
+                      class="shrink-0"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                    >
                       <img
                         src={line.image ? imageUrl(line.image, 160) : undefined}
                         alt=""
