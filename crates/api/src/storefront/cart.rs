@@ -375,22 +375,30 @@ async fn redeem_handoff(
     Ok(no_store(Json(CheckoutCart { cart_token }).into_response()))
 }
 
-/// Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events
-/// and server counters (A20).
+/// Events beacon (`/_p/e`, A20): `{"events": [...]}` with `page_view`, `view_item`,
+/// `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
+/// records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
+/// `analytics` right now; purposes the client claims are ignored and unknown props dropped.
+/// Always `202`, so the answer does not reveal the consent state.
 #[utoipa::path(
     post,
     path = "/storefront/v1/events",
     tag = "storefront",
-    params(StorefrontHeaders),
+    params(StorefrontHeaders, super::consent::ConsentHeaders),
     responses((status = 202, description = "Accepted"))
 )]
 async fn events(
     shopper: Shopper,
     State(s): State<AppState>,
-    _body: Bytes,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> Result<StatusCode, Error> {
-    // Validates the caller (token + market) so the endpoint is not an open sink.
-    with_ctx(&s, &shopper, async |_, _| Ok(())).await?;
+    let subject = super::customer::header_str(&headers, super::customer::CONSENT_SUBJECT_HEADER);
+    let stored = with_ctx(&s, &shopper, async |tx, ctx| {
+        commerce::analytics::ingest(tx, ctx.market.id, subject, &body, ctx.now).await
+    })
+    .await?;
+    tracing::debug!(stored, "events beacon");
     Ok(StatusCode::ACCEPTED)
 }
 

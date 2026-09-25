@@ -21,8 +21,33 @@ use crate::auth::Service;
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(resolve))
+        .routes(routes!(counters))
         // A wildcard path: registered on axum directly (utoipa paths cannot express `{*path}`).
         .route("/internal/v1/artifacts/{id}/{*path}", get(artifact_file))
+}
+
+/// Page request and search counters flushed by the edge (A20: no identifiers).
+#[utoipa::path(
+    post,
+    path = "/internal/v1/analytics/counters",
+    tag = "internal",
+    security(("service_token" = [])),
+    request_body = commerce::analytics::CounterBatch,
+    responses(
+        (status = 200, body = commerce::analytics::CountersRecorded),
+        (status = 401, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn counters(
+    _service: Service,
+    State(s): State<AppState>,
+    body: axum::body::Bytes,
+) -> Result<Json<commerce::analytics::CountersRecorded>, Error> {
+    let batch: commerce::analytics::CounterBatch = crate::admin::parse_json(&body)?;
+    Ok(Json(
+        commerce::analytics::record_counters(&s.db, &batch).await?,
+    ))
 }
 
 #[derive(Deserialize, IntoParams)]

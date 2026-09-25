@@ -5,8 +5,8 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig,
-    StaffAuthConfig, StorefrontConfig,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, OpsConfig, S3Config,
+    ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
@@ -96,9 +96,23 @@ fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
 
+/// Webhook secrets + the SSRF-safe client (A21); `None` without `SECRETS_KEY`.
+fn webhooks(ops: &OpsConfig, env: AppEnv) -> Option<commerce::webhooks::Webhooks> {
+    let Some(key) = ops.secrets_key else {
+        tracing::warn!("SECRETS_KEY not set: webhook subscriptions answer 503");
+        return None;
+    };
+    Some(commerce::webhooks::Webhooks {
+        secrets: platform::crypto::SecretBox::new(&key),
+        http: platform::http::SafeClient::new(ops.safe_http_allow_hosts.clone()),
+        require_https: env == AppEnv::Prod,
+    })
+}
+
 async fn serve() -> anyhow::Result<()> {
     init_tracing()?;
     let cfg = ApiConfig::from_env()?;
+    let ops = OpsConfig::from_env()?;
     let auth = StaffAuthConfig::from_env()?;
     let sf = StorefrontConfig::from_env()?;
     let db = platform::db::pool(&DbConfig::from_env()?)?;
@@ -134,7 +148,29 @@ async fn serve() -> anyhow::Result<()> {
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
         checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
+        webhooks: webhooks(&ops, cfg.env),
+        rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
+            ops.storefront_rate_per_second,
+            ops.storefront_rate_burst,
+        )),
     };
+    let limiter = state.rate_limit.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            limiter.prune();
+        }
+    });
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    if let Some(bind) = ops.metrics_bind {
+        let handle = platform::metrics::install().map_err(|e| anyhow!(e))?;
+        let shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            if let Err(e) = platform::metrics::serve(bind, handle, shutdown).await {
+                tracing::error!(error = %e, "metrics listener failed");
+            }
+        });
+    }
     let app = api::app(state, cfg.env == AppEnv::Dev);
 
     let listener = tokio::net::TcpListener::bind(cfg.bind)
@@ -142,7 +178,10 @@ async fn serve() -> anyhow::Result<()> {
         .with_context(|| format!("bind {}", cfg.bind))?;
     tracing::info!(addr = %cfg.bind, env = ?cfg.env, "api listening");
     axum::serve(listener, app)
-        .with_graceful_shutdown(platform::shutdown::signal())
+        .with_graceful_shutdown(async move {
+            platform::shutdown::signal().await;
+            let _ = stop.send(true);
+        })
         .await?;
     db.close().await;
     tracing::info!("api stopped");
