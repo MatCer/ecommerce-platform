@@ -374,3 +374,41 @@ separate cache namespace, never cached (already bypassed by the policy).
   engine's `f.<facet key>` parameters in both paths. `/storefront/v1/search` and
   `/search/suggest` use the storefront-token model like every storefront call; islands reach
   them as `/_p/public/search*`. `make seed` queues a full index rebuild.
+
+## 12. WP8: the default theme on the platform
+
+- **Locale prefixes (§9.1):** a market's non-default locales live under `/<locale>/…`
+  (`demo-sk.localhost/cs/…`). The edge (`splitLocale`) strips the prefix for theme renders and
+  `/_p/public/*` and renders with that locale; the locale is part of the HTML cache key, and
+  the default locale or a locale of another market is never stripped (404). Cart routes stay
+  unprefixed (cookie `Path=/_p`). The API builds every page-model href with
+  `Context::path()` and canonicals with `Context::page_url()`; hreflang alternates cover every
+  (market, locale). `ShopModel.base_path` is what themes put in front of the links they build
+  themselves; `ShopModel.checkout_url` is the checkout origin (account, `/withdraw`).
+- **New `/_p/*` routes:** `POST /_p/consent` (same-origin JSON, forwarded to
+  `/storefront/v1/consent`; answered 202 `{recorded:false}` while the API has no such route,
+  WP9). `POST /_p/newsletter` also accepts a plain urlencoded form and answers 303 back to the
+  same-origin `Referer` (else `/`) with `?newsletter=ok|invalid#newsletter`.
+- **Consent banner** is a platform component in the SDK (`@platform/storefront-sdk/consent-banner`,
+  Solid + plain CSS on token variables). Nothing is stored before a choice; the choice is the
+  `consent` cookie plus a JSON beacon to `/_p/consent`; withdrawing `personalization` clears the
+  SDK's device storage (`consentStorage`).
+- **SSR hazard found:** a top-level Solid `onCleanup` that touches `document` runs when the
+  server render is disposed and hangs Astro's async Solid renderer ("renderToString timed out",
+  the edge answers 504 after 10 s). Browser-only setup and teardown belong inside `onMount`.
+- **Measured** (`make perf`, seeded demo shop, 3-run medians over h2, all islands wired):
+
+  | Page | LCP | TBT | CLS | JS gz (A26) | + RUM sampled | calls |
+  |---|---|---|---|---|---|---|
+  | `/` | 1276 ms | 0 | 0.000 | 21.9 kB | 24.9 kB | 2 |
+  | `/c/trika` | 1276 ms | 0 | 0.000 | 22.4 kB | 25.4 kB | 2 |
+  | `/p/tricko-basic` | 1428 ms | 0 | 0.000 | 27.6 kB | 30.6 kB | 3 |
+  | `/search?q=mikina` | 1127 ms | 0 | 0.000 | 22.4 kB | 25.4 kB | 2 |
+
+  axe (WCAG 2.2 AA tags): 0 serious/critical, no CSP violations, no third-party origins. What
+  it took: the cart drawer is a dynamic import on first open (not counted, never downloaded by
+  most visitors; Solid's `lazy()` was avoided because it adds ~1 kB of Suspense runtime to every
+  page), the newsletter is a plain form (no island), extra gallery photos wait for the load
+  event, card srcsets are capped at 720 w (HTML weight), `web-vitals` standard build instead of
+  `/attribution` (−2.5 kB when sampled), and the listing's no-JS submit button lives in
+  `<noscript>` (hiding it on hydration shifted the toolbar, CLS 0.03).
