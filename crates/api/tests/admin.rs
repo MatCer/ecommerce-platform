@@ -282,7 +282,8 @@ async fn jwks_refreshes_on_unknown_kid_at_most_once_per_interval(db: PgPool) {
     let s = state(
         testkit::runtime_pool(&db, 2).await,
         &jwks,
-        Duration::from_millis(300),
+        // Wide enough that five DB-backed requests fit inside it on a slow CI runner.
+        Duration::from_millis(2000),
     );
 
     let ok = |status: StatusCode| assert_eq!(status, StatusCode::OK);
@@ -300,7 +301,7 @@ async fn jwks_refreshes_on_unknown_kid_at_most_once_per_interval(db: PgPool) {
 
     // Key rotation: a token with a new kid forces one refresh (once the minimum interval
     // since the last fetch has passed).
-    tokio::time::sleep(Duration::from_millis(350)).await;
+    tokio::time::sleep(Duration::from_millis(2100)).await;
     *jwks.keys.write().await = json!([jwk("a", X_A), jwk("b", X_B)]);
     let rotated = sign_with("b", KEY_B, &claims("u"));
     ok(Call::get("/admin/v1/me").token(&rotated).send(&s).await.0);
@@ -321,7 +322,7 @@ async fn jwks_refreshes_on_unknown_kid_at_most_once_per_interval(db: PgPool) {
         2,
         "rotation refresh was just now"
     );
-    tokio::time::sleep(Duration::from_millis(350)).await;
+    tokio::time::sleep(Duration::from_millis(2100)).await;
     hammer().await;
     assert_eq!(
         jwks.hits.load(Ordering::SeqCst),
