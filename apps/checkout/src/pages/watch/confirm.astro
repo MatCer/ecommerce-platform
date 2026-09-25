@@ -1,35 +1,44 @@
 ---
+import { t } from "@platform/storefront-sdk/format";
+import { Button } from "@platform/ui";
 import Checkout from "../../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../../lib/api";
 
+// Stock / price alert double opt-in (WP19, A20). Opening the link changes nothing; the button
+// confirms (a plain POST form, no JS), so mail scanners that follow links confirm nobody.
 const shop = await checkoutApi(Astro.request).shop();
 const token = Astro.url.searchParams.get("token") ?? "";
 const valid = /^[0-9a-f]{64}$/.test(token) && !Astro.url.searchParams.has("invalid");
 const done = Astro.url.searchParams.get("done") === "1";
-const language = (shop?.locale ?? "en").slice(0, 2);
-const copy = {
-  cs: [
-    "Potvrdit upozornění",
-    "Potvrdit",
-    "Upozornění je potvrzené.",
-    "Odkaz je neplatný nebo vypršel.",
-  ],
-  sk: [
-    "Potvrdiť upozornenie",
-    "Potvrdiť",
-    "Upozornenie je potvrdené.",
-    "Odkaz je neplatný alebo vypršal.",
-  ],
-  en: ["Confirm alert", "Confirm", "Your alert is confirmed.", "This link is invalid or expired."],
-} as const;
-const words = language === "cs" ? copy.cs : language === "sk" ? copy.sk : copy.en;
+const m = shop?.messages ?? {};
 ---
-<Checkout title={words[0]} shopName={shop?.name ?? ""} shopUrl={shopUrl(Astro.url)} lang={shop?.locale ?? "en"}>
+
+<Checkout
+  title={t(m, "watch.confirm_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
   <div class="grid max-w-xl gap-4">
-    <h1 class="font-display text-2xl font-bold">{words[0]}</h1>
-    {done ? <p role="status">{words[2]}</p> : valid ? <form method="post" action="/_p/watch/confirm">
-      <input type="hidden" name="token" value={token} />
-      <button type="submit" class="rounded bg-identity px-5 py-3 text-identity-ink">{words[1]}</button>
-    </form> : <p role="alert">{words[3]}</p>}
+    <h1 class="font-display text-2xl font-bold">{t(m, "watch.confirm_title")}</h1>
+    {
+      done ? (
+        <p role="status" class="font-semibold">
+          {t(m, "watch.confirmed")}
+        </p>
+      ) : valid ? (
+        <form method="post" action="/_p/watch/confirm" class="grid justify-items-start gap-4">
+          <p>{t(m, "watch.confirm_intro")}</p>
+          <input type="hidden" name="token" value={token} />
+          <Button type="submit" variant="primary">
+            {t(m, "watch.confirm_button")}
+          </Button>
+        </form>
+      ) : (
+        <p role="alert">{t(m, "watch.link_invalid")}</p>
+      )
+    }
+    <a href={shopUrl(Astro.url)} class="text-sm text-identity-ink underline">{t(m, "nl.back")}</a>
   </div>
 </Checkout>

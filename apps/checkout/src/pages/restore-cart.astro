@@ -1,29 +1,39 @@
 ---
+import { t } from "@platform/storefront-sdk/format";
+import { Button } from "@platform/ui";
 import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../lib/api";
 
-// A GET never consumes the capability: mail scanners can open this page safely.
+// Abandoned-cart reminder link (WP19). A GET never consumes the capability, so mail scanners
+// can open this page safely; the button's POST restores the cart once.
 const shop = await checkoutApi(Astro.request).shop();
 const token = Astro.url.searchParams.get("token") ?? "";
 const valid = /^[0-9a-f]{64}$/.test(token) && !Astro.url.searchParams.has("invalid");
-const language = (shop?.locale ?? "en").slice(0, 2);
-const copy = {
-  cs: ["Obnovit košík", "Pokračovat k pokladně", "Odkaz je neplatný nebo již použitý."],
-  sk: ["Obnoviť košík", "Pokračovať k pokladni", "Odkaz je neplatný alebo už použitý."],
-  en: [
-    "Restore your cart",
-    "Continue to checkout",
-    "This link is invalid or has already been used.",
-  ],
-} as const;
-const words = language === "cs" ? copy.cs : language === "sk" ? copy.sk : copy.en;
+const m = shop?.messages ?? {};
 ---
-<Checkout title={words[0]} shopName={shop?.name ?? ""} shopUrl={shopUrl(Astro.url)} lang={shop?.locale ?? "en"}>
+
+<Checkout
+  title={t(m, "flows.restore_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
   <div class="grid max-w-xl gap-4">
-    <h1 class="font-display text-2xl font-bold">{words[0]}</h1>
-    {valid ? <form method="post" action="/_p/flows/restore-cart">
-      <input type="hidden" name="token" value={token} />
-      <button type="submit" class="rounded bg-identity px-5 py-3 text-identity-ink">{words[1]}</button>
-    </form> : <p role="alert">{words[2]}</p>}
+    <h1 class="font-display text-2xl font-bold">{t(m, "flows.restore_title")}</h1>
+    {
+      valid ? (
+        <form method="post" action="/_p/flows/restore-cart" class="grid justify-items-start gap-4">
+          <p>{t(m, "flows.restore_intro")}</p>
+          <input type="hidden" name="token" value={token} />
+          <Button type="submit" variant="primary">
+            {t(m, "flows.restore_button")}
+          </Button>
+        </form>
+      ) : (
+        <p role="alert">{t(m, "flows.restore_invalid")}</p>
+      )
+    }
+    <a href={shopUrl(Astro.url)} class="text-sm text-identity-ink underline">{t(m, "nl.back")}</a>
   </div>
 </Checkout>
