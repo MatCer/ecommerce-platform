@@ -54,17 +54,24 @@ export function createAuthedFetch(deps: AuthDeps) {
     return deps.fetch(new Request(req, { headers }));
   }
 
+  // At most one token refresh and one re-authentication per request, in either order.
   return async (req: Request): Promise<Response> => {
-    const retry = req.clone();
-    const res = await send(req);
-    if (res.status !== 401) return res;
-    const { code } = await problemOf(res);
-    if (code === "invalid_token") {
-      await deps.refresh();
-      return send(retry);
-    }
-    if (code === "reauth_required" && (await deps.reauth())) {
-      return send(retry);
+    const original = req.clone();
+    let res = await send(req);
+    let refreshed = false;
+    let reauthed = false;
+    while (res.status === 401) {
+      const { code } = await problemOf(res);
+      if (code === "invalid_token" && !refreshed) {
+        refreshed = true;
+        await deps.refresh();
+      } else if (code === "reauth_required" && !reauthed) {
+        reauthed = true;
+        if (!(await deps.reauth())) return res;
+      } else {
+        return res;
+      }
+      res = await send(original.clone());
     }
     return res;
   };

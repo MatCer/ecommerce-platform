@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   codify,
+  DraftError,
   draftFromProduct,
   draftToInput,
   eanValid,
@@ -144,6 +145,50 @@ describe("draftToInput", () => {
     expect(input.gpsr?.manufacturer?.email).toBe("a@acme.cz");
     expect(input.tax_categories).toEqual({ CZ: "reduced" });
     expect(input.media).toEqual([{ asset_id: "a1", alt_i18n: { sk: "foto" } }]);
+  });
+});
+
+describe("draftToInput validation", () => {
+  it("drops blank option and value translations", () => {
+    const d = emptyDraft();
+    d.options = [
+      {
+        code: "size",
+        name_i18n: { cs: "Velikost", en: "" },
+        values: [{ code: "s", name_i18n: { cs: "S", sk: " " } }],
+      },
+    ];
+    expect(draftToInput(d).options).toEqual([
+      {
+        code: "size",
+        name_i18n: { cs: "Velikost" },
+        values: [{ code: "s", name_i18n: { cs: "S" } }],
+      },
+    ]);
+  });
+
+  it("rejects non-numeric or fractional weights instead of clearing them", () => {
+    const d = emptyDraft();
+    d.variants = [{ sku: "A", ean: "", weight_g: "abc", option_values: {}, is_default: true }];
+    expect(() => draftToInput(d)).toThrow(DraftError);
+    d.variants = [{ sku: "A", ean: "", weight_g: "1.5", option_values: {}, is_default: true }];
+    expect(() => draftToInput(d)).toThrow("invalid_weight");
+    d.unit_measure = "l";
+    d.unit_quantity = "x";
+    d.variants = [];
+    expect(() => draftToInput(d)).toThrow("invalid_unit");
+  });
+
+  it("refuses matrices above the variant limit before building them", () => {
+    const many = (code: string): ProductOption => ({
+      code,
+      name_i18n: { cs: code },
+      values: Array.from({ length: 10 }, (_, i) => ({ code: `v${i}`, name_i18n: { cs: `${i}` } })),
+    });
+    expect(() => variantMatrix([many("a"), many("b"), many("c")], [], "X")).toThrow(
+      "too_many_variants",
+    );
+    expect(variantMatrix([many("a"), many("b")], [], "X")).toHaveLength(100);
   });
 });
 

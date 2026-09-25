@@ -19,7 +19,7 @@ import { ParameterValues } from "../components/ParameterValues.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { VariantsEditor } from "../components/VariantsEditor.tsx";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
-import { ApiError, api, idempotencyKey, tenantHeader, unwrap } from "../lib/api.ts";
+import { ApiError, api, idempotencyKey, tenantHeader, tenantId, unwrap } from "../lib/api.ts";
 import { categoryName, flatten } from "../lib/category-tree.ts";
 import { tenantKey } from "../lib/me.ts";
 import {
@@ -148,31 +148,34 @@ export default function ProductEditor() {
       .toUpperCase();
 
   const save = createMutation(() => ({
+    // The tenant is captured when the save starts: switching shops mid-request must neither
+    // cache the answer under the new shop nor update this (by then unmounted) screen.
     mutationFn: async () => {
       const body = draftToInput(draft);
-      if (isNew()) {
-        return unwrap(
-          api.POST("/admin/v1/products", { params: { header: idempotencyKey() }, body }),
-        );
-      }
-      return unwrap(
-        api.PUT("/admin/v1/products/{id}", {
-          params: { header: tenantHeader(), path: { id: params.id as string } },
-          body,
-        }),
-      );
+      const header = idempotencyKey();
+      const created = isNew();
+      const product = await (created
+        ? unwrap(api.POST("/admin/v1/products", { params: { header }, body }))
+        : unwrap(
+            api.PUT("/admin/v1/products/{id}", {
+              params: { header, path: { id: params.id as string } },
+              body,
+            }),
+          ));
+      return { product, tenant: header["X-Tenant-Id"], created };
     },
-    onSuccess: (p) => {
+    onSuccess: ({ product: p, tenant, created }) => {
+      qc.setQueryData(["t", tenant, "product", p.id], p);
+      void qc.invalidateQueries({ queryKey: ["t", tenant, "products"] });
+      if (tenant !== tenantId()) return;
       setSaveError(undefined);
-      qc.setQueryData(tenantKey("product", p.id), p);
-      void qc.invalidateQueries({ queryKey: tenantKey("products") });
       setDraft(reconcile(draftFromProduct(p)));
       setLoaded(p.id);
       showToast({
-        title: isNew() ? t("editor.created") : t("common.saved"),
+        title: created ? t("editor.created") : t("common.saved"),
         closeLabel: t("common.close"),
       });
-      if (isNew()) navigate(`/products/${p.id}`, { replace: true });
+      if (created) navigate(`/products/${p.id}`, { replace: true });
     },
     onError: (err) => {
       setSaveError(errorMessage(err));

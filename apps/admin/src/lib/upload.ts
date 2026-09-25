@@ -3,7 +3,7 @@
  * returned URL with exactly the returned headers -> `POST /assets/{id}/complete`. The worker
  * then renders the variants; callers poll the asset until `ready` or `failed`.
  */
-import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "./api.ts";
+import { api, idempotencyKey, type Schemas, unwrap } from "./api.ts";
 
 export type Asset = Schemas["Asset"];
 
@@ -45,9 +45,11 @@ export async function uploadImage(
   file: File,
   onProgress: (fraction: number) => void,
 ): Promise<Asset> {
+  // One tenant for the whole flow, even if the user switches shops meanwhile.
+  const header = idempotencyKey();
   const { asset, upload } = await unwrap(
     api.POST("/admin/v1/assets/uploads", {
-      params: { header: idempotencyKey() },
+      params: { header },
       body: { content_type: file.type, size: file.size, filename: file.name },
     }),
   );
@@ -55,7 +57,7 @@ export async function uploadImage(
   onProgress(1);
   await unwrap(
     api.POST("/admin/v1/assets/{id}/complete", {
-      params: { header: tenantHeader(), path: { id: asset.id } },
+      params: { header: { "X-Tenant-Id": header["X-Tenant-Id"] }, path: { id: asset.id } },
     }),
   );
   return asset;

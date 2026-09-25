@@ -1,6 +1,6 @@
 import { Button, TextField } from "@platform/ui";
-import { For, Index, Show } from "solid-js";
-import { contentLocales, t } from "../i18n/index.ts";
+import { createSignal, For, Index, Show } from "solid-js";
+import { contentLocales, errorMessage, t } from "../i18n/index.ts";
 import {
   CONTENT_LOCALES,
   codify,
@@ -126,7 +126,9 @@ function OptionEditor(props: {
         </tbody>
       </table>
       <div class="flex flex-wrap gap-2">
-        <Button onClick={addValue}>{t("common.add")}</Button>
+        <Button onClick={addValue} disabled={props.option.values.length >= 100}>
+          {t("common.add")}
+        </Button>
         <Button variant="ghost" onClick={props.onRemove}>
           {t("editor.removeOption")}
         </Button>
@@ -153,6 +155,8 @@ export function VariantsEditor(props: {
       })
       .join(" / ") || "—";
 
+  const [matrixError, setMatrixError] = createSignal<string>();
+
   const regenerate = () => {
     // Settle value codes from names first, so generated variants reference final codes.
     const options = props.options.map((o) => {
@@ -171,7 +175,12 @@ export function VariantsEditor(props: {
       };
     });
     props.onOptions(options);
-    props.onVariants(variantMatrix(options, props.variants, props.skuBase));
+    try {
+      props.onVariants(variantMatrix(options, props.variants, props.skuBase));
+      setMatrixError(undefined);
+    } catch (err) {
+      setMatrixError(errorMessage(err));
+    }
   };
 
   const setVariant = (i: number, patch: Partial<VariantDraft>) =>
@@ -180,6 +189,11 @@ export function VariantsEditor(props: {
   return (
     <div class="flex flex-col gap-3">
       <p class="text-xs text-muted-foreground">{t("editor.matrixHint")}</p>
+      <Show when={matrixError()}>
+        <p role="alert" class="text-xs font-medium text-error-700">
+          {matrixError()}
+        </p>
+      </Show>
       <Index each={props.options}>
         {(o, i) => (
           <OptionEditor
@@ -193,6 +207,7 @@ export function VariantsEditor(props: {
       </Index>
       <div class="flex flex-wrap gap-2">
         <Button
+          disabled={props.options.length >= 5}
           onClick={() =>
             props.onOptions([
               ...props.options,

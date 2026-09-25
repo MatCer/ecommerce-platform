@@ -25,6 +25,25 @@ export { claims, status };
 
 let token: string | null = null;
 let inflight: Promise<string | null> | null = null;
+/** Bumped on sign-out so a refresh that was in flight cannot restore the old session. */
+let generation = 0;
+const subjectListeners: Array<() => void> = [];
+
+/**
+ * Called whenever the signed-in user changes (sign-out, session expiry, another account).
+ * Private caches must be dropped then, or the next user could see the previous one's data.
+ */
+export function onSubjectChange(listener: () => void): void {
+  subjectListeners.push(listener);
+}
+
+function setSession(t: string | null, c: StaffClaims | null): void {
+  // Before the status flips: clearing afterwards would also drop the new user's first queries.
+  if (claims()?.sub !== c?.sub) for (const l of subjectListeners) l();
+  token = c ? t : null;
+  setClaims(c);
+  setStatus(c ? "signed-in" : "signed-out");
+}
 
 export class SignedOutError extends Error {
   constructor() {
@@ -44,18 +63,19 @@ async function fetchToken(): Promise<string | null> {
 
 /** Fetches a new JWT (one request at a time). `null` means there is no session. */
 export function refreshToken(): Promise<string | null> {
-  inflight ??= fetchToken()
+  if (inflight) return inflight;
+  const started = generation;
+  const pending: Promise<string | null> = fetchToken()
     .then((t) => {
-      const c = t ? readClaims(t) : null;
-      token = c ? t : null;
-      setClaims(c);
-      setStatus(c ? "signed-in" : "signed-out");
+      if (started !== generation) return null;
+      setSession(t, t ? readClaims(t) : null);
       return token;
     })
     .finally(() => {
-      inflight = null;
+      if (inflight === pending) inflight = null;
     });
-  return inflight;
+  inflight = pending;
+  return pending;
 }
 
 /** A JWT valid for at least another minute; throws `SignedOutError` without a session. */
@@ -77,12 +97,12 @@ export async function bootstrapSession(): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  generation += 1;
+  inflight = null;
   try {
     await authClient.signOut();
   } finally {
-    token = null;
-    setClaims(null);
-    setStatus("signed-out");
+    setSession(null, null);
   }
 }
 
@@ -108,10 +128,11 @@ export async function verifyTotp(code: string): Promise<SignInResult> {
   return (await refreshToken()) ? { kind: "ok" } : { kind: "error", code: "NO_TOKEN", status: 403 };
 }
 
-export async function sendMagicLink(email: string): Promise<SignInResult> {
+/** `callbackURL` is a same-origin path to land on after following the link. */
+export async function sendMagicLink(email: string, callbackURL = "/"): Promise<SignInResult> {
   const { error } = await authClient.signIn.magicLink({
     email,
-    callbackURL: "/",
+    callbackURL,
     errorCallbackURL: "/login?error=link",
   });
   return error ? failure(error) : { kind: "ok" };

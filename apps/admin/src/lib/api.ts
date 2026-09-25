@@ -4,7 +4,7 @@ import { createSignal } from "solid-js";
 import { ApiError, createAuthedFetch, problemOf } from "./authed-fetch.ts";
 import { API_ORIGIN } from "./config.ts";
 import { requestReauth } from "./reauth.ts";
-import { accessToken, refreshToken, SignedOutError } from "./session.ts";
+import { accessToken, onSubjectChange, refreshToken, SignedOutError } from "./session.ts";
 
 export { ApiError };
 export type Schemas = components["schemas"];
@@ -70,6 +70,9 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Another user (or none) now: drop every cached response of the previous one.
+onSubjectChange(() => queryClient.clear());
 
 const ORDER: Record<Role, number> = { staff: 0, admin: 1, owner: 2 };
 

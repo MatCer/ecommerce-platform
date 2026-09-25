@@ -160,6 +160,9 @@ export default function Categories() {
       // Rows are re-rendered: return focus to the control that was used, or the row.
       const el =
         document.querySelector<HTMLButtonElement>(`[data-focus="${v.focus}"]:not([disabled])`) ??
+        document.querySelector<HTMLButtonElement>(
+          `button[data-focus^="${v.id}:"]:not([disabled])`,
+        ) ??
         document.querySelector<HTMLElement>(`[data-focus="${v.id}:row"]`);
       el?.focus();
       showToast({ title: t("categories.moved"), closeLabel: t("common.close") });
@@ -186,7 +189,9 @@ export default function Categories() {
   }));
 
   const doMove = (row: Row, body: CategoryMove | null, action: string) => {
-    if (body) move.mutate({ id: row.node.id, body, focus: `${row.node.id}:${action}` });
+    // Ignore repeats while a move runs (buttons stay enabled so focus can return to them).
+    if (body && !move.isPending)
+      move.mutate({ id: row.node.id, body, focus: `${row.node.id}:${action}` });
   };
 
   const openCreate = (parentId = "") => {
@@ -209,7 +214,7 @@ export default function Categories() {
       data-focus={`${row.node.id}:${action}`}
       aria-label={`${label}: ${name(row.node)}`}
       title={label}
-      disabled={!body || move.isPending}
+      disabled={!body}
       onClick={() => doMove(row, body, action)}
     >
       <span aria-hidden="true">{glyph}</span>
@@ -255,7 +260,7 @@ export default function Categories() {
                         <span
                           tabindex="-1"
                           data-focus={`${row.node.id}:row`}
-                          class="min-w-0 flex-1 truncate outline-none"
+                          class="min-w-0 flex-1 truncate rounded-sm"
                           classList={{ "font-medium": row.depth === 0 }}
                         >
                           <Show when={row.depth > 0}>

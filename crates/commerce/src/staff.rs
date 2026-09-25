@@ -142,7 +142,8 @@ pub async fn invite(
     email: &str,
     role: Role,
 ) -> Result<StaffMember, Error> {
-    lock_owners(tx).await?;
+    // No owner lock: adding a member never lowers the owner count, and the caller holds this
+    // transaction open across the auth-service invite call.
     authorize(actor_role(tx, actor).await?, None, Some(role))?;
     let email = normalize_email(email)?;
     let tenant = tx.tenant_id();

@@ -8,8 +8,10 @@ import {
   expectAccessible,
   magicLink,
   pngFixture,
+  resetLink,
   run,
   screenshot,
+  totp,
   useEnglish,
 } from "./support.ts";
 
@@ -77,12 +79,17 @@ test("creates a category", async () => {
   await dialog.getByRole("button", { name: "Create" }).click();
   const tree = page.getByRole("list", { name: "Category tree" });
   await expect(tree.getByText("Basic")).toBeVisible();
-  // Keyboard-accessible reorder: outdent moves Basic to the top level.
-  await page.getByRole("button", { name: "Outdent (move up a level): Basic" }).click();
+  // Keyboard reorder: outdent moves Basic to the top level; focus stays on the row's controls.
+  const outdent = page.getByRole("button", { name: "Outdent (move up a level): Basic" });
+  await outdent.focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByText("Category moved")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Outdent (move up a level): Basic" }),
-  ).toBeDisabled();
+  await expect(outdent).toBeDisabled();
+  const up = page.getByRole("button", { name: "Move up: Basic" });
+  await expect(up).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(tree.getByRole("listitem").first()).toContainText("Basic");
+  await expect(page.getByRole("button", { name: "Move down: Basic" })).toBeFocused();
   await expectAccessible(page, "categories");
   await screenshot(page, "03-categories");
 });
@@ -203,5 +210,59 @@ test("a staff member sees only what their role allows", async ({ browser }) => {
   // Catalog work is allowed: the product created by the owner is visible.
   await p.goto("/products");
   await expect(p.getByRole("link", { name: productName })).toBeVisible();
+  await ctx.close();
+});
+
+test("owner sets a password, turns on TOTP and signs in with password + code", async ({
+  browser,
+}) => {
+  const password = `Correct horse ${run} battery`;
+  await page.goto("/account/security");
+  await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
+  // Invited by magic link: no password yet, which two-factor needs.
+  const since = new Date(Date.now() - 1000);
+  await page.getByRole("button", { name: "Email me a link to set a password" }).click();
+  await expect(page.getByText("Check your email for the link.")).toBeVisible();
+  await page.goto(await resetLink(owner, since));
+  await expect(page.getByRole("heading", { name: "Set a new password" })).toBeVisible();
+  await page.getByLabel("New password").fill(password);
+  await page.getByRole("button", { name: "Save password" }).click();
+  await expect(page.getByText("Password saved.")).toBeVisible();
+
+  // The reset revoked the sessions: sign in with the new password.
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(owner);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+
+  await page.goto("/account/security");
+  await page.getByLabel("Current password").fill(password);
+  await page.getByRole("button", { name: "Turn on two-factor" }).click();
+  await expect(page.getByRole("img", { name: "QR code for your authenticator app" })).toBeVisible();
+  const secret = await page.getByLabel("Secret key").inputValue();
+  await expectAccessible(page, "security-enrollment");
+  await screenshot(page, "09-security-2fa");
+  await page.getByLabel("Code from the app").fill(await totp(secret));
+  await page.getByRole("button", { name: "Activate" }).click();
+  await expect(page.getByText("Two-factor authentication is on.")).toBeVisible();
+  await expect(page.getByText("On", { exact: true })).toBeVisible();
+
+  // A fresh browser: password, then the TOTP challenge; magic links are refused for 2FA users.
+  const ctx = await browser.newContext();
+  const p = await ctx.newPage();
+  await useEnglish(p);
+  await p.goto("/login");
+  await p.getByLabel("Email").fill(owner);
+  await p.getByLabel("Password").fill(password);
+  await p.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(p.getByRole("heading", { name: "Two-factor authentication" })).toBeVisible();
+  await expectAccessible(p, "two-factor");
+  await p.getByLabel("Authentication code").fill("000000");
+  await p.getByRole("button", { name: "Verify" }).click();
+  await expect(p.getByRole("alert")).toContainText("The code is not valid");
+  await p.getByLabel("Authentication code").fill(await totp(secret));
+  await p.getByRole("button", { name: "Verify" }).click();
+  await expect(p.getByRole("heading", { name: "Overview" })).toBeVisible();
   await ctx.close();
 });

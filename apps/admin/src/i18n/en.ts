@@ -92,6 +92,8 @@ export const en = {
     invalid_variants:
       "Check the variants: an active product needs at least one, SKUs must be unique.",
     invalid_options: "Every option needs a name and at least one value.",
+    invalid_weight: "Weights are whole grams (0 to 10,000,000).",
+    too_many_variants: "At most 500 variants: reduce the option values.",
     has_children: "Move or delete its subcategories first.",
     parameter_in_use: "Products still use this parameter.",
   },
@@ -127,6 +129,8 @@ export const en = {
     resetInvalid: "This link is invalid or has expired. Request a new one.",
     reauthTitle: "Confirm it's you",
     reauthDesc: "This action needs a recent sign-in. Enter your password to continue.",
+    reauthLink: "Email me a sign-in link instead",
+    reauthLinkSent: "Sign-in link sent to {{email}}. Open it, then repeat the action.",
     reauthSubmit: "Confirm",
     signOut: "Sign out",
     signedInAs: "Signed in as {{email}}",

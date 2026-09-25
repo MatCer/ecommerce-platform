@@ -1,11 +1,21 @@
-import { Button, Dialog, TextField } from "@platform/ui";
+import { Button, Dialog, showToast, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { t } from "../i18n/index.ts";
 import { finishReauth, reauthOpen } from "../lib/reauth.ts";
-import { claims, type SignInResult, signInWithPassword, verifyTotp } from "../lib/session.ts";
+import {
+  claims,
+  type SignInResult,
+  sendMagicLink,
+  signInWithPassword,
+  verifyTotp,
+} from "../lib/session.ts";
 import { signInError } from "../pages/Login.tsx";
 
-/** Password (+ TOTP) re-login for `401 reauth_required`; the parked request is then retried. */
+/**
+ * Password (+ TOTP) re-login for `401 reauth_required`; the parked request is then retried.
+ * Accounts without a password (invited by email link) can ask for a sign-in link instead; the
+ * pending action is then cancelled and must be repeated after following the link.
+ */
 export function ReauthDialog() {
   const [password, setPassword] = createSignal("");
   const [code, setCode] = createSignal("");
@@ -41,6 +51,8 @@ export function ReauthDialog() {
           ? await signInWithPassword(claims()?.email ?? "", password())
           : await verifyTotp(code().trim()),
       );
+    } catch {
+      setError(t("errors.network"));
     } finally {
       setPending(false);
     }
@@ -49,6 +61,28 @@ export function ReauthDialog() {
   const cancel = () => {
     reset();
     finishReauth(false);
+  };
+
+  const sendLink = async () => {
+    const email = claims()?.email ?? "";
+    setPending(true);
+    try {
+      const r = await sendMagicLink(email, location.pathname + location.search);
+      if (r.kind === "error") {
+        setError(signInError(r.code, r.status));
+        return;
+      }
+      cancel();
+      showToast({
+        title: t("auth.reauthLinkSent", { email }),
+        tone: "info",
+        closeLabel: t("common.close"),
+      });
+    } catch {
+      setError(t("errors.network"));
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -92,6 +126,15 @@ export function ReauthDialog() {
           <p role="alert" class="text-xs font-medium text-error-700">
             {error()}
           </p>
+        </Show>
+        <Show when={step() === "password"}>
+          <button
+            type="button"
+            class="self-start text-xs text-accent-700 underline-offset-2 hover:underline"
+            onClick={() => void sendLink()}
+          >
+            {t("auth.reauthLink")}
+          </button>
         </Show>
         <div class="flex justify-end gap-2">
           <Button onClick={cancel}>{t("common.cancel")}</Button>

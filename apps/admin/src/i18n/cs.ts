@@ -93,6 +93,8 @@ export const cs: Dictionary = {
     invalid_variants:
       "Zkontrolujte varianty: aktivní produkt potřebuje alespoň jednu, SKU musí být jedinečné.",
     invalid_options: "Každá vlastnost potřebuje název a alespoň jednu hodnotu.",
+    invalid_weight: "Hmotnost se zadává v celých gramech (0 až 10 000 000).",
+    too_many_variants: "Nejvýše 500 variant: snižte počet hodnot vlastností.",
     has_children: "Nejdříve přesuňte nebo smažte podkategorie.",
     parameter_in_use: "Parametr ještě používají produkty.",
   },
@@ -129,6 +131,8 @@ export const cs: Dictionary = {
     resetInvalid: "Odkaz je neplatný nebo vypršel. Vyžádejte si nový.",
     reauthTitle: "Potvrďte svou identitu",
     reauthDesc: "Tato akce vyžaduje nedávné přihlášení. Pokračujte zadáním hesla.",
+    reauthLink: "Poslat místo toho přihlašovací odkaz e-mailem",
+    reauthLinkSent: "Přihlašovací odkaz jsme poslali na {{email}}. Otevřete ho a akci zopakujte.",
     reauthSubmit: "Potvrdit",
     signOut: "Odhlásit se",
     signedInAs: "Přihlášen(a) jako {{email}}",

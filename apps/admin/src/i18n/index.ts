@@ -1,6 +1,7 @@
 import * as i18n from "@solid-primitives/i18n";
 import { createEffect, createMemo, createRoot, createSignal } from "solid-js";
 import { ApiError } from "../lib/authed-fetch.ts";
+import { DraftError } from "../lib/product-form.ts";
 import { SignedOutError } from "../lib/session.ts";
 import { cs } from "./cs.ts";
 import { type Dictionary, en } from "./en.ts";
@@ -50,7 +51,7 @@ export function contentLocales(): string[] {
 
 /** A user-facing message for any error thrown by the API layer. */
 export function errorMessage(err: unknown): string {
-  if (err instanceof ApiError) {
+  if (err instanceof ApiError || err instanceof DraftError) {
     const key = `errors.${err.code}`;
     const known = flat()[key as keyof ReturnType<typeof flat>];
     if (typeof known === "string") return known;

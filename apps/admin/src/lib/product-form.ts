@@ -178,11 +178,40 @@ function partyInput(p: PartyDraft): GpsrParty | null {
   };
 }
 
-/** Number from a form field; `NaN` stays `NaN` so the API reports it rather than guessing. */
-function num(s: string): number {
-  return Number(s.trim().replace(",", "."));
+/** A form value the API would reject or misread; `code` is an `errors.*` message key. */
+export class DraftError extends Error {
+  readonly code: string;
+
+  constructor(code: string) {
+    super(code);
+    this.code = code;
+  }
 }
 
+/** Number from a form field (decimal comma allowed); throws instead of sending NaN (-> null). */
+function num(s: string, code: string): number {
+  const n = Number(s.trim().replace(",", "."));
+  if (!Number.isFinite(n)) throw new DraftError(code);
+  return n;
+}
+
+function weight(s: string): number | null {
+  if (s.trim() === "") return null;
+  const n = num(s, "invalid_weight");
+  if (!Number.isInteger(n) || n < 0 || n > 10_000_000) throw new DraftError("invalid_weight");
+  return n;
+}
+
+/** Option names and value names without blank locales (the API rejects empty entries). */
+function compactOptions(options: readonly ProductOption[]): ProductOption[] {
+  return options.map((o) => ({
+    ...o,
+    name_i18n: compactI18n(o.name_i18n),
+    values: o.values.map((v) => ({ ...v, name_i18n: compactI18n(v.name_i18n) })),
+  }));
+}
+
+/** The API document for a draft; throws `DraftError` for values it cannot represent. */
 export function draftToInput(d: ProductDraft): ProductInput {
   const translations = CONTENT_LOCALES.filter((l) => d.translations[l].name.trim() !== "").map(
     (locale) => {
@@ -202,12 +231,12 @@ export function draftToInput(d: ProductDraft): ProductInput {
     status: d.status,
     brand: opt(d.brand),
     translations,
-    options: d.options,
+    options: compactOptions(d.options),
     variants: d.variants.map((v) => ({
       ...(v.id ? { id: v.id } : {}),
       sku: v.sku.trim(),
       ean: opt(v.ean),
-      weight_g: v.weight_g.trim() === "" ? null : Math.round(num(v.weight_g)),
+      weight_g: weight(v.weight_g),
       option_values: v.option_values,
       is_default: v.is_default,
     })),
@@ -221,7 +250,7 @@ export function draftToInput(d: ProductDraft): ProductInput {
       warnings: compactI18n(d.warnings),
     },
     unit_measure: d.unit_measure === "" ? null : d.unit_measure,
-    unit_quantity: d.unit_quantity.trim() === "" ? null : num(d.unit_quantity),
+    unit_quantity: d.unit_quantity.trim() === "" ? null : num(d.unit_quantity, "invalid_unit"),
     tax_categories: d.tax_categories,
     google_category: opt(d.google_category),
     heureka_category: opt(d.heureka_category),
@@ -245,6 +274,9 @@ export function codify(text: string): string {
   return slugify(text).slice(0, 64).replace(/-+$/, "");
 }
 
+/** The API's limit per product. */
+export const MAX_VARIANTS = 500;
+
 const comboKey = (values: Record<string, string>, codes: readonly string[]) =>
   codes.map((c) => `${c}=${values[c] ?? ""}`).join("&");
 
@@ -258,6 +290,9 @@ export function variantMatrix(
   existing: readonly VariantDraft[],
   skuBase: string,
 ): VariantDraft[] {
+  // Count before materialising: a few options with many values explode combinatorially.
+  const count = options.reduce((n, o) => n * o.values.length, 1);
+  if (count > MAX_VARIANTS) throw new DraftError("too_many_variants");
   const codes = options.map((o) => o.code);
   let combos: Record<string, string>[] = [{}];
   for (const o of options) {

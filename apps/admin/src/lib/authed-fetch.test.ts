@@ -69,6 +69,23 @@ describe("createAuthedFetch", () => {
     expect(seen).toHaveLength(1);
   });
 
+  it("chains a token refresh and a re-authentication, each at most once", async () => {
+    const { d, seen } = deps([
+      problem(401, "invalid_token"),
+      problem(401, "reauth_required"),
+      new Response("{}", { status: 201 }),
+    ]);
+    const res = await createAuthedFetch(d)(post());
+    expect(res.status).toBe(201);
+    expect(d.refresh).toHaveBeenCalledTimes(1);
+    expect(d.reauth).toHaveBeenCalledTimes(1);
+    expect(await seen[2]?.text()).toBe('{"email":"a@b.cz"}');
+
+    const again = deps([problem(401, "invalid_token"), problem(401, "invalid_token")]);
+    expect((await createAuthedFetch(again.d)(post())).status).toBe(401);
+    expect(again.seen).toHaveLength(2);
+  });
+
   it("does not retry other errors", async () => {
     const { d, seen } = deps([problem(403, "insufficient_role")]);
     const res = await createAuthedFetch(d)(post());
