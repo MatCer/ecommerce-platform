@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE webhook_subscriptions\n         SET url = $2, events = $3, description = $4, active = $5, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "TextArray",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a884fefc8c83a5ae3f57036da7326a3ebacfed1b774f5f38bfbb457360f67503"
+}

@@ -40,13 +40,14 @@ pub const STAFF_INVITE_MAIL: &str = "staff.invite_mail";
 /// Purges the edge's cached pages an outbox event invalidates (A2, WP13a).
 pub const EDGE_PURGE: &str = "edge.purge";
 
-/// Services of the WP13a jobs: edge purges, the SSRF-safe fetcher (imports) and the public
-/// storefront URLs (export feeds).
+/// Services of the WP13a/WP14 jobs: edge purges, the SSRF-safe fetcher (imports), the public
+/// storefront URLs (export feeds) and webhook delivery (`None` without `SECRETS_KEY`).
 #[derive(Clone)]
 pub struct Extra {
     pub edge: EdgePurge,
     pub fetch: SafeClient,
     pub urls: PublicUrls,
+    pub webhooks: Option<commerce::webhooks::Webhooks>,
 }
 
 impl Extra {
@@ -56,6 +57,7 @@ impl Extra {
             edge: EdgePurge::disabled(),
             fetch: SafeClient::new(Vec::<String>::new())?,
             urls: PublicUrls::default(),
+            webhooks: None,
         })
     }
 }
@@ -64,6 +66,9 @@ impl Extra {
 pub const LINK_GUEST_ORDERS: &str = "orders.link_guest";
 /// Payment timeouts (A10): cancel unpaid orders whose payment window closed. Every minute.
 pub const PAYMENTS_EXPIRE: &str = "payments.expire";
+pub use commerce::analytics::{PARTITIONS_JOB, ROLLUP_JOB};
+pub use commerce::ops::SWEEP_JOB;
+pub use commerce::webhooks::{DELIVER_JOB, FANOUT_JOB};
 
 pub fn all(
     storage: Storage,
@@ -75,7 +80,9 @@ pub fn all(
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
     let (import_storage, export_storage) = (storage.clone(), storage.clone());
-    let (m1, m3, m4) = (meili.clone(), meili.clone(), meili);
+    let sweep_storage = storage.clone();
+    let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
+    let webhooks = extra.webhooks.clone();
     let (e1, e2, e3) = (extra.clone(), extra.clone(), extra);
     Handlers::default()
         .register(EDGE_PURGE, move |_ctx, job| {
@@ -115,6 +122,15 @@ pub fn all(
         .register(intervals::TRANSITION_JOB, price_transition)
         .register(LINK_GUEST_ORDERS, link_guest_orders)
         .register(PAYMENTS_EXPIRE, payments_expire)
+        .register(ROLLUP_JOB, analytics_rollup)
+        .register(PARTITIONS_JOB, analytics_partitions)
+        .register(FANOUT_JOB, webhooks_fanout)
+        .register(DELIVER_JOB, move |ctx, job| {
+            webhooks_deliver(ctx, job, webhooks.clone())
+        })
+        .register(SWEEP_JOB, move |ctx, job| {
+            ops_sweep(ctx, job, sweep_storage.clone(), m5.clone())
+        })
 }
 
 /// Delivers one email (A14). A message that could not be handed over is retried with backoff
@@ -466,5 +482,104 @@ async fn payments_expire(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     if expired > 0 {
         tracing::info!(expired, "unpaid orders expired");
     }
+    Ok(())
+}
+
+/// Hourly: today's and yesterday's `daily_metrics` of every tenant; once a day (02:00 UTC
+/// slot) the last 14 days, so an outage or late events leave no permanent gap.
+async fn analytics_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let today = chrono::Utc::now().date_naive();
+    let slot = job.payload.get("slot").and_then(serde_json::Value::as_i64);
+    let days: u64 = if slot.is_some_and(|s| s.rem_euclid(24) == 2) {
+        14
+    } else {
+        2
+    };
+    let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+        .fetch_all(&ctx.db)
+        .await?;
+    for tenant in &tenants {
+        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
+        for back in 0..days {
+            let day = today - chrono::Days::new(back);
+            commerce::analytics::rollup(&mut tx, day)
+                .await
+                .map_err(|e| JobError::Retry(e.to_string()))?;
+        }
+        tx.commit().await?;
+    }
+    tracing::info!(tenants = tenants.len(), "analytics rollup done");
+    Ok(())
+}
+
+/// Nightly: event partitions two months ahead, drop those past the 13-month retention.
+async fn analytics_partitions(ctx: Ctx, _job: Job) -> Result<(), JobError> {
+    let created = sqlx::query_scalar!(r#"SELECT platform.ensure_event_partitions(2) AS "n!""#)
+        .fetch_one(&ctx.db)
+        .await?;
+    let dropped = sqlx::query_scalar!(r#"SELECT platform.drop_event_partitions(13) AS "n!""#)
+        .fetch_one(&ctx.db)
+        .await?;
+    tracing::info!(created, dropped, "event partitions maintained");
+    Ok(())
+}
+
+/// An outbox event → deliveries for the tenant's matching webhook subscriptions.
+async fn webhooks_fanout(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let Some(tenant) = job.tenant_id else {
+        return Ok(()); // platform events have no subscribers
+    };
+    let event_id = job
+        .payload
+        .get("event_id")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| JobError::Permanent("payload has no event_id".into()))?;
+    let event_type = job
+        .payload
+        .get("type")
+        .and_then(|t| t.as_str())
+        .ok_or_else(|| JobError::Permanent("payload has no type".into()))?;
+    let data = job.payload.get("payload").cloned().unwrap_or_default();
+    commerce::webhooks::fanout(&ctx.db, tenant, event_id, event_type, &data)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    Ok(())
+}
+
+/// One webhook delivery attempt. HTTP failures are recorded on the delivery (it has its own
+/// retry schedule); only database trouble retries the job.
+async fn webhooks_deliver(
+    ctx: Ctx,
+    job: Job,
+    webhooks: Option<commerce::webhooks::Webhooks>,
+) -> Result<(), JobError> {
+    let (tenant, delivery) = tenant_and(&job, "delivery_id")?;
+    let attempt = job
+        .payload
+        .get("attempt")
+        .and_then(serde_json::Value::as_i64)
+        .and_then(|a| i32::try_from(a).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no attempt".into()))?;
+    let window = job
+        .payload
+        .get("window")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no window".into()))?
+        .with_timezone(&chrono::Utc);
+    let hooks = webhooks.ok_or_else(|| JobError::Retry("SECRETS_KEY is not configured".into()))?;
+    let outcome = commerce::webhooks::deliver(&ctx.db, &hooks, tenant, delivery, attempt, window)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::info!(%tenant, %delivery, attempt, ?outcome, "webhook delivery");
+    Ok(())
+}
+
+/// Every 15 minutes: stuck assets, abandoned uploads, expired carts, stale indexes.
+async fn ops_sweep(ctx: Ctx, _job: Job, storage: Storage, meili: Meili) -> Result<(), JobError> {
+    let report = commerce::ops::sweep(&ctx.db, &storage, Some(&meili))
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::info!(?report, "sweep done");
     Ok(())
 }

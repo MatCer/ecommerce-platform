@@ -18,12 +18,25 @@ const BATCH: i32 = 100;
 pub fn subscribers(event_type: &str) -> &'static [&'static str] {
     match event_type {
         commerce::staff::INVITED_EVENT => &[handlers::EVENTS_LOG, handlers::STAFF_INVITE_MAIL],
+        // Catalog changes both purge the edge and go out as webhooks (product.*, inventory).
+        t if commerce::storefront::purge::EVENTS.contains(&t)
+            && commerce::webhooks::is_event(t) =>
+        {
+            &[
+                handlers::EVENTS_LOG,
+                handlers::EDGE_PURGE,
+                handlers::FANOUT_JOB,
+            ]
+        }
         t if commerce::storefront::purge::EVENTS.contains(&t) => {
             &[handlers::EVENTS_LOG, handlers::EDGE_PURGE]
         }
         commerce::customers::EMAIL_VERIFIED_EVENT => {
             &[handlers::EVENTS_LOG, handlers::LINK_GUEST_ORDERS]
         }
+        // ponytail: a fan-out job per event even for tenants without subscriptions (it finds
+        // none and finishes); filter here if event volume makes that noticeable.
+        t if commerce::webhooks::is_event(t) => &[handlers::EVENTS_LOG, handlers::FANOUT_JOB],
         _ => &[handlers::EVENTS_LOG],
     }
 }
@@ -73,8 +86,9 @@ pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
     Ok(events.len())
 }
 
-/// Polls until `shutdown`. ponytail: polling only; add LISTEN/NOTIFY wake-ups if the poll
-/// latency matters.
+/// Polls until `shutdown`. Polling every 500 ms keeps the dispatch lag under a second
+/// (`outbox_lag_seconds` on `/metrics`); ponytail: add LISTEN/NOTIFY wake-ups if that
+/// metric shows the lag matters.
 pub async fn run(db: PgPool, poll: Duration, mut shutdown: watch::Receiver<bool>) {
     while !*shutdown.borrow() {
         match dispatch_batch(&db).await {
@@ -86,5 +100,23 @@ pub async fn run(db: PgPool, poll: Duration, mut shutdown: watch::Receiver<bool>
             _ = shutdown.changed() => {}
             () = tokio::time::sleep(poll) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn webhook_events_fan_out() {
+        assert_eq!(
+            subscribers("order.created"),
+            [handlers::EVENTS_LOG, handlers::FANOUT_JOB]
+        );
+        for t in commerce::webhooks::EVENTS {
+            assert!(subscribers(t).contains(&handlers::FANOUT_JOB), "{t}");
+        }
+        assert!(subscribers("product.updated").contains(&handlers::EDGE_PURGE));
+        assert_eq!(subscribers("coupon.created"), [handlers::EVENTS_LOG]);
     }
 }

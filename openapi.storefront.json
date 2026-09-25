@@ -2735,7 +2735,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events\nand server counters (A20).",
+        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nAlways `202`, so the answer does not reveal the consent state.",
         "operationId": "events",
         "parameters": [
           {
@@ -2761,6 +2761,42 @@
             "name": "X-Locale",
             "in": "header",
             "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous subject id from the consent cookie (32 hex characters).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Checkout origin only: the signed-in customer's session.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (stored as a salted hash with the record).",
             "required": false,
             "schema": {
               "type": [

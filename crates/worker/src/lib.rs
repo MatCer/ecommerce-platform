@@ -2,5 +2,6 @@
 
 pub mod cron;
 pub mod handlers;
+pub mod metrics;
 pub mod outbox;
 pub mod runner;

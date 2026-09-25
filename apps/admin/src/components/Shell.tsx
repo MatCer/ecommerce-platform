@@ -13,6 +13,8 @@ interface NavItem {
   label: () => string;
   min: Role;
   end?: boolean;
+  /** Platform operators only (`me.is_superadmin`), whatever their shop role. */
+  superadmin?: boolean;
 }
 
 const groups: { label: () => string; items: NavItem[] }[] = [
@@ -64,7 +66,12 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/settings/tax", label: () => t("nav.taxProfile"), min: "staff" },
       { href: "/staff", label: () => t("nav.staff"), min: "admin" },
       { href: "/audit-log", label: () => t("nav.auditLog"), min: "admin" },
+      { href: "/settings/webhooks", label: () => t("nav.webhooks"), min: "admin" },
     ],
+  },
+  {
+    label: () => t("nav.platform"),
+    items: [{ href: "/platform/jobs", label: () => t("nav.jobs"), min: "staff", superadmin: true }],
   },
 ];
 
@@ -97,6 +104,8 @@ export function Shell(props: { children: JSX.Element }) {
     navigate("/login");
   };
 
+  const visible = (i: NavItem) => (i.superadmin ? me.data?.is_superadmin === true : can(i.min));
+
   const nav = () => (
     <nav aria-label={t("nav.main")} class="flex flex-col gap-4">
       <A href="/" end class={linkClass} activeClass={activeClass}>
@@ -104,11 +113,11 @@ export function Shell(props: { children: JSX.Element }) {
       </A>
       <For each={groups}>
         {(g) => (
-          <Show when={g.items.some((i) => can(i.min))}>
+          <Show when={g.items.some(visible)}>
             <div class="flex flex-col gap-0.5">
               <p class="col-label px-2 pb-1">{g.label()}</p>
               <ul class="flex flex-col gap-0.5">
-                <For each={g.items.filter((i) => can(i.min))}>
+                <For each={g.items.filter(visible)}>
                   {(item) => (
                     <li>
                       <A href={item.href} class={linkClass} activeClass={activeClass}>

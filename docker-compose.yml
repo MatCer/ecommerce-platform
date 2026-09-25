@@ -20,6 +20,8 @@ x-runtime-db: &runtime-db
   DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:-app-runtime-local}@postgres:5432/app
   APP_ENV: ${APP_ENV:-dev}
   RUST_LOG: ${RUST_LOG:-info}
+  # WP14: key for stored integration secrets (webhook signing secrets, AES-256-GCM).
+  SECRETS_KEY: ${SECRETS_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
 
 services:
   postgres:
@@ -252,6 +254,10 @@ services:
     environment:
       <<: *runtime-db
       API_BIND: 0.0.0.0:8000
+      METRICS_BIND: 0.0.0.0:9100
+      # Storefront API rate limit per storefront token + client IP (spec §8.1).
+      STOREFRONT_RATE_PER_SECOND: ${STOREFRONT_RATE_PER_SECOND:-20}
+      STOREFRONT_RATE_BURST: ${STOREFRONT_RATE_BURST:-120}
       MEILI_URL: http://meilisearch:7700
       MEILI_SEARCH_KEY: ${MEILI_SEARCH_KEY:-2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918}
       S3_ENDPOINT: http://minio:9000
@@ -297,6 +303,7 @@ services:
     environment:
       <<: *runtime-db
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      METRICS_BIND: 0.0.0.0:9101
       MEILI_URL: http://meilisearch:7700
       MEILI_ADMIN_KEY: ${MEILI_ADMIN_KEY:-39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6}
       S3_ENDPOINT: http://minio:9000

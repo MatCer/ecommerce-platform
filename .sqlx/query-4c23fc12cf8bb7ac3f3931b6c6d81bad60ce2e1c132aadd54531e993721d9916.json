@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT locale, building_uid FROM search_indexes\n         WHERE locale NOT IN (SELECT DISTINCT unnest(locales) FROM markets)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "building_uid",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "building_uid"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "4c23fc12cf8bb7ac3f3931b6c6d81bad60ce2e1c132aadd54531e993721d9916"
+}

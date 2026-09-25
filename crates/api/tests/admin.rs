@@ -90,7 +90,7 @@ async fn staff_tokens_are_validated_strictly(db: PgPool) {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         body,
-        json!({ "user_id": "u1", "email": "u1@example.test", "memberships": [] })
+        json!({ "user_id": "u1", "email": "u1@example.test", "memberships": [], "is_superadmin": false })
     );
 }
 

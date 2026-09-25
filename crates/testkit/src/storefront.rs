@@ -154,3 +154,68 @@ pub async fn shop(runtime: &PgPool, slug: &str) -> Shop {
         slug: "tee-cs".into(),
     }
 }
+
+/// Inserts a placed order with one line of the shop's product straight into the tables (for
+/// reporting tests that only read orders); returns its id.
+pub async fn raw_order(
+    runtime: &PgPool,
+    shop: &Shop,
+    market: Uuid,
+    currency: &str,
+    total_minor: i64,
+    quantity: i32,
+    status: &str,
+) -> Uuid {
+    let mut tx = platform::db::tenant_tx(runtime, shop.tenant).await.unwrap();
+    let cart: Uuid = sqlx::query_scalar(
+        "INSERT INTO carts (tenant_id, market_id, locale, currency, status)
+         VALUES ($1, $2, 'cs', $3, 'converted') RETURNING id",
+    )
+    .bind(shop.tenant)
+    .bind(market)
+    .bind(currency)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    let number: i64 = sqlx::query_scalar("SELECT coalesce(max(number), 0) + 1 FROM orders")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    let order: Uuid = sqlx::query_scalar(
+        "INSERT INTO orders (tenant_id, number, market_id, cart_id, email, locale, currency, status,
+                             payment_status, fulfillment_status, ship_to_country, vat_payer,
+                             subtotal_minor, discount_minor, shipping_minor, payment_fee_minor,
+                             tax_minor, rounding_minor, total_minor, vat_recap,
+                             shipping_method_snapshot, payment_method)
+         VALUES ($1, $2, $3, $4, 'buyer@example.com', 'cs', $5, $6, 'unpaid', 'unfulfilled', 'CZ',
+                 true, $7, 0, 0, 0, 0, 0, $7, '[]', '{}', 'cod')
+         RETURNING id",
+    )
+    .bind(shop.tenant)
+    .bind(number)
+    .bind(market)
+    .bind(cart)
+    .bind(currency)
+    .bind(status)
+    .bind(total_minor)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO order_lines (tenant_id, order_id, position, variant_id, product_id, sku, name,
+                                  quantity, unit_gross_minor, base_minor, discount_minor,
+                                  total_minor, tax_rate, tax_minor, net_minor)
+         VALUES ($1, $2, 1, $3, $4, 'TEE-1', 'Tričko', $5, $6, $6, 0, $6, '21', 0, $6)",
+    )
+    .bind(shop.tenant)
+    .bind(order)
+    .bind(shop.variants[0])
+    .bind(shop.product)
+    .bind(quantity)
+    .bind(total_minor)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    order
+}

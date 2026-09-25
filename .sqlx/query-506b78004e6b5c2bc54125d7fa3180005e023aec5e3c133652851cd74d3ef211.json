@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO daily_metrics (tenant_id, date, market_id, metric, dims, value)\n           SELECT $1, $2, s.market_id, m.metric, '{}'::jsonb, m.value\n           FROM (\n               SELECT market_id,\n                      count(*) AS sessions,\n                      count(*) FILTER (WHERE view_item) AS view_item,\n                      count(*) FILTER (WHERE add_to_cart) AS add_to_cart,\n                      count(*) FILTER (WHERE begin_checkout) AS begin_checkout,\n                      count(*) FILTER (WHERE purchase) AS purchase\n               FROM (\n                   SELECT session_id,\n                          (array_agg(market_id ORDER BY at))[1] AS market_id,\n                          bool_or(type = 'view_item') AS view_item,\n                          bool_or(type = 'add_to_cart') AS add_to_cart,\n                          bool_or(type = 'begin_checkout') AS begin_checkout,\n                          bool_or(type = 'purchase') AS purchase\n                   FROM events\n                   WHERE session_id IS NOT NULL AND market_id IS NOT NULL\n                     AND at >= $3::timestamptz - interval '2 days'\n                     AND at < $4::timestamptz + interval '2 days'\n                   GROUP BY session_id\n                   HAVING min(at) >= $3 AND min(at) < $4\n               ) started\n               GROUP BY market_id\n           ) s\n           CROSS JOIN LATERAL (VALUES\n               ('sessions', s.sessions::float8),\n               ('funnel.view_item', s.view_item::float8),\n               ('funnel.add_to_cart', s.add_to_cart::float8),\n               ('funnel.begin_checkout', s.begin_checkout::float8),\n               ('funnel.purchase', s.purchase::float8)\n           ) AS m(metric, value)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "506b78004e6b5c2bc54125d7fa3180005e023aec5e3c133652851cd74d3ef211"
+}

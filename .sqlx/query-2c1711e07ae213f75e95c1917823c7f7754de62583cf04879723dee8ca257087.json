@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d::date AS \"date!\",\n                  coalesce((SELECT sum(requests) FROM analytics_counters c\n                            WHERE c.day = d::date AND ($3::uuid IS NULL OR c.market_id = $3)), 0)::bigint\n                      AS \"page_requests!\",\n                  coalesce((SELECT sum(value) FROM daily_metrics x\n                            WHERE x.date = d::date AND x.metric = 'sessions'\n                              AND ($3::uuid IS NULL OR x.market_id = $3)), 0)::bigint\n                      AS \"consented_sessions!\"\n           FROM generate_series($1::date, $2::date, interval '1 day') AS d\n           ORDER BY 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "date!",
+        "type_info": "Date",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "page_requests!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "consented_sessions!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "2c1711e07ae213f75e95c1917823c7f7754de62583cf04879723dee8ca257087"
+}

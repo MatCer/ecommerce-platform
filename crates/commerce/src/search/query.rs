@@ -800,11 +800,11 @@ async fn label_facets(
     Ok(facets)
 }
 
-/// The form a zero-result query is logged in, or `None` when it must not be stored (A20):
-/// only short product-like queries, folded; anything that looks like contact data (an e-mail
-/// address, a phone or account number: `@` or 6+ digits) or free text (more than 6 words, over
-/// 64 characters) is dropped. Nothing ties it to a shopper; rows expire after 90 days.
-fn zero_result_text(q: &str) -> Option<String> {
+/// The form a search query is logged in (zero-result log, query counts), or `None` when it
+/// must not be stored (A20): only short product-like queries, folded; anything that looks like
+/// contact data (an e-mail address, a phone or account number: `@` or 6+ digits) or free text
+/// (more than 6 words, over 64 characters) is dropped. Nothing ties it to a shopper; rows expire after 90 days.
+pub fn loggable_query(q: &str) -> Option<String> {
     let digits = q.chars().filter(char::is_ascii_digit).count();
     let folded = lang::fold(q);
     let ok = !q.contains('@')
@@ -815,9 +815,9 @@ fn zero_result_text(q: &str) -> Option<String> {
     ok.then_some(folded)
 }
 
-/// Counts a query without results (see [`zero_result_text`]).
+/// Counts a query without results (see [`loggable_query`]).
 pub async fn record_zero_result(tx: &mut TenantTx, locale: &str, q: &str) -> Result<(), Error> {
-    let Some(normalized) = zero_result_text(q) else {
+    let Some(normalized) = loggable_query(q) else {
         return Ok(());
     };
     let tenant_id = tx.tenant_id();
@@ -1230,7 +1230,7 @@ mod tests {
     #[test]
     fn zero_result_log_keeps_only_product_like_queries() {
         assert_eq!(
-            zero_result_text("Modré  TRIČKO"),
+            loggable_query("Modré  TRIČKO"),
             Some("modre tricko".to_owned())
         );
         for personal in [
@@ -1241,9 +1241,9 @@ mod tests {
             "please call me back tomorrow morning about my order",
             "",
         ] {
-            assert_eq!(zero_result_text(personal), None, "{personal}");
+            assert_eq!(loggable_query(personal), None, "{personal}");
         }
-        assert!(zero_result_text("iphone 15").is_some());
+        assert!(loggable_query("iphone 15").is_some());
     }
 
     #[test]

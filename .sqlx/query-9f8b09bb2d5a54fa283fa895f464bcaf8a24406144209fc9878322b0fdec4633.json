@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM checkout_handoffs\n         WHERE (used_at IS NOT NULL OR expires_at < now()) AND created_at < now() - interval '1 hour'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "9f8b09bb2d5a54fa283fa895f464bcaf8a24406144209fc9878322b0fdec4633"
+}

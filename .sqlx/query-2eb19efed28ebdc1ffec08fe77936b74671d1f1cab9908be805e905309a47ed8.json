@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT props->>'query' AS \"query!\", count(*) AS \"count!\"\n           FROM events\n           WHERE type = 'search' AND at >= $1 AND at < $2 AND props ? 'query'\n             AND ($3::uuid IS NULL OR market_id = $3)\n           GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "query!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "2eb19efed28ebdc1ffec08fe77936b74671d1f1cab9908be805e905309a47ed8"
+}

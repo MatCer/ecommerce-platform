@@ -3,22 +3,26 @@
 //! edge) and the Internal API (`/internal/v1`, service token).
 
 pub mod admin;
+pub mod admin_analytics;
 pub mod admin_catalog;
 pub mod admin_content;
 pub mod admin_feeds;
 pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_orders;
+pub mod admin_platform;
 pub mod admin_pricing;
 pub mod admin_promotions;
 pub mod admin_search;
 pub mod admin_staff;
 pub mod admin_storefront;
+pub mod admin_webhooks;
 pub mod auth;
 pub mod auth_service;
 pub mod cli;
 pub use platform::edge;
 pub mod internal;
+pub mod rate_limit;
 pub mod seed;
 pub mod storefront;
 pub mod storefront_search;
@@ -28,9 +32,9 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::{Bytes, HttpBody};
-use axum::extract::{Request, State};
+use axum::extract::{MatchedPath, Request, State};
 use axum::http::{HeaderName, HeaderValue, Method, StatusCode, header};
-use axum::middleware::{map_request, map_response};
+use axum::middleware::{Next, from_fn, from_fn_with_state, map_request, map_response};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{BoxError, Json};
@@ -76,6 +80,10 @@ pub struct AppState {
     pub edge: edge::EdgePurge,
     /// Payment gateways and the pickup-point widget (WP10).
     pub checkout: Arc<commerce::checkout::Settings>,
+    /// Webhook secrets + SSRF-safe client; `None` without `SECRETS_KEY` (webhooks answer 503).
+    pub webhooks: Option<commerce::webhooks::Webhooks>,
+    /// Storefront API rate limits (§8.1).
+    pub rate_limit: Arc<rate_limit::StorefrontLimiter>,
 }
 
 #[derive(OpenApi)]
@@ -97,6 +105,9 @@ pub struct AppState {
         (name = "feeds", description = "Admin API: feed imports (Heureka, Google) and export feeds"),
         (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
+        (name = "analytics", description = "Admin API: the analytics dashboard"),
+        (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
+        (name = "platform", description = "Admin API for platform superadmins: the job queue"),
         (name = "webhooks", description = "Payment provider webhooks (signed)"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
         (name = "internal", description = "Internal API for platform services (service token)")
@@ -144,6 +155,9 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_content::routes())
         .merge(admin_feeds::routes())
         .merge(admin_orders::routes())
+        .merge(admin_analytics::routes())
+        .merge(admin_webhooks::routes())
+        .merge(admin_platform::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())
@@ -243,10 +257,42 @@ pub fn app(state: AppState, docs: bool) -> Router {
                 .layer(map_response(problem_for_body_limit))
                 .layer(RequestBodyLimitLayer::new(BODY_LIMIT_BYTES)),
         )
+        .layer(from_fn_with_state(state.clone(), rate_limit::storefront))
+        .layer(from_fn(record_latency))
         .layer(admin_cors(state.admin_origin.clone()))
         // Outermost, so invalid ids are gone before `SetRequestIdLayer` looks at them.
         .layer(map_request(drop_invalid_request_id))
         .with_state(state)
+}
+
+/// `http_request_duration_seconds{method,route,status}` (route = the matched template, so
+/// ids and tokens in paths never become labels).
+async fn record_latency(req: Request, next: Next) -> Response {
+    let started = std::time::Instant::now();
+    // A fixed label set: extension methods must not mint new series.
+    let method = match *req.method() {
+        Method::GET => "GET",
+        Method::POST => "POST",
+        Method::PUT => "PUT",
+        Method::PATCH => "PATCH",
+        Method::DELETE => "DELETE",
+        Method::HEAD => "HEAD",
+        Method::OPTIONS => "OPTIONS",
+        _ => "OTHER",
+    };
+    let route = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map_or_else(|| "unmatched".to_owned(), |p| p.as_str().to_owned());
+    let res = next.run(req).await;
+    metrics::histogram!(
+        "http_request_duration_seconds",
+        "method" => method,
+        "route" => route,
+        "status" => res.status().as_u16().to_string(),
+    )
+    .record(started.elapsed().as_secs_f64());
+    res
 }
 
 /// Client-supplied request ids are echoed and logged, so only short, plain ids are kept;

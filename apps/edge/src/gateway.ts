@@ -13,6 +13,7 @@ import {
   type Upstream,
 } from "./bindings.ts";
 import { HtmlCache, normalizeUrl, requestVerdict, responseVerdict } from "./cache.ts";
+import { type Counters, templateOf } from "./counters.ts";
 import {
   contentSecurityPolicy,
   securityHeaders,
@@ -54,6 +55,8 @@ export interface GatewayOptions {
    */
   packetaWidgetUrl?: string;
   upstream?: Upstream;
+  /** Cookieless page/search counters (A20); flushed to the API by the server. */
+  counters?: Counters;
   renderTimeoutMs?: number;
   log?: (event: Record<string, unknown>) => void;
 }
@@ -246,6 +249,7 @@ export function createGateway(opts: GatewayOptions) {
     "x-market": site.market_id,
     "x-locale": site.locale,
     "x-storefront-token": site.storefront_token,
+    ...(site.clientIp ? { "x-client-ip": site.clientIp } : {}),
     ...extra,
   });
 
@@ -355,6 +359,8 @@ export function createGateway(opts: GatewayOptions) {
   ): Promise<Response> {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
+    // A20: counted before the cache, without identifiers (template + day only).
+    if (req.method === "GET") opts.counters?.page(site, templateOf(url.pathname));
     const artifact = site.theme_artifact;
     if (!artifact)
       return text(503, "This shop has not been published yet", { "retry-after": "60" });
@@ -569,7 +575,7 @@ export function createGateway(opts: GatewayOptions) {
     else if (res.ok && session) headers.append("set-cookie", sessionCookie(session));
     return new Response(res.status === 204 ? null : await res.arrayBuffer(), {
       status: res.status,
-      headers,
+      headers: withRetryAfter(res, headers),
     });
   }
 
@@ -604,6 +610,8 @@ export function createGateway(opts: GatewayOptions) {
     }
     const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
     const session = capabilityCookie(req, SESSION_COOKIE);
+    // A20: place-order links a consented visitor's purchase to their analytics session.
+    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1${apiPath}${rest}`, {
         method: req.method,
@@ -611,6 +619,7 @@ export function createGateway(opts: GatewayOptions) {
           ...(body ? { "content-type": "application/json" } : {}),
           ...(cart ? { "x-cart-token": cart } : {}),
           ...(session ? { "x-customer-session": session } : {}),
+          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
           ...(clientIp ? { "x-client-ip": clientIp } : {}),
           ...(key ? { "idempotency-key": key } : {}),
         }),
@@ -624,7 +633,10 @@ export function createGateway(opts: GatewayOptions) {
     });
     const replayed = res.headers.get("idempotent-replayed");
     if (replayed) headers.set("idempotent-replayed", replayed);
-    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, headers),
+    });
   }
 
   /**
@@ -768,7 +780,10 @@ ${
         "set-cookie",
         `${CONSENT_COOKIE}=${encodeURIComponent(summary)}; ${scope}; Max-Age=${CONSENT_MAX_AGE}`,
       );
-    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, headers),
+    });
   }
 
   async function cartProxy(
@@ -822,6 +837,8 @@ ${
           "x-cart-token": token,
           ...(body ? { "content-type": "application/json" } : {}),
           ...(key ? { "idempotency-key": key } : {}),
+          // A20: the API records add-to-cart for a consented visitor (server-resolved).
+          ...consentSubject(req),
         }),
         body,
       }),
@@ -842,7 +859,10 @@ ${
       // Expiry counts from the last use (§10.3): every successful use renews the cookie.
       headers.append("set-cookie", cartCookie(token));
     }
-    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, headers),
+    });
   }
 
   async function checkoutStart(
@@ -863,7 +883,7 @@ ${
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/cart/handoff`, {
         method: "POST",
-        headers: apiHeaders(site, { "x-cart-token": token }),
+        headers: apiHeaders(site, { "x-cart-token": token, ...consentSubject(req) }),
       }),
     );
     const h = res.ok ? ((await res.json()) as { token?: unknown }).token : undefined;
@@ -897,10 +917,10 @@ ${
     );
     return new Response(await res.arrayBuffer(), {
       status: res.status,
-      headers: {
+      headers: withRetryAfter(res, {
         "content-type": res.headers.get("content-type") ?? "application/json",
         "cache-control": "no-store",
-      },
+      }),
     });
   }
 
@@ -911,13 +931,20 @@ ${
     const capped = await readCapped(req.body, MAX_EVENTS_BODY).catch(() => null);
     if (!capped) return problem(413, "payload_too_large", "events batch too large");
     const body = capped.buffer;
+    // A20: the API stores events only if this subject's consent records grant `analytics`.
+    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
     await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/events`, {
         method: "POST",
-        headers: apiHeaders(site, { "content-type": "application/json" }),
+        headers: apiHeaders(site, {
+          "content-type": "application/json",
+          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+        }),
         body,
       }),
-    ).catch((err) => log({ level: "warn", msg: "events forward failed", err: String(err) }));
+    )
+      .then((res) => res.body?.cancel())
+      .catch((err) => log({ level: "warn", msg: "events forward failed", err: String(err) }));
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   }
 
@@ -970,10 +997,10 @@ ${
     );
     return new Response(await res.arrayBuffer(), {
       status: res.status,
-      headers: {
+      headers: withRetryAfter(res, {
         "content-type": res.headers.get("content-type") ?? "application/json",
         "cache-control": "no-store",
-      },
+      }),
     });
   }
 
@@ -1146,6 +1173,7 @@ ${
     if (asset) return asset;
 
     const m = await manifest(checkoutArtifact);
+    if (req.method === "GET") opts.counters?.page(site, "checkout");
     // The checkout binding (cart capability, session) is only ever handed to the platform
     // checkout; the worker itself never sees the cookies, only the edge's context id.
     if (m.kind !== "checkout") throw new Error(`artifact ${checkoutArtifact} is not a checkout`);
@@ -1187,8 +1215,10 @@ ${
 
     if (host.startsWith("preview-")) return text(404, "Previews are not available yet"); // M3 (WP23)
     const origin = classifyHost(host);
-    const site = await resolver.resolve(origin.shopHost);
-    if (!site) return text(404, "Unknown shop");
+    const resolved = await resolver.resolve(origin.shopHost);
+    if (!resolved) return text(404, "Unknown shop");
+    // A per-request copy: the resolver's cached object is shared between requests.
+    const site: Site = { ...resolved, clientIp };
     return origin.kind === "shop"
       ? shop(site, req, publicUrl, host, port, clientIp)
       : checkout(site, req, publicUrl, host, port, clientIp);
@@ -1307,6 +1337,20 @@ function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Prom
       }, ms);
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+/** The anonymous consent subject from its cookie, as an API header (A20). */
+function consentSubject(req: Request): Record<string, string> {
+  const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+  return subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {};
+}
+
+/** API answers keep a rate limit's `Retry-After` (spec §8.1) when proxied. */
+function withRetryAfter(res: Response, init: HeadersInit): Headers {
+  const headers = new Headers(init);
+  const retry = res.headers.get("retry-after");
+  if (res.status === 429 && retry && /^\d{1,5}$/.test(retry)) headers.set("retry-after", retry);
+  return headers;
 }
 
 function safeHost(url: string) {

@@ -467,8 +467,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events
-         *     and server counters (A20).
+         * Events beacon (`/_p/e`, A20): `{"events": [...]}` with `page_view`, `view_item`,
+         *     `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
+         *     records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
+         *     `analytics` right now; purposes the client claims are ignored and unknown props dropped.
+         *     Always `202`, so the answer does not reveal the consent state.
          */
         post: operations["events"];
         delete?: never;
@@ -3168,6 +3171,12 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description Anonymous subject id from the consent cookie (32 hex characters). */
+                "X-Consent-Subject"?: string | null;
+                /** @description Checkout origin only: the signed-in customer's session. */
+                "X-Customer-Session"?: string | null;
+                /** @description The client's IP (stored as a salted hash with the record). */
+                "X-Client-Ip"?: string | null;
             };
             path?: never;
             cookie?: never;
