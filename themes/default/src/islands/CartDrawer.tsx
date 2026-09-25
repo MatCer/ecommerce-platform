@@ -1,7 +1,7 @@
+import { flushEvents, track } from "@platform/storefront-sdk/client";
 import { imageUrl, type Messages, t, tn } from "@platform/storefront-sdk/format";
 import type { CartLine, Money } from "@platform/storefront-sdk/types";
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { flushEvents, track } from "@platform/storefront-sdk/client";
 import { cart, open, setOpen, updateLine } from "../lib/cart-store";
 import Icon from "../lib/Icon";
 

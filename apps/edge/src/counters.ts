@@ -1,5 +1,5 @@
-import type { Site } from "./sites.ts";
 import type { Upstream } from "./bindings.ts";
+import type { Site } from "./sites.ts";
 
 /**
  * Cookieless page counters (spec A20): before (or without) analytics consent the platform only
@@ -86,7 +86,13 @@ export class Counters {
     const row = this.#searches.get(key);
     if (row) row.count++;
     else if (this.#searches.size < MAX_SEARCH_KEYS)
-      this.#searches.set(key, { tenant_id: site.tenant_id, day: d, locale: site.locale, query, count: 1 });
+      this.#searches.set(key, {
+        tenant_id: site.tenant_id,
+        day: d,
+        locale: site.locale,
+        query,
+        count: 1,
+      });
     else this.dropped++;
   }
 

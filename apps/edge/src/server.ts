@@ -41,9 +41,11 @@ const idle = setInterval(() => void gateway.pool.evictIdle(10 * 60_000), 60_000)
 
 // A20: cookieless counters go to the API every 30 s (kept for the next flush on failure).
 const flushCounters = () =>
-  counters.flush(apiOrigin, serviceToken).catch((err) =>
-    console.log(JSON.stringify({ level: "warn", msg: "counter flush failed", err: String(err) })),
-  );
+  counters
+    .flush(apiOrigin, serviceToken)
+    .catch((err) =>
+      console.log(JSON.stringify({ level: "warn", msg: "counter flush failed", err: String(err) })),
+    );
 const flushing = setInterval(() => void flushCounters(), 30_000);
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

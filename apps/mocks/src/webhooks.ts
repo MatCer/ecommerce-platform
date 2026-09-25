@@ -68,7 +68,9 @@ export function webhookRoutes(app: Hono) {
       received_at: new Date().toISOString(),
       event: c.req.header("x-webhook-event") ?? null,
       webhook_id: c.req.header("x-webhook-id") ?? null,
-      signature_valid: b.secret ? verifySignature(c.req.header("x-signature"), raw, b.secret) : null,
+      signature_valid: b.secret
+        ? verifySignature(c.req.header("x-signature"), raw, b.secret)
+        : null,
       body,
     });
     if (b.deliveries.length > MAX_DELIVERIES) b.deliveries.shift();

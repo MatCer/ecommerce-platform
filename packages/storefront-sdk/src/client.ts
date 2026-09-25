@@ -123,7 +123,11 @@ let shared: ReturnType<typeof createBeacon> | undefined;
  * server checks its own consent records again (A20). Sent when the page is hidden; call
  * `flushEvents()` before a navigation that must not lose it.
  */
-export const track = (e: BeaconEvent) => (shared ??= createBeacon()).track(e);
+const sharedBeacon = () => {
+  shared ??= createBeacon();
+  return shared;
+};
+export const track = (e: BeaconEvent) => sharedBeacon().track(e);
 export const flushEvents = () => shared?.flush();
 
 /**
@@ -132,11 +136,7 @@ export const flushEvents = () => shared?.flush();
  * out in one beacon when the page is hidden. `template` (`home`, `category`, `product`, ...)
  * groups the dashboard's p75 per template.
  */
-export async function startRum(
-  sampleRate: number,
-  template: string,
-  beacon = (shared ??= createBeacon()),
-) {
+export async function startRum(sampleRate: number, template: string, beacon = sharedBeacon()) {
   if (!hasConsent("analytics") || Math.random() >= sampleRate) return;
   const { observeVitals } = await import("./vitals.ts");
   observeVitals((metrics) => {
