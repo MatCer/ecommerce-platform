@@ -2257,7 +2257,8 @@ export const sk: Dictionary = {
     desc_abandoned_cart: "Až tri pripomienky s odkazom, ktorý košík obnoví.",
     desc_watchdog:
       "Zákazníci si na stránke produktu nechajú poslať správu, keď bude variant skladom alebo lacnejší.",
-    desc_review_invite: "Po doručení objednávky jeden e-mail s odkazom na recenziu každého produktu.",
+    desc_review_invite:
+      "Po doručení objednávky jeden e-mail s odkazom na recenziu každého produktu.",
     disabled: "Vypnuté",
     enabled: "Zapnuté",
     stepDelay: "E-mail {{n}} po (hodinách)",
@@ -2292,7 +2293,6 @@ export const sk: Dictionary = {
     source_cart: "Košík",
     source_order: "Objednávka",
     source_watch: "Upozornenie",
-    stepOf: "{{n}} z {{total}}",
     runTitle: "Beh automatizácie",
     attempts: "Neúspešné pokusy",
     lastError: "Posledná chyba",
@@ -2300,7 +2300,7 @@ export const sk: Dictionary = {
     step: "E-mail {{n}}",
     executed: "Spracované",
     noSteps: "Žiadny e-mail tohto behu zatiaľ nebol spracovaný.",
-    stepStatus_sent: "Odoslaný",
+    stepStatus_sent: "Zaradené na odoslanie",
     stepStatus_skipped: "Preskočený",
     stepStatus_failed: "Zlyhal",
     cancel: "Zrušiť beh",
@@ -2326,6 +2326,7 @@ export const sk: Dictionary = {
     reason_fired: "Upozornenie odoslané",
     reason_watch_unsubscribed: "Upozornenie zrušené",
     reason_source_missing: "Spúšťač už neexistuje",
+    reason_review_invites: "Odkazy na recenzie zaradené na odoslanie",
     clockTitle: "Testovacie hodiny",
     clockDesc:
       "Len pre vývoj, v produkcii nikdy nedostupné: posunie čas automatizácií tohto obchodu dopredu a hneď spustí všetko, čo tým nastane.",

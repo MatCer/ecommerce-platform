@@ -45,10 +45,11 @@ const label = "mb-1 block text-sm font-semibold";
         {outcome === "ok" ? (
           <p role="status" class="font-semibold">{t("watch.ok")}</p>
         ) : (
-          <form method="post" action="/_p/watch" class="grid gap-4">
+          <form method="post" action={`${shop.base_path}/_p/watch`} class="grid gap-4">
             <p class="text-sm text-muted-foreground">{t("watch.intro")}</p>
             {outcome === "invalid" && <p id="watch-error" role="alert" class="text-sm font-semibold text-sale">{t("watch.invalid")}</p>}
             {outcome === "unavailable" && <p role="alert" class="text-sm font-semibold text-sale">{t("watch.unavailable")}</p>}
+            {outcome === "error" && <p role="alert" class="text-sm font-semibold text-sale">{t("watch.error")}</p>}
             {p.variants.length > 1 ? (
               <div>
                 <label for="watch-variant" class={label}>{t("watch.variant")}</label>
@@ -76,7 +77,7 @@ const label = "mb-1 block text-sm font-semibold";
             </fieldset>
             <div>
               <label for="watch-target" class={label}>{t("watch.target", { currency: shop.currency })}</label>
-              <input id="watch-target" name="target" type="text" inputmode="decimal" autocomplete="off" maxlength="14" aria-describedby="watch-target-hint" aria-invalid={outcome === "invalid" ? "true" : undefined} class={`${field} max-w-48`} />
+              <input id="watch-target" name="target" type="text" inputmode="decimal" autocomplete="off" maxlength="14" aria-describedby={outcome === "invalid" ? "watch-error watch-target-hint" : "watch-target-hint"} aria-invalid={outcome === "invalid" ? "true" : undefined} class={`${field} max-w-48`} />
               <p id="watch-target-hint" class="mt-1 text-xs text-muted-foreground">{t("watch.target_hint")}</p>
             </div>
             <div>

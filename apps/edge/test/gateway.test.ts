@@ -698,6 +698,10 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     expect(
       (await post("variant_id=v-gone&kind=back_in_stock&email=a%40b.cz")).headers.get("location"),
     ).toBe("/p/tricko?variant=v1&watch=unavailable#watch");
+    // Throttling or an outage is not the shopper's mistake.
+    expect(
+      (await post("variant_id=v-busy&kind=back_in_stock&email=a%40b.cz")).headers.get("location"),
+    ).toBe("/p/tricko?variant=v1&watch=error#watch");
     // Same shop only as the redirect target, and same-origin only as the request.
     const foreign = await post(
       "variant_id=v1&kind=back_in_stock&email=a%40b.cz",
@@ -1031,6 +1035,21 @@ describe("platform routes backed by the real API (WP6)", () => {
       headers: { "x-locale": "cs", "x-market": "m-sk" },
     });
     expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
+    // The watch form posts under the page's locale: the confirmation mail is in that language.
+    const watch = await get(
+      "http://demo-sk.localhost/cs/_p/watch",
+      {
+        origin: "http://demo-sk.localhost",
+        referer: "http://demo-sk.localhost/cs/p/tricko",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      { method: "POST", body: "variant_id=v1&kind=back_in_stock&email=a%40b.cz" },
+    );
+    expect(watch.headers.get("location")).toBe("/cs/p/tricko?watch=ok#watch");
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/watch/subscribe",
+      headers: { "x-locale": "cs", "x-market": "m-sk" },
+    });
     // Private recommendations stay unprefixed like the cart (cookie `Path=/_p`); `?locale=`
     // picks one of the market's locales, anything else falls back to the default.
     expect((await get("http://demo-sk.localhost/cs/_p/recommendations")).status).toBe(404);

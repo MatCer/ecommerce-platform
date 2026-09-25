@@ -257,6 +257,8 @@ export function fakeApi() {
       };
       if (body.variant_id === "v-gone")
         return Response.json({ code: "not_found" }, { status: 404 });
+      if (body.variant_id === "v-busy")
+        return Response.json({ code: "rate_limited" }, { status: 429 });
       if (!body.email?.includes("@"))
         return Response.json({ code: "invalid_email" }, { status: 422 });
       return Response.json({ status: "accepted" }, { status: 202 });

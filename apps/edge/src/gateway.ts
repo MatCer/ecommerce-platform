@@ -1127,7 +1127,14 @@ ${
         }),
       );
       await res.body?.cancel();
-      const outcome = res.ok ? "ok" : res.status === 404 ? "unavailable" : "invalid";
+      // 404: watchdog off or product gone; 4xx: the shopper's input; else a retryable failure.
+      const outcome = res.ok
+        ? "ok"
+        : res.status === 404
+          ? "unavailable"
+          : res.status === 429 || res.status >= 500
+            ? "error"
+            : "invalid";
       return backToPage(req, host, port, "watch", outcome);
     }
     const body = await readJsonBody(req, MAX_JSON_BODY);
@@ -1409,6 +1416,9 @@ ${
     if (split) {
       const localized = { ...site, locale: split.locale };
       const inner = new URL(`${split.path}${url.search}`, url);
+      // The product page's watch form posts under the page's locale prefix, so the
+      // confirmation mail is written in the language the shopper read.
+      if (split.path === "/_p/watch") return watchSubscribe(localized, req, host, port);
       if (split.path.startsWith("/_p/public/"))
         return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
       if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))

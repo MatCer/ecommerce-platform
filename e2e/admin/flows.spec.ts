@@ -100,7 +100,8 @@ test("the dev test clock moves flow time forward", async () => {
 });
 
 test("a run shows its details and can be cancelled", async () => {
-  // A cart run due far beyond anything the parallel suites advance the clock to.
+  // A cart run due 300 days past the shop's (shifted) flow clock: parallel suites advance it
+  // by at most days, so the worker never touches it during the test.
   const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
   const market = sql(`SELECT id FROM markets WHERE tenant_id='${tenant}' AND is_default`);
   const cart = sql(`INSERT INTO carts(tenant_id,market_id,email,locale,currency,last_activity_at)
@@ -110,7 +111,9 @@ test("a run shows its details and can be cancelled", async () => {
     ?.trim();
   const id =
     sql(`INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at,config_snapshot)
-    SELECT '${tenant}',id,'cart','${cart}',now()+interval '300 days',config FROM flow_definitions
+    SELECT '${tenant}',id,'cart','${cart}',
+      now() + make_interval(secs => COALESCE((SELECT offset_seconds FROM flow_test_clocks
+        WHERE tenant_id='${tenant}'), 0)) + interval '300 days',config FROM flow_definitions
     WHERE tenant_id='${tenant}' AND kind='abandoned_cart' RETURNING id`)
       .split("\n")[0]
       ?.trim();
@@ -121,7 +124,7 @@ test("a run shows its details and can be cancelled", async () => {
   await page.goto(`/marketing/flows/runs/${id}`);
   await expect(page.getByRole("heading", { name: "Flow run" })).toBeVisible();
   await expect(page.getByText("Active", { exact: true })).toBeVisible();
-  await expect(page.getByText("1 of 3")).toBeVisible();
+  await expect(page.getByText("Email 1", { exact: true })).toBeVisible();
   await expect(page.getByText("No email of this run has been processed yet.")).toBeVisible();
   await expectAccessible(page, "flow run");
 

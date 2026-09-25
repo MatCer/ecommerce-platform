@@ -1,12 +1,4 @@
-import {
-  Badge,
-  Button,
-  Checkbox,
-  EmptyState,
-  showToast,
-  TextField,
-  type Tone,
-} from "@platform/ui";
+import { Badge, Button, Checkbox, EmptyState, showToast, TextField, type Tone } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Index, Show } from "solid-js";
@@ -30,8 +22,7 @@ export const runTone: Record<RunStatus, Tone> = {
   cancelled: "neutral",
   failed: "error",
 };
-export const asRunStatus = (s: string): RunStatus | undefined =>
-  RUN_STATUSES.find((x) => x === s);
+export const asRunStatus = (s: string): RunStatus | undefined => RUN_STATUSES.find((x) => x === s);
 
 /** Flow and trigger labels; unknown values (a newer API) show their raw code. */
 export function kindLabel(kind: string): string {
@@ -66,6 +57,7 @@ const REASONS = [
   "fired",
   "watch_unsubscribed",
   "source_missing",
+  "review_invites",
 ] as const;
 type Reason = (typeof REASONS)[number];
 export function reasonLabel(reason: string | null | undefined): string {
@@ -186,7 +178,10 @@ function FlowCard(props: { definition: Definition; editable: boolean }) {
   const kind = () => d().kind as Kind;
   const [enabled, setEnabled] = createSignal(d().enabled);
   const [delays, setDelays] = createSignal<string[]>(
-    Array.from({ length: stepCount(kind()) }, (_, i) => d().config.delays_hours[i]?.toString() ?? ""),
+    Array.from(
+      { length: stepCount(kind()) },
+      (_, i) => d().config.delays_hours[i]?.toString() ?? "",
+    ),
   );
   const [couponOn, setCouponOn] = createSignal(d().config.coupon_percent != null);
   const [coupon, setCoupon] = createSignal(String(d().config.coupon_percent ?? 10));

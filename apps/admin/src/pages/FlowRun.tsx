@@ -6,7 +6,14 @@ import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/P
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
 import { api, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
-import { asRunStatus, kindLabel, reasonLabel, runTone, sourceLabel, statusLabel } from "./Flows.tsx";
+import {
+  asRunStatus,
+  kindLabel,
+  reasonLabel,
+  runTone,
+  sourceLabel,
+  statusLabel,
+} from "./Flows.tsx";
 
 const stepTone: Record<string, Tone> = { sent: "success", skipped: "neutral", failed: "error" };
 const stepLabel = (s: string) =>
@@ -61,7 +68,6 @@ export default function FlowRun() {
         {(data) => {
           const r = data.run;
           const status = asRunStatus(r.status);
-          const total = r.kind === "abandoned_cart" ? 3 : 1;
           return (
             <div class="grid gap-6">
               <dl class="grid max-w-2xl grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
@@ -79,10 +85,7 @@ export default function FlowRun() {
                 </Row>
                 <Show when={r.status === "active"}>
                   <Row label={t("flows.nextStep")}>
-                    {t("flows.stepOf", {
-                      n: String(r.next_step + 1),
-                      total: String(Math.max(total, r.next_step + 1)),
-                    })}
+                    {t("flows.step", { n: String(r.next_step + 1) })}
                   </Row>
                   <Row label={t("flows.due")}>{formatDateTime(r.due_at)}</Row>
                 </Show>
