@@ -45,7 +45,8 @@ test("staff segment subscribers, build a campaign, preview it and send a test", 
 }) => {
   const segment = `Czech ${run}`;
   const campaign = `Autumn ${run}`;
-  const tester = `test-${run}@example.com`;
+  // Test sends go only to the shop's own staff addresses.
+  const tester = "owner@lnen.example";
   await signIn(page, "owner@lnen.example");
 
   await nav(page, "Subscribers").click();
@@ -107,21 +108,19 @@ test("staff segment subscribers, build a campaign, preview it and send a test", 
   await expect(page.getByText("Test emails queued: 1")).toBeVisible();
   await expect
     .poll(() => subjectsFor(tester), { timeout: 30_000 })
-    .toContainEqual(expect.stringMatching(/^\[TEST\] Podzimní novinky/));
+    .toContainEqual(`[TEST] Podzimní novinky ${run}`);
 
   // The email log shows the test message.
   await nav(page, "Emails").click();
   await expect(page.getByRole("heading", { name: "Emails", level: 1 })).toBeVisible();
   await page.getByLabel("Recipient").fill(tester);
   const log = page.getByRole("table", { name: "Sent emails" });
-  await expect(log.getByRole("cell", { name: tester })).toBeVisible();
+  const row = log.getByRole("row", { name: new RegExp(`Podzimní novinky ${run}`) });
+  await expect(row.getByRole("cell", { name: tester })).toBeVisible();
   await expectAccessible(page, "email log");
-  await log
-    .getByRole("button", { name: /^Details/ })
-    .first()
-    .click();
+  await row.getByRole("button", { name: /^Details/ }).click();
   const detail = page.getByRole("dialog");
-  await expect(detail.getByText(tester)).toBeVisible();
+  await expect(detail.getByText(tester).first()).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(detail).toBeHidden();
 

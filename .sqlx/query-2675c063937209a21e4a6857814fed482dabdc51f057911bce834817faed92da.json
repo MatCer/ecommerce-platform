@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT count(*) AS \"n!\" FROM subscribers\n               WHERE request_ip_hash = $1 AND requested_at > now() - interval '1 hour'",
+  "query": "SELECT count(DISTINCT lower(email)) AS \"n!\" FROM staff_members\n           WHERE lower(email) = ANY($1)",
   "describe": {
     "columns": [
       {
@@ -12,12 +12,12 @@
     ],
     "parameters": {
       "Left": [
-        "Bytea"
+        "TextArray"
       ]
     },
     "nullable": [
       null
     ]
   },
-  "hash": "e40cfbc709c40b2921fd812de3111ea9277ef7cba92640f470485a311599b255"
+  "hash": "2675c063937209a21e4a6857814fed482dabdc51f057911bce834817faed92da"
 }

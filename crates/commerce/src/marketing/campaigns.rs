@@ -55,6 +55,8 @@ pub const BATCH_SIZE: i64 = 500;
 /// per-tenant setting when sending quotas differ per tenant.
 pub const RATE_PER_MINUTE: i32 = 500;
 pub const MAX_TEST_RECIPIENTS: usize = 5;
+/// Test messages per tenant and hour.
+pub const MAX_TEST_SENDS_PER_HOUR: i64 = 50;
 pub const MAX_BLOCKS: usize = 50;
 pub const MAX_GRID: usize = 12;
 const CODE: &str = "invalid_content";
@@ -729,9 +731,12 @@ fn text_html(ctx: &Context, links: &Links, html: &str) -> String {
 }
 
 /// The recipient-specific parts of a render.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 struct Recipient {
     customer_id: Option<Uuid>,
+    /// Set while rendering when the customer's own signals shaped the content (A20: the
+    /// `personalization` consent is checked again before SMTP).
+    personalized: std::sync::atomic::AtomicBool,
 }
 
 struct Renderer<'a> {
@@ -792,8 +797,13 @@ impl Renderer<'_> {
                     )
                     .await?
                 {
+                    let affinity = engine::customer_affinity(tx, customer).await?;
+                    if !affinity.is_empty() {
+                        who.personalized
+                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
                     visitor.personalization = true;
-                    visitor.affinity = Some(engine::customer_affinity(tx, customer).await?);
+                    visitor.affinity = Some(affinity);
                 }
                 engine::recommend(
                     tx,
@@ -985,6 +995,7 @@ pub async fn preview(
                 s.locale,
                 Recipient {
                     customer_id: s.customer_id,
+                    ..Recipient::default()
                 },
             )
         }
@@ -1023,7 +1034,7 @@ async fn default_market(tx: &mut TenantTx) -> Result<Uuid, Error> {
         .ok_or_else(|| invalid("no_market", "the shop has no market"))
 }
 
-/// Sends the campaign to up to 5 staff addresses now (marketing stream, subject marked, no
+/// Sends the campaign to up to 5 of the shop's staff addresses now (marketing stream, subject marked, no
 /// tracking, not counted in the stats). Returns how many were queued.
 pub async fn test_send(
     tx: &mut TenantTx,
@@ -1044,6 +1055,36 @@ pub async fn test_send(
         .iter()
         .map(|e| crate::staff::normalize_email(e))
         .collect::<Result<Vec<_>, _>>()?;
+    // A test send is for the shop's own people: only staff addresses of this tenant, and a
+    // quota, so it can never become a way around consent, suppression or the throttle.
+    let staff = sqlx::query_scalar!(
+        r#"SELECT count(DISTINCT lower(email)) AS "n!" FROM staff_members
+           WHERE lower(email) = ANY($1)"#,
+        &emails
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let mut distinct = emails.clone();
+    distinct.sort();
+    distinct.dedup();
+    if usize::try_from(staff).unwrap_or(0) != distinct.len() {
+        return Err(invalid(
+            "not_staff",
+            "test emails go only to staff addresses of this shop",
+        ));
+    }
+    let recent = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM email_messages
+           WHERE template = 'campaign_test' AND created_at > now() - interval '1 hour'"#
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if recent + i64::try_from(distinct.len()).unwrap_or(0) > MAX_TEST_SENDS_PER_HOUR {
+        return Err(Error::TooManyRequests {
+            code: "too_many_test_sends",
+        });
+    }
+    let emails = distinct;
     let mut r = preview(tx, urls, id, None, locale, now).await?;
     r.subject = format!("[TEST] {}", r.subject);
     let lang = locale.unwrap_or("cs");
@@ -1322,6 +1363,7 @@ async fn send_one(
     };
     let who = Recipient {
         customer_id: m.customer_id,
+        ..Recipient::default()
     };
     let rendered = match (Renderer {
         ctx,
@@ -1358,17 +1400,55 @@ async fn send_one(
     .await?;
     sqlx::query!(
         "INSERT INTO campaign_sends (tenant_id, campaign_id, subscriber_id, status, message_id,
-                                     token_hash)
-         VALUES ($1, $2, $3, 'sent', $4, $5)",
+                                     token_hash, personalized)
+         VALUES ($1, $2, $3, 'sent', $4, $5, $6)",
         tx.tenant_id(),
         campaign,
         m.id,
         message,
-        minted.hash
+        minted.hash,
+        who.personalized.load(std::sync::atomic::Ordering::Relaxed)
     )
     .execute(&mut **tx)
     .await?;
     Ok(Ok(()))
+}
+
+/// Why a queued campaign message must not go out now (checked right before SMTP, next to the
+/// subscriber's status and consent): its campaign was cancelled, or it was personalized and the
+/// customer no longer grants `personalization` (A20). `None` = send.
+pub async fn delivery_refusal(
+    tx: &mut TenantTx,
+    message_id: Uuid,
+) -> Result<Option<&'static str>, Error> {
+    let Some(r) = sqlx::query!(
+        "SELECT c.status, s.personalized, sub.customer_id
+         FROM campaign_sends s
+         JOIN campaigns c ON c.id = s.campaign_id
+         JOIN subscribers sub ON sub.id = s.subscriber_id
+         WHERE s.message_id = $1",
+        message_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(None);
+    };
+    if r.status == "cancelled" {
+        return Ok(Some("campaign_cancelled"));
+    }
+    if r.personalized {
+        let granted = match r.customer_id {
+            Some(c) => {
+                consent::current(tx, &Subject::Customer(c), ConsentPurpose::Personalization).await?
+            }
+            None => false,
+        };
+        if !granted {
+            return Ok(Some("personalization_withdrawn"));
+        }
+    }
+    Ok(None)
 }
 
 // ---------------------------------------------------------------------------------------

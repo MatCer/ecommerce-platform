@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.status, s.personalized, sub.customer_id\n         FROM campaign_sends s\n         JOIN campaigns c ON c.id = s.campaign_id\n         JOIN subscribers sub ON sub.id = s.subscriber_id\n         WHERE s.message_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "campaigns",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "personalized",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "campaign_sends",
+            "name": "personalized"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "customer_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "78a8bab20b21931569388e6a3bce4874593a6a38be1c944e672f1cd222b5ff53"
+}

@@ -180,16 +180,16 @@ async fn signups_per_ip_are_capped(db: PgPool) {
     let (runtime, s) = setup(&db, "cap").await;
     let c = ctx(&runtime, &s, "cs").await;
     let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    // Every request counts, also repeats of one address.
     for i in 0..subscribers::MAX_REQUESTS_PER_IP_HOUR {
-        subscribers::subscribe(
-            &mut tx,
-            &c,
-            &format!("u{i}@example.com"),
-            Some(&[5; 32]),
-            "form",
-        )
-        .await
-        .unwrap();
+        let email = if i % 2 == 0 {
+            format!("u{i}@example.com")
+        } else {
+            "same@example.com".to_owned()
+        };
+        subscribers::subscribe(&mut tx, &c, &email, Some(&[5; 32]), "form")
+            .await
+            .unwrap();
     }
     let r =
         subscribers::subscribe(&mut tx, &c, "one-more@example.com", Some(&[5; 32]), "form").await;
@@ -620,13 +620,16 @@ async fn campaigns_send_once_per_subscriber_with_rechecks_and_tracking(db: PgPoo
         .await
         .unwrap();
     assert!(pos(&public.html, "Product LIN") < pos(&public.html, "Product MER"));
+    tx.commit().await.unwrap();
+    testkit::staff(&runtime, s.tenant, "boss", "owner").await;
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
     assert_eq!(
         campaigns::test_send(
             &mut tx,
             &urls(),
             "staff",
             campaign.id,
-            &["boss@example.com".into()],
+            &["Boss@Example.test".into()],
             None,
             Utc::now()
         )
@@ -634,6 +637,24 @@ async fn campaigns_send_once_per_subscriber_with_rechecks_and_tracking(db: PgPoo
         .unwrap(),
         1
     );
+    // Anyone else (a customer, an unsubscribed address) is refused: no way around consent.
+    let refused = campaigns::test_send(
+        &mut tx,
+        &urls(),
+        "staff",
+        campaign.id,
+        &["boss@example.test".into(), "bert@example.com".into()],
+        None,
+        Utc::now(),
+    )
+    .await;
+    assert!(matches!(
+        refused,
+        Err(platform::Error::Validation {
+            code: "not_staff",
+            ..
+        })
+    ));
     let scheduled = campaigns::schedule(&mut tx, "staff", campaign.id, None, Utc::now())
         .await
         .unwrap();
@@ -942,4 +963,339 @@ async fn bounces_and_complaints_suppress_only_the_messages_recipient(db: PgPool)
         .await
         .unwrap()
     );
+}
+
+/// Enqueues campaign messages for the given subscribed addresses and returns (campaign,
+/// message ids).
+async fn sent_campaign(runtime: &PgPool, s: &Shop, blocks: Vec<EmailBlock>) -> (Uuid, Vec<Uuid>) {
+    let mut tx = tenant_tx(runtime, s.tenant).await.unwrap();
+    let c = campaigns::create(
+        &mut tx,
+        "staff",
+        &CampaignInput {
+            name: format!("C {}", Uuid::now_v7()),
+            segment_id: None,
+            content: content(blocks),
+        },
+    )
+    .await
+    .unwrap();
+    campaigns::schedule(&mut tx, "staff", c.id, None, Utc::now())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    campaigns::run_batch(runtime, &urls(), s.tenant, c.id, Utc::now())
+        .await
+        .unwrap();
+    let mut tx = tenant_tx(runtime, s.tenant).await.unwrap();
+    let ids: Vec<Uuid> = sqlx::query_scalar(
+        "SELECT message_id FROM campaign_sends WHERE campaign_id = $1 AND status = 'sent' ORDER BY id",
+    )
+    .bind(c.id)
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    (c.id, ids)
+}
+
+async fn message_state(runtime: &PgPool, tenant: Uuid, id: Uuid) -> (String, Option<String>) {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    let r = sqlx::query_as("SELECT status, last_error FROM email_messages WHERE id = $1")
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    r
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn cancellation_and_withdrawn_personalization_stop_queued_mail(db: PgPool) {
+    let (runtime, s) = setup(&db, "stop").await;
+    let _ = product(&runtime, &s, "MER", "Merino").await;
+    subscribed(&runtime, &s, "anna@example.com").await;
+    let smtp = FakeSmtp::start(Mode::Accept).await;
+
+    // Cancelled while sending, after a batch queued its messages: nothing reaches SMTP. (The
+    // rate window has room for one message, so the campaign is still `sending`.)
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO email_settings (tenant_id, throttle_window_start, throttle_window_count)
+         VALUES ($1, now(), $2)",
+    )
+    .bind(s.tenant)
+    .bind(campaigns::RATE_PER_MINUTE - 1)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let (campaign, ids) =
+        sent_campaign(&runtime, &s, vec![EmailBlock::Heading { text: "A".into() }]).await;
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    campaigns::cancel(&mut tx, "staff", campaign).await.unwrap();
+    tx.commit().await.unwrap();
+    notifications::deliver(&runtime, &smtp.mailer(), s.tenant, ids[0])
+        .await
+        .unwrap();
+    assert_eq!(
+        message_state(&runtime, s.tenant, ids[0]).await,
+        ("failed".into(), Some("campaign_cancelled".into()))
+    );
+    // A fresh rate window for the rest of the test.
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    sqlx::query("UPDATE email_settings SET throttle_window_count = 0")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    // Anna becomes a customer granting personalization, with an affinity: her message is
+    // personalized; withdrawing personalization before SMTP stops it (A20).
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    let customer: Uuid = sqlx::query_scalar(
+        "INSERT INTO customers (tenant_id, email, locale, email_verified_at)
+         VALUES ($1, 'anna@example.com', 'cs', now()) RETURNING id",
+    )
+    .bind(s.tenant)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    subscribers::link_customer(&mut tx, customer).await.unwrap();
+    sqlx::query(
+        "INSERT INTO customer_affinity (tenant_id, customer_id, dim, key, score)
+         VALUES ($1, $2, 'brand', 'Merino', 5.0)",
+    )
+    .bind(s.tenant)
+    .bind(customer)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let choose = |granted: bool| ConsentChoice {
+        purposes: Purposes {
+            personalization: Some(granted),
+            ..Purposes::default()
+        },
+        text_version: "2026-09-25".into(),
+        source: Source::Preferences,
+    };
+    consent::record(&mut tx, &Subject::Customer(customer), &choose(true), None)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let personal = vec![EmailBlock::PersonalizedProducts {
+        title: "Pro vás".into(),
+        limit: 2,
+    }];
+    let (_, ids) = sent_campaign(&runtime, &s, personal.clone()).await;
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    consent::record(&mut tx, &Subject::Customer(customer), &choose(false), None)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    notifications::deliver(&runtime, &smtp.mailer(), s.tenant, ids[0])
+        .await
+        .unwrap();
+    assert_eq!(
+        message_state(&runtime, s.tenant, ids[0]).await,
+        ("failed".into(), Some("personalization_withdrawn".into()))
+    );
+    assert!(smtp.received().is_empty());
+    // Without personalization the next campaign is rendered from the fallback and goes out.
+    let (_, ids) = sent_campaign(&runtime, &s, personal).await;
+    notifications::deliver(&runtime, &smtp.mailer(), s.tenant, ids[0])
+        .await
+        .unwrap();
+    assert_eq!(
+        message_state(&runtime, s.tenant, ids[0]).await.0,
+        "accepted"
+    );
+    assert_eq!(smtp.received().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_batches_send_once_and_share_the_tenant_rate(db: PgPool) {
+    let (runtime, s) = setup(&db, "conc").await;
+    // More subscribers than one minute's rate, subscribed with consent (bulk fixture).
+    let n = campaigns::RATE_PER_MINUTE + 20;
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    sqlx::query(
+        "WITH s AS (
+             INSERT INTO subscribers (tenant_id, email, status, locale, market_id, text_version,
+                                      source, confirmed_at)
+             SELECT $1, 'bulk' || g || '@example.com', 'subscribed', 'cs', $2, 'v1', 'form', now()
+             FROM generate_series(1, $3) g RETURNING email)
+         INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted,
+                                      text_version, source)
+         SELECT $1, 'email', email, 'email_marketing', true, 'v1', 'double_opt_in' FROM s",
+    )
+    .bind(s.tenant)
+    .bind(s.cz)
+    .bind(n)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let mut ids = Vec::new();
+    for name in ["One", "Two"] {
+        let c = campaigns::create(
+            &mut tx,
+            "staff",
+            &CampaignInput {
+                name: name.into(),
+                segment_id: None,
+                content: content(vec![EmailBlock::Heading { text: name.into() }]),
+            },
+        )
+        .await
+        .unwrap();
+        campaigns::schedule(&mut tx, "staff", c.id, None, Utc::now())
+            .await
+            .unwrap();
+        ids.push(c.id);
+    }
+    tx.commit().await.unwrap();
+    let now = Utc::now();
+    // The same campaign's job twice at once plus another campaign of the tenant.
+    let u = urls();
+    let (a, b, c) = tokio::join!(
+        campaigns::run_batch(&runtime, &u, s.tenant, ids[0], now),
+        campaigns::run_batch(&runtime, &u, s.tenant, ids[0], now),
+        campaigns::run_batch(&runtime, &u, s.tenant, ids[1], now),
+    );
+    let total = a.unwrap().sent + b.unwrap().sent + c.unwrap().sent;
+    assert_eq!(
+        total,
+        usize::try_from(campaigns::RATE_PER_MINUTE).unwrap(),
+        "one minute's rate across the tenant's campaigns"
+    );
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    let dupes: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM (SELECT campaign_id, subscriber_id FROM campaign_sends
+                               GROUP BY 1, 2 HAVING count(*) > 1) d",
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(dupes, 0);
+    let messages: i64 = sqlx::query_scalar("SELECT count(*) FROM email_messages")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(messages, i64::from(campaigns::RATE_PER_MINUTE));
+    tx.commit().await.unwrap();
+    // The next window finishes both, still once per subscriber and campaign.
+    for _ in 0..3 {
+        for id in &ids {
+            campaigns::run_batch(
+                &runtime,
+                &urls(),
+                s.tenant,
+                *id,
+                now + Duration::seconds(61),
+            )
+            .await
+            .unwrap();
+        }
+    }
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    let per_campaign: Vec<i64> = sqlx::query_scalar(
+        "SELECT count(*) FROM campaign_sends GROUP BY campaign_id ORDER BY campaign_id",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+    assert!(
+        per_campaign.iter().all(|c| *c <= i64::from(n)),
+        "{per_campaign:?}"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn every_marketing_table_is_tenant_isolated(db: PgPool) {
+    let (runtime, s) = setup(&db, "iso").await;
+    subscribed(&runtime, &s, "anna@example.com").await;
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    segments::create(
+        &mut tx,
+        "staff",
+        &SegmentInput {
+            name: "Vše".into(),
+            rules: Rules::default(),
+        },
+    )
+    .await
+    .unwrap();
+    notifications::admin::set_text(
+        &mut tx,
+        "staff",
+        "newsletter_confirm",
+        "cs",
+        &serde_json::from_value(json!({"subject": "Ahoj {shop}"})).unwrap(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let (_, _) = sent_campaign(&runtime, &s, vec![EmailBlock::Heading { text: "X".into() }]).await;
+
+    let other = shop(&runtime, "iso2").await;
+    let mut tx = tenant_tx(&runtime, other.tenant).await.unwrap();
+    for table in [
+        "subscribers",
+        "segments",
+        "campaigns",
+        "campaign_sends",
+        "email_settings",
+        "email_template_texts",
+    ] {
+        let n: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert_eq!(n, 0, "{table} leaks across tenants");
+        let touched = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {table} SET tenant_id = tenant_id"
+        )))
+        .execute(&mut *tx)
+        .await
+        .unwrap()
+        .rows_affected();
+        assert_eq!(touched, 0, "{table} writable across tenants");
+        let deleted = sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
+            .execute(&mut *tx)
+            .await
+            .unwrap()
+            .rows_affected();
+        assert_eq!(deleted, 0, "{table} deletable across tenants");
+    }
+    // Inserting rows for the first tenant is refused by the policies' WITH CHECK.
+    for insert in [
+        "INSERT INTO email_settings (tenant_id) VALUES ($1)",
+        "INSERT INTO email_template_texts (tenant_id, template, locale, subject)
+         VALUES ($1, 'magic_link', 'cs', 'x')",
+        "INSERT INTO segments (tenant_id, name, rules) VALUES ($1, 'x', '{}')",
+    ] {
+        let mut sp = tenant_tx(&runtime, other.tenant).await.unwrap();
+        let r = sqlx::query(insert).bind(s.tenant).execute(&mut *sp).await;
+        assert!(r.is_err(), "{insert}");
+        drop(sp);
+    }
+    tx.commit().await.unwrap();
+    // The first tenant still has all of its rows.
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    for table in [
+        "subscribers",
+        "segments",
+        "campaigns",
+        "campaign_sends",
+        "email_settings",
+        "email_template_texts",
+    ] {
+        let n: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert!(n > 0, "{table}");
+    }
 }

@@ -225,7 +225,7 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
   const campaign = await create(`Podzim ${run}`, subject);
 
   // Test send: marked, untracked, to staff only.
-  const tester = `nl-test-${run}@example.com`;
+  const tester = "owner@lnen.example"; // test sends go only to staff addresses
   const sent = await request.post(`${API}/admin/v1/campaigns/${campaign}/test`, {
     headers: h,
     data: { emails: [tester] },

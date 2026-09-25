@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO customer_auth_attempts (tenant_id, kind, email, ip_hash)\n             VALUES ($1, 'newsletter', $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5aca0f2a81f14da4ea667bdb748ba8ba583e4e63f7691fb21300c6a9a28e3aa5"
+}

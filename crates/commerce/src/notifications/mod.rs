@@ -579,7 +579,10 @@ pub async fn begin_send(
     // A20: a marketing recipient must still be subscribed and consenting right now.
     let marketing_refusal = match m.subscriber_id {
         Some(sub) if stream == Stream::Marketing => {
-            crate::marketing::subscribers::may_receive(&mut tx, sub).await?
+            match crate::marketing::subscribers::may_receive(&mut tx, sub).await? {
+                Some(reason) => Some(reason),
+                None => crate::marketing::campaigns::delivery_refusal(&mut tx, id).await?,
+            }
         }
         _ => None,
     };

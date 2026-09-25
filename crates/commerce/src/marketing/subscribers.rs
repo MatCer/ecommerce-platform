@@ -129,10 +129,12 @@ pub async fn subscribe(
     source: &'static str,
 ) -> Result<(), Error> {
     let email = crate::staff::normalize_email(raw_email)?;
+    // Every request counts (the rate-limit ledger of customer sign-ins, purged daily), not
+    // just new rows: repeating one address cannot get around the cap.
     if let Some(ip) = ip_hash {
         let recent = sqlx::query_scalar!(
-            r#"SELECT count(*) AS "n!" FROM subscribers
-               WHERE request_ip_hash = $1 AND requested_at > now() - interval '1 hour'"#,
+            r#"SELECT count(*) AS "n!" FROM customer_auth_attempts
+               WHERE kind = 'newsletter' AND ip_hash = $1 AND at > now() - interval '1 hour'"#,
             ip
         )
         .fetch_one(&mut **tx)
@@ -142,6 +144,15 @@ pub async fn subscribe(
                 code: "too_many_signups",
             });
         }
+        sqlx::query!(
+            "INSERT INTO customer_auth_attempts (tenant_id, kind, email, ip_hash)
+             VALUES ($1, 'newsletter', $2, $3)",
+            tx.tenant_id(),
+            email,
+            ip
+        )
+        .execute(&mut **tx)
+        .await?;
     }
     let minted = capability::mint();
     let inserted = sqlx::query_scalar!(

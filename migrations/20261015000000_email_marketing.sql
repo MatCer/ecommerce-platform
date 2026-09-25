@@ -43,7 +43,13 @@ CREATE UNIQUE INDEX subscribers_confirm_token ON subscribers (tenant_id, confirm
     WHERE confirm_token_hash IS NOT NULL;
 CREATE INDEX subscribers_status ON subscribers (tenant_id, status, id);
 CREATE INDEX subscribers_customer ON subscribers (tenant_id, customer_id) WHERE customer_id IS NOT NULL;
-CREATE INDEX subscribers_request_ip ON subscribers (tenant_id, request_ip_hash, requested_at);
+
+-- Newsletter sign-ups join the customer rate-limit ledger (per hashed IP and hour, every
+-- request counts, purged daily with the rest of it).
+ALTER TABLE customer_auth_attempts
+    DROP CONSTRAINT customer_auth_attempts_kind_check,
+    ADD CONSTRAINT customer_auth_attempts_kind_check
+        CHECK (kind IN ('magic_link', 'login_failed', 'newsletter'));
 
 -- Segments (§11.5): an allowlisted rule set (validated by commerce::marketing::segments,
 -- compiled to parameterized SQL at use; never stored as SQL).
@@ -105,6 +111,8 @@ CREATE TABLE campaign_sends (
     skip_reason     text CHECK (skip_reason ~ '^[a-z_]{1,32}$'),
     message_id      uuid,
     token_hash      bytea CHECK (length(token_hash) = 32),
+    -- Rendered with the customer's personal signals (A20: re-checked before SMTP).
+    personalized    boolean NOT NULL DEFAULT false,
     clicked_at      timestamptz,
     click_count     integer NOT NULL DEFAULT 0,
     unsubscribed_at timestamptz,
