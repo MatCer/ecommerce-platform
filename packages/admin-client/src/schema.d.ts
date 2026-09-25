@@ -4,6 +4,81 @@
  */
 
 export interface paths {
+    "/admin/v1/ad-platforms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every platform's configuration (never the credentials). */
+        get: operations["list_ad_platforms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ad-platforms/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The delivery log, newest first: status, attempts, response code, error. No payloads. */
+        get: operations["list_ad_deliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ad-platforms/{platform}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Changes a platform's configuration (absent fields are kept; credentials are merged).
+         *     Enabling needs complete settings and credentials; resuming sends what was held.
+         */
+        patch: operations["update_ad_platform"];
+        trace?: never;
+    };
+    "/admin/v1/ad-platforms/{platform}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Checks the stored settings and credentials against the vendor without recording an event
+         *     (Meta: reads the pixel; GA4: validation server; Google Ads: OAuth + validate-only upload;
+         *     Seznam: no test endpoint, the settings only).
+         */
+        post: operations["test_ad_platform"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/analytics/dashboard": {
         parameters: {
             query?: never;
@@ -2055,7 +2130,8 @@ export interface paths {
          *     `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
          *     records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
          *     `analytics` right now; purposes the client claims are ignored and unknown props dropped.
-         *     Always `202`, so the answer does not reveal the consent state.
+         *     Page views and shopping steps also go to the enabled ad platforms while the subject grants
+         *     `ads` (WP20). Always `202`, so the answer does not reveal the consent state.
          */
         post: operations["events"];
         delete?: never;
@@ -3064,6 +3140,16 @@ export interface components {
             kind: string;
             value: string;
         };
+        ConnectionTest: {
+            /** @description What was checked or what failed (no secrets). */
+            message: string;
+            ok: boolean;
+            /**
+             * Format: int32
+             * @description The vendor's HTTP status, when it answered.
+             */
+            response_code?: number | null;
+        };
         /** @description A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`). */
         ConsentChoice: {
             purposes: components["schemas"]["Purposes"];
@@ -3183,6 +3269,20 @@ export interface components {
         CreatedImport: {
             run: components["schemas"]["ImportRun"];
             upload?: components["schemas"]["UploadTarget"] | null;
+        };
+        /** @description Secrets. Write-only: merged into the stored ones (a field left out keeps its value). */
+        Credentials: {
+            /** @description Meta: a Conversions API access token. */
+            access_token?: string | null;
+            /** @description GA4: a Measurement Protocol API secret. */
+            api_secret?: string | null;
+            /**
+             * @description Google: OAuth client id, client secret and a refresh token with the
+             *     `https://www.googleapis.com/auth/datamanager` scope.
+             */
+            client_id?: string | null;
+            client_secret?: string | null;
+            refresh_token?: string | null;
         };
         /**
          * @description Currencies used by EU markets: the euro and the member states' own currencies.
@@ -4445,6 +4545,53 @@ export interface components {
             payment: components["schemas"]["PaymentStart"];
         };
         /**
+         * @description The ad platforms.
+         * @enum {string}
+         */
+        Platform: "meta" | "ga4" | "google_ads" | "sklik";
+        PlatformConfig: {
+            /** @description Settings and credentials are complete (the platform can be enabled). */
+            complete: boolean;
+            credential_fields: string[];
+            credentials_hint?: string | null;
+            enabled: boolean;
+            /** @description Our event names the platform takes. */
+            events: string[];
+            has_credentials: boolean;
+            /** @description Markets whose events are forwarded. */
+            market_ids: string[];
+            /**
+             * @description Known limits, as codes: `sklik_no_browser_ids`, `sklik_czk_only`,
+             *     `sklik_no_test_channel`, `google_ads_purchases_only`.
+             */
+            notices: string[];
+            /** @description Paused: events are kept (`paused`) and sent after resuming. */
+            paused: boolean;
+            platform: components["schemas"]["Platform"];
+            /** @description Settings and credential fields the platform uses. */
+            setting_fields: string[];
+            settings: components["schemas"]["Settings"];
+            /**
+             * @description The vendor's test channel (Meta test code, GA4 validation server, Google Ads
+             *     validate-only); Seznam has none, so nothing is sent.
+             */
+            test_mode: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        PlatformList: {
+            items: components["schemas"]["PlatformConfig"][];
+        };
+        /** @description A partial update; absent fields keep their value. */
+        PlatformUpdate: {
+            credentials?: components["schemas"]["Credentials"] | null;
+            enabled?: boolean | null;
+            market_ids?: string[] | null;
+            paused?: boolean | null;
+            settings?: components["schemas"]["Settings"] | null;
+            test_mode?: boolean | null;
+        };
+        /**
          * @description Why the base prices change (recorded on the price intervals).
          * @enum {string}
          */
@@ -4923,6 +5070,23 @@ export interface components {
             /** @description `noindex,follow` on filtered listings (spec §9.5); absent otherwise. */
             robots?: string | null;
             title: string;
+        };
+        /** @description Non-secret ids. Only the fields of the platform are accepted. */
+        Settings: {
+            /** @description Google Ads: the conversion action (type "import from clicks"). */
+            conversion_action_id?: string | null;
+            /** @description Google Ads: the account the conversions belong to (10 digits). */
+            customer_id?: string | null;
+            /** @description Google Ads: the manager account used to sign in, when not the account itself. */
+            login_customer_id?: string | null;
+            /** @description GA4: `G-XXXXXXX`. */
+            measurement_id?: string | null;
+            /** @description Meta: the dataset (pixel) id. */
+            pixel_id?: string | null;
+            /** @description Seznam: the server-to-server SEM id (differs from the browser SEM id). */
+            sem_id?: string | null;
+            /** @description Meta: the Events Manager test code used in test mode (`TEST12345`). */
+            test_event_code?: string | null;
         };
         ShippingInput: {
             /** Format: uuid */
@@ -5464,6 +5628,182 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_ad_platforms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformList"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_ad_deliveries: {
+        parameters: {
+            query?: {
+                platform?: components["schemas"]["Platform"];
+                status?: string;
+                cursor?: string;
+                /** @description 1-100, default 50. */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryPage"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_ad_platform: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                /** @description `meta`, `ga4`, `google_ads` or `sklik`. */
+                platform: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformConfig"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    test_ad_platform: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                /** @description `meta`, `ga4`, `google_ads` or `sklik`. */
+                platform: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTest"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     analytics_dashboard: {
         parameters: {
             query: {
@@ -11001,6 +11341,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -11033,6 +11375,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -11635,6 +11979,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
