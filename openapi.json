@@ -34,7 +34,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlatformList"
+                  "$ref": "#/components/schemas/AdPlatformList"
                 }
               }
             }
@@ -79,7 +79,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/Platform"
+              "$ref": "#/components/schemas/AdPlatform"
             }
           },
           {
@@ -115,7 +115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeliveryPage"
+                  "$ref": "#/components/schemas/AdDeliveryPage"
                 }
               }
             }
@@ -169,7 +169,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PlatformUpdate"
+                "$ref": "#/components/schemas/AdPlatformUpdate"
               }
             }
           },
@@ -180,7 +180,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlatformConfig"
+                  "$ref": "#/components/schemas/AdPlatformConfig"
                 }
               }
             }
@@ -271,7 +271,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ConnectionTest"
+                  "$ref": "#/components/schemas/AdConnectionTest"
                 }
               }
             }
@@ -12887,6 +12887,394 @@
   },
   "components": {
     "schemas": {
+      "AdConnectionTest": {
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "What was checked or what failed (no secrets)."
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "response_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The vendor's HTTP status, when it answered."
+          }
+        }
+      },
+      "AdDelivery": {
+        "type": "object",
+        "required": [
+          "id",
+          "platform",
+          "event_name",
+          "event_id",
+          "status",
+          "attempts",
+          "occurred_at",
+          "created_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The dedupe key sent to the vendor."
+          },
+          "event_name": {
+            "type": "string",
+            "description": "Our event name (`purchase`, `view_item`, ...)."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/AdPlatform"
+          },
+          "response_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `retrying`, `paused`, `succeeded`, `dead`, `cancelled` or `skipped`."
+          }
+        }
+      },
+      "AdDeliveryPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdDelivery"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next (older) page; absent on the last page."
+          }
+        }
+      },
+      "AdPlatform": {
+        "type": "string",
+        "description": "The ad platforms.",
+        "enum": [
+          "meta",
+          "ga4",
+          "google_ads",
+          "sklik"
+        ]
+      },
+      "AdPlatformConfig": {
+        "type": "object",
+        "required": [
+          "platform",
+          "enabled",
+          "paused",
+          "test_mode",
+          "market_ids",
+          "settings",
+          "has_credentials",
+          "setting_fields",
+          "credential_fields",
+          "events",
+          "complete",
+          "notices"
+        ],
+        "properties": {
+          "complete": {
+            "type": "boolean",
+            "description": "Settings and credentials are complete (the platform can be enabled)."
+          },
+          "credential_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "credentials_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Our event names the platform takes."
+          },
+          "has_credentials": {
+            "type": "boolean"
+          },
+          "market_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Markets whose events are forwarded."
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Known limits, as codes: `sklik_no_browser_ids`, `sklik_czk_only`,\n`sklik_no_test_channel`, `google_ads_purchases_only`."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused: events are kept (`paused`) and sent after resuming."
+          },
+          "platform": {
+            "$ref": "#/components/schemas/AdPlatform"
+          },
+          "setting_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Settings and credential fields the platform uses."
+          },
+          "settings": {
+            "$ref": "#/components/schemas/AdPlatformSettings"
+          },
+          "test_mode": {
+            "type": "boolean",
+            "description": "The vendor's test channel (Meta test code, GA4 validation server, Google Ads\nvalidate-only); Seznam has none, so nothing is sent."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AdPlatformCredentials": {
+        "type": "object",
+        "description": "Secrets. Write-only: merged into the stored ones (a field left out keeps its value).",
+        "properties": {
+          "access_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta: a Conversions API access token."
+          },
+          "api_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "GA4: a Measurement Protocol API secret."
+          },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google: OAuth client id, client secret and a refresh token with the\n`https://www.googleapis.com/auth/datamanager` scope."
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refresh_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdPlatformList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdPlatformConfig"
+            }
+          }
+        }
+      },
+      "AdPlatformSettings": {
+        "type": "object",
+        "description": "Non-secret ids. Only the fields of the platform are accepted.",
+        "properties": {
+          "conversion_action_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google Ads: the conversion action (type \"import from clicks\")."
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google Ads: the account the conversions belong to (10 digits)."
+          },
+          "login_customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google Ads: the manager account used to sign in, when not the account itself."
+          },
+          "measurement_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "GA4: `G-XXXXXXX`."
+          },
+          "pixel_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta: the dataset (pixel) id."
+          },
+          "sem_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seznam: the server-to-server SEM id (differs from the browser SEM id)."
+          },
+          "test_event_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta: the Events Manager test code used in test mode (`TEST12345`)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdPlatformUpdate": {
+        "type": "object",
+        "description": "A partial update; absent fields keep their value.",
+        "properties": {
+          "credentials": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdPlatformCredentials",
+                "description": "Merged into the stored credentials."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "market_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "paused": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "settings": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdPlatformSettings",
+                "description": "Replaces the settings."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "test_mode": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "Address": {
         "type": "object",
         "required": [
@@ -15019,30 +15407,6 @@
           }
         }
       },
-      "ConnectionTest": {
-        "type": "object",
-        "required": [
-          "ok",
-          "message"
-        ],
-        "properties": {
-          "message": {
-            "type": "string",
-            "description": "What was checked or what failed (no secrets)."
-          },
-          "ok": {
-            "type": "boolean"
-          },
-          "response_code": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int32",
-            "description": "The vendor's HTTP status, when it answered."
-          }
-        }
-      },
       "ConsentChoice": {
         "type": "object",
         "description": "A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`).",
@@ -15449,46 +15813,6 @@
             ]
           }
         }
-      },
-      "Credentials": {
-        "type": "object",
-        "description": "Secrets. Write-only: merged into the stored ones (a field left out keeps its value).",
-        "properties": {
-          "access_token": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Meta: a Conversions API access token."
-          },
-          "api_secret": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "GA4: a Measurement Protocol API secret."
-          },
-          "client_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Google: OAuth client id, client secret and a refresh token with the\n`https://www.googleapis.com/auth/datamanager` scope."
-          },
-          "client_secret": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "refresh_token": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "additionalProperties": false
       },
       "Currency": {
         "type": "string",
@@ -19418,178 +19742,6 @@
           }
         }
       },
-      "Platform": {
-        "type": "string",
-        "description": "The ad platforms.",
-        "enum": [
-          "meta",
-          "ga4",
-          "google_ads",
-          "sklik"
-        ]
-      },
-      "PlatformConfig": {
-        "type": "object",
-        "required": [
-          "platform",
-          "enabled",
-          "paused",
-          "test_mode",
-          "market_ids",
-          "settings",
-          "has_credentials",
-          "setting_fields",
-          "credential_fields",
-          "events",
-          "complete",
-          "notices"
-        ],
-        "properties": {
-          "complete": {
-            "type": "boolean",
-            "description": "Settings and credentials are complete (the platform can be enabled)."
-          },
-          "credential_fields": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "credentials_hint": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Our event names the platform takes."
-          },
-          "has_credentials": {
-            "type": "boolean"
-          },
-          "market_ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Markets whose events are forwarded."
-          },
-          "notices": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Known limits, as codes: `sklik_no_browser_ids`, `sklik_czk_only`,\n`sklik_no_test_channel`, `google_ads_purchases_only`."
-          },
-          "paused": {
-            "type": "boolean",
-            "description": "Paused: events are kept (`paused`) and sent after resuming."
-          },
-          "platform": {
-            "$ref": "#/components/schemas/Platform"
-          },
-          "setting_fields": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Settings and credential fields the platform uses."
-          },
-          "settings": {
-            "$ref": "#/components/schemas/Settings"
-          },
-          "test_mode": {
-            "type": "boolean",
-            "description": "The vendor's test channel (Meta test code, GA4 validation server, Google Ads\nvalidate-only); Seznam has none, so nothing is sent."
-          },
-          "updated_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          }
-        }
-      },
-      "PlatformList": {
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PlatformConfig"
-            }
-          }
-        }
-      },
-      "PlatformUpdate": {
-        "type": "object",
-        "description": "A partial update; absent fields keep their value.",
-        "properties": {
-          "credentials": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Credentials",
-                "description": "Merged into the stored credentials."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "enabled": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "market_ids": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          "paused": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "settings": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Settings",
-                "description": "Replaces the settings."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "test_mode": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          }
-        },
-        "additionalProperties": false
-      },
       "PriceChangeReason": {
         "type": "string",
         "description": "Why the base prices change (recorded on the price intervals).",
@@ -21160,62 +21312,6 @@
             "type": "string"
           }
         }
-      },
-      "Settings": {
-        "type": "object",
-        "description": "Non-secret ids. Only the fields of the platform are accepted.",
-        "properties": {
-          "conversion_action_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Google Ads: the conversion action (type \"import from clicks\")."
-          },
-          "customer_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Google Ads: the account the conversions belong to (10 digits)."
-          },
-          "login_customer_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Google Ads: the manager account used to sign in, when not the account itself."
-          },
-          "measurement_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "GA4: `G-XXXXXXX`."
-          },
-          "pixel_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Meta: the dataset (pixel) id."
-          },
-          "sem_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Seznam: the server-to-server SEM id (differs from the browser SEM id)."
-          },
-          "test_event_code": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Meta: the Events Manager test code used in test mode (`TEST12345`)."
-          }
-        },
-        "additionalProperties": false
       },
       "ShippingInput": {
         "type": "object",

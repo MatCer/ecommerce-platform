@@ -39,6 +39,7 @@ const BankTransactions = lazy(() => import("./pages/BankTransactions.tsx"));
 const Orders = lazy(() => import("./pages/Orders.tsx"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
 const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
+const AdTracking = lazy(() => import("./pages/AdTracking.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -113,6 +114,7 @@ export function App() {
           <Route path="/staff" component={Staff} />
           <Route path="/audit-log" component={AuditLog} />
           <Route path="/settings/webhooks" component={Webhooks} />
+          <Route path="/settings/ad-tracking" component={AdTracking} />
           <Route path="/platform/jobs" component={PlatformJobs} />
           <Route path="/account/security" component={Security} />
           <Route path="*" component={NotFound} />

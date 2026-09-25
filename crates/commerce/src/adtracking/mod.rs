@@ -69,6 +69,7 @@ const LIMITS: Limits = Limits {
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
 )]
 #[serde(rename_all = "snake_case")]
+#[schema(as = AdPlatform)]
 pub enum Platform {
     Meta,
     Ga4,
@@ -174,6 +175,7 @@ pub const EVENTS: [&str; 6] = [
 /// Non-secret ids. Only the fields of the platform are accepted.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = AdPlatformSettings)]
 pub struct Settings {
     /// Meta: the dataset (pixel) id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -231,6 +233,7 @@ impl Settings {
 /// Secrets. Write-only: merged into the stored ones (a field left out keeps its value).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = AdPlatformCredentials)]
 pub struct Credentials {
     /// Meta: a Conversions API access token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -295,6 +298,7 @@ impl Credentials {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = AdPlatformConfig)]
 pub struct PlatformConfig {
     pub platform: Platform,
     pub enabled: bool,
@@ -322,6 +326,7 @@ pub struct PlatformConfig {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = AdPlatformList)]
 pub struct PlatformList {
     pub items: Vec<PlatformConfig>,
 }
@@ -329,6 +334,7 @@ pub struct PlatformList {
 /// A partial update; absent fields keep their value.
 #[derive(Debug, Default, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = AdPlatformUpdate)]
 pub struct PlatformUpdate {
     pub enabled: Option<bool>,
     pub paused: Option<bool>,
@@ -351,6 +357,7 @@ impl PlatformUpdate {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = AdDelivery)]
 pub struct Delivery {
     pub id: Uuid,
     pub platform: Platform,
@@ -370,6 +377,7 @@ pub struct Delivery {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = AdDeliveryPage)]
 pub struct DeliveryPage {
     pub items: Vec<Delivery>,
     /// Pass as `cursor` for the next (older) page; absent on the last page.
@@ -387,6 +395,7 @@ pub struct DeliveryQuery {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = AdConnectionTest)]
 pub struct ConnectionTest {
     pub ok: bool,
     /// The vendor's HTTP status, when it answered.
