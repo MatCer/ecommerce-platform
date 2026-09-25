@@ -15,10 +15,13 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+/// One received delivery: headers and raw body.
+type Received = (HeaderMap, Vec<u8>);
+
 #[derive(Clone, Default)]
 struct Receiver {
     status: Arc<Mutex<u16>>,
-    got: Arc<Mutex<Vec<(HeaderMap, Vec<u8>)>>>,
+    got: Arc<Mutex<Vec<Received>>>,
 }
 
 async fn receiver() -> (String, Receiver) {
