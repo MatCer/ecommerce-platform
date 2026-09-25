@@ -1282,9 +1282,11 @@ ${
     if (!opts.previews || !PREVIEW_HOST_RE.test(host)) return text(404, "Unknown preview");
     const fromLink = url.searchParams.get("preview_token");
     const token = fromLink ?? readCookie(raw.headers, PREVIEW_COOKIE);
-    if (!token || !PREVIEW_TOKEN_RE.test(token)) return denied("This preview link is missing or invalid.");
+    if (!token || !PREVIEW_TOKEN_RE.test(token))
+      return denied("This preview link is missing or invalid.");
     const resolved = await opts.previews.resolve(host, token);
-    if (!resolved?.preview) return denied("This preview link has expired or is not valid for this revision.");
+    if (!resolved?.preview)
+      return denied("This preview link has expired or is not valid for this revision.");
     if (fromLink !== null) {
       const clean = new URL(url);
       clean.searchParams.delete("preview_token");

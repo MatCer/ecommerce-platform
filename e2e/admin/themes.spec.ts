@@ -20,7 +20,8 @@ const owner = "owner@lnen.example";
 const port = process.env.HTTP_PORT ?? "8080";
 const shop = `http://demo.localhost:${port}`;
 const DEMO = "(SELECT id FROM platform.tenants WHERE slug = 'demo')";
-const GREEN = "#0b6e4f";
+// A light green: the buy button keeps dark text, so contrast (axe) still passes.
+const GREEN = "#86d7a8";
 let context: BrowserContext;
 let page: Page;
 
@@ -146,20 +147,17 @@ test.afterAll(async () => {
 
 let forked = 0;
 let tokens = 0;
-let before = "";
 
 test("forking the default theme builds and passes every gate", async () => {
   test.setTimeout(10 * 60_000);
-  const shopPage = await context.newPage();
-  await shopPage.goto(shop);
-  before = await buyColor(shopPage);
-  await shopPage.close();
-
   await page.goto("/themes");
   await expect(page.getByRole("heading", { name: "Theme", exact: true })).toBeVisible();
   const start = latest();
   const fork = page.getByRole("button", { name: "Create my own theme" });
-  await (await fork.isVisible() ? fork : page.getByRole("button", { name: "Reset to default theme" })).click();
+  await ((await fork.isVisible())
+    ? fork
+    : page.getByRole("button", { name: "Reset to default theme" })
+  ).click();
   await expect(page.getByText(/is being built and checked/)).toBeVisible();
   forked = start + 1;
   const result = await settled(forked);
@@ -185,8 +183,8 @@ test("a token change builds on the fast path and previews behind its token", asy
   await page.goto("/themes");
   const editor = page.getByRole("region", { name: "Colours, fonts and corners" });
   await editor.getByRole("textbox", { name: "buy", exact: true }).fill(GREEN);
+  tokens = latest() + 1;
   await editor.getByRole("button", { name: "Create revision" }).click();
-  tokens = forked + 1;
   await expect(page.getByText(`Revision #${tokens} is being built and checked.`)).toBeVisible();
   const result = await settled(tokens);
   expect(result.failures).toEqual([]);
@@ -198,16 +196,25 @@ test("a token change builds on the fast path and previews behind its token", asy
 
   // Preview in the admin: a sandboxed iframe on the preview origin.
   await page.goto("/themes");
-  const row = page.getByRole("row").filter({ has: page.getByRole("button", { name: `#${tokens}`, exact: true }) });
+  const row = page
+    .getByRole("row")
+    .filter({ has: page.getByRole("button", { name: `#${tokens}`, exact: true }) });
   await row.getByRole("button", { name: "Preview" }).click();
   const frame = page.locator(`iframe[title="Preview of revision #${tokens}"]`);
   await expect(frame).toHaveAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
   const src = (await frame.getAttribute("src")) ?? "";
-  expect(src).toMatch(new RegExp(`^http://preview-${tokens}--demo\\.localhost:${port}/\\?preview_token=`));
+  expect(src).toMatch(
+    new RegExp(`^http://preview-${tokens}--demo\\.localhost:${port}/\\?preview_token=`),
+  );
   await expect(frame.contentFrame().locator("main")).toBeVisible();
-  expect(await frame.contentFrame().locator("html").evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue("--color-buy").trim(),
-  )).toBe(GREEN);
+  expect(
+    await frame
+      .contentFrame()
+      .locator("html")
+      .evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue("--color-buy").trim(),
+      ),
+  ).toBe(GREEN);
 
   // Token-bound: no token, or this token on another revision's host, gets nothing.
   const stranger = await context.browser()?.newContext();
@@ -215,7 +222,9 @@ test("a token change builds on the fast path and previews behind its token", asy
   const bare = await p?.goto(`http://preview-${tokens}--demo.localhost:${port}/`);
   expect(bare?.status()).toBe(401);
   const token = new URL(src).searchParams.get("preview_token") ?? "";
-  const other = await p?.goto(`http://preview-${forked}--demo.localhost:${port}/?preview_token=${token}`);
+  const other = await p?.goto(
+    `http://preview-${tokens - 1}--demo.localhost:${port}/?preview_token=${token}`,
+  );
   expect(other?.status()).toBe(401);
   const good = await p?.goto(src);
   expect(good?.status()).toBe(200);
@@ -228,22 +237,26 @@ test("publishing changes the storefront; rolling back restores it", async () => 
   const live = sql(
     `SELECT r.number FROM theme_active a JOIN theme_revisions r ON r.id = a.revision_id WHERE a.tenant_id = ${DEMO}`,
   )[0];
+  const shopPage = await context.newPage();
+  await shopPage.goto(shop);
+  const before = await buyColor(shopPage);
+  expect(before).not.toBe(GREEN);
   await page.goto("/themes");
   const row = (n: number | string) =>
     page.getByRole("row").filter({ has: page.getByRole("button", { name: `#${n}`, exact: true }) });
   await row(tokens).getByRole("button", { name: "Publish" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText(`Revision #${tokens} is live.`)).toBeVisible();
-
-  const shopPage = await context.newPage();
-  await shopPage.goto(shop);
+  await shopPage.reload();
   expect(await buyColor(shopPage)).toBe(GREEN);
   const audit = sql(
     `SELECT count(*) FROM audit_log WHERE tenant_id = ${DEMO} AND action = 'theme.published'`,
   );
   expect(Number(audit[0])).toBeGreaterThan(0);
 
-  await row(live ?? "").getByRole("button", { name: "Roll back" }).click();
+  await row(live ?? "")
+    .getByRole("button", { name: "Roll back" })
+    .click();
   await page.getByRole("dialog").getByRole("button", { name: "Roll back" }).click();
   await expect(page.getByText(`Revision #${live} is live.`)).toBeVisible();
   await shopPage.reload();
@@ -312,11 +325,12 @@ test("contract violations and a network attempt fail the build with reasons", as
               "---",
               "export const prerender = true;",
               'const target = ["https:", "", "example.com", ""].join("/");',
-              "let outcome;",
-              "try { await fetch(target); outcome = 'NETWORK-PROBE: reachable'; }",
-              "catch (e) { outcome = 'NETWORK-PROBE: blocked ' + (e.cause?.code ?? e.message); }",
-              "console.error(outcome);",
-              "if (!outcome.includes('blocked')) throw new Error(outcome);",
+              "let outcome = 'NETWORK-PROBE: reachable';",
+              "try { await fetch(target); } catch (e) {",
+              "  const err = e as { cause?: { code?: string }; message?: string };",
+              "  outcome = 'NETWORK-PROBE: blocked ' + (err.cause?.code ?? err.message);",
+              "}",
+              "// The build fails either way, so the outcome lands in the report.",
               "throw new Error(outcome);",
               "---",
               "<p>probe</p>",
@@ -324,7 +338,8 @@ test("contract violations and a network attempt fail the build with reasons", as
             ].join("\n"),
           ),
         ),
-      /build:[\s\S]*NETWORK-PROBE: blocked/,
+      // No network in the build sandbox: the lookup itself fails (workerd prerenders the page).
+      /build:[\s\S]*(NETWORK-PROBE: blocked|EAI_AGAIN[\s\S]*example\.com)/,
     ],
   ];
   for (const [name, mutate, reason] of cases) {
@@ -341,7 +356,7 @@ test("contract violations and a network attempt fail the build with reasons", as
   // The failure reasons are shown in the admin.
   await page.goto("/themes");
   await page.getByRole("button", { name: `#${latest()}`, exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("NETWORK-PROBE: blocked");
+  await expect(page.getByRole("alert")).toContainText(/NETWORK-PROBE: blocked|EAI_AGAIN/);
 });
 
 test("a revision that blows the JS budget fails with the numbers", async () => {

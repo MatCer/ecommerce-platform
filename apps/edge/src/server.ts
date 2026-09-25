@@ -46,8 +46,16 @@ const prune = setInterval(
   () =>
     void gateway
       .pruneArtifacts(7 * 86_400_000)
-      .then((removed) => removed.length && console.log(JSON.stringify({ level: "info", msg: "pruned artifacts", removed })))
-      .catch((err) => console.log(JSON.stringify({ level: "warn", msg: "artifact prune failed", err: String(err) }))),
+      .then(
+        (removed) =>
+          removed.length &&
+          console.log(JSON.stringify({ level: "info", msg: "pruned artifacts", removed })),
+      )
+      .catch((err) =>
+        console.log(
+          JSON.stringify({ level: "warn", msg: "artifact prune failed", err: String(err) }),
+        ),
+      ),
   3_600_000,
 );
 

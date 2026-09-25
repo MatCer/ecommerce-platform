@@ -10,8 +10,8 @@
 import { spawn } from "node:child_process";
 import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { judge, type PageResult } from "@platform/theme-kit/budget";
 import { verifyArtifact } from "@platform/theme-kit";
+import { judge, type PageResult } from "@platform/theme-kit/budget";
 import type { Docker, SandboxSpec, StepResult } from "./docker.ts";
 
 export const SCREENSHOTS = [
@@ -103,6 +103,16 @@ const tail = (r: StepResult, n = 1500) =>
   `${r.stderr}\n${r.stdout.replace(/^@@result .*$/gm, "")}`.trim().slice(-n);
 
 /**
+ * The readable part of a failed step's log: the first error line and what follows it, without
+ * stack frames (the full tail stays in the step's report).
+ */
+export function errorSummary(log: string, max = 1200): string {
+  const lines = log.split("\n").filter((l) => !/^\s+at /.test(l));
+  const i = lines.findIndex((l) => /error/i.test(l));
+  return (i < 0 ? lines.slice(-12) : lines.slice(i, i + 8)).join("\n").trim().slice(0, max);
+}
+
+/**
  * Reads `rel` under `root` only if every component is a real directory and the file a regular
  * file of at most `max` bytes: a sandbox cannot make the builder read through a symlink.
  */
@@ -169,7 +179,8 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
   const job = revision.toLowerCase();
   const dir = path.join(cfg.workDir, job);
   await rm(dir, { recursive: true, force: true });
-  for (const sub of ["in", "out/build", "out/check"]) await mkdir(path.join(dir, sub), { recursive: true });
+  for (const sub of ["in", "out/build", "out/check"])
+    await mkdir(path.join(dir, sub), { recursive: true });
   await writeFile(path.join(dir, "in/source.tar.gz"), await cfg.api.source(tenant, revision));
 
   const step = (s: Omit<SandboxSpec, "job" | "cmd">) =>
@@ -210,7 +221,12 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
     const tc = sr?.typecheck as { ok: boolean; ms: number; log: string } | null | undefined;
     report.steps.push(
       tc
-        ? { name: "typecheck", status: tc.ok ? "passed" : "failed", ms: tc.ms, log: tc.ok ? "" : tc.log }
+        ? {
+            name: "typecheck",
+            status: tc.ok ? "passed" : "failed",
+            ms: tc.ms,
+            log: tc.ok ? "" : tc.log,
+          }
         : { name: "typecheck", status: "skipped" },
     );
     if (tc && !tc.ok) fail(`types (astro check): ${tc.log.slice(-800)}`);
@@ -235,11 +251,15 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
     const id = typeof br?.artifact_id === "string" ? br.artifact_id : "";
     if (b.exitCode !== 0 || b.timedOut || !/^[0-9a-f]{32}$/.test(id)) {
       report.steps.push({ name: "build", status: "failed", ms: b.ms, log: tail(b, 4000) });
-      fail(`build: ${b.timedOut ? "timed out" : tail(b, 1200)}`);
+      fail(`build: ${b.timedOut ? "timed out" : errorSummary(tail(b, 20_000))}`);
       return;
     }
     const root = path.join(dir, "out/build/artifacts");
-    if (!(await realDir(path.join(dir, "out/build"))) || !(await realDir(root)) || !(await realDir(path.join(root, id))))
+    if (
+      !(await realDir(path.join(dir, "out/build"))) ||
+      !(await realDir(root)) ||
+      !(await realDir(path.join(root, id)))
+    )
       throw new Error("the build output is not a plain directory");
     const manifest = await verifyArtifact(root, id);
     report.steps.push({
@@ -263,7 +283,9 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
         PAGES: check.pages.join(","),
         TOKENS_ONLY: tokensOnly ? "1" : "0",
         LIGHTHOUSE_RUNS: String(cfg.lighthouseRuns),
-        THEME_KIT_CHROMIUM_ARGS: JSON.stringify([`--host-resolver-rules=MAP *.localhost ${cfg.proxyHost}`]),
+        THEME_KIT_CHROMIUM_ARGS: JSON.stringify([
+          `--host-resolver-rules=MAP *.localhost ${cfg.proxyHost}`,
+        ]),
         HOME: "/tmp",
       },
       network: cfg.checkNetwork,
@@ -296,7 +318,8 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
         failures,
       };
     });
-    if (!results.length) fail(`budget: nothing was measured (${c.timedOut ? "timed out" : tail(c, 800)})`);
+    if (!results.length)
+      fail(`budget: nothing was measured (${c.timedOut ? "timed out" : tail(c, 800)})`);
     report.steps.push({
       name: "budget",
       status: results.length && pages.every((p) => p.failures.length === 0) ? "passed" : "failed",
@@ -306,12 +329,18 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
     });
     const summary = await safeRead(out, "result.json", 64 * 1024);
     const smoke = summary
-      ? ((JSON.parse(summary.toString("utf8")) as { smoke?: { ok: boolean; log: string } }).smoke ?? null)
+      ? ((JSON.parse(summary.toString("utf8")) as { smoke?: { ok: boolean; log: string } }).smoke ??
+        null)
       : null;
     if (tokensOnly) report.steps.push({ name: "smoke", status: "skipped" });
     else {
-      report.steps.push({ name: "smoke", status: smoke?.ok ? "passed" : "failed", log: smoke?.ok ? "" : smoke?.log });
-      if (!smoke?.ok) fail(`smoke (browse → cart → checkout): ${smoke?.log.slice(-600) ?? "did not run"}`);
+      report.steps.push({
+        name: "smoke",
+        status: smoke?.ok ? "passed" : "failed",
+        log: smoke?.ok ? "" : smoke?.log,
+      });
+      if (!smoke?.ok)
+        fail(`smoke (browse → cart → checkout): ${smoke?.log.slice(-600) ?? "did not run"}`);
     }
     report.screenshots = [];
     for (const name of SCREENSHOTS) {
@@ -328,7 +357,9 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
         env: {
           PREVIEW_BASE: `https://${check.preview_host}`,
           PREVIEW_COOKIE: `__Host-preview=${check.preview_token}`,
-          THEME_KIT_CHROMIUM_ARGS: JSON.stringify([`--host-resolver-rules=MAP *.localhost ${cfg.proxyHost}`]),
+          THEME_KIT_CHROMIUM_ARGS: JSON.stringify([
+            `--host-resolver-rules=MAP *.localhost ${cfg.proxyHost}`,
+          ]),
           HOME: "/tmp",
         },
         network: cfg.checkNetwork,
@@ -339,7 +370,13 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
         timeoutMs: 240_000,
       });
       const ok = f.exitCode === 0 && !f.timedOut;
-      report.steps.push({ name: "functional", status: ok ? "passed" : "failed", ms: f.ms, checks: functional, log: ok ? "" : tail(f, 3000) });
+      report.steps.push({
+        name: "functional",
+        status: ok ? "passed" : "failed",
+        ms: f.ms,
+        checks: functional,
+        log: ok ? "" : tail(f, 3000),
+      });
       if (!ok) fail(`functional checks: ${f.timedOut ? "timed out" : tail(f, 800)}`);
     } else report.steps.push({ name: "functional", status: "skipped" });
   } catch (err) {
@@ -347,10 +384,18 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
   } finally {
     report.finished_at = new Date().toISOString();
     const final = report.failures.length || status === "building" ? "failed" : "ready";
-    await cfg.api.status(tenant, revision, final, report).catch((err) =>
-      log({ level: "error", msg: "status callback failed", revision, err: String(err) }),
-    );
+    await cfg.api
+      .status(tenant, revision, final, report)
+      .catch((err) =>
+        log({ level: "error", msg: "status callback failed", revision, err: String(err) }),
+      );
     await rm(dir, { recursive: true, force: true }).catch(() => {});
-    log({ level: "info", msg: "theme build finished", revision, status: final, failures: report.failures.length });
+    log({
+      level: "info",
+      msg: "theme build finished",
+      revision,
+      status: final,
+      failures: report.failures.length,
+    });
   }
 }

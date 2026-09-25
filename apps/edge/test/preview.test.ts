@@ -27,7 +27,9 @@ const counters = new Counters();
 const upstream = async (req: Request) => {
   const url = new URL(req.url);
   if (url.pathname === "/internal/v1/previews/resolve") {
-    resolveCalls.push(`${url.searchParams.get("host")} ${url.searchParams.get("token")?.slice(0, 4)}`);
+    resolveCalls.push(
+      `${url.searchParams.get("host")} ${url.searchParams.get("token")?.slice(0, 4)}`,
+    );
     if (url.searchParams.get("host") !== HOST || url.searchParams.get("token") !== TOKEN)
       return Response.json({ code: "not_found" }, { status: 404 });
     return Response.json({
@@ -55,8 +57,11 @@ const get = (url: string, headers: Record<string, string> = {}, init: RequestIni
 
 beforeAll(async () => {
   root = await mkdtemp(path.join(tmpdir(), "wp23-preview-"));
-  live = (await buildArtifact(root, "theme", hostileTheme("live"), { "_astro/app.live.js": "1" })).id;
-  draft = (await buildArtifact(root, "theme", hostileTheme("draft"), { "_astro/app.draft.js": "2" })).id;
+  live = (await buildArtifact(root, "theme", hostileTheme("live"), { "_astro/app.live.js": "1" }))
+    .id;
+  draft = (
+    await buildArtifact(root, "theme", hostileTheme("draft"), { "_astro/app.draft.js": "2" })
+  ).id;
   gw = createGateway({
     artifactRoot: root,
     resolver: new StaticResolver({ "demo.localhost": site({ theme_artifact: live }) }),
@@ -82,7 +87,9 @@ describe("previews (A21)", () => {
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/c/x?sort=price");
     const cookie = res.headers.get("set-cookie") ?? "";
-    expect(cookie).toMatch(/^__Host-preview=a{32}\.1900000000\.b{64}; Path=\/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=3[0-9]{3}$/);
+    expect(cookie).toMatch(
+      /^__Host-preview=a{32}\.1900000000\.b{64}; Path=\/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=3[0-9]{3}$/,
+    );
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
   });
 
@@ -95,7 +102,9 @@ describe("previews (A21)", () => {
       expect(res.headers.get("cache-control")).toBe("no-store");
       expect(res.headers.get("x-edge-cache")).toBe("BYPASS");
       expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
-      expect(res.headers.get("content-security-policy")).toContain("frame-ancestors http://admin.localhost:8080");
+      expect(res.headers.get("content-security-policy")).toContain(
+        "frame-ancestors http://admin.localhost:8080",
+      );
     }
     // The live shop is untouched and still unframable.
     const shop = await get("http://demo.localhost:8080/");
@@ -112,11 +121,19 @@ describe("previews (A21)", () => {
 
   test("no checkout handoff, events or counters from a preview", async () => {
     const headers = { cookie: `__Host-preview=${TOKEN}` };
-    const res = await get(`http://${HOST}:8080/_p/checkout/start`, { ...headers, origin: `http://${HOST}:8080` }, { method: "POST" });
+    const res = await get(
+      `http://${HOST}:8080/_p/checkout/start`,
+      { ...headers, origin: `http://${HOST}:8080` },
+      { method: "POST" },
+    );
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Checkout is disabled in preview");
     expect(api.calls.some((c) => c.url.includes("/cart/handoff"))).toBe(false);
-    const ev = await get(`http://${HOST}:8080/_p/e`, { ...headers, "content-type": "application/json" }, { method: "POST", body: "[]" });
+    const ev = await get(
+      `http://${HOST}:8080/_p/e`,
+      { ...headers, "content-type": "application/json" },
+      { method: "POST", body: "[]" },
+    );
     expect(ev.status).toBe(204);
     expect(api.calls.some((c) => c.url.includes("/events"))).toBe(false);
     // Only the one live shop render above was counted (A20 counters), no preview render.
@@ -125,19 +142,28 @@ describe("previews (A21)", () => {
       sent.push(await r.text());
       return Response.json({ recorded: 1 });
     });
-    const rows = sent.flatMap((b) => (JSON.parse(b) as { counters: { requests: number }[] }).counters);
+    const rows = sent.flatMap(
+      (b) => (JSON.parse(b) as { counters: { requests: number }[] }).counters,
+    );
     expect(rows.reduce((n, r) => n + r.requests, 0)).toBe(1);
   });
 
   test("missing, forged, other-revision and expired tokens are refused", async () => {
-    const variants: Record<string, string>[] = [{}, { cookie: "__Host-preview=nope" }, { cookie: `__Host-preview=${OTHER}` }];
+    const variants: Record<string, string>[] = [
+      {},
+      { cookie: "__Host-preview=nope" },
+      { cookie: `__Host-preview=${OTHER}` },
+    ];
     for (const headers of variants) {
       const res = await get(`http://${HOST}:8080/`, headers);
       expect(res.status).toBe(401);
       expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     }
     // The same token on another revision's host.
-    expect((await get("http://preview-8--demo.localhost:8080/", { cookie: `__Host-preview=${TOKEN}` })).status).toBe(401);
+    expect(
+      (await get("http://preview-8--demo.localhost:8080/", { cookie: `__Host-preview=${TOKEN}` }))
+        .status,
+    ).toBe(401);
     const link = await get(`http://${HOST}:8080/?preview_token=${OTHER}`);
     expect(link.status).toBe(401);
     expect(link.headers.get("set-cookie")).toBeNull();
@@ -147,7 +173,9 @@ describe("previews (A21)", () => {
 
 test("local artifact GC removes long-unused artifacts only", async () => {
   const old = Date.now() / 1000 - 30 * 86_400;
-  const extra = (await buildArtifact(root, "theme", hostileTheme("old"), { "_astro/app.old.js": "3" })).id;
+  const extra = (
+    await buildArtifact(root, "theme", hostileTheme("old"), { "_astro/app.old.js": "3" })
+  ).id;
   await utimes(path.join(root, extra), old, old);
   const removed = await gw.pruneArtifacts(7 * 86_400_000);
   expect(removed).toEqual([extra]);

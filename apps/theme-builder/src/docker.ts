@@ -55,7 +55,10 @@ export function demux(buf: Uint8Array): { stdout: string; stderr: string } {
     (kind === 2 ? err : out).push(frame);
     i += 8 + size;
   }
-  return { stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(err).toString("utf8") };
+  return {
+    stdout: Buffer.concat(out).toString("utf8"),
+    stderr: Buffer.concat(err).toString("utf8"),
+  };
 }
 
 export class Docker {
@@ -72,7 +75,9 @@ export class Docker {
       signal,
     });
     if (!res.ok && res.status !== 304) {
-      throw new Error(`docker ${method} ${path.split("?")[0]}: ${res.status} ${(await res.text()).slice(0, 500)}`);
+      throw new Error(
+        `docker ${method} ${path.split("?")[0]}: ${res.status} ${(await res.text()).slice(0, 500)}`,
+      );
     }
     return res;
   }
@@ -150,7 +155,9 @@ export class Docker {
         clearTimeout(timer);
       }
       const logs = new Uint8Array(
-        await (await this.#call("GET", `/containers/${id}/logs?stdout=1&stderr=1&tail=5000`)).arrayBuffer(),
+        await (
+          await this.#call("GET", `/containers/${id}/logs?stdout=1&stderr=1&tail=5000`)
+        ).arrayBuffer(),
       );
       const { stdout, stderr } = demux(logs.subarray(0, MAX_LOG * 2));
       return { exitCode, timedOut, stdout, stderr, ms: Date.now() - started };
@@ -161,8 +168,11 @@ export class Docker {
 
   /** Removes sandbox containers left over from a crash (this project's label only). */
   async cleanup(): Promise<number> {
-    const list = (await (await this.#call("GET", "/containers/json?all=1")).json()) as { Id: string }[];
-    for (const c of list) await this.#call("DELETE", `/containers/${c.Id}?force=1&v=1`).catch(() => {});
+    const list = (await (await this.#call("GET", "/containers/json?all=1")).json()) as {
+      Id: string;
+    }[];
+    for (const c of list)
+      await this.#call("DELETE", `/containers/${c.Id}?force=1&v=1`).catch(() => {});
     return list.length;
   }
 }

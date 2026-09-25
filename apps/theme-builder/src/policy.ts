@@ -98,7 +98,10 @@ export function checkCreate(body: unknown, p: Policy, name: string | null): stri
   }
   if (typeof body.User !== "string" || !/^[1-9]\d{0,5}:[1-9]\d{0,5}$/.test(body.User))
     fail("User must be a numeric non-root uid:gid");
-  if (body.WorkingDir !== undefined && !(typeof body.WorkingDir === "string" && TMPFS_PATHS.has(body.WorkingDir)))
+  if (
+    body.WorkingDir !== undefined &&
+    !(typeof body.WorkingDir === "string" && TMPFS_PATHS.has(body.WorkingDir))
+  )
     fail("WorkingDir must be /work or /tmp");
   for (const k of ["AttachStdin", "Tty", "OpenStdin"] as const)
     if (body[k] !== undefined && body[k] !== false) fail(`${k} must be false`);

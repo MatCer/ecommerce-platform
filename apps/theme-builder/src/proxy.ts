@@ -87,7 +87,9 @@ export function createProxy(policy: Policy, upstream: Upstream, log = console.lo
       return false;
     }
     const c = (await json(res)) as { Config?: { Image?: string; Labels?: Record<string, string> } };
-    return c.Config?.Image === policy.image && c.Config.Labels?.[policy.labelKey] === policy.labelValue;
+    return (
+      c.Config?.Image === policy.image && c.Config.Labels?.[policy.labelKey] === policy.labelValue
+    );
   }
 
   return http.createServer(async (req, res) => {
@@ -96,7 +98,14 @@ export function createProxy(policy: Policy, upstream: Upstream, log = console.lo
       const url = req.url ?? "/";
       const r = route(method, url);
       if (!r) {
-        log(JSON.stringify({ level: "warn", msg: "sandbox proxy refused", method, path: url.split("?")[0] }));
+        log(
+          JSON.stringify({
+            level: "warn",
+            msg: "sandbox proxy refused",
+            method,
+            path: url.split("?")[0],
+          }),
+        );
         return deny(res, 403, "not allowed by the sandbox proxy");
       }
       let body: Buffer | undefined;
@@ -145,7 +154,9 @@ if (import.meta.main) {
   const server = createProxy(policy, socketUpstream(env("DOCKER_SOCKET", "/var/run/docker.sock")));
   const port = Number(process.env.PORT ?? 2375);
   server.listen(port, () =>
-    console.log(JSON.stringify({ level: "info", msg: "sandbox proxy listening", port, image: policy.image })),
+    console.log(
+      JSON.stringify({ level: "info", msg: "sandbox proxy listening", port, image: policy.image }),
+    ),
   );
   for (const signal of ["SIGINT", "SIGTERM"] as const)
     process.on(signal, () => server.close(() => process.exit(0)));

@@ -19,7 +19,13 @@ import { type Api, type BuildSpec, type CheckSpec, type Report, runPipeline } fr
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function apiClient(origin: string, token: string): Api {
-  const call = async (tenant: string, method: string, p: string, body?: BodyInit, type?: string) => {
+  const call = async (
+    tenant: string,
+    method: string,
+    p: string,
+    body?: BodyInit,
+    type?: string,
+  ) => {
     const res = await fetch(`${origin}/internal/v1/themes/revisions/${p}`, {
       method,
       headers: {
@@ -30,7 +36,10 @@ export function apiClient(origin: string, token: string): Api {
       body,
       signal: AbortSignal.timeout(120_000),
     });
-    if (!res.ok) throw new Error(`api ${method} ${p.split("/").slice(1).join("/")}: ${res.status} ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok)
+      throw new Error(
+        `api ${method} ${p.split("/").slice(1).join("/")}: ${res.status} ${(await res.text()).slice(0, 300)}`,
+      );
     return res;
   };
   return {
@@ -40,7 +49,9 @@ export function apiClient(origin: string, token: string): Api {
       await call(t, "POST", `${r}/status`, JSON.stringify({ status, checks }), "application/json");
     },
     artifact: async (t, r, tar) =>
-      (await (await call(t, "PUT", `${r}/artifact`, new Uint8Array(tar), "application/x-tar")).json()) as CheckSpec,
+      (await (
+        await call(t, "PUT", `${r}/artifact`, new Uint8Array(tar), "application/x-tar")
+      ).json()) as CheckSpec,
     screenshot: async (t, r, name, png) => {
       await call(t, "PUT", `${r}/screenshots/${name}`, new Uint8Array(png), "image/png");
     },
@@ -66,7 +77,14 @@ export function createQueue(run: (tenant: string, revision: string) => Promise<v
     try {
       await run(item.tenant, item.revision);
     } catch (err) {
-      console.log(JSON.stringify({ level: "error", msg: "build failed", revision: item.revision, err: String(err) }));
+      console.log(
+        JSON.stringify({
+          level: "error",
+          msg: "build failed",
+          revision: item.revision,
+          err: String(err),
+        }),
+      );
     } finally {
       known.delete(item.revision);
       busy = false;
@@ -97,13 +115,19 @@ export function createServer(opts: {
     if (url.pathname === "/healthz") return Response.json({ status: "ok" });
     if (url.pathname === "/readyz") {
       const ok = await opts.ready();
-      return Response.json({ status: ok ? "ok" : "degraded", queued: opts.queue.size }, { status: ok ? 200 : 503 });
+      return Response.json(
+        { status: ok ? "ok" : "degraded", queued: opts.queue.size },
+        { status: ok ? 200 : 503 },
+      );
     }
     if (url.pathname !== "/builds") return new Response("not found", { status: 404 });
     if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
     if (!bearerOk(req.headers.get("authorization"), opts.token))
       return new Response("unauthorized", { status: 401 });
-    const body = (await req.json().catch(() => null)) as { tenant_id?: unknown; revision_id?: unknown } | null;
+    const body = (await req.json().catch(() => null)) as {
+      tenant_id?: unknown;
+      revision_id?: unknown;
+    } | null;
     const tenant = typeof body?.tenant_id === "string" ? body.tenant_id : "";
     const revision = typeof body?.revision_id === "string" ? body.revision_id : "";
     if (!UUID.test(tenant) || !UUID.test(revision))
@@ -146,13 +170,20 @@ if (import.meta.main) {
   // Leftovers of a crash: this project's sandbox containers and job directories.
   void docker
     .cleanup()
-    .then((n) => n && console.log(JSON.stringify({ level: "info", msg: "removed leftover sandboxes", n })))
+    .then(
+      (n) =>
+        n && console.log(JSON.stringify({ level: "info", msg: "removed leftover sandboxes", n })),
+    )
     .catch(() => {});
   for (const d of await readdir(workDir).catch(() => []))
     if (UUID.test(d)) await rm(path.join(workDir, d), { recursive: true, force: true });
   const port = Number(process.env.PORT ?? 4020);
   const server = serve({
-    fetch: createServer({ token: required("THEME_BUILDER_TOKEN"), queue, ready: () => docker.ping() }),
+    fetch: createServer({
+      token: required("THEME_BUILDER_TOKEN"),
+      queue,
+      ready: () => docker.ping(),
+    }),
     port,
   });
   console.log(JSON.stringify({ level: "info", msg: "theme builder listening", port }));

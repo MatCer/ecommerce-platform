@@ -83,8 +83,7 @@ async function unpack(): Promise<string[]> {
  * them (`.vite`, `.astro`) but cannot change a dependency.
  */
 async function overlay() {
-  for (const f of PLATFORM_FILES)
-    await copyFile(path.join(PLATFORM_THEME, f), path.join(THEME, f));
+  for (const f of PLATFORM_FILES) await copyFile(path.join(PLATFORM_THEME, f), path.join(THEME, f));
   const src = path.join(PLATFORM_THEME, "node_modules");
   const dst = path.join(THEME, "node_modules");
   await mkdir(dst);

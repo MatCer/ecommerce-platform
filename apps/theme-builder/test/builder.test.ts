@@ -11,6 +11,7 @@ import { demux, type SandboxSpec, type StepResult } from "../src/docker.ts";
 import {
   type Api,
   type CheckSpec,
+  errorSummary,
   parseResult,
   type Report,
   runPipeline,
@@ -35,6 +36,13 @@ test("demux splits docker's multiplexed log stream", () => {
     Buffer.concat([frame(1, "hello "), frame(2, "oops"), frame(1, "world")]),
   );
   expect([stdout, stderr]).toEqual(["hello world", "oops"]);
+});
+
+test("errorSummary keeps the error, drops stack frames", () => {
+  const log =
+    "building...\n12:00 [build] Rendering\nError: NETWORK-PROBE: blocked EAI_AGAIN\n    at probe (x.js:1:1)\n    at y (z.js:2:2)\n  Hint: see docs";
+  expect(errorSummary(log)).toBe("Error: NETWORK-PROBE: blocked EAI_AGAIN\n  Hint: see docs");
+  expect(errorSummary("a\nb")).toBe("a\nb");
 });
 
 test("parseResult takes the last @@result line", () => {
@@ -82,7 +90,9 @@ test("POST /builds needs the builder token and UUIDs", async () => {
   const added: string[] = [];
   const fetch = createServer({
     token: TOKEN,
-    queue: { add: (_t: string, r: string) => added.push(r) > 0, size: 0 } as ReturnType<typeof createQueue>,
+    queue: { add: (_t: string, r: string) => added.push(r) > 0, size: 0 } as ReturnType<
+      typeof createQueue
+    >,
     ready: async () => false,
   });
   const body = JSON.stringify({
@@ -90,9 +100,13 @@ test("POST /builds needs the builder token and UUIDs", async () => {
     revision_id: "0192f000-0000-7000-8000-000000000002",
   });
   const post = (auth: string, b = body) =>
-    fetch(new Request("http://b/builds", { method: "POST", headers: { authorization: auth }, body: b }));
+    fetch(
+      new Request("http://b/builds", { method: "POST", headers: { authorization: auth }, body: b }),
+    );
   expect((await post("Bearer wrong")).status).toBe(401);
-  expect((await post(`Bearer ${TOKEN}`, '{"tenant_id":"x","revision_id":"../y"}')).status).toBe(400);
+  expect((await post(`Bearer ${TOKEN}`, '{"tenant_id":"x","revision_id":"../y"}')).status).toBe(
+    400,
+  );
   expect((await post(`Bearer ${TOKEN}`)).status).toBe(202);
   expect(added).toEqual(["0192f000-0000-7000-8000-000000000002"]);
   expect((await fetch(new Request("http://b/readyz"))).status).toBe(503);
@@ -100,14 +114,21 @@ test("POST /builds needs the builder token and UUIDs", async () => {
 });
 
 describe("sandbox proxy", () => {
-  async function start(containers: Record<string, { Image: string; Labels: Record<string, string> }>) {
+  async function start(
+    containers: Record<string, { Image: string; Labels: Record<string, string> }>,
+  ) {
     const calls: string[] = [];
     const upstream = async (o: { method: string; path: string }) => {
       calls.push(`${o.method} ${o.path}`);
       const m = /^\/containers\/([^/]+)\/json$/.exec(o.path);
       const c = m?.[1] ? containers[m[1]] : undefined;
-      const res = Readable.from([Buffer.from(JSON.stringify(m ? { Config: c ?? {} } : { ok: true }))]) as unknown as http.IncomingMessage;
-      Object.assign(res, { statusCode: m && !c ? 404 : 200, headers: { "content-type": "application/json" } });
+      const res = Readable.from([
+        Buffer.from(JSON.stringify(m ? { Config: c ?? {} } : { ok: true })),
+      ]) as unknown as http.IncomingMessage;
+      Object.assign(res, {
+        statusCode: m && !c ? 404 : 200,
+        headers: { "content-type": "application/json" },
+      });
       return res;
     };
     const server = createProxy(
@@ -136,10 +157,18 @@ describe("sandbox proxy", () => {
       other: { Image: "postgres:17", Labels: { "com.docker.compose.project": "wp20" } },
     });
     try {
-      expect((await fetch(`${p.base}/v1.44/containers/mine/start`, { method: "POST" })).status).toBe(200);
-      expect((await fetch(`${p.base}/v1.44/containers/other/kill`, { method: "POST" })).status).toBe(404);
-      expect((await fetch(`${p.base}/v1.44/containers/other`, { method: "DELETE" })).status).toBe(404);
-      expect((await fetch(`${p.base}/v1.44/containers/mine/exec`, { method: "POST" })).status).toBe(403);
+      expect(
+        (await fetch(`${p.base}/v1.44/containers/mine/start`, { method: "POST" })).status,
+      ).toBe(200);
+      expect(
+        (await fetch(`${p.base}/v1.44/containers/other/kill`, { method: "POST" })).status,
+      ).toBe(404);
+      expect((await fetch(`${p.base}/v1.44/containers/other`, { method: "DELETE" })).status).toBe(
+        404,
+      );
+      expect((await fetch(`${p.base}/v1.44/containers/mine/exec`, { method: "POST" })).status).toBe(
+        403,
+      );
       const bad = await fetch(`${p.base}/v1.44/containers/create`, {
         method: "POST",
         body: JSON.stringify({ Image: "img:local", HostConfig: { Privileged: true } }),
@@ -160,7 +189,9 @@ describe("sandbox proxy", () => {
 
 describe("pipeline", () => {
   /** A fake API + docker that record what the builder does. */
-  async function harness(steps: Record<string, (s: SandboxSpec, work: string) => Promise<Partial<StepResult>>>) {
+  async function harness(
+    steps: Record<string, (s: SandboxSpec, work: string) => Promise<Partial<StepResult>>>,
+  ) {
     const workDir = await mkdtemp(path.join(tmpdir(), "wp23-work-"));
     const statuses: [string, Report][] = [];
     const uploads: string[] = [];
@@ -181,7 +212,12 @@ describe("pipeline", () => {
       },
       artifact: async (_t, _r, tar): Promise<CheckSpec> => {
         uploads.push(`artifact ${tar.length > 0}`);
-        return { artifact_id: "x", preview_host: "preview-2--demo.localhost", preview_token: "tok", pages: ["/"] };
+        return {
+          artifact_id: "x",
+          preview_host: "preview-2--demo.localhost",
+          preview_token: "tok",
+          pages: ["/"],
+        };
       },
       screenshot: async (_t, _r, name) => {
         uploads.push(`shot ${name}`);
@@ -197,7 +233,15 @@ describe("pipeline", () => {
     };
     const run = () =>
       runPipeline(
-        { docker, api, workDir, checkNetwork: "net", proxyHost: "caddy", lighthouseRuns: 1, log: () => {} },
+        {
+          docker,
+          api,
+          workDir,
+          checkNetwork: "net",
+          proxyHost: "caddy",
+          lighthouseRuns: 1,
+          log: () => {},
+        },
         "t",
         revision,
       );
@@ -215,27 +259,38 @@ describe("pipeline", () => {
     const [first, last] = [h.statuses[0], h.statuses.at(-1)];
     expect(first?.[0]).toBe("building");
     expect(last?.[0]).toBe("failed");
-    expect(last?.[1].failures).toEqual(["lint: src/x.astro:2 foreign-fetch: fetch to another origin"]);
+    expect(last?.[1].failures).toEqual([
+      "lint: src/x.astro:2 foreign-fetch: fetch to another origin",
+    ]);
     expect(h.specs.map((s) => [s.step, s.network])).toEqual([["static", "none"]]);
     expect(h.uploads).toEqual([]);
   });
 
   test("a failing build reports its log (e.g. blocked network)", async () => {
     const h = await harness({
-      static: async () => ({ stdout: '@@result {"violations":[],"typecheck":{"ok":true,"ms":1,"log":""},"checks":[]}' }),
-      build: async () => ({ exitCode: 1, stderr: "TypeError: fetch failed (getaddrinfo EAI_AGAIN example.com)" }),
+      static: async () => ({
+        stdout: '@@result {"violations":[],"typecheck":{"ok":true,"ms":1,"log":""},"checks":[]}',
+      }),
+      build: async () => ({
+        exitCode: 1,
+        stderr: "TypeError: fetch failed (getaddrinfo EAI_AGAIN example.com)",
+      }),
     });
     await h.run();
     const last = h.statuses.at(-1);
     expect(last?.[0]).toBe("failed");
     expect(last?.[1].failures[0]).toContain("EAI_AGAIN");
     expect(h.specs.find((s) => s.step === "build")?.network).toBe("none");
-    expect(h.specs.find((s) => s.step === "build")?.env.ASTRO_KEY).toBe(Buffer.alloc(32).toString("base64"));
+    expect(h.specs.find((s) => s.step === "build")?.env.ASTRO_KEY).toBe(
+      Buffer.alloc(32).toString("base64"),
+    );
   });
 
   test("a build whose output is a symlink is refused", async () => {
     const h = await harness({
-      static: async () => ({ stdout: '@@result {"violations":[],"typecheck":{"ok":true,"ms":1,"log":""},"checks":[]}' }),
+      static: async () => ({
+        stdout: '@@result {"violations":[],"typecheck":{"ok":true,"ms":1,"log":""},"checks":[]}',
+      }),
       build: async (s, work) => {
         const out = path.join(work, s.job, "out/build");
         await symlink("/etc", path.join(out, "artifacts"));
@@ -250,7 +305,8 @@ describe("pipeline", () => {
   test("happy path: verified artifact, budgets, smoke, screenshots → ready", async () => {
     const h = await harness({
       static: async () => ({
-        stdout: '@@result {"violations":[],"typecheck":{"ok":true,"ms":5,"log":""},"checks":["checks/buy.spec.ts"]}',
+        stdout:
+          '@@result {"violations":[],"typecheck":{"ok":true,"ms":5,"log":""},"checks":["checks/buy.spec.ts"]}',
       }),
       build: async (s, work) => {
         // A real (tiny) Astro-shaped build, packed like the sandbox does.
@@ -285,7 +341,10 @@ describe("pipeline", () => {
           subrequests: 2,
         };
         await writeFile(path.join(out, "report.json"), JSON.stringify({ results: [page] }));
-        await writeFile(path.join(out, "result.json"), JSON.stringify({ smoke: { ok: true, log: "" } }));
+        await writeFile(
+          path.join(out, "result.json"),
+          JSON.stringify({ smoke: { ok: true, log: "" } }),
+        );
         await mkdir(path.join(out, "shots"));
         await writeFile(path.join(out, "shots/home-mobile.png"), "png");
         expect(s.env.PREVIEW_COOKIE).toBe("__Host-preview=tok");
@@ -324,14 +383,35 @@ describe("pipeline", () => {
         await mkdir(path.join(dist, "server"), { recursive: true });
         await mkdir(path.join(dist, "client"), { recursive: true });
         await writeFile(path.join(dist, "server/entry.mjs"), "export default {}");
-        const m = await packArtifact({ dist, outRoot: path.join(work, s.job, "out/build/artifacts"), kind: "theme", projectDir: THEME });
+        const m = await packArtifact({
+          dist,
+          outRoot: path.join(work, s.job, "out/build/artifacts"),
+          kind: "theme",
+          projectDir: THEME,
+        });
         return { stdout: `@@result {"ok":true,"artifact_id":"${m.id}"}` };
       },
       check: async (s, work) => {
         const out = path.join(work, s.job, "out/check");
-        const page = { path: "/p/x", kind: "product", lcpMs: 1200, tbtMs: 0, cls: 0, jsGzip: 60_000, jsTransfer: 1, jsGzipWithRum: 61_000, thirdPartyOrigins: [], axe: [], cspViolations: [], subrequests: 2 };
+        const page = {
+          path: "/p/x",
+          kind: "product",
+          lcpMs: 1200,
+          tbtMs: 0,
+          cls: 0,
+          jsGzip: 60_000,
+          jsTransfer: 1,
+          jsGzipWithRum: 61_000,
+          thirdPartyOrigins: [],
+          axe: [],
+          cspViolations: [],
+          subrequests: 2,
+        };
         await writeFile(path.join(out, "report.json"), JSON.stringify({ results: [page] }));
-        await writeFile(path.join(out, "result.json"), JSON.stringify({ smoke: { ok: true, log: "" } }));
+        await writeFile(
+          path.join(out, "result.json"),
+          JSON.stringify({ smoke: { ok: true, log: "" } }),
+        );
         return {};
       },
     });

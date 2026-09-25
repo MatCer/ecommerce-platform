@@ -72,7 +72,10 @@ describe("sandbox create policy (A6)", () => {
     ["capabilities", (b) => (b.HostConfig.CapDrop = [])],
     ["cap add", (b) => Object.assign(b.HostConfig, { CapAdd: ["SYS_ADMIN"] })],
     ["new privileges", (b) => (b.HostConfig.SecurityOpt = [])],
-    ["seccomp off", (b) => (b.HostConfig.SecurityOpt = ["no-new-privileges", "seccomp=unconfined"])],
+    [
+      "seccomp off",
+      (b) => (b.HostConfig.SecurityOpt = ["no-new-privileges", "seccomp=unconfined"]),
+    ],
     ["bind mount", (b) => Object.assign(b.HostConfig, { Binds: ["/var/run/docker.sock:/s"] })],
     ["pid host", (b) => Object.assign(b.HostConfig, { PidMode: "host" })],
     ["devices", (b) => Object.assign(b.HostConfig, { Devices: [{ PathOnHost: "/dev/sda" }] })],
@@ -81,11 +84,30 @@ describe("sandbox create policy (A6)", () => {
     ["too many pids", (b) => (b.HostConfig.PidsLimit = 100_000)],
     ["no cpu limit", (b) => (b.HostConfig.NanoCpus = 0)],
     ["exec tmpfs", (b) => (b.HostConfig.Tmpfs["/work"] = "rw,size=1g")],
-    ["tmpfs elsewhere", (b) => Object.assign(b.HostConfig.Tmpfs, { "/etc": "rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700" })],
-    ["other volume", (b) => ((b.HostConfig.Mounts[0] as { Source: string }).Source = "wp20_pg-data")],
+    [
+      "tmpfs elsewhere",
+      (b) =>
+        Object.assign(b.HostConfig.Tmpfs, {
+          "/etc": "rw,noexec,nosuid,nodev,size=1m,uid=1000,gid=1000,mode=0700",
+        }),
+    ],
+    [
+      "other volume",
+      (b) => ((b.HostConfig.Mounts[0] as { Source: string }).Source = "wp20_pg-data"),
+    ],
     ["bind type", (b) => ((b.HostConfig.Mounts[0] as { Type: string }).Type = "bind")],
-    ["subpath escape", (b) => ((b.HostConfig.Mounts[1] as { VolumeOptions: { Subpath: string } }).VolumeOptions.Subpath = "../x/out/build")],
-    ["whole volume", (b) => ((b.HostConfig.Mounts[1] as { VolumeOptions: { Subpath: string } }).VolumeOptions.Subpath = "")],
+    [
+      "subpath escape",
+      (b) =>
+        ((b.HostConfig.Mounts[1] as { VolumeOptions: { Subpath: string } }).VolumeOptions.Subpath =
+          "../x/out/build"),
+    ],
+    [
+      "whole volume",
+      (b) =>
+        ((b.HostConfig.Mounts[1] as { VolumeOptions: { Subpath: string } }).VolumeOptions.Subpath =
+          ""),
+    ],
     ["writable input", (b) => Object.assign(b.HostConfig.Mounts[0] as object, { ReadOnly: false })],
     ["input at /out", (b) => ((b.HostConfig.Mounts[0] as { Target: string }).Target = "/out")],
     ["secret env", (b) => b.Env.push("THEME_BUILDER_TOKEN=x")],
@@ -110,7 +132,11 @@ describe("sandbox create policy (A6)", () => {
 describe("routes", () => {
   test("only the sandbox calls", () => {
     expect(route("POST", "/v1.44/containers/create?name=x")).toEqual({ kind: "create", name: "x" });
-    expect(route("POST", "/containers/abc/start")).toEqual({ kind: "container", id: "abc", action: "start" });
+    expect(route("POST", "/containers/abc/start")).toEqual({
+      kind: "container",
+      id: "abc",
+      action: "start",
+    });
     expect(route("GET", "/v1.44/containers/abc/logs?stdout=1")).toMatchObject({ action: "logs" });
     expect(route("DELETE", "/containers/abc?force=1")).toMatchObject({ action: "remove" });
     expect(route("GET", "/containers/json")).toEqual({ kind: "list" });
@@ -135,10 +161,12 @@ describe("routes", () => {
 
   test("queries are rebuilt from an allowlist; lists are always filtered", () => {
     const list = route("GET", "/containers/json?filters={}") ?? { kind: "ping" as const };
-    expect(decodeURIComponent(safeQuery(list, "/containers/json?all=1&filters={}", policy))).toContain(
-      '"label":["platform.theme-sandbox=wp23"]',
-    );
+    expect(
+      decodeURIComponent(safeQuery(list, "/containers/json?all=1&filters={}", policy)),
+    ).toContain('"label":["platform.theme-sandbox=wp23"]');
     const logs = route("GET", "/containers/a/logs") ?? { kind: "ping" as const };
-    expect(safeQuery(logs, "/containers/a/logs?stdout=1&follow=1&since=x", policy)).toBe("?stdout=1");
+    expect(safeQuery(logs, "/containers/a/logs?stdout=1&follow=1&since=x", policy)).toBe(
+      "?stdout=1",
+    );
   });
 });
