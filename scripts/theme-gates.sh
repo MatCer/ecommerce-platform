@@ -18,7 +18,7 @@ kit="$repo/packages/theme-kit/src"
 step() { printf '\n== %s\n' "$1"; }
 
 step "contract lint"
-node "$kit/cli.ts" lint "$theme" --reference "$repo/themes/default/package.json"
+node "$kit/cli.ts" lint "$theme" --reference "$repo/themes/default"
 step "astro check"
 (cd "$theme" && node_modules/.bin/astro check --minimumSeverity error | tail -3)
 step "astro build"
