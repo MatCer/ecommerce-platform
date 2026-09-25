@@ -51,6 +51,7 @@ test("flags foreign fetch, set:html on arbitrary data, inline handlers, cookies 
       '---\nconst r = await fetch("https://tracker.example/x");\n---',
       "<div set:html={Astro.url.searchParams.get('x')} />",
       '<button onclick="alert(1)">x</button>',
+      '<RecentlyViewed client:visible />',
       "<script>document.cookie = 'a=1'</script>",
     ].join("\n"),
   );
@@ -65,6 +66,7 @@ test("flags foreign fetch, set:html on arbitrary data, inline handlers, cookies 
       "set-html",
       "inline-handler",
       "cookie-access",
+      "client-visible",
       "locked-deps",
     ]),
   );
