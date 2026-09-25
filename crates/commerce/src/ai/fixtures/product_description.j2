@@ -1,0 +1,9 @@
+{#- Fake provider: a deterministic product description from the request data. -#}
+{%- set p = data.product -%}
+{%- set intro = ({"cs": "ukázkový popis od demo AI", "sk": "ukážkový popis od demo AI"}[data.locale] | default("sample description by the demo AI")) -%}
+{%- set html -%}
+<p><strong>{{ p.name }}</strong>{% if p.brand %} ({{ p.brand }}){% endif %}: {{ intro }} ({{ data.tone }}, {{ data.length }}).</p>
+{%- if p.parameters %}<ul>{% for x in p.parameters %}<li>{{ x.name }}: {{ x.value }}</li>{% endfor %}</ul>{% endif %}
+{%- if p.safety_info %}<p>{{ p.safety_info }}</p>{% endif %}
+{%- endset -%}
+{"description_html": {{ html | tojson }}, "short_description": {{ (p.name ~ ": " ~ intro ~ ".") | tojson }}}

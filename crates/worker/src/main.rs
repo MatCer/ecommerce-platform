@@ -83,10 +83,12 @@ async fn main() -> anyhow::Result<()> {
         edge: platform::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
         fetch,
         urls,
+        ai: commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?,
         webhooks,
         fio: fio_poller(env, &ops)?,
         ads,
     };
+    tracing::info!(provider = extra.ai.provider(), "AI helpers");
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
     if let Some(bind) = ops.metrics_bind {

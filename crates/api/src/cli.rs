@@ -69,6 +69,15 @@ pub enum AdminCommand {
         #[arg(long)]
         note: Option<String>,
     },
+    /// Override a tenant's monthly AI token allowance (spec §12.1); without `--tokens` the
+    /// override is removed and the plan default (AI_PLAN_QUOTAS) applies again.
+    SetAiQuota {
+        /// Tenant slug.
+        #[arg(long)]
+        tenant: String,
+        #[arg(long)]
+        tokens: Option<i64>,
+    },
     /// Upload packed artifacts (`theme-kit pack` output under `--root`) to the private bucket,
     /// register them, publish the theme as the default for every tenant following it and set
     /// the checkout artifact (spec A22, A30). Then purges the edge.
@@ -142,6 +151,9 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
     {
         return suppress_email(db, tenant, email, reason, note.as_deref()).await;
     }
+    if let AdminCommand::SetAiQuota { tenant, tokens } = &cmd {
+        return set_ai_quota(db, tenant, *tokens).await;
+    }
     match &cmd {
         AdminCommand::Reindex { tenant } => return reindex(db, tenant.as_deref()).await,
         AdminCommand::DeadJobs { kind, limit } => {
@@ -180,7 +192,8 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
         | AdminCommand::SuppressEmail { .. }
         | AdminCommand::Reindex { .. }
         | AdminCommand::DeadJobs { .. }
-        | AdminCommand::RequeueJob { .. } => Ok(()),
+        | AdminCommand::RequeueJob { .. }
+        | AdminCommand::SetAiQuota { .. } => Ok(()),
         AdminCommand::AddDomain {
             tenant,
             host,
@@ -266,6 +279,32 @@ async fn suppress_email(
     print_json(
         &json!({ "tenant": tenant, "suppressed": email.trim().to_lowercase(), "reason": reason }),
     )
+}
+
+async fn set_ai_quota(db: &PgPool, tenant: &str, tokens: Option<i64>) -> anyhow::Result<()> {
+    if tokens.is_some_and(|t| t < 0) {
+        bail!("--tokens must be 0 or more");
+    }
+    let tenant_id = sqlx::query_scalar!(
+        "UPDATE platform.tenants SET ai_monthly_tokens = $2 WHERE slug = $1 RETURNING id",
+        tenant,
+        tokens
+    )
+    .fetch_optional(db)
+    .await?
+    .with_context(|| format!("no tenant {tenant:?}"))?;
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    commerce::audit::record(
+        &mut tx,
+        commerce::audit::PLATFORM_ACTOR,
+        "ai.quota.set",
+        "tenant",
+        Some(&tenant_id.to_string()),
+        &json!({ "ai_monthly_tokens": tokens }),
+    )
+    .await?;
+    tx.commit().await?;
+    print_json(&json!({ "tenant": tenant, "ai_monthly_tokens": tokens }))
 }
 
 async fn seed_demo(db: &PgPool, env: &CliEnv, owner_email: &str) -> anyhow::Result<()> {

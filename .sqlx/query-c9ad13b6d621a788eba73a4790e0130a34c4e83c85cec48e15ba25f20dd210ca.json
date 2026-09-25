@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH RECURSIVE sub AS (\n                   SELECT id FROM categories WHERE id = ANY($1)\n                   UNION SELECT c.id FROM categories c JOIN sub ON c.parent_id = sub.id)\n               SELECT id AS \"id!\" FROM sub",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c9ad13b6d621a788eba73a4790e0130a34c4e83c85cec48e15ba25f20dd210ca"
+}

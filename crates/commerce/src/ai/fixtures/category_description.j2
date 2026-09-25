@@ -1,0 +1,8 @@
+{#- Fake provider: a deterministic category description from the request data. -#}
+{%- set c = data.category -%}
+{%- set intro = ({"cs": "ukázkový popis kategorie od demo AI", "sk": "ukážkový popis kategórie od demo AI"}[data.locale] | default("sample category description by the demo AI")) -%}
+{%- set html -%}
+<p><strong>{{ c.name }}</strong>: {{ intro }} ({{ data.tone }}, {{ data.length }}).</p>
+{%- if c.products %}<ul>{% for n in c.products[:5] %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+{%- endset -%}
+{"description_html": {{ html | tojson }}}

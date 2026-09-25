@@ -5,6 +5,7 @@
 //! tenant transaction (spec A8).
 
 pub mod adtracking;
+pub mod ai;
 pub mod analytics;
 pub mod audit;
 pub mod capability;

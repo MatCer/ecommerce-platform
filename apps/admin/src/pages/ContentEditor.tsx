@@ -2,6 +2,7 @@ import { Button, SelectField, showToast, Tabs, TextField } from "@platform/ui";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { AiPanel } from "../components/AiPanel.tsx";
 import { BlockEditor } from "../components/BlockEditor.tsx";
 import { ContentAsset } from "../components/ContentAsset.tsx";
 import { DateTimeField } from "../components/DateTimeField.tsx";
@@ -209,6 +210,20 @@ export default function ContentEditor() {
           {t("common.save")}
         </Button>
       </div>
+      <Show when={params.id}>
+        {(id) => (
+          <AiPanel
+            entityType="page"
+            entityId={id()}
+            locale={locale()}
+            onAccepted={() => {
+              setLoaded("");
+              void page.refetch();
+            }}
+            acceptHint={t("ai.unsavedHint")}
+          />
+        )}
+      </Show>
     </form>
   );
   return (
