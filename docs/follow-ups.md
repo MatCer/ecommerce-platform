@@ -26,3 +26,5 @@
 | WP6 | Catalog/content changes do not purge the edge; HTML ages out by `cache.max_age` (60 s) | WP13 |
 | WP6 | Locale prefixes inside one market (`/en/...`) are not routed; one locale per market host | WP8 |
 | WP6 | The probe theme does not render the second card image (it would compete with the LCP) | WP8 |
+| WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
+| WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart) | WP10 |
