@@ -12,5 +12,9 @@
 | WP2 | JS headroom on PDP is 0.8 kB with RUM sampled; keep islands lean | WP8 |
 | WP3 | Assets stuck in `processing` after the final lease-timeout death → needs a dead-job sweeper | WP14 |
 | WP3 | Abandoned uploads / reused presigned URLs never cleaned up | WP14 |
-| WP3 | Staff management API (the smoke uses psql) | WP5 |
-| WP3 | Product list search unindexed (pg_trgm) | WP5 |
+| WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
+| WP4 | Price history returns the full timeline per variant (no pagination) | later |
+| WP4 | Allocations are not yet persisted on order lines/charges | WP10 |
+| WP5 | The staff invite email is sent before the membership commits (not via the outbox) | WP9 (mail core) |
+| WP5 | No invitation-accepted status in the staff list | WP15 |
+| WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
