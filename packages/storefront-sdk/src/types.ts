@@ -112,3 +112,20 @@ export type SignInResult = S["SignInResult"];
 export type ConsentChoice = S["ConsentChoice"];
 export type ConsentState = S["ConsentState"];
 export type ConsentPurposes = S["Purposes"];
+
+/** Checkout origin only (WP10): the one-page checkout, the order page, account orders. */
+export type CheckoutView = S["CheckoutView"];
+export type CheckoutAddress = S["CheckoutAddress"];
+export type ShippingOption = S["ShippingOption"];
+export type PaymentOption = S["PaymentOption"];
+export type PaymentMethodKind = S["MethodKind"];
+export type PickupPoint = S["PickupPoint"];
+export type PacketaWidget = S["PacketaWidget"];
+export type PlaceOrderInput = S["PlaceOrderInput"];
+export type PlacedOrder = S["PlacedOrder"];
+export type PaymentStart = S["PaymentStart"];
+export type NextAction = S["NextAction"];
+export type Order = S["OrderView"];
+export type OrderPayment = S["PaymentView"];
+export type OrderSummary = S["OrderSummary"];
+export type OrderPage = S["OrderPage"];

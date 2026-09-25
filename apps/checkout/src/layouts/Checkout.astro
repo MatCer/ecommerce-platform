@@ -8,8 +8,11 @@ interface Props {
   lang?: string;
   /** Localized "My account" (from the shop's messages). */
   accountLabel?: string;
+  /** The two-column checkout needs more room than the account pages. */
+  wide?: boolean;
 }
-const { title, shopName, shopUrl, lang = "cs", accountLabel = "Můj účet" } = Astro.props;
+const { title, shopName, shopUrl, lang = "cs", accountLabel = "Můj účet", wide = false } = Astro.props;
+const width = wide ? "max-w-5xl" : "max-w-3xl";
 ---
 
 <!doctype html>
@@ -24,17 +27,17 @@ const { title, shopName, shopUrl, lang = "cs", accountLabel = "Můj účet" } = 
   </head>
   <body class="min-h-dvh">
     <header class="border-b border-border bg-card">
-      <div class="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
+      <div class:list={["mx-auto flex h-14 items-center justify-between px-4", width]}>
         <a href={shopUrl} class="font-display font-extrabold">{shopName}</a>
         <nav aria-label={accountLabel} class="flex gap-4 text-sm">
           <a href="/account" class="underline-offset-4 hover:underline">{accountLabel}</a>
         </nav>
       </div>
     </header>
-    <main class="mx-auto max-w-3xl px-4 py-6">
+    <main class:list={["mx-auto px-4 py-6", width]}>
       <slot />
     </main>
-    <footer class="mx-auto max-w-3xl px-4 py-6 text-sm text-muted-foreground">
+    <footer class:list={["mx-auto px-4 py-6 text-sm text-muted-foreground", width]}>
       <a href="/withdraw" class="underline">Odstoupení od smlouvy</a>
     </footer>
   </body>

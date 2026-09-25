@@ -1,0 +1,42 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import OrderDetails from "../../../components/OrderDetails.astro";
+import Checkout from "../../../layouts/Checkout.astro";
+import { checkoutApi, shopUrl } from "../../../lib/api";
+
+// One of the signed-in customer's orders (placed signed in, or linked after verification, A5).
+const api = checkoutApi(Astro.request);
+const id = Astro.params.id ?? "";
+const [shop, me] = await Promise.all([api.shop(), api.me()]);
+if (!me) return Astro.redirect(`/account?next=/account/orders/${encodeURIComponent(id)}`);
+const order = await api.customerOrder(id);
+if (!order) Astro.response.status = 404;
+const m = shop?.messages ?? {};
+---
+
+<Checkout
+  title={order ? t(m, "order.title", { number: order.number }) : t(m, "account.orders")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+  wide
+>
+  <div class="grid gap-4">
+    <a href="/account" class="text-sm text-identity-ink underline">← {t(m, "account.back")}</a>
+    {
+      order ? (
+        <>
+          <h1 class="font-display text-2xl font-bold">{t(m, "order.title", { number: order.number })}</h1>
+          <p class="text-sm">
+            {t(m, "order.status")}: <strong>{t(m, `order.status.${order.status}`)}</strong> ·{" "}
+            {t(m, "order.payment")}: <strong>{t(m, `order.payment_status.${order.payment.status}`)}</strong>
+          </p>
+          <OrderDetails order={order} m={m} />
+        </>
+      ) : (
+        <p>{t(m, "account.orders_empty")}</p>
+      )
+    }
+  </div>
+</Checkout>

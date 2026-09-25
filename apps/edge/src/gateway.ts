@@ -1154,8 +1154,10 @@ ${
     });
     for (const [k, v] of Object.entries(securityHeaders("checkout", csp))) headers.set(k, v);
     headers.set("cache-control", "no-store");
-    // A sign-in link (`/account/verify?token=`) must not leak through Referer.
-    if (url.searchParams.has("token")) headers.set("referrer-policy", "no-referrer");
+    // A sign-in link (`/account/verify?token=`) or an order page (`/o/<token>`, A4) must not
+    // leak its capability through Referer.
+    if (url.searchParams.has("token") || url.pathname.startsWith("/o/"))
+      headers.set("referrer-policy", "no-referrer");
     return new Response(req.method === "HEAD" ? null : r.body, { status: r.status, headers });
   }
 

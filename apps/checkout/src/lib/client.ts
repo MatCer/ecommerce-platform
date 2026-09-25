@@ -15,12 +15,16 @@ export async function call<T = unknown>(
   method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Result<T>> {
   try {
     const res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? {} : { "content-type": "application/json" },
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+        ...extraHeaders,
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();

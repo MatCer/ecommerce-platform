@@ -1,0 +1,94 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import type { Order } from "@platform/storefront-sdk/types";
+
+/** An order's lines, totals, delivery, addresses and payment (order page, account). */
+interface Props {
+  order: Order;
+  m: Record<string, string>;
+}
+const { order: o, m } = Astro.props;
+const charge = (kind: string) => o.charges.find((c) => c.kind === kind);
+const payment = charge("payment_fee");
+const addresses = [
+  { key: "order.billing_address", a: o.billing_address },
+  { key: "order.shipping_address", a: o.shipping_address },
+].filter((x) => x.a);
+const card = "rounded-lg border border-border bg-card p-4";
+---
+
+<div class="grid gap-4 md:grid-cols-[1fr_18rem] md:items-start">
+  <section aria-labelledby="order-items" class={card}>
+    <h2 id="order-items" class="mb-3 font-display text-lg font-bold">{t(m, "order.items")}</h2>
+    <ul class="grid gap-2 text-sm">
+      {
+        o.lines.map((l) => (
+          <li class="flex justify-between gap-2">
+            <span>
+              {l.quantity}× {l.name}
+              {l.options_label && <span class="text-muted-foreground"> ({l.options_label})</span>}
+            </span>
+            <span class="tabular-nums">{l.total.formatted}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <dl class="mt-3 grid gap-1 border-t border-border pt-3 text-sm">
+      <div class="flex justify-between"><dt>{t(m, "checkout.subtotal")}</dt><dd class="tabular-nums">{o.subtotal.formatted}</dd></div>
+      {
+        o.discount.amount_minor > 0 && (
+          <div class="flex justify-between text-sale">
+            <dt>{t(m, "cart.discount")}{o.coupon_code && ` (${o.coupon_code})`}</dt>
+            <dd class="tabular-nums">−{o.discount.formatted}</dd>
+          </div>
+        )
+      }
+      <div class="flex justify-between"><dt>{t(m, "checkout.shipping")}</dt><dd class="tabular-nums">{o.shipping_total.formatted}</dd></div>
+      {
+        payment && (
+          <div class="flex justify-between"><dt>{t(m, "checkout.payment_fee")}</dt><dd class="tabular-nums">{payment.total.formatted}</dd></div>
+        )
+      }
+      {
+        o.vat.map((r) => (
+          <div class="flex justify-between text-muted-foreground">
+            <dt>{t(m, "checkout.vat", { rate: r.rate })}</dt>
+            <dd class="tabular-nums">{r.vat.formatted}</dd>
+          </div>
+        ))
+      }
+      <div class="mt-1 flex justify-between border-t border-border pt-2 text-base font-bold">
+        <dt>{t(m, "order.total")}</dt><dd class="tabular-nums" data-testid="order-total">{o.total.formatted}</dd>
+      </div>
+    </dl>
+  </section>
+  <div class="grid gap-4">
+    <section aria-labelledby="order-delivery" class={card}>
+      <h2 id="order-delivery" class="mb-2 font-display text-lg font-bold">{t(m, "order.delivery")}</h2>
+      <p class="text-sm">{o.shipping.name}</p>
+      {
+        o.shipping.pickup_point && (
+          <p class="mt-1 text-sm" data-testid="order-pickup-point">
+            <span class="font-semibold">{t(m, "order.pickup_point")}:</span> {o.shipping.pickup_point.name},{" "}
+            {o.shipping.pickup_point.street}, {o.shipping.pickup_point.zip} {o.shipping.pickup_point.city}
+          </p>
+        )
+      }
+      <h2 class="mt-3 mb-1 font-display text-base font-bold">{t(m, "order.payment")}</h2>
+      <p class="text-sm">{t(m, `payment.${o.payment.method}`)}</p>
+    </section>
+    {
+      addresses.map(({ key, a }) => (
+        <section class={card}>
+          <h2 class="mb-2 font-display text-base font-bold">{t(m, key)}</h2>
+          <address class="text-sm not-italic">
+            {a?.name}<br />
+            {a?.company && (<>{a.company}<br /></>)}
+            {a?.street}<br />
+            {a?.postal_code} {a?.city}, {a?.country}
+          </address>
+        </section>
+      ))
+    }
+  </div>
+</div>
