@@ -1,0 +1,26 @@
+{#- Skeleton for order emails (WP10-12): a template extends it and fills `intro` (and
+    optionally `after_summary`); the order summary comes from `order`:
+    {number, lines: [{name, detail, quantity, total}], totals: [{label, amount}], total, url}. -#}
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{% block heading %}{{ t("order.heading", number=order.number) }}{% endblock %}</mj-text>
+{% block intro %}{% endblock %}
+        <mj-table font-size="14px" color="{{ brand.colors.ink }}" padding="12px 0" cellpadding="6px">
+          <tr style="border-bottom: 1px solid #e1e4e8; text-align: left;">
+            <th>{{ t("order.item") }}</th><th style="text-align: right;">{{ t("order.quantity") }}</th><th style="text-align: right;">{{ t("order.price") }}</th>
+          </tr>
+{%- for line in order.lines %}
+          <tr style="border-bottom: 1px solid #e1e4e8;">
+            <td>{{ line.name }}{% if line.detail %}<br /><span style="color: {{ brand.colors.muted }};">{{ line.detail }}</span>{% endif %}</td>
+            <td style="text-align: right;">{{ line.quantity }}</td>
+            <td style="text-align: right; white-space: nowrap;">{{ line.total }}</td>
+          </tr>
+{%- endfor %}
+{%- for row in order.totals %}
+          <tr><td colspan="2">{{ row.label }}</td><td style="text-align: right; white-space: nowrap;">{{ row.amount }}</td></tr>
+{%- endfor %}
+          <tr style="font-weight: 700;"><td colspan="2">{{ t("order.total") }}</td><td style="text-align: right; white-space: nowrap;">{{ order.total }}</td></tr>
+        </mj-table>
+{% block after_summary %}{% endblock %}
+        <mj-button href="{{ order.url }}">{{ t("order.button") }}</mj-button>
+{% endblock %}

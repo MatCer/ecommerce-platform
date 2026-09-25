@@ -51,6 +51,11 @@ impl FakeSmtp {
         format!("smtp://{}", self.addr)
     }
 
+    /// A mailer whose both streams point at this server.
+    pub fn mailer(&self) -> platform::mail::Mailer {
+        mailer_for(&self.url())
+    }
+
     pub fn set_mode(&self, mode: Mode) {
         *self.mode.lock().unwrap() = mode;
     }
@@ -113,4 +118,21 @@ impl FakeSmtp {
             write.write_all(reply).await?;
         }
     }
+}
+
+/// A mailer for `url` (both streams), e.g. `smtp://127.0.0.1:1` for an unreachable server.
+pub fn mailer_for(url: &str) -> platform::mail::Mailer {
+    let cfg = platform::mail::MailConfig::from_lookup(&|k| {
+        Some(
+            match k {
+                "MAIL_TRANSACTIONAL_SMTP_URL" | "MAIL_MARKETING_SMTP_URL" => url,
+                "MAIL_TRANSACTIONAL_FROM" => "shop@mail.test",
+                "MAIL_MARKETING_FROM" => "news@mail.test",
+                _ => return None,
+            }
+            .to_owned(),
+        )
+    })
+    .unwrap();
+    platform::mail::Mailer::new(&cfg).unwrap()
 }
