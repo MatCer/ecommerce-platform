@@ -136,7 +136,9 @@ test("price-drop watch form works without JavaScript and asks for confirmation",
   await watch.getByLabel("E-mail").fill(email);
   await watch.getByRole("button", { name: "Hlídat" }).click();
   await expect(shopper).toHaveURL(/[?&]watch=ok#watch$/);
-  await expect(shopper.getByRole("status")).toContainText("poslali jsme na ni e-mail s potvrzovacím odkazem");
+  await expect(shopper.getByRole("status")).toContainText(
+    "poslali jsme na ni e-mail s potvrzovacím odkazem",
+  );
   expect(
     sql(`SELECT kind || ':' || target_minor || ':' || status FROM flow_watches
       WHERE email='${email}'`),
