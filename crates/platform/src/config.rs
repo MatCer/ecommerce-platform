@@ -682,3 +682,149 @@ mod auth_service_config_tests {
         ));
     }
 }
+
+/// Which model provider serves the AI helpers.
+#[derive(Clone, PartialEq, Eq)]
+pub enum AiProvider {
+    /// The Anthropic Messages API with this key.
+    Anthropic { api_key: String },
+    /// Deterministic fixtures (tests, local stacks without a key; never with `APP_ENV=prod`).
+    Fake,
+    /// No key in production: AI endpoints answer `503 ai_unavailable`.
+    Disabled,
+}
+
+/// AI gateway (spec D21, §12.1). Not `Debug`: holds the API key.
+#[derive(Clone)]
+pub struct AiConfig {
+    /// `ANTHROPIC_API_KEY` set: Anthropic. Unset: the fake provider, or `Disabled` with
+    /// `APP_ENV=prod` (fixture text must never reach a real shop).
+    pub provider: AiProvider,
+    /// `ANTHROPIC_BASE_URL`, default `https://api.anthropic.com/`.
+    pub base_url: Url,
+    /// `AI_HELPER_MODEL`, default `claude-sonnet-5` (admin helpers, bulk plans).
+    pub helper_model: String,
+    /// `AI_THEME_MODEL`, default `claude-opus-5-5` (AI theme editing, WP24).
+    pub theme_model: String,
+    /// `AI_TIMEOUT_SECS` per attempt, default 90.
+    pub timeout: std::time::Duration,
+    /// `AI_MAX_RETRIES` on 408/429/5xx/529 and network errors, default 2.
+    pub max_retries: u32,
+    /// `AI_PRICES`: `model=input:output;...` USD per MTok over the built-in list prices.
+    pub prices: crate::ai::PriceTable,
+    /// `AI_PLAN_QUOTAS`: `plan=tokens;...` monthly tokens per tenant plan, default
+    /// `standard=2000000`. Plans not listed get the `standard` quota.
+    pub plan_quotas: std::collections::BTreeMap<String, i64>,
+}
+
+impl AiConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let env: AppEnv = parsed(lookup, "APP_ENV", AppEnv::Prod)?;
+        let provider = match get(lookup, "ANTHROPIC_API_KEY") {
+            Some(api_key) => AiProvider::Anthropic {
+                api_key: api_key.trim().to_owned(),
+            },
+            None if env == AppEnv::Prod => AiProvider::Disabled,
+            None => AiProvider::Fake,
+        };
+        let base_url = match get(lookup, "ANTHROPIC_BASE_URL") {
+            None => Url::parse("https://api.anthropic.com/").map_err(|e| ConfigError::Invalid {
+                name: "ANTHROPIC_BASE_URL",
+                reason: e.to_string(),
+            })?,
+            Some(_) => {
+                let mut u = url(lookup, "ANTHROPIC_BASE_URL")?;
+                if !u.path().ends_with('/') {
+                    u.set_path(&format!("{}/", u.path()));
+                }
+                u
+            }
+        };
+        let prices = match get(lookup, "AI_PRICES") {
+            None => crate::ai::PriceTable::default(),
+            Some(spec) => {
+                crate::ai::PriceTable::parse(&spec).map_err(|reason| ConfigError::Invalid {
+                    name: "AI_PRICES",
+                    reason,
+                })?
+            }
+        };
+        let mut plan_quotas =
+            std::collections::BTreeMap::from([("standard".to_owned(), 2_000_000)]);
+        for entry in get(lookup, "AI_PLAN_QUOTAS")
+            .unwrap_or_default()
+            .split(';')
+            .map(str::trim)
+            .filter(|e| !e.is_empty())
+        {
+            let invalid = || ConfigError::Invalid {
+                name: "AI_PLAN_QUOTAS",
+                reason: format!("{entry:?}: expected plan=tokens"),
+            };
+            let (plan, tokens) = entry.split_once('=').ok_or_else(invalid)?;
+            let tokens: i64 = tokens.trim().parse().map_err(|_| invalid())?;
+            if tokens < 0 {
+                return Err(invalid());
+            }
+            plan_quotas.insert(plan.trim().to_owned(), tokens);
+        }
+        let model = |name: &'static str, default: &str| {
+            let m = get(lookup, name).unwrap_or_else(|| default.into());
+            let ok = (1..=100).contains(&m.len())
+                && m.bytes().all(|b| {
+                    b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b':')
+                });
+            ok.then_some(m).ok_or(ConfigError::Invalid {
+                name,
+                reason: "expected a model id".into(),
+            })
+        };
+        Ok(Self {
+            provider,
+            base_url,
+            helper_model: model("AI_HELPER_MODEL", "claude-sonnet-5")?,
+            theme_model: model("AI_THEME_MODEL", "claude-opus-5-5")?,
+            timeout: std::time::Duration::from_secs(parsed(lookup, "AI_TIMEOUT_SECS", 90u64)?),
+            max_retries: parsed(lookup, "AI_MAX_RETRIES", 2u32)?,
+            prices,
+            plan_quotas,
+        })
+    }
+}
+
+#[cfg(test)]
+mod ai_config_tests {
+    use super::*;
+
+    #[test]
+    fn provider_follows_key_and_environment() {
+        let dev = |k: &str| (k == "APP_ENV").then(|| "dev".to_owned());
+        let cfg = AiConfig::from_lookup(&dev).unwrap();
+        assert!(cfg.provider == AiProvider::Fake);
+        assert_eq!(cfg.helper_model, "claude-sonnet-5");
+        assert_eq!(cfg.theme_model, "claude-opus-5-5");
+        assert_eq!(cfg.plan_quotas["standard"], 2_000_000);
+        assert_eq!(cfg.base_url.as_str(), "https://api.anthropic.com/");
+        // Production without a key never falls back to fixtures.
+        assert!(AiConfig::from_lookup(&|_| None).unwrap().provider == AiProvider::Disabled);
+        let keyed = |k: &str| match k {
+            "ANTHROPIC_API_KEY" => Some("sk-test".into()),
+            "AI_PLAN_QUOTAS" => Some("pro=9000000; free=0".into()),
+            "ANTHROPIC_BASE_URL" => Some("http://127.0.0.1:9/base".into()),
+            _ => None,
+        };
+        let cfg = AiConfig::from_lookup(&keyed).unwrap();
+        assert!(matches!(cfg.provider, AiProvider::Anthropic { .. }));
+        assert_eq!(cfg.plan_quotas["pro"], 9_000_000);
+        assert_eq!(cfg.plan_quotas["free"], 0);
+        assert_eq!(cfg.base_url.as_str(), "http://127.0.0.1:9/base/");
+        let bad = |k: &str| (k == "AI_PLAN_QUOTAS").then(|| "pro=lots".to_owned());
+        assert!(AiConfig::from_lookup(&bad).is_err());
+        let bad_model = |k: &str| (k == "AI_HELPER_MODEL").then(|| "a b".to_owned());
+        assert!(AiConfig::from_lookup(&bad_model).is_err());
+    }
+}

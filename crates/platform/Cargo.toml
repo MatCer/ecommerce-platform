@@ -10,6 +10,7 @@ publish.workspace = true
 axum.workspace = true
 chrono.workspace = true
 lettre.workspace = true
+minijinja = { workspace = true, features = ["json"] }
 mrml.workspace = true
 object_store.workspace = true
 rand.workspace = true
