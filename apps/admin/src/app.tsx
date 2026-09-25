@@ -24,6 +24,13 @@ const Sales = lazy(() => import("./pages/Sales.tsx"));
 const Coupons = lazy(() => import("./pages/Coupons.tsx"));
 const Inventory = lazy(() => import("./pages/Inventory.tsx"));
 const TaxProfile = lazy(() => import("./pages/TaxProfile.tsx"));
+const ContentPages = lazy(() => import("./pages/ContentPages.tsx"));
+const ContentEditor = lazy(() => import("./pages/ContentEditor.tsx"));
+const ContentMenus = lazy(() => import("./pages/ContentMenus.tsx"));
+const ContentLegal = lazy(() => import("./pages/ContentLegal.tsx"));
+const Imports = lazy(() => import("./pages/Imports.tsx"));
+const ExportFeeds = lazy(() => import("./pages/ExportFeeds.tsx"));
+const SearchSynonyms = lazy(() => import("./pages/SearchSynonyms.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -74,6 +81,18 @@ export function App() {
           <Route path="/sales" component={Sales} />
           <Route path="/coupons" component={Coupons} />
           <Route path="/markets" component={Markets} />
+          <Route path="/content/pages" component={ContentPages} />
+          <Route path="/content/blog" component={ContentPages} />
+          <Route path="/content/pages/new" component={ContentEditor} />
+          <Route path="/content/pages/:id" component={ContentEditor} />
+          <Route path="/content/blog/new" component={ContentEditor} />
+          <Route path="/content/blog/:id" component={ContentEditor} />
+          <Route path="/content/menus" component={ContentMenus} />
+          <Route path="/content/legal" component={ContentLegal} />
+          <Route path="/imports" component={Imports} />
+          <Route path="/imports/:id" component={Imports} />
+          <Route path="/feeds" component={ExportFeeds} />
+          <Route path="/settings/search" component={SearchSynonyms} />
           <Route path="/settings/tax" component={TaxProfile} />
           <Route path="/staff" component={Staff} />
           <Route path="/audit-log" component={AuditLog} />

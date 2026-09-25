@@ -34,8 +34,25 @@ const groups: { label: () => string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: () => t("content.content"),
+    items: [
+      { href: "/content/pages", label: () => t("content.pages"), min: "staff" },
+      { href: "/content/blog", label: () => t("content.blog"), min: "staff" },
+      { href: "/content/menus", label: () => t("content.menus"), min: "staff" },
+      { href: "/content/legal", label: () => t("content.legal"), min: "staff" },
+    ],
+  },
+  {
+    label: () => t("content.channels"),
+    items: [
+      { href: "/imports", label: () => t("content.imports"), min: "admin" },
+      { href: "/feeds", label: () => t("content.feeds"), min: "staff" },
+    ],
+  },
+  {
     label: () => t("nav.settings"),
     items: [
+      { href: "/settings/search", label: () => t("content.search"), min: "staff" },
       { href: "/markets", label: () => t("nav.markets"), min: "staff" },
       { href: "/settings/tax", label: () => t("nav.taxProfile"), min: "staff" },
       { href: "/staff", label: () => t("nav.staff"), min: "admin" },

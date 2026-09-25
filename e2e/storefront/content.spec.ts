@@ -53,7 +53,9 @@ test("CMS page from the footer menu with a keyboard-operable FAQ", async ({ page
   await expectAccessible(page, "cms page");
 
   await page.goto(`${CZ}/pages/doprava-a-platba`);
-  await expect(main(page).getByRole("heading", { level: 2, name: "Způsoby dopravy" })).toBeVisible();
+  await expect(
+    main(page).getByRole("heading", { level: 2, name: "Způsoby dopravy" }),
+  ).toBeVisible();
   const missing = await page.goto(`${CZ}/pages/neexistuje`);
   expect(missing?.status()).toBe(404);
 });
@@ -81,7 +83,11 @@ test("blog index and post", async ({ page, context }) => {
 
 test("sitemaps, llms.txt and export feeds", async ({ request }) => {
   const sitemap = await (await request.get(`${CZ}/sitemap-1.xml`)).text();
-  for (const path of ["/pages/obchodni-podminky", "/pages/kontakt", "/blog/jak-vybrat-velikost-tricka"]) {
+  for (const path of [
+    "/pages/obchodni-podminky",
+    "/pages/kontakt",
+    "/blog/jak-vybrat-velikost-tricka",
+  ]) {
     expect(sitemap).toContain(`${CZ}${path}`);
   }
   const llms = await (await request.get(`${CZ}/llms.txt`)).text();
