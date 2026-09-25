@@ -188,10 +188,8 @@ pub struct Change {
     /// for a menu's labels: `[{path, label}]`).
     pub field: String,
     /// The value when the proposal was generated (`null`: none yet).
-    #[schema(value_type = Object)]
     pub before: Option<Value>,
     /// The proposed value: text, or the block/label list.
-    #[schema(value_type = Object)]
     pub after: Value,
 }
 

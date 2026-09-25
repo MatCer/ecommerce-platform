@@ -2620,9 +2620,9 @@ export interface components {
         /** @description One proposed field value. */
         Change: {
             /** @description The proposed value: text, or the block/label list. */
-            after: Record<string, never>;
+            after: unknown;
             /** @description The value when the proposal was generated (`null`: none yet). */
-            before: Record<string, never>;
+            before?: unknown;
             /**
              * @description `name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`
              *     for a menu's labels: `[{path, label}]`).

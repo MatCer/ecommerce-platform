@@ -12740,16 +12740,13 @@
         "required": [
           "locale",
           "field",
-          "before",
           "after"
         ],
         "properties": {
           "after": {
-            "type": "object",
             "description": "The proposed value: text, or the block/label list."
           },
           "before": {
-            "type": "object",
             "description": "The value when the proposal was generated (`null`: none yet)."
           },
           "field": {

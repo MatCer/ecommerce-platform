@@ -1,6 +1,7 @@
 import { Button, SelectField, showToast, TextField } from "@platform/ui";
 import { createMutation, createQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Index, Show } from "solid-js";
+import { AiPanel } from "../components/AiPanel.tsx";
 import { PageHeader, QueryState } from "../components/Page.tsx";
 import { ProductPicker } from "../components/ProductPicker.tsx";
 import { t } from "../i18n/index.ts";
@@ -283,6 +284,17 @@ export default function ContentMenus() {
                 {t("common.save")}
               </Button>
             </div>
+            <Show when={data.items.some((m) => m.handle === handle())}>
+              <AiPanel
+                entityType="menu"
+                entityId={handle()}
+                onAccepted={() => {
+                  setLoaded("");
+                  void menus.refetch();
+                }}
+                acceptHint={t("ai.unsavedHint")}
+              />
+            </Show>
           </form>
         )}
       </QueryState>
