@@ -18,6 +18,7 @@ pub mod admin_media;
 pub mod admin_orders;
 pub mod admin_payments;
 pub mod admin_platform;
+pub mod admin_portability;
 pub mod admin_pricing;
 pub mod admin_promotions;
 pub mod admin_recommendations;
@@ -139,6 +140,7 @@ pub struct AppState {
         (name = "ad-tracking", description = "Admin API: ad-platform forwarders (Meta, GA4, Google Ads, Sklik) and their delivery log"),
         (name = "platform", description = "Admin API for platform superadmins: the job queue"),
         (name = "marketing", description = "Admin API: newsletter subscribers, segments, campaigns"),
+        (name = "portability", description = "Admin API: CSV imports, archived orders, data exports, GDPR access and erasure"),
         (name = "email", description = "Admin API: sent emails, suppressions, email logo and texts"),
         (name = "reviews", description = "Admin API: review moderation (publish, reject, hide) and replies"),
         (name = "webhooks", description = "Provider webhooks: payments (signed), email bounces/complaints"),
@@ -210,6 +212,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_platform::routes())
         .merge(admin_marketing::routes())
         .merge(admin_email::routes())
+        .merge(admin_portability::routes())
         .merge(admin_reviews::routes())
         .merge(admin_flows::routes())
         .merge(storefront::routes())

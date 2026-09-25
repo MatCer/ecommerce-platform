@@ -176,7 +176,7 @@ pub struct ConsentState {
     pub text_version: Option<String>,
 }
 
-fn valid_text_version(v: &str) -> bool {
+pub fn valid_text_version(v: &str) -> bool {
     (1..=32).contains(&v.len())
         && v.bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
@@ -237,6 +237,42 @@ pub async fn record_server(
         ip_hash,
     )
     .await
+}
+
+/// Records a grant given elsewhere (a subscriber import, source `import`) at the time it was
+/// given, so any later decision of the subject still wins. Recording the same grant again is
+/// a no-op. Grants only: nothing is withdrawn or cancelled here.
+pub async fn record_imported_grant(
+    tx: &mut TenantTx,
+    subject: &Subject,
+    purpose: ConsentPurpose,
+    text_version: &str,
+    at: chrono::DateTime<chrono::Utc>,
+) -> Result<(), Error> {
+    if !valid_text_version(text_version) {
+        return Err(invalid(
+            "invalid_text_version",
+            "text_version must be 1-32 of [A-Za-z0-9_-]",
+        ));
+    }
+    let (kind, id) = subject.parts();
+    sqlx::query!(
+        "INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted,
+                                      text_version, source, at)
+         SELECT $1, $2, $3, $4, true, $5, 'import', $6
+         WHERE NOT EXISTS (SELECT 1 FROM consent_records
+                           WHERE subject_type = $2 AND subject_id = $3 AND purpose = $4
+                             AND source = 'import' AND at = $6)",
+        tx.tenant_id(),
+        kind,
+        id,
+        purpose.as_str(),
+        text_version,
+        at
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 async fn insert(

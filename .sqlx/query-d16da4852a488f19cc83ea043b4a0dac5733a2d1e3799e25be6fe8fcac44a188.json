@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(jsonb_build_object(\n                   'number', i.number, 'kind', i.kind, 'order_id', i.order_id,\n                   'issued_on', i.issued_on, 'currency', i.currency,\n                   'total_minor', i.total_minor, 'document', i.document)\n                   ORDER BY i.created_at), '[]') AS \"v!\"\n           FROM invoices i WHERE i.order_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d16da4852a488f19cc83ea043b4a0dac5733a2d1e3799e25be6fe8fcac44a188"
+}

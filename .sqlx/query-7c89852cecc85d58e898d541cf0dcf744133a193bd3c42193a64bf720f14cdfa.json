@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(o) || jsonb_build_object(\n                   'lines', (SELECT coalesce(jsonb_agg(to_jsonb(l) ORDER BY l.position), '[]')\n                             FROM order_lines l WHERE l.order_id = o.id),\n                   'addresses', (SELECT coalesce(jsonb_agg(to_jsonb(a)), '[]')\n                                 FROM order_addresses a WHERE a.order_id = o.id),\n                   'events', (SELECT coalesce(jsonb_agg(to_jsonb(e) ORDER BY e.at), '[]')\n                              FROM order_events e WHERE e.order_id = o.id))\n                   ORDER BY o.placed_at), '[]') AS \"v!\"\n           FROM orders o WHERE o.id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7c89852cecc85d58e898d541cf0dcf744133a193bd3c42193a64bf720f14cdfa"
+}

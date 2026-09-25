@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(jsonb_build_object(\n                   'purpose', c.purpose, 'granted', c.granted, 'text_version', c.text_version,\n                   'source', c.source, 'at', c.at, 'subject_type', c.subject_type)\n                   ORDER BY c.at), '[]') AS \"v!\"\n           FROM consent_records c\n           WHERE (c.subject_type = 'email' AND c.subject_id = $1)\n              OR (c.subject_type = 'customer' AND c.subject_id = $2::uuid::text)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9912df1a377d41232838eba0fbed6889fee812e35ad7dbfe5dab294840db13d3"
+}

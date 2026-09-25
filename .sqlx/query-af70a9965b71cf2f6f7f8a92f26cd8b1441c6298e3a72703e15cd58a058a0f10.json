@@ -1,0 +1,105 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT placed_at, total_minor, currency, status_label, customer_id, address, lines,\n                  jsonb_array_length(lines) AS \"n!\"\n           FROM archived_orders WHERE number = 'A-1'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "placed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "total_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "total_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "status_label"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "address",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "lines",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "archived_orders",
+            "name": "lines"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "n!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "af70a9965b71cf2f6f7f8a92f26cd8b1441c6298e3a72703e15cd58a058a0f10"
+}

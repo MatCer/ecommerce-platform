@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers SET consent_evidence = coalesce(consent_evidence, $2)\n                     WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "df827f6cd672b6f2a777b28de6a8dd9af0e46ad17985f3054b3e2966ead581f6"
+}

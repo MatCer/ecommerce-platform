@@ -32,6 +32,7 @@ pub mod notifications;
 pub mod ops;
 pub mod orders;
 pub mod payments;
+pub mod portability;
 pub mod pricing;
 pub mod privacy;
 pub mod promotions;

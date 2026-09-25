@@ -282,6 +282,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/archived-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Imported historical orders (read-only archive), newest first. */
+        get: operations["list_archived_orders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/assets": {
         parameters: {
             query?: never;
@@ -747,6 +764,138 @@ export interface paths {
         post?: never;
         /** Deletes an unused coupon (`409 coupon_in_use` once redeemed or advertised). */
         delete: operations["delete_coupon"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent full data exports. */
+        get: operations["list_data_exports"];
+        put?: never;
+        /**
+         * Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),
+         *     prepared in the background. One at a time; needs a recent sign-in (A9).
+         */
+        post: operations["create_data_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-exports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_data_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-exports/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A 5-minute download link of a ready export (A21). Needs a recent sign-in (A9); audited. */
+        post: operations["download_data_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The 50 most recent CSV imports. */
+        get: operations["list_data_imports"];
+        put?: never;
+        /**
+         * Starts a CSV import of customers, historical orders (archived, A28) or newsletter
+         *     subscribers: PUT the file to `upload`, then call `analyze`. Nothing is written until
+         *     `apply`. Honors `Idempotency-Key`.
+         */
+        post: operations["create_data_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_data_import"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-imports/{id}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Runs (or re-runs, optionally with a new column mapping) the dry run: row errors, counts
+         *     and a preview. Writes nothing.
+         */
+        post: operations["analyze_data_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/data-imports/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Imports the valid rows of an analyzed file in the background. Rows with errors are
+         *     skipped; no email, stock movement, payment, invoice or event is ever triggered.
+         */
+        post: operations["apply_data_import"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1977,6 +2126,47 @@ export interface paths {
         post?: never;
         /** Stops selling a variant from this list (from now on; history stays). */
         delete: operations["delete_price"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/privacy/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * GDPR access request (art. 15): everything the shop holds about an email address and its
+         *     customer account, as a JSON file. Needs a recent sign-in (A9); audited.
+         */
+        post: operations["privacy_access"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/privacy/erasure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * GDPR erasure (art. 17): deletes the customer account and personal data, anonymizes orders
+         *     (invoices stay as issued, tax law). Refused with `409 erasure_blocked` while an order is in
+         *     progress. Irreversible; `confirm_email` must repeat the address. Needs a recent sign-in.
+         */
+        post: operations["privacy_erasure"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4304,6 +4494,9 @@ export interface components {
              */
             fields: components["schemas"]["FieldRef"][];
         };
+        AccessRequest: {
+            email: string;
+        };
         AdConnectionTest: {
             /** @description What was checked or what failed (no secrets). */
             message: string;
@@ -4536,6 +4729,9 @@ export interface components {
             /** @description hreflang value (`cs-CZ`, `x-default`). */
             locale: string;
         };
+        AnalyzeInput: {
+            mapping?: components["schemas"]["BTreeMap"] | null;
+        };
         ApplyProgress: {
             /** Format: int64 */
             done?: number;
@@ -4546,6 +4742,39 @@ export interface components {
             skipped?: number;
             /** Format: int64 */
             total?: number;
+        };
+        ArchivedOrder: {
+            /** @description `{name, company, street, city, postal_code, country}` */
+            address?: Record<string, never> | null;
+            /** Format: date-time */
+            created_at: string;
+            currency: string;
+            /** Format: uuid */
+            customer_id?: string | null;
+            email: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            import_id?: string | null;
+            /** @description `[{sku, name, quantity, unit_price_minor}]` */
+            lines: Record<string, never>[];
+            name?: string | null;
+            /** @description The old shop's order number. */
+            number: string;
+            phone?: string | null;
+            /** Format: date-time */
+            placed_at: string;
+            /** @description The old shop's status, as imported. */
+            status_label?: string | null;
+            /** Format: int64 */
+            total_minor: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ArchivedOrderPage: {
+            items: components["schemas"]["ArchivedOrder"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
         };
         Asset: {
             /** Format: int64 */
@@ -5479,6 +5708,11 @@ export interface components {
              */
             next_cursor?: string | null;
         };
+        CreatedDataImport: {
+            import: components["schemas"]["DataImport"];
+            /** @description PUT the CSV here (with exactly these headers), then call `analyze`. */
+            upload: components["schemas"]["UploadTarget"];
+        };
         CreatedImport: {
             run: components["schemas"]["ImportRun"];
             upload?: components["schemas"]["UploadTarget"] | null;
@@ -5545,6 +5779,103 @@ export interface components {
             /** @description Searches without results (the search log, minimized; filtered by the market's locales). */
             zero_result_searches: components["schemas"]["QueryCount"][];
         };
+        DataExport: {
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            size_bytes?: number | null;
+            status: components["schemas"]["ExportStatus"];
+        };
+        DataExportList: {
+            items: components["schemas"]["DataExport"][];
+        };
+        DataImport: {
+            /** Format: date-time */
+            applied_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["DataImportKind"];
+            mapping: components["schemas"]["BTreeMap"];
+            /** Format: uuid */
+            market_id: string;
+            progress: components["schemas"]["DataImportProgress"];
+            report?: components["schemas"]["DataImportReport"] | null;
+            status: components["schemas"]["DataImportStatus"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @enum {string} */
+        DataImportKind: "customers" | "orders" | "subscribers";
+        DataImportList: {
+            items: components["schemas"]["DataImport"][];
+        };
+        DataImportProgress: {
+            /** Format: int32 */
+            created: number;
+            /** Format: int32 */
+            done: number;
+            /** @description Subscribers: how many were subscribed, left pending, already subscribed or kept. */
+            outcomes: {
+                [key: string]: number;
+            };
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            updated: number;
+        };
+        /** @description Dry-run report (the apply step adds its outcome to `progress`). */
+        DataImportReport: {
+            /**
+             * @description DataImportKind-specific counts (`with_address`, `lines`, `linked_to_customer`, `subscribed`,
+             *     `pending_not_marketable`, `already_subscribed`, `kept_unsubscribed`).
+             */
+            counts: {
+                [key: string]: number;
+            };
+            errors: components["schemas"]["RowError"][];
+            /** Format: int32 */
+            existing: number;
+            /** @description The file's column headers (for the mapping UI). */
+            headers: string[];
+            /**
+             * Format: int32
+             * @description Rows with at least one error; they are skipped (a bad line drops its whole order).
+             */
+            invalid_rows: number;
+            /**
+             * Format: int32
+             * @description Records that do not exist yet / already exist (by email or order number).
+             */
+            new: number;
+            /** @description The first 10 valid records as they will be imported. */
+            preview: {
+                [key: string]: string;
+            }[];
+            /**
+             * Format: int32
+             * @description Valid records that apply will import (orders: orders, not lines).
+             */
+            records: number;
+            /**
+             * Format: int32
+             * @description Data rows in the file.
+             */
+            rows: number;
+            /** @description More errors than listed (200). */
+            truncated: boolean;
+        };
+        /** @enum {string} */
+        DataImportStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
         DeclareInput: {
             /** @description The explicit confirmation step (A19): must be `true`. */
             confirm: boolean;
@@ -5689,6 +6020,44 @@ export interface components {
         };
         /** @enum {string} */
         EntityType: "product" | "category" | "page" | "menu";
+        /** @description What an erasure did. Counts only: the report holds no personal data. */
+        ErasureReport: {
+            /** Format: int64 */
+            archived_orders_anonymized: number;
+            /** Format: int64 */
+            consent_records_pseudonymized: number;
+            /**
+             * Format: uuid
+             * @description The customer account that was deleted.
+             */
+            customer_id?: string | null;
+            /** Format: int64 */
+            emails_anonymized: number;
+            /**
+             * Format: int64
+             * @description Private files (labels, document sheets, exports, import CSVs) queued for deletion.
+             */
+            files_deleted: number;
+            /**
+             * Format: int64
+             * @description Invoices and credit notes of the subject's orders, kept unchanged (tax law).
+             */
+            invoices_retained: number;
+            /** Format: int64 */
+            orders_anonymized: number;
+            /**
+             * Format: int64
+             * @description Reviews kept without the author's name, IP hash or order link.
+             */
+            reviews_anonymized: number;
+            /** Format: int64 */
+            subscribers_deleted: number;
+        };
+        ErasureRequest: {
+            /** @description The same address again: erasure cannot be undone. */
+            confirm_email: string;
+            email: string;
+        };
         Explained: {
             /** @description The strategies tried, in order. */
             chain: components["schemas"]["Strategy"][];
@@ -5707,6 +6076,14 @@ export interface components {
             score: number;
             strategy: components["schemas"]["Strategy"];
         };
+        ExportDownload: {
+            /** Format: date-time */
+            expires_at: string;
+            /** @description Presigned GET, valid 5 minutes (A21). */
+            url: string;
+        };
+        /** @enum {string} */
+        ExportStatus: "pending" | "running" | "ready" | "failed";
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
             key: string;
@@ -6452,6 +6829,20 @@ export interface components {
              */
             parent_id?: string | null;
             translations: components["schemas"]["CategoryTranslation"][];
+        };
+        NewDataImport: {
+            kind: components["schemas"]["DataImportKind"];
+            mapping?: components["schemas"]["BTreeMap"];
+            /**
+             * Format: uuid
+             * @description Customers without a `locale` get this market's default locale; subscribers join it.
+             */
+            market_id: string;
+            /**
+             * Format: int64
+             * @description Bytes of the CSV (at most 20 MB) to upload with the returned presigned PUT.
+             */
+            upload_size: number;
         };
         NewImport: {
             /** @description Publish new products right away instead of creating drafts (the default, A28). */
@@ -7829,6 +8220,20 @@ export interface components {
         Role: "staff" | "admin" | "owner";
         RoleChange: {
             role: components["schemas"]["Role"];
+        };
+        RowError: {
+            /**
+             * @description `missing`, `invalid_email`, `invalid_date`, `in_future`, `duplicate`,
+             *     `conflicting_order`, ...
+             */
+            code: string;
+            detail: string;
+            field?: string | null;
+            /**
+             * Format: int64
+             * @description Line in the file (the header is line 1).
+             */
+            line: number;
         };
         Rules: {
             conditions?: components["schemas"]["Condition"][];
@@ -9508,6 +9913,35 @@ export interface operations {
             };
         };
     };
+    list_archived_orders: {
+        parameters: {
+            query?: {
+                /** @description Exact order number or part of the email address (case-insensitive). */
+                q?: string;
+                /** @description `next_cursor` of the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArchivedOrderPage"];
+                };
+            };
+        };
+    };
     list_assets: {
         parameters: {
             query?: {
@@ -10998,6 +11432,315 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_data_exports: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataExportList"];
+                };
+            };
+        };
+    };
+    create_data_export: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataExport"];
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description export_busy */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_data_export: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataExport"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    download_data_export: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportDownload"];
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_data_imports: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataImportList"];
+                };
+            };
+        };
+    };
+    create_data_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDataImport"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedDataImport"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_data_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataImport"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    analyze_data_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyzeInput"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataImport"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    apply_data_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataImport"];
                 };
             };
             409: {
@@ -14137,6 +14880,101 @@ export interface operations {
                 content?: never;
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    privacy_access: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    privacy_erasure: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ErasureRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErasureReport"];
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description erasure_blocked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

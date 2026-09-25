@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(r) - 'ip_hash' ORDER BY r.created_at), '[]')\n                  AS \"v!\"\n           FROM reviews r\n           WHERE r.order_line_id IN (SELECT l.id FROM order_lines l WHERE l.order_id = ANY($1))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3f6d1a8ea201ed16811d721f03090a57191d205c9442d2ba11fc003e85f02d5f"
+}

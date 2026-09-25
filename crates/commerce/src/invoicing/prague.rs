@@ -28,6 +28,17 @@ pub fn local(t: DateTime<Utc>) -> chrono::NaiveDateTime {
     t.naive_utc() + Duration::hours(offset(t))
 }
 
+/// The instant of a local Czech/Slovak wall-clock time. In the autumn hour that occurs twice
+/// the summer reading wins; a spring-gap time maps one hour later.
+pub fn from_local(t: chrono::NaiveDateTime) -> DateTime<Utc> {
+    let summer = t.and_utc() - Duration::hours(2);
+    if offset(summer) == 2 {
+        summer
+    } else {
+        t.and_utc() - Duration::hours(1)
+    }
+}
+
 pub fn date(t: DateTime<Utc>) -> NaiveDate {
     local(t).date()
 }

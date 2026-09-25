@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_imports SET status = 'analyzing', error = NULL, updated_at = now(),\n                mapping = coalesce($2, mapping)\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f47326068f2a3e3763d1684112eafd406381bab3d2bf24b646fada91aa63df57"
+}

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(c) - 'shop_token_hash' - 'checkout_token_hash'\n                   ORDER BY c.created_at), '[]') AS \"v!\"\n           FROM carts c\n           WHERE lower(btrim(c.email)) = $1 OR c.customer_id = $2\n              OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id = ANY($3))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "adf2647713e6dee91d7fa1d39af208d60375d300fbf5b0f5fb9f3b7d1b145d1a"
+}

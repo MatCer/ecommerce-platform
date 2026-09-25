@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT label_key AS \"k!\" FROM shipments\n           WHERE order_id = ANY($1) AND label_key IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "k!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "label_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "f08436fe2ef032d640bff49a070b70013fc0801308a9e97248db90b019ba32e1"
+}
