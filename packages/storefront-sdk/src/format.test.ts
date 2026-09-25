@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { readConsent } from "./client.ts";
-import { formatMoney, imageAttrs, imageUrl, lcpImage, times } from "./format.ts";
+import { formatMoney, imageAttrs, imageUrl, lcpImage, pick, t, times } from "./format.ts";
 
 const img = {
   alt: "Tričko",
@@ -46,4 +46,11 @@ test("consent cookie parsing ignores unknown purposes", () => {
   expect(readConsent("a=1; consent=analytics%2Cevil%2Cads")).toEqual(["analytics", "ads"]);
   expect(readConsent("consent=")).toEqual([]);
   expect(readConsent("x=1")).toBeNull();
+});
+
+test("platform messages: placeholders, missing keys, island subsets", () => {
+  const m = { "listing.count": "{count} produktů", "cart.add": "Přidat do košíku" };
+  expect(t(m, "listing.count", { count: 3 })).toBe("3 produktů");
+  expect(t(m, "nope")).toBe("nope");
+  expect(pick(m, ["cart.add", "x"])).toEqual({ "cart.add": "Přidat do košíku", x: "x" });
 });

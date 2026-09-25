@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /**
  * Playwright smoke gate (spec §12.3): browse → category → product → add to cart → checkout
- * handoff lands on the checkout origin with the cart. Screenshots go to `--shots` for review.
+ * handoff lands on the checkout origin with the cart. Every page must also stay within the
+ * storefront-calls budget (an uncached render's `x-edge-subrequests`, N+1 guard). Screenshots
+ * go to `--shots` for review.
  *
  *   node packages/theme-kit/src/smoke.ts --base http://demo.localhost:8280 [--shots .perf/shots]
  */
 import { mkdir } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { chromium, expect } from "playwright/test";
+import { chromium, expect, type Page } from "playwright/test";
+import { BUDGET } from "./budget.ts";
 
 const { values } = parseArgs({
   options: {
@@ -28,27 +31,40 @@ page.on("console", (m) => {
 });
 page.on("pageerror", (e) => errors.push(e.message));
 
+/** Page-model calls of a fresh render of the current URL (Authorization bypasses the cache). */
+const calls: string[] = [];
+async function budget(p: Page) {
+  const res = await p.request.get(p.url(), { headers: { authorization: "Bearer smoke" } });
+  const n = Number(res.headers()["x-edge-subrequests"]);
+  calls.push(`${new URL(p.url()).pathname}=${n}`);
+  if (!(n <= BUDGET.maxSubrequests))
+    throw new Error(`${p.url()}: ${n} storefront calls per render > ${BUDGET.maxSubrequests}`);
+}
+
 try {
   await page.goto(new URL("/", values.base).href);
-  await page.getByRole("button", { name: /Odmítnout|Reject/ }).click();
+  await budget(page);
+  await page.getByRole("button", { name: /Odmítnout|Odmietnuť|Reject/ }).click();
   await page.getByRole("navigation", { name: "Kategorie" }).getByRole("link").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/category.png` });
+  await budget(page);
 
   await page.locator("main article a").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/product.png` });
+  await budget(page);
 
-  await page.getByRole("button", { name: /do košíku/ }).click();
-  await expect(page.getByRole("dialog", { name: "Košík" })).toBeVisible();
+  await page.getByRole("button", { name: /do košíku|do košíka|to cart/i }).click();
+  await expect(page.getByRole("dialog", { name: /Košík|Cart/ })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/cart.png` });
 
-  await page.getByRole("button", { name: /pokladně/ }).click();
+  await page.getByRole("button", { name: /pokladně|pokladni|checkout/i }).click();
   await page.waitForURL(/\/\/checkout\./);
-  await expect(page.getByRole("heading", { name: "Souhrn" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Souhrn|Súhrn|Summary/ })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/checkout.png` });
   if (errors.length) throw new Error(`console errors:\n${errors.join("\n")}`);
-  console.log(`smoke: ok (${page.url()})`);
+  console.log(`smoke: ok (${page.url()}; calls ${calls.join(" ")})`);
 } catch (err) {
   await page.screenshot({ path: `${values.shots}/failure.png` }).catch(() => {});
   console.error(`smoke: FAILED — ${err instanceof Error ? err.message : String(err)}`);

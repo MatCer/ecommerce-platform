@@ -321,3 +321,34 @@ separate cache namespace, never cached (already bypassed by the policy).
 6. **Lantern quantisation:** single runs move in ~75 ms steps. Use 3 runs (median) for decisions.
 7. **Theme CSS contract:** `style-src-attr 'unsafe-inline'` and external-only stylesheets are
    deliberate. Revisit if critical-CSS inlining is ever needed; that needs build-time style hashes.
+
+## 11. WP6: from stubs to the platform (supersedes the local-only parts above)
+
+- **Sites** come from `GET /internal/v1/resolve?host=` (service token `INTERNAL_API_TOKEN`,
+  `ApiResolver`), cached 60 s and purged by `/_edge/purge`. The response adds
+  `storefront_token`, `theme_artifact` (`null` until published → 503), `retained_artifacts` and
+  `checkout_artifact`. `sites.local.json`, `StaticResolver.fromFile` and channel pointers are gone
+  from the runtime (the static resolver stays for tests).
+- **Artifacts (A22, A30):** `make theme-build` packs the theme and checkout and runs
+  `api admin publish-artifacts`: every file goes to the private bucket under
+  `artifacts/<id>/…`, the id is registered in `platform.theme_artifacts`, the `default-theme` /
+  `checkout` channels move, and every tenant that follows the default gets a new published
+  `theme_revisions` row + `theme_active` (one shared artifact, revision per tenant). The edge
+  downloads a missing artifact through `GET /internal/v1/artifacts/{id}/{path}`, recomputes the
+  content address from the bytes (`theme-kit artifactId`) and only then renames it into place.
+  **Deviation:** per-file objects instead of `bundle.tar.zst`: no archive format to parse, and
+  integrity comes from the content address. Retention: previous 3 revisions or 7 days.
+- **Handoff (A1, A4):** state moved to the API. `POST /storefront/v1/cart/handoff` (shop
+  capability) revokes the shop capability and returns a single-use 60 s token (SHA-256 in
+  `checkout_handoffs`, bound to tenant + market + cart); `POST /storefront/v1/checkout/handoff`
+  consumes it atomically and mints the checkout capability. The edge keeps the Sec-Fetch-Site
+  check and the cookies; it holds no state, so it can scale out.
+- **Redirects:** a theme 404 triggers `GET /storefront/v1/redirects/resolve?path=`; only
+  same-shop paths are followed (checked by the API and again by the edge), `no-store`.
+- **Media:** `/media/<tenant>/…` only (the public bucket is shared; other prefixes 404).
+- **WfP mapping (confirmed for M1):** option (b): the `STOREFRONT` wrapper binding with the
+  opaque per-render context id; the tenant, market and storefront token never come from theme
+  code. The `ASSETS` exception stays (read-only, same artifact).
+- **Storefront API authorization:** token → tenant (401), market loaded under that tenant's RLS
+  (403 `market_mismatch`), a disagreeing `X-Tenant` is 403. Caddy no longer proxies
+  `api.localhost/storefront/*`.

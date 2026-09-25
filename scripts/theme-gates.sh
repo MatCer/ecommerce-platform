@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Runs the theme gates of spec §12.3 against a theme directory and a running edge:
-# contract lint → astro check → astro build → pack + publish (channel) → purge → budget/axe →
-# Playwright smoke. BASE should be HTTPS/h2 (see docker/caddy/Caddyfile); the smoke runs the
-# checkout handoff, which follows the edge's canonical scheme (http locally).
+# Runs the theme gates of spec §12.3 against a theme directory and the running stack:
+# contract lint → astro check → astro build → pack → publish (upload + activate for every
+# tenant following the default, A30; the edge is purged) → budget/axe → Playwright smoke.
+# BASE should be HTTPS/h2 (see docker/caddy/Caddyfile); the smoke runs the checkout handoff,
+# which follows the edge's canonical scheme (http locally).
 #
-#   ARTIFACT_ROOT=/tmp/artifacts EDGE_ADMIN=http://127.0.0.1:8688 BASE=https://demo.localhost:8691 \
-#   SMOKE_BASE=http://demo.localhost:8690 \
+#   ARTIFACT_ROOT=.artifacts BASE=https://demo.localhost:8681 SMOKE_BASE=http://demo.localhost:8680 \
 #     scripts/theme-gates.sh /path/to/theme-copy
 #
-# The edge must serve ARTIFACT_ROOT with sites pointing at "@default-theme".
+# PUBLISH overrides the publish command (default: the api CLI in the compose stack).
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 theme="$(cd "${1:?theme dir}" && pwd)"
-: "${ARTIFACT_ROOT:?}" "${EDGE_ADMIN:?}" "${BASE:?}"
+: "${ARTIFACT_ROOT:?}" "${BASE:?}"
 kit="$repo/packages/theme-kit/src"
 
 step() { printf '\n== %s\n' "$1"; }
@@ -24,10 +24,11 @@ step "astro check"
 step "astro build"
 (cd "$theme" && node_modules/.bin/astro build --silent)
 step "pack + publish"
-node "$kit/cli.ts" pack --dist "$theme/dist" --kind theme --tokens "$theme/theme.tokens.json" \
-  --out "$ARTIFACT_ROOT" --channel default-theme
-curl -fsS -X POST "$EDGE_ADMIN/_edge/purge" -H "authorization: Bearer ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}" \
-  -H 'content-type: application/json' -d '{"all":true}'
+id=$(node "$kit/cli.ts" pack --dist "$theme/dist" --kind theme --tokens "$theme/theme.tokens.json" \
+  --out "$ARTIFACT_ROOT" | tail -1)
+root_abs="$(cd "$ARTIFACT_ROOT" && pwd)"
+${PUBLISH:-docker compose run --rm --no-deps -v "$root_abs:/artifacts:ro" api \
+  /usr/local/bin/api admin publish-artifacts --root /artifacts --theme} "$id"
 step "budget + axe"
 node "$kit/measure.ts" --base "$BASE" --pages "${PAGES:-/,/c/trika,/p/tricko-basic}" --runs "${RUNS:-1}" \
   --out "${REPORT:-$theme/.perf/report.json}"

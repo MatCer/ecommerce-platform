@@ -8,8 +8,10 @@
 }
 
 # Service-to-service endpoints stay on the compose network: /internal/* is never proxied.
+# The Storefront API is reached only through the edge (spec A4), never from browsers directly.
 http://api.localhost {
 	respond /internal/* "not found" 404
+	respond /storefront/* "not found" 404
 	reverse_proxy api:8000
 }
 

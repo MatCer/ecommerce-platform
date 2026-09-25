@@ -11,13 +11,13 @@ Design: [`docs/superpowers/specs/2026-09-24-platform-design.md`](docs/superpower
 ```text
 crates/commerce   business modules (no HTTP, no framework types)
 crates/platform   config, problem+json errors, tracing, db pool, S3 storage, health checks
-crates/api        axum binary: health, OpenAPI, Admin API (/admin/v1), Internal API, superadmin CLI
+crates/api        axum binary: health, OpenAPI, Admin, Storefront and Internal APIs, superadmin CLI + demo seed
 crates/worker     job runner, outbox dispatcher, cron leader
 crates/testkit    shared test helpers
 migrations/       sqlx migrations (run as app_owner)
 packages/         shared TS config, generated API clients, storefront SDK, theme-kit (artifacts + gates)
 apps/auth         Better Auth (Hono): staff sign-in, magic links, TOTP, EdDSA JWTs + JWKS
-apps/mocks        third-party API stand-ins (incl. a DNS TXT stub) + the stub Storefront API (until WP6)
+apps/mocks        third-party API stand-ins (incl. a DNS TXT stub)
 apps/edge         storefront edge: Node + Miniflare gateway (tenancy, cache, headers, checkout handoff)
 apps/checkout     platform checkout app (Astro + Solid) served on checkout.<shop>
 themes/default    default Astro + Solid theme (the template merchants fork)
@@ -56,9 +56,13 @@ make down
 | localhost:55432 | Postgres (`app` and `app_test` databases) |
 | http://localhost:57700 | Meilisearch |
 | http://localhost:12111 | stripe-mock |
-| http://demo.localhost:8080, http://demo-sk.localhost:8080 | Demo shop (CZ / SK market) via the edge |
-| http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "Pokračovat k pokladně") |
+| http://demo.localhost:8080, http://demo-sk.localhost:8080 | Demo shop (CZ / SK market) via the edge, after `make seed theme-build` |
+| http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "K pokladně") |
 | https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
+
+First run of the demo shop: `make up && make seed && make theme-build`. The seed owner
+(`owner@lnen.example`) gets a magic link in Mailpit. `api.localhost` does not expose the
+Storefront API: browsers reach it only through the edge (`/_p/*`, spec A4).
 
 `/internal/*` on `api` and `auth` is
 never proxied by Caddy; it is for services on the compose network only. The storefront runtime
@@ -87,7 +91,8 @@ trusted network.
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
-| `make theme-build` | Build + pack the theme and checkout artifacts into `.artifacts` |
+| `make seed` | Create or complete the demo shop (tenant `demo`, CZ + SK markets, 60 products); idempotent |
+| `make theme-build` | Build + pack the theme and checkout artifacts, upload and publish them for every tenant |
 | `make e2e` | Playwright suites (`e2e/`) against the running stack; `WP5_SCREENSHOTS=1` also writes `docs/screenshots/wp5/` |
 | `make perf` | Lab budget gate (Lighthouse mobile, A26 JS, axe) over HTTPS/h2 |
 
