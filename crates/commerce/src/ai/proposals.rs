@@ -973,7 +973,7 @@ impl Gen<'_> {
         };
         let all_source: String = units
             .iter()
-            .map(|u| u.text.as_str())
+            .map(Unit::plain)
             .collect::<Vec<_>>()
             .join("\n");
         let mut changes = vec![];
@@ -1080,7 +1080,12 @@ impl Gen<'_> {
             if text.is_empty() {
                 return Err(CallError::output(format!("{} is empty", u.key)));
             }
-            for term in glossary.violations(&u.text, &text, target) {
+            let output = if u.html {
+                plain(&text, usize::MAX)
+            } else {
+                text.clone()
+            };
+            for term in glossary.violations(&u.plain(), &output, target) {
                 warnings.push(format!(
                     "{target}: {}: glossary term \"{term}\" was not kept",
                     u.key
@@ -1154,6 +1159,17 @@ struct Unit {
     key: String,
     text: String,
     html: bool,
+}
+
+impl Unit {
+    /// The text without markup (glossary terms are matched in text, not in HTML entities).
+    fn plain(&self) -> String {
+        if self.html {
+            plain(&self.text, usize::MAX)
+        } else {
+            self.text.clone()
+        }
+    }
 }
 
 /// The texts of `locale` to translate, keyed by field (`blocks.3.html`, `labels.0.1`).

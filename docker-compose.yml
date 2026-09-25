@@ -21,6 +21,14 @@ x-runtime-db: &runtime-db
   APP_ENV: ${APP_ENV:-dev}
   RUST_LOG: ${RUST_LOG:-info}
 
+# AI helpers (WP22). Without ANTHROPIC_API_KEY the fake provider answers from fixtures (dev);
+# with APP_ENV=prod and no key the helpers are off.
+x-ai: &ai
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_HELPER_MODEL: ${AI_HELPER_MODEL:-claude-sonnet-5}
+  AI_THEME_MODEL: ${AI_THEME_MODEL:-claude-opus-5-5}
+  AI_PLAN_QUOTAS: ${AI_PLAN_QUOTAS:-standard=2000000}
+
 services:
   postgres:
     <<: *infra
@@ -250,7 +258,7 @@ services:
     <<: *rust-app
     command: ["/usr/local/bin/api"]
     environment:
-      <<: *runtime-db
+      <<: [*runtime-db, *ai]
       API_BIND: 0.0.0.0:8000
       MEILI_URL: http://meilisearch:7700
       MEILI_SEARCH_KEY: ${MEILI_SEARCH_KEY:-2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918}
@@ -295,7 +303,7 @@ services:
     <<: *rust-app
     command: ["/usr/local/bin/worker"]
     environment:
-      <<: *runtime-db
+      <<: [*runtime-db, *ai]
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       MEILI_URL: http://meilisearch:7700
       MEILI_ADMIN_KEY: ${MEILI_ADMIN_KEY:-39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6}
