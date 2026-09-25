@@ -96,7 +96,9 @@ test("an owner adds a webhook and sees the signing secret once", async () => {
   const form = page.getByRole("dialog", { name: "Add webhook" });
   await form.getByLabel("Endpoint URL").fill(endpoint);
   await form.getByLabel("Description (optional)").fill("E2E receiver");
-  await form.getByRole("checkbox", { name: "product.created" }).check();
+  // Click the label like a user; the visually hidden input sits under the control.
+  await form.getByText("product.created", { exact: true }).click();
+  await expect(form.getByRole("checkbox", { name: "product.created" })).toBeChecked();
   await expectAccessible(page, "webhook form");
   await form.getByRole("button", { name: "Create" }).click();
 

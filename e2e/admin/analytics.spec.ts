@@ -117,7 +117,7 @@ test("the demo shop dashboard shows sales, the consented-sessions funnel and pas
 
   const traffic = page.getByRole("region", { name: "Traffic" });
   await expect(traffic.getByText("Page requests")).toBeVisible();
-  await expect(traffic.getByText("Consented sessions")).toBeVisible();
+  await expect(traffic.getByText("Consented sessions", { exact: true }).first()).toBeVisible();
 
   const funnel = page.getByRole("region", { name: "Funnel (consented sessions)" });
   await expect(funnel).toBeVisible();
