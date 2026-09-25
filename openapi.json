@@ -7164,7 +7164,7 @@
         "properties": {
           "key": {
             "type": "string",
-            "description": "Query parameter name."
+            "description": "Facet key (`opt.color`, `param.material`, `brand`); the listing query parameter is\n`f.<key>` (`?f.opt.color=red`)."
           },
           "kind": {
             "$ref": "#/components/schemas/FacetKind"
@@ -9907,7 +9907,9 @@
           "name",
           "locale",
           "currency",
+          "base_path",
           "locales",
+          "checkout_url",
           "currencies",
           "markets",
           "menus",
@@ -9920,8 +9922,16 @@
           "cache"
         ],
         "properties": {
+          "base_path": {
+            "type": "string",
+            "description": "`\"\"` in the market's default locale, else `/<locale>` (spec §9.1). Page-model hrefs\nalready carry it; themes prefix the links they build themselves (`/search`,\n`/p/<slug>`, `/_p/public/*`)."
+          },
           "cache": {
             "$ref": "#/components/schemas/CacheHints"
+          },
+          "checkout_url": {
+            "type": "string",
+            "description": "The checkout origin (`https://checkout.<shop host>`, A1): account, order status and the\nwithdrawal form (`/withdraw`, A19) live there, not on the theme's origin."
           },
           "consent": {
             "$ref": "#/components/schemas/ConsentConfig"
@@ -9962,7 +9972,7 @@
             "items": {
               "$ref": "#/components/schemas/Alternate"
             },
-            "description": "Locales of this market (M1: the market's default locale; prefixes arrive with WP8)."
+            "description": "Locales of this market, the default first, each with its home page URL."
           },
           "markets": {
             "type": "array",

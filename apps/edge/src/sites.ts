@@ -5,7 +5,10 @@
 export interface Site {
   tenant_id: string;
   market_id: string;
+  /** The market's default locale (no path prefix); a prefixed request overrides it. */
   locale: string;
+  /** Every locale of the market; the non-default ones are served under `/<locale>/…`. */
+  locales: string[];
   /** Canonical shop host of this market (the checkout origin is `checkout.<shop_host>`). */
   shop_host: string;
   /** Public storefront token the edge injects; never exposed to theme code. */
@@ -47,6 +50,22 @@ export function classifyHost(host: string): Origin {
     : { kind: "shop", shopHost: host };
 }
 
+/**
+ * Locale prefix (spec §9.1): `/cs/c/x` on a market whose default locale is `sk` and which also
+ * offers `cs` is the `cs` page `/c/x`. The default locale is never prefixed, and anything that
+ * is not one of the market's locales stays a plain path (the theme answers 404).
+ */
+export function splitLocale(
+  site: Pick<Site, "locale" | "locales">,
+  path: string,
+): { locale: string; path: string } | null {
+  // The first segment must be exactly one of the market's configured tags (`cs`, `en-GB`).
+  const m = /^\/([^/]+)(\/.*)?$/.exec(path);
+  const locale = m?.[1];
+  if (!m || !locale || locale === site.locale || !site.locales.includes(locale)) return null;
+  return { locale, path: m[2] && m[2] !== "/" ? m[2] : "/" };
+}
+
 /** Fixed host → site map (tests). */
 export class StaticResolver implements SiteResolver {
   #sites: Record<string, Site>;
@@ -68,6 +87,7 @@ interface Resolved {
   tenant_id: string;
   market_id: string;
   default_locale: string;
+  locales: string[];
   storefront_token: string;
   theme_artifact: string | null;
   retained_artifacts: string[];
@@ -101,6 +121,7 @@ export class ApiResolver implements SiteResolver {
       tenant_id: r.tenant_id,
       market_id: r.market_id,
       locale: r.default_locale,
+      locales: r.locales,
       shop_host: r.hostname,
       storefront_token: r.storefront_token,
       theme_artifact: r.theme_artifact,

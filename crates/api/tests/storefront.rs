@@ -137,6 +137,8 @@ async fn page_models_carry_seo_and_cache_hints(db: PgPool) {
     assert_eq!(shop["cache"]["public"], true);
     assert_eq!(shop["markets"].as_array().unwrap().len(), 2);
     assert_eq!(shop["seo"]["canonical"], "http://shop.localhost:8080/");
+    assert_eq!(shop["checkout_url"], "http://checkout.shop.localhost:8080");
+    assert_eq!(shop["base_path"], "");
 
     let (status, home) = c.get("/storefront/v1/pages/home").await;
     assert_eq!(status, StatusCode::OK, "{home}");
@@ -199,6 +201,109 @@ async fn page_models_carry_seo_and_cache_hints(db: PgPool) {
     .send(&c.s)
     .await;
     assert_eq!(status, StatusCode::OK, "its own product with the same slug");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_second_market_locale_gets_prefixed_hrefs_and_alternates(db: PgPool) {
+    let c = setup(db).await;
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE markets SET locales = ARRAY['sk', 'cs'] WHERE id = $1")
+        .bind(c.shop.sk)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let get = async |uri: &str, locale: &str| {
+        let (status, body, _) = sf(Call::get(uri), &c.shop, c.shop.sk)
+            .header("x-locale", locale)
+            .send(&c.s)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        body
+    };
+
+    let shop = get("/storefront/v1/shop", "cs").await;
+    assert_eq!(shop["locale"], "cs");
+    assert_eq!(shop["base_path"], "/cs");
+    assert_eq!(shop["messages"]["cart.add"], "Přidat do košíku");
+    assert_eq!(shop["menus"]["main"][0]["href"], "/cs/c/trika");
+    assert_eq!(shop["seo"]["canonical"], "http://shop-sk.localhost:8080/cs");
+    let locales: Vec<(&str, &str)> = shop["locales"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| (l["locale"].as_str().unwrap(), l["href"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        locales,
+        [
+            ("sk", "http://shop-sk.localhost:8080/"),
+            ("cs", "http://shop-sk.localhost:8080/cs")
+        ]
+    );
+
+    let page = get("/storefront/v1/pages/product/tee-cs", "cs").await;
+    assert_eq!(
+        page["seo"]["canonical"],
+        "http://shop-sk.localhost:8080/cs/p/tee-cs"
+    );
+    assert_eq!(page["breadcrumbs"][0]["href"], "/cs");
+    assert_eq!(page["breadcrumbs"][1]["href"], "/cs/c/trika");
+    assert_eq!(
+        page["seo"]["json_ld"][1]["itemListElement"][1]["item"],
+        "http://shop-sk.localhost:8080/cs/c/trika"
+    );
+    let alts: Vec<(&str, &str)> = page["seo"]["alternates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| (a["locale"].as_str().unwrap(), a["href"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        alts,
+        [
+            ("cs-CZ", "http://shop.localhost:8080/p/tee-cs"),
+            ("x-default", "http://shop.localhost:8080/p/tee-cs"),
+            ("cs-SK", "http://shop-sk.localhost:8080/cs/p/tee-cs"),
+        ]
+    );
+
+    let listing = get("/storefront/v1/pages/category/trika", "cs").await;
+    assert_eq!(
+        listing["seo"]["canonical"],
+        "http://shop-sk.localhost:8080/cs/c/trika"
+    );
+    assert!(
+        listing["sort"][1]["href"]
+            .as_str()
+            .unwrap()
+            .starts_with("/cs/c/trika?"),
+        "{}",
+        listing["sort"]
+    );
+
+    // The SK sitemap lists the product in the locale it exists in (Czech only here).
+    let (_, chunk, _) = sf(
+        Call::get("/storefront/v1/files/sitemap-1.xml"),
+        &c.shop,
+        c.shop.sk,
+    )
+    .send_text(&c.s)
+    .await;
+    assert!(
+        chunk.contains("<loc>http://shop-sk.localhost:8080/cs/p/tee-cs</loc>"),
+        "{chunk}"
+    );
+    assert!(!chunk.contains("<loc>http://shop-sk.localhost:8080/p/tee-cs</loc>"));
+    assert!(chunk.contains("<loc>http://shop-sk.localhost:8080/cs</loc>"));
+
+    // (No sk-SK alternate: the product has no Slovak translation.) The default locale stays
+    // unprefixed.
+    let sk = get("/storefront/v1/shop", "sk").await;
+    assert_eq!(sk["base_path"], "");
+    assert_eq!(sk["menus"]["main"][0]["href"], "/c/trika");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -1,35 +1,80 @@
 ---
-import { imageAttrs, t } from "@platform/storefront-sdk/format";
-import ProductCard from "../components/ProductCard.astro";
+import { imageAttrs } from "@platform/storefront-sdk/format";
+import Icon from "../components/Icon.astro";
+import ProductGrid from "../components/ProductGrid.astro";
+import TrustRow from "../components/TrustRow.astro";
 import Base from "../layouts/Base.astro";
+import { i18n } from "../lib/i18n";
+import { CARD_SIZES, cardImage, TILE_SIZES } from "../lib/images";
 import { storefront } from "../lib/storefront";
 
 const sf = storefront(Astro.request);
 const [shop, home] = await Promise.all([sf.shop(), sf.home()]);
-const m = shop.messages;
-// Category tiles come first and are the largest above-the-fold images: the first one is the LCP.
-const CARD_SIZES = "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)";
-const TILE_SIZES = "(min-width: 48rem) 25vw, calc(50vw - 1.5rem)";
-const tile = home.categories[0]?.image;
+const { t } = i18n(shop);
+// The family forbids a tall hero above the products: a shallow brand block sits beside the
+// category tiles, which are the largest above-the-fold images (the first one is the LCP).
+const tiles = home.categories.slice(0, 4);
+const tile = tiles[0]?.image;
 const lcp = tile
   ? { image: tile, sizes: TILE_SIZES }
-  : home.featured[0]?.images[0] && { image: home.featured[0].images[0], sizes: CARD_SIZES };
+  : home.featured[0]?.images[0] && {
+      image: cardImage(home.featured[0].images[0]),
+      sizes: CARD_SIZES,
+    };
 ---
 
-<Base shop={shop} seo={home.seo} lcp={lcp}>
-  <h1 class="sr-only">{shop.name}</h1>
-  <section aria-label={t(m, "home.categories")} class="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+<Base shop={shop} seo={home.seo} template="home" lcp={lcp}>
+  <section class="container-shop grid gap-6 pt-6 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-stretch md:gap-8 md:pt-10">
+    <div class="flex flex-col justify-center gap-4 md:py-6">
+      <p class="eyebrow text-identity-ink">{home.hero.subtitle}</p>
+      <h1 class="text-4xl leading-[1.05] font-extrabold md:text-5xl lg:text-6xl">{home.hero.title}</h1>
+      <ul class="grid gap-2 text-muted-foreground">
+        <li class="flex items-center gap-2"><Icon name="truck" class="size-5 text-identity-ink" />{shop.trust.delivery}</li>
+        <li class="flex items-center gap-2"><Icon name="returns" class="size-5 text-identity-ink" />{shop.trust.returns}</li>
+      </ul>
+      <p class="mt-2"><a href={home.hero.cta.href} class="btn btn-primary px-6 text-base">{home.hero.cta.label}<Icon name="chevronRight" class="size-4" /></a></p>
+    </div>
     {
-      home.categories.map((c, i) => (
-        <a href={c.href} class="group overflow-hidden rounded-lg border border-border bg-card">
-          {c.image ? <img {...imageAttrs(c.image, { sizes: TILE_SIZES, width: 360, priority: i === 0 })} loading="eager" class="aspect-[4/5] w-full bg-muted object-cover" /> : <span class="block aspect-[4/5] w-full bg-muted" />}
-          <span class="block p-2 text-center font-display font-bold">{c.label}</span>
-        </a>
-      ))
+      tiles.length > 0 && (
+        <nav aria-label={t("home.categories")}>
+          <ul class="grid grid-cols-2 gap-3 md:gap-4">
+            {tiles.map((c, i) => (
+              <li>
+                <a href={c.href} class="group relative block overflow-hidden rounded-xl bg-muted">
+                  {c.image ? (
+                    <img {...imageAttrs(c.image, { sizes: TILE_SIZES, width: 480, priority: i === 0 })} loading="eager" class="aspect-[4/5] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
+                  ) : (
+                    <span class="block aspect-[4/5] w-full" />
+                  )}
+                  <span class="absolute inset-x-2 bottom-2 flex items-center justify-between rounded-lg bg-card/95 px-3 py-2 font-display font-bold shadow-sm md:inset-x-3 md:bottom-3 md:px-4 md:py-3 md:text-lg">
+                    {c.label}
+                    <Icon name="chevronRight" class="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )
     }
   </section>
-  <h2 class="mb-4 font-display text-xl font-bold">{t(m, "home.featured")}</h2>
-  <ul class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-    {home.featured.map((p, i) => <li class="flex"><ProductCard product={p} messages={m} eager={!tile && i < 2} priority={!tile && i === 0} /></li>)}
-  </ul>
+
+  {
+    home.featured.length > 0 && (
+      <section aria-labelledby="featured" class="container-shop mt-14 md:mt-20">
+        <div class="mb-5 flex items-end justify-between gap-4">
+          <h2 id="featured" class="text-2xl font-extrabold md:text-3xl">{t("home.featured")}</h2>
+          <a href={home.hero.cta.href} class="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-identity-ink hover:underline">
+            {t("home.view_all")}
+            <Icon name="chevronRight" class="size-4" />
+          </a>
+        </div>
+        <ProductGrid products={home.featured} shop={shop} lcp={!tile} />
+      </section>
+    )
+  }
+
+  <section aria-label={t("home.why")} class="container-shop mt-14 md:mt-20">
+    <TrustRow shop={shop} layout="band" />
+  </section>
 </Base>

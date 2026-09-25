@@ -1,0 +1,20 @@
+---
+import type { StockState } from "@platform/storefront-sdk/types";
+
+/** Stock as a coloured, worded state; always present, never hidden (family rule). */
+interface Props {
+  state: StockState;
+  label: string;
+}
+const { state, label } = Astro.props;
+const color = {
+  in_stock: "text-stock-in",
+  low_stock: "text-stock-low",
+  backorder: "text-stock-low",
+  out_of_stock: "text-subtle",
+}[state];
+---
+
+<p class={`flex items-center gap-1.5 text-xs font-semibold ${color}`}>
+  <span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>{label}
+</p>

@@ -7,8 +7,7 @@
 | WP1 | The superadmin dead-job view | WP14 |
 | WP1 | The smoke scripts are manual; move them into the e2e suite | WP15 |
 | WP2 | Artifact GC (private bucket `artifacts/` + edge cache volume); WP6 keeps everything | WP23 |
-| WP2 | Page-model gaps left after WP6: size chart, dispatch cutoff + holidays, batch card lookup by ids; font library | WP8/WP10 |
-| WP2 | JS headroom on PDP is 0.8 kB with RUM sampled; keep islands lean | WP8 |
+| WP2 | Page-model gaps left after WP8: size chart, dispatch cutoff + holidays, batch card lookup by ids (recently viewed shows no prices until then); font library | WP10 / WP13 |
 | WP3 | Assets stuck in `processing` after the final lease-timeout death → needs a dead-job sweeper | WP14 |
 | WP3 | Abandoned uploads / reused presigned URLs never cleaned up | WP14 |
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
@@ -24,7 +23,11 @@
 | WP6 | Expired carts (30 days) and used/expired handoff rows are not swept by a job (handoffs are pruned on mint) | WP14 |
 | WP6 | `/events` and `/newsletter/subscribe` validate and drop (no storage) | WP14 / M2 |
 | WP6 | Catalog/content changes do not purge the edge; HTML ages out by `cache.max_age` (60 s) | WP13 |
-| WP6 | Locale prefixes inside one market (`/en/...`) are not routed; one locale per market host | WP8 |
-| WP6 | The probe theme does not render the second card image (it would compete with the LCP) | WP8 |
 | WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
 | WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart) | WP10 |
+| WP8 | The edge forwards `POST /_p/consent` to `/storefront/v1/consent` and answers 202 `{recorded:false}` while the API has no such route; the consent record's subject (anon id / customer) is not passed yet | WP9 |
+| WP8 | The theme links `checkout.<host>/account` and `/withdraw` (A19); the checkout app must serve both | WP9 / WP13 |
+| WP8 | A market locale without product translations gets an empty search index (documents need a translation); a default-locale fallback would keep listings full. The demo uses `cs` on the SK market, which is fully translated | WP13 |
+| WP8 | Legal/CMS page slugs in `/shop` are Czech placeholders for every locale; payment/carrier marks are generic catalog text until payment and shipping methods exist; `free_shipping_threshold` stays null | WP13 / WP10 / WP11 |
+| WP8 | No cart cross-sell in the drawer yet (the PDP slot renders `/recommendations`; the drawer would need a client fetch) | WP17 |
+| WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |

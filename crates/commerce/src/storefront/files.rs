@@ -10,7 +10,7 @@ use platform::Error;
 use platform::db::TenantTx;
 use uuid::Uuid;
 
-use super::{Context, MarketCtx, alternates};
+use super::{Context, MarketCtx, alternates, locale_path};
 
 pub const SITEMAP_CHUNK: usize = 10_000;
 
@@ -39,12 +39,17 @@ struct Entry {
 }
 
 impl Entry {
-    fn path_for(&self, m: &MarketCtx) -> Option<String> {
+    /// The path in `locale` of market `m` (the default locale's slug when it has no translation).
+    fn path_for(&self, m: &MarketCtx, locale: &str) -> Option<String> {
         let sold = match &self.lists {
             None => true,
             Some(lists) => m.price_list_id.is_some_and(|l| lists.contains(&l)),
         };
-        self.paths.get(&m.default_locale).filter(|_| sold).cloned()
+        self.paths
+            .get(locale)
+            .or_else(|| self.paths.get(&m.default_locale))
+            .filter(|_| sold)
+            .cloned()
     }
 }
 
@@ -117,14 +122,27 @@ async fn entries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Entry>, Error> 
             .insert(r.locale, format!("/p/{}", r.slug));
     }
     out.extend(products.into_values());
-    // Only what exists in this market's language.
-    out.retain(|e| e.path_for(&ctx.market).is_some());
     Ok(out)
+}
+
+/// Every URL of this market: each entry in each market locale it exists in (`/cs/p/x` for a
+/// non-default locale, spec §9.1), as `(entry, path)`.
+fn urls<'a>(ctx: &Context, all: &'a [Entry]) -> Vec<(&'a Entry, String)> {
+    let m = &ctx.market;
+    all.iter()
+        .flat_map(|e| {
+            m.locales_default_first().filter_map(move |l| {
+                e.path_for(m, l)
+                    .map(|p| (e, locale_path(&m.default_locale, l, &p)))
+            })
+        })
+        .collect()
 }
 
 /// `sitemap.xml`: the index of this market's chunks.
 pub async fn sitemap_index(tx: &mut TenantTx, ctx: &Context) -> Result<String, Error> {
-    let n = entries(tx, ctx).await?.len().div_ceil(SITEMAP_CHUNK).max(1);
+    let all = entries(tx, ctx).await?;
+    let n = urls(ctx, &all).len().div_ceil(SITEMAP_CHUNK).max(1);
     let mut xml = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
     );
@@ -146,21 +164,19 @@ pub async fn sitemap_chunk(
     n: usize,
 ) -> Result<Option<String>, Error> {
     let all = entries(tx, ctx).await?;
+    let all = urls(ctx, &all);
     if n == 0 || (n - 1) * SITEMAP_CHUNK >= all.len().max(1) {
         return Ok(None);
     }
     let mut xml = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n",
     );
-    for e in all.iter().skip((n - 1) * SITEMAP_CHUNK).take(SITEMAP_CHUNK) {
-        let Some(path) = e.path_for(&ctx.market) else {
-            continue;
-        };
-        let _ = write!(xml, "  <url><loc>{}</loc>", xml_escape(&ctx.url(&path)));
+    for (e, path) in all.iter().skip((n - 1) * SITEMAP_CHUNK).take(SITEMAP_CHUNK) {
+        let _ = write!(xml, "  <url><loc>{}</loc>", xml_escape(&ctx.url(path)));
         if let Some(t) = e.lastmod {
             let _ = write!(xml, "<lastmod>{}</lastmod>", t.format("%Y-%m-%d"));
         }
-        for a in alternates(ctx, |m| e.path_for(m)) {
+        for a in alternates(ctx, |m, l| e.path_for(m, l)) {
             let _ = write!(
                 xml,
                 "<xhtml:link rel=\"alternate\" hreflang=\"{}\" href=\"{}\"/>",

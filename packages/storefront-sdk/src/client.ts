@@ -1,3 +1,4 @@
+import { hasConsent } from "./consent.ts";
 import type {
   Cart,
   CartState,
@@ -6,6 +7,14 @@ import type {
   SearchResult,
   SearchSuggest,
 } from "./types.ts";
+
+export {
+  consentStorage,
+  hasConsent,
+  openConsentSettings,
+  readConsent,
+  saveConsent,
+} from "./consent.ts";
 
 /**
  * Browser-side helpers for islands. Everything goes through same-origin gateway routes
@@ -40,14 +49,23 @@ export const cart = {
   removeCoupon: (code: string) => send("DELETE", `/_p/cart/coupons/${encodeURIComponent(code)}`),
 };
 
-export const suggest = (q: string, signal?: AbortSignal) =>
-  fetch(`/_p/public/search/suggest?${new URLSearchParams({ q })}`, { signal }).then((r) =>
-    json<SearchSuggest>(r),
-  );
+/**
+ * Public reads for islands. `base` is `ShopModel.base_path` (`/cs` on a prefixed locale), so
+ * the edge answers in the page's locale.
+ */
+export const suggest = (q: string, opts: { base?: string; signal?: AbortSignal } = {}) =>
+  fetch(`${opts.base ?? ""}/_p/public/search/suggest?${new URLSearchParams({ q })}`, {
+    signal: opts.signal,
+  }).then((r) => json<SearchSuggest>(r));
 
 /** Full search from an island: `params` as in `/storefront/v1/search` (`q`, `f.opt.color`, ...). */
-export const search = (params: URLSearchParams, signal?: AbortSignal) =>
-  fetch(`/_p/public/search?${params}`, { signal }).then((r) => json<SearchResult>(r));
+export const search = (
+  params: URLSearchParams,
+  opts: { base?: string; signal?: AbortSignal } = {},
+) =>
+  fetch(`${opts.base ?? ""}/_p/public/search?${params}`, { signal: opts.signal }).then((r) =>
+    json<SearchResult>(r),
+  );
 
 /** The smallest AVIF (else any) thumbnail of a search hit at least `width` px wide. */
 export function hitThumb(hit: SearchHit, width: number): string | undefined {
@@ -57,33 +75,6 @@ export function hitThumb(hit: SearchHit, width: number): string | undefined {
   const v = pool.find((x) => x.width >= width) ?? pool.at(-1);
   // Same-origin: the shop serves the public media bucket under /media (CSP img-src 'self').
   return v && `/${v.key}`;
-}
-
-// --- consent (spec A20: before consent, no device storage and no beacons) ---------------------
-
-const CONSENT_COOKIE = "consent";
-
-/** `null` = the visitor has not decided yet (show the banner). */
-export function readConsent(cookie = globalThis.document?.cookie ?? ""): ConsentPurpose[] | null {
-  const raw = cookie
-    .split(";")
-    .map((c) => c.trim())
-    .find((c) => c.startsWith(`${CONSENT_COOKIE}=`))
-    ?.slice(CONSENT_COOKIE.length + 1);
-  if (raw === undefined) return null;
-  return decodeURIComponent(raw)
-    .split(",")
-    .filter((p): p is ConsentPurpose =>
-      ["analytics", "ads", "personalization", "email_marketing", "review_invites"].includes(p),
-    );
-}
-
-/** Stores the choice (also "none") for 180 days and reports it to the platform. */
-export function writeConsent(purposes: ConsentPurpose[]) {
-  // A strictly necessary cookie (it records the choice itself), so it is allowed before consent.
-  // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is not available in Safari/Firefox
-  document.cookie = `${CONSENT_COOKIE}=${encodeURIComponent(purposes.join(","))}; Path=/; Max-Age=15552000; SameSite=Lax; Secure`;
-  navigator.sendBeacon?.("/_p/e", JSON.stringify({ events: [{ type: "consent", purposes }] }));
 }
 
 // --- events beacon ------------------------------------------------------------------------------
@@ -105,7 +96,7 @@ export function createBeacon({
   endpoint?: string;
 } = {}) {
   let queue: BeaconEvent[] = [];
-  const allowed = () => readConsent()?.includes(purpose) ?? false;
+  const allowed = () => hasConsent(purpose);
   const flush = () => {
     if (!queue.length) return;
     if (allowed())
@@ -125,20 +116,23 @@ export function createBeacon({
 }
 
 /**
- * Web Vitals RUM (spec §9.6): only for consented, sampled page views; `web-vitals` is loaded
- * lazily, so unsampled visitors download nothing.
+ * Web Vitals RUM (spec §9.6): only for consented, sampled page views. The reporter
+ * (`vitals.ts`, < 1 kB) loads lazily, so unsampled visitors download nothing; its metrics go
+ * out in one beacon when the page is hidden. `template` (`home`, `category`, `product`, ...)
+ * groups the dashboard's p75 per template.
  */
-export async function startRum(sampleRate: number, beacon = createBeacon()) {
-  if (!(readConsent()?.includes("analytics") ?? false) || Math.random() >= sampleRate) return;
-  const { onCLS, onINP, onLCP } = await import("web-vitals/attribution");
-  const report = (m: { name: string; value: number; rating: string }) =>
-    beacon.track({
-      type: "web_vital",
-      name: m.name,
-      value: Math.round(m.value * 1000) / 1000,
-      rating: m.rating,
-    });
-  onLCP(report);
-  onINP(report);
-  onCLS(report);
+export async function startRum(sampleRate: number, template: string, beacon = createBeacon()) {
+  if (!hasConsent("analytics") || Math.random() >= sampleRate) return;
+  const { observeVitals } = await import("./vitals.ts");
+  observeVitals((metrics) => {
+    for (const m of metrics)
+      beacon.track({
+        type: "web_vital",
+        template,
+        name: m.name,
+        value: Math.round(m.value * 1000) / 1000,
+        rating: m.rating,
+      });
+    beacon.flush();
+  });
 }

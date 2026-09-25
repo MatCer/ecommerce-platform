@@ -27,6 +27,7 @@ import {
   normalizeHost,
   type Site,
   type SiteResolver,
+  splitLocale,
 } from "./sites.ts";
 
 export interface GatewayOptions {
@@ -272,7 +273,18 @@ export function createGateway(opts: GatewayOptions) {
     };
   }
 
-  async function renderTheme(site: Site, url: URL, req: Request, port: string): Promise<Response> {
+  /**
+   * `prefix` is the locale prefix the visitor used (`/cs`) when `url` is the unprefixed page:
+   * a 404 looks up redirects as the visitor typed the URL first, then unprefixed with the
+   * target kept in the visitor's locale.
+   */
+  async function renderTheme(
+    site: Site,
+    url: URL,
+    req: Request,
+    port: string,
+    prefix = "",
+  ): Promise<Response> {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     const artifact = site.theme_artifact;
@@ -365,7 +377,9 @@ export function createGateway(opts: GatewayOptions) {
     }
     const { r, cacheable } = await store();
     if (r.status === 404) {
-      const redirect = await redirectFor(site, url);
+      const redirect =
+        (prefix ? await redirectFor(site, `${prefix}${url.pathname}`) : null) ??
+        (await redirectFor(site, url.pathname, prefix));
       if (redirect) return redirect;
     }
     return respond(
@@ -379,8 +393,8 @@ export function createGateway(opts: GatewayOptions) {
   }
 
   /** Spec §9.5: a page the theme does not know may have a merchant-defined redirect. */
-  async function redirectFor(site: Site, url: URL): Promise<Response | null> {
-    const query = new URLSearchParams({ path: url.pathname });
+  async function redirectFor(site: Site, path: string, prefix = ""): Promise<Response | null> {
+    const query = new URLSearchParams({ path });
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/redirects/resolve?${query}`, {
         headers: apiHeaders(site, { accept: "application/json" }),
@@ -391,9 +405,14 @@ export function createGateway(opts: GatewayOptions) {
     const to = r?.to_path;
     // Same-shop paths only (the API enforces it too): never an open redirect.
     if (typeof to !== "string" || !SAME_SHOP_PATH.test(to)) return null;
+    // Keep the visitor's locale unless the rule already targets a localized path.
+    const localized = !prefix || to === prefix || to.startsWith(`${prefix}/`);
     return new Response(null, {
       status: r?.code === 302 ? 302 : 301,
-      headers: { location: to, "cache-control": "no-store" },
+      headers: {
+        location: localized ? to : `${prefix}${to === "/" ? "" : to}`,
+        "cache-control": "no-store",
+      },
     });
   }
 
@@ -572,6 +591,39 @@ export function createGateway(opts: GatewayOptions) {
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   }
 
+  /**
+   * Consent record from the platform banner (A20): same-origin JSON, forwarded to the API.
+   * Until the API records consent (WP9) an unknown route is answered 202 "not recorded", so
+   * the banner stays quiet; the browser keeps its own copy of the choice either way.
+   */
+  async function consent(site: Site, req: Request, host: string, port: string): Promise<Response> {
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    const body = await readJsonBody(req, MAX_JSON_BODY);
+    if (body instanceof Response) return body;
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/consent`, {
+        method: "POST",
+        headers: apiHeaders(site, { "content-type": "application/json" }),
+        body,
+      }),
+    );
+    if (res.status === 404 || res.status === 405) {
+      await res.body?.cancel();
+      return Response.json(
+        { recorded: false },
+        { status: 202, headers: { "cache-control": "no-store" } },
+      );
+    }
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   /** Newsletter sign-up: same-origin JSON only; double opt-in is the API's job (§11.5). */
   async function newsletter(
     site: Site,
@@ -581,6 +633,35 @@ export function createGateway(opts: GatewayOptions) {
   ): Promise<Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    // A plain HTML form (works without JS): subscribe, then 303 back to the page it came from
+    // with `?newsletter=ok|invalid#newsletter` for the theme to render the outcome.
+    if ((req.headers.get("content-type") ?? "").startsWith("application/x-www-form-urlencoded")) {
+      const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+      if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+      const email = new URLSearchParams(new TextDecoder().decode(raw)).get("email") ?? "";
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/newsletter/subscribe`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({ email }),
+        }),
+      );
+      await res.body?.cancel();
+      let back = new URL("/", `${scheme}://${host}${port}`);
+      const referer = URL.parse(req.headers.get("referer") ?? "");
+      // Same shop only (never an open redirect); the query keeps its other parameters.
+      if (referer && referer.host === `${host}${port}`) back = referer;
+      back.searchParams.set("newsletter", res.ok ? "ok" : "invalid");
+      // `//evil.example/x` is a same-host path but a network-path reference as a Location.
+      const path = /^\/(?![/\\])/.test(back.pathname) ? back.pathname : "/";
+      return new Response(null, {
+        status: 303,
+        headers: {
+          location: `${path}${back.search}#newsletter`,
+          "cache-control": "no-store",
+        },
+      });
+    }
     const body = await readJsonBody(req, MAX_JSON_BODY);
     if (body instanceof Response) return body;
     const res = await upstream(
@@ -609,6 +690,19 @@ export function createGateway(opts: GatewayOptions) {
     port: string,
   ): Promise<Response> {
     const p = url.pathname;
+    // `/<locale>/…` of a non-default market locale (spec §9.1): theme pages and island reads
+    // render in that locale from the unprefixed path. The locale is part of the cache key; the
+    // cart keeps its unprefixed routes (cookie `Path=/_p`).
+    const split = splitLocale(site, p);
+    if (split) {
+      const localized = { ...site, locale: split.locale };
+      const inner = new URL(`${split.path}${url.search}`, url);
+      if (split.path.startsWith("/_p/public/"))
+        return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
+      if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))
+        return renderTheme(localized, inner, req, port, `/${split.locale}`);
+      return text(404, "Not found");
+    }
     if (p === "/_p/cart" || p.startsWith("/_p/cart/"))
       return cartProxy(site, req, p.slice("/_p/cart".length), host, port);
     if (p === "/_p/checkout/start") return checkoutStart(site, req, host, port);
@@ -616,6 +710,7 @@ export function createGateway(opts: GatewayOptions) {
       return publicProxy(site, req, url, p.slice("/_p/public".length));
     if (p === "/_p/e") return events(site, req, host, port);
     if (p === "/_p/newsletter") return newsletter(site, req, host, port);
+    if (p === "/_p/consent") return consent(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {
       return new Response(SPECULATION_RULES, {
         headers: {

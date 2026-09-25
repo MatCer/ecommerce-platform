@@ -1,0 +1,126 @@
+---
+import type { ShopModel } from "@platform/storefront-sdk/types";
+import MiniCart from "../islands/MiniCart";
+import SearchBox from "../islands/SearchBox";
+import Sheets from "../islands/Sheets";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * Trust band, sticky header (logo, search, account, cart) and category navigation.
+ * Desktop: top-level categories in a row (subcategories are chips on the category page; no
+ * hover menus, which WCAG 1.4.13 would require to be dismissible with Escape).
+ * Phones: the full tree in a native popover sheet (no JS, Escape and outside click close it).
+ */
+interface Props {
+  shop: ShopModel;
+  q?: string;
+}
+const { shop, q } = Astro.props;
+const { t, href, pick, pluralKeys } = i18n(shop);
+const accountUrl = `${shop.checkout_url}/account`;
+const CART_KEYS = [
+  "cart.title",
+  "cart.open",
+  "cart.close",
+  "cart.empty",
+  "cart.continue",
+  "cart.subtotal",
+  "cart.discount",
+  "cart.total",
+  "cart.vat_included",
+  "cart.checkout",
+  "cart.increase",
+  "cart.decrease",
+  "cart.remove",
+  "cart.quantity",
+  "cart.unavailable",
+  "cart.update_failed",
+  "cart.shipping_note",
+  "cart.free_shipping_remaining",
+  "cart.free_shipping_reached",
+  ...pluralKeys("cart.items"),
+];
+---
+
+<div class="bg-panel text-panel-foreground">
+  <ul class="container-shop flex h-9 items-center justify-center gap-8 text-xs font-medium md:justify-start">
+    <li class="flex items-center gap-2"><Icon name="truck" class="size-4" />{shop.trust.delivery}</li>
+    <li class="hidden items-center gap-2 md:flex"><Icon name="returns" class="size-4" />{shop.trust.returns}</li>
+    {
+      shop.free_shipping_threshold && (
+        <li class="hidden items-center gap-2 lg:flex">
+          <Icon name="check" class="size-4" />
+          {t("trust.free_shipping_from", { amount: shop.free_shipping_threshold.formatted })}
+        </li>
+      )
+    }
+  </ul>
+</div>
+
+<header class="sticky top-0 z-30 border-b border-border bg-card">
+  <div class="container-shop grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-2 py-2 md:grid-cols-[auto_minmax(0,34rem)_1fr] md:gap-x-6 md:py-3">
+    <div class="flex items-center gap-1">
+      <button type="button" popovertarget="nav-drawer" class="-ml-2 grid size-11 place-items-center rounded-md hover:bg-muted md:hidden">
+        <Icon name="menu" class="size-6" />
+        <span class="sr-only">{t("nav.menu")}</span>
+      </button>
+      <a href={href("/")} class="font-display text-xl font-extrabold tracking-tight whitespace-nowrap md:text-2xl">{shop.name}</a>
+    </div>
+    <div class="col-span-full row-start-2 md:col-span-1 md:col-start-2 md:row-start-1">
+      <SearchBox client:idle q={q} base={shop.base_path} labels={pick(["search.label", "search.placeholder", "search.all_results", "nav.categories", "search.products"])} />
+    </div>
+    <div class="col-start-3 flex items-center justify-self-end md:gap-1">
+      <a href={accountUrl} class="grid size-11 place-items-center rounded-md hover:bg-muted lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold">
+        <Icon name="user" class="size-6 lg:size-5" />
+        <span class="sr-only lg:not-sr-only">{t("nav.account")}</span>
+      </a>
+      <MiniCart client:idle locale={shop.locale} base={shop.base_path} threshold={shop.free_shipping_threshold ?? undefined} labels={pick(CART_KEYS)} />
+    </div>
+  </div>
+  <nav aria-label={t("nav.main")} class="hidden border-t border-border md:block">
+    <ul class="container-shop flex gap-1 text-[0.9375rem] font-semibold">
+      {
+        shop.menus.main.map((item) => (
+          <li>
+            <a href={item.href} class="-ml-3 flex h-11 items-center px-3 underline-offset-8 decoration-2 hover:text-identity-ink hover:underline">
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>
+
+<Sheets client:idle />
+<nav id="nav-drawer" popover aria-label={t("nav.main")} class="sheet">
+  <div class="flex h-16 items-center justify-between border-b border-border px-4">
+    <a href={href("/")} class="font-display text-lg font-extrabold tracking-tight">{shop.name}</a>
+    <button type="button" popovertarget="nav-drawer" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-muted">
+      <Icon name="close" class="size-6" />
+      <span class="sr-only">{t("nav.close")}</span>
+    </button>
+  </div>
+  <ul class="divide-y divide-border px-4">
+    {
+      shop.menus.main.map((item) => (
+        <li class="py-3">
+          <a href={item.href} class="flex min-h-11 items-center font-display text-lg font-bold">{item.label}</a>
+          {item.children.length > 0 && (
+            <ul class="grid pb-1">
+              {item.children.map((c) => (
+                <li>
+                  <a href={c.href} class="flex min-h-11 items-center text-muted-foreground hover:text-foreground">{c.label}</a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))
+    }
+  </ul>
+  <div class="mt-2 border-t border-border px-4 py-4">
+    <a href={accountUrl} class="flex min-h-11 items-center gap-3 font-semibold"><Icon name="user" />{t("nav.account")}</a>
+  </div>
+</nav>

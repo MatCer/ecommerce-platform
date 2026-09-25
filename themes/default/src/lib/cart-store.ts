@@ -3,14 +3,26 @@ import type { CartState } from "@platform/storefront-sdk/types";
 import { createSignal } from "solid-js";
 
 /**
- * Cart state shared by islands (mini cart, buy box). Islands are separate Solid roots, but
- * they import this module from the same chunk, so they share one signal.
+ * Cart state shared by islands (mini cart, buy box). Islands are separate Solid roots, but they
+ * import this module from the same chunk, so they share one signal. The cart itself lives on
+ * the server behind the HttpOnly `cart` capability cookie (A4); this is only its last answer.
  */
 const [cart, setCart] = createSignal<CartState | null>(null);
 const [open, setOpen] = createSignal(false);
+/** Increments whenever an item lands, to animate the cart count. */
+const [added, setAdded] = createSignal(0);
 let loading: Promise<void> | null = null;
 
-export { cart, open, setOpen };
+export { added, cart, open, setOpen };
+
+/**
+ * Opens the drawer even if a close is still settling (the dialog's `close` event is async, so
+ * `open` can briefly read true while the dialog is already shut).
+ */
+export function openCart() {
+  setOpen(false);
+  setOpen(true);
+}
 
 export function loadCart() {
   loading ??= api.get().then(
@@ -20,8 +32,10 @@ export function loadCart() {
   return loading;
 }
 
-export async function addToCart(variantId: string, quantity = 1) {
-  setCart(await api.add(variantId, quantity));
+/** Adds a variant; retried adds reuse the key, so a lost response is not counted twice. */
+export async function addToCart(variantId: string, quantity = 1, key = crypto.randomUUID()) {
+  setCart(await api.add(variantId, quantity, key));
+  setAdded(added() + 1);
 }
 
 export async function updateLine(lineId: string, quantity: number) {

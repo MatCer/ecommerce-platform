@@ -514,7 +514,10 @@ export interface components {
             value: string;
         };
         FacetView: {
-            /** @description Query parameter name. */
+            /**
+             * @description Facet key (`opt.color`, `param.material`, `brand`); the listing query parameter is
+             *     `f.<key>` (`?f.opt.color=red`).
+             */
             key: string;
             kind: components["schemas"]["FacetKind"];
             label: string;
@@ -786,7 +789,18 @@ export interface components {
             title: string;
         };
         ShopModel: {
+            /**
+             * @description `""` in the market's default locale, else `/<locale>` (spec §9.1). Page-model hrefs
+             *     already carry it; themes prefix the links they build themselves (`/search`,
+             *     `/p/<slug>`, `/_p/public/*`).
+             */
+            base_path: string;
             cache: components["schemas"]["CacheHints"];
+            /**
+             * @description The checkout origin (`https://checkout.<shop host>`, A1): account, order status and the
+             *     withdrawal form (`/withdraw`, A19) live there, not on the theme's origin.
+             */
+            checkout_url: string;
             consent: components["schemas"]["ConsentConfig"];
             currencies: string[];
             currency: string;
@@ -795,7 +809,7 @@ export interface components {
             legal_pages: components["schemas"]["Link"][];
             /** @description Active locale (`cs`); also the `lang` of pages. */
             locale: string;
-            /** @description Locales of this market (M1: the market's default locale; prefixes arrive with WP8). */
+            /** @description Locales of this market, the default first, each with its home page URL. */
             locales: components["schemas"]["Alternate"][];
             /** @description The tenant's markets (other shops of the same merchant). */
             markets: components["schemas"]["MarketLink"][];

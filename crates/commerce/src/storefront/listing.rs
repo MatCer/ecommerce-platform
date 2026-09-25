@@ -534,8 +534,13 @@ pub async fn search_listing(
                     disabled: !v.available,
                 })
                 .collect(),
+            // The engine labels option/parameter facets from the catalog; brand is ours.
+            label: if f.key == "brand" {
+                messages::text(&ctx.locale, "listing.brand").to_owned()
+            } else {
+                f.label
+            },
             key: f.key,
-            label: f.label,
         })
         .collect();
     let applied = facets

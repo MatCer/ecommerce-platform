@@ -1,0 +1,15 @@
+---
+/**
+ * Reading layout for CMS pages and blog articles. `html` must be platform-sanitized content
+ * (`content_html`); the theme contract allows unescaped HTML only for that.
+ */
+interface Props {
+  content_html: string;
+}
+const { content_html } = Astro.props;
+---
+
+<div
+  class="grid max-w-prose gap-4 text-[1.0625rem] leading-relaxed [&_a]:text-identity-ink [&_a]:underline [&_h2]:mt-6 [&_h2]:text-2xl [&_h2]:font-extrabold [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-bold [&_img]:rounded-lg [&_li]:mt-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+  set:html={content_html}
+/>

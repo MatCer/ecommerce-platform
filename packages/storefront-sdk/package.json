@@ -7,6 +7,8 @@
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
     "./client": "./src/client.ts",
+    "./consent": "./src/consent.ts",
+    "./consent-banner": "./src/ConsentBanner.tsx",
     "./format": "./src/format.ts",
     "./types": "./src/types.ts"
   },
@@ -15,10 +17,13 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "openapi-fetch": "catalog:",
-    "web-vitals": "catalog:"
+    "openapi-fetch": "catalog:"
+  },
+  "peerDependencies": {
+    "solid-js": "catalog:"
   },
   "devDependencies": {
-    "@platform/config": "workspace:*"
+    "@platform/config": "workspace:*",
+    "solid-js": "catalog:"
   }
 }
