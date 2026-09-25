@@ -59,6 +59,10 @@ pub struct FeedItem {
     /// `PARAM` name/value pairs (Google: color, size, material, pattern, gender, age group).
     pub params: Vec<(String, String)>,
     pub stock: Option<i32>,
+    /// Heureka's own category (`Heureka.cz | ...`), kept for the Heureka export.
+    pub heureka_category: Option<String>,
+    /// `g:google_product_category`, kept for the Google export.
+    pub google_category: Option<String>,
 }
 
 /// Parses a decimal price (`1 299,90`, `1299.90`, `299.00 CZK`) into minor units (2 decimals)

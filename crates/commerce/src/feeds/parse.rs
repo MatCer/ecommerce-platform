@@ -214,12 +214,15 @@ fn heureka_item(raw: &Raw) -> FeedItem {
         })
         .unwrap_or_default();
     // Heureka's own taxonomy starts with the portal name.
-    if category
+    let heureka_category = if category
         .first()
         .is_some_and(|c| c.to_ascii_lowercase().starts_with("heureka."))
     {
         category.remove(0);
-    }
+        opt(raw.get("CATEGORYTEXT"))
+    } else {
+        None
+    };
     let images = raw
         .all("IMGURL")
         .chain(raw.all("IMGURL_ALTERNATIVE"))
@@ -259,6 +262,8 @@ fn heureka_item(raw: &Raw) -> FeedItem {
         category,
         params,
         stock: stock(raw.get("STOCK_QUANTITY")),
+        heureka_category,
+        google_category: None,
     }
 }
 
@@ -317,6 +322,8 @@ fn google_item(raw: &Raw, locale: &str) -> FeedItem {
         category,
         params,
         stock: stock(raw.get("quantity")),
+        heureka_category: None,
+        google_category: opt(raw.get("google_product_category")),
     }
 }
 
