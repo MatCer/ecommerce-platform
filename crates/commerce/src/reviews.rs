@@ -121,9 +121,12 @@ pub async fn issue_tokens(
         r#"SELECT DISTINCT ON (l.product_id) l.id, l.product_id AS "product_id!", l.name
            FROM order_lines l
            WHERE l.order_id = $1 AND l.product_id IS NOT NULL
-             AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.order_line_id = l.id)
+             -- One review per product and order, whichever line it came through.
+             AND NOT EXISTS (SELECT 1 FROM reviews r JOIN order_lines x ON x.id = r.order_line_id
+                             WHERE x.order_id = $1 AND r.product_id = l.product_id)
              AND NOT EXISTS (SELECT 1 FROM review_tokens t
-                             WHERE t.order_line_id = l.id AND t.used_at IS NOT NULL)
+                             WHERE t.order_id = $1 AND t.product_id = l.product_id
+                               AND t.used_at IS NOT NULL)
            ORDER BY l.product_id, l.position"#,
         order_id
     )
