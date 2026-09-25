@@ -119,6 +119,28 @@ async fn openapi_lists_health_routes() {
     assert!(spec["components"]["schemas"]["Problem"].is_object());
 }
 
+#[test]
+fn openapi_operation_ids_are_unique() {
+    // Generated clients key operations by id: a duplicate silently retypes another endpoint
+    // (a WP19 `list_runs` once turned the AI theme run list into flow runs).
+    // Duplicated before this check existed; rename them and drop this list.
+    const KNOWN: [&str; 4] = ["me", "get_order", "update_address", "search"];
+    for spec in [api::openapi(), api::openapi_storefront()] {
+        let spec = serde_json::to_value(&spec).unwrap();
+        let mut seen = std::collections::HashSet::new();
+        for ops in spec["paths"].as_object().unwrap().values() {
+            for op in ops.as_object().unwrap().values() {
+                if let Some(id) = op["operationId"].as_str() {
+                    assert!(
+                        seen.insert(id.to_owned()) || KNOWN.contains(&id),
+                        "duplicate operationId {id}"
+                    );
+                }
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn unknown_route_is_problem_json() {
     let res = get(app(state(dead_db()), false), "/nope").await;

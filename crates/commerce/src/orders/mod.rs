@@ -162,6 +162,10 @@ pub(crate) async fn apply_order(
         .await?;
     }
     o.status = next.as_str().to_owned();
+    if next == OrderStatus::Delivered {
+        platform::queue::publish(&mut **tx, "order.delivered", &json!({ "order_id": o.id }))
+            .await?;
+    }
     Ok(())
 }
 

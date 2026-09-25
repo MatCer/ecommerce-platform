@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT stream, to_email, subject, html, body_text, status, uncertain_count, attempts,\n                  subscriber_id, list_unsubscribe, attachments,\n                  updated_at < now() - make_interval(secs => $2) AS \"stale!\"\n           FROM email_messages WHERE id = $1 FOR UPDATE",
+  "query": "SELECT stream, template, to_email, subject, html, body_text, status, uncertain_count, attempts,\n                  subscriber_id, list_unsubscribe, attachments,\n                  updated_at < now() - make_interval(secs => $2) AS \"stale!\"\n           FROM email_messages WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "template",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "template"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "to_email",
         "type_info": "Text",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "subject",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "html",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "body_text",
         "type_info": "Text",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -70,7 +81,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "uncertain_count",
         "type_info": "Int2",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "attempts",
         "type_info": "Int4",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "subscriber_id",
         "type_info": "Uuid",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "list_unsubscribe",
         "type_info": "Text",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "attachments",
         "type_info": "Jsonb",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "stale!",
         "type_info": "Bool",
         "origin": "Expression"
@@ -141,6 +152,7 @@
       false,
       false,
       false,
+      false,
       true,
       true,
       false,
@@ -152,5 +164,5 @@
       null
     ]
   },
-  "hash": "35ca74b284e9c13b5bbd47c58693e6b235e27357c36875bee851f8177a944ed8"
+  "hash": "5417ce4accfde9c0f913346cfcc8d1ca91e5c225850fcc80bf0d083eaa6de386"
 }

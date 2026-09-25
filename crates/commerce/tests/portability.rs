@@ -551,6 +551,9 @@ async fn tenant_export_zips_every_table_without_secrets(db: PgPool) {
         "customer_sessions.jsonl",
         "order_tokens.jsonl",
         "review_tokens.jsonl",
+        "flow_restore_tokens.jsonl",
+        "flow_unsubscribe_tokens.jsonl",
+        "flow_watch_mail_quotas.jsonl",
         "data_exports.jsonl",
         "idempotency_keys.jsonl",
     ] {

@@ -1,0 +1,23 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, shopUrl } from "../../lib/api";
+
+// Stock / price alert cancelled through its unsubscribe link (WP19).
+const shop = await checkoutApi(Astro.request).shop();
+const m = shop?.messages ?? {};
+---
+
+<Checkout
+  title={t(m, "watch.cancelled_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid max-w-xl gap-4">
+    <h1 class="font-display text-2xl font-bold">{t(m, "watch.cancelled_title")}</h1>
+    <p role="status">{t(m, "watch.cancelled")}</p>
+    <a href={shopUrl(Astro.url)} class="text-sm text-identity-ink underline">{t(m, "nl.back")}</a>
+  </div>
+</Checkout>

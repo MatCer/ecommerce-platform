@@ -17,6 +17,19 @@ const BATCH: i32 = 100;
 /// cache purges here. Search jobs are versioned per product (`commerce::search::job_for_event`).
 pub fn subscribers(event_type: &str) -> &'static [&'static str] {
     match event_type {
+        "inventory.changed" | "price.changed" => &[
+            handlers::EVENTS_LOG,
+            handlers::EDGE_PURGE,
+            handlers::FANOUT_JOB,
+            commerce::flows::EVENT_JOB,
+        ],
+        commerce::orders::CREATED_EVENT => &[
+            handlers::EVENTS_LOG,
+            handlers::FANOUT_JOB,
+            commerce::flows::EVENT_JOB,
+        ],
+        "cart.changed" => &[handlers::EVENTS_LOG, commerce::flows::EVENT_JOB],
+        "order.delivered" => &[handlers::EVENTS_LOG, commerce::flows::EVENT_JOB],
         commerce::staff::INVITED_EVENT => &[handlers::EVENTS_LOG, handlers::STAFF_INVITE_MAIL],
         // Catalog changes both purge the edge and go out as webhooks (product.*, inventory).
         t if commerce::storefront::purge::EVENTS.contains(&t)
@@ -123,8 +136,14 @@ mod tests {
     fn webhook_events_fan_out() {
         assert_eq!(
             subscribers("order.created"),
-            [handlers::EVENTS_LOG, handlers::FANOUT_JOB]
+            [
+                handlers::EVENTS_LOG,
+                handlers::FANOUT_JOB,
+                commerce::flows::EVENT_JOB
+            ]
         );
+        assert!(subscribers("cart.changed").contains(&commerce::flows::EVENT_JOB));
+        assert!(subscribers("inventory.changed").contains(&commerce::flows::EVENT_JOB));
         for t in commerce::webhooks::EVENTS {
             assert!(subscribers(t).contains(&handlers::FANOUT_JOB), "{t}");
         }

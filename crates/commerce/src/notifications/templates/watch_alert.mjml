@@ -1,0 +1,7 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("watch_alert.heading") }}</mj-text>
+        <mj-text>{{ t("watch_alert.intro", shop=brand.shop_name) }}</mj-text>
+        <mj-button href="{{ url }}">{{ t("watch_alert.button") }}</mj-button>
+        <mj-text><a href="{{ unsubscribe_url }}">{{ t("watch_alert.unsubscribe") }}</a></mj-text>
+{% endblock %}

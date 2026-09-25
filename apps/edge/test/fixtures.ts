@@ -250,6 +250,19 @@ export function fakeApi() {
         ? Response.json({ status: "ok" }, { status: p.endsWith("resubscribe") ? 202 : 200 })
         : Response.json({ code: "not_found" }, { status: 404 });
     }
+    if (p === "/watch/subscribe") {
+      const body = JSON.parse(calls.at(-1)?.body || "{}") as {
+        email?: string;
+        variant_id?: string;
+      };
+      if (body.variant_id === "v-gone")
+        return Response.json({ code: "not_found" }, { status: 404 });
+      if (body.variant_id === "v-busy")
+        return Response.json({ code: "rate_limited" }, { status: 429 });
+      if (!body.email?.includes("@"))
+        return Response.json({ code: "invalid_email" }, { status: 422 });
+      return Response.json({ status: "accepted" }, { status: 202 });
+    }
     if (p === "/newsletter/subscribe")
       return Response.json(
         { tenant, body: JSON.parse(calls.at(-1)?.body || "null") },

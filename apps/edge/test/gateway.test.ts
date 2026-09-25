@@ -701,6 +701,60 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     expect(cross.status).toBe(403);
   });
 
+  test("watch form without JS: target price to minor units, 303 back to the product", async () => {
+    api.calls.length = 0;
+    const form = { ...origin, "content-type": "application/x-www-form-urlencoded" };
+    const post = (body: string, referer = `${shop}/p/tricko?variant=v1`) =>
+      get(`${shop}/_p/watch`, { ...form, referer }, { method: "POST", body });
+    const ok = await post("variant_id=v1&kind=price_drop&email=jana%40example.cz&target=199%2C90");
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("location")).toBe("/p/tricko?variant=v1&watch=ok#watch");
+    expect(ok.headers.get("cache-control")).toBe("no-store");
+    expect(JSON.parse(api.calls.at(-1)?.body ?? "")).toEqual({
+      variant_id: "v1",
+      kind: "price_drop",
+      email: "jana@example.cz",
+      target_minor: 19990,
+    });
+    // An empty target means "any drop"; back-in-stock never sends one.
+    await post("variant_id=v1&kind=back_in_stock&email=a%40b.cz&target=5");
+    expect(JSON.parse(api.calls.at(-1)?.body ?? "")).toEqual({
+      variant_id: "v1",
+      kind: "back_in_stock",
+      email: "a@b.cz",
+    });
+    await post("variant_id=v1&kind=price_drop&email=a%40b.cz&target=");
+    expect(JSON.parse(api.calls.at(-1)?.body ?? "").target_minor).toBeUndefined();
+    // A malformed price never reaches the API.
+    const calls = api.calls.length;
+    const bad = await post("variant_id=v1&kind=price_drop&email=a%40b.cz&target=12.345");
+    expect(bad.headers.get("location")).toBe("/p/tricko?variant=v1&watch=invalid#watch");
+    expect(api.calls.length).toBe(calls);
+    expect(
+      (await post("variant_id=v1&kind=back_in_stock&email=nope")).headers.get("location"),
+    ).toBe("/p/tricko?variant=v1&watch=invalid#watch");
+    // Watchdog disabled or product gone: its own outcome.
+    expect(
+      (await post("variant_id=v-gone&kind=back_in_stock&email=a%40b.cz")).headers.get("location"),
+    ).toBe("/p/tricko?variant=v1&watch=unavailable#watch");
+    // Throttling or an outage is not the shopper's mistake.
+    expect(
+      (await post("variant_id=v-busy&kind=back_in_stock&email=a%40b.cz")).headers.get("location"),
+    ).toBe("/p/tricko?variant=v1&watch=error#watch");
+    // Same shop only as the redirect target, and same-origin only as the request.
+    const foreign = await post(
+      "variant_id=v1&kind=back_in_stock&email=a%40b.cz",
+      "https://evil.example/p",
+    );
+    expect(foreign.headers.get("location")).toBe("/?watch=ok#watch");
+    const cross = await get(
+      `${shop}/_p/watch`,
+      { "content-type": "application/x-www-form-urlencoded" },
+      { method: "POST", body: "variant_id=v1" },
+    );
+    expect(cross.status).toBe(403);
+  });
+
   test("local http mode also accepts the https origin of the same host (Caddy tls internal)", async () => {
     const res = await get(
       `${shop}/_p/cart/lines`,
@@ -1020,6 +1074,21 @@ describe("platform routes backed by the real API (WP6)", () => {
       headers: { "x-locale": "cs", "x-market": "m-sk" },
     });
     expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
+    // The watch form posts under the page's locale: the confirmation mail is in that language.
+    const watch = await get(
+      "http://demo-sk.localhost/cs/_p/watch",
+      {
+        origin: "http://demo-sk.localhost",
+        referer: "http://demo-sk.localhost/cs/p/tricko",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      { method: "POST", body: "variant_id=v1&kind=back_in_stock&email=a%40b.cz" },
+    );
+    expect(watch.headers.get("location")).toBe("/cs/p/tricko?watch=ok#watch");
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/watch/subscribe",
+      headers: { "x-locale": "cs", "x-market": "m-sk" },
+    });
     // Private recommendations stay unprefixed like the cart (cookie `Path=/_p`); `?locale=`
     // picks one of the market's locales, anything else falls back to the default.
     expect((await get("http://demo-sk.localhost/cs/_p/recommendations")).status).toBe(404);
@@ -1180,6 +1249,11 @@ describe("platform routes backed by the real API (WP6)", () => {
     // send `Origin: null` (refused as cross-origin); `same-origin` still hides the token.
     const nl = await get(`${co}/newsletter/confirm?token=${"a".repeat(64)}`);
     expect(nl.headers.get("referrer-policy")).toBe("same-origin");
+    for (const path of ["watch/confirm", "restore-cart"]) {
+      const link = await get(`${co}/${path}?token=${"a".repeat(64)}`);
+      expect(link.headers.get("referrer-policy")).toBe("same-origin");
+      expect(link.headers.get("cache-control")).toBe("no-store");
+    }
   });
 
   test("consent: first-party cookies for the shop host after a choice only", async () => {
