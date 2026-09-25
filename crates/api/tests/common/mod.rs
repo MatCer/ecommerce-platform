@@ -114,7 +114,12 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
                 .unwrap(),
         ),
         http: reqwest::Client::new(),
-        meili_url: "http://127.0.0.1:1".parse().unwrap(),
+        meili: commerce::search::Meili::new(
+            reqwest::Client::new(),
+            "http://127.0.0.1:1".parse().unwrap(),
+            "unused".into(),
+            Duration::from_secs(1),
+        ),
         storage: testkit::memory_storage(),
         staff_auth: Arc::new(StaffAuth::with_timing(
             reqwest::Client::new(),

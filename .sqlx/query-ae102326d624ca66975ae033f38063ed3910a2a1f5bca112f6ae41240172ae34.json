@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search_indexes SET building_uid = NULL WHERE building_uid IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "ae102326d624ca66975ae033f38063ed3910a2a1f5bca112f6ae41240172ae34"
+}

@@ -1,5 +1,6 @@
 //! Readiness checks (spec §15): database, Meilisearch and object storage.
-//! Search is out of core readiness (spec A30): Meilisearch is reported but does not fail it.
+//! Search is out of core readiness (spec A27, A30): a Meilisearch failure makes the overall
+//! status `degraded` (still ready, HTTP 200), never `fail`.
 //! Responses expose only ok/fail per dependency; the cause goes to the logs, since `/readyz`
 //! is publicly reachable and must not reveal internal hostnames or errors.
 
@@ -19,6 +20,8 @@ const CHECK_TIMEOUT: Duration = Duration::from_secs(2);
 #[serde(rename_all = "snake_case")]
 pub enum CheckStatus {
     Ok,
+    /// Only for the overall status: core dependencies are fine, search is not.
+    Degraded,
     Fail,
 }
 
@@ -31,15 +34,16 @@ pub struct Checks {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Readiness {
-    /// `ok` when the core dependencies (database, storage) are `ok`. Meilisearch is reported
-    /// but not required: search degrades, the shop keeps working (spec A30).
+    /// `ok` when every dependency is `ok`; `degraded` when only Meilisearch fails (search
+    /// answers 503, the shop keeps working, spec A27/A30); `fail` when a core dependency
+    /// (database, storage) fails.
     pub status: CheckStatus,
     pub checks: Checks,
 }
 
 impl Readiness {
     pub fn is_ready(&self) -> bool {
-        self.status == CheckStatus::Ok
+        self.status != CheckStatus::Fail
     }
 }
 
@@ -57,10 +61,10 @@ pub async fn readiness(
     );
     let core_ok = database == CheckStatus::Ok && storage == CheckStatus::Ok;
     Readiness {
-        status: if core_ok {
-            CheckStatus::Ok
-        } else {
-            CheckStatus::Fail
+        status: match (core_ok, meilisearch) {
+            (false, _) => CheckStatus::Fail,
+            (true, CheckStatus::Ok) => CheckStatus::Ok,
+            (true, _) => CheckStatus::Degraded,
         },
         checks: Checks {
             database,

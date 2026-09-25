@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.code, o.name_i18n, v.value->>'code' AS \"value?\", v.value->'name_i18n' AS \"value_names?\"\n               FROM product_options o\n               CROSS JOIN LATERAL jsonb_array_elements(o.\"values\") AS v(value)\n               WHERE o.code = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_options",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_options",
+            "name": "name_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value?",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "value_names?",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "221a61dffc82f44bc24b8041e6bad704c396adfc81d755bd3f51612323ee296b"
+}

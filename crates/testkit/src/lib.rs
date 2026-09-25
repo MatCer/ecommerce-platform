@@ -98,3 +98,37 @@ pub async fn staff(runtime: &PgPool, tenant_id: Uuid, user_id: &str, role: &str)
     .unwrap();
     tx.commit().await.unwrap();
 }
+
+/// A Meilisearch client for tests that must not reach one (nothing listens on port 1).
+pub fn dead_meili() -> commerce::search::Meili {
+    commerce::search::Meili::new(
+        reqwest::Client::new(),
+        "http://127.0.0.1:1".parse().unwrap(),
+        "unused".into(),
+        std::time::Duration::from_secs(1),
+    )
+}
+
+/// The real Meilisearch of `make test-search` with the worker's admin key (`MEILI_URL`,
+/// `MEILI_ADMIN_KEY`), for `#[ignore]`d search integration tests. Index names contain the
+/// test's tenant UUID, so tests never share an index.
+pub fn meili() -> commerce::search::Meili {
+    meili_with("MEILI_ADMIN_KEY")
+}
+
+/// Like [`meili`] with the API's search-only key (`MEILI_SEARCH_KEY`): queries in tests run
+/// with the same permissions as in production (A27).
+pub fn meili_search() -> commerce::search::Meili {
+    meili_with("MEILI_SEARCH_KEY")
+}
+
+fn meili_with(key_var: &str) -> commerce::search::Meili {
+    let url = std::env::var("MEILI_URL").expect("MEILI_URL (run via `make test-search`)");
+    let key = std::env::var(key_var).expect("Meilisearch key (run via `make test-search`)");
+    commerce::search::Meili::new(
+        reqwest::Client::new(),
+        url.parse().unwrap(),
+        key,
+        std::time::Duration::from_secs(30),
+    )
+}

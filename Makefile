@@ -11,6 +11,9 @@ SHELL := bash
 export CARGO_BUILD_JOBS ?= 6
 
 PG_PORT ?= 55432
+MEILI_PORT ?= 57700
+MEILI_SEARCH_KEY ?= 2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918
+MEILI_ADMIN_KEY ?= 39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6
 HTTPS_PORT ?= 8443
 APP_OWNER_PASSWORD ?= app-owner-local
 OWNER_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/app
@@ -19,7 +22,7 @@ TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_P
 COMPOSE_FULL := COMPOSE_PROFILES=full docker compose
 COMPOSE_INFRA := COMPOSE_PROFILES=infra docker compose
 
-.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts lint fmt openapi openapi-check admin logs ps theme-build perf e2e
+.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin logs ps theme-build perf e2e
 
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -46,6 +49,11 @@ test-rust:
 
 test-ts:
 	pnpm test
+
+test-search: ## Search integration tests + cs/sk relevance fixtures against Meilisearch (needs `make dev-infra`)
+	DATABASE_URL="$(TEST_DATABASE_URL)" MEILI_URL="http://localhost:$(MEILI_PORT)" \
+	MEILI_ADMIN_KEY="$(MEILI_ADMIN_KEY)" MEILI_SEARCH_KEY="$(MEILI_SEARCH_KEY)" \
+	cargo test --workspace --locked -- --ignored
 
 lint: ## rustfmt check, clippy, Biome, TS typecheck
 	cargo fmt --all --check

@@ -176,7 +176,7 @@ async fn outbox_fans_out_once_and_atomically(db: PgPool) {
     let (tenant, _) = testkit::tenant(&runtime, "alpha").await;
     let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
     for n in 0..3 {
-        queue::publish(&mut *tx, "market.created", &json!({ "n": n }))
+        queue::publish(&mut *tx, "demo.happened", &json!({ "n": n }))
             .await
             .unwrap();
     }
@@ -232,6 +232,45 @@ async fn outbox_fans_out_once_and_atomically(db: PgPool) {
     assert_eq!(pending, 0);
 }
 
+/// Catalog, price and stock events become one debounced search job per product (§11.1).
+#[sqlx::test(migrations = "../../migrations")]
+async fn outbox_versions_search_indexing_per_product(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "alpha").await;
+    let product = testkit::catalog::product(&runtime, tenant, "TS", 2).await;
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let adj = commerce::inventory::Adjustment {
+        delta: Some(3),
+        on_hand: None,
+        note: None,
+    };
+    commerce::inventory::adjust(&mut tx, "t", product.variants[1].id, "r1", &adj)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let payload: serde_json::Value =
+        sqlx::query_scalar("SELECT payload FROM queue.outbox WHERE type = 'inventory.changed'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(payload["product_id"], json!(product.id));
+
+    // product.created + inventory.changed in one dispatch batch → one versioned job.
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let jobs: Vec<(serde_json::Value, Option<uuid::Uuid>, bool)> = sqlx::query_as(
+        "SELECT payload, tenant_id, run_at > now() FROM queue.jobs
+         WHERE kind = 'search.index_product'",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(jobs.len(), 1, "{jobs:?}");
+    assert_eq!(jobs[0].0["product_id"], json!(product.id));
+    assert!(commerce::search::job_version(&jobs[0].0).is_some());
+    assert_eq!(jobs[0].1, Some(tenant));
+    assert!(jobs[0].2, "runs after the delay");
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn only_one_cron_leader_and_one_job_per_slot(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
@@ -283,7 +322,7 @@ async fn cleanup_job_runs_end_to_end(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(testkit::memory_storage()),
+        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili()),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "done").await;
@@ -343,7 +382,7 @@ async fn media_jobs_process_and_purge_assets(db: PgPool) {
     };
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(storage.clone()),
+        worker::handlers::all(storage.clone(), testkit::dead_meili()),
         fast_config(),
     );
     wait_for_status(&db, job_id(media::PROCESS_JOB).await, "done").await;
@@ -417,7 +456,7 @@ async fn media_job_failing_every_attempt_marks_the_asset_failed(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(storage.clone()),
+        worker::handlers::all(storage.clone(), testkit::dead_meili()),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "dead").await;
@@ -462,7 +501,7 @@ async fn scheduled_sale_start_publishes_price_changed(db: PgPool) {
 
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(testkit::memory_storage()),
+        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili()),
         fast_config(),
     );
     let mut found = None;

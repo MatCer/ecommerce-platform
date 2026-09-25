@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pi.price_list_id, pi.variant_id, pi.amount_minor\n         FROM price_intervals pi JOIN variants v ON v.id = pi.variant_id\n         WHERE v.product_id = ANY($1)\n           AND pi.valid_from <= $2 AND (pi.valid_to IS NULL OR pi.valid_to > $2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "price_list_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "price_list_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "amount_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "caee92edec0f3cdbbfe3c9bd979e97e1215982a1c954caa44f8fda57a9e3ddf7"
+}

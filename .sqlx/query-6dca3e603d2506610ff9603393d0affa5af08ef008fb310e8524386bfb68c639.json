@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT locale, building_uid FROM search_indexes",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "building_uid",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "building_uid"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "6dca3e603d2506610ff9603393d0affa5af08ef008fb310e8524386bfb68c639"
+}

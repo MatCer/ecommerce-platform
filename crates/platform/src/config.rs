@@ -245,20 +245,31 @@ impl ServiceTokenConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+/// Meilisearch endpoint and key. The API gets the search-only key, the worker the admin key
+/// (spec A27); the master key stays with Meilisearch. Not `Debug`: holds the key.
+#[derive(Clone)]
 pub struct MeiliConfig {
     /// `MEILI_URL`
     pub url: Url,
+    /// `MEILI_SEARCH_KEY` (API) or `MEILI_ADMIN_KEY` (worker)
+    pub key: String,
 }
 
 impl MeiliConfig {
-    pub fn from_env() -> Result<Self, ConfigError> {
-        Self::from_lookup(&process_env)
+    /// API: `MEILI_URL` + `MEILI_SEARCH_KEY`.
+    pub fn search_from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env, "MEILI_SEARCH_KEY")
     }
 
-    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+    /// Worker: `MEILI_URL` + `MEILI_ADMIN_KEY`.
+    pub fn admin_from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env, "MEILI_ADMIN_KEY")
+    }
+
+    pub fn from_lookup(lookup: Lookup, key_var: &'static str) -> Result<Self, ConfigError> {
         Ok(Self {
             url: url(lookup, "MEILI_URL")?,
+            key: required(lookup, key_var)?,
         })
     }
 }
@@ -405,15 +416,27 @@ mod tests {
 
     #[test]
     fn meili_rejects_non_http_url() {
-        let err =
-            MeiliConfig::from_lookup(&env(&[("MEILI_URL", "file:///etc/passwd")])).unwrap_err();
+        let err = MeiliConfig::from_lookup(
+            &env(&[
+                ("MEILI_URL", "file:///etc/passwd"),
+                ("MEILI_SEARCH_KEY", "k"),
+            ]),
+            "MEILI_SEARCH_KEY",
+        )
+        .err();
         assert!(matches!(
             err,
-            ConfigError::Invalid {
+            Some(ConfigError::Invalid {
                 name: "MEILI_URL",
                 ..
-            }
+            })
         ));
+        let missing = MeiliConfig::from_lookup(
+            &env(&[("MEILI_URL", "http://meili:7700")]),
+            "MEILI_ADMIN_KEY",
+        )
+        .err();
+        assert_eq!(missing, Some(ConfigError::Missing("MEILI_ADMIN_KEY")));
     }
 
     #[test]

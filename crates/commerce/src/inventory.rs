@@ -144,6 +144,15 @@ async fn level(tx: &mut TenantTx, variant_id: Uuid) -> Result<Level, Error> {
     })
 }
 
+/// The variant's product: `inventory.changed` carries it for per-product consumers (search).
+async fn product_of(tx: &mut TenantTx, variant_id: Uuid) -> Result<Uuid, Error> {
+    Ok(
+        sqlx::query_scalar!("SELECT product_id FROM variants WHERE id = $1", variant_id)
+            .fetch_one(&mut **tx)
+            .await?,
+    )
+}
+
 pub async fn get(tx: &mut TenantTx, variant_id: Uuid) -> Result<Level, Error> {
     level(tx, variant_id).await
 }
@@ -266,11 +275,13 @@ pub async fn apply(
         "reserved": now.reserved - d_reserved,
         "available": (now.on_hand - d_on_hand) - (now.reserved - d_reserved),
     });
+    let product_id = product_of(tx, variant_id).await?;
     platform::queue::publish(
         &mut **tx,
         "inventory.changed",
         &json!({
             "variant_id": variant_id,
+            "product_id": product_id,
             "kind": kind,
             "quantity": quantity,
             "ref_type": r.ref_type,
@@ -469,11 +480,12 @@ pub async fn update_settings(
         &json!({ "before": before, "after": after }),
     )
     .await?;
+    let product_id = product_of(tx, variant_id).await?;
     platform::queue::publish(
         &mut **tx,
         "inventory.changed",
         &json!({
-            "variant_id": variant_id, "kind": "settings",
+            "variant_id": variant_id, "product_id": product_id, "kind": "settings",
             "before": { "track": before.track, "allow_backorder": before.allow_backorder,
                         "available": before.available },
             "after": { "track": after.track, "allow_backorder": after.allow_backorder,

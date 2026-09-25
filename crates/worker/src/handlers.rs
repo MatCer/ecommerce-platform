@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use commerce::media::{self, Processed};
 use commerce::pricing::intervals;
+use commerce::search::{self, Meili, index::Rebuilt};
 use platform::queue::{self, Job};
 use platform::storage::Storage;
 use tokio::sync::Semaphore;
@@ -14,7 +15,8 @@ use crate::runner::{Ctx, Handlers, JobError};
 
 /// Structured log line per outbox event: the default subscriber of every event type.
 pub const EVENTS_LOG: &str = "events.log";
-/// Hourly retention: finished jobs, dispatched events, expired idempotency keys (A12).
+/// Hourly retention: finished jobs, dispatched events, expired idempotency keys (A12),
+/// zero-result search queries older than 90 days (A20).
 pub const MAINTENANCE_CLEANUP: &str = "maintenance.cleanup";
 
 const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
@@ -24,10 +26,18 @@ const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
 /// when a dedicated media worker gets more cores.
 const MEDIA_CONCURRENCY: usize = 1;
 
-pub fn all(storage: Storage) -> Handlers {
+pub fn all(storage: Storage, meili: Meili) -> Handlers {
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
+    let (m1, m3) = (meili.clone(), meili);
     Handlers::default()
+        .register(search::INDEX_PRODUCT_JOB, move |ctx, job| {
+            search_index_product(ctx, job, m1.clone())
+        })
+        .register(search::REINDEX_CATEGORY_JOB, search_reindex_category)
+        .register(search::REBUILD_JOB, move |ctx, job| {
+            search_rebuild(ctx, job, m3.clone())
+        })
         .register(EVENTS_LOG, events_log)
         .register(MAINTENANCE_CLEANUP, maintenance_cleanup)
         .register(media::PROCESS_JOB, move |ctx, job| {
@@ -60,6 +70,65 @@ async fn price_transition(ctx: Ctx, job: Job) -> Result<(), JobError> {
     Ok(())
 }
 
+fn tenant_and(job: &Job, field: &str) -> Result<(Uuid, Uuid), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent(format!("{} without tenant", job.kind)))?;
+    let id = job
+        .payload
+        .get(field)
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| JobError::Permanent(format!("payload has no {field}")))?;
+    Ok((tenant, id))
+}
+
+/// (Re)indexes one product; stale versions are dropped (spec A27).
+async fn search_index_product(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
+    let (tenant, product) = tenant_and(&job, "product_id")?;
+    let version = search::job_version(&job.payload);
+    let outcome = search::index::index_product(&ctx.db, &meili, tenant, product, version)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::debug!(%tenant, %product, ?outcome, "product indexed");
+    Ok(())
+}
+
+/// A category was renamed or moved: reindex the products in its subtree.
+async fn search_reindex_category(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let (tenant, category) = tenant_and(&job, "category_id")?;
+    let mut tx = platform::db::tenant_tx(&ctx.db, tenant).await?;
+    let products = search::index::category_products(&mut tx, category)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    let version = search::next_version(&mut *tx).await?;
+    for product in &products {
+        queue::enqueue(
+            &mut *tx,
+            &search::index_product_job(tenant, *product, version),
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    tracing::info!(%tenant, %category, products = products.len(), "category reindex queued");
+    Ok(())
+}
+
+async fn search_rebuild(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("search rebuild without tenant".into()))?;
+    let version = search::job_version(&job.payload);
+    match search::index::rebuild(&ctx.db, &meili, tenant, job.id, version).await {
+        Ok(Rebuilt::Done | Rebuilt::Stale) => Ok(()),
+        // Runs again after the current rebuild (backoff), so late changes are not lost.
+        Ok(Rebuilt::Busy) => Err(JobError::Retry(
+            "another rebuild of this tenant is running".into(),
+        )),
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
 async fn events_log(_ctx: Ctx, job: Job) -> Result<(), JobError> {
     let event_type = job
         .payload
@@ -84,7 +153,16 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let keys = sqlx::query_scalar!(r#"SELECT platform.purge_idempotency_keys() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
-    tracing::info!(queue_rows, idempotency_keys = keys, "cleanup done");
+    let zero_results =
+        sqlx::query_scalar!(r#"SELECT platform.purge_search_zero_results() AS "n!""#)
+            .fetch_one(&ctx.db)
+            .await?;
+    tracing::info!(
+        queue_rows,
+        idempotency_keys = keys,
+        zero_results,
+        "cleanup done"
+    );
     Ok(())
 }
 

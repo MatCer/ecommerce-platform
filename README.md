@@ -79,6 +79,7 @@ trusted network.
 | `make dev-infra` | Dependencies only; then `cargo run -p api` against them (see below) |
 | `make migrate` | Apply migrations as `app_owner` |
 | `make test` | Rust tests (need Postgres from `make dev-infra`) + vitest |
+| `make test-search` | Search integration tests + cs/sk relevance fixtures against the real Meilisearch (`make dev-infra`) |
 | `make lint` | rustfmt check, clippy `-D warnings`, Biome, TS typecheck |
 | `make fmt` | Format Rust and TS |
 | `make openapi` | Regenerate `openapi.json` and the TS clients; commit the result |
@@ -96,7 +97,8 @@ Running the API natively against `make dev-infra` (values from `.env.example`):
 make migrate
 APP_ENV=dev API_BIND=127.0.0.1:8000 \
 DATABASE_URL=postgres://app_runtime:app-runtime-local@localhost:55432/app \
-MEILI_URL=http://localhost:57700 S3_ENDPOINT=http://localhost:59000 \
+MEILI_URL=http://localhost:57700 MEILI_SEARCH_KEY=2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918 \
+S3_ENDPOINT=http://localhost:59000 \
 S3_ACCESS_KEY_ID=app-local S3_SECRET_ACCESS_KEY=app-local-secret-key \
 S3_BUCKET_PUBLIC=public S3_BUCKET_PRIVATE=private \
 AUTH_JWKS_URL=http://auth.localhost:8080/api/auth/jwks ADMIN_ORIGIN=http://admin.localhost:8080 \

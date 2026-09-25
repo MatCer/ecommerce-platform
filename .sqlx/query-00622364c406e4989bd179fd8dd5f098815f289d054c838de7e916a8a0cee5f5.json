@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO search_zero_results (tenant_id, day, locale, query)\n         VALUES ($1, current_date, $2, $3)\n         ON CONFLICT (tenant_id, day, locale, query)\n         DO UPDATE SET count = search_zero_results.count + 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "00622364c406e4989bd179fd8dd5f098815f289d054c838de7e916a8a0cee5f5"
+}

@@ -17,7 +17,7 @@ trap cleanup EXIT
 # Nothing listens on port 1: dependencies are down, which the processes must tolerate.
 dead_deps=(
   -e DATABASE_URL=postgres://nobody:nothing@127.0.0.1:1/none
-  -e MEILI_URL=http://127.0.0.1:1
+  -e MEILI_URL=http://127.0.0.1:1 -e MEILI_SEARCH_KEY=smoke -e MEILI_ADMIN_KEY=smoke
   -e S3_ENDPOINT=http://127.0.0.1:1
   -e S3_ACCESS_KEY_ID=smoke -e S3_SECRET_ACCESS_KEY=smoke
   -e S3_BUCKET_PUBLIC=public -e S3_BUCKET_PRIVATE=private

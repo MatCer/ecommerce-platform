@@ -517,6 +517,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/search/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rebuilds every index of the tenant from the catalog into new indexes and swaps them in
+         *     atomically; searches keep being answered from the old ones meanwhile. Owner or admin.
+         *     A request made while a rebuild is already running is served by a second rebuild after it,
+         *     unless one started after the request anyway.
+         */
+        post: operations["rebuild"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/search/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** State of the tenant's search indexes. */
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/staff": {
         parameters: {
             query?: never;
@@ -648,8 +687,50 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Readiness: database, Meilisearch and object storage are reachable. */
+        /**
+         * Readiness: database and object storage are reachable. Meilisearch is reported; when only
+         *     it fails the status is `degraded` and the response still 200 (spec A27).
+         */
         get: operations["readyz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Product search with variant-correct facets (spec §11.1, A23).
+         * @description Results are distinct products; `variant_id` is the variant that matched best. Facets list
+         *     every value found for the query and category; `available: false` values would match
+         *     nothing with the other active filters and are shown disabled. No counts (A23).
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/search/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Typeahead: up to 8 suggestions, matching categories (≤ 3) first, then products. */
+        get: operations["suggest"];
         put?: never;
         post?: never;
         delete?: never;
@@ -775,6 +856,12 @@ export interface components {
         CategoryNode: components["schemas"]["Category"] & {
             children: components["schemas"]["CategoryNode"][];
         };
+        CategorySuggestion: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+        };
         CategoryTranslation: {
             /** @description Sanitized on write. */
             description_html?: string;
@@ -802,7 +889,7 @@ export interface components {
          */
         Cause: "base" | "sale" | "tax";
         /** @enum {string} */
-        CheckStatus: "ok" | "fail";
+        CheckStatus: "ok" | "degraded" | "fail";
         Checks: {
             database: components["schemas"]["CheckStatus"];
             meilisearch: components["schemas"]["CheckStatus"];
@@ -884,6 +971,19 @@ export interface components {
         Currency: "BGN" | "CZK" | "DKK" | "EUR" | "HUF" | "PLN" | "RON" | "SEK";
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
+        Facet: {
+            /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
+            key: string;
+            label: string;
+            values: components["schemas"]["FacetValue"][];
+        };
+        FacetValue: {
+            /** @description Selecting it would still match something. Unavailable values are shown disabled (A23). */
+            available: boolean;
+            label: string;
+            selected: boolean;
+            value: string;
+        };
         /** @description EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19). */
         Gpsr: {
             eu_responsible_person?: components["schemas"]["GpsrParty"] | null;
@@ -903,6 +1003,23 @@ export interface components {
         };
         Health: {
             status: components["schemas"]["CheckStatus"];
+        };
+        /** @description Current state of a tenant's search indexes (admin status endpoint). */
+        IndexStatus: {
+            /**
+             * Format: int64
+             * @description Documents (sellable variants) written by the last rebuild.
+             */
+            documents?: number | null;
+            /** @description Meilisearch index uid. */
+            index: string;
+            locale: string;
+            /** @description A rebuild is filling a new index. */
+            rebuilding: boolean;
+            /** Format: date-time */
+            rebuilt_at?: string | null;
+            /** Format: int32 */
+            settings_version: number;
         };
         /** @description A stored interval. */
         Interval: {
@@ -986,6 +1103,14 @@ export interface components {
             slug: string;
             /** Format: uuid */
             tenant_id: string;
+        };
+        /** @description The API shape of an amount (spec §8.1): `{amount_minor, currency, formatted}`. */
+        MoneyView: {
+            /** Format: int64 */
+            amount_minor: number;
+            currency: components["schemas"]["Currency"];
+            /** @example 1 290,00 Kč */
+            formatted: string;
         };
         Movement: {
             actor: string;
@@ -1200,6 +1325,12 @@ export interface components {
             market_ids: string[];
             name: string;
         };
+        PriceRange: {
+            /** Format: int64 */
+            max_minor: number;
+            /** Format: int64 */
+            min_minor: number;
+        };
         PriceUpsert: {
             /**
              * @description The prices come from an import: for new prices the history before now is unknown, so
@@ -1332,10 +1463,15 @@ export interface components {
         Readiness: {
             checks: components["schemas"]["Checks"];
             /**
-             * @description `ok` when the core dependencies (database, storage) are `ok`. Meilisearch is reported
-             *     but not required: search degrades, the shop keeps working (spec A30).
+             * @description `ok` when every dependency is `ok`; `degraded` when only Meilisearch fails (search
+             *     answers 503, the shop keeps working, spec A27/A30); `fail` when a core dependency
+             *     (database, storage) fails.
              */
             status: components["schemas"]["CheckStatus"];
+        };
+        RebuildQueued: {
+            /** Format: int64 */
+            job_id: number;
         };
         /** @description What the edge needs to serve a hostname (spec §5.1, `GET /internal/v1/resolve`). */
         Resolved: {
@@ -1418,6 +1554,44 @@ export interface components {
             category_ids?: string[];
             product_ids?: string[];
         };
+        SearchHit: {
+            brand?: string | null;
+            /** @description The first product image, in the list-sized variants (up to 640 px). */
+            image: components["schemas"]["AssetVariant"][];
+            /** @description At least one variant can be bought now. */
+            in_stock: boolean;
+            name: string;
+            /** @description Current price of the matched variant in the market (gross). */
+            price: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            product_id: string;
+            slug: string;
+            /**
+             * Format: uuid
+             * @description The variant that matched best (e.g. the red one when filtering by red).
+             */
+            variant_id: string;
+        };
+        SearchResult: {
+            facets: components["schemas"]["Facet"][];
+            items: components["schemas"]["SearchHit"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            per_page: number;
+            price_range?: components["schemas"]["PriceRange"] | null;
+            /**
+             * Format: int64
+             * @description Matching products (before rehydration dropped any that just became unavailable).
+             */
+            total: number;
+            /** Format: int32 */
+            total_pages: number;
+        };
+        SearchStatus: {
+            /** @description One index per locale the tenant's markets sell in. */
+            indexes: components["schemas"]["IndexStatus"][];
+        };
         StaffList: {
             items: components["schemas"]["StaffMember"][];
         };
@@ -1429,6 +1603,10 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
             user_id: string;
+        };
+        Suggestions: {
+            categories: components["schemas"]["CategorySuggestion"][];
+            products: components["schemas"]["SearchHit"][];
         };
         TaxCategory: {
             /** @example reduced */
@@ -3458,6 +3636,58 @@ export interface operations {
             };
         };
     };
+    rebuild: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebuildQueued"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    status: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchStatus"];
+                };
+            };
+        };
+    };
     list: {
         parameters: {
             query?: never;
@@ -3932,7 +4162,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description All dependencies reachable */
+            /** @description Ready (`ok`, or `degraded` without search) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3941,13 +4171,155 @@ export interface operations {
                     "application/json": components["schemas"]["Readiness"];
                 };
             };
-            /** @description At least one dependency is unreachable */
+            /** @description A core dependency is unreachable */
             503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["Readiness"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query?: {
+                /** @description Search text (≤ 200 characters). Empty: browse (e.g. a category listing). */
+                q?: string;
+                sort?: "relevance" | "price_asc" | "price_desc" | "newest";
+                /** @description 1-based page (results beyond the first 1000 are not available). */
+                page?: number;
+                /** @description 1-48, default 24. */
+                per_page?: number;
+                /** @description Only products in this category or its subcategories. */
+                category?: string;
+                /** @description Only variants that can be bought now. */
+                in_stock?: boolean;
+                /** @description Gross price bounds in minor units (inclusive). */
+                price_min?: number;
+                price_max?: number;
+                /**
+                 * @description Facet filters: `f.<facet key>=<value>`, repeatable (`f.opt.color=red&f.opt.color=blue`).
+                 *     Keys are the `facets[].key` of a previous response. Values of one facet are OR-ed,
+                 *     facets are AND-ed, and all of them must hold for one variant.
+                 */
+                "f.{facet}"?: string;
+            };
+            header: {
+                /** @description Tenant resolved from the shop hostname. */
+                "X-Tenant": string;
+                /** @description Market resolved from the shop hostname. */
+                "X-Market": string;
+                /**
+                 * @description One of the market's locales.
+                 * @example cs
+                 */
+                "X-Locale": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or unpublished storefront */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Search is temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    suggest: {
+        parameters: {
+            query: {
+                /** @description What the shopper typed so far (≤ 200 characters). */
+                q: string;
+            };
+            header: {
+                /** @description Tenant resolved from the shop hostname. */
+                "X-Tenant": string;
+                /** @description Market resolved from the shop hostname. */
+                "X-Market": string;
+                /**
+                 * @description One of the market's locales.
+                 * @example cs
+                 */
+                "X-Locale": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suggestions"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or unpublished storefront */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Search is temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

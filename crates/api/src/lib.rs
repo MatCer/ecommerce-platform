@@ -7,11 +7,13 @@ pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_pricing;
 pub mod admin_promotions;
+pub mod admin_search;
 pub mod admin_staff;
 pub mod auth;
 pub mod auth_service;
 pub mod cli;
 pub mod internal;
+pub mod storefront_search;
 
 use std::sync::Arc;
 
@@ -27,7 +29,6 @@ use platform::Error;
 use platform::error::PROBLEM_CONTENT_TYPE;
 use platform::health::{CheckStatus, Readiness};
 use platform::storage::Storage;
-use reqwest::Url;
 use serde::Serialize;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
@@ -54,7 +55,8 @@ pub struct AppState {
     /// The auth service's internal API (staff invitations); `None` when not configured.
     pub auth_service: Option<auth_service::AuthService>,
     pub http: reqwest::Client,
-    pub meili_url: Url,
+    /// Search-only key (A27): the API never writes to Meilisearch.
+    pub meili: commerce::search::Meili,
     pub storage: Storage,
     pub staff_auth: Arc<auth::StaffAuth>,
     pub internal_token: auth::ServiceToken,
@@ -76,6 +78,8 @@ pub struct AppState {
         (name = "pricing", description = "Admin API: tax profile, price lists, variant prices, price history"),
         (name = "promotions", description = "Admin API: sales and coupons"),
         (name = "inventory", description = "Admin API: stock levels and movements"),
+        (name = "search", description = "Admin API: search index status and rebuilds"),
+        (name = "storefront", description = "Storefront API (via the edge: X-Tenant, X-Market, X-Locale)"),
         (name = "internal", description = "Internal API for platform services (service token)")
     )
 )]
@@ -116,6 +120,8 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_pricing::routes())
         .merge(admin_promotions::routes())
         .merge(admin_inventory::routes())
+        .merge(admin_search::routes())
+        .merge(storefront_search::routes())
         .merge(internal::routes())
         .split_for_parts()
 }
@@ -249,18 +255,19 @@ async fn healthz() -> Json<Health> {
     })
 }
 
-/// Readiness: database, Meilisearch and object storage are reachable.
+/// Readiness: database and object storage are reachable. Meilisearch is reported; when only
+/// it fails the status is `degraded` and the response still 200 (spec A27).
 #[utoipa::path(
     get,
     path = "/readyz",
     tag = "health",
     responses(
-        (status = 200, description = "All dependencies reachable", body = Readiness),
-        (status = 503, description = "At least one dependency is unreachable", body = Readiness)
+        (status = 200, description = "Ready (`ok`, or `degraded` without search)", body = Readiness),
+        (status = 503, description = "A core dependency is unreachable", body = Readiness)
     )
 )]
 async fn readyz(State(s): State<AppState>) -> (StatusCode, Json<Readiness>) {
-    let report = platform::health::readiness(&s.db, &s.http, &s.meili_url, &s.storage).await;
+    let report = platform::health::readiness(&s.db, &s.http, s.meili.url(), &s.storage).await;
     let status = if report.is_ready() {
         StatusCode::OK
     } else {
