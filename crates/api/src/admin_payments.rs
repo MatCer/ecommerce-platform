@@ -13,8 +13,8 @@ use axum::http::StatusCode;
 use commerce::orders::{self, OrderSummary};
 use commerce::payments::Attempt;
 use commerce::payments::bank::{
-    self, BankAccount, BankAccountInput, BankTransaction, BankTransactionPage, StatementImport,
-    ResolveInput, TxFilter, TxStatus,
+    self, BankAccount, BankAccountInput, BankTransaction, BankTransactionPage, ResolveInput,
+    StatementImport, TxFilter, TxStatus,
 };
 use commerce::payments::cod::{self, CodReport, CollectInput};
 use commerce::payments::statements::{self, StatementFormat};

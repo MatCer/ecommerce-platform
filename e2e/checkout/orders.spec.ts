@@ -9,7 +9,6 @@ import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, magicLink, mailpit, run, useEnglish } from "../admin/support";
 import {
   acceptAndPlace,
-  type CartModel,
   CZ,
   checkoutOf,
   choosePickupPoint,
@@ -18,7 +17,6 @@ import {
   type MailSummary,
   mail,
   newPage,
-  type OrderModel,
   order,
   SK,
   toCheckout,

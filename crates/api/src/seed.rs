@@ -1101,7 +1101,10 @@ impl Seeder<'_> {
             (cz, "CZ6508000000192000145399", "GIBACZPX"),
             (sk, "SK9611000000002918599669", "TATRSKBX"),
         ] {
-            if commerce::payments::bank::account(&mut tx, market).await?.is_none() {
+            if commerce::payments::bank::account(&mut tx, market)
+                .await?
+                .is_none()
+            {
                 commerce::payments::bank::configure_account(
                     &mut tx,
                     ACTOR,

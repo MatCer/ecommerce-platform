@@ -75,6 +75,7 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
+  await admin.context().close();
 });
 
 const nav = (p: Page, name: string) =>
