@@ -4,24 +4,28 @@
  */
 
 export interface paths {
-    "/admin/v1/assets": {
+    "/storefront/v1/cart": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Assets, newest first. */
-        get: operations["list_assets"];
+        /** The cart with totals and VAT recomputed now (shop or checkout capability). */
+        get: operations["get_cart"];
         put?: never;
-        post?: never;
+        /**
+         * Creates an empty cart; the capability comes back in `X-Cart-Token` (the edge stores it in
+         *     the HttpOnly `cart` cookie).
+         */
+        post: operations["create_cart"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/admin/v1/assets/uploads": {
+    "/storefront/v1/cart/coupons": {
         parameters: {
             query?: never;
             header?: never;
@@ -31,376 +35,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Starts an image upload: returns a pending asset and a presigned `PUT` URL (15 minutes)
-         *     into private storage. Upload the file there with the returned headers, then call
-         *     `complete`. Honors `Idempotency-Key`.
+         * Applies a coupon (one per cart; replaces an earlier one). `422` with the coupon's reason
+         *     (`coupon_not_found`, `coupon_min_subtotal`, ...) when it does not apply.
          */
-        post: operations["create_upload"];
+        post: operations["apply_coupon"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/admin/v1/assets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** An asset with its public variant URLs once `ready`. */
-        get: operations["get_asset"];
-        put?: never;
-        post?: never;
-        /** Deletes an asset no product uses (`409 asset_in_use`); its files are removed afterwards. */
-        delete: operations["delete_asset"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/assets/{id}/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.
-         *     A rejected file is deleted and the asset stays `pending` (upload again, then retry).
-         *     Calling it again on a processing or ready asset returns it unchanged; on a failed asset
-         *     it runs processing again from the kept original.
-         */
-        post: operations["complete_upload"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/audit-log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The tenant's audit log, newest first (owner/admin). */
-        get: operations["audit_log"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["category_tree"];
-        put?: never;
-        /** Creates a category at the end of its siblings. Honors `Idempotency-Key`. */
-        post: operations["create_category"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/categories/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_category"];
-        /** Updates translations and image; use `/move` to change the parent or position. */
-        put: operations["update_category"];
-        post?: never;
-        /** Deletes a category without subcategories (`409 has_children` otherwise). */
-        delete: operations["delete_category"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/categories/{id}/move": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Moves a category with its subtree. Into its own subtree: `422 category_cycle`. */
-        post: operations["move_category"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/coupons": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Coupons, newest first. */
-        get: operations["list_coupons"];
-        put?: never;
-        /**
-         * Creates a coupon. `published` coupons count as price reductions for the Omnibus
-         *     reference. Honors `Idempotency-Key`.
-         */
-        post: operations["create_coupon"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/coupons/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_coupon"];
-        /**
-         * Replaces a coupon. A started published coupon only accepts a new end and limits
-         *     (`409 coupon_started`).
-         */
-        put: operations["update_coupon"];
-        post?: never;
-        /** Deletes an unused coupon (`409 coupon_in_use` once redeemed or advertised). */
-        delete: operations["delete_coupon"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/inventory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stock of every variant (defaults where nothing was recorded yet), by variant id. */
-        get: operations["list_levels"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/inventory/{variant_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Whether the variant's stock is tracked and may be sold below zero. */
-        put: operations["update_settings"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/inventory/{variant_id}/adjustments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * A manual stock correction: `delta` units, or the counted `on_hand`. Honors
-         *     `Idempotency-Key` (A12): a retry replays the first response and the key is also the
-         *     movement's identity, so a correction is never applied twice.
-         */
-        post: operations["adjust"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/inventory/{variant_id}/movements": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The variant's stock movements, newest first. */
-        get: operations["list_movements"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/markets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_markets"];
-        put?: never;
-        /**
-         * Creates a market (owner/admin; login at most 15 minutes old, else `401 reauth_required`).
-         *     Honors `Idempotency-Key`: a retry with the same key and body returns the original response
-         *     with `Idempotent-Replayed: true`; the same key with a different body is
-         *     `409 idempotency_conflict`.
-         */
-        post: operations["create_market"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The signed-in staff user and their tenants. Needs no `X-Tenant-Id`. */
-        get: operations["me"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/parameters": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Parameters ordered by key. */
-        get: operations["list_parameters"];
-        put?: never;
-        /** Honors `Idempotency-Key`. */
-        post: operations["create_parameter"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/parameters/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_parameter"];
-        /** The kind cannot change while products have values (`409 parameter_in_use`). */
-        put: operations["update_parameter"];
-        post?: never;
-        /** Deletes the parameter and its values on all products. */
-        delete: operations["delete_parameter"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/price-lists": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list_price_lists"];
-        put?: never;
-        /**
-         * Creates a price list (owner/admin) and optionally assigns markets of the same currency.
-         *     Honors `Idempotency-Key`.
-         */
-        post: operations["create_price_list"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/price-lists/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_price_list"];
-        /** Renames the list and sets the complete set of markets using it (owner/admin). */
-        put: operations["update_price_list"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/price-lists/{id}/prices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Gross base prices of a list, by variant id. */
-        get: operations["list_prices"];
-        /**
-         * Bulk upsert of up to 1000 gross base prices. The effective-price timeline (incl. running
-         *     and scheduled sales) is recomputed and `price.changed` published for changed prices.
-         *     `reason: tax` marks a VAT-driven repricing; `imported: true` marks prices whose history is
-         *     unknown (no Omnibus reduction claims for 30 days).
-         */
-        put: operations["upsert_prices"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/price-lists/{id}/prices/{variant_id}": {
+    "/storefront/v1/cart/coupons/{code}": {
         parameters: {
             query?: never;
             header?: never;
@@ -410,114 +55,13 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Stops selling a variant from this list (from now on; history stays). */
-        delete: operations["delete_price"];
+        delete: operations["remove_coupon"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/admin/v1/products": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Products, newest first, with filters and cursor pagination. */
-        get: operations["list_products"];
-        put?: never;
-        /**
-         * Creates a product document (attributes, translations, options, variants, categories,
-         *     media, parameter values, tax categories). Honors `Idempotency-Key`.
-         */
-        post: operations["create_product"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/products/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_product"];
-        /**
-         * Replaces the whole product document. Variants listed with an `id` are updated in place
-         *     (their ids stay stable), variants without one are created, unlisted ones are deleted.
-         */
-        put: operations["replace_product"];
-        post?: never;
-        delete: operations["delete_product"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/products/{id}/price-history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Effective-price intervals (base, sale, tax; including scheduled future changes) per
-         *     variant and price list, with the Omnibus reference price (A18).
-         */
-        get: operations["price_history"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/sales": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Sales, newest first. */
-        get: operations["list_sales"];
-        put?: never;
-        /**
-         * Creates a sale, optionally scheduled in the future. The price timelines of the targeted
-         *     variants get the scheduled start and end. Honors `Idempotency-Key`.
-         */
-        post: operations["create_sale"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/sales/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_sale"];
-        /** Replaces a sale. A running sale keeps its start and discount (`422 sale_started`). */
-        put: operations["update_sale"];
-        post?: never;
-        /** Deletes a sale; a running one ends now (its past price intervals remain as history). */
-        delete: operations["delete_sale"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/search/rebuild": {
+    "/storefront/v1/cart/handoff": {
         parameters: {
             query?: never;
             header?: never;
@@ -527,52 +71,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Rebuilds every index of the tenant from the catalog into new indexes and swaps them in
-         *     atomically; searches keep being answered from the old ones meanwhile. Owner or admin.
-         *     A request made while a rebuild is already running is served by a second rebuild after it,
-         *     unless one started after the request anyway.
+         * Starts the checkout handoff (A1): revokes the shop capability (the edge clears the `cart`
+         *     cookie) and returns a single-use handoff token.
          */
-        post: operations["rebuild"];
+        post: operations["start_handoff"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/admin/v1/search/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** State of the tenant's search indexes. */
-        get: operations["status"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/staff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/v1/staff/invitations": {
+    "/storefront/v1/cart/lines": {
         parameters: {
             query?: never;
             header?: never;
@@ -581,14 +90,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["invite"];
+        post: operations["add_line"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/admin/v1/staff/{id}": {
+    "/storefront/v1/cart/lines/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -598,24 +107,63 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["remove"];
+        delete: operations["remove_line"];
         options?: never;
         head?: never;
-        patch: operations["change_role"];
+        /** Sets the quantity (0 removes the line). */
+        patch: operations["update_line"];
         trace?: never;
     };
-    "/admin/v1/tax-categories": {
+    "/storefront/v1/checkout/handoff": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
         /**
-         * Tax categories and rates in force on a date. Products map to one per country
-         *     (`tax_categories` in the product document) and default to `standard`.
+         * Redeems a handoff token on the checkout origin (A1): consumed atomically; returns a new
+         *     checkout-scoped capability. `400 invalid_handoff` when unknown, used, expired or minted for
+         *     another market.
          */
-        get: operations["list_tax_categories"];
+        post: operations["redeem_handoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events
+         *     and server counters (A20).
+         */
+        post: operations["events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/files/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** `robots.txt`, `llms.txt`, `sitemap.xml` (index) or `sitemap-<n>.xml` (chunk). */
+        get: operations["file"];
         put?: never;
         post?: never;
         delete?: never;
@@ -624,37 +172,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/v1/tax-profile": {
+    "/storefront/v1/newsletter/subscribe": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** The tenant's VAT setup (A3). `404` until it has been set. */
-        get: operations["get_tax_profile"];
+        get?: never;
+        put?: never;
         /**
-         * Creates or replaces the VAT setup (owner/admin, login at most 15 minutes old, else
-         *     `401 reauth_required`). Switching to `origin_threshold` needs `confirm_origin_threshold`.
-         *     The configuration must be confirmed by the merchant's accountant.
+         * Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail
+         *     arrive with the newsletter module (M2).
          */
-        put: operations["put_tax_profile"];
-        post?: never;
+        post: operations["newsletter"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/healthz": {
+    "/storefront/v1/pages/category/{slug}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Liveness: the process serves HTTP. Never touches dependencies. */
-        get: operations["healthz"];
+        /**
+         * A category listing with facets, sort options and pagination. Filtered or re-sorted URLs
+         *     are `noindex,follow` with a canonical to the category (spec §9.5).
+         */
+        get: operations["category"];
         put?: never;
         post?: never;
         delete?: never;
@@ -663,15 +212,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/v1/resolve": {
+    "/storefront/v1/pages/home": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Hostname -> tenant and market, for verified domains of active tenants. */
-        get: operations["resolve"];
+        get: operations["home"];
         put?: never;
         post?: never;
         delete?: never;
@@ -680,18 +228,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/readyz": {
+    "/storefront/v1/pages/product/{slug}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Readiness: database and object storage are reachable. Meilisearch is reported; when only
-         *     it fails the status is `degraded` and the response still 200 (spec A27).
-         */
-        get: operations["readyz"];
+        get: operations["product_page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search results (name search until WP7's Meilisearch); always `noindex`. */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/redirects/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The redirect for a path the theme could not render (the edge asks on 404, spec §9.5). */
+        get: operations["resolve_redirect"];
         put?: never;
         post?: never;
         delete?: never;
@@ -739,57 +333,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/shop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Layout data: shop name, locale, markets, menus, consent config, messages, theme tokens. */
+        get: operations["shop"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Adjustment: {
-            /**
-             * Format: int32
-             * @description Units to add (negative: remove). Exactly one of `delta` and `on_hand`.
-             */
-            delta?: number | null;
-            note?: string | null;
-            /**
-             * Format: int32
-             * @description Set the counted stock; the difference is recorded as the delta.
-             */
-            on_hand?: number | null;
+        Alternate: {
+            href: string;
+            /** @description hreflang value (`cs-CZ`, `x-default`). */
+            locale: string;
         };
-        AdjustmentResult: {
-            /** @description False when this `Idempotency-Key` was already applied (or the change was zero). */
-            applied: boolean;
-            level: components["schemas"]["Level"];
-        };
-        Asset: {
-            /** Format: int64 */
-            bytes?: number | null;
-            /** Format: date-time */
-            created_at: string;
-            /** @description Why processing failed. */
-            error?: string | null;
-            filename?: string | null;
-            /** Format: int32 */
-            height?: number | null;
-            /** Format: uuid */
-            id: string;
-            /** @description Sniffed type of the original (after `complete`). */
-            mime?: string | null;
-            sha256?: string | null;
-            status: components["schemas"]["AssetStatus"];
-            /** Format: date-time */
-            updated_at: string;
-            variants: components["schemas"]["AssetVariant"][];
-            /** Format: int32 */
-            width?: number | null;
-        };
-        AssetPage: {
-            items: components["schemas"]["Asset"][];
-            /** Format: uuid */
-            next_cursor?: string | null;
-        };
-        /** @enum {string} */
-        AssetStatus: "pending" | "processing" | "ready" | "failed";
         AssetVariant: {
             /** Format: int64 */
             bytes: number;
@@ -802,59 +371,79 @@ export interface components {
             /** Format: int32 */
             width: number;
         };
-        AuditEntry: {
-            action: string;
-            /** @description Better Auth user id, or `platform` for superadmin operations. */
-            actor: string;
-            /** Format: date-time */
-            at: string;
-            diff: unknown;
-            entity: string;
-            entity_id?: string | null;
-            /** Format: uuid */
-            id: string;
-        };
-        AuditPage: {
-            items: components["schemas"]["AuditEntry"][];
-            /**
-             * Format: uuid
-             * @description Pass as `cursor` for the next (older) page; absent on the last page.
-             */
-            next_cursor?: string | null;
-        };
-        BTreeMap: {
-            [key: string]: string;
-        };
-        Category: {
-            /** Format: date-time */
-            created_at: string;
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            image_asset_id?: string | null;
-            /** Format: uuid */
-            parent_id?: string | null;
-            /** Format: int32 */
-            position: number;
-            translations: components["schemas"]["CategoryTranslation"][];
-            /** Format: date-time */
-            updated_at: string;
-        };
-        CategoryMove: {
-            /**
-             * Format: uuid
-             * @description New parent, `null` for the root level.
-             */
-            parent_id?: string | null;
+        /** @enum {string} */
+        Badge: "sale" | "new";
+        /** @description Cache hints the edge reads from every page model (spec §8.2, A2). */
+        CacheHints: {
             /**
              * Format: int32
-             * @description 0-based index among the new siblings; larger values append.
+             * @description Seconds.
              */
-            position: number;
+            max_age: number;
+            public: boolean;
+            /** @description Purge tags (`product:<id>`, `category:<id>`, `shop`, ...). */
+            tags: string[];
         };
-        /** @description A category with its subtree. */
-        CategoryNode: components["schemas"]["Category"] & {
-            children: components["schemas"]["CategoryNode"][];
+        CartCoupon: {
+            /** @description Whether it applies to the cart right now. */
+            applied: boolean;
+            code: string;
+            /** @description Why not (`coupon_min_subtotal`, `coupon_not_active`, ...). */
+            reason?: string | null;
+        };
+        CartLineView: {
+            /**
+             * @description False when the variant is no longer sold (not priced, archived or sold out); such
+             *     lines are not part of the totals.
+             */
+            available: boolean;
+            /** @description This line's share of the coupon. */
+            discount: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            id: string;
+            image?: components["schemas"]["Image"] | null;
+            /** Format: uuid */
+            product_id: string;
+            product_name: string;
+            /** Format: int32 */
+            quantity: number;
+            sku: string;
+            /** @description Product page slug (`/p/<slug>`). */
+            slug: string;
+            stock: components["schemas"]["StockState"];
+            /** @description VAT rate in percent (`"21"`). */
+            tax_rate: string;
+            /** @description What the customer pays for the line (VAT included, after the coupon). */
+            total: components["schemas"]["MoneyView"];
+            unit_price: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            variant_id: string;
+            /** @description Option values, e.g. `Zelená / M`. */
+            variant_label: string;
+        };
+        CartView: {
+            coupon?: components["schemas"]["CartCoupon"] | null;
+            currency: components["schemas"]["Currency"];
+            discount: components["schemas"]["MoneyView"];
+            free_shipping_remaining?: components["schemas"]["MoneyView"] | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            item_count: number;
+            lines: components["schemas"]["CartLineView"][];
+            /** @description Country whose VAT applies (checkout sets it; the market's first country until then). */
+            ship_to_country: string;
+            /** @description Goods before the coupon. */
+            subtotal: components["schemas"]["MoneyView"];
+            /** @description Goods after the coupon, VAT included (shipping and payment arrive with checkout). */
+            total: components["schemas"]["MoneyView"];
+            vat: components["schemas"]["VatRow"][];
+            vat_total: components["schemas"]["MoneyView"];
+            /**
+             * Format: int32
+             * @description Changes with every modification.
+             */
+            version: number;
         };
         CategorySuggestion: {
             /** Format: uuid */
@@ -862,106 +451,31 @@ export interface components {
             name: string;
             slug: string;
         };
-        CategoryTranslation: {
-            /** @description Sanitized on write. */
-            description_html?: string;
-            /** @example cs */
-            locale: string;
-            /** @example Trička */
-            name: string;
-            seo_description?: string | null;
-            seo_title?: string | null;
-            /** @example tricka */
-            slug: string;
+        CategoryTile: {
+            href: string;
+            image?: components["schemas"]["Image"] | null;
+            label: string;
         };
-        CategoryTree: {
-            /** @description Root categories with nested `children`, siblings in position order. */
-            items: components["schemas"]["CategoryNode"][];
-        };
-        CategoryUpdate: {
-            /** Format: uuid */
-            image_asset_id?: string | null;
-            translations: components["schemas"]["CategoryTranslation"][];
-        };
-        /**
-         * @description Why an interval has its price.
-         * @enum {string}
-         */
-        Cause: "base" | "sale" | "tax";
-        /** @enum {string} */
-        CheckStatus: "ok" | "degraded" | "fail";
-        Checks: {
-            database: components["schemas"]["CheckStatus"];
-            meilisearch: components["schemas"]["CheckStatus"];
-            storage: components["schemas"]["CheckStatus"];
-        };
-        Coupon: {
-            /** @example PODZIM10 */
-            code: string;
-            /** Format: date-time */
-            created_at: string;
-            currency?: components["schemas"]["Currency"] | null;
-            discount: components["schemas"]["CouponDiscount"];
-            /** Format: date-time */
-            ends_at?: string | null;
+        CategoryView: {
+            description_html: string;
             /** Format: uuid */
             id: string;
-            /** Format: int64 */
-            min_subtotal_minor?: number | null;
-            /** Format: int32 */
-            per_customer_limit?: number | null;
-            published: boolean;
-            /** Format: date-time */
-            starts_at?: string | null;
-            /** Format: date-time */
-            updated_at: string;
-            /** Format: int32 */
-            usage_limit?: number | null;
-            /** Format: int32 */
-            used_count: number;
+            name: string;
+            slug: string;
         };
-        CouponDiscount: {
-            /** Format: int32 */
-            basis_points: number;
-            /** @enum {string} */
-            type: "percent";
-        } | {
-            /** Format: int64 */
-            amount_minor: number;
-            /** @enum {string} */
-            type: "fixed";
-        } | {
-            /** @enum {string} */
-            type: "free_shipping";
+        CheckoutCart: {
+            /** @description Checkout-scoped cart capability (the edge sets it as the `__Host-cart` cookie). */
+            cart_token: string;
         };
-        CouponInput: {
-            /**
-             * @description 3-32 characters `A-Z 0-9 _ -`; lowercase input is uppercased.
-             * @example PODZIM10
-             */
+        ConsentConfig: {
+            policy_url: string;
+            /** @description Purposes the banner asks for (placeholder until WP9's consent model, A20). */
+            purposes: components["schemas"]["ConsentPurpose"][];
+        };
+        /** @enum {string} */
+        ConsentPurpose: "analytics" | "ads" | "personalization" | "email_marketing" | "review_invites";
+        CouponCode: {
             code: string;
-            currency?: components["schemas"]["Currency"] | null;
-            discount: components["schemas"]["CouponDiscount"];
-            /** Format: date-time */
-            ends_at?: string | null;
-            /** Format: int64 */
-            min_subtotal_minor?: number | null;
-            /** Format: int32 */
-            per_customer_limit?: number | null;
-            /** @description Available to all customers (advertised). Counts for the Omnibus reference. */
-            published?: boolean;
-            /** Format: date-time */
-            starts_at?: string | null;
-            /** Format: int32 */
-            usage_limit?: number | null;
-        };
-        CouponPage: {
-            items: components["schemas"]["Coupon"][];
-            /**
-             * Format: uuid
-             * @description Pass as `cursor` for the next (older) page; absent on the last page.
-             */
-            next_cursor?: string | null;
         };
         /**
          * @description Currencies used by EU markets: the euro and the member states' own currencies.
@@ -969,14 +483,20 @@ export interface components {
          * @enum {string}
          */
         Currency: "BGN" | "CZK" | "DKK" | "EUR" | "HUF" | "PLN" | "RON" | "SEK";
-        /** @enum {string} */
-        DistanceSalesMode: "origin_threshold" | "destination";
+        DeliveryEstimate: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
             key: string;
             label: string;
             values: components["schemas"]["FacetValue"][];
         };
+        /** @enum {string} */
+        FacetKind: "option" | "parameter" | "brand";
         FacetValue: {
             /** @description Selecting it would still match something. Unavailable values are shown disabled (A23). */
             available: boolean;
@@ -984,125 +504,120 @@ export interface components {
             selected: boolean;
             value: string;
         };
-        /** @description EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19). */
-        Gpsr: {
-            eu_responsible_person?: components["schemas"]["GpsrParty"] | null;
-            manufacturer?: components["schemas"]["GpsrParty"] | null;
-            /** @description Safety information per locale. */
-            safety_info?: components["schemas"]["BTreeMap"];
-            /** @description Warnings per locale. */
-            warnings?: components["schemas"]["BTreeMap"];
+        FacetValueView: {
+            /** @description Selecting it would give no result (counts are not shown, A23). */
+            disabled: boolean;
+            /** @description The listing URL with this value toggled. */
+            href: string;
+            label: string;
+            selected: boolean;
+            value: string;
         };
-        /** @description Name, postal address and an electronic contact (email or URL). */
-        GpsrParty: {
+        FacetView: {
+            /** @description Query parameter name. */
+            key: string;
+            kind: components["schemas"]["FacetKind"];
+            label: string;
+            values: components["schemas"]["FacetValueView"][];
+        };
+        GpsrPartyView: {
             address: string;
             email?: string | null;
             name: string;
             phone?: string | null;
             url?: string | null;
         };
-        Health: {
-            status: components["schemas"]["CheckStatus"];
+        /** @description General Product Safety Regulation information (Regulation (EU) 2023/988, art. 19). */
+        GpsrView: {
+            eu_responsible_person?: components["schemas"]["GpsrPartyView"] | null;
+            manufacturer?: components["schemas"]["GpsrPartyView"] | null;
+            safety_info?: string | null;
+            warnings?: string | null;
         };
-        /** @description Current state of a tenant's search indexes (admin status endpoint). */
-        IndexStatus: {
-            /**
-             * Format: int64
-             * @description Documents (sellable variants) written by the last rebuild.
-             */
-            documents?: number | null;
-            /** @description Meilisearch index uid. */
-            index: string;
-            locale: string;
-            /** @description A rebuild is filling a new index. */
-            rebuilding: boolean;
-            /** Format: date-time */
-            rebuilt_at?: string | null;
+        HandoffToken: {
+            /** @description Single use, valid for 60 seconds, for `checkout.<shop>/start?h=`. */
+            token: string;
+        };
+        Hero: {
+            cta: components["schemas"]["Link"];
+            image?: components["schemas"]["Image"] | null;
+            subtitle: string;
+            title: string;
+        };
+        HomePage: {
+            cache: components["schemas"]["CacheHints"];
+            categories: components["schemas"]["CategoryTile"][];
+            featured: components["schemas"]["ProductCard"][];
+            /** @description Placeholder built from the catalog until CMS blocks exist (WP13). */
+            hero: components["schemas"]["Hero"];
+            seo: components["schemas"]["Seo"];
+        };
+        /**
+         * @description An image with every generated width. Render `srcset` (AVIF) with a `sizes` that matches the
+         *     real slot; `src` is a JPEG/PNG fallback. `width`/`height` are the intrinsic size of the
+         *     largest variant (use them for the aspect ratio: no layout shift).
+         */
+        Image: {
+            alt: string;
             /** Format: int32 */
-            settings_version: number;
+            height: number;
+            /** @description Fallback (JPEG or PNG) around 640 px wide. */
+            src: string;
+            /** @description AVIF candidates: `"/media/... 320w, /media/... 640w"`. */
+            srcset: string;
+            /** @description Fallback-format candidates. */
+            srcset_fallback: string;
+            /** @description WebP candidates, for `<picture>` fallbacks. */
+            srcset_webp: string;
+            /** Format: int32 */
+            width: number;
         };
-        /** @description A stored interval. */
-        Interval: {
-            /** Format: int64 */
-            amount_minor: number;
-            cause: components["schemas"]["Cause"];
-            /** Format: uuid */
-            id: string;
-            /** @description The price arrived by import; nothing is known about the price before it. */
-            imported: boolean;
-            /** Format: uuid */
-            sale_id?: string | null;
-            /** Format: date-time */
-            valid_from: string;
-            /** Format: date-time */
-            valid_to?: string | null;
-        };
-        Invitation: {
-            email: string;
-            role: components["schemas"]["Role"];
-        };
-        Level: {
-            /** @description Sell below zero. */
-            allow_backorder: boolean;
+        LineUpdate: {
             /**
              * Format: int32
-             * @description on_hand − reserved.
+             * @description 0 removes the line.
              */
-            available: number;
+            quantity: number;
+        };
+        Link: {
+            href: string;
+            label: string;
+        };
+        /** @description A category page or search results. */
+        ListingPage: {
+            breadcrumbs: components["schemas"]["Link"][];
+            cache: components["schemas"]["CacheHints"];
+            category?: components["schemas"]["CategoryView"] | null;
+            facets: components["schemas"]["FacetView"][];
+            pagination: components["schemas"]["Pagination"];
+            products: components["schemas"]["ProductCard"][];
+            /** @description The search query (absent on category pages). */
+            query?: string | null;
+            seo: components["schemas"]["Seo"];
+            sort: components["schemas"]["SortOption"][];
+            subcategories: components["schemas"]["Link"][];
+            title: string;
             /** Format: int32 */
-            on_hand: number;
-            /** Format: int32 */
-            reserved: number;
-            /** @description Untracked stock is never checked (services, dropshipping). */
-            track: boolean;
-            /** Format: date-time */
-            updated_at?: string | null;
-            /** Format: uuid */
-            variant_id: string;
+            total: number;
         };
-        LevelPage: {
-            items: components["schemas"]["LevelRow"][];
-            /** Format: uuid */
-            next_cursor?: string | null;
-        };
-        LevelRow: components["schemas"]["Level"] & {
-            /** Format: uuid */
-            product_id: string;
-            sku: string;
-        };
-        LevelSettings: {
-            allow_backorder: boolean;
-            track: boolean;
-        };
-        Market: {
+        MarketLink: {
             code: string;
-            country_codes: string[];
-            /** Format: date-time */
-            created_at: string;
             currency: string;
-            default_locale: string;
-            /** Format: uuid */
-            id: string;
-            is_default: boolean;
-            locales: string[];
+            current: boolean;
+            /** @description Home page of the market. */
+            href: string;
+            /** @description hreflang value (`sk-SK`). */
+            locale: string;
             name: string;
-            tax_mode: components["schemas"]["TaxMode"];
         };
-        MarketList: {
-            items: components["schemas"]["Market"][];
+        MenuItem: {
+            children: components["schemas"]["Link"][];
+            href: string;
+            label: string;
         };
-        Me: {
-            email: string;
-            /** @description Tenants the user can act in (send one as `X-Tenant-Id`). */
-            memberships: components["schemas"]["Membership"][];
-            user_id: string;
-        };
-        Membership: {
-            name: string;
-            role: components["schemas"]["Role"];
-            slug: string;
-            /** Format: uuid */
-            tenant_id: string;
+        Menus: {
+            footer: components["schemas"]["MenuItem"][];
+            main: components["schemas"]["MenuItem"][];
         };
         /** @description The API shape of an amount (spec §8.1): `{amount_minor, currency, formatted}`. */
         MoneyView: {
@@ -1112,218 +627,43 @@ export interface components {
             /** @example 1 290,00 Kč */
             formatted: string;
         };
-        Movement: {
-            actor: string;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: uuid */
-            id: string;
-            kind: components["schemas"]["MovementKind"];
-            note?: string | null;
-            /** Format: int32 */
-            on_hand_after: number;
+        NewLine: {
             /**
              * Format: int32
-             * @description Units; a signed delta for `adjust`.
+             * @description 1-999 (added to an existing line of the same variant).
              */
-            quantity: number;
-            ref_id: string;
-            ref_type: string;
-            /** Format: int32 */
-            reserved_after: number;
+            quantity?: number;
             /** Format: uuid */
             variant_id: string;
         };
-        /** @enum {string} */
-        MovementKind: "reserve" | "release" | "commit" | "restock" | "adjust";
-        MovementPage: {
-            items: components["schemas"]["Movement"][];
-            /** Format: uuid */
-            next_cursor?: string | null;
+        NewsletterSignup: {
+            email: string;
         };
-        NewCategory: {
-            /** Format: uuid */
-            image_asset_id?: string | null;
-            /**
-             * Format: uuid
-             * @description `null` for a root category. The new category is appended to its siblings.
-             */
-            parent_id?: string | null;
-            translations: components["schemas"]["CategoryTranslation"][];
+        NewsletterStatus: {
+            /** @description `accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5). */
+            status: string;
         };
-        NewMarket: {
-            /**
-             * @description Lowercase identifier, unique per tenant, e.g. `sk`.
-             * @example sk
-             */
+        OptionValueView: {
             code: string;
-            /**
-             * @description ISO 3166-1 alpha-2 ship-to countries.
-             * @example [
-             *       "SK"
-             *     ]
-             */
-            country_codes: string[];
-            /**
-             * @description ISO 4217 code.
-             * @example EUR
-             */
-            currency: string;
-            /** @example sk */
-            default_locale: string;
-            /** @description Makes this the tenant's default market (the previous default loses the flag). */
-            is_default?: boolean;
-            /**
-             * @example [
-             *       "sk",
-             *       "en"
-             *     ]
-             */
-            locales: string[];
-            /** @example Slovensko */
-            name: string;
-            tax_mode?: components["schemas"]["TaxMode"];
-        };
-        NewPriceList: {
-            /**
-             * @description Lowercase identifier, unique per tenant.
-             * @example cz-retail
-             */
-            code: string;
-            /** @description Fixed after creation. Prices are gross (VAT included). */
-            currency: components["schemas"]["Currency"];
-            /** @description Markets that sell from this list (their currency must match). */
-            market_ids?: string[];
-            /** @example Česko – maloobchod */
             name: string;
         };
-        NewUpload: {
-            /**
-             * @description `image/jpeg`, `image/png`, `image/webp` or `image/gif`. Must be sent with the PUT.
-             * @example image/jpeg
-             */
-            content_type: string;
-            /**
-             * @description Original file name, for display only.
-             * @example tricko.jpg
-             */
-            filename?: string | null;
-            /**
-             * Format: int64
-             * @description Exact size in bytes (at most 20 MB); `complete` checks the uploaded file against it.
-             * @example 184320
-             */
-            size: number;
-        };
-        Omnibus: {
-            /** @description Whether the storefront may show a reduction (strikethrough + percent) at all. */
-            claim: boolean;
-            /**
-             * Format: int64
-             * @description The price in force at the evaluation time.
-             */
-            current_minor?: number | null;
-            /**
-             * Format: int32
-             * @description Whole percent off the reference, rounded down (never overstated).
-             */
-            discount_percent?: number | null;
-            /** @description A sale sets the current price (a reduction is being announced). */
-            on_sale: boolean;
-            /**
-             * Format: date-time
-             * @description Start of the current reduction chain.
-             */
-            reduction_started_at?: string | null;
-            /**
-             * Format: int64
-             * @description Lowest price in the 30 days before `reduction_started_at`.
-             */
-            reference_minor?: number | null;
-        };
-        OptionValue: {
-            /** @example red */
+        OptionView: {
             code: string;
-            name_i18n: components["schemas"]["BTreeMap"];
+            name: string;
+            values: components["schemas"]["OptionValueView"][];
         };
-        Parameter: {
-            /** Format: date-time */
-            created_at: string;
-            filterable: boolean;
-            /** Format: uuid */
-            id: string;
+        Pagination: {
+            next?: string | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pages: number;
+            prev?: string | null;
+        };
+        ParameterView: {
             key: string;
-            kind: components["schemas"]["ParameterKind"];
-            name_i18n: components["schemas"]["BTreeMap"];
-            unit?: string | null;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        ParameterInput: {
-            filterable?: boolean;
-            /**
-             * @description Unique per tenant, e.g. `material`.
-             * @example material
-             */
-            key: string;
-            /** @description Cannot change while values exist. */
-            kind: components["schemas"]["ParameterKind"];
-            name_i18n: components["schemas"]["BTreeMap"];
-            /** @description Display unit for numbers, e.g. `cm`. */
-            unit?: string | null;
-        };
-        /** @enum {string} */
-        ParameterKind: "text" | "number" | "bool";
-        ParameterPage: {
-            items: components["schemas"]["Parameter"][];
-            /** @description Pass as `cursor` for the next page (the last key); absent on the last page. */
-            next_cursor?: string | null;
-        };
-        ParameterValue: {
-            /** Format: uuid */
-            parameter_id: string;
-            /** @description `{"cs": "bavlna"}` for text parameters, a number or a boolean otherwise. */
-            value: unknown;
-            /** @description Variant-level value (by SKU); omit for a product-level value. */
-            variant_sku?: string | null;
-        };
-        /**
-         * @description Why the base prices change (recorded on the price intervals).
-         * @enum {string}
-         */
-        PriceChangeReason: "base" | "tax";
-        PriceHistory: {
-            items: components["schemas"]["VariantPriceHistory"][];
-        };
-        PriceItem: {
-            /** Format: int64 */
-            amount_minor: number;
-            /** Format: int64 */
-            compare_at_minor?: number | null;
-            /** Format: uuid */
-            variant_id: string;
-        };
-        PriceList: {
-            /** @example cz-retail */
-            code: string;
-            /** Format: date-time */
-            created_at: string;
-            currency: components["schemas"]["Currency"];
-            /** Format: uuid */
-            id: string;
-            /** @description Markets selling from this list. */
-            market_ids: string[];
             name: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        PriceListList: {
-            items: components["schemas"]["PriceList"][];
-        };
-        PriceListUpdate: {
-            /** @description The complete set of markets using this list; markets removed from it lose their list. */
-            market_ids: string[];
-            name: string;
+            value: string;
         };
         PriceRange: {
             /** Format: int64 */
@@ -1331,15 +671,17 @@ export interface components {
             /** Format: int64 */
             min_minor: number;
         };
-        PriceUpsert: {
-            /**
-             * @description The prices come from an import: for new prices the history before now is unknown, so
-             *     no reduction may be claimed for 30 days (A18).
-             */
-            imported?: boolean;
-            /** @description 1-1000 items, one per variant. */
-            items: components["schemas"]["PriceItem"][];
-            reason?: components["schemas"]["PriceChangeReason"];
+        /**
+         * @description A selling price with its Omnibus reference (A18). `reference_price` and
+         *     `discount_percent` are present only when a reduction may be claimed; they are computed
+         *     against the lowest price of the 30 days before the reduction, never `compare_at`.
+         */
+        PriceView: {
+            /** Format: int32 */
+            discount_percent?: number | null;
+            price: components["schemas"]["MoneyView"];
+            reference_price?: components["schemas"]["MoneyView"] | null;
+            unit_price?: components["schemas"]["UnitPrice"] | null;
         };
         /** @description RFC 9457 problem details body. */
         Problem: {
@@ -1352,207 +694,52 @@ export interface components {
             /** @description Always `about:blank`; `code` carries the specific error kind. */
             type: string;
         };
-        Product: {
+        ProductCard: components["schemas"]["PriceView"] & {
+            badges: components["schemas"]["Badge"][];
             brand?: string | null;
-            category_ids: string[];
-            /** Format: date-time */
-            created_at: string;
-            google_category?: string | null;
-            gpsr: components["schemas"]["Gpsr"];
-            heureka_category?: string | null;
             /** Format: uuid */
             id: string;
-            media: components["schemas"]["ProductMedia"][];
-            options: components["schemas"]["ProductOption"][];
-            parameters: components["schemas"]["ParameterValue"][];
-            status: components["schemas"]["ProductStatus"];
-            tax_categories: {
-                [key: string]: string;
-            };
-            translations: components["schemas"]["ProductTranslation"][];
-            unit_measure?: components["schemas"]["UnitMeasure"] | null;
-            /** Format: double */
-            unit_quantity?: number | null;
-            /** Format: date-time */
-            updated_at: string;
-            variants: components["schemas"]["Variant"][];
+            /** @description Up to two images: the main one and a second (hover) image. */
+            images: components["schemas"]["Image"][];
+            name: string;
+            /** @description Variants differ in price: show the price as "from". */
+            price_varies: boolean;
+            slug: string;
+            /** @description The best state over the product's variants. */
+            stock: components["schemas"]["StockState"];
         };
-        /** @description A product document, as written by `POST /products` and `PUT /products/{id}`. */
-        ProductInput: {
+        ProductDetail: {
             brand?: string | null;
-            category_ids?: string[];
-            google_category?: string | null;
-            gpsr?: components["schemas"]["Gpsr"];
-            heureka_category?: string | null;
-            /** @description In display order. */
-            media?: components["schemas"]["ProductMedia"][];
-            options?: components["schemas"]["ProductOption"][];
-            parameters?: components["schemas"]["ParameterValue"][];
-            status?: components["schemas"]["ProductStatus"];
-            /** @description Country -> tax category code (`reduced`, ...); countries not listed use `standard` (A3). */
-            tax_categories?: {
-                [key: string]: string;
-            };
-            translations: components["schemas"]["ProductTranslation"][];
-            unit_measure?: components["schemas"]["UnitMeasure"] | null;
-            /**
-             * Format: double
-             * @description Content in `unit_measure` units (0.75 for 750 ml with `l`); set together with it.
-             */
-            unit_quantity?: number | null;
-            variants?: components["schemas"]["VariantInput"][];
-        };
-        ProductMedia: {
-            alt_i18n?: components["schemas"]["BTreeMap"];
+            /** @description Sanitized server-side; the only HTML a theme may render unescaped. */
+            description_html: string;
+            gpsr?: components["schemas"]["GpsrView"] | null;
             /** Format: uuid */
-            asset_id: string;
-            /** @description Shows the image for one variant only (by SKU). */
-            variant_sku?: string | null;
-        };
-        ProductOption: {
-            /**
-             * @description Referenced by `variants[].option_values`, e.g. `color`.
-             * @example color
-             */
-            code: string;
-            name_i18n: components["schemas"]["BTreeMap"];
-            values: components["schemas"]["OptionValue"][];
+            id: string;
+            images: components["schemas"]["Image"][];
+            name: string;
+            options: components["schemas"]["OptionView"][];
+            parameters: components["schemas"]["ParameterView"][];
+            short_description: string;
+            slug: string;
+            /** @description Variants sold in this market, in the merchant's order. */
+            variants: components["schemas"]["VariantView"][];
         };
         ProductPage: {
-            items: components["schemas"]["ProductSummary"][];
-            /**
-             * Format: uuid
-             * @description Pass as `cursor` for the next page; absent on the last page.
-             */
-            next_cursor?: string | null;
+            breadcrumbs: components["schemas"]["Link"][];
+            cache: components["schemas"]["CacheHints"];
+            delivery_estimate?: components["schemas"]["DeliveryEstimate"] | null;
+            product: components["schemas"]["ProductDetail"];
+            seo: components["schemas"]["Seo"];
         };
-        /** @enum {string} */
-        ProductStatus: "draft" | "active" | "archived";
-        /** @description A row of the product list. */
-        ProductSummary: {
-            brand?: string | null;
-            /** Format: date-time */
-            created_at: string;
-            default_sku?: string | null;
-            /** Format: uuid */
-            id: string;
-            /** @description Locale -> name. */
-            name: components["schemas"]["BTreeMap"];
-            status: components["schemas"]["ProductStatus"];
-            /** Format: date-time */
-            updated_at: string;
-            /** Format: int64 */
-            variant_count: number;
+        Recommendations: {
+            cache: components["schemas"]["CacheHints"];
+            products: components["schemas"]["ProductCard"][];
         };
-        ProductTranslation: {
-            /** @description Sanitized on write: unsafe markup is removed. */
-            description_html?: string;
-            /** @example cs */
-            locale: string;
-            /** @example Tričko Basic */
-            name: string;
-            seo_description?: string | null;
-            seo_title?: string | null;
-            short_description?: string;
-            /**
-             * @description Unique per tenant and locale.
-             * @example tricko-basic
-             */
-            slug: string;
-        };
-        Readiness: {
-            checks: components["schemas"]["Checks"];
-            /**
-             * @description `ok` when every dependency is `ok`; `degraded` when only Meilisearch fails (search
-             *     answers 503, the shop keeps working, spec A27/A30); `fail` when a core dependency
-             *     (database, storage) fails.
-             */
-            status: components["schemas"]["CheckStatus"];
-        };
-        RebuildQueued: {
-            /** Format: int64 */
-            job_id: number;
-        };
-        /** @description What the edge needs to serve a hostname (spec §5.1, `GET /internal/v1/resolve`). */
-        Resolved: {
-            country_codes: string[];
-            currency: string;
-            default_locale: string;
-            hostname: string;
-            locales: string[];
-            market_code: string;
-            /** Format: uuid */
-            market_id: string;
-            /** Format: uuid */
-            tenant_id: string;
-            tenant_slug: string;
-        };
-        /**
-         * @description Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
-         *     management or exports.
-         * @enum {string}
-         */
-        Role: "staff" | "admin" | "owner";
-        RoleChange: {
-            role: components["schemas"]["Role"];
-        };
-        Sale: {
-            /** Format: date-time */
-            created_at: string;
-            discount: components["schemas"]["SaleDiscount"];
-            /**
-             * Format: date-time
-             * @description Open-ended when absent.
-             */
-            ends_at?: string | null;
-            /** Format: uuid */
-            id: string;
-            name: string;
-            /** Format: date-time */
-            starts_at: string;
-            targets: components["schemas"]["SaleTargets"];
-            /** Format: date-time */
-            updated_at: string;
-        };
-        SaleDiscount: {
+        /** @description What the edge needs to answer a redirect. */
+        ResolvedRedirect: {
             /** Format: int32 */
-            basis_points: number;
-            /** @enum {string} */
-            type: "percent";
-        } | {
-            /** Format: int64 */
-            amount_minor: number;
-            currency: components["schemas"]["Currency"];
-            /** @enum {string} */
-            type: "fixed";
-        };
-        SaleInput: {
-            discount: components["schemas"]["SaleDiscount"];
-            /** Format: date-time */
-            ends_at?: string | null;
-            /** @example Podzimní výprodej */
-            name: string;
-            /**
-             * Format: date-time
-             * @description Default: now. A start in the past means now; a started sale keeps its start.
-             */
-            starts_at?: string | null;
-            targets: components["schemas"]["SaleTargets"];
-        };
-        SalePage: {
-            items: components["schemas"]["Sale"][];
-            /**
-             * Format: uuid
-             * @description Pass as `cursor` for the next (older) page; absent on the last page.
-             */
-            next_cursor?: string | null;
-        };
-        SaleTargets: {
-            /** @description Every product. */
-            all?: boolean;
-            /** @description Products in these categories or any of their subcategories. */
-            category_ids?: string[];
-            product_ids?: string[];
+            code: number;
+            to_path: string;
         };
         SearchHit: {
             brand?: string | null;
@@ -1588,181 +775,96 @@ export interface components {
             /** Format: int32 */
             total_pages: number;
         };
-        SearchStatus: {
-            /** @description One index per locale the tenant's markets sell in. */
-            indexes: components["schemas"]["IndexStatus"][];
+        Seo: {
+            alternates: components["schemas"]["Alternate"][];
+            canonical: string;
+            description: string;
+            /** @description JSON-LD documents for `<script type="application/ld+json">`. */
+            json_ld: unknown[];
+            /** @description `noindex,follow` on filtered listings (spec §9.5); absent otherwise. */
+            robots?: string | null;
+            title: string;
         };
-        StaffList: {
-            items: components["schemas"]["StaffMember"][];
+        ShopModel: {
+            cache: components["schemas"]["CacheHints"];
+            consent: components["schemas"]["ConsentConfig"];
+            currencies: string[];
+            currency: string;
+            free_shipping_threshold?: components["schemas"]["MoneyView"] | null;
+            /** @description Placeholders until CMS pages exist (WP13). */
+            legal_pages: components["schemas"]["Link"][];
+            /** @description Active locale (`cs`); also the `lang` of pages. */
+            locale: string;
+            /** @description Locales of this market (M1: the market's default locale; prefixes arrive with WP8). */
+            locales: components["schemas"]["Alternate"][];
+            /** @description The tenant's markets (other shops of the same merchant). */
+            markets: components["schemas"]["MarketLink"][];
+            menus: components["schemas"]["Menus"];
+            /** @description Platform UI messages in the active locale (`cart.add` -> "Přidat do košíku"). */
+            messages: {
+                [key: string]: string;
+            };
+            name: string;
+            seo: components["schemas"]["Seo"];
+            /** @description Design tokens of the active theme (A6). */
+            tokens?: unknown;
+            tracking: components["schemas"]["Tracking"];
+            trust: components["schemas"]["Trust"];
         };
-        StaffMember: {
-            /** Format: date-time */
-            created_at: string;
-            email: string;
-            /** Format: uuid */
-            id: string;
-            role: components["schemas"]["Role"];
-            user_id: string;
+        /** @enum {string} */
+        Sort: "recommended" | "price_asc" | "price_desc" | "newest";
+        SortOption: {
+            href: string;
+            label: string;
+            selected: boolean;
+            value: components["schemas"]["Sort"];
         };
+        /** @enum {string} */
+        StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
             products: components["schemas"]["SearchHit"][];
         };
-        TaxCategory: {
-            /** @example reduced */
-            code: string;
-            /** @example CZ */
-            country: string;
+        Tracking: {
             /**
-             * @description Percent as a decimal string, e.g. `"12"` or `"13.5"`.
-             * @example 12
+             * Format: double
+             * @description Share of consented page views that report Web Vitals (spec §9.6).
              */
-            rate: string;
-            /** Format: date */
-            valid_from: string;
+            rum_sample_rate: number;
         };
-        TaxCategoryList: {
-            items: components["schemas"]["TaxCategory"][];
+        Trust: {
+            delivery: string;
+            payments: string[];
+            returns: string;
         };
-        /**
-         * @description Whether prices are entered gross (B2C, default) or net.
-         * @enum {string}
-         */
-        TaxMode: "gross" | "net";
-        TaxProfile: {
-            /**
-             * @description Whether the cash rounding line is taxed (A16). Default false: outside the VAT base.
-             *     Confirm with an accountant before enabling.
-             */
-            cash_rounding_in_vat_base: boolean;
-            distance_sales_mode: components["schemas"]["DistanceSalesMode"];
-            /** @example CZ */
-            establishment_country: string;
-            /**
-             * Format: date-time
-             * @description When the merchant confirmed eligibility for the origin-country threshold regime.
-             */
-            origin_threshold_confirmed_at?: string | null;
-            /** @description SK IČ DPH (Slovak establishments only). */
-            sk_ic_dph?: string | null;
-            /** Format: date-time */
-            updated_at: string;
-            /**
-             * @description DIČ.
-             * @example CZ12345678
-             */
-            vat_id?: string | null;
-            vat_payer: boolean;
+        /** @description Price per unit of measure (EU price indication directive), e.g. per 1 kg. */
+        UnitPrice: {
+            price: components["schemas"]["MoneyView"];
+            /** @description `kg`, `l`, `m`, `m²` or `ks`. */
+            unit: string;
         };
-        TaxProfileInput: {
-            cash_rounding_in_vat_base?: boolean;
-            /**
-             * @description Required (true) when switching to `origin_threshold`: the merchant confirms their EU
-             *     distance sales stay under EUR 10 000 per year. The time of confirmation is stored.
-             */
-            confirm_origin_threshold?: boolean;
-            distance_sales_mode: components["schemas"]["DistanceSalesMode"];
-            /** @example CZ */
-            establishment_country: string;
-            sk_ic_dph?: string | null;
-            vat_id?: string | null;
-            vat_payer: boolean;
-        };
-        /**
-         * @description Basis of the unit price shown next to the price (per kg, per l, ...).
-         * @enum {string}
-         */
-        UnitMeasure: "kg" | "l" | "m" | "m2" | "pcs";
-        Upload: {
-            asset: components["schemas"]["Asset"];
-            upload: components["schemas"]["UploadTarget"];
-        };
-        /** @description Where and how to upload the file. */
-        UploadTarget: {
-            /** Format: date-time */
-            expires_at: string;
-            /** @description Headers the upload must send exactly as given (they are part of the signature). */
-            headers: {
-                [key: string]: string;
-            };
-            /** @example PUT */
-            method: string;
-            url: string;
-        };
-        Variant: {
-            ean?: string | null;
+        VariantView: components["schemas"]["PriceView"] & {
             /** Format: uuid */
             id: string;
+            /**
+             * Format: int32
+             * @description Index into `product.images` of this variant's first image.
+             */
+            image_index?: number | null;
             is_default: boolean;
-            option_values: {
+            /** @description Option code -> value code (`{"color": "red", "size": "m"}`). */
+            options: {
                 [key: string]: string;
             };
             sku: string;
-            /** Format: int32 */
-            weight_g?: number | null;
+            stock: components["schemas"]["StockState"];
         };
-        VariantInput: {
-            /** @description GTIN-8/12/13/14 with a valid check digit. */
-            ean?: string | null;
-            /**
-             * Format: uuid
-             * @description Existing variant to update; omit for a new variant.
-             */
-            id?: string | null;
-            /** @description At most one; defaults to the first variant. */
-            is_default?: boolean;
-            /** @description One value code per product option: `{"color": "red", "size": "m"}`. */
-            option_values?: {
-                [key: string]: string;
-            };
-            /**
-             * @description Unique per tenant.
-             * @example TS-RED-M
-             */
-            sku: string;
-            /** Format: int32 */
-            weight_g?: number | null;
-        };
-        VariantPrice: {
-            /**
-             * Format: int64
-             * @description Gross base price in minor units.
-             */
-            amount_minor: number;
-            /**
-             * Format: int64
-             * @description Display-only "was"/recommended price, never a reduction basis (A18).
-             */
-            compare_at_minor?: number | null;
-            /** Format: date-time */
-            updated_at: string;
-            /** Format: uuid */
-            variant_id: string;
-        };
-        VariantPriceHistory: {
-            currency: components["schemas"]["Currency"];
-            /** @description The full effective-price timeline, oldest first, including scheduled future changes. */
-            intervals: components["schemas"]["Interval"][];
-            /** @description The Omnibus figures right now. */
-            omnibus: components["schemas"]["Omnibus"];
-            price?: components["schemas"]["VariantPrice"] | null;
-            /** Format: uuid */
-            price_list_id: string;
-            sku: string;
-            /** Format: uuid */
-            variant_id: string;
-        };
-        VariantPriceList: {
-            items: components["schemas"]["VariantPrice"][];
-        };
-        VariantPricePage: {
-            currency: components["schemas"]["Currency"];
-            items: components["schemas"]["VariantPrice"][];
-            /**
-             * Format: uuid
-             * @description Pass as `cursor` for the next page; absent on the last page.
-             */
-            next_cursor?: string | null;
+        VatRow: {
+            gross: components["schemas"]["MoneyView"];
+            net: components["schemas"]["MoneyView"];
+            /** @description Percent (`"21"`). */
+            rate: string;
+            vat: components["schemas"]["MoneyView"];
         };
     };
     responses: never;
@@ -1773,17 +875,18 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_assets: {
+    get_cart: {
         parameters: {
-            query?: {
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
-                status?: components["schemas"]["AssetStatus"];
-            };
+            query?: never;
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
             };
             path?: never;
             cookie?: never;
@@ -1795,7 +898,309 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AssetPage"];
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_cart: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    /** @description Shop cart capability */
+                    "X-Cart-Token"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    apply_coupon: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CouponCode"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_coupon: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    start_handoff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffToken"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description cart_empty */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewLine"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description out_of_stock / insufficient_stock */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    update_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    redeem_handoff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutCart"];
                 };
             };
             400: {
@@ -1808,105 +1213,60 @@ export interface operations {
             };
         };
     };
-    create_upload: {
+    events: {
         parameters: {
             query?: never;
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewUpload"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Upload"];
-                };
-            };
-            /** @description `unsupported_type`, `file_too_large` */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_asset: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
         requestBody?: never;
         responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Asset"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_asset: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
+            /** @description Accepted */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            404: {
+        };
+    };
+    file: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description robots.txt, llms.txt, sitemap.xml, sitemap-<n>.xml */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["Problem"];
+                    "text/plain": unknown;
                 };
             };
-            409: {
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1916,46 +1276,34 @@ export interface operations {
             };
         };
     };
-    complete_upload: {
+    newsletter: {
         parameters: {
             query?: never;
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterSignup"];
+            };
+        };
         responses: {
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Asset"];
+                    "application/json": components["schemas"]["NewsletterStatus"];
                 };
             };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `upload_missing` */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `unsupported_type`, `file_too_large`, `image_too_large`, `corrupt_image`, `size_mismatch` */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1966,17 +1314,57 @@ export interface operations {
             };
         };
     };
-    audit_log: {
+    category: {
         parameters: {
             query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
+                /** @description `recommended` (default), `price_asc`, `price_desc`, `newest`, `name`. */
+                sort?: string;
+                /** @description 1-based page (24 products per page). */
+                page?: number;
             };
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingPage"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    home: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -1988,1222 +1376,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuditPage"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
+                    "application/json": components["schemas"]["HomePage"];
                 };
             };
         };
     };
-    category_tree: {
+    product_page: {
         parameters: {
             query?: never;
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CategoryTree"];
-                };
-            };
-        };
-    };
-    create_category: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewCategory"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Category"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_category: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path: {
-                id: string;
+                slug: string;
             };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Category"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    update_category: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CategoryUpdate"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Category"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_category: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    move_category: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CategoryMove"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Category"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_coupons: {
-        parameters: {
-            query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CouponPage"];
-                };
-            };
-        };
-    };
-    create_coupon: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CouponInput"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Coupon"];
-                };
-            };
-            /** @description `code_taken` */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_coupon: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Coupon"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    update_coupon: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CouponInput"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Coupon"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_coupon: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_levels: {
-        parameters: {
-            query?: {
-                /** @description Only this product's variants. */
-                product_id?: string;
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LevelPage"];
-                };
-            };
-        };
-    };
-    update_settings: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                variant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LevelSettings"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Level"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `below_reserved`: stock is oversold */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    adjust: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path: {
-                variant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Adjustment"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdjustmentResult"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `below_reserved`, `idempotency_conflict` */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_movements: {
-        parameters: {
-            query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                variant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MovementPage"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_markets: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MarketList"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    create_market: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewMarket"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Market"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    me: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Me"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_parameters: {
-        parameters: {
-            query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 100). */
-                limit?: number;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ParameterPage"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    create_parameter: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ParameterInput"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Parameter"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_parameter: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Parameter"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    update_parameter: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ParameterInput"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Parameter"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_parameter: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_price_lists: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceListList"];
-                };
-            };
-        };
-    };
-    create_price_list: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewPriceList"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceList"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `currency_mismatch`, `unknown_market`, validation */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_price_list: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceList"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    update_price_list: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PriceListUpdate"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceList"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_prices: {
-        parameters: {
-            query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-1000 (default 100). */
-                limit?: number;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VariantPricePage"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    upsert_prices: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PriceUpsert"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VariantPriceList"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_price: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-                variant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_products: {
-        parameters: {
-            query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
-                status?: components["schemas"]["ProductStatus"];
-                /** @description Only products in this category (not its subcategories). */
-                category_id?: string;
-                /** @description Case-insensitive substring of a product name (any locale) or a SKU. */
-                q?: string;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3216,123 +1407,6 @@ export interface operations {
                     "application/json": components["schemas"]["ProductPage"];
                 };
             };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    create_product: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProductInput"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Product"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `sku_taken`, `slug_taken`, `idempotency_conflict` */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_product: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Product"];
-                };
-            };
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3343,107 +1417,22 @@ export interface operations {
             };
         };
     };
-    replace_product: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProductInput"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Product"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_product: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    price_history: {
+    search: {
         parameters: {
             query?: {
-                /** @description Only this price list. */
-                price_list_id?: string;
-                /**
-                 * @description Evaluate the current price and Omnibus reference at this time (default now), e.g. the
-                 *     start of a scheduled sale.
-                 */
-                at?: string;
+                q?: string;
+                sort?: string;
+                page?: number;
             };
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3453,30 +1442,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PriceHistory"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
+                    "application/json": components["schemas"]["ListingPage"];
                 };
             };
         };
     };
-    list_sales: {
+    recommendations: {
         parameters: {
             query?: {
-                /** @description `next_cursor` from the previous page. */
-                cursor?: string;
-                /** @description Page size, 1-100 (default 50). */
-                limit?: number;
+                /** @description `product:<id>`, `cart` or `home`. */
+                context?: string;
             };
             header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3488,640 +1471,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SalePage"];
+                    "application/json": components["schemas"]["Recommendations"];
                 };
             };
         };
     };
-    create_sale: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
-                "Idempotency-Key"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SaleInput"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Sale"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_sale: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Sale"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    update_sale: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SaleInput"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Sale"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    delete_sale: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    rebuild: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RebuildQueued"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    status: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SearchStatus"];
-                };
-            };
-        };
-    };
-    list: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StaffList"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    invite: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Invitation"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StaffMember"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    remove: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                /** @description Staff membership id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    change_role: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path: {
-                /** @description Staff membership id */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RoleChange"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StaffMember"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_tax_categories: {
-        parameters: {
-            query?: {
-                /** @description ISO 3166-1 alpha-2, e.g. `CZ`; all EU countries when omitted. */
-                country?: string;
-                /** @description Rates in force on this date (default today). */
-                at?: string;
-            };
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaxCategoryList"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    get_tax_profile: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaxProfile"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    put_tax_profile: {
-        parameters: {
-            query?: never;
-            header: {
-                /** @description The tenant to act in; the caller must be a member. */
-                "X-Tenant-Id": string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaxProfileInput"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaxProfile"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    healthz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Process is alive */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Health"];
-                };
-            };
-        };
-    };
-    resolve: {
+    resolve_redirect: {
         parameters: {
             query: {
-                /** @description Request hostname, optionally with a port (`demo.localhost:8080`). */
-                host: string;
+                /** @description Requested path (`/stary-produkt`); the query string is ignored. */
+                path: string;
             };
-            header?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -4132,15 +1500,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Resolved"];
-                };
-            };
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
+                    "application/json": components["schemas"]["ResolvedRedirect"];
                 };
             };
             404: {
@@ -4149,35 +1509,6 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    readyz: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Ready (`ok`, or `degraded` without search) */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Readiness"];
-                };
-            };
-            /** @description A core dependency is unreachable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Readiness"];
                 };
             };
         };
@@ -4207,15 +1538,12 @@ export interface operations {
                 "f.{facet}"?: string;
             };
             header: {
-                /** @description Tenant resolved from the shop hostname. */
-                "X-Tenant": string;
-                /** @description Market resolved from the shop hostname. */
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
                 "X-Market": string;
-                /**
-                 * @description One of the market's locales.
-                 * @example cs
-                 */
-                "X-Locale": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4238,8 +1566,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Unknown or unpublished storefront */
-            404: {
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4273,15 +1608,12 @@ export interface operations {
                 q: string;
             };
             header: {
-                /** @description Tenant resolved from the shop hostname. */
-                "X-Tenant": string;
-                /** @description Market resolved from the shop hostname. */
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
                 "X-Market": string;
-                /**
-                 * @description One of the market's locales.
-                 * @example cs
-                 */
-                "X-Locale": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4304,8 +1636,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Unknown or unpublished storefront */
-            404: {
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4315,6 +1654,48 @@ export interface operations {
             };
             /** @description Search is temporarily unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    shop: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopModel"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

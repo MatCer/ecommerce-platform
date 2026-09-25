@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT to_path, code FROM redirects WHERE from_path = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "to_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "redirects",
+            "name": "to_path"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "redirects",
+            "name": "code"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "e3cdfb659c445405466e055f7858af1853257de31d97102d03cff84e50ec516d"
+}

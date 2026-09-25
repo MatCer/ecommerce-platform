@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.tenant_id, d.market_id, t.slug, s.token AS \"token?\"\n         FROM platform.domains d JOIN platform.tenants t ON t.id = d.tenant_id\n         LEFT JOIN platform.storefront_tokens s ON s.tenant_id = t.id AND s.expires_at IS NULL\n         WHERE d.hostname = $1 AND d.verified_at IS NOT NULL AND t.status = 'active'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "platform.domains",
+            "name": "tenant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "platform.domains",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.tenants",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "token?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.storefront_tokens",
+            "name": "token"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "da37a62d0b68a8bad36ae7c9089036f9896557df7eb7139b991058837577be00"
+}

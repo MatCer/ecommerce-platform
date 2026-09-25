@@ -130,6 +130,11 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
         )),
         internal_token: api::auth::ServiceToken::new(SERVICE_TOKEN),
         admin_origin: HeaderValue::from_static(ADMIN_ORIGIN),
+        public_urls: commerce::storefront::PublicUrls {
+            scheme: "http".into(),
+            port: Some(8080),
+        },
+        edge: api::edge::EdgePurge::disabled(),
     }
 }
 
@@ -167,6 +172,7 @@ pub struct Call<'a> {
     tenant: Option<Uuid>,
     body: Option<Value>,
     idempotency_key: Option<&'a str>,
+    headers: Vec<(&'a str, String)>,
 }
 
 impl<'a> Call<'a> {
@@ -178,7 +184,13 @@ impl<'a> Call<'a> {
             tenant: None,
             body: None,
             idempotency_key: None,
+            headers: Vec::new(),
         }
+    }
+
+    pub fn header(mut self, name: &'a str, value: impl Into<String>) -> Self {
+        self.headers.push((name, value.into()));
+        self
     }
 
     pub fn post(uri: &'a str, body: Value) -> Self {
@@ -234,6 +246,13 @@ impl<'a> Call<'a> {
     }
 
     pub async fn send(self, state: &AppState) -> (StatusCode, Value, Response) {
+        let (status, text, res) = self.send_text(state).await;
+        let json = serde_json::from_str(&text).unwrap_or(Value::Null);
+        (status, json, res)
+    }
+
+    /// Like [`Call::send`], with the body as text.
+    pub async fn send_text(self, state: &AppState) -> (StatusCode, String, Response) {
         let mut req = Request::builder().method(self.method).uri(self.uri);
         if let Some(t) = self.token {
             req = req.header(header::AUTHORIZATION, format!("Bearer {t}"));
@@ -243,6 +262,9 @@ impl<'a> Call<'a> {
         }
         if let Some(k) = self.idempotency_key {
             req = req.header("idempotency-key", k);
+        }
+        for (name, value) in &self.headers {
+            req = req.header(*name, value.as_str());
         }
         let body = match self.body {
             Some(b) => {
@@ -258,7 +280,7 @@ impl<'a> Call<'a> {
         let status = res.status();
         let (parts, body) = res.into_parts();
         let bytes = body.collect().await.unwrap().to_bytes();
-        let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-        (status, json, Response::from_parts(parts, Body::empty()))
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        (status, text, Response::from_parts(parts, Body::empty()))
     }
 }

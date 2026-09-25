@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH RECURSIVE up AS (\n               SELECT id, parent_id, 0 AS depth FROM categories WHERE id = $1\n               UNION ALL\n               SELECT c.id, c.parent_id, up.depth + 1 FROM categories c JOIN up ON c.id = up.parent_id\n               WHERE up.depth < 32\n           )\n           SELECT t.name AS \"name!\", t.slug AS \"slug!\"\n           FROM up CROSS JOIN LATERAL (\n               SELECT name, slug FROM category_translations ct WHERE ct.category_id = up.id\n               ORDER BY (ct.locale = $2) DESC, (ct.locale = $3) DESC, ct.locale LIMIT 1\n           ) t\n           ORDER BY up.depth DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "category_translations",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slug!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "category_translations",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "75c5bf0e0d4b8df39e42af5c2bcd7e7676af64f0ec1a3f43a5da0c55c1dd255e"
+}

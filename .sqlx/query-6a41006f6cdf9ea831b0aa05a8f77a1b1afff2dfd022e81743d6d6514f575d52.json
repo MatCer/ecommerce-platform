@@ -1,0 +1,129 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.id, m.code, m.name, m.currency, m.default_locale, m.locales, m.country_codes,\n                  m.price_list_id, m.is_default,\n                  (SELECT d.hostname FROM platform.domains d\n                   WHERE d.market_id = m.id AND d.verified_at IS NOT NULL\n                   ORDER BY d.is_primary DESC, d.hostname LIMIT 1) AS host\n           FROM markets m ORDER BY m.is_default DESC, m.code",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "default_locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "default_locale"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "locales",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "locales"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "country_codes",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "country_codes"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "price_list_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "price_list_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "is_default",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "is_default"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "host",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "6a41006f6cdf9ea831b0aa05a8f77a1b1afff2dfd022e81743d6d6514f575d52"
+}

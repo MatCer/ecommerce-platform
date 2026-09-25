@@ -11,7 +11,7 @@
     "./types": "./src/types.ts"
   },
   "scripts": {
-    "openapi:generate": "openapi-typescript ../../openapi.json --output src/schema.d.ts",
+    "openapi:generate": "openapi-typescript ../../openapi.storefront.json --output src/schema.d.ts",
     "typecheck": "tsc -p ."
   },
   "dependencies": {

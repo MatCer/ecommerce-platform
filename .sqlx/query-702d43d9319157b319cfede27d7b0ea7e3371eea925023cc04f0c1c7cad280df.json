@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.product_id FROM variants v JOIN products p ON p.id = v.product_id\n         WHERE v.id = $1 AND p.status = 'active'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "702d43d9319157b319cfede27d7b0ea7e3371eea925023cc04f0c1c7cad280df"
+}

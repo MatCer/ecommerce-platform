@@ -35,6 +35,8 @@ fn state(db: PgPool) -> AppState {
         )),
         internal_token: api::auth::ServiceToken::new("unused-in-these-tests"),
         admin_origin: axum::http::HeaderValue::from_static("http://admin.localhost:8080"),
+        public_urls: commerce::storefront::PublicUrls::default(),
+        edge: api::edge::EdgePurge::disabled(),
     }
 }
 

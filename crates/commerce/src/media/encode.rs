@@ -19,8 +19,11 @@ pub const MAX_SIDE: u32 = 12_000;
 pub const MAX_PIXELS: u64 = 50_000_000;
 /// Accepted upload types (sniffed from the bytes, never trusted from the client).
 pub const ACCEPTED: &[&str] = &["image/jpeg", "image/png", "image/webp", "image/gif"];
-/// Responsive widths; an image is never upscaled.
-pub const WIDTHS: &[u32] = &[160, 320, 640, 960, 1280, 1920];
+/// Responsive widths; an image is never upscaled. 480 and 720 exist for phones: a
+/// full-width product image on a 412 px viewport at DPR 1.75 needs 665 px, and without 720 the
+/// browser takes the 960 variant, about 3x heavier (measured with `make perf` in WP6: PDP LCP
+/// 1.8 s instead of 1.2 s).
+pub const WIDTHS: &[u32] = &[160, 320, 480, 640, 720, 960, 1280, 1920];
 
 /// rav1e speed 0-10 (10 fastest) and quality; speed 8 keeps a 1920 px encode around a second.
 const AVIF_SPEED: u8 = 8;
@@ -324,9 +327,15 @@ pub(crate) mod tests {
 
     #[test]
     fn widths_never_upscale() {
-        assert_eq!(target_widths(4000), vec![160, 320, 640, 960, 1280, 1920]);
-        assert_eq!(target_widths(1000), vec![160, 320, 640, 960, 1000]);
-        assert_eq!(target_widths(640), vec![160, 320, 640]);
+        assert_eq!(
+            target_widths(4000),
+            vec![160, 320, 480, 640, 720, 960, 1280, 1920]
+        );
+        assert_eq!(
+            target_widths(1000),
+            vec![160, 320, 480, 640, 720, 960, 1000]
+        );
+        assert_eq!(target_widths(640), vec![160, 320, 480, 640]);
         assert_eq!(target_widths(100), vec![100]);
         assert_eq!(scaled_height(4000, 3000, 160), 120);
         assert_eq!(scaled_height(3000, 1, 160), 1);

@@ -2,7 +2,7 @@
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { type ArtifactKind, packArtifact } from "./artifact.ts";
+import { type ArtifactKind, packArtifact, verifyArtifact } from "./artifact.ts";
 import { lintTheme } from "./lint.ts";
 
 const [command, ...rest] = process.argv.slice(2);
@@ -39,6 +39,19 @@ if (command === "pack") {
     await rename(path.join(dir, `.${values.channel}.tmp`), path.join(dir, values.channel));
   }
   console.log(manifest.id);
+} else if (command === "verify") {
+  // Before publishing (A22): the directory must be exactly the content-addressed artifact.
+  const { values, positionals } = parseArgs({
+    args: rest,
+    allowPositionals: true,
+    options: { root: { type: "string", default: ".artifacts" } },
+  });
+  for (const id of positionals) {
+    const m = await verifyArtifact(values.root, id);
+    console.log(
+      `${id}: ok (${m.kind}, ${m.runtime.modules.length} modules, ${Object.keys(m.assets).length} assets)`,
+    );
+  }
 } else if (command === "lint") {
   const { values, positionals } = parseArgs({
     args: rest,
@@ -55,7 +68,7 @@ if (command === "pack") {
   process.exit(violations.length ? 1 : 0);
 } else {
   console.error(
-    "usage: theme-kit pack ... | theme-kit lint <theme-dir> [--reference package.json]",
+    "usage: theme-kit pack ... | theme-kit verify [--root dir] <id>... | theme-kit lint <theme-dir> [--reference package.json]",
   );
   process.exit(2);
 }

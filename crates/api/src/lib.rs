@@ -1,5 +1,6 @@
 //! HTTP API (spec §8): health, readiness, OpenAPI, Swagger UI (dev only), the Admin API
-//! (`/admin/v1`, staff JWT) and the Internal API (`/internal/v1`, service token).
+//! (`/admin/v1`, staff JWT), the Storefront API (`/storefront/v1`, storefront token via the
+//! edge) and the Internal API (`/internal/v1`, service token).
 
 pub mod admin;
 pub mod admin_catalog;
@@ -9,10 +10,14 @@ pub mod admin_pricing;
 pub mod admin_promotions;
 pub mod admin_search;
 pub mod admin_staff;
+pub mod admin_storefront;
 pub mod auth;
 pub mod auth_service;
 pub mod cli;
+pub mod edge;
 pub mod internal;
+pub mod seed;
+pub mod storefront;
 pub mod storefront_search;
 
 use std::sync::Arc;
@@ -62,6 +67,9 @@ pub struct AppState {
     pub internal_token: auth::ServiceToken,
     /// The admin SPA origin, the only one CORS allows on `/admin/v1` (A9).
     pub admin_origin: HeaderValue,
+    /// How public storefront URLs look (canonicals, sitemaps).
+    pub public_urls: commerce::storefront::PublicUrls,
+    pub edge: edge::EdgePurge,
 }
 
 #[derive(OpenApi)]
@@ -79,7 +87,8 @@ pub struct AppState {
         (name = "promotions", description = "Admin API: sales and coupons"),
         (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "search", description = "Admin API: search index status and rebuilds"),
-        (name = "storefront", description = "Storefront API (via the edge: X-Tenant, X-Market, X-Locale)"),
+        (name = "storefront-admin", description = "Admin API: redirects and the storefront token"),
+        (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
         (name = "internal", description = "Internal API for platform services (service token)")
     )
 )]
@@ -121,6 +130,8 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_promotions::routes())
         .merge(admin_inventory::routes())
         .merge(admin_search::routes())
+        .merge(admin_storefront::routes())
+        .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())
         .split_for_parts()
@@ -129,6 +140,27 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
 /// The OpenAPI document, as served at `/openapi.json`.
 pub fn openapi() -> OpenApiSpec {
     documented_routes().1
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Commerce Platform Storefront API",
+        version = "0.1.0",
+        description = "Theme-facing page models and cart (spec §8.2). Reached through the edge only."
+    ),
+    components(schemas(platform::Problem)),
+    tags((name = "storefront", description = "Page models, cart, checkout handoff"))
+)]
+struct StorefrontDoc;
+
+/// The storefront subset (`api openapi --storefront`), source of the SDK's generated types.
+pub fn openapi_storefront() -> OpenApiSpec {
+    OpenApiRouter::<AppState>::with_openapi(StorefrontDoc::openapi())
+        .merge(storefront::routes())
+        .merge(storefront_search::routes())
+        .split_for_parts()
+        .1
 }
 
 /// CORS for the admin SPA (A9): one exact origin, bearer tokens (no cookies to this API).

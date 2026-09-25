@@ -20,16 +20,25 @@ struct Shop {
     runtime: PgPool,
     tenant: Uuid,
     market: Uuid,
+    token: String,
     _jwks: Jwks,
 }
 
-/// A tenant with staff and a `cz` market; `publish` adds a verified domain for it.
+/// A tenant with staff, a storefront token and a `cz` market; `publish` adds a verified
+/// domain for it.
 async fn shop(db: &PgPool, slug: &str, publish: bool) -> Shop {
     let jwks = jwks_server(json!([jwk("a", X_A)])).await;
     let runtime = testkit::runtime_pool(db, 4).await;
     let (tenant, market) = testkit::tenant(&runtime, slug).await;
     testkit::staff(&runtime, tenant, "boss", "owner").await;
     testkit::staff(&runtime, tenant, "clerk", "staff").await;
+    let token = format!("sf_{:064x}", Uuid::now_v7().as_u128());
+    sqlx::query("INSERT INTO platform.storefront_tokens (token, tenant_id) VALUES ($1, $2)")
+        .bind(&token)
+        .bind(tenant)
+        .execute(db)
+        .await
+        .unwrap();
     if publish {
         sqlx::query(
             "INSERT INTO platform.domains (hostname, tenant_id, market_id, is_primary, verified_at)
@@ -47,6 +56,7 @@ async fn shop(db: &PgPool, slug: &str, publish: bool) -> Shop {
         runtime,
         tenant,
         market,
+        token,
         _jwks: jwks,
     }
 }
@@ -58,7 +68,7 @@ impl Shop {
         locale: &str,
     ) -> (StatusCode, Value, axum::http::HeaderMap) {
         let req = Request::get(uri)
-            .header("x-tenant", self.tenant.to_string())
+            .header("x-storefront-token", self.token.clone())
             .header("x-market", self.market.to_string())
             .header("x-locale", locale)
             .body(Body::empty())
@@ -82,7 +92,7 @@ async fn storefront_context_must_be_a_published_market(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND, "no verified domain: {body}");
 
-    // Missing or malformed context headers.
+    // No storefront token (the edge always sends one).
     let res = api::app(unpublished.s.clone(), false)
         .oneshot(
             Request::get("/storefront/v1/search")
@@ -91,18 +101,16 @@ async fn storefront_context_must_be_a_published_market(db: PgPool) {
         )
         .await
         .unwrap();
-    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
     drop(unpublished);
 
     let published = shop(&db, "live", true).await;
+    // A locale the market does not sell in is only a hint: the market's default is used (and
+    // Meilisearch is down in this harness).
     let (status, _, _) = published
         .storefront("/storefront/v1/search?q=x", "de")
         .await;
-    assert_eq!(
-        status,
-        StatusCode::NOT_FOUND,
-        "the market does not sell in de"
-    );
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     let (status, body, _) = published
         .storefront("/storefront/v1/search?f.price.cz=1", "cs")
         .await;
@@ -128,14 +136,17 @@ async fn storefront_context_must_be_a_published_market(db: PgPool) {
         .storefront("/storefront/v1/search/suggest?q=tri", "cs")
         .await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-    // Another tenant's market id with this tenant id is not a valid context either.
+    // Another tenant's market with this tenant's token is refused (A4).
     let other = testkit::tenant(&published.runtime, "other").await.1;
     let forged = Shop {
         market: other,
         ..published
     };
-    let (status, _, _) = forged.storefront("/storefront/v1/search?q=x", "cs").await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, body, _) = forged.storefront("/storefront/v1/search?q=x", "cs").await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("market_mismatch"))
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

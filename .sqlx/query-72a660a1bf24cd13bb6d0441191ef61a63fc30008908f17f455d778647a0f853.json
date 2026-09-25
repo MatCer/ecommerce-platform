@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT on_hand, reserved, track, allow_backorder FROM inventory_levels WHERE variant_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "on_hand",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "inventory_levels",
+            "name": "on_hand"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "reserved",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "inventory_levels",
+            "name": "reserved"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "track",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "inventory_levels",
+            "name": "track"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "allow_backorder",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "inventory_levels",
+            "name": "allow_backorder"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "72a660a1bf24cd13bb6d0441191ef61a63fc30008908f17f455d778647a0f853"
+}

@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pt.product_id, pt.locale, pt.slug, p.updated_at FROM product_translations pt\n         JOIN products p ON p.id = pt.product_id\n         WHERE pt.product_id = ANY($1)\n         ORDER BY pt.product_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d773139ce6385bc4c4d1ad195acc7043500a17cc97f10b7c02e6781bbc120a45"
+}

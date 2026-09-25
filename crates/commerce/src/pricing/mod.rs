@@ -600,6 +600,80 @@ async fn coupon_windows(tx: &mut TenantTx, currency: Currency) -> Result<Vec<Cou
     .collect())
 }
 
+/// A variant's selling price in one price list at one instant, with its Omnibus figures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShelfPrice {
+    pub amount_minor: i64,
+    pub omnibus: Omnibus,
+}
+
+/// Effective prices and Omnibus references for many variants of one price list at `at`, in
+/// three queries (storefront listings and product pages). Variants without a price in the list
+/// are absent from the result: they are not sold there.
+pub async fn shelf_prices(
+    tx: &mut TenantTx,
+    price_list_id: Uuid,
+    currency: Currency,
+    variant_ids: &[Uuid],
+    at: DateTime<Utc>,
+) -> Result<HashMap<Uuid, ShelfPrice>, Error> {
+    let current = effective_prices(tx, price_list_id, variant_ids, at).await?;
+    let on_sale: Vec<Uuid> = current
+        .iter()
+        .filter(|p| p.cause == Cause::Sale)
+        .map(|p| p.variant_id)
+        .collect();
+    let mut histories: HashMap<Uuid, Vec<Interval>> = HashMap::new();
+    if !on_sale.is_empty() {
+        // ponytail: whole history of the variants on sale; bound it to the last months if it
+        // grows large.
+        for r in sqlx::query!(
+            "SELECT variant_id, id, amount_minor, valid_from, valid_to, cause, sale_id, imported
+             FROM price_intervals WHERE price_list_id = $1 AND variant_id = ANY($2)
+             ORDER BY variant_id, valid_from",
+            price_list_id,
+            &on_sale
+        )
+        .fetch_all(&mut **tx)
+        .await?
+        {
+            histories.entry(r.variant_id).or_default().push(Interval {
+                id: r.id,
+                amount_minor: r.amount_minor,
+                valid_from: r.valid_from,
+                valid_to: r.valid_to,
+                cause: Cause::parse(&r.cause),
+                sale_id: r.sale_id,
+                imported: r.imported,
+            });
+        }
+    }
+    let coupons = if on_sale.is_empty() {
+        Vec::new()
+    } else {
+        coupon_windows(tx, currency).await?
+    };
+    Ok(current
+        .into_iter()
+        .map(|p| {
+            let omnibus = match histories.get(&p.variant_id) {
+                Some(h) => omnibus::reference(h, &coupons, at),
+                None => Omnibus {
+                    current_minor: Some(p.amount_minor),
+                    ..Omnibus::default()
+                },
+            };
+            (
+                p.variant_id,
+                ShelfPrice {
+                    amount_minor: p.amount_minor,
+                    omnibus,
+                },
+            )
+        })
+        .collect())
+}
+
 /// Price timelines and Omnibus references of a product's variants at `at`, per price list
 /// (or only `price_list_id`).
 pub async fn price_history(

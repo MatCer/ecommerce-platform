@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coupon_id FROM cart_coupons WHERE cart_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "coupon_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "cart_coupons",
+            "name": "coupon_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "58f5c1bf41af638acd1a200d4cf59ddbd607619b3a161c5e789f877e8a39c0bf"
+}

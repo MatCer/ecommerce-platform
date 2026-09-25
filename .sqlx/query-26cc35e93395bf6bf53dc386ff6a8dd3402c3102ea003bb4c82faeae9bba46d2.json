@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.name AS \"name!\", t.slug AS \"slug!\" FROM categories c\n           CROSS JOIN LATERAL (\n               SELECT name, slug FROM category_translations ct WHERE ct.category_id = c.id\n               ORDER BY (ct.locale = $2) DESC, (ct.locale = $3) DESC, ct.locale LIMIT 1\n           ) t\n           WHERE c.parent_id = $1 ORDER BY c.position, c.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "category_translations",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slug!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "category_translations",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "26cc35e93395bf6bf53dc386ff6a8dd3402c3102ea003bb4c82faeae9bba46d2"
+}

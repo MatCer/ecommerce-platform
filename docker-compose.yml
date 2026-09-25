@@ -152,22 +152,26 @@ services:
       timeout: 3s
       retries: 30
 
-  # Storefront edge (spec §9.3, WP2): Node + Miniflare running the default-theme and checkout
-  # artifacts baked into the image. Until WP6 its Storefront API upstream is the stub in `mocks`.
+  # Storefront edge (spec §9.3): Node + Miniflare. Sites come from the API's internal resolve,
+  # theme/checkout artifacts are downloaded from the private bucket through the API on first use
+  # (`make theme-build` publishes them) and cached in a volume. Media come from the public bucket.
   # Port 8788 (purge/health) stays internal: Caddy only routes to 8787.
   edge:
-    <<: *infra
+    profiles: [full]
+    restart: unless-stopped
     build:
       context: .
       dockerfile: apps/edge/Dockerfile
     image: ${COMPOSE_PROJECT_NAME:-ecommerce}-edge:local
     environment:
-      API_ORIGIN: http://mocks:4010
-      MEDIA_ORIGIN: http://mocks:4010
+      API_ORIGIN: http://api:8000
+      MEDIA_ORIGIN: http://minio:9000/public
       PUBLIC_SCHEME: http
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-api-token-0123456789abcdef}
       EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+    volumes: [edge-artifacts:/var/cache/artifacts]
     depends_on:
-      mocks: { condition: service_healthy }
+      api: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/_edge/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
       interval: 2s
@@ -220,7 +224,8 @@ services:
     <<: *infra
     image: caddy:2.11.4-alpine
     depends_on:
-      edge: { condition: service_started }
+      # Only in the full profile; `make dev-infra` runs Caddy without shops.
+      edge: { condition: service_started, required: false }
     ports:
       - "${HOST_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"
       - "${HOST_BIND:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
@@ -258,6 +263,11 @@ services:
       AUTH_ISSUER: http://auth.localhost
       ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-api-token-0123456789abcdef}
+      # Canonical storefront URLs (sitemaps, hreflang) and edge cache purges (spec §9.3).
+      PUBLIC_STOREFRONT_SCHEME: http
+      PUBLIC_STOREFRONT_PORT: ${HTTP_PORT:-8080}
+      EDGE_PURGE_URL: http://edge:8788/_edge/purge
+      EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
       # Superadmin CLI (`make admin args=...`) only.
       AUTH_INTERNAL_URL: http://auth:3000/
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
@@ -294,6 +304,7 @@ services:
       meili-init: { condition: service_completed_successfully }
 
 volumes:
+  edge-artifacts:
   pg-data:
   meili-data:
   minio-data:

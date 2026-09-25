@@ -162,7 +162,7 @@ fn internal(e: impl std::fmt::Display) -> Error {
 }
 
 /// Where the client uploads (presigned PUT).
-fn upload_key(tenant_id: Uuid, id: Uuid) -> Path {
+pub fn upload_key(tenant_id: Uuid, id: Uuid) -> Path {
     Path::from(format!("uploads/{tenant_id}/{id}"))
 }
 

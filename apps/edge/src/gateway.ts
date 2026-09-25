@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
+import type { ArtifactFetcher } from "./artifacts.ts";
 import {
   assetsBinding,
   CHECKOUT_OPERATIONS,
@@ -12,7 +13,6 @@ import {
   type Upstream,
 } from "./bindings.ts";
 import { HtmlCache, normalizeUrl, requestVerdict, responseVerdict } from "./cache.ts";
-import { HandoffStore } from "./handoff.ts";
 import {
   contentSecurityPolicy,
   securityHeaders,
@@ -32,9 +32,14 @@ import {
 export interface GatewayOptions {
   artifactRoot: string;
   resolver: SiteResolver;
-  /** The one platform-owned checkout artifact (same bundle for all tenants, spec §9.4). */
-  checkoutArtifact: string;
-  /** Storefront API origin, e.g. `http://api:8000` (the stub lives in apps/mocks until WP6). */
+  /**
+   * The platform-owned checkout artifact (same bundle for all tenants, spec §9.4) when the
+   * resolved site does not name one (tests, local fallbacks).
+   */
+  checkoutArtifact?: string;
+  /** Downloads artifacts missing under `artifactRoot` from the API (A22); absent = local only. */
+  artifacts?: ArtifactFetcher;
+  /** Storefront API origin, e.g. `http://api:8000`. */
   apiOrigin: string;
   /** Public media origin (image variants), proxied under `/media/*`. */
   mediaOrigin: string;
@@ -104,12 +109,21 @@ function readCookie(headers: Headers, name: string): string | undefined {
 }
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+const IDEMPOTENCY_KEY_RE = /^[\x21-\x7e]{1,255}$/;
+/** A path on the same shop: one leading slash, no `//` or `/\` host smuggling, no spaces. */
+const SAME_SHOP_PATH = /^\/(?![/\\])[^\s\\]*$/;
 const CLEAR_CART_COOKIE = `${SHOP_CART_COOKIE}=; Path=/_p; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+/** `GET /_p/cart` before the first write (the SDK's `EmptyCart`): no cart is created. */
 const EMPTY_CART = {
   id: null,
   lines: [],
   item_count: 0,
+  coupon: null,
   subtotal: null,
+  discount: null,
+  total: null,
+  vat: [],
+  vat_total: null,
   free_shipping_remaining: null,
 };
 
@@ -121,7 +135,6 @@ export function createGateway(opts: GatewayOptions) {
     opts.resolver instanceof CachedResolver ? opts.resolver : new CachedResolver(opts.resolver);
   const registry = new ContextRegistry();
   const cache = new HtmlCache();
-  const handoffs = new HandoffStore();
   const manifests = new Map<string, Promise<ArtifactManifest>>();
   const revalidating = new Set<string>();
   let outboundDenied = 0;
@@ -129,7 +142,10 @@ export function createGateway(opts: GatewayOptions) {
   const manifest = (id: string) => {
     let m = manifests.get(id);
     if (!m) {
-      m = readManifest(opts.artifactRoot, id);
+      m = (async () => {
+        await opts.artifacts?.ensure(id);
+        return readManifest(opts.artifactRoot, id);
+      })();
       manifests.set(id, m);
       m.catch(() => manifests.delete(id));
     }
@@ -260,7 +276,11 @@ export function createGateway(opts: GatewayOptions) {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     const artifact = site.theme_artifact;
+    if (!artifact)
+      return text(503, "This shop has not been published yet", { "retry-after": "60" });
     const m = await manifest(artifact);
+    // Theme workers get the theme bindings only; a checkout artifact never runs as a theme.
+    if (m.kind !== "theme") throw new Error(`artifact ${artifact} is not a theme`);
     const normalized = normalizeUrl(url);
     const verdict = requestVerdict({
       method: req.method,
@@ -344,6 +364,10 @@ export function createGateway(opts: GatewayOptions) {
       }
     }
     const { r, cacheable } = await store();
+    if (r.status === 404) {
+      const redirect = await redirectFor(site, url);
+      if (redirect) return redirect;
+    }
     return respond(
       r.status,
       r.headers,
@@ -352,6 +376,25 @@ export function createGateway(opts: GatewayOptions) {
       cacheable,
       r.subrequests,
     );
+  }
+
+  /** Spec §9.5: a page the theme does not know may have a merchant-defined redirect. */
+  async function redirectFor(site: Site, url: URL): Promise<Response | null> {
+    const query = new URLSearchParams({ path: url.pathname });
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/redirects/resolve?${query}`, {
+        headers: apiHeaders(site, { accept: "application/json" }),
+      }),
+    ).catch(() => null);
+    if (!res?.ok) return null;
+    const r = (await res.json().catch(() => null)) as { to_path?: unknown; code?: unknown } | null;
+    const to = r?.to_path;
+    // Same-shop paths only (the API enforces it too): never an open redirect.
+    if (typeof to !== "string" || !SAME_SHOP_PATH.test(to)) return null;
+    return new Response(null, {
+      status: r?.code === 302 ? 302 : 301,
+      headers: { location: to, "cache-control": "no-store" },
+    });
   }
 
   // --- platform routes (/_p/*) ---------------------------------------------------------------
@@ -391,6 +434,11 @@ export function createGateway(opts: GatewayOptions) {
     if (req.method !== "GET" && !sameOrigin(req, host, port))
       return problem(403, "cross_origin", "cross-origin request");
 
+    // Idempotency-Key (§8.1): the API runs a keyed cart mutation once and replays it after. A
+    // malformed key is refused, never silently dropped (a retry would then apply twice).
+    const key = req.headers.get("idempotency-key");
+    if (key !== null && !IDEMPOTENCY_KEY_RE.test(key))
+      return problem(400, "invalid_idempotency_key", "1-255 visible ASCII characters");
     let body: ArrayBuffer | undefined;
     if (req.method === "POST" || req.method === "PATCH") {
       const b = await readJsonBody(req, MAX_JSON_BODY);
@@ -424,6 +472,7 @@ export function createGateway(opts: GatewayOptions) {
         headers: apiHeaders(site, {
           "x-cart-token": token,
           ...(body ? { "content-type": "application/json" } : {}),
+          ...(key ? { "idempotency-key": key } : {}),
         }),
         body,
       }),
@@ -432,11 +481,17 @@ export function createGateway(opts: GatewayOptions) {
       "content-type": res.headers.get("content-type") ?? "application/json",
       "cache-control": "no-store",
     });
+    const replayed = res.headers.get("idempotent-replayed");
+    if (replayed) headers.set("idempotent-replayed", replayed);
     if (setCookie) headers.append("set-cookie", setCookie);
+    // The API answers 404 only for a cart it does not know (line/coupon errors are 422).
     if (res.status === 404 && !setCookie) {
       // Unknown, expired or rotated (handed off) cart: forget the capability.
       headers.append("set-cookie", CLEAR_CART_COOKIE);
       if (req.method === "GET") return Response.json(EMPTY_CART, { headers });
+    } else if (res.ok && !setCookie) {
+      // Expiry counts from the last use (§10.3): every successful use renews the cookie.
+      headers.append("set-cookie", cartCookie(token));
     }
     return new Response(await res.arrayBuffer(), { status: res.status, headers });
   }
@@ -455,21 +510,21 @@ export function createGateway(opts: GatewayOptions) {
         status: 303,
         headers: { location: "/", "cache-control": "no-store" },
       });
+    // The API revokes the shop capability and mints a single-use, 60 s handoff token (A1, A4).
     const res = await upstream(
-      new Request(`${opts.apiOrigin}/storefront/v1/cart/checkout-token`, {
+      new Request(`${opts.apiOrigin}/storefront/v1/cart/handoff`, {
         method: "POST",
         headers: apiHeaders(site, { "x-cart-token": token }),
       }),
     );
-    const checkoutToken = res.ok ? ((await res.json()) as { token?: unknown }).token : undefined;
-    if (typeof checkoutToken !== "string" || !TOKEN_RE.test(checkoutToken)) {
+    const h = res.ok ? ((await res.json()) as { token?: unknown }).token : undefined;
+    if (typeof h !== "string" || !TOKEN_RE.test(h)) {
       return new Response(null, {
         status: 303,
         headers: { location: "/", "cache-control": "no-store" },
       });
     }
     const checkoutHost = `checkout.${site.shop_host}`;
-    const h = handoffs.mint({ checkoutHost, tenantId: site.tenant_id, cartToken: checkoutToken });
     return new Response(null, {
       status: 303,
       headers: {
@@ -574,6 +629,9 @@ export function createGateway(opts: GatewayOptions) {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     if (p.startsWith("/media/")) {
+      // The public bucket is shared; a shop serves only its own tenant's images.
+      if (!p.startsWith(`/media/${site.tenant_id}/`) || p.includes(".."))
+        return text(404, "Not found");
       const res = await upstream(new Request(`${opts.mediaOrigin}${p}`));
       const headers = new Headers();
       for (const k of ["content-type", "cache-control", "etag", "last-modified"]) {
@@ -595,24 +653,19 @@ export function createGateway(opts: GatewayOptions) {
         },
       });
     }
+    const active = site.theme_artifact ? [site.theme_artifact] : [];
     if (p.startsWith("/_astro/")) {
       return (
-        (await serveAsset([site.theme_artifact, ...site.retained_artifacts], p, true)) ??
+        (await serveAsset([...active, ...site.retained_artifacts], p, true)) ??
         text(404, "Not found")
       );
     }
-    const pub = await serveAsset([site.theme_artifact], p, false);
+    const pub = await serveAsset(active, p, false);
     if (pub) return pub;
     return renderTheme(site, url, req, port);
   }
 
-  async function checkout(
-    site: Site,
-    req: Request,
-    url: URL,
-    host: string,
-    port: string,
-  ): Promise<Response> {
+  async function checkout(site: Site, req: Request, url: URL, port: string): Promise<Response> {
     const p = url.pathname;
     if (p === "/start") {
       const h = url.searchParams.get("h") ?? "";
@@ -622,8 +675,20 @@ export function createGateway(opts: GatewayOptions) {
       const fetchSite = req.headers.get("sec-fetch-site");
       const redeemable =
         req.method === "GET" && (fetchSite === "same-site" || fetchSite === "same-origin");
-      const handoff = redeemable ? handoffs.consume(h, host) : null;
-      if (!handoff || handoff.tenantId !== site.tenant_id) {
+      let cartToken: string | undefined;
+      if (redeemable && TOKEN_RE.test(h)) {
+        // Bound to this tenant and market by the API: another shop's checkout cannot redeem it.
+        const res = await upstream(
+          new Request(`${opts.apiOrigin}/storefront/v1/checkout/handoff`, {
+            method: "POST",
+            headers: apiHeaders(site, { "content-type": "application/json" }),
+            body: JSON.stringify({ token: h }),
+          }),
+        );
+        const got = res.ok ? ((await res.json()) as { cart_token?: unknown }).cart_token : null;
+        if (typeof got === "string" && TOKEN_RE.test(got)) cartToken = got;
+      }
+      if (!cartToken) {
         return new Response(
           `<!doctype html><meta charset="utf-8"><title>Odkaz vypršel</title><p>Odkaz na pokladnu vypršel nebo už byl použit. <a href="${scheme}://${site.shop_host}${port}/">Zpět do obchodu</a></p>`,
           {
@@ -640,13 +705,14 @@ export function createGateway(opts: GatewayOptions) {
         status: 303,
         headers: {
           location: "/",
-          "set-cookie": `${CHECKOUT_CART_COOKIE}=${handoff.cartToken}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+          "set-cookie": `${CHECKOUT_CART_COOKIE}=${cartToken}; Path=/; HttpOnly; Secure; SameSite=Lax`,
           "cache-control": "no-store",
           "referrer-policy": "no-referrer",
         },
       });
     }
     if (p === "/_p/tokens.css") {
+      if (!site.theme_artifact) return text(404, "Not found");
       const m = await manifest(site.theme_artifact);
       return new Response(m.tokens ? tokensToCss(m.tokens) : "", {
         headers: {
@@ -659,13 +725,18 @@ export function createGateway(opts: GatewayOptions) {
       return problem(404, "not_found", "unknown platform route");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
-    const asset = await serveAsset([opts.checkoutArtifact], p, p.startsWith("/_astro/"));
+    const checkoutArtifact = site.checkout_artifact ?? opts.checkoutArtifact;
+    if (!checkoutArtifact)
+      return text(503, "Checkout is not available yet", { "retry-after": "60" });
+    const asset = await serveAsset([checkoutArtifact], p, p.startsWith("/_astro/"));
     if (asset) return asset;
 
     let cartToken = readCookie(req.headers, CHECKOUT_CART_COOKIE);
     if (cartToken && !TOKEN_RE.test(cartToken)) cartToken = undefined;
-    const m = await manifest(opts.checkoutArtifact);
-    const r = await render(opts.checkoutArtifact, normalizeUrl(url), site, { cartToken });
+    const m = await manifest(checkoutArtifact);
+    // The checkout binding (cart capability) is only ever handed to the platform checkout.
+    if (m.kind !== "checkout") throw new Error(`artifact ${checkoutArtifact} is not a checkout`);
+    const r = await render(checkoutArtifact, normalizeUrl(url), site, { cartToken });
     const headers = r.headers;
     const csp = contentSecurityPolicy("checkout", {
       scriptHashes: m.csp.script_hashes,
@@ -692,7 +763,7 @@ export function createGateway(opts: GatewayOptions) {
     if (!site) return text(404, "Unknown shop");
     return origin.kind === "shop"
       ? shop(site, req, publicUrl, host, port)
-      : checkout(site, req, publicUrl, host, port);
+      : checkout(site, req, publicUrl, port);
   }
 
   async function fetchHandler(request: Request): Promise<Response> {

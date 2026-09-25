@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM cart_coupons cc USING coupons c\n         WHERE cc.cart_id = $1 AND c.id = cc.coupon_id AND c.code = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a88e4e9986a881e780ffec433f9b829e210ed53d8b464c1729689d7e954fcf84"
+}

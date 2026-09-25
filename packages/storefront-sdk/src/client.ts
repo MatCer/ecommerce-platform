@@ -1,4 +1,11 @@
-import type { Cart, ConsentPurpose, SearchSuggest } from "./types.ts";
+import type {
+  Cart,
+  CartState,
+  ConsentPurpose,
+  SearchHit,
+  SearchResult,
+  SearchSuggest,
+} from "./types.ts";
 
 /**
  * Browser-side helpers for islands. Everything goes through same-origin gateway routes
@@ -10,27 +17,47 @@ async function json<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-const send = (method: string, path: string, body?: unknown) =>
+const send = (method: string, path: string, body?: unknown, idempotencyKey?: string) =>
   fetch(path, {
     method,
-    headers: body === undefined ? {} : { "content-type": "application/json" },
+    headers: {
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: "same-origin",
   }).then((r) => json<Cart>(r));
 
 export const cart = {
-  get: () => send("GET", "/_p/cart"),
-  add: (variantId: string, quantity = 1) =>
-    send("POST", "/_p/cart/lines", { variant_id: variantId, quantity }),
+  get: () => fetch("/_p/cart", { credentials: "same-origin" }).then((r) => json<CartState>(r)),
+  /** Pass the same `idempotencyKey` when retrying an add, so it is counted once. */
+  add: (variantId: string, quantity = 1, idempotencyKey?: string) =>
+    send("POST", "/_p/cart/lines", { variant_id: variantId, quantity }, idempotencyKey),
   update: (lineId: string, quantity: number) =>
     send("PATCH", `/_p/cart/lines/${encodeURIComponent(lineId)}`, { quantity }),
   remove: (lineId: string) => send("DELETE", `/_p/cart/lines/${encodeURIComponent(lineId)}`),
+  applyCoupon: (code: string) => send("POST", "/_p/cart/coupons", { code }),
+  removeCoupon: (code: string) => send("DELETE", `/_p/cart/coupons/${encodeURIComponent(code)}`),
 };
 
 export const suggest = (q: string, signal?: AbortSignal) =>
   fetch(`/_p/public/search/suggest?${new URLSearchParams({ q })}`, { signal }).then((r) =>
     json<SearchSuggest>(r),
   );
+
+/** Full search from an island: `params` as in `/storefront/v1/search` (`q`, `f.opt.color`, ...). */
+export const search = (params: URLSearchParams, signal?: AbortSignal) =>
+  fetch(`/_p/public/search?${params}`, { signal }).then((r) => json<SearchResult>(r));
+
+/** The smallest AVIF (else any) thumbnail of a search hit at least `width` px wide. */
+export function hitThumb(hit: SearchHit, width: number): string | undefined {
+  const sorted = [...hit.image].sort((a, b) => a.width - b.width);
+  const avif = sorted.filter((v) => v.format === "avif");
+  const pool = avif.length ? avif : sorted;
+  const v = pool.find((x) => x.width >= width) ?? pool.at(-1);
+  // Same-origin: the shop serves the public media bucket under /media (CSP img-src 'self').
+  return v && `/${v.key}`;
+}
 
 // --- consent (spec A20: before consent, no device storage and no beacons) ---------------------
 

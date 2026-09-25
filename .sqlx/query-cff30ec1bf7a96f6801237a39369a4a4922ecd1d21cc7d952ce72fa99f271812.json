@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT v.product_id, pi.price_list_id FROM variants v\n         JOIN products p ON p.id = v.product_id AND p.status = 'active'\n         JOIN price_intervals pi ON pi.variant_id = v.id\n          AND pi.valid_from <= $1 AND (pi.valid_to IS NULL OR pi.valid_to > $1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "price_list_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "price_list_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "cff30ec1bf7a96f6801237a39369a4a4922ecd1d21cc7d952ce72fa99f271812"
+}

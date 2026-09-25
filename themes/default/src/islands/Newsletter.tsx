@@ -1,7 +1,9 @@
+import { type Messages, t } from "@platform/storefront-sdk/format";
 import { createSignal, Show } from "solid-js";
 
 /** Newsletter sign-up (double opt-in happens server-side, spec §11.5). */
-export default function Newsletter() {
+export default function Newsletter(props: { labels: Messages }) {
+  const l = (key: string) => t(props.labels, key);
   const [state, setState] = createSignal<"idle" | "busy" | "done" | "error">("idle");
 
   async function submit(e: SubmitEvent) {
@@ -17,10 +19,7 @@ export default function Newsletter() {
   }
 
   return (
-    <Show
-      when={state() !== "done"}
-      fallback={<p role="status">Děkujeme! Potvrzovací odkaz jsme poslali na váš e-mail.</p>}
-    >
+    <Show when={state() !== "done"} fallback={<p role="status">{l("newsletter.done")}</p>}>
       <form
         onSubmit={submit}
         class="flex max-w-md flex-col gap-2 sm:flex-row"
@@ -28,7 +27,7 @@ export default function Newsletter() {
         action="/_p/newsletter"
       >
         <label for="nl-email" class="sr-only">
-          E-mail
+          {l("newsletter.email")}
         </label>
         <input
           id="nl-email"
@@ -44,11 +43,11 @@ export default function Newsletter() {
           disabled={state() === "busy"}
           class="h-11 rounded-md bg-card px-5 font-semibold text-panel"
         >
-          Odebírat
+          {l("newsletter.submit")}
         </button>
         <Show when={state() === "error"}>
           <p role="alert" class="text-sm">
-            Přihlášení se nezdařilo, zkuste to znovu.
+            {l("newsletter.invalid")}
           </p>
         </Show>
       </form>

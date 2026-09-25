@@ -577,6 +577,7 @@ dependencies = [
  "object_store",
  "platform",
  "proptest",
+ "rand 0.10.3",
  "ravif",
  "reqwest",
  "serde",

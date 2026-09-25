@@ -76,7 +76,33 @@ export async function astroInlineHashes(projectDir: string) {
   return { script_hashes: scripts.map(cspHash), style_hashes: styles.map(cspHash) };
 }
 
-const sha256 = (data: string | Uint8Array) => createHash("sha256").update(data).digest("hex");
+export const sha256 = (data: string | Uint8Array) =>
+  createHash("sha256").update(data).digest("hex");
+
+/**
+ * The content address of an artifact: sha256 over every server module and client asset
+ * (path + content hash, in that order, each sorted), the tokens, the CSP hashes, the platform
+ * runtime and the kind. `packArtifact` assigns it; the edge recomputes it after downloading an
+ * artifact, so a tampered or incomplete download can never run.
+ */
+export function artifactId(input: {
+  kind: ArtifactKind;
+  /** `[path under server/, sha256]` */
+  server: [string, string][];
+  /** URL path → entry, as in the manifest. */
+  assets: Record<string, AssetEntry>;
+  tokens: ThemeTokens | null;
+  csp: ArtifactManifest["csp"];
+}): string {
+  const digest = createHash("sha256");
+  for (const [f, h] of [...input.server].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    digest.update(`server/${f}\0${h}\n`);
+  for (const p of Object.keys(input.assets).sort())
+    digest.update(`client${p}\0${input.assets[p]?.sha256}\n`);
+  digest.update(`tokens\0${JSON.stringify(input.tokens)}\ncsp\0${JSON.stringify(input.csp)}\n`);
+  digest.update(`runtime\0${JSON.stringify(RUNTIME)}\nkind\0${input.kind}\n`);
+  return digest.digest("hex").slice(0, 32);
+}
 
 /** Lists regular files under `dir` (relative, posix). Rejects symlinks and special files. */
 async function listFiles(dir: string, rel = ""): Promise<string[]> {
@@ -118,7 +144,6 @@ export async function packArtifact(opts: {
   const clientFiles = (await listFiles(clientDir)).filter((f) => !CLIENT_IGNORE.has(f));
 
   let total = 0;
-  const digest = createHash("sha256");
   // Read each file once and publish exactly the bytes that were hashed (no re-read races).
   const contents = new Map<string, Buffer>();
   const hashFile = async (abs: string, label: string) => {
@@ -126,12 +151,12 @@ export async function packArtifact(opts: {
     total += buf.byteLength;
     if (total > MAX_ARTIFACT_BYTES) throw new Error("artifact: larger than 50 MB");
     contents.set(label, buf);
-    const h = sha256(buf);
-    digest.update(`${label}\0${h}\n`);
-    return { sha256: h, size: buf.byteLength };
+    return { sha256: sha256(buf), size: buf.byteLength };
   };
 
-  for (const f of serverFiles) await hashFile(path.join(serverDir, f), `server/${f}`);
+  const serverHashes: [string, string][] = [];
+  for (const f of serverFiles)
+    serverHashes.push([f, (await hashFile(path.join(serverDir, f), `server/${f}`)).sha256]);
   const assets: Record<string, AssetEntry> = {};
   for (const f of clientFiles)
     assets[`/${f}`] = await hashFile(path.join(clientDir, f), `client/${f}`);
@@ -140,9 +165,7 @@ export async function packArtifact(opts: {
     ? validateTokens(JSON.parse(await readFile(opts.tokensFile, "utf8")))
     : null;
   const csp = await astroInlineHashes(opts.projectDir ?? path.dirname(path.resolve(opts.dist)));
-  digest.update(`tokens\0${JSON.stringify(tokens)}\ncsp\0${JSON.stringify(csp)}\n`);
-  digest.update(`runtime\0${JSON.stringify(RUNTIME)}\nkind\0${opts.kind}\n`);
-  const id = digest.digest("hex").slice(0, 32);
+  const id = artifactId({ kind: opts.kind, server: serverHashes, assets, tokens, csp });
 
   const manifest: ArtifactManifest = {
     schema: 1,
@@ -183,17 +206,76 @@ async function exists(p: string) {
 
 const ID_RE = /^[0-9a-f]{32}$/;
 
+/**
+ * Checks what the content address does not cover: the manifest's runtime section must be the
+ * platform's (A22). The id covers every module and asset, the tokens, the CSP hashes and the
+ * kind; the entry point, compatibility date and flags are fixed by the platform, so a
+ * manifest that names anything else is refused instead of trusted.
+ */
+export function validateManifest(m: ArtifactManifest, id: string): ArtifactManifest {
+  if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
+  if (m.kind !== "theme" && m.kind !== "checkout")
+    throw new Error(`artifact ${id}: unknown kind ${JSON.stringify(m.kind)}`);
+  const r = m.runtime;
+  const flags = JSON.stringify(r?.compatibility_flags);
+  if (
+    r?.compatibility_date !== RUNTIME.compatibility_date ||
+    flags !== JSON.stringify(RUNTIME.compatibility_flags) ||
+    r.main !== "entry.mjs" ||
+    !Array.isArray(r.modules) ||
+    r.modules[0] !== "entry.mjs" ||
+    new Set(r.modules).size !== r.modules.length
+  )
+    throw new Error(`artifact ${id}: runtime section differs from the platform runtime`);
+  for (const mod of r.modules) {
+    if (typeof mod !== "string" || mod.startsWith("/") || mod.split("/").includes("..")) {
+      throw new Error(`artifact ${id}: bad module path ${mod}`);
+    }
+  }
+  return m;
+}
+
+/**
+ * Verifies an unpacked artifact directory before it is published: the manifest is valid,
+ * every listed module and asset is present with the listed bytes, nothing else is there, and
+ * the content address recomputed from the files equals the id.
+ */
+export async function verifyArtifact(root: string, id: string): Promise<ArtifactManifest> {
+  const m = await readManifest(root, id);
+  const dir = path.join(root, id);
+  const present = new Set(await listFiles(dir));
+  const expected = new Set(["manifest.json"]);
+  const server: [string, string][] = [];
+  for (const mod of m.runtime.modules) {
+    expected.add(`server/${mod}`);
+    server.push([mod, sha256(await readFile(path.join(dir, "server", mod)))]);
+  }
+  for (const [p, entry] of Object.entries(m.assets)) {
+    expected.add(`client${p}`);
+    const body = await readFile(path.join(dir, "client", p));
+    if (sha256(body) !== entry.sha256 || body.byteLength !== entry.size)
+      throw new Error(`artifact ${id}: ${p} does not match the manifest`);
+  }
+  const extra = [...present].filter((f) => !expected.has(f));
+  const missing = [...expected].filter((f) => !present.has(f));
+  if (extra.length || missing.length)
+    throw new Error(`artifact ${id}: extra ${extra.join(", ")} / missing ${missing.join(", ")}`);
+  const computed = artifactId({
+    kind: m.kind,
+    server,
+    assets: m.assets,
+    tokens: m.tokens,
+    csp: m.csp,
+  });
+  if (computed !== id) throw new Error(`artifact ${id}: content address mismatch (${computed})`);
+  return m;
+}
+
 /** Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. */
 export async function readManifest(root: string, id: string): Promise<ArtifactManifest> {
   if (!ID_RE.test(id)) throw new Error(`artifact: invalid id ${JSON.stringify(id)}`);
   const m = JSON.parse(
     await readFile(path.join(root, id, "manifest.json"), "utf8"),
   ) as ArtifactManifest;
-  if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
-  for (const mod of m.runtime.modules) {
-    if (mod.startsWith("/") || mod.split("/").includes("..")) {
-      throw new Error(`artifact ${id}: bad module path ${mod}`);
-    }
-  }
-  return m;
+  return validateManifest(m, id);
 }

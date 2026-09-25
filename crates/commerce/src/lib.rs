@@ -5,6 +5,8 @@
 //! tenant transaction (spec A8).
 
 pub mod audit;
+pub mod capability;
+pub mod cart;
 pub mod catalog;
 pub mod id;
 pub mod idempotency;
@@ -14,10 +16,13 @@ pub mod media;
 pub mod money;
 pub mod pricing;
 pub mod promotions;
+pub mod redirects;
 pub mod search;
 pub mod staff;
+pub mod storefront;
 pub mod tax;
 pub mod tenancy;
+pub mod themes;
 
 /// Postgres `unique_violation` (23505).
 fn unique_violation(e: &sqlx::Error) -> bool {

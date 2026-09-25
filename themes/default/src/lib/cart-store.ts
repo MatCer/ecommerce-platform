@@ -1,12 +1,12 @@
 import { cart as api } from "@platform/storefront-sdk/client";
-import type { Cart } from "@platform/storefront-sdk/types";
+import type { CartState } from "@platform/storefront-sdk/types";
 import { createSignal } from "solid-js";
 
 /**
  * Cart state shared by islands (mini cart, buy box). Islands are separate Solid roots, but
  * they import this module from the same chunk, so they share one signal.
  */
-const [cart, setCart] = createSignal<Cart | null>(null);
+const [cart, setCart] = createSignal<CartState | null>(null);
 const [open, setOpen] = createSignal(false);
 let loading: Promise<void> | null = null;
 

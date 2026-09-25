@@ -22,6 +22,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 COPY migrations migrations
 COPY .sqlx .sqlx
+# Demo seed photos, compiled into the api binary (`api admin seed-demo`).
+COPY fixtures/images/demo fixtures/images/demo
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --locked --bin api --bin worker
 

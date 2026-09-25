@@ -478,6 +478,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/redirects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Redirects, newest first. */
+        get: operations["list_redirects"];
+        put?: never;
+        /**
+         * Creates a redirect from a path to another path on the same shop (301 by default).
+         *     Honors `Idempotency-Key`.
+         */
+        post: operations["create_redirect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/redirects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_redirect"];
+        put: operations["update_redirect"];
+        post?: never;
+        delete: operations["delete_redirect"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/sales": {
         parameters: {
             query?: never;
@@ -604,6 +641,43 @@ export interface paths {
         patch: operations["change_role"];
         trace?: never;
     };
+    "/admin/v1/storefront-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current storefront token (owner/admin). */
+        get: operations["get_token"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/storefront-token/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issues a new storefront token (owner/admin, login at most 15 minutes old). The previous
+         *     token keeps working for 5 minutes while the edge picks up the new one.
+         */
+        post: operations["rotate_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/tax-categories": {
         parameters: {
             query?: never;
@@ -700,6 +774,296 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The cart with totals and VAT recomputed now (shop or checkout capability). */
+        get: operations["get_cart"];
+        put?: never;
+        /**
+         * Creates an empty cart; the capability comes back in `X-Cart-Token` (the edge stores it in
+         *     the HttpOnly `cart` cookie).
+         */
+        post: operations["create_cart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/cart/coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applies a coupon (one per cart; replaces an earlier one). `422` with the coupon's reason
+         *     (`coupon_not_found`, `coupon_min_subtotal`, ...) when it does not apply.
+         */
+        post: operations["apply_coupon"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/cart/coupons/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove_coupon"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/cart/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts the checkout handoff (A1): revokes the shop capability (the edge clears the `cart`
+         *     cookie) and returns a single-use handoff token.
+         */
+        post: operations["start_handoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/cart/lines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["add_line"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/cart/lines/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["remove_line"];
+        options?: never;
+        head?: never;
+        /** Sets the quantity (0 removes the line). */
+        patch: operations["update_line"];
+        trace?: never;
+    };
+    "/storefront/v1/checkout/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeems a handoff token on the checkout origin (A1): consumed atomically; returns a new
+         *     checkout-scoped capability. `400 invalid_handoff` when unknown, used, expired or minted for
+         *     another market.
+         */
+        post: operations["redeem_handoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events
+         *     and server counters (A20).
+         */
+        post: operations["events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/files/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** `robots.txt`, `llms.txt`, `sitemap.xml` (index) or `sitemap-<n>.xml` (chunk). */
+        get: operations["file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail
+         *     arrive with the newsletter module (M2).
+         */
+        post: operations["newsletter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/category/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A category listing with facets, sort options and pagination. Filtered or re-sorted URLs
+         *     are `noindex,follow` with a canonical to the category (spec §9.5).
+         */
+        get: operations["category"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["home"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/product/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["product_page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search results (name search until WP7's Meilisearch); always `noindex`. */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/recommendations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recommendations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/redirects/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The redirect for a path the theme could not render (the edge asks on 404, spec §9.5). */
+        get: operations["resolve_redirect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/search": {
         parameters: {
             query?: never;
@@ -739,6 +1103,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/shop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Layout data: shop name, locale, markets, menus, consent config, messages, theme tokens. */
+        get: operations["shop"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -760,6 +1141,11 @@ export interface components {
             /** @description False when this `Idempotency-Key` was already applied (or the change was zero). */
             applied: boolean;
             level: components["schemas"]["Level"];
+        };
+        Alternate: {
+            href: string;
+            /** @description hreflang value (`cs-CZ`, `x-default`). */
+            locale: string;
         };
         Asset: {
             /** Format: int64 */
@@ -825,6 +1211,80 @@ export interface components {
         BTreeMap: {
             [key: string]: string;
         };
+        /** @enum {string} */
+        Badge: "sale" | "new";
+        /** @description Cache hints the edge reads from every page model (spec §8.2, A2). */
+        CacheHints: {
+            /**
+             * Format: int32
+             * @description Seconds.
+             */
+            max_age: number;
+            public: boolean;
+            /** @description Purge tags (`product:<id>`, `category:<id>`, `shop`, ...). */
+            tags: string[];
+        };
+        CartCoupon: {
+            /** @description Whether it applies to the cart right now. */
+            applied: boolean;
+            code: string;
+            /** @description Why not (`coupon_min_subtotal`, `coupon_not_active`, ...). */
+            reason?: string | null;
+        };
+        CartLineView: {
+            /**
+             * @description False when the variant is no longer sold (not priced, archived or sold out); such
+             *     lines are not part of the totals.
+             */
+            available: boolean;
+            /** @description This line's share of the coupon. */
+            discount: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            id: string;
+            image?: components["schemas"]["Image"] | null;
+            /** Format: uuid */
+            product_id: string;
+            product_name: string;
+            /** Format: int32 */
+            quantity: number;
+            sku: string;
+            /** @description Product page slug (`/p/<slug>`). */
+            slug: string;
+            stock: components["schemas"]["StockState"];
+            /** @description VAT rate in percent (`"21"`). */
+            tax_rate: string;
+            /** @description What the customer pays for the line (VAT included, after the coupon). */
+            total: components["schemas"]["MoneyView"];
+            unit_price: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            variant_id: string;
+            /** @description Option values, e.g. `Zelená / M`. */
+            variant_label: string;
+        };
+        CartView: {
+            coupon?: components["schemas"]["CartCoupon"] | null;
+            currency: components["schemas"]["Currency"];
+            discount: components["schemas"]["MoneyView"];
+            free_shipping_remaining?: components["schemas"]["MoneyView"] | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            item_count: number;
+            lines: components["schemas"]["CartLineView"][];
+            /** @description Country whose VAT applies (checkout sets it; the market's first country until then). */
+            ship_to_country: string;
+            /** @description Goods before the coupon. */
+            subtotal: components["schemas"]["MoneyView"];
+            /** @description Goods after the coupon, VAT included (shipping and payment arrive with checkout). */
+            total: components["schemas"]["MoneyView"];
+            vat: components["schemas"]["VatRow"][];
+            vat_total: components["schemas"]["MoneyView"];
+            /**
+             * Format: int32
+             * @description Changes with every modification.
+             */
+            version: number;
+        };
         Category: {
             /** Format: date-time */
             created_at: string;
@@ -862,6 +1322,11 @@ export interface components {
             name: string;
             slug: string;
         };
+        CategoryTile: {
+            href: string;
+            image?: components["schemas"]["Image"] | null;
+            label: string;
+        };
         CategoryTranslation: {
             /** @description Sanitized on write. */
             description_html?: string;
@@ -883,6 +1348,13 @@ export interface components {
             image_asset_id?: string | null;
             translations: components["schemas"]["CategoryTranslation"][];
         };
+        CategoryView: {
+            description_html: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+        };
         /**
          * @description Why an interval has its price.
          * @enum {string}
@@ -890,11 +1362,22 @@ export interface components {
         Cause: "base" | "sale" | "tax";
         /** @enum {string} */
         CheckStatus: "ok" | "degraded" | "fail";
+        CheckoutCart: {
+            /** @description Checkout-scoped cart capability (the edge sets it as the `__Host-cart` cookie). */
+            cart_token: string;
+        };
         Checks: {
             database: components["schemas"]["CheckStatus"];
             meilisearch: components["schemas"]["CheckStatus"];
             storage: components["schemas"]["CheckStatus"];
         };
+        ConsentConfig: {
+            policy_url: string;
+            /** @description Purposes the banner asks for (placeholder until WP9's consent model, A20). */
+            purposes: components["schemas"]["ConsentPurpose"][];
+        };
+        /** @enum {string} */
+        ConsentPurpose: "analytics" | "ads" | "personalization" | "email_marketing" | "review_invites";
         Coupon: {
             /** @example PODZIM10 */
             code: string;
@@ -919,6 +1402,9 @@ export interface components {
             usage_limit?: number | null;
             /** Format: int32 */
             used_count: number;
+        };
+        CouponCode: {
+            code: string;
         };
         CouponDiscount: {
             /** Format: int32 */
@@ -969,6 +1455,12 @@ export interface components {
          * @enum {string}
          */
         Currency: "BGN" | "CZK" | "DKK" | "EUR" | "HUF" | "PLN" | "RON" | "SEK";
+        DeliveryEstimate: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
         Facet: {
@@ -977,12 +1469,30 @@ export interface components {
             label: string;
             values: components["schemas"]["FacetValue"][];
         };
+        /** @enum {string} */
+        FacetKind: "option" | "parameter" | "brand";
         FacetValue: {
             /** @description Selecting it would still match something. Unavailable values are shown disabled (A23). */
             available: boolean;
             label: string;
             selected: boolean;
             value: string;
+        };
+        FacetValueView: {
+            /** @description Selecting it would give no result (counts are not shown, A23). */
+            disabled: boolean;
+            /** @description The listing URL with this value toggled. */
+            href: string;
+            label: string;
+            selected: boolean;
+            value: string;
+        };
+        FacetView: {
+            /** @description Query parameter name. */
+            key: string;
+            kind: components["schemas"]["FacetKind"];
+            label: string;
+            values: components["schemas"]["FacetValueView"][];
         };
         /** @description EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19). */
         Gpsr: {
@@ -1001,8 +1511,60 @@ export interface components {
             phone?: string | null;
             url?: string | null;
         };
+        GpsrPartyView: {
+            address: string;
+            email?: string | null;
+            name: string;
+            phone?: string | null;
+            url?: string | null;
+        };
+        /** @description General Product Safety Regulation information (Regulation (EU) 2023/988, art. 19). */
+        GpsrView: {
+            eu_responsible_person?: components["schemas"]["GpsrPartyView"] | null;
+            manufacturer?: components["schemas"]["GpsrPartyView"] | null;
+            safety_info?: string | null;
+            warnings?: string | null;
+        };
+        HandoffToken: {
+            /** @description Single use, valid for 60 seconds, for `checkout.<shop>/start?h=`. */
+            token: string;
+        };
         Health: {
             status: components["schemas"]["CheckStatus"];
+        };
+        Hero: {
+            cta: components["schemas"]["Link"];
+            image?: components["schemas"]["Image"] | null;
+            subtitle: string;
+            title: string;
+        };
+        HomePage: {
+            cache: components["schemas"]["CacheHints"];
+            categories: components["schemas"]["CategoryTile"][];
+            featured: components["schemas"]["ProductCard"][];
+            /** @description Placeholder built from the catalog until CMS blocks exist (WP13). */
+            hero: components["schemas"]["Hero"];
+            seo: components["schemas"]["Seo"];
+        };
+        /**
+         * @description An image with every generated width. Render `srcset` (AVIF) with a `sizes` that matches the
+         *     real slot; `src` is a JPEG/PNG fallback. `width`/`height` are the intrinsic size of the
+         *     largest variant (use them for the aspect ratio: no layout shift).
+         */
+        Image: {
+            alt: string;
+            /** Format: int32 */
+            height: number;
+            /** @description Fallback (JPEG or PNG) around 640 px wide. */
+            src: string;
+            /** @description AVIF candidates: `"/media/... 320w, /media/... 640w"`. */
+            srcset: string;
+            /** @description Fallback-format candidates. */
+            srcset_fallback: string;
+            /** @description WebP candidates, for `<picture>` fallbacks. */
+            srcset_webp: string;
+            /** Format: int32 */
+            width: number;
         };
         /** @description Current state of a tenant's search indexes (admin status endpoint). */
         IndexStatus: {
@@ -1074,6 +1636,34 @@ export interface components {
             allow_backorder: boolean;
             track: boolean;
         };
+        LineUpdate: {
+            /**
+             * Format: int32
+             * @description 0 removes the line.
+             */
+            quantity: number;
+        };
+        Link: {
+            href: string;
+            label: string;
+        };
+        /** @description A category page or search results. */
+        ListingPage: {
+            breadcrumbs: components["schemas"]["Link"][];
+            cache: components["schemas"]["CacheHints"];
+            category?: components["schemas"]["CategoryView"] | null;
+            facets: components["schemas"]["FacetView"][];
+            pagination: components["schemas"]["Pagination"];
+            products: components["schemas"]["ProductCard"][];
+            /** @description The search query (absent on category pages). */
+            query?: string | null;
+            seo: components["schemas"]["Seo"];
+            sort: components["schemas"]["SortOption"][];
+            subcategories: components["schemas"]["Link"][];
+            title: string;
+            /** Format: int32 */
+            total: number;
+        };
         Market: {
             code: string;
             country_codes: string[];
@@ -1087,6 +1677,16 @@ export interface components {
             locales: string[];
             name: string;
             tax_mode: components["schemas"]["TaxMode"];
+        };
+        MarketLink: {
+            code: string;
+            currency: string;
+            current: boolean;
+            /** @description Home page of the market. */
+            href: string;
+            /** @description hreflang value (`sk-SK`). */
+            locale: string;
+            name: string;
         };
         MarketList: {
             items: components["schemas"]["Market"][];
@@ -1103,6 +1703,15 @@ export interface components {
             slug: string;
             /** Format: uuid */
             tenant_id: string;
+        };
+        MenuItem: {
+            children: components["schemas"]["Link"][];
+            href: string;
+            label: string;
+        };
+        Menus: {
+            footer: components["schemas"]["MenuItem"][];
+            main: components["schemas"]["MenuItem"][];
         };
         /** @description The API shape of an amount (spec §8.1): `{amount_minor, currency, formatted}`. */
         MoneyView: {
@@ -1150,6 +1759,15 @@ export interface components {
              */
             parent_id?: string | null;
             translations: components["schemas"]["CategoryTranslation"][];
+        };
+        NewLine: {
+            /**
+             * Format: int32
+             * @description 1-999 (added to an existing line of the same variant).
+             */
+            quantity?: number;
+            /** Format: uuid */
+            variant_id: string;
         };
         NewMarket: {
             /**
@@ -1215,6 +1833,13 @@ export interface components {
              */
             size: number;
         };
+        NewsletterSignup: {
+            email: string;
+        };
+        NewsletterStatus: {
+            /** @description `accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5). */
+            status: string;
+        };
         Omnibus: {
             /** @description Whether the storefront may show a reduction (strikethrough + percent) at all. */
             claim: boolean;
@@ -1245,6 +1870,23 @@ export interface components {
             /** @example red */
             code: string;
             name_i18n: components["schemas"]["BTreeMap"];
+        };
+        OptionValueView: {
+            code: string;
+            name: string;
+        };
+        OptionView: {
+            code: string;
+            name: string;
+            values: components["schemas"]["OptionValueView"][];
+        };
+        Pagination: {
+            next?: string | null;
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            pages: number;
+            prev?: string | null;
         };
         Parameter: {
             /** Format: date-time */
@@ -1286,6 +1928,11 @@ export interface components {
             value: unknown;
             /** @description Variant-level value (by SKU); omit for a product-level value. */
             variant_sku?: string | null;
+        };
+        ParameterView: {
+            key: string;
+            name: string;
+            value: string;
         };
         /**
          * @description Why the base prices change (recorded on the price intervals).
@@ -1341,6 +1988,18 @@ export interface components {
             items: components["schemas"]["PriceItem"][];
             reason?: components["schemas"]["PriceChangeReason"];
         };
+        /**
+         * @description A selling price with its Omnibus reference (A18). `reference_price` and
+         *     `discount_percent` are present only when a reduction may be claimed; they are computed
+         *     against the lowest price of the 30 days before the reduction, never `compare_at`.
+         */
+        PriceView: {
+            /** Format: int32 */
+            discount_percent?: number | null;
+            price: components["schemas"]["MoneyView"];
+            reference_price?: components["schemas"]["MoneyView"] | null;
+            unit_price?: components["schemas"]["UnitPrice"] | null;
+        };
         /** @description RFC 9457 problem details body. */
         Problem: {
             /** @description Stable machine-readable error code, e.g. `not_found`. */
@@ -1376,6 +2035,36 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             variants: components["schemas"]["Variant"][];
+        };
+        ProductCard: components["schemas"]["PriceView"] & {
+            badges: components["schemas"]["Badge"][];
+            brand?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description Up to two images: the main one and a second (hover) image. */
+            images: components["schemas"]["Image"][];
+            name: string;
+            /** @description Variants differ in price: show the price as "from". */
+            price_varies: boolean;
+            slug: string;
+            /** @description The best state over the product's variants. */
+            stock: components["schemas"]["StockState"];
+        };
+        ProductDetail: {
+            brand?: string | null;
+            /** @description Sanitized server-side; the only HTML a theme may render unescaped. */
+            description_html: string;
+            gpsr?: components["schemas"]["GpsrView"] | null;
+            /** Format: uuid */
+            id: string;
+            images: components["schemas"]["Image"][];
+            name: string;
+            options: components["schemas"]["OptionView"][];
+            parameters: components["schemas"]["ParameterView"][];
+            short_description: string;
+            slug: string;
+            /** @description Variants sold in this market, in the merchant's order. */
+            variants: components["schemas"]["VariantView"][];
         };
         /** @description A product document, as written by `POST /products` and `PUT /products/{id}`. */
         ProductInput: {
@@ -1473,8 +2162,48 @@ export interface components {
             /** Format: int64 */
             job_id: number;
         };
+        Recommendations: {
+            cache: components["schemas"]["CacheHints"];
+            products: components["schemas"]["ProductCard"][];
+        };
+        Redirect: {
+            /** Format: int32 */
+            code: number;
+            /** Format: date-time */
+            created_at: string;
+            from_path: string;
+            /** Format: uuid */
+            id: string;
+            to_path: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RedirectInput: {
+            /**
+             * Format: int32
+             * @description 301 (permanent, default) or 302.
+             */
+            code?: number;
+            /**
+             * @description Path on the shop, without query string: `/stara-kategorie`.
+             * @example /stary-produkt
+             */
+            from_path: string;
+            /**
+             * @description Path on the same shop, may carry a query string: `/p/novy-produkt`.
+             * @example /p/novy-produkt
+             */
+            to_path: string;
+        };
+        RedirectPage: {
+            items: components["schemas"]["Redirect"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
         /** @description What the edge needs to serve a hostname (spec §5.1, `GET /internal/v1/resolve`). */
         Resolved: {
+            /** @description The platform checkout artifact (same for every tenant, §9.4). */
+            checkout_artifact?: string | null;
             country_codes: string[];
             currency: string;
             default_locale: string;
@@ -1483,9 +2212,21 @@ export interface components {
             market_code: string;
             /** Format: uuid */
             market_id: string;
+            /** @description Earlier artifacts whose `/_astro/*` assets stay served (A22). */
+            retained_artifacts: string[];
+            /** @description The tenant's public storefront token (§5.5); the edge injects it, never the browser. */
+            storefront_token: string;
             /** Format: uuid */
             tenant_id: string;
             tenant_slug: string;
+            /** @description Active theme artifact; `None` until a theme is published for the tenant. */
+            theme_artifact?: string | null;
+        };
+        /** @description What the edge needs to answer a redirect. */
+        ResolvedRedirect: {
+            /** Format: int32 */
+            code: number;
+            to_path: string;
         };
         /**
          * @description Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
@@ -1592,6 +2333,50 @@ export interface components {
             /** @description One index per locale the tenant's markets sell in. */
             indexes: components["schemas"]["IndexStatus"][];
         };
+        Seo: {
+            alternates: components["schemas"]["Alternate"][];
+            canonical: string;
+            description: string;
+            /** @description JSON-LD documents for `<script type="application/ld+json">`. */
+            json_ld: unknown[];
+            /** @description `noindex,follow` on filtered listings (spec §9.5); absent otherwise. */
+            robots?: string | null;
+            title: string;
+        };
+        ShopModel: {
+            cache: components["schemas"]["CacheHints"];
+            consent: components["schemas"]["ConsentConfig"];
+            currencies: string[];
+            currency: string;
+            free_shipping_threshold?: components["schemas"]["MoneyView"] | null;
+            /** @description Placeholders until CMS pages exist (WP13). */
+            legal_pages: components["schemas"]["Link"][];
+            /** @description Active locale (`cs`); also the `lang` of pages. */
+            locale: string;
+            /** @description Locales of this market (M1: the market's default locale; prefixes arrive with WP8). */
+            locales: components["schemas"]["Alternate"][];
+            /** @description The tenant's markets (other shops of the same merchant). */
+            markets: components["schemas"]["MarketLink"][];
+            menus: components["schemas"]["Menus"];
+            /** @description Platform UI messages in the active locale (`cart.add` -> "Přidat do košíku"). */
+            messages: {
+                [key: string]: string;
+            };
+            name: string;
+            seo: components["schemas"]["Seo"];
+            /** @description Design tokens of the active theme (A6). */
+            tokens?: unknown;
+            tracking: components["schemas"]["Tracking"];
+            trust: components["schemas"]["Trust"];
+        };
+        /** @enum {string} */
+        Sort: "recommended" | "price_asc" | "price_desc" | "newest";
+        SortOption: {
+            href: string;
+            label: string;
+            selected: boolean;
+            value: components["schemas"]["Sort"];
+        };
         StaffList: {
             items: components["schemas"]["StaffMember"][];
         };
@@ -1603,6 +2388,15 @@ export interface components {
             id: string;
             role: components["schemas"]["Role"];
             user_id: string;
+        };
+        /** @enum {string} */
+        StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
+        StorefrontToken: {
+            /**
+             * @description Public storefront token of the tenant (the edge sends it; it grants only public reads
+             *     and cart operations of this tenant).
+             */
+            token: string;
         };
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
@@ -1668,11 +2462,29 @@ export interface components {
             vat_id?: string | null;
             vat_payer: boolean;
         };
+        Tracking: {
+            /**
+             * Format: double
+             * @description Share of consented page views that report Web Vitals (spec §9.6).
+             */
+            rum_sample_rate: number;
+        };
+        Trust: {
+            delivery: string;
+            payments: string[];
+            returns: string;
+        };
         /**
          * @description Basis of the unit price shown next to the price (per kg, per l, ...).
          * @enum {string}
          */
         UnitMeasure: "kg" | "l" | "m" | "m2" | "pcs";
+        /** @description Price per unit of measure (EU price indication directive), e.g. per 1 kg. */
+        UnitPrice: {
+            price: components["schemas"]["MoneyView"];
+            /** @description `kg`, `l`, `m`, `m²` or `ks`. */
+            unit: string;
+        };
         Upload: {
             asset: components["schemas"]["Asset"];
             upload: components["schemas"]["UploadTarget"];
@@ -1763,6 +2575,29 @@ export interface components {
              * @description Pass as `cursor` for the next page; absent on the last page.
              */
             next_cursor?: string | null;
+        };
+        VariantView: components["schemas"]["PriceView"] & {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: int32
+             * @description Index into `product.images` of this variant's first image.
+             */
+            image_index?: number | null;
+            is_default: boolean;
+            /** @description Option code -> value code (`{"color": "red", "size": "m"}`). */
+            options: {
+                [key: string]: string;
+            };
+            sku: string;
+            stock: components["schemas"]["StockState"];
+        };
+        VatRow: {
+            gross: components["schemas"]["MoneyView"];
+            net: components["schemas"]["MoneyView"];
+            /** @description Percent (`"21"`). */
+            rate: string;
+            vat: components["schemas"]["MoneyView"];
         };
     };
     responses: never;
@@ -3466,6 +4301,192 @@ export interface operations {
             };
         };
     };
+    list_redirects: {
+        parameters: {
+            query?: {
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedirectPage"];
+                };
+            };
+        };
+    };
+    create_redirect: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedirectInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redirect"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_redirect: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redirect"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_redirect: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedirectInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Redirect"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_redirect: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_sales: {
         parameters: {
             query?: {
@@ -3980,6 +5001,66 @@ export interface operations {
             };
         };
     };
+    get_token: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorefrontToken"];
+                };
+            };
+        };
+    };
+    rotate_token: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorefrontToken"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_tax_categories: {
         parameters: {
             query?: {
@@ -4182,6 +5263,644 @@ export interface operations {
             };
         };
     };
+    get_cart: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_cart: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    /** @description Shop cart capability */
+                    "X-Cart-Token"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    apply_coupon: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CouponCode"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_coupon: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    start_handoff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffToken"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description cart_empty */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewLine"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description out_of_stock / insufficient_stock */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    update_line: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LineUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    redeem_handoff: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandoffToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutCart"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    events: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    file: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description robots.txt, llms.txt, sitemap.xml, sitemap-<n>.xml */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": unknown;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    newsletter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterSignup"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterStatus"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    category: {
+        parameters: {
+            query?: {
+                /** @description `recommended` (default), `price_asc`, `price_desc`, `newest`, `name`. */
+                sort?: string;
+                /** @description 1-based page (24 products per page). */
+                page?: number;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingPage"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    home: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomePage"];
+                };
+            };
+        };
+    };
+    product_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductPage"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query?: {
+                q?: string;
+                sort?: string;
+                page?: number;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingPage"];
+                };
+            };
+        };
+    };
+    recommendations: {
+        parameters: {
+            query?: {
+                /** @description `product:<id>`, `cart` or `home`. */
+                context?: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recommendations"];
+                };
+            };
+        };
+    };
+    resolve_redirect: {
+        parameters: {
+            query: {
+                /** @description Requested path (`/stary-produkt`); the query string is ignored. */
+                path: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedRedirect"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     search: {
         parameters: {
             query?: {
@@ -4207,15 +5926,12 @@ export interface operations {
                 "f.{facet}"?: string;
             };
             header: {
-                /** @description Tenant resolved from the shop hostname. */
-                "X-Tenant": string;
-                /** @description Market resolved from the shop hostname. */
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
                 "X-Market": string;
-                /**
-                 * @description One of the market's locales.
-                 * @example cs
-                 */
-                "X-Locale": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4238,8 +5954,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Unknown or unpublished storefront */
-            404: {
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4273,15 +5996,12 @@ export interface operations {
                 q: string;
             };
             header: {
-                /** @description Tenant resolved from the shop hostname. */
-                "X-Tenant": string;
-                /** @description Market resolved from the shop hostname. */
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
                 "X-Market": string;
-                /**
-                 * @description One of the market's locales.
-                 * @example cs
-                 */
-                "X-Locale": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -4304,8 +6024,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Unknown or unpublished storefront */
-            404: {
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4315,6 +6042,48 @@ export interface operations {
             };
             /** @description Search is temporarily unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    shop: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopModel"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

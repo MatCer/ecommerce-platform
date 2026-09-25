@@ -1,25 +1,15 @@
 ---
 import type { Link } from "@platform/storefront-sdk/types";
-import { jsonLd } from "../lib/storefront";
 
+/** Breadcrumb trail; its BreadcrumbList JSON-LD comes with the page model's `seo.json_ld`. */
 interface Props {
   items: Link[];
-  base: string;
+  label: string;
 }
-const { items, base } = Astro.props;
-const ld = {
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  itemListElement: items.map((b, i) => ({
-    "@type": "ListItem",
-    position: i + 1,
-    name: b.label,
-    item: new URL(b.href, base).href,
-  })),
-};
+const { items, label } = Astro.props;
 ---
 
-<nav aria-label="Drobečková navigace" class="mb-4 text-sm text-muted-foreground">
+<nav aria-label={label} class="mb-4 text-sm text-muted-foreground">
   <ol class="flex flex-wrap gap-1">
     {
       items.map((b, i) => (
@@ -31,4 +21,3 @@ const ld = {
     }
   </ol>
 </nav>
-<script type="application/ld+json" set:html={jsonLd(ld)} />

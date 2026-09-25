@@ -1,4 +1,5 @@
-import type { CategoryPage } from "@platform/storefront-sdk/types";
+import { type Messages, t } from "@platform/storefront-sdk/format";
+import type { ListingPage } from "@platform/storefront-sdk/types";
 import { createSignal, For, onMount, Show } from "solid-js";
 
 /**
@@ -6,9 +7,10 @@ import { createSignal, For, onMount, Show } from "solid-js";
  * submit button works without JS; once hydrated, changes apply immediately.
  */
 export default function FacetFilters(props: {
-  facets: CategoryPage["facets"];
-  sort: CategoryPage["sort"];
+  facets: ListingPage["facets"];
+  sort: ListingPage["sort"];
   action: string;
+  labels: Messages;
 }) {
   const [enhanced, setEnhanced] = createSignal(false);
   let form: HTMLFormElement | undefined;
@@ -50,7 +52,7 @@ export default function FacetFilters(props: {
         )}
       </For>
       <label class="ml-auto text-sm">
-        <span class="mr-2 text-muted-foreground">Řadit</span>
+        <span class="mr-2 text-muted-foreground">{t(props.labels, "listing.sort")}</span>
         <select name="sort" class="h-9 rounded-md border border-border bg-card px-2">
           <For each={props.sort}>
             {(s) => (
@@ -66,7 +68,7 @@ export default function FacetFilters(props: {
           type="submit"
           class="h-9 rounded-md border border-border bg-card px-4 text-sm font-semibold text-identity-ink"
         >
-          Použít filtry
+          {t(props.labels, "listing.apply")}
         </button>
       </Show>
     </form>

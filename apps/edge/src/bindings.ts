@@ -97,6 +97,8 @@ export const STOREFRONT_OPERATIONS: Operation[] = [
   { method: "GET", path: /^\/shop$/ },
   { method: "GET", path: /^\/pages\/(home|search|blog)$/ },
   { method: "GET", path: /^\/pages\/(category|product|cms|blog)\/[a-z0-9][a-z0-9-/]{0,199}$/ },
+  // Search (WP7): full results with facets and the typeahead.
+  { method: "GET", path: /^\/search$/ },
   { method: "GET", path: /^\/search\/suggest$/ },
   { method: "GET", path: /^\/recommendations$/ },
   { method: "GET", path: /^\/redirects\/resolve$/ },

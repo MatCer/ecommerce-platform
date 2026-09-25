@@ -1,14 +1,14 @@
 //! Tenants, domains and staff membership (spec §5.1, §5.3, A8, A29).
 
 use platform::Error;
-use platform::db::tenant_tx;
+use platform::db::{TenantTx, tenant_tx};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{audit, id, unique_violation};
+use crate::{audit, capability, id, themes, unique_violation};
 
 /// Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
 /// management or exports.
@@ -172,6 +172,14 @@ pub async fn create_tenant(db: &PgPool, t: &NewTenant<'_>) -> Result<CreatedTena
     )
     .execute(&mut *tx)
     .await?;
+    sqlx::query!(
+        "INSERT INTO platform.storefront_tokens (token, tenant_id) VALUES ($1, $2)",
+        new_storefront_token(),
+        tenant_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    themes::assign_default(&mut tx, audit::PLATFORM_ACTOR).await?;
     audit::record(
         &mut tx,
         audit::PLATFORM_ACTOR,
@@ -332,6 +340,14 @@ pub struct Resolved {
     pub default_locale: String,
     pub locales: Vec<String>,
     pub country_codes: Vec<String>,
+    /// The tenant's public storefront token (§5.5); the edge injects it, never the browser.
+    pub storefront_token: String,
+    /// Active theme artifact; `None` until a theme is published for the tenant.
+    pub theme_artifact: Option<String>,
+    /// Earlier artifacts whose `/_astro/*` assets stay served (A22).
+    pub retained_artifacts: Vec<String>,
+    /// The platform checkout artifact (same for every tenant, §9.4).
+    pub checkout_artifact: Option<String>,
 }
 
 /// Resolves a verified domain of an active tenant; `None` for anything else.
@@ -340,9 +356,10 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
         return Ok(None);
     };
     let Some(d) = sqlx::query!(
-        "SELECT d.tenant_id, d.market_id, t.slug
+        r#"SELECT d.tenant_id, d.market_id, t.slug, s.token AS "token?"
          FROM platform.domains d JOIN platform.tenants t ON t.id = d.tenant_id
-         WHERE d.hostname = $1 AND d.verified_at IS NOT NULL AND t.status = 'active'",
+         LEFT JOIN platform.storefront_tokens s ON s.tenant_id = t.id AND s.expires_at IS NULL
+         WHERE d.hostname = $1 AND d.verified_at IS NOT NULL AND t.status = 'active'"#,
         host
     )
     .fetch_optional(db)
@@ -350,6 +367,10 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
     else {
         return Ok(None);
     };
+    let token = d.token.ok_or_else(|| {
+        Error::Internal(format!("tenant {} has no storefront token", d.tenant_id))
+    })?;
+    let checkout_artifact = themes::channel(db, themes::CHECKOUT).await?;
     let mut tx = tenant_tx(db, d.tenant_id).await?;
     let m = sqlx::query!(
         "SELECT code, currency, default_locale, locales, country_codes FROM markets WHERE id = $1",
@@ -357,6 +378,7 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
     )
     .fetch_one(&mut *tx)
     .await?;
+    let theme = themes::active(&mut tx).await?;
     tx.commit().await?;
     Ok(Some(Resolved {
         hostname: host,
@@ -368,7 +390,85 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
         default_locale: m.default_locale,
         locales: m.locales,
         country_codes: m.country_codes,
+        storefront_token: token,
+        theme_artifact: theme.artifact_id,
+        retained_artifacts: theme.retained,
+        checkout_artifact,
     }))
+}
+
+// ---------------------------------------------------------------------------------------
+// Storefront tokens (§5.5)
+
+/// How long a rotated-out token keeps working (longer than the edge's 60 s resolver cache).
+pub const TOKEN_GRACE_SECS: i32 = 300;
+
+fn new_storefront_token() -> String {
+    format!("sf_{}", capability::mint().token)
+}
+
+/// The tenant a storefront token belongs to: the current token or one still in its grace
+/// period, of an active tenant.
+pub async fn storefront_token_tenant(db: &PgPool, token: &str) -> Result<Option<Uuid>, Error> {
+    let shaped = token.len() == 67
+        && token
+            .strip_prefix("sf_")
+            .is_some_and(|t| t.bytes().all(|b| b.is_ascii_hexdigit()));
+    if !shaped {
+        return Ok(None);
+    }
+    Ok(sqlx::query_scalar!(
+        "SELECT s.tenant_id FROM platform.storefront_tokens s
+         JOIN platform.tenants t ON t.id = s.tenant_id
+         WHERE s.token = $1 AND (s.expires_at IS NULL OR s.expires_at > now())
+           AND t.status = 'active'",
+        token
+    )
+    .fetch_optional(db)
+    .await?)
+}
+
+/// The current storefront token of the tenant in `tx`.
+pub async fn storefront_token(tx: &mut TenantTx) -> Result<String, Error> {
+    sqlx::query_scalar!(
+        "SELECT token FROM platform.storefront_tokens WHERE tenant_id = $1 AND expires_at IS NULL",
+        tx.tenant_id()
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)
+}
+
+/// Issues a new storefront token. The previous one keeps working for [`TOKEN_GRACE_SECS`].
+/// Audited (without the token values).
+pub async fn rotate_storefront_token(tx: &mut TenantTx, actor: &str) -> Result<String, Error> {
+    let tenant_id = tx.tenant_id();
+    sqlx::query!(
+        "UPDATE platform.storefront_tokens SET expires_at = now() + make_interval(secs => $2)
+         WHERE tenant_id = $1 AND expires_at IS NULL",
+        tenant_id,
+        f64::from(TOKEN_GRACE_SECS)
+    )
+    .execute(&mut **tx)
+    .await?;
+    let token = new_storefront_token();
+    sqlx::query!(
+        "INSERT INTO platform.storefront_tokens (token, tenant_id) VALUES ($1, $2)",
+        token,
+        tenant_id
+    )
+    .execute(&mut **tx)
+    .await?;
+    audit::record(
+        tx,
+        actor,
+        "storefront_token.rotated",
+        "storefront_token",
+        None,
+        &json!({ "grace_seconds": TOKEN_GRACE_SECS }),
+    )
+    .await?;
+    Ok(token)
 }
 
 /// The caller's role in an active tenant (A8 bootstrap), or `None`.

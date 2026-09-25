@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id AS \"id!\", coalesce(ptc.code, $3) AS \"code!\"\n           FROM unnest($1::uuid[]) AS p (id)\n           LEFT JOIN product_tax_categories ptc ON ptc.product_id = p.id AND ptc.country = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "code!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "8bdccc5b30cbfc0a2eebc618892e476043d6ec5f85612d45927f5c618a6c7544"
+}

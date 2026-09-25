@@ -126,14 +126,17 @@ export const site = (over: Partial<Site> = {}): Site => ({
   storefront_token: "sf_demo_public",
   theme_artifact: "",
   retained_artifacts: [],
+  checkout_artifact: null,
   ...over,
 });
 
-/** Records every upstream call and answers like the stub Storefront API. */
+/** Records every upstream call and answers like the Storefront API. */
 export function fakeApi() {
   const calls: { method: string; url: string; headers: Record<string, string>; body: string }[] =
     [];
   let carts = 0;
+  // Handoff tokens (A1): single use, bound to the tenant + market that minted them.
+  const handoffs = new Map<string, { tenant: string | null; market: string | null }>();
   const fn = async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     calls.push({
@@ -164,7 +167,25 @@ export function fakeApi() {
       return Response.json({ token_seen: req.headers.get("x-cart-token"), lines: [] });
     if (p === "/cart/lines")
       return Response.json({ token_seen: req.headers.get("x-cart-token"), lines: [{ id: "l1" }] });
-    if (p === "/cart/checkout-token") return Response.json({ token: "checkouttoken_000000000001" });
+    if (p === "/cart/handoff") {
+      const token = `handofftoken_${String(handoffs.size + 1).padStart(20, "0")}`;
+      handoffs.set(token, { tenant, market: req.headers.get("x-market") });
+      return Response.json({ token });
+    }
+    if (p === "/checkout/handoff") {
+      const { token } = JSON.parse(calls.at(-1)?.body || "{}") as { token?: string };
+      const h = token ? handoffs.get(token) : undefined;
+      if (!h || h.tenant !== tenant || h.market !== req.headers.get("x-market"))
+        return Response.json({ code: "invalid_handoff" }, { status: 400 });
+      handoffs.delete(token as string);
+      return Response.json({ cart_token: "checkouttoken_000000000001" });
+    }
+    if (p === "/redirects/resolve") {
+      const path = url.searchParams.get("path");
+      if (path === "/stary-produkt") return Response.json({ to_path: "/p/novy", code: 301 });
+      if (path === "/docasne") return Response.json({ to_path: "/c/akce?x=1", code: 302 });
+      if (path === "/podvrh") return Response.json({ to_path: "//evil.example/", code: 301 });
+    }
     if (p === "/events") return new Response(null, { status: 202 });
     if (p === "/newsletter/subscribe")
       return Response.json(

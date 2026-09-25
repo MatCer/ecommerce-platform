@@ -10,6 +10,6 @@ const query = Object.fromEntries(
 const [shop, page] = await Promise.all([sf.shop(), sf.search(query)]);
 ---
 
-<Base shop={shop} seo={{ ...page.seo, robots: "noindex,follow" }} q={Astro.url.searchParams.get("q") ?? ""}>
-  <Listing page={page} action="/search" />
+<Base shop={shop} seo={page.seo} q={Astro.url.searchParams.get("q") ?? ""}>
+  <Listing page={page} action="/search" messages={shop.messages} />
 </Base>

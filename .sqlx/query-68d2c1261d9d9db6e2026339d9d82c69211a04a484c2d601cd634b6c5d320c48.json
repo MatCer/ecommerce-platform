@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.tenant_id FROM platform.storefront_tokens s\n         JOIN platform.tenants t ON t.id = s.tenant_id\n         WHERE s.token = $1 AND (s.expires_at IS NULL OR s.expires_at > now())\n           AND t.status = 'active'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "platform.storefront_tokens",
+            "name": "tenant_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "68d2c1261d9d9db6e2026339d9d82c69211a04a484c2d601cd634b6c5d320c48"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH RECURSIVE subtree AS (\n               SELECT id FROM categories WHERE id = $1\n               UNION ALL\n               SELECT c.id FROM categories c JOIN subtree s ON c.parent_id = s.id\n           )\n           SELECT a.variants FROM product_categories pc\n           JOIN products p ON p.id = pc.product_id AND p.status = 'active'\n           JOIN product_media pm ON pm.product_id = p.id\n           JOIN assets a ON a.id = pm.asset_id AND a.status = 'ready'\n           WHERE pc.category_id IN (SELECT id FROM subtree)\n           ORDER BY pc.position, p.id, pm.position LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "variants",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "variants"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f025baaf9bab91c8e935786f5bc889c14580bbaebaea49204bd3d272bf0f003c"
+}

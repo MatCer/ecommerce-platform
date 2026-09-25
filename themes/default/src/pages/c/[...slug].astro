@@ -9,9 +9,9 @@ const query = Object.fromEntries(
 );
 const [shop, page] = await Promise.all([sf.shop(), sf.category(Astro.params.slug ?? "", query)]);
 if (!page) return Astro.rewrite("/404");
-const first = page.products[0];
+const first = page.products[0]?.images[0];
 ---
 
-<Base shop={shop} seo={page.seo} lcp={first && { image: first.image, sizes: "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)" }}>
-  <Listing page={page} action={Astro.url.pathname} />
+<Base shop={shop} seo={page.seo} lcp={first && { image: first, sizes: "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)" }}>
+  <Listing page={page} action={Astro.url.pathname} messages={shop.messages} />
 </Base>

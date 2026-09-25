@@ -22,7 +22,7 @@ TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_P
 COMPOSE_FULL := COMPOSE_PROFILES=full docker compose
 COMPOSE_INFRA := COMPOSE_PROFILES=infra docker compose
 
-.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin logs ps theme-build perf e2e
+.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin seed logs ps theme-build perf e2e
 
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -65,9 +65,11 @@ fmt: ## Format Rust and TS
 	cargo fmt --all
 	pnpm run fmt
 
-openapi: ## Regenerate openapi.json and the TS clients from the Rust API
+openapi: ## Regenerate openapi.json (+ the storefront subset) and the TS clients from the Rust API
 	cargo run --quiet --locked -p api -- openapi > openapi.json.tmp
 	mv openapi.json.tmp openapi.json
+	cargo run --quiet --locked -p api -- openapi --storefront > openapi.storefront.json.tmp
+	mv openapi.storefront.json.tmp openapi.storefront.json
 	pnpm run openapi:generate
 
 openapi-check: ## Fail if openapi.json or the generated clients are stale
@@ -76,14 +78,22 @@ openapi-check: ## Fail if openapi.json or the generated clients are stale
 admin: ## Superadmin CLI in the api container, e.g. make admin args="create-tenant --slug demo --name Demo --owner-email you@example.com"
 	$(COMPOSE_FULL) exec api /usr/local/bin/api admin $(args)
 
+seed: ## Create or complete the demo shop (demo.localhost CZ, demo-sk.localhost SK); idempotent
+	$(COMPOSE_FULL) exec api /usr/local/bin/api admin seed-demo
+
 logs: ## Follow logs (`make logs s=api` for one service)
 	$(COMPOSE_FULL) logs -f --tail=100 $(s)
 
 ps: ## Show stack status
 	$(COMPOSE_FULL) ps
 
-theme-build: ## Build + pack the default theme and checkout artifacts into .artifacts (spec A22)
+theme-build: ## Build + pack the default theme and checkout (A22), upload + publish them for every tenant (A30)
 	scripts/build-artifacts.sh
+	node packages/theme-kit/src/cli.ts verify --root .artifacts \
+		"$$(cat .artifacts/channels/default-theme)" "$$(cat .artifacts/channels/checkout)"
+	$(COMPOSE_FULL) run --rm --no-deps -v "$(CURDIR)/.artifacts:/artifacts:ro" api \
+		/usr/local/bin/api admin publish-artifacts --root /artifacts \
+		--theme "$$(cat .artifacts/channels/default-theme)" --checkout "$$(cat .artifacts/channels/checkout)"
 
 e2e: ## Playwright suites against the running stack (`make up` first; at most 4 workers)
 	HTTP_PORT=$(or $(HTTP_PORT),8080) pnpm --filter @platform/e2e exec playwright test $(args)

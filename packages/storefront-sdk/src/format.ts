@@ -24,33 +24,38 @@ export function times(m: Money, qty: number, locale?: string): Money {
   };
 }
 
-const KEY = /^[a-z0-9][a-z0-9/_-]{0,200}$/;
+/** `srcset` candidates as `[url, width]`, narrowest first. */
+function candidates(srcset: string): [string, number][] {
+  return srcset
+    .split(",")
+    .map((c) => c.trim().split(/\s+/))
+    .filter((p): p is [string, string] => p.length === 2 && /^\d+w$/.test(p[1] ?? ""))
+    .map(([url, w]): [string, number] => [url, Number.parseInt(w, 10)])
+    .sort((a, b) => a[1] - b[1]);
+}
 
-/** URL of a pre-generated AVIF variant: the closest available width not smaller than `width`. */
+/**
+ * URL of the narrowest AVIF variant at least `width` px wide (the widest if none is), e.g.
+ * for thumbnails in islands. Falls back to `src` when the image has no AVIF variants.
+ */
 export function imageUrl(img: Image, width: number): string {
-  if (!KEY.test(img.key)) throw new Error(`invalid image key ${img.key}`);
-  const sorted = [...img.widths].sort((a, b) => a - b);
-  const w = sorted.find((x) => x >= width) ?? sorted.at(-1) ?? img.width;
-  return `/media/${img.key}/${w}.avif`;
+  const list = candidates(img.srcset);
+  return (list.find(([, w]) => w >= width) ?? list.at(-1))?.[0] ?? img.src;
 }
 
-/** `srcset` over every variant width. */
-export function srcset(img: Image): string {
-  return [...img.widths]
-    .sort((a, b) => a - b)
-    .map((w) => `${imageUrl(img, w)} ${w}w`)
-    .join(", ");
-}
-
-/** Attributes for an `<img>` with explicit dimensions (no CLS), lazy unless it is the LCP. */
+/**
+ * Attributes for an `<img>`: AVIF `srcset` (every current browser decodes AVIF; `src` is the
+ * JPEG/PNG fallback), explicit dimensions (no CLS), lazy unless it is the LCP image. `sizes`
+ * must describe the real slot: a loose guess makes the browser pick a 2-4× heavier variant.
+ */
 export function imageAttrs(
   img: Image,
   opts: { sizes: string; priority?: boolean; width?: number },
 ) {
   const width = opts.width ?? img.width;
   return {
-    src: imageUrl(img, width),
-    srcset: srcset(img),
+    src: img.src,
+    srcset: img.srcset || img.srcset_fallback,
     sizes: opts.sizes,
     width,
     height: Math.round((img.height / img.width) * width),
@@ -59,4 +64,42 @@ export function imageAttrs(
     decoding: "async" as const,
     fetchpriority: opts.priority ? ("high" as const) : ("auto" as const),
   };
+}
+
+/**
+ * The LCP image (spec §9.6): the `<link rel=preload>` attributes and the matching `<img>`
+ * attributes from one `sizes` value, so the preload and the image can never disagree.
+ */
+export function lcpImage(img: Image, sizes: string, width?: number) {
+  return {
+    preload: {
+      rel: "preload" as const,
+      as: "image" as const,
+      type: "image/avif",
+      imagesrcset: img.srcset,
+      imagesizes: sizes,
+      fetchpriority: "high" as const,
+    },
+    img: imageAttrs(img, { sizes, priority: true, width }),
+  };
+}
+
+/** Platform messages of the active locale (`ShopModel.messages`). */
+export type Messages = Record<string, string>;
+
+/** A message with `{name}` placeholders filled in; the key itself when it is missing. */
+export function t(
+  messages: Messages,
+  key: string,
+  args: Record<string, string | number> = {},
+): string {
+  let out = messages[key] ?? key;
+  for (const [name, value] of Object.entries(args))
+    out = out.replaceAll(`{${name}}`, String(value));
+  return out;
+}
+
+/** The messages an island needs: islands serialize their props into the page, so send few. */
+export function pick(messages: Messages, keys: readonly string[]): Messages {
+  return Object.fromEntries(keys.map((k) => [k, messages[k] ?? k]));
 }
