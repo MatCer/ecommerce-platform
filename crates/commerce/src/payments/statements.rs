@@ -392,12 +392,14 @@ fn camt053(bytes: &[u8]) -> Result<Statement, Error> {
 // ---------------------------------------------------------------------------------------
 // Fio CSV
 
-/// Splits one `;`-separated line with `"` quoting (`""` inside quotes is a quote).
-fn csv_fields(line: &str, sep: char) -> Vec<String> {
-    let mut out = Vec::new();
+/// Splits `;`-separated CSV into records with `"` quoting (RFC 4180 style: `""` is a quote,
+/// quoted fields may span lines). An unterminated quote is refused.
+fn csv_records(text: &str, sep: char) -> Result<Vec<Vec<String>>, Error> {
+    let mut records = Vec::new();
+    let mut record = Vec::new();
     let mut cur = String::new();
     let mut quoted = false;
-    let mut chars = line.chars().peekable();
+    let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
         match c {
             '"' if quoted && chars.peek() == Some(&'"') => {
@@ -405,12 +407,26 @@ fn csv_fields(line: &str, sep: char) -> Vec<String> {
                 chars.next();
             }
             '"' => quoted = !quoted,
-            c if c == sep && !quoted => out.push(std::mem::take(&mut cur)),
+            c if c == sep && !quoted => record.push(std::mem::take(&mut cur)),
+            '\r' if !quoted => {}
+            '\n' if !quoted => {
+                record.push(std::mem::take(&mut cur));
+                records.push(std::mem::take(&mut record));
+            }
             c => cur.push(c),
         }
+        if records.len() > MAX_LINES + 100 {
+            return Err(bad(format!("at most {MAX_LINES} lines per statement")));
+        }
     }
-    out.push(cur);
-    out
+    if quoted {
+        return Err(bad("the CSV has an unterminated quoted field"));
+    }
+    if !cur.is_empty() || !record.is_empty() {
+        record.push(cur);
+        records.push(record);
+    }
+    Ok(records)
 }
 
 fn column(header: &[String], names: &[&str]) -> Option<usize> {
@@ -425,11 +441,10 @@ fn fio_csv(bytes: &[u8]) -> Result<Statement, Error> {
     let mut out = Statement::default();
     let mut header: Option<Vec<String>> = None;
     let mut cols = [None; 9];
-    for (n, line) in text.lines().enumerate() {
-        if line.trim().is_empty() {
+    for (n, fields) in csv_records(text, ';')?.into_iter().enumerate() {
+        if fields.iter().all(|f| f.trim().is_empty()) {
             continue;
         }
-        let fields = csv_fields(line, ';');
         let Some(h) = &header else {
             // The preamble: `"iban";"CZ…"` and friends, until the column header.
             if fields
@@ -462,7 +477,7 @@ fn fio_csv(bytes: &[u8]) -> Result<Statement, Error> {
         let get = |i: Option<usize>| i.and_then(|i| fields.get(i)).map(String::as_str);
         let id = get(cols[0]).map(str::trim).unwrap_or_default();
         if id.is_empty() {
-            return Err(bad(format!("line {}: no transaction id", n + 1)));
+            return Err(bad(format!("record {}: no transaction id", n + 1)));
         }
         let account = match (get(cols[5]), get(cols[6])) {
             (Some(a), Some(b)) if !a.trim().is_empty() && !b.trim().is_empty() => {
@@ -523,11 +538,25 @@ fn gpc(bytes: &[u8]) -> Result<Statement, Error> {
         let line = line.trim_end_matches(['\r', ' ']);
         let field = |from: usize, to: usize| line.get(from - 1..to).unwrap_or_default();
         match line.get(..3) {
-            Some("074") => out.domestic = non_empty(field(4, 19), 16),
+            Some("074") => {
+                // One account per file: a second header for another account is refused, so
+                // no transaction can be attributed to the wrong account.
+                let account = non_empty(field(4, 19), 16);
+                if out.domestic.is_some() && out.domestic != account {
+                    return Err(bad("the GPC file holds statements of several accounts"));
+                }
+                out.domestic = account;
+            }
             Some("075") => {
                 if line.len() < 128 {
                     return Err(bad(format!(
                         "line {}: a 075 record has 128 characters",
+                        n + 1
+                    )));
+                }
+                if out.domestic.as_deref() != Some(field(4, 19)) {
+                    return Err(bad(format!(
+                        "line {}: the record is for another account than the 074 header",
                         n + 1
                     )));
                 }
@@ -757,6 +786,15 @@ mod tests {
         assert_eq!(s.lines[1].amount_minor, -20_000);
         assert_eq!(s.lines[2].variable_symbol, None);
         assert!(parse(StatementFormat::FioCsv, b"a;b\n1;2").is_err());
+        // A quoted message spanning lines stays one record; an open quote is refused.
+        let multi = "\"ID pohybu\";\"Datum\";\"Objem\";\"M\u{11b}na\";\"Zpr\u{e1}va pro p\u{159}\u{ed}jemce\"\n\
+                     \"1\";\"25.09.2026\";\"10,00\";\"CZK\";\"a\nb \"\"c\"\"\"\n";
+        let s = parse(StatementFormat::FioCsv, multi.as_bytes()).unwrap();
+        assert_eq!(s.lines.len(), 1);
+        assert_eq!(s.lines[0].message.as_deref(), Some("a\nb \"c\""));
+        let open =
+            "\"ID pohybu\";\"Datum\";\"Objem\";\"M\u{11b}na\"\n\"1\";\"25.09.2026\";\"10\";\"CZK";
+        assert!(parse(StatementFormat::FioCsv, open.as_bytes()).is_err());
     }
 
     #[test]
@@ -773,6 +811,18 @@ mod tests {
             cz_domestic("CZ7920100000002000000000"),
             Some("0000002000000000")
         );
+        // Mixed accounts are refused: a second header, or a record of another account.
+        let file = String::from_utf8(fixture("statement.gpc")).unwrap();
+        let header = file.lines().next().unwrap().to_owned();
+        let other = header.replace("0000002000000000", "0000009999999999");
+        let mixed = format!("{file}{other}\r\n");
+        assert!(parse(StatementFormat::Gpc, mixed.as_bytes()).is_err());
+        let record = file.lines().nth(1).unwrap();
+        let foreign = format!(
+            "{header}\r\n{}\r\n",
+            record.replacen("0000002000000000", "0000009999999999", 1)
+        );
+        assert!(parse(StatementFormat::Gpc, foreign.as_bytes()).is_err());
     }
 
     #[test]

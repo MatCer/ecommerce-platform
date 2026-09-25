@@ -35,6 +35,7 @@ use crate::auth::TenantStaff;
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(get_bank_account, put_bank_account))
+        .routes(routes!(list_bank_accounts))
         .routes(routes!(upload_statement))
         .routes(routes!(list_bank_transactions))
         .routes(routes!(resolve_bank_transaction))
@@ -116,6 +117,28 @@ async fn put_bank_account(
         })
         .await?,
     ))
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct BankAccountList {
+    pub items: Vec<BankAccount>,
+}
+
+/// Every receiving account, active ones first (retired accounts still import statements).
+#[utoipa::path(
+    get,
+    path = "/admin/v1/bank-accounts",
+    tag = "payments",
+    security(("staff_jwt" = [])),
+    params(TenantHeader),
+    responses((status = 200, body = BankAccountList))
+)]
+async fn list_bank_accounts(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+) -> Result<Json<BankAccountList>, Error> {
+    let items = in_tx(&s, staff.tenant_id, async |tx| bank::accounts(tx).await).await?;
+    Ok(Json(BankAccountList { items }))
 }
 
 #[derive(Deserialize, IntoParams)]

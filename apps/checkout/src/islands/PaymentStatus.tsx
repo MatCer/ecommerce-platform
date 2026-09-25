@@ -144,11 +144,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
           </Button>
         </div>
       </Show>
-      <Show
-        when={
-          p().can_pay && open() && p().method === "fake" && p().attempt
-        }
-      >
+      <Show when={p().can_pay && open() && p().method === "fake" && p().attempt}>
         {(a) => (
           <div>
             <Button

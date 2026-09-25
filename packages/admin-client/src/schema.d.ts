@@ -99,6 +99,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/bank-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every receiving account, active ones first (retired accounts still import statements). */
+        get: operations["list_bank_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/bank-accounts/{id}/statements": {
         parameters: {
             query?: never;
@@ -2464,6 +2481,8 @@ export interface components {
         Badge: "sale" | "new";
         BankAccount: {
             account_name: string;
+            /** @description The market's current account; retired ones still import and match statements. */
+            active: boolean;
             bic?: string | null;
             currency: string;
             /** @description A Fio API token is stored (encrypted; never returned). */
@@ -2486,6 +2505,9 @@ export interface components {
             fio_token?: string | null;
             /** @description Spaces are ignored; the check digits are verified. */
             iban: string;
+        };
+        BankAccountList: {
+            items: components["schemas"]["BankAccount"][];
         };
         BankTransaction: {
             /** Format: int64 */
@@ -5272,6 +5294,28 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_bank_accounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BankAccountList"];
                 };
             };
         };

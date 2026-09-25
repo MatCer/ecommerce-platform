@@ -180,6 +180,7 @@ function BankAccountForm(props: { market: Schemas["Market"] }) {
           current={current}
           onSaved={(saved) => {
             qc.setQueryData(key(), saved);
+            void qc.invalidateQueries({ queryKey: tenantKey("bank-accounts") });
             void qc.invalidateQueries({ queryKey: tenantKey("payment-methods", props.market.id) });
           }}
         />
@@ -232,6 +233,7 @@ function BankAccountFields(props: {
           {t("pay.bankAccount")} ({props.market.currency})
         </legend>
         <p class="text-sm text-muted-foreground">{t("pay.bankAccountDesc")}</p>
+        <p class="text-sm text-muted-foreground">{t("pay.ibanChange")}</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <TextField label={t("pay.iban")} required value={iban()} onChange={setIban} />
           <TextField label={t("pay.bic")} value={bic()} onChange={setBic} />

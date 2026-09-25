@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT coalesce(sum(amount_minor), 0)::bigint AS \"sum!\" FROM refunds\n               WHERE attempt_id = $1 AND status = 'succeeded'",
+  "query": "SELECT coalesce(sum(amount_minor), 0)::bigint AS \"sum!\" FROM refunds\n           WHERE attempt_id = $1 AND status = 'succeeded'",
   "describe": {
     "columns": [
       {
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "425b95ca5c709cedea988bcae30b2272f2a2ec476a3ee95a98289a1d5e436cd6"
+  "hash": "123f3137963e40833a54235829282fe213c1d781ea6e342b5f1be76e991bde6d"
 }

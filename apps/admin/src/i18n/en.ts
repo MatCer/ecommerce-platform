@@ -282,6 +282,9 @@ export const en = {
     fioConnected: "Fio API connected",
     fioSynced: "Last download: {{at}}",
     clearFio: "Disconnect the Fio API",
+    retired: "retired",
+    ibanChange:
+      "Entering another IBAN retires the current account: its statements can still be imported, new orders use the new one.",
     saveAccount: "Save account",
     stripeTitle: "Stripe (cards, Apple Pay, Google Pay)",
     stripeNotConfigured: "Stripe is not configured on this platform.",

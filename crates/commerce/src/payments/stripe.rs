@@ -125,7 +125,19 @@ impl Stripe {
                 .and_then(Value::as_str)
                 .unwrap_or("error");
             tracing::warn!(%status, code, path, "stripe API error");
-            return Err(Error::Unavailable(format!("stripe: {code}")));
+            // A 4xx (other than a rate limit or an idempotency clash) is a definite refusal;
+            // anything else leaves the outcome unknown.
+            let definite = status.is_client_error()
+                && status != reqwest::StatusCode::TOO_MANY_REQUESTS
+                && status != reqwest::StatusCode::CONFLICT;
+            return Err(if definite {
+                Error::Conflict {
+                    code: "provider_rejected",
+                    detail: format!("stripe: {code}"),
+                }
+            } else {
+                Error::Unavailable(format!("stripe: {code}"))
+            });
         }
         Ok(body)
     }
@@ -690,6 +702,9 @@ async fn apply(
         | "payment_intent.payment_failed"
         | "payment_intent.canceled" => apply_intent(tx, kind, object).await,
         "charge.refunded" => apply_refund(tx, object).await,
+        "refund.created" | "refund.updated" | "charge.refund.updated" => {
+            apply_refund_object(tx, object).await
+        }
         "account.updated" => {
             if text(object, "object") != Some("account")
                 || text(object, "id") != Some(acc.account_id.as_str())
@@ -805,6 +820,11 @@ async fn apply_refund(tx: &mut TenantTx, charge: &Value) -> Result<Processed, Er
     if refunded <= 0 || refunded > a.amount_minor {
         return Ok(Processed::Rejected("refunded amount out of range".into()));
     }
+    if !super::is_retained(tx, a.id).await? {
+        return Ok(Processed::Ignored(
+            "refund of a duplicate or late payment: the order keeps its payment".into(),
+        ));
+    }
     let full = refunded == a.amount_minor;
     let mut order = orders::lock(tx, a.order_id).await?;
     let target = if full {
@@ -824,6 +844,96 @@ async fn apply_refund(tx: &mut TenantTx, charge: &Value) -> Result<Processed, Er
         "refunded {refunded} of {}",
         a.amount_minor
     )))
+}
+
+/// A Stripe refund object (`refund.*` events): our refund by `metadata.refund_id` (or its
+/// provider id) moves to Stripe's state; a refund made elsewhere (the Stripe dashboard) enters
+/// the ledger. The order's payment state then follows the ledger.
+async fn apply_refund_object(tx: &mut TenantTx, re: &Value) -> Result<Processed, Error> {
+    if text(re, "object") != Some("refund") {
+        return Ok(Processed::Rejected("not a refund".into()));
+    }
+    let (Some(re_id), Some(pi)) = (text(re, "id"), text(re, "payment_intent")) else {
+        return Ok(Processed::Rejected(
+            "refund without id or payment intent".into(),
+        ));
+    };
+    let Some(amount) = re.get("amount").and_then(Value::as_i64).filter(|a| *a > 0) else {
+        return Ok(Processed::Rejected("refund without amount".into()));
+    };
+    let status = super::RefundStatus::from_stripe(text(re, "status").unwrap_or("pending"));
+    let Some(a) = sqlx::query!(
+        "SELECT id, order_id, currency FROM payment_attempts
+         WHERE method = 'stripe' AND provider_ref = $1 AND status = 'succeeded'
+         ORDER BY created_at DESC LIMIT 1",
+        pi
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(Processed::Rejected(
+            "no succeeded attempt for the refund".into(),
+        ));
+    };
+    if !text(re, "currency").is_some_and(|c| c.eq_ignore_ascii_case(&a.currency)) {
+        return Ok(Processed::Rejected("currency mismatch".into()));
+    }
+    let mut order = orders::lock(tx, a.order_id).await?;
+    let ours = re
+        .pointer("/metadata/refund_id")
+        .and_then(Value::as_str)
+        .and_then(|s| s.parse::<Uuid>().ok());
+    let existing = sqlx::query_scalar!(
+        "SELECT id FROM refunds WHERE attempt_id = $3 AND (id = $1 OR provider_ref = $2)",
+        ours,
+        re_id,
+        a.id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    let detail = match existing {
+        Some(id) => {
+            sqlx::query!(
+                "UPDATE refunds SET status = $2, provider_ref = $3, updated_at = now()
+                 WHERE id = $1",
+                id,
+                match status {
+                    super::RefundStatus::Pending => "pending",
+                    super::RefundStatus::Succeeded => "succeeded",
+                    super::RefundStatus::Failed => "failed",
+                },
+                re_id
+            )
+            .execute(&mut **tx)
+            .await?;
+            format!("refund {id} {status:?}").to_lowercase()
+        }
+        None => {
+            let id = crate::id::new_id();
+            sqlx::query!(
+                "INSERT INTO refunds (id, tenant_id, order_id, attempt_id, amount_minor, currency,
+                     reason, status, provider_ref, created_by)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'made in Stripe', $7, $8, 'stripe')",
+                id,
+                tx.tenant_id(),
+                a.order_id,
+                a.id,
+                amount,
+                a.currency,
+                match status {
+                    super::RefundStatus::Pending => "pending",
+                    super::RefundStatus::Succeeded => "succeeded",
+                    super::RefundStatus::Failed => "failed",
+                },
+                re_id
+            )
+            .execute(&mut **tx)
+            .await?;
+            format!("external refund {re_id} recorded")
+        }
+    };
+    super::settle_refunds(tx, &mut order, "stripe").await?;
+    Ok(Processed::Applied(detail))
 }
 
 // ---------------------------------------------------------------------------------------

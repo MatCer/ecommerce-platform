@@ -283,6 +283,9 @@ export const cs: Dictionary = {
     fioConnected: "Fio API připojeno",
     fioSynced: "Poslední stažení: {{at}}",
     clearFio: "Odpojit Fio API",
+    retired: "vyřazený",
+    ibanChange:
+      "Jiný IBAN vyřadí současný účet: jeho výpisy lze dál importovat, nové objednávky použijí nový účet.",
     saveAccount: "Uložit účet",
     stripeTitle: "Stripe (karty, Apple Pay, Google Pay)",
     stripeNotConfigured: "Stripe na této platformě není nastaven.",

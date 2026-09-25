@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, market_id, currency, iban, bic, account_name,\n                  fio_token IS NOT NULL AS \"fio_connected!\", fio_synced_at\n           FROM bank_accounts WHERE market_id = $1",
+  "query": "SELECT id, market_id, currency, iban, bic, account_name, active,\n                  fio_token IS NOT NULL AS \"fio_connected!\", fio_synced_at\n           FROM bank_accounts WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -71,12 +71,23 @@
       },
       {
         "ordinal": 6,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "fio_connected!",
         "type_info": "Bool",
         "origin": "Expression"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "fio_synced_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -99,9 +110,10 @@
       false,
       true,
       false,
+      false,
       null,
       true
     ]
   },
-  "hash": "740f17012a6fa1186570389dc7bb4b093bd09c5129e7c74f6efa6ba854940479"
+  "hash": "a51287103f2cf2891b1016bf4d90143543b70cbc0fe85ec454bb69cc581fe54b"
 }

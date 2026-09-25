@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT a.id, a.currency FROM payment_attempts a JOIN orders o ON o.id = a.order_id\n                 WHERE o.number = $1 AND a.method = 'bank_transfer'\n                 ORDER BY a.created_at DESC LIMIT 1",
+  "query": "SELECT id, amount_minor FROM payment_attempts\n         WHERE order_id = $1 AND status = 'succeeded'\n         ORDER BY completed_at, id LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -16,19 +16,19 @@
       },
       {
         "ordinal": 1,
-        "name": "currency",
-        "type_info": "Text",
+        "name": "amount_minor",
+        "type_info": "Int8",
         "origin": {
           "Table": {
             "table": "payment_attempts",
-            "name": "currency"
+            "name": "amount_minor"
           }
         }
       }
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "a945ef18e0759c9d98238d7682fef84c290ceab5de97d06a058d4e9ba4b0a5e1"
+  "hash": "bddecdf9e8287b8879dd8d5664e81c211c61677507bcfb8e8493532224b543d3"
 }

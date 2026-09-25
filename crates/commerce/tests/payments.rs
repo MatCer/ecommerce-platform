@@ -582,10 +582,11 @@ async fn statements_match_by_vs_amount_and_currency_once(db: PgPool) {
         2
     );
 
-    // Assign: a transfer without VS for a third order.
+    // Assign: a transfer without VS for a third order (50 Kč: a partial payment of it, which
+    // is then accepted explicitly).
     let c = place(&runtime, &s, M::Cz, MethodKind::BankTransfer).await;
     let mut tx = tenant_tx(&runtime, t).await.unwrap();
-    bank::resolve(
+    let assigned = bank::resolve(
         &mut tx,
         ACTOR,
         by("T4").id,
@@ -593,6 +594,19 @@ async fn statements_match_by_vs_amount_and_currency_once(db: PgPool) {
             action: ResolveAction::Assign,
             order_number: Some(c.number.clone()),
             note: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(assigned.status, TxStatus::Partial);
+    bank::resolve(
+        &mut tx,
+        ACTOR,
+        by("T4").id,
+        &ResolveInput {
+            action: ResolveAction::Accept,
+            order_number: None,
+            note: Some("the rest arrives in cash".into()),
         },
     )
     .await
@@ -1310,7 +1324,7 @@ async fn stripe_mock_intent_simulator_and_refund(db: PgPool) {
     );
 
     let amount = total(&runtime, t, a.order_id).await;
-    let r = payments::refund(&runtime, &p, t, a.order_id, 500, Some("damaged"), ACTOR)
+    let r = payments::refund(&runtime, &p, t, a.attempt_id, 500, Some("damaged"), ACTOR)
         .await
         .unwrap();
     assert!(r.provider_ref.unwrap().starts_with("re_"));
@@ -1318,11 +1332,11 @@ async fn stripe_mock_intent_simulator_and_refund(db: PgPool) {
         view(&runtime, t, a.order_id).await.payment.status,
         orders::status::PaymentStatus::PartiallyRefunded
     );
-    let err = payments::refund(&runtime, &p, t, a.order_id, amount, None, ACTOR)
+    let err = payments::refund(&runtime, &p, t, a.attempt_id, amount, None, ACTOR)
         .await
         .unwrap_err();
     assert_eq!(err.code(), "nothing_to_refund");
-    payments::refund(&runtime, &p, t, a.order_id, amount - 500, None, ACTOR)
+    payments::refund(&runtime, &p, t, a.attempt_id, amount - 500, None, ACTOR)
         .await
         .unwrap();
     assert_eq!(
@@ -1566,7 +1580,7 @@ async fn payment_tables_are_tenant_isolated(db: PgPool) {
         &runtime,
         &settings().payments,
         s.shop.tenant,
-        a.order_id,
+        a.attempt_id,
         100,
         None,
         ACTOR,
@@ -1600,4 +1614,332 @@ async fn payment_tables_are_tenant_isolated(db: PgPool) {
         .await;
         assert!(insert.is_err(), "{table}: writing another tenant's row");
     }
+}
+
+// ---------------------------------------------------------------------------------------
+// Review regressions
+
+/// A Stripe client whose API cannot be reached: every call's outcome is unknown.
+fn unreachable_stripe() -> Payments {
+    Payments {
+        stripe: Some(Stripe::new(
+            &StripeConfig {
+                mode: StripeMode::Simulator,
+                api_url: "http://127.0.0.1:1/".parse().unwrap(),
+                secret_key: "sk_test_x".into(),
+                publishable_key: None,
+                webhook_secret: "whsec_test_0123456789".into(),
+            },
+            reqwest::Client::new(),
+        )),
+        ..Payments::default()
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn refunds_follow_the_retained_payment_and_survive_ambiguous_failures(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "refunds").await;
+    let t = s.shop.tenant;
+    let acct = s.account.as_str();
+    let a = place(&runtime, &s, M::Cz, MethodKind::Stripe).await;
+    let amount = total(&runtime, t, a.order_id).await;
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    sqlx::query("UPDATE payment_attempts SET provider_ref = 'pi_kept' WHERE id = $1")
+        .bind(a.attempt_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    deliver(
+        &runtime,
+        &event(
+            "evt_paid",
+            "payment_intent.succeeded",
+            acct,
+            false,
+            intent("pi_kept", a.attempt_id, amount, "czk"),
+        ),
+    )
+    .await;
+    // A second payment for the same order (A10: duplicate, to be returned).
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let dup: Uuid = sqlx::query_scalar(
+        "INSERT INTO payment_attempts (tenant_id, order_id, method, amount_minor, currency, provider_ref)
+         VALUES ($1, $2, 'stripe', $3, 'CZK', 'pi_dup') RETURNING id",
+    )
+    .bind(t)
+    .bind(a.order_id)
+    .bind(amount)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    deliver(
+        &runtime,
+        &event(
+            "evt_dup",
+            "payment_intent.succeeded",
+            acct,
+            false,
+            intent("pi_dup", dup, amount, "czk"),
+        ),
+    )
+    .await;
+    let o = view(&runtime, t, a.order_id).await;
+    assert_eq!(o.exception.as_deref(), Some("duplicate_payment"));
+
+    // Returning the duplicate: Stripe cannot be reached, the outcome is unknown → pending, the
+    // balance stays reserved, the order keeps its payment.
+    let lost = unreachable_stripe();
+    let err = payments::refund(&runtime, &lost, t, dup, amount, None, ACTOR)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "service_unavailable");
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let pending: (Uuid, String) =
+        sqlx::query_as("SELECT id, status FROM refunds WHERE attempt_id = $1")
+            .bind(dup)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(pending.1, "pending");
+    let again = payments::refund(&runtime, &lost, t, dup, 1, None, ACTOR)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        again.code(),
+        "nothing_to_refund",
+        "the pending refund reserves the balance"
+    );
+    // Stripe's webhook confirms it; the order is still paid (only the duplicate went back).
+    let refund = |id: &str, pi: &str, amount: i64, status: &str, ours: Option<Uuid>| {
+        json!({ "id": id, "object": "refund", "payment_intent": pi, "amount": amount,
+                "currency": "czk", "status": status,
+                "metadata": ours.map_or(json!({}), |r| json!({ "refund_id": r })) })
+    };
+    deliver(
+        &runtime,
+        &event(
+            "evt_re1",
+            "refund.updated",
+            acct,
+            false,
+            refund("re_1", "pi_dup", amount, "succeeded", Some(pending.0)),
+        ),
+    )
+    .await;
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let r = payments::refund_row(&mut tx, pending.0).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(r.status, payments::RefundStatus::Succeeded);
+    assert_eq!(
+        view(&runtime, t, a.order_id).await.payment.status,
+        orders::status::PaymentStatus::Paid
+    );
+    // charge.refunded of the duplicate changes nothing either.
+    let dup_charge = json!({ "id": "ch_dup", "object": "charge", "payment_intent": "pi_dup",
+                             "amount": amount, "amount_refunded": amount, "currency": "czk" });
+    assert!(matches!(
+        deliver(
+            &runtime,
+            &event("evt_ch_dup", "charge.refunded", acct, false, dup_charge)
+        )
+        .await,
+        Some(Processed::Ignored(_))
+    ));
+
+    // A refund made in the Stripe dashboard enters the ledger and refunds the order partly.
+    deliver(
+        &runtime,
+        &event(
+            "evt_re2",
+            "refund.created",
+            acct,
+            false,
+            refund("re_dash", "pi_kept", 100, "succeeded", None),
+        ),
+    )
+    .await;
+    assert_eq!(
+        view(&runtime, t, a.order_id).await.payment.status,
+        orders::status::PaymentStatus::PartiallyRefunded
+    );
+    // The rest: first lost, then retried with the same key against stripe-mock.
+    let err = payments::refund(&runtime, &lost, t, a.attempt_id, amount - 100, None, ACTOR)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "service_unavailable");
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let rest: Uuid =
+        sqlx::query_scalar("SELECT id FROM refunds WHERE attempt_id = $1 AND status = 'pending'")
+            .bind(a.attempt_id)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    let done = payments::retry_refund(&runtime, &settings().payments, t, rest)
+        .await
+        .unwrap();
+    assert_eq!(done.status, payments::RefundStatus::Succeeded);
+    assert_eq!(
+        view(&runtime, t, a.order_id).await.payment.status,
+        orders::status::PaymentStatus::Refunded
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_transfers_pay_an_order_once(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 8).await;
+    let s = setup(&runtime, "race-bank").await;
+    let t = s.shop.tenant;
+    let a = place(&runtime, &s, M::Cz, MethodKind::BankTransfer).await;
+    let amount = total(&runtime, t, a.order_id).await;
+    let cz = account_id(&runtime, t, s.shop.cz).await;
+    let (r1, r2) = tokio::join!(
+        import(
+            &runtime,
+            t,
+            cz,
+            vec![line("C1", amount, "CZK", Some(&a.number))]
+        ),
+        import(
+            &runtime,
+            t,
+            cz,
+            vec![line("C2", amount, "CZK", Some(&a.number))]
+        ),
+    );
+    let (r1, r2) = (r1.unwrap(), r2.unwrap());
+    assert_eq!(r1.matched + r2.matched, 1, "one transfer pays the order");
+    assert_eq!(
+        r1.exceptions + r2.exceptions,
+        1,
+        "the other waits to be returned"
+    );
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let open = bank::transactions(
+        &mut tx,
+        &bank::TxFilter {
+            open: true,
+            ..Default::default()
+        },
+        None,
+        10,
+    )
+    .await
+    .unwrap()
+    .items;
+    assert_eq!(open.len(), 1);
+    assert_eq!(open[0].reason, Some(TxReason::AlreadyPaid));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn assigning_keeps_the_account_scope_and_amounts_explicit(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "assign").await;
+    let t = s.shop.tenant;
+    let a = place(&runtime, &s, M::Cz, MethodKind::BankTransfer).await;
+    let amount = total(&runtime, t, a.order_id).await;
+    let cz = account_id(&runtime, t, s.shop.cz).await;
+    let sk = account_id(&runtime, t, s.shop.sk).await;
+    import(&runtime, t, sk, vec![line("S1", amount, "CZK", None)])
+        .await
+        .unwrap();
+    import(&runtime, t, cz, vec![line("S2", amount - 500, "CZK", None)])
+        .await
+        .unwrap();
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let open = bank::transactions(
+        &mut tx,
+        &bank::TxFilter {
+            open: true,
+            ..Default::default()
+        },
+        None,
+        10,
+    )
+    .await
+    .unwrap()
+    .items;
+    let by = |id: &str| open.iter().find(|x| x.bank_tx_id == id).unwrap().id;
+    let assign = ResolveInput {
+        action: ResolveAction::Assign,
+        order_number: Some(a.number.clone()),
+        note: None,
+    };
+    // Money on the SK account never pays a CZ-account order (A25).
+    let err = bank::resolve(&mut tx, ACTOR, by("S1"), &assign)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "invalid_resolution");
+    // A short amount becomes a partial payment of that order, not a payment.
+    let partial = bank::resolve(&mut tx, ACTOR, by("S2"), &assign)
+        .await
+        .unwrap();
+    assert_eq!(partial.status, TxStatus::Partial);
+    assert_eq!(partial.order_number.as_deref(), Some(a.number.as_str()));
+    tx.commit().await.unwrap();
+    assert_eq!(
+        view(&runtime, t, a.order_id).await.payment.status,
+        orders::status::PaymentStatus::Unpaid
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_new_iban_retires_the_account_which_still_matches_its_orders(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "iban").await;
+    let t = s.shop.tenant;
+    let a = place(&runtime, &s, M::Cz, MethodKind::BankTransfer).await;
+    let amount = total(&runtime, t, a.order_id).await;
+    let old = account_id(&runtime, t, s.shop.cz).await;
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let new = bank::configure_account(
+        &mut tx,
+        ACTOR,
+        None,
+        s.shop.cz,
+        &BankAccountInput {
+            iban: "CZ5855000000001265098001".into(),
+            bic: None,
+            account_name: "Demo s.r.o.".into(),
+            fio_token: None,
+            clear_fio_token: false,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert_ne!(new.id, old);
+    assert!(new.active);
+    // The old account's statement still pays the order placed while it was active.
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let r = bank::import(
+        &mut tx,
+        ACTOR,
+        old,
+        "camt053",
+        &Statement {
+            iban: Some(CZ_IBAN.into()),
+            domestic: None,
+            lines: vec![line("I1", amount, "CZK", Some(&a.number))],
+        },
+    )
+    .await
+    .unwrap();
+    let all = bank::accounts(&mut tx).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(r.matched, 1);
+    assert_eq!(all.iter().filter(|x| x.market_id == s.shop.cz).count(), 2);
+    assert!(!all.iter().find(|x| x.id == old).unwrap().active);
+    // New orders use the new account.
+    let b = place(&runtime, &s, M::Cz, MethodKind::BankTransfer).await;
+    let bt = view(&runtime, t, b.order_id)
+        .await
+        .payment
+        .bank_transfer
+        .unwrap();
+    assert_eq!(bt.iban, "CZ5855000000001265098001");
 }

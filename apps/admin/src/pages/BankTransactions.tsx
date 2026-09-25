@@ -3,7 +3,7 @@ import { A } from "@solidjs/router";
 import {
   createInfiniteQuery,
   createMutation,
-  createQueries,
+  createQuery,
   useQueryClient,
 } from "@tanstack/solid-query";
 import { createSignal, For, type JSX, Show } from "solid-js";
@@ -13,7 +13,6 @@ import { formatDateTime, locale, t } from "../i18n/index.ts";
 import { ApiError, api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 import { formatMoney } from "../lib/money.ts";
-import { useMarkets } from "../lib/queries.ts";
 
 const statuses: Schemas["TxStatus"][] = [
   "matched",
@@ -175,26 +174,12 @@ export function TransactionTable(props: {
 /** Upload of a statement file into a market's receiving account. */
 function StatementUpload() {
   const qc = useQueryClient();
-  const markets = useMarkets();
-  const accounts = createQueries(() => ({
-    queries: (markets.data?.items ?? []).map((m) => ({
-      queryKey: tenantKey("bank-account", m.id),
-      queryFn: async () => {
-        try {
-          return await unwrap(
-            api.GET("/admin/v1/markets/{id}/bank-account", {
-              params: { header: tenantHeader(), path: { id: m.id } },
-            }),
-          );
-        } catch (e) {
-          if (e instanceof ApiError && e.status === 404) return null;
-          throw e;
-        }
-      },
-    })),
+  const accounts = createQuery(() => ({
+    queryKey: tenantKey("bank-accounts"),
+    queryFn: () =>
+      unwrap(api.GET("/admin/v1/bank-accounts", { params: { header: tenantHeader() } })),
   }));
-  const available = () =>
-    accounts.flatMap((q) => (q.data ? [q.data] : [])) as Schemas["BankAccount"][];
+  const available = () => accounts.data?.items ?? [];
   const [account, setAccount] = createSignal("");
   const [format, setFormat] = createSignal<Format>("camt053");
   const [file, setFile] = createSignal<File>();
@@ -238,7 +223,10 @@ function StatementUpload() {
           <SelectField
             label={t("pay.account")}
             value={account() || (available()[0]?.id ?? "")}
-            options={available().map((a) => ({ value: a.id, label: `${a.iban} (${a.currency})` }))}
+            options={available().map((a) => ({
+              value: a.id,
+              label: `${a.iban} (${a.currency})${a.active ? "" : ` · ${t("pay.retired")}`}`,
+            }))}
             onChange={setAccount}
           />
           <SelectField

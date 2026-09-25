@@ -285,6 +285,9 @@ export const sk: Dictionary = {
     fioConnected: "Fio API pripojené",
     fioSynced: "Posledné stiahnutie: {{at}}",
     clearFio: "Odpojiť Fio API",
+    retired: "vyradený",
+    ibanChange:
+      "Iný IBAN vyradí súčasný účet: jeho výpisy možno ďalej importovať, nové objednávky použijú nový účet.",
     saveAccount: "Uložiť účet",
     stripeTitle: "Stripe (karty, Apple Pay, Google Pay)",
     stripeNotConfigured: "Stripe na tejto platforme nie je nastavený.",

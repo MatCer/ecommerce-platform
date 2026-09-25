@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT a.id, a.method, a.amount_minor, a.currency, a.provider_ref,\n                  a.amount_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r\n                      WHERE r.attempt_id = a.id AND r.status <> 'failed'), 0)::bigint AS \"left!\"\n           FROM payment_attempts a\n           WHERE a.order_id = $1 AND a.status = 'succeeded'\n           ORDER BY a.completed_at DESC LIMIT 1",
+  "query": "SELECT id, status, amount_minor, currency FROM payment_attempts WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -16,12 +16,12 @@
       },
       {
         "ordinal": 1,
-        "name": "method",
+        "name": "status",
         "type_info": "Text",
         "origin": {
           "Table": {
             "table": "payment_attempts",
-            "name": "method"
+            "name": "status"
           }
         }
       },
@@ -46,23 +46,6 @@
             "name": "currency"
           }
         }
-      },
-      {
-        "ordinal": 4,
-        "name": "provider_ref",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "payment_attempts",
-            "name": "provider_ref"
-          }
-        }
-      },
-      {
-        "ordinal": 5,
-        "name": "left!",
-        "type_info": "Int8",
-        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -74,10 +57,8 @@
       false,
       false,
       false,
-      false,
-      true,
-      null
+      false
     ]
   },
-  "hash": "55ffaa0366864481281425e1fac9d08777191a9721b0e759325b97b0c5a6c739"
+  "hash": "38590503b169ba04dcf464de1a0bd201c6dcac5de2c2775b015cd266ef6ef2c5"
 }

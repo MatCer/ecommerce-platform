@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO refunds (id, tenant_id, order_id, attempt_id, amount_minor, currency,\n                     reason, status, provider_ref, created_by)\n                 VALUES ($1, $2, $3, $4, $5, $6, 'made in Stripe', $7, $8, 'stripe')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9655a40e255fad89ca8f3d7cb90a683feb41c56f1992504c1e3796a9dbdbe4fa"
+}

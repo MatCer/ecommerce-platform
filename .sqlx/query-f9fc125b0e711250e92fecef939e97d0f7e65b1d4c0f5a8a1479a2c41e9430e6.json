@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT r.id FROM payment_attempts r\n                   WHERE r.order_id = a.order_id AND r.status = 'succeeded'\n                   ORDER BY r.completed_at, r.id LIMIT 1) = a.id AS \"retained!\"\n           FROM payment_attempts a WHERE a.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "retained!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f9fc125b0e711250e92fecef939e97d0f7e65b1d4c0f5a8a1479a2c41e9430e6"
+}

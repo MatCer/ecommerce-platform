@@ -867,6 +867,33 @@ pub enum RefundStatus {
     Failed,
 }
 
+impl RefundStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+        }
+    }
+
+    fn parse(s: &str) -> Self {
+        match s {
+            "succeeded" => Self::Succeeded,
+            "failed" => Self::Failed,
+            _ => Self::Pending,
+        }
+    }
+
+    /// Stripe's refund states.
+    pub(crate) fn from_stripe(s: &str) -> Self {
+        match s {
+            "succeeded" => Self::Succeeded,
+            "failed" | "canceled" => Self::Failed,
+            _ => Self::Pending,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct Refund {
     pub id: Uuid,
@@ -879,16 +906,43 @@ pub struct Refund {
     pub reason: Option<String>,
 }
 
-/// Refunds `amount_minor` of an order's successful payment. Stripe refunds go through the API
-/// with the refund id as idempotency key and `refund_application_fee=true` (A11); bank transfer
-/// and cash on delivery are paid back outside the platform, so they are recorded as done.
-/// The order's payment becomes `partially_refunded` / `refunded`. `409 nothing_to_refund`
-/// when the amount exceeds what is left.
+pub async fn refund_row(tx: &mut TenantTx, id: Uuid) -> Result<Refund, Error> {
+    let r = sqlx::query!(
+        "SELECT id, order_id, attempt_id, amount_minor, currency, status, provider_ref, reason
+         FROM refunds WHERE id = $1",
+        id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    Ok(Refund {
+        id: r.id,
+        order_id: r.order_id,
+        attempt_id: r.attempt_id,
+        amount_minor: r.amount_minor,
+        currency: r.currency,
+        status: RefundStatus::parse(&r.status),
+        provider_ref: r.provider_ref,
+        reason: r.reason,
+    })
+}
+
+/// Refunds `amount_minor` of one successful attempt (the order's payment, or a duplicate/late
+/// payment to return). The balance is reserved in the same transaction (pending refunds count),
+/// so concurrent or repeated calls cannot refund more than was paid.
+///
+/// Stripe refunds go through the API with the refund id as idempotency key and
+/// `refund_application_fee=true` (A11). An ambiguous failure (timeout, 5xx) keeps the refund
+/// `pending` and its balance reserved: [`retry_refund`] repeats it with the same key, and
+/// Stripe's `refund.*` webhooks reconcile it either way. A rejection marks it `failed`. Bank
+/// transfer and cash on delivery are paid back outside the platform and recorded as done.
+/// `409 nothing_to_refund` when the amount exceeds what is left.
+#[allow(clippy::too_many_arguments)]
 pub async fn refund(
     db: &sqlx::PgPool,
     payments: &Payments,
     tenant_id: Uuid,
-    order_id: Uuid,
+    attempt_id: Uuid,
     amount_minor: i64,
     reason: Option<&str>,
     actor: &str,
@@ -901,31 +955,36 @@ pub async fn refund(
         ));
     }
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    orders::lock(&mut tx, order_id).await?;
-    let paid = sqlx::query!(
-        r#"SELECT a.id, a.method, a.amount_minor, a.currency, a.provider_ref,
-                  a.amount_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r
-                      WHERE r.attempt_id = a.id AND r.status <> 'failed'), 0)::bigint AS "left!"
-           FROM payment_attempts a
-           WHERE a.order_id = $1 AND a.status = 'succeeded'
-           ORDER BY a.completed_at DESC LIMIT 1"#,
-        order_id
-    )
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(|| Error::Conflict {
-        code: "nothing_to_refund",
-        detail: "the order has no successful payment".into(),
-    })?;
-    if amount_minor <= 0 || amount_minor > paid.left {
+    let order_id = attempt(&mut tx, attempt_id).await?.order_id;
+    let mut order = orders::lock(&mut tx, order_id).await?;
+    let paid = attempt(&mut tx, attempt_id).await?;
+    if paid.status != AttemptStatus::Succeeded {
         return Err(Error::Conflict {
             code: "nothing_to_refund",
-            detail: format!("at most {} can be refunded", paid.left.max(0)),
+            detail: "the payment attempt did not succeed".into(),
         });
     }
-    let method = MethodKind::parse(&paid.method)?;
+    let reserved = sqlx::query_scalar!(
+        r#"SELECT coalesce(sum(amount_minor), 0)::bigint AS "sum!" FROM refunds
+           WHERE attempt_id = $1 AND status <> 'failed'"#,
+        attempt_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    let left = paid.amount_minor - reserved;
+    if amount_minor <= 0 || amount_minor > left {
+        return Err(Error::Conflict {
+            code: "nothing_to_refund",
+            detail: format!("at most {} can be refunded", left.max(0)),
+        });
+    }
+    let manual = paid.method != MethodKind::Stripe;
     let id = crate::id::new_id();
-    let manual = method != MethodKind::Stripe;
+    let status = if manual {
+        RefundStatus::Succeeded
+    } else {
+        RefundStatus::Pending
+    };
     sqlx::query!(
         "INSERT INTO refunds (id, tenant_id, order_id, attempt_id, amount_minor, currency, reason,
              status, created_by)
@@ -933,11 +992,11 @@ pub async fn refund(
         id,
         tenant_id,
         order_id,
-        paid.id,
+        attempt_id,
         amount_minor,
         paid.currency,
         reason,
-        if manual { "succeeded" } else { "pending" },
+        status.as_str(),
         actor
     )
     .execute(&mut *tx)
@@ -948,106 +1007,158 @@ pub async fn refund(
         "refund.created",
         "order",
         Some(&order_id.to_string()),
-        &json!({ "refund_id": id, "amount_minor": amount_minor, "method": method,
-                 "reason": reason }),
+        &json!({ "refund_id": id, "attempt_id": attempt_id, "amount_minor": amount_minor,
+                 "method": paid.method, "reason": reason }),
     )
     .await?;
+    if manual {
+        settle_refunds(&mut tx, &mut order, actor).await?;
+    }
     tx.commit().await?;
-
-    let status = if manual {
-        RefundStatus::Succeeded
-    } else {
-        // The API call runs outside the transaction; the refund id makes a retry idempotent.
-        let s = payments.stripe.as_ref().ok_or_else(unavailable)?;
+    if manual {
         let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-        let account = stripe::account(&mut tx)
-            .await?
-            .ok_or_else(unavailable)?
-            .account_id;
+        let r = refund_row(&mut tx, id).await?;
         tx.commit().await?;
-        let pi = paid
-            .provider_ref
-            .as_deref()
-            .ok_or_else(|| Error::Internal("Stripe payment without intent".into()))?;
-        let (status, provider_ref) = match s.refund(&account, pi, amount_minor, id).await {
-            Ok((re, status)) => (
-                match status.as_str() {
-                    "succeeded" => RefundStatus::Succeeded,
-                    "failed" | "canceled" => RefundStatus::Failed,
-                    _ => RefundStatus::Pending,
-                },
-                Some(re),
-            ),
+        return Ok(r);
+    }
+    submit_refund(db, payments, tenant_id, id).await
+}
+
+/// Repeats a `pending` Stripe refund with the same idempotency key (after an ambiguous failure
+/// or a crash between recording and sending it).
+pub async fn retry_refund(
+    db: &sqlx::PgPool,
+    payments: &Payments,
+    tenant_id: Uuid,
+    refund_id: Uuid,
+) -> Result<Refund, Error> {
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let r = refund_row(&mut tx, refund_id).await?;
+    tx.commit().await?;
+    if r.status != RefundStatus::Pending {
+        return Ok(r);
+    }
+    submit_refund(db, payments, tenant_id, refund_id).await
+}
+
+async fn submit_refund(
+    db: &sqlx::PgPool,
+    payments: &Payments,
+    tenant_id: Uuid,
+    refund_id: Uuid,
+) -> Result<Refund, Error> {
+    let s = payments.stripe.as_ref().ok_or_else(unavailable)?;
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let r = refund_row(&mut tx, refund_id).await?;
+    let pi = attempt(&mut tx, r.attempt_id)
+        .await?
+        .provider_ref
+        .ok_or_else(|| Error::Internal("Stripe payment without intent".into()))?;
+    let account = stripe::account(&mut tx)
+        .await?
+        .ok_or_else(unavailable)?
+        .account_id;
+    tx.commit().await?;
+    // The API call runs outside any transaction; the refund id makes a repeat idempotent.
+    let (status, provider_ref, outcome) =
+        match s.refund(&account, &pi, r.amount_minor, refund_id).await {
+            Ok((re, status)) => (RefundStatus::from_stripe(&status), Some(re), Ok(())),
+            Err(Error::Conflict { detail, .. }) => {
+                tracing::warn!(refund = %refund_id, detail, "stripe rejected the refund");
+                (
+                    RefundStatus::Failed,
+                    None,
+                    Err(Error::Conflict {
+                        code: "refund_rejected",
+                        detail: "the payment provider rejected the refund".into(),
+                    }),
+                )
+            }
             Err(e) => {
-                tracing::warn!(refund = %id, error = %e, "stripe refund failed");
-                (RefundStatus::Failed, None)
+                tracing::warn!(refund = %refund_id, error = %e, "stripe refund outcome unknown");
+                (
+                    RefundStatus::Pending,
+                    None,
+                    Err(Error::Unavailable(
+                        "the refund is pending: retry it, or wait for Stripe's confirmation".into(),
+                    )),
+                )
             }
         };
-        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-        sqlx::query!(
-            "UPDATE refunds SET status = $2, provider_ref = $3, updated_at = now() WHERE id = $1",
-            id,
-            match status {
-                RefundStatus::Pending => "pending",
-                RefundStatus::Succeeded => "succeeded",
-                RefundStatus::Failed => "failed",
-            },
-            provider_ref
-        )
-        .execute(&mut *tx)
-        .await?;
-        tx.commit().await?;
-        status
-    };
-    if status == RefundStatus::Succeeded {
-        // Stripe's `charge.refunded` arrives later and finds the state already applied.
-        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-        let mut order = orders::lock(&mut tx, order_id).await?;
-        let refunded = sqlx::query_scalar!(
-            r#"SELECT coalesce(sum(amount_minor), 0)::bigint AS "sum!" FROM refunds
-               WHERE attempt_id = $1 AND status = 'succeeded'"#,
-            paid.id
-        )
-        .fetch_one(&mut *tx)
-        .await?;
-        let full = refunded >= paid.amount_minor;
-        let target = if full {
-            "refunded"
-        } else {
-            "partially_refunded"
-        };
-        if order.payment_status != target
-            && matches!(order.payment_status.as_str(), "paid" | "partially_refunded")
-        {
-            orders::apply_payment(&mut tx, &mut order, PaymentCommand::Refund { full }, actor)
-                .await?;
-        }
-        tx.commit().await?;
-    }
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    let r = sqlx::query!(
-        "SELECT id, order_id, attempt_id, amount_minor, currency, status, provider_ref, reason
-         FROM refunds WHERE id = $1",
-        id
+    let mut order = orders::lock(&mut tx, r.order_id).await?;
+    // Only a still-pending row moves: a webhook may have reconciled it meanwhile.
+    sqlx::query!(
+        "UPDATE refunds SET status = $2, provider_ref = coalesce(provider_ref, $3),
+             updated_at = now()
+         WHERE id = $1 AND status = 'pending'",
+        refund_id,
+        status.as_str(),
+        provider_ref
     )
-    .fetch_one(&mut *tx)
+    .execute(&mut *tx)
     .await?;
+    settle_refunds(&mut tx, &mut order, "stripe").await?;
+    let out = refund_row(&mut tx, refund_id).await?;
     tx.commit().await?;
-    if status == RefundStatus::Failed {
-        return Err(Error::Unavailable(
-            "the refund failed at the provider".into(),
-        ));
+    outcome.map(|()| out)
+}
+
+/// Derives the order's payment state from the refund ledger (under the order lock): only
+/// refunds of the order's retained payment (its first successful attempt) refund the order;
+/// returning a duplicate or late payment leaves the order's payment as it is (A10).
+pub(crate) async fn settle_refunds(
+    tx: &mut TenantTx,
+    order: &mut orders::OrderRow,
+    actor: &str,
+) -> Result<(), Error> {
+    let Some(retained) = sqlx::query!(
+        "SELECT id, amount_minor FROM payment_attempts
+         WHERE order_id = $1 AND status = 'succeeded'
+         ORDER BY completed_at, id LIMIT 1",
+        order.id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(());
+    };
+    let refunded = sqlx::query_scalar!(
+        r#"SELECT coalesce(sum(amount_minor), 0)::bigint AS "sum!" FROM refunds
+           WHERE attempt_id = $1 AND status = 'succeeded'"#,
+        retained.id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if refunded <= 0 {
+        return Ok(());
     }
-    Ok(Refund {
-        id: r.id,
-        order_id: r.order_id,
-        attempt_id: r.attempt_id,
-        amount_minor: r.amount_minor,
-        currency: r.currency,
-        status,
-        provider_ref: r.provider_ref,
-        reason: r.reason,
-    })
+    let full = refunded >= retained.amount_minor;
+    let target = if full {
+        "refunded"
+    } else {
+        "partially_refunded"
+    };
+    if order.payment_status != target
+        && matches!(order.payment_status.as_str(), "paid" | "partially_refunded")
+    {
+        orders::apply_payment(tx, order, PaymentCommand::Refund { full }, actor).await?;
+    }
+    Ok(())
+}
+
+/// Whether `attempt_id` is its order's retained payment (its first successful attempt).
+pub(crate) async fn is_retained(tx: &mut TenantTx, attempt_id: Uuid) -> Result<bool, Error> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT (SELECT r.id FROM payment_attempts r
+                   WHERE r.order_id = a.order_id AND r.status = 'succeeded'
+                   ORDER BY r.completed_at, r.id LIMIT 1) = a.id AS "retained!"
+           FROM payment_attempts a WHERE a.id = $1"#,
+        attempt_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .unwrap_or(false))
 }
 
 #[cfg(test)]

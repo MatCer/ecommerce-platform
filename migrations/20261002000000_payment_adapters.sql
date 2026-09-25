@@ -44,8 +44,10 @@ CREATE INDEX provider_events_unprocessed ON platform.provider_events (received_a
     WHERE processed_at IS NULL;
 
 -- ---------------------------------------------------------------------------------------
--- Bank transfer (A25): one receiving account per market. The Fio API token (optional) is
--- AES-256-GCM ciphertext bound to the tenant and account (`platform::crypto`).
+-- Bank transfer (A25): one active receiving account per market. An account's identity (IBAN) never
+-- changes: switching banks retires the old row (still used to import and match its statements)
+-- and adds a new one. The Fio API token (optional) is AES-256-GCM ciphertext bound to the tenant
+-- and account (`platform::crypto`).
 
 CREATE TABLE bank_accounts (
     id            uuid NOT NULL DEFAULT platform.uuid_v7(),
@@ -57,13 +59,16 @@ CREATE TABLE bank_accounts (
     account_name  text NOT NULL CHECK (length(account_name) BETWEEN 1 AND 70),
     fio_token     bytea CHECK (length(fio_token) BETWEEN 29 AND 400),
     fio_synced_at timestamptz,
+    active        boolean NOT NULL DEFAULT true,
     created_at    timestamptz NOT NULL DEFAULT now(),
     updated_at    timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
     UNIQUE (tenant_id, id),
-    CONSTRAINT bank_accounts_market_unique UNIQUE (tenant_id, market_id),
     FOREIGN KEY (tenant_id, market_id) REFERENCES markets (tenant_id, id) ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX bank_accounts_active_market ON bank_accounts (tenant_id, market_id) WHERE active;
+CREATE UNIQUE INDEX bank_accounts_iban ON bank_accounts (tenant_id, market_id, iban);
 
 -- Statement lines (credits only). The bank's transaction id is unique per account, so a
 -- statement imported twice (or overlapping Fio API windows) adds nothing.

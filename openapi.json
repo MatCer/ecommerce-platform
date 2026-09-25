@@ -413,6 +413,43 @@
         ]
       }
     },
+    "/admin/v1/bank-accounts": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Every receiving account, active ones first (retired accounts still import statements).",
+        "operationId": "list_bank_accounts",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccountList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/bank-accounts/{id}/statements": {
       "post": {
         "tags": [
@@ -12357,11 +12394,16 @@
           "currency",
           "iban",
           "account_name",
+          "active",
           "fio_connected"
         ],
         "properties": {
           "account_name": {
             "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "The market's current account; retired ones still import and match statements."
           },
           "bic": {
             "type": [
@@ -12430,6 +12472,20 @@
           }
         },
         "additionalProperties": false
+      },
+      "BankAccountList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankAccount"
+            }
+          }
+        }
       },
       "BankTransaction": {
         "type": "object",

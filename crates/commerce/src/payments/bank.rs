@@ -39,6 +39,8 @@ pub struct BankAccount {
     pub iban: String,
     pub bic: Option<String>,
     pub account_name: String,
+    /// The market's current account; retired ones still import and match statements.
+    pub active: bool,
     /// A Fio API token is stored (encrypted; never returned).
     pub fio_connected: bool,
     pub fio_synced_at: Option<DateTime<Utc>>,
@@ -105,13 +107,28 @@ fn token_aad(tenant_id: Uuid, account_id: Uuid) -> Vec<u8> {
     [tenant_id.as_bytes().as_slice(), account_id.as_bytes()].concat()
 }
 
-/// The receiving account of a market.
+/// The receiving account of a market (the active one).
 pub async fn account(tx: &mut TenantTx, market_id: Uuid) -> Result<Option<BankAccount>, Error> {
-    Ok(sqlx::query!(
-        r#"SELECT id, market_id, currency, iban, bic, account_name,
-                  fio_token IS NOT NULL AS "fio_connected!", fio_synced_at
-           FROM bank_accounts WHERE market_id = $1"#,
+    let id = sqlx::query_scalar!(
+        "SELECT id FROM bank_accounts WHERE market_id = $1 AND active",
         market_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    match id {
+        Some(id) => account_by_id(tx, id).await.map(Some),
+        None => Ok(None),
+    }
+}
+
+/// Any account of the tenant, active or retired (statements of a retired account still match
+/// the orders placed while it was active).
+pub async fn account_by_id(tx: &mut TenantTx, id: Uuid) -> Result<BankAccount, Error> {
+    sqlx::query!(
+        r#"SELECT id, market_id, currency, iban, bic, account_name, active,
+                  fio_token IS NOT NULL AS "fio_connected!", fio_synced_at
+           FROM bank_accounts WHERE id = $1"#,
+        id
     )
     .fetch_optional(&mut **tx)
     .await?
@@ -122,22 +139,32 @@ pub async fn account(tx: &mut TenantTx, market_id: Uuid) -> Result<Option<BankAc
         iban: r.iban,
         bic: r.bic,
         account_name: r.account_name,
+        active: r.active,
         fio_connected: r.fio_connected,
         fio_synced_at: r.fio_synced_at,
-    }))
+    })
+    .ok_or(Error::NotFound)
 }
 
-async fn account_by_id(tx: &mut TenantTx, id: Uuid) -> Result<BankAccount, Error> {
-    let market = sqlx::query_scalar!("SELECT market_id FROM bank_accounts WHERE id = $1", id)
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or(Error::NotFound)?;
-    account(tx, market).await?.ok_or(Error::NotFound)
+/// Every receiving account of the tenant, active ones first.
+pub async fn accounts(tx: &mut TenantTx) -> Result<Vec<BankAccount>, Error> {
+    let ids = sqlx::query_scalar!(
+        "SELECT id FROM bank_accounts ORDER BY active DESC, market_id, created_at DESC"
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut out = Vec::with_capacity(ids.len());
+    for id in ids {
+        out.push(account_by_id(tx, id).await?);
+    }
+    Ok(out)
 }
 
 /// Sets the market's receiving account (payment settings: the caller checks role and fresh
-/// authentication). The account currency is the market's. Orders placed earlier keep the
-/// instructions they were given.
+/// authentication). The account currency is the market's. An account's IBAN never changes:
+/// a different IBAN retires the current account (kept for importing and matching its
+/// statements, with its Fio token) and activates a new or earlier one. Orders placed earlier
+/// keep the instructions they were given.
 pub async fn configure_account(
     tx: &mut TenantTx,
     actor: &str,
@@ -164,27 +191,59 @@ pub async fn configure_account(
     if input.fio_token.is_some() && input.clear_fio_token {
         return Err(invalid(CODE, "set or clear the Fio token, not both"));
     }
-    let currency = sqlx::query_scalar!("SELECT currency FROM markets WHERE id = $1", market_id)
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or(Error::NotFound)?;
-    let id = sqlx::query_scalar!(
-        "INSERT INTO bank_accounts (id, tenant_id, market_id, currency, iban, bic, account_name)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (tenant_id, market_id) DO UPDATE SET currency = EXCLUDED.currency,
-             iban = EXCLUDED.iban, bic = EXCLUDED.bic, account_name = EXCLUDED.account_name,
-             updated_at = now()
-         RETURNING id",
-        crate::id::new_id(),
-        tx.tenant_id(),
-        market_id,
-        currency,
-        iban,
-        bic,
-        name
+    // The market row lock serializes concurrent changes of its account.
+    let currency = sqlx::query_scalar!(
+        "SELECT currency FROM markets WHERE id = $1 FOR UPDATE",
+        market_id
     )
-    .fetch_one(&mut **tx)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    let existing = sqlx::query!(
+        "SELECT id, active FROM bank_accounts WHERE market_id = $1 AND iban = $2",
+        market_id,
+        iban
+    )
+    .fetch_optional(&mut **tx)
     .await?;
+    let retired = sqlx::query_scalar!(
+        "UPDATE bank_accounts SET active = false, updated_at = now()
+         WHERE market_id = $1 AND active AND iban <> $2 RETURNING id",
+        market_id,
+        iban
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    let id = match existing {
+        Some(e) => {
+            sqlx::query!(
+                "UPDATE bank_accounts SET bic = $2, account_name = $3, active = true,
+                     updated_at = now()
+                 WHERE id = $1",
+                e.id,
+                bic,
+                name
+            )
+            .execute(&mut **tx)
+            .await?;
+            e.id
+        }
+        None => {
+            sqlx::query_scalar!(
+                "INSERT INTO bank_accounts (id, tenant_id, market_id, currency, iban, bic, account_name)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+                crate::id::new_id(),
+                tx.tenant_id(),
+                market_id,
+                currency,
+                iban,
+                bic,
+                name
+            )
+            .fetch_one(&mut **tx)
+            .await?
+        }
+    };
     let token_change = match (&input.fio_token, input.clear_fio_token) {
         (Some(token), _) => {
             let token = token.trim();
@@ -229,7 +288,7 @@ pub async fn configure_account(
         "bank_account",
         Some(&id.to_string()),
         &json!({ "market_id": market_id, "iban": iban, "bic": bic, "account_name": name,
-                 "fio_token": token_change }),
+                 "fio_token": token_change, "retired": retired }),
     )
     .await?;
     account_by_id(tx, id).await
@@ -571,11 +630,11 @@ async fn match_line(tx: &mut TenantTx, id: Uuid, actor: &str) -> Result<TxStatus
     )
     .fetch_one(&mut **tx)
     .await?;
-    let attempt = match &line.variable_symbol {
+    let candidate = match &line.variable_symbol {
         None => None,
         Some(vs) => {
             sqlx::query!(
-                "SELECT id, status, amount_minor, currency FROM payment_attempts
+                "SELECT id, order_id FROM payment_attempts
              WHERE bank_account_id = $1 AND variable_symbol = $2",
                 line.bank_account_id,
                 vs
@@ -583,6 +642,21 @@ async fn match_line(tx: &mut TenantTx, id: Uuid, actor: &str) -> Result<TxStatus
             .fetch_optional(&mut **tx)
             .await?
         }
+    };
+    // Attempts change only under their order's lock: taken before reading the attempt's state,
+    // so of two concurrent transfers for one order exactly one pays it (the other is
+    // `already_paid`).
+    let attempt = match candidate {
+        Some(c) => {
+            crate::orders::lock(tx, c.order_id).await?;
+            sqlx::query!(
+                "SELECT id, status, amount_minor, currency FROM payment_attempts WHERE id = $1",
+                c.id
+            )
+            .fetch_optional(&mut **tx)
+            .await?
+        }
+        None => None,
     };
     let (status, reason, attempt_id) = match (&line.variable_symbol, attempt) {
         (None, _) => (TxStatus::Unmatched, Some(TxReason::NoVariableSymbol), None),
@@ -664,7 +738,8 @@ pub async fn resolve(
         return Err(invalid(CODE, "the note is at most 500 characters"));
     }
     let line = sqlx::query!(
-        "SELECT status, attempt_id, currency FROM bank_transactions WHERE id = $1 FOR UPDATE",
+        "SELECT status, attempt_id, currency, bank_account_id, amount_minor
+         FROM bank_transactions WHERE id = $1 FOR UPDATE",
         id
     )
     .fetch_optional(&mut **tx)
@@ -699,7 +774,8 @@ pub async fn resolve(
                 .and_then(|n| n.parse().ok())
                 .ok_or_else(|| invalid(CODE, "assign needs the order number"))?;
             let a = sqlx::query!(
-                "SELECT a.id, a.currency FROM payment_attempts a JOIN orders o ON o.id = a.order_id
+                "SELECT a.id, a.order_id, a.currency, a.bank_account_id, a.amount_minor
+                 FROM payment_attempts a JOIN orders o ON o.id = a.order_id
                  WHERE o.number = $1 AND a.method = 'bank_transfer'
                  ORDER BY a.created_at DESC LIMIT 1",
                 number
@@ -707,8 +783,47 @@ pub async fn resolve(
             .fetch_optional(&mut **tx)
             .await?
             .ok_or_else(|| invalid(CODE, "no bank-transfer order with this number"))?;
+            // A25: money received on one account never pays an order of another.
+            if a.bank_account_id != Some(line.bank_account_id) {
+                return Err(invalid(
+                    CODE,
+                    "the order was to be paid to another receiving account",
+                ));
+            }
             if a.currency != line.currency {
                 return Err(invalid(CODE, "the order is in another currency"));
+            }
+            crate::orders::lock(tx, a.order_id).await?;
+            if line.amount_minor != a.amount_minor {
+                // A different amount becomes a partial/over payment of that order: accepting
+                // it is a separate, explicit decision.
+                let (status, reason) = if line.amount_minor < a.amount_minor {
+                    (TxStatus::Partial, TxReason::AmountShort)
+                } else {
+                    (TxStatus::Overpaid, TxReason::AmountOver)
+                };
+                sqlx::query!(
+                    "UPDATE bank_transactions SET status = $2, reason = $3, attempt_id = $4,
+                         note = $5
+                     WHERE id = $1",
+                    id,
+                    status.as_str(),
+                    reason.as_str(),
+                    a.id,
+                    note
+                )
+                .execute(&mut **tx)
+                .await?;
+                audit::record(
+                    tx,
+                    actor,
+                    "bank_transaction.assigned",
+                    "bank_transaction",
+                    Some(&id.to_string()),
+                    &json!({ "attempt_id": a.id, "status": status, "note": note }),
+                )
+                .await?;
+                return transaction(tx, id).await;
             }
             super::apply_outcome(tx, a.id, Outcome::Succeeded, actor).await?;
             Some(a.id)
@@ -985,6 +1100,8 @@ pub async fn fio_accounts(db: &sqlx::PgPool) -> Result<Vec<FioAccount>, Error> {
 /// crash between download and commit loses nothing.
 const FIO_OVERLAP_DAYS: i64 = 3;
 const FIO_FIRST_DAYS: i64 = 30;
+/// A statement answer is small; anything bigger is refused before it is buffered.
+const FIO_MAX_BYTES: usize = 5 * 1024 * 1024;
 
 /// Downloads the account's recent transactions from the Fio API and imports them. The token
 /// is decrypted only for the request and never logged (it is part of the URL, so request
@@ -1034,10 +1151,20 @@ pub async fn poll_fio(
             res.status()
         )));
     }
-    let body = res
-        .bytes()
+    let mut res = res;
+    let mut body = Vec::new();
+    while let Some(chunk) = res
+        .chunk()
         .await
-        .map_err(|e| Error::Unavailable(format!("fio api: {}", e.without_url())))?;
+        .map_err(|e| Error::Unavailable(format!("fio api: {}", e.without_url())))?
+    {
+        if body.len() + chunk.len() > FIO_MAX_BYTES {
+            return Err(Error::Unavailable(format!(
+                "fio api: response over {FIO_MAX_BYTES} bytes"
+            )));
+        }
+        body.extend_from_slice(&chunk);
+    }
     let statement = statements::fio_json(&body)?;
     let mut tx = platform::db::tenant_tx(db, acc.tenant_id).await?;
     let report = import(
