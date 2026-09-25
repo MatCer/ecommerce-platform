@@ -1,0 +1,83 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id, a.method, a.amount_minor, a.currency, a.provider_ref,\n                  a.amount_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r\n                      WHERE r.attempt_id = a.id AND r.status <> 'failed'), 0)::bigint AS \"left!\"\n           FROM payment_attempts a\n           WHERE a.order_id = $1 AND a.status = 'succeeded'\n           ORDER BY a.completed_at DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "method",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "method"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "provider_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "provider_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "left!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "55ffaa0366864481281425e1fac9d08777191a9721b0e759325b97b0c5a6c739"
+}

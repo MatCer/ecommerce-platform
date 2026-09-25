@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(sum(amount_minor), 0)::bigint AS \"sum!\" FROM refunds\n               WHERE attempt_id = $1 AND status = 'succeeded'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sum!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "425b95ca5c709cedea988bcae30b2272f2a2ec476a3ee95a98289a1d5e436cd6"
+}

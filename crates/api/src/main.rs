@@ -5,8 +5,8 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig,
-    StaffAuthConfig, StorefrontConfig,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, PaymentsConfig, S3Config,
+    ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
@@ -65,8 +65,11 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Payment gateways and the pickup-point widget from `CheckoutConfig`.
-fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
+/// Payment gateways and the pickup-point widget from `CheckoutConfig` and `PaymentsConfig`.
+fn checkout_settings(
+    c: &CheckoutConfig,
+    p: &PaymentsConfig,
+) -> anyhow::Result<commerce::checkout::Settings> {
     let fake = c.payments_fake.then(|| {
         tracing::warn!("PAYMENTS_FAKE=1: the fake payment gateway is enabled (local/e2e only)");
         let secret = c
@@ -86,10 +89,40 @@ fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
             None
         }
     };
-    commerce::checkout::Settings {
-        payments: commerce::payments::Payments { fake },
+    let stripe = match &p.stripe {
+        Some(cfg) => {
+            if cfg.mode == platform::config::StripeMode::Simulator {
+                tracing::warn!(
+                    "no STRIPE_SECRET_KEY: Stripe runs against stripe-mock with the test simulator"
+                );
+            }
+            let http = reqwest::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .build()?;
+            Some(commerce::payments::stripe::Stripe::new(cfg, http))
+        }
+        None => {
+            tracing::warn!("Stripe is not configured (STRIPE_SECRET_KEY or STRIPE_MOCK_URL)");
+            None
+        }
+    };
+    let secrets = match &p.secret_key {
+        Some(k) => Some(Arc::new(
+            platform::crypto::SecretBox::from_hex(k).context("PAYMENTS_SECRET_KEY")?,
+        )),
+        None => {
+            tracing::warn!("PAYMENTS_SECRET_KEY not set: Fio API tokens cannot be stored");
+            None
+        }
+    };
+    Ok(commerce::checkout::Settings {
+        payments: commerce::payments::Payments {
+            fake,
+            stripe,
+            secrets,
+        },
         packeta,
-    }
+    })
 }
 
 fn init_tracing() -> anyhow::Result<()> {
@@ -133,7 +166,10 @@ async fn serve() -> anyhow::Result<()> {
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
-        checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
+        checkout: Arc::new(checkout_settings(
+            &CheckoutConfig::from_env(cfg.env)?,
+            &PaymentsConfig::from_env(cfg.env)?,
+        )?),
     };
     let app = api::app(state, cfg.env == AppEnv::Dev);
 

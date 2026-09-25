@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use chrono::{Duration, NaiveDate, Utc};
+use chrono::{NaiveDate, Utc};
 use commerce::cart::{self, NewLine, Scope};
 use commerce::checkout::{
     self, AddressesInput, CheckoutAddress, ContactInput, PaymentInput, PlaceOrderInput, Placement,
@@ -1552,15 +1552,21 @@ async fn payment_tables_are_tenant_isolated(db: PgPool) {
     ] {
         let sql = format!("SELECT count(*) FROM {table}");
         let mut tx = tenant_tx(&runtime, s.shop.tenant).await.unwrap();
-        let mine: i64 = sqlx::query_scalar(&sql).fetch_one(&mut *tx).await.unwrap();
+        let mine: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.clone()))
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
         assert!(mine > 0, "{table}");
         let mut tx = tenant_tx(&runtime, other.tenant).await.unwrap();
-        let theirs: i64 = sqlx::query_scalar(&sql).fetch_one(&mut *tx).await.unwrap();
+        let theirs: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(sql.clone()))
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
         assert_eq!(theirs, 0, "{table} leaks across tenants");
-        let insert = sqlx::query(&format!(
+        let insert = sqlx::query(sqlx::AssertSqlSafe(format!(
             "INSERT INTO {table} (tenant_id) VALUES ('{}')",
             s.shop.tenant
-        ))
+        )))
         .execute(&mut *tx)
         .await;
         assert!(insert.is_err(), "{table}: writing another tenant's row");

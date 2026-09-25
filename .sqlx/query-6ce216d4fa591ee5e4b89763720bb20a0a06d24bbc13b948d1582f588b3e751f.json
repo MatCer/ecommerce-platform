@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO platform.provider_events (provider, event_id, type, account, livemode, payload)\n         VALUES ('stripe', $1, $2, $3, $4, $5)\n         ON CONFLICT (provider, event_id) DO NOTHING\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "platform.provider_events",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6ce216d4fa591ee5e4b89763720bb20a0a06d24bbc13b948d1582f588b3e751f"
+}

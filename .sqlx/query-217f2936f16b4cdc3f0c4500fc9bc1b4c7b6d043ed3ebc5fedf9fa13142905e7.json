@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, order_id, method, status, amount_minor, currency, provider_ref, expires_at,\n                created_at, completed_at\n         FROM payment_attempts WHERE id = $1",
+  "query": "SELECT id, order_id, method, status, amount_minor, currency, provider_ref, expires_at,\n                created_at, completed_at, variable_symbol, cod_status, tender, collector\n         FROM payment_attempts WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -112,6 +112,50 @@
             "name": "completed_at"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "variable_symbol",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "variable_symbol"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "cod_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "cod_status"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "tender",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "tender"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "collector",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "collector"
+          }
+        }
       }
     ],
     "parameters": {
@@ -129,8 +173,12 @@
       true,
       true,
       false,
+      true,
+      true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "6ce1c45123e100d209242082bd1413d1a86e710ff07893139a59209a4e1df6c5"
+  "hash": "217f2936f16b4cdc3f0c4500fc9bc1b4c7b6d043ed3ebc5fedf9fa13142905e7"
 }

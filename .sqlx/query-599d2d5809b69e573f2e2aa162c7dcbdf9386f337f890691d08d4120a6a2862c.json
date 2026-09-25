@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT platform.stripe_account_tenant($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stripe_account_tenant",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "599d2d5809b69e573f2e2aa162c7dcbdf9386f337f890691d08d4120a6a2862c"
+}

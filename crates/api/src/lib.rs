@@ -9,6 +9,7 @@ pub mod admin_feeds;
 pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_orders;
+pub mod admin_payments;
 pub mod admin_pricing;
 pub mod admin_promotions;
 pub mod admin_search;
@@ -97,6 +98,7 @@ pub struct AppState {
         (name = "feeds", description = "Admin API: feed imports (Heureka, Google) and export feeds"),
         (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
+        (name = "payments", description = "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"),
         (name = "webhooks", description = "Payment provider webhooks (signed)"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
         (name = "internal", description = "Internal API for platform services (service token)")
@@ -144,6 +146,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_content::routes())
         .merge(admin_feeds::routes())
         .merge(admin_orders::routes())
+        .merge(admin_payments::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())

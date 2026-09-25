@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE payment_attempts SET cod_status = $2, remitted_at = now(), updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dd139634d7e0a3a6c479fc309893d8739ca631a72cb256fee80b81aec21fd1ee"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT status, payment_expires_at FROM orders WHERE id = $1",
+  "query": "SELECT status, payment_expires_at, number FROM orders WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -24,6 +24,17 @@
             "name": "payment_expires_at"
           }
         }
+      },
+      {
+        "ordinal": 2,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
       }
     ],
     "parameters": {
@@ -33,8 +44,9 @@
     },
     "nullable": [
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "63b3b467decddce500c03896ea8a3e169401b8f9311d39340b24c29a0fc4ee2f"
+  "hash": "eeeb2bdcaced256f8f8280e94eb3f75467de4df94f27ebac41736de9adf0095d"
 }

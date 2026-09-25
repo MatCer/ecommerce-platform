@@ -1,0 +1,107 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, market_id, currency, iban, bic, account_name,\n                  fio_token IS NOT NULL AS \"fio_connected!\", fio_synced_at\n           FROM bank_accounts WHERE market_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "iban",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "iban"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "bic",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "bic"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "account_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "account_name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "fio_connected!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "fio_synced_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bank_accounts",
+            "name": "fio_synced_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      null,
+      true
+    ]
+  },
+  "hash": "740f17012a6fa1186570389dc7bb4b093bd09c5129e7c74f6efa6ba854940479"
+}
