@@ -1,0 +1,102 @@
+//! `robots.txt`, `llms.txt` and sitemaps of a market (spec §9.5); the edge passes
+//! `/<file>` through to `/storefront/v1/files/<file>`.
+
+use axum::extract::rejection::PathRejection;
+use axum::extract::{Path, State};
+use axum::http::{HeaderValue, header};
+use axum::response::{IntoResponse, Response};
+use commerce::storefront::files;
+use platform::Error;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+
+use super::{Shopper, StorefrontHeaders, with_ctx};
+use crate::AppState;
+
+pub fn routes() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new().routes(routes!(file))
+}
+
+enum File {
+    Robots,
+    Llms,
+    SitemapIndex,
+    Sitemap(usize),
+}
+
+fn parse(name: &str) -> Option<File> {
+    match name {
+        "robots.txt" => Some(File::Robots),
+        "llms.txt" => Some(File::Llms),
+        "sitemap.xml" => Some(File::SitemapIndex),
+        _ => name
+            .strip_prefix("sitemap-")?
+            .strip_suffix(".xml")
+            .filter(|n| (1..=6).contains(&n.len()) && n.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|n| n.parse().ok())
+            .map(File::Sitemap),
+    }
+}
+
+/// `robots.txt`, `llms.txt`, `sitemap.xml` (index) or `sitemap-<n>.xml` (chunk).
+#[utoipa::path(
+    get,
+    path = "/storefront/v1/files/{name}",
+    tag = "storefront",
+    params(StorefrontHeaders, ("name" = String, Path, description = "robots.txt, llms.txt, sitemap.xml, sitemap-<n>.xml")),
+    responses(
+        (status = 200, description = "The file", content_type = "text/plain"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn file(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    name: Result<Path<String>, PathRejection>,
+) -> Result<Response, Error> {
+    let Path(name) = name.map_err(|_| Error::NotFound)?;
+    let file = parse(&name).ok_or(Error::NotFound)?;
+    let (body, content_type) = with_ctx(&s, &shopper, async |tx, ctx| {
+        Ok(match file {
+            File::Robots => (Some(files::robots(ctx)), "text/plain; charset=utf-8"),
+            File::Llms => (
+                Some(files::llms(tx, ctx).await?),
+                "text/plain; charset=utf-8",
+            ),
+            File::SitemapIndex => (
+                Some(files::sitemap_index(tx, ctx).await?),
+                "application/xml; charset=utf-8",
+            ),
+            File::Sitemap(n) => (
+                files::sitemap_chunk(tx, ctx, n).await?,
+                "application/xml; charset=utf-8",
+            ),
+        })
+    })
+    .await?;
+    let body = body.ok_or(Error::NotFound)?;
+    let mut res = body.into_response();
+    res.headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+    Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_names() {
+        assert!(matches!(parse("robots.txt"), Some(File::Robots)));
+        assert!(matches!(parse("sitemap-12.xml"), Some(File::Sitemap(12))));
+        for bad in [
+            "sitemap-.xml",
+            "sitemap-1a.xml",
+            "sitemap-1234567.xml",
+            "feeds/x",
+            "../x",
+        ] {
+            assert!(parse(bad).is_none(), "{bad}");
+        }
+    }
+}

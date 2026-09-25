@@ -6,6 +6,7 @@ use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
     ApiConfig, AppEnv, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig, StaffAuthConfig,
+    StorefrontConfig,
 };
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
@@ -25,7 +26,11 @@ enum Command {
     /// Serve HTTP (default).
     Serve,
     /// Print the OpenAPI document (used by `make openapi`).
-    Openapi,
+    Openapi {
+        /// Only the Storefront API (source of the storefront SDK types).
+        #[arg(long)]
+        storefront: bool,
+    },
     /// Apply migrations; run with the owner role's DATABASE_URL.
     Migrate,
     /// Container health probe.
@@ -40,8 +45,13 @@ async fn main() -> anyhow::Result<()> {
     match Cli::parse().command.unwrap_or(Command::Serve) {
         Command::Serve => serve().await,
         // No logging here: stdout is the document.
-        Command::Openapi => {
-            println!("{}", api::openapi().to_pretty_json()?);
+        Command::Openapi { storefront } => {
+            let doc = if storefront {
+                api::openapi_storefront()
+            } else {
+                api::openapi()
+            };
+            println!("{}", doc.to_pretty_json()?);
             Ok(())
         }
         Command::Migrate => migrate().await,
@@ -63,6 +73,7 @@ async fn serve() -> anyhow::Result<()> {
     init_tracing()?;
     let cfg = ApiConfig::from_env()?;
     let auth = StaffAuthConfig::from_env()?;
+    let sf = StorefrontConfig::from_env()?;
     let db = platform::db::pool(&DbConfig::from_env()?)?;
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -90,6 +101,11 @@ async fn serve() -> anyhow::Result<()> {
             &ServiceTokenConfig::from_env()?.internal_api_token,
         ),
         admin_origin: HeaderValue::from_str(&auth.admin_origin).context("ADMIN_ORIGIN")?,
+        public_urls: commerce::storefront::PublicUrls {
+            scheme: sf.scheme,
+            port: sf.port,
+        },
+        edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
     };
     let app = api::app(state, cfg.env == AppEnv::Dev);
 
