@@ -99,6 +99,8 @@ pub struct ProductPage {
     pub breadcrumbs: Vec<Link>,
     /// Absent when nothing is in stock.
     pub delivery_estimate: Option<DeliveryEstimate>,
+    /// Published reviews, their summary and the verification disclosure link (WP16).
+    pub reviews: crate::reviews::ProductReviews,
     pub seo: Seo,
     pub cache: CacheHints,
 }
@@ -421,6 +423,12 @@ pub async fn product_page(
             "url": canonical,
         })).collect::<Vec<_>>(),
     });
+    let reviews = crate::reviews::for_product(tx, ctx, product_id).await?;
+    let mut product_ld = product_ld;
+    if let Some((aggregate, items)) = crate::reviews::json_ld(&reviews) {
+        product_ld["aggregateRating"] = aggregate;
+        product_ld["review"] = items;
+    }
     let product_ld = strip_nulls(product_ld);
 
     let title = p
@@ -460,6 +468,7 @@ pub async fn product_page(
         },
         breadcrumbs,
         delivery_estimate,
+        reviews,
         seo,
         cache: CacheHints::public(60, vec![format!("product:{product_id}")]),
     }))

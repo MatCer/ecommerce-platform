@@ -358,3 +358,92 @@ async fn reviews_and_tokens_are_tenant_isolated(db: PgPool) {
     .await;
     assert!(forged.is_err());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn product_page_carries_reviews_json_ld_and_the_disclosure(db: PgPool) {
+    use commerce::content::LegalType;
+    use commerce::content::legal::{self, CheckCode, InstallInput};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "wp16-page").await;
+    let order = raw_order(&runtime, &shop, shop.cz, "CZK", 12_900, 1, "delivered").await;
+    let token = issue(&runtime, &shop, order).await.unwrap().remove(0).token;
+    let mut i = input(&token, 4);
+    i.body = "</script><script>alert(1)</script>".into();
+    let id = submit(&runtime, &shop, &i, &[1; 32]).await.unwrap();
+
+    let page = async || {
+        run(&runtime, shop.tenant, async |tx| {
+            let c = ctx(tx, &shop).await;
+            storefront::product::product_page(tx, &c, &shop.slug).await
+        })
+        .await
+        .unwrap()
+        .unwrap()
+    };
+    let p = page().await;
+    assert!(p.reviews.summary.is_none());
+    assert!(
+        p.seo.json_ld[0].get("aggregateRating").is_none(),
+        "pending reviews stay out"
+    );
+
+    run(&runtime, shop.tenant, async |tx| {
+        reviews::set_status(tx, "staff", id, Status::Published).await
+    })
+    .await
+    .unwrap();
+    let missing = async || {
+        run(&runtime, shop.tenant, async |tx| {
+            legal::go_live(tx, Utc::now()).await
+        })
+        .await
+        .unwrap()
+        .checks
+        .into_iter()
+        .find(|c| c.code == CheckCode::LegalPages)
+        .unwrap()
+        .missing
+    };
+    assert!(
+        missing().await.contains(&"reviews:cs".to_owned()),
+        "Omnibus page required"
+    );
+    run(&runtime, shop.tenant, async |tx| {
+        legal::install(
+            tx,
+            "staff",
+            &InstallInput {
+                locales: vec!["cs".into(), "sk".into()],
+                types: vec![LegalType::Reviews],
+            },
+        )
+        .await?;
+        sqlx::query(
+            "UPDATE pages SET status = 'published', published_at = now() WHERE legal_type = 'reviews'",
+        )
+        .execute(&mut **tx)
+        .await?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    assert!(!missing().await.iter().any(|m| m.starts_with("reviews:")));
+
+    let p = page().await;
+    let s = p.reviews.summary.unwrap();
+    assert_eq!((s.count, s.average), (1, 4.0));
+    assert_eq!(
+        p.reviews.items[0].body,
+        "</script><script>alert(1)</script>"
+    );
+    assert_eq!(
+        p.reviews.verification_url.as_deref(),
+        Some("/pages/overovani-recenzi")
+    );
+    let ld = &p.seo.json_ld[0];
+    assert_eq!(ld["aggregateRating"]["reviewCount"], 1);
+    assert_eq!(ld["aggregateRating"]["ratingValue"], "4.0");
+    assert_eq!(ld["review"][0]["author"]["name"], "Jana N.");
+    assert_eq!(ld["review"][0]["reviewRating"]["ratingValue"], 4);
+}
