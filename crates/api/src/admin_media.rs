@@ -68,7 +68,8 @@ async fn create_upload(
 
 /// Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.
 /// A rejected file is deleted and the asset stays `pending` (upload again, then retry).
-/// Calling it again on a processing or ready asset returns it unchanged.
+/// Calling it again on a processing or ready asset returns it unchanged; on a failed asset
+/// it runs processing again from the kept original.
 #[utoipa::path(
     post,
     path = "/admin/v1/assets/{id}/complete",
@@ -79,7 +80,7 @@ async fn create_upload(
         (status = 200, body = Asset),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
         (status = 409, body = platform::Problem, content_type = "application/problem+json",
-         description = "`upload_missing`, `asset_failed`"),
+         description = "`upload_missing`"),
         (status = 422, body = platform::Problem, content_type = "application/problem+json",
          description = "`unsupported_type`, `file_too_large`, `image_too_large`, `corrupt_image`, `size_mismatch`"),
     )

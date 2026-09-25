@@ -72,7 +72,8 @@ export interface paths {
         /**
          * Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.
          *     A rejected file is deleted and the asset stays `pending` (upload again, then retry).
-         *     Calling it again on a processing or ready asset returns it unchanged.
+         *     Calling it again on a processing or ready asset returns it unchanged; on a failed asset
+         *     it runs processing again from the kept original.
          */
         post: operations["complete_upload"];
         delete?: never;
@@ -1026,7 +1027,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `upload_missing`, `asset_failed` */
+            /** @description `upload_missing` */
             409: {
                 headers: {
                     [name: string]: unknown;

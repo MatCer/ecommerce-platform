@@ -268,7 +268,7 @@
         "tags": [
           "media"
         ],
-        "summary": "Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.\nA rejected file is deleted and the asset stays `pending` (upload again, then retry).\nCalling it again on a processing or ready asset returns it unchanged.",
+        "summary": "Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.\nA rejected file is deleted and the asset stays `pending` (upload again, then retry).\nCalling it again on a processing or ready asset returns it unchanged; on a failed asset\nit runs processing again from the kept original.",
         "operationId": "complete_upload",
         "parameters": [
           {
@@ -311,7 +311,7 @@
             }
           },
           "409": {
-            "description": "`upload_missing`, `asset_failed`",
+            "description": "`upload_missing`",
             "content": {
               "application/problem+json": {
                 "schema": {
