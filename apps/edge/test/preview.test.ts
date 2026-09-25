@@ -130,7 +130,8 @@ describe("previews (A21)", () => {
   });
 
   test("missing, forged, other-revision and expired tokens are refused", async () => {
-    for (const headers of [{}, { cookie: "__Host-preview=nope" }, { cookie: `__Host-preview=${OTHER}` }]) {
+    const variants: Record<string, string>[] = [{}, { cookie: "__Host-preview=nope" }, { cookie: `__Host-preview=${OTHER}` }];
+    for (const headers of variants) {
       const res = await get(`http://${HOST}:8080/`, headers);
       expect(res.status).toBe(401);
       expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
