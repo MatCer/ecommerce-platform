@@ -32,6 +32,29 @@ pub fn analyze(text: &str, locale: &str) -> String {
         .join(" ")
 }
 
+/// Typeahead form of [`analyze`]: the last word is still being typed, so it is only folded
+/// (stemming a prefix like `trič` → `trik` would miss `tričko` → `trick`). The engine matches
+/// the last query word as a prefix.
+pub fn analyze_prefix(text: &str, locale: &str) -> String {
+    let complete = text.trim_end().len() < text.len();
+    let words: Vec<&str> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .collect();
+    match words.split_last() {
+        Some((last, head)) if !complete => {
+            let head = analyze(&head.join(" "), locale);
+            let last = fold(last);
+            if head.is_empty() {
+                last
+            } else {
+                format!("{head} {last}")
+            }
+        }
+        _ => analyze(text, locale),
+    }
+}
+
 /// Lowercased, diacritics-folded text with every non-alphanumeric run turned into one space.
 pub fn fold(text: &str) -> String {
     tokens(text).collect::<Vec<_>>().join(" ")
@@ -311,6 +334,15 @@ mod tests {
         assert_eq!(stem("xl"), "xl");
         assert_eq!(stem("m"), "m");
         assert_eq!(analyze("", "cs"), "");
+    }
+
+    #[test]
+    fn typeahead_keeps_the_word_being_typed_unstemmed() {
+        assert_eq!(analyze_prefix("pánská Trič", "cs"), "pansk tric");
+        assert_eq!(analyze_prefix("Trič", "cs"), "tric");
+        // A trailing space means the last word is complete.
+        assert_eq!(analyze_prefix("trička ", "cs"), "trick");
+        assert_eq!(analyze_prefix("", "cs"), "");
     }
 
     #[test]

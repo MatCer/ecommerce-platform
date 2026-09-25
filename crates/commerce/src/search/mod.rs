@@ -100,6 +100,14 @@ pub fn rebuild_job(tenant_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
     )
 }
 
+/// A rebuild requested by staff: runs now; requests in the same window share the job.
+pub fn manual_rebuild_job(tenant_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
+    let mut job = rebuild_job(tenant_id, now);
+    job.run_at = None;
+    job.idempotency_key = job.idempotency_key.map(|k| format!("{k}:manual"));
+    job
+}
+
 /// The search job an outbox event triggers, if any (the dispatcher enqueues it next to the
 /// generic subscribers).
 pub fn job_for_event(

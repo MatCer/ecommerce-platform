@@ -55,6 +55,36 @@ pub struct Scope {
     pub locale: String,
 }
 
+/// The storefront scope for a request context (tenant, market, locale from the edge), or
+/// `None` unless the tenant is active, the market has a verified domain (so the shop is
+/// public) and sells in `locale`. Until WP6's storefront token check exists this is what keeps
+/// unpublished catalogs out of reach (fail closed).
+pub async fn storefront_scope(
+    db: &sqlx::PgPool,
+    tenant_id: Uuid,
+    market_id: Uuid,
+    locale: &str,
+) -> Result<Option<Scope>, Error> {
+    let public = sqlx::query_scalar!(
+        r#"SELECT EXISTS (
+               SELECT 1 FROM platform.domains d JOIN platform.tenants t ON t.id = d.tenant_id
+               WHERE d.tenant_id = $1 AND d.market_id = $2 AND d.verified_at IS NOT NULL
+                 AND t.status = 'active'
+           ) AS "public!""#,
+        tenant_id,
+        market_id
+    )
+    .fetch_one(db)
+    .await?;
+    if !public {
+        return Ok(None);
+    }
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let scope = scope(&mut tx, market_id, locale).await?;
+    tx.commit().await?;
+    Ok(scope)
+}
+
 /// Loads the market for `market_id` if it sells in `locale`.
 pub async fn scope(
     tx: &mut TenantTx,
@@ -265,6 +295,9 @@ fn and(clauses: impl IntoIterator<Item = String>) -> String {
         .join(" AND ")
 }
 
+/// Facet key → values as `(value, selected, available)`, before labelling.
+type RawFacets = Vec<(String, Vec<(String, bool, bool)>)>;
+
 /// Which query of the multi-search answers what.
 #[derive(Debug, Default, PartialEq, Eq)]
 struct Plan {
@@ -370,11 +403,7 @@ fn distribution(result: Option<&Value>) -> BTreeMap<String, BTreeSet<String>> {
 /// Facets with availability: values come from the universe; a value is available when the
 /// query for its facet (the full filter, or the filter without the facet's own clause if the
 /// facet is refined) still has it.
-fn facets_from(
-    plan: &Plan,
-    results: &[Value],
-    req: &SearchRequest,
-) -> Vec<(String, Vec<(String, bool, bool)>)> {
+fn facets_from(plan: &Plan, results: &[Value], req: &SearchRequest) -> RawFacets {
     let universe = distribution(plan.universe.and_then(|i| results.get(i)));
     let available = distribution(plan.available.and_then(|i| results.get(i)));
     let mut out = vec![];
@@ -598,7 +627,7 @@ async fn rehydrate(
 async fn label_facets(
     tx: &mut TenantTx,
     locale: &str,
-    raw: Vec<(String, Vec<(String, bool, bool)>)>,
+    raw: RawFacets,
 ) -> Result<Vec<Facet>, Error> {
     let options: Vec<String> = raw
         .iter()
@@ -760,13 +789,21 @@ pub async fn suggest(
         per_page: u32::try_from(SUGGEST_LIMIT - categories.len()).unwrap_or(1),
         ..Default::default()
     };
-    let plan = plan(scope, &req, false);
+    let mut plan = plan(scope, &req, false);
+    // Also match the word being typed as a prefix of the folded names (unstemmed).
+    let mut prefix = plan.queries[0].clone();
+    prefix["q"] = json!(lang::analyze_prefix(q, &scope.locale));
+    let prefix_at = plan.queries.len();
+    plan.queries.push(prefix);
     let results = meili.multi_search(&plan.queries).await?;
     let mut ids = plan
         .exact
         .map(|i| hit_ids(results.get(i)))
         .unwrap_or_default();
-    for id in hit_ids(results.first()) {
+    for id in hit_ids(results.first())
+        .into_iter()
+        .chain(hit_ids(results.get(prefix_at)))
+    {
         if !ids.iter().any(|(_, p)| *p == id.1) {
             ids.push(id);
         }
