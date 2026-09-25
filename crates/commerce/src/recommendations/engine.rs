@@ -287,7 +287,10 @@ enum Scope {
 enum Step {
     BoughtTogether(Vec<Uuid>),
     Bestsellers(Scope),
+    /// Open seasonal collections.
     Seasonal,
+    /// This month's best sellers a year ago (strategy `seasonal`).
+    LastYear,
     Collection(Uuid),
     Personalized,
     Recent(Vec<Uuid>),
@@ -299,7 +302,7 @@ impl Step {
         match self {
             Self::BoughtTogether(_) => Strategy::BoughtTogether,
             Self::Bestsellers(_) => Strategy::Bestsellers,
-            Self::Seasonal => Strategy::Seasonal,
+            Self::Seasonal | Self::LastYear => Strategy::Seasonal,
             Self::Collection(_) => Strategy::Collection,
             Self::Personalized => Strategy::Personalized,
             Self::Recent(_) => Strategy::RecentlyViewed,
@@ -347,6 +350,11 @@ fn chain(target: &Target, settings: &RecommendationSettings, visitor: &Visitor) 
         }
     };
     steps.push(Step::Bestsellers(Scope::All));
+    // Last year's bestsellers of this month fill in where current sales cannot (a shop back
+    // from a pause, a new season): they never push this year's best sellers aside.
+    if *target == Target::Home {
+        steps.push(Step::LastYear);
+    }
     steps.push(Step::Newest);
     steps.retain(|s| settings.enabled(s.strategy()));
     steps
@@ -564,38 +572,40 @@ async fn candidates(
             )
             .fetch_all(&mut **tx)
             .await?;
-            if let Some(first) = open.first() {
-                let title = ctx.text(&first.title_i18n).unwrap_or(first.name.clone());
-                let mut ids: Vec<Uuid> = Vec::new();
-                for id in open.iter().flat_map(|c| c.product_ids.iter()) {
-                    if !ids.contains(id) {
-                        ids.push(*id);
-                    }
+            let Some(first) = open.first() else {
+                return Ok((Vec::new(), None));
+            };
+            let title = ctx.text(&first.title_i18n).unwrap_or(first.name.clone());
+            let mut ids: Vec<Uuid> = Vec::new();
+            for id in open.iter().flat_map(|c| c.product_ids.iter()) {
+                if !ids.contains(id) {
+                    ids.push(*id);
                 }
-                (positional(&ids), Some(title))
-            } else if let Some((from, to)) = last_year_month(ctx.now) {
-                // This month's best sellers a year ago, when there is data for it.
-                let rows = sqlx::query!(
-                    r#"SELECT d.product_id AS "id!", sum(d.purchases)::float8 AS "score!"
-                       FROM product_stats_daily d JOIN products p ON p.id = d.product_id
-                       WHERE d.market_id = $1 AND d.date >= $2 AND d.date < $3
-                         AND p.status = 'active'
-                       GROUP BY d.product_id HAVING sum(d.purchases) > 0
-                       ORDER BY 2 DESC, 1 LIMIT $4"#,
-                    ctx.market.id,
-                    from,
-                    to,
-                    n
-                )
-                .fetch_all(&mut **tx)
-                .await?;
-                (
-                    scored(rows.into_iter().map(|r| (r.id, r.score)).collect()),
-                    None,
-                )
-            } else {
-                (Vec::new(), None)
             }
+            (positional(&ids), Some(title))
+        }
+        Step::LastYear => {
+            let Some((from, to)) = last_year_month(ctx.now) else {
+                return Ok((Vec::new(), None));
+            };
+            let rows = sqlx::query!(
+                r#"SELECT d.product_id AS "id!", sum(d.purchases)::float8 AS "score!"
+                   FROM product_stats_daily d JOIN products p ON p.id = d.product_id
+                   WHERE d.market_id = $1 AND d.date >= $2 AND d.date < $3
+                     AND p.status = 'active'
+                   GROUP BY d.product_id HAVING sum(d.purchases) > 0
+                   ORDER BY 2 DESC, 1 LIMIT $4"#,
+                ctx.market.id,
+                from,
+                to,
+                n
+            )
+            .fetch_all(&mut **tx)
+            .await?;
+            (
+                scored(rows.into_iter().map(|r| (r.id, r.score)).collect()),
+                None,
+            )
         }
         Step::Personalized => {
             let Some(affinity) = visitor.affinity.as_ref().filter(|a| !a.is_empty()) else {
@@ -801,7 +811,7 @@ mod tests {
         );
         assert_eq!(
             strategies(&chain(&Target::Home, &s, &public)),
-            [Seasonal, Bestsellers, Newest]
+            [Seasonal, Bestsellers, Seasonal, Newest]
         );
         // The cart without products has nothing to be bought together with.
         assert_eq!(
@@ -822,7 +832,7 @@ mod tests {
         };
         assert_eq!(
             strategies(&chain(&Target::Home, &s, &consented)),
-            [Personalized, Seasonal, Bestsellers, Newest]
+            [Personalized, Seasonal, Bestsellers, Seasonal, Newest]
         );
         assert_eq!(
             strategies(&chain(&Target::Cart, &s, &consented)),
@@ -849,7 +859,7 @@ mod tests {
         };
         assert_eq!(
             strategies(&chain(&Target::Home, &s, &not_granted)),
-            [Seasonal, Bestsellers, Newest]
+            [Seasonal, Bestsellers, Seasonal, Newest]
         );
         let recent = Target::Recent(vec![u(1)]);
         assert!(chain(&recent, &s, &not_granted).is_empty());

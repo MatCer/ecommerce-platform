@@ -764,3 +764,46 @@ async fn recommendation_tables_are_tenant_isolated(db: PgPool) {
             .await;
     assert!(denied.is_err());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn last_years_month_fills_in_after_current_bestsellers(db: PgPool) {
+    use chrono::Datelike;
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = shop(&runtime, "reco-season").await;
+    let now_seller = sellable(&runtime, &shop, "NOW", 10).await;
+    let last_year = sellable(&runtime, &shop, "LASTYEAR", 10).await;
+    let now = Utc::now();
+    order(
+        &runtime,
+        &shop,
+        &[now_seller],
+        now - Duration::days(1),
+        "confirmed",
+    )
+    .await;
+    // The 15th of this month, a year ago.
+    let then = chrono::NaiveDate::from_ymd_opt(now.year() - 1, now.month(), 15)
+        .unwrap()
+        .and_hms_opt(12, 0, 0)
+        .unwrap()
+        .and_utc();
+    order(&runtime, &shop, &[last_year], then, "confirmed").await;
+    run(&runtime, &shop, now).await;
+
+    let got = recommend(
+        &runtime,
+        &shop,
+        shop.cz,
+        Target::Home,
+        &Visitor::default(),
+        3,
+    )
+    .await;
+    assert_eq!(ids(&got), [now_seller.0, last_year.0, shop.product]);
+    let strategies: Vec<Strategy> = got.items.iter().map(|i| i.strategy).collect();
+    assert_eq!(
+        strategies,
+        [Strategy::Bestsellers, Strategy::Seasonal, Strategy::Newest],
+        "this year's best sellers first, last year's month next"
+    );
+}

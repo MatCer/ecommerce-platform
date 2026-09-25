@@ -4,7 +4,15 @@
  * Needs `make up && make seed && make theme-build`.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { CZ, decideConsent, expectAccessible, hydrated, SK, screenshot } from "./support";
+import {
+  CZ,
+  decideConsent,
+  expectAccessible,
+  grantConsent,
+  hydrated,
+  SK,
+  screenshot,
+} from "./support";
 
 const main = (page: Page) => page.getByRole("main");
 
@@ -301,14 +309,15 @@ test.describe("consent (A20)", () => {
     await banner.getByRole("button", { name: "Uložit výběr" }).click();
     await expect(banner).toBeHidden();
     await page.reload();
-    // Personalization granted: this visit is remembered for "recently viewed".
+    // Personalization granted: this visit is remembered for "recently viewed" (its id).
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("sf:personalization:recent")))
-      .toContain("mikina-fleece");
+      .toMatch(/[0-9a-f-]{36}/);
   });
 
-  test("recently viewed appears only with personalization consent", async ({ page, context }) => {
-    await decideConsent(context, CZ, "personalization");
+  test("recently viewed appears only with personalization consent", async ({ page }) => {
+    // Recorded on the server too: the list is rehydrated there only with the consent (A20).
+    await grantConsent(page, CZ, ["personalization"]);
     await page.goto(`${CZ}/p/mikina-fleece`);
     await hydrated(page);
     await expect

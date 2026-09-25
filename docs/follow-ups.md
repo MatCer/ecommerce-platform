@@ -5,18 +5,16 @@
 | WP0 | CI doesn't smoke-test the auth image (needs Postgres) | WP15 |
 | WP1 | The smoke scripts are manual; move them into the e2e suite | WP15 |
 | WP2 | Artifact GC (private bucket `artifacts/` + edge cache volume); WP6 keeps everything | WP23 |
-| WP2 | Page-model gaps left after WP8: size chart, dispatch cutoff + holidays, batch card lookup by ids (recently viewed shows no prices until then); font library | WP15 |
+| WP2 | Page-model gaps left after WP8: size chart, dispatch cutoff + holidays; font library (recently viewed has live prices since WP17) | WP15 |
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
 | WP5 | No invitation-accepted status in the staff list | WP15 |
 | WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
-| WP7 | Real popularity signal is a placeholder (tenant synonyms done in WP13a) | WP17 |
 | WP6 | `/newsletter/subscribe` validates and drops (no storage); `/events` is stored since WP14 | M2 (WP18) |
 | WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
 | WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart); place-order is keyed since WP10 | WP15 |
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | Payment/carrier marks in `/shop` are generic catalog text (legal/CMS links come from published pages since WP13a; the checkout still links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale) | WP11 / WP12 |
-| WP8 | No cart cross-sell in the drawer yet (the PDP slot renders `/recommendations`; the drawer would need a client fetch) | WP17 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
 | WP9 | Email suppressions are added manually (`api admin suppress-email`); no bounce/complaint ingestion from the provider (SES notifications; on the runbook pre-launch checklist) | pre-launch |
 | WP9 | Per-tenant editable email subject/intro text (§11.4) and a tenant logo in emails (no logo in the data model yet; the shop name is the wordmark) | WP13b |
@@ -42,3 +40,7 @@
 | WP13a | Feed import applies product by product and feeds render in memory per market; batch/stream for 100k-item catalogs | later (perf) |
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
 | WP13a | Orders/customers CSV import, tenant data export, customer access/erasure (A29) | WP13b |
+| WP17 | The hourly rollup recomputes the tenant's co-purchases, scores and customer affinity in full (stats only for the last 2 days); fine for demo-sized shops, narrow it for large catalogs/order books | later (perf) |
+| WP17 | Search popularity changes are reindexed after the rollup commits; a crash in between leaves that change unindexed until the product's next change or a rebuild | later |
+| WP17 | `customer_affinity` is rolled up (consent-filtered) but only the staff "why recommended" view reads it; the shop origin never knows the customer | WP18 (personalized product blocks) |
+| WP17 | The cart cross-sell on a locale-prefixed page reads in the market's default locale (the cart cookie is `Path=/_p`, like the cart lines themselves) | later |

@@ -30,6 +30,24 @@ export async function decideConsent(ctx: BrowserContext, base = CZ, purposes = "
   await ctx.addCookies([{ name: "consent", value: purposes, url: base }]);
 }
 
+/**
+ * A recorded consent choice through the edge (`POST /_p/consent`), as the banner makes it: the
+ * server-side record (A20), the HttpOnly subject cookie and the script-readable summary.
+ */
+export async function grantConsent(page: Page, base: string, granted: string[]) {
+  const shop = (await (await page.request.get(`${base}/_p/public/shop`)).json()) as {
+    consent: { text_version: string };
+  };
+  const purposes = Object.fromEntries(
+    ["analytics", "ads", "personalization"].map((p) => [p, granted.includes(p)]),
+  );
+  const res = await page.request.post(`${base}/_p/consent`, {
+    headers: { origin: base },
+    data: { purposes, text_version: shop.consent.text_version, source: "banner" },
+  });
+  expect(res.status()).toBe(200);
+}
+
 /** WCAG 2.0-2.2 A/AA automated checks: no serious or critical violations (spec §9.6). */
 export async function expectAccessible(page: Page, name: string) {
   const result = await new AxeBuilder({ page })
