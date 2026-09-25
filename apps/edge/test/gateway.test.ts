@@ -477,6 +477,34 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     ).toBe(415);
   });
 
+  test("newsletter as a plain HTML form: subscribes, then 303 back to the same page", async () => {
+    api.calls.length = 0;
+    const form = { ...origin, "content-type": "application/x-www-form-urlencoded" };
+    const ok = await get(
+      `${shop}/_p/newsletter`,
+      { ...form, referer: `${shop}/cs/c/trika?sort=price_asc` },
+      { method: "POST", body: "email=jana%40example.cz" },
+    );
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("location")).toBe("/cs/c/trika?sort=price_asc&newsletter=ok#newsletter");
+    expect(JSON.parse(api.calls.at(-1)?.body ?? "")).toEqual({ email: "jana@example.cz" });
+    expect(api.calls.at(-1)?.headers["x-tenant"]).toBe("t-demo");
+    // A foreign Referer never becomes the redirect target.
+    const foreign = await get(
+      `${shop}/_p/newsletter`,
+      { ...form, referer: "https://evil.example/x" },
+      { method: "POST", body: "email=a%40b.cz" },
+    );
+    expect(foreign.headers.get("location")).toBe("/?newsletter=ok#newsletter");
+    // Still same-origin only.
+    const cross = await get(
+      `${shop}/_p/newsletter`,
+      { "content-type": "application/x-www-form-urlencoded" },
+      { method: "POST", body: "email=a%40b.cz" },
+    );
+    expect(cross.status).toBe(403);
+  });
+
   test("local http mode also accepts the https origin of the same host (Caddy tls internal)", async () => {
     const res = await get(
       `${shop}/_p/cart/lines`,

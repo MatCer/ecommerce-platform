@@ -582,6 +582,33 @@ export function createGateway(opts: GatewayOptions) {
   ): Promise<Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    // A plain HTML form (works without JS): subscribe, then 303 back to the page it came from
+    // with `?newsletter=ok|invalid#newsletter` for the theme to render the outcome.
+    if ((req.headers.get("content-type") ?? "").startsWith("application/x-www-form-urlencoded")) {
+      const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+      if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+      const email = new URLSearchParams(new TextDecoder().decode(raw)).get("email") ?? "";
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/newsletter/subscribe`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({ email }),
+        }),
+      );
+      await res.body?.cancel();
+      let back = new URL("/", `${scheme}://${host}${port}`);
+      const referer = URL.parse(req.headers.get("referer") ?? "");
+      // Same shop only (never an open redirect); the query keeps its other parameters.
+      if (referer && referer.host === `${host}${port}`) back = referer;
+      back.searchParams.set("newsletter", res.ok ? "ok" : "invalid");
+      return new Response(null, {
+        status: 303,
+        headers: {
+          location: `${back.pathname}${back.search}#newsletter`,
+          "cache-control": "no-store",
+        },
+      });
+    }
     const body = await readJsonBody(req, MAX_JSON_BODY);
     if (body instanceof Response) return body;
     const res = await upstream(

@@ -66,18 +66,14 @@ const { pagination: pg } = page;
             <Icon name="chevronLeft" class="size-4" />
             {t("listing.prev")}
           </a>
-        ) : (
-          <span class="btn btn-secondary pointer-events-none opacity-40" aria-hidden="true"><Icon name="chevronLeft" class="size-4" />{t("listing.prev")}</span>
-        )}
+        ) : null}
         <p class="px-2 text-sm font-medium text-muted-foreground">{t("listing.page", { page: pg.page, pages: pg.pages })}</p>
         {pg.next ? (
           <a rel="next" href={pg.next} class="btn btn-secondary">
             {t("listing.next")}
             <Icon name="chevronRight" class="size-4" />
           </a>
-        ) : (
-          <span class="btn btn-secondary pointer-events-none opacity-40" aria-hidden="true">{t("listing.next")}<Icon name="chevronRight" class="size-4" /></span>
-        )}
+        ) : null}
       </nav>
     )
   }

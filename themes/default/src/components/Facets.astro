@@ -59,7 +59,7 @@ const clearHref = page.category ? (page.breadcrumbs.at(-1)?.href ?? action) : `$
                 <div class="flex flex-wrap gap-2">
                   {f.values.map((v) => (
                     <label class="chip">
-                      <input class="sr-only" type="checkbox" name={f.key} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
+                      <input class="sr-only" type="checkbox" name={`f.${f.key}`} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
                       {v.label}
                     </label>
                   ))}
@@ -82,7 +82,8 @@ const clearHref = page.category ? (page.breadcrumbs.at(-1)?.href ?? action) : `$
       {page.sort.map((s) => <option value={s.value} selected={s.selected}>{s.label}</option>)}
     </select>
   </label>
-  <button type="submit" class="btn btn-secondary min-h-10 group-data-[enhanced]/facets:hidden">{t("listing.apply")}</button>
+  <!-- Without JS sort needs a submit; with JS it submits on change (no button, no layout shift). -->
+  <noscript><button type="submit" class="btn btn-secondary min-h-10">{t("listing.apply")}</button></noscript>
 </form>
 <FacetForm client:idle form="facets" />
 
