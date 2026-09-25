@@ -1179,9 +1179,15 @@ pub async fn run_apply(
     id: Uuid,
     last_attempt: bool,
 ) -> Result<Outcome, Error> {
-    match apply_items(db, tenant, id).await {
-        Err(e) if last_attempt && !matches!(e, Error::NotFound) => {
-            tracing::error!(plan = %id, error = %e, "bulk plan apply gave up");
+    let result = apply_items(db, tenant, id).await;
+    let gave_up = match &result {
+        Err(Error::NotFound) | Ok(Outcome::Done) => None,
+        Err(e) => Some(e.to_string()),
+        Ok(Outcome::Retry(reason)) => Some(reason.clone()),
+    };
+    match gave_up {
+        Some(reason) if last_attempt => {
+            tracing::error!(plan = %id, reason, "bulk plan apply gave up");
             let mut tx = tenant_tx(db, tenant).await?;
             let progress = progress(&mut tx, id).await?;
             sqlx::query!(
@@ -1197,7 +1203,7 @@ pub async fn run_apply(
             tx.commit().await?;
             Ok(Outcome::Done)
         }
-        other => other,
+        _ => result,
     }
 }
 
@@ -1339,6 +1345,18 @@ async fn apply_one(
     product_id: Uuid,
 ) -> Result<bool, Error> {
     let actor = source.actor;
+    // Lock order as in product saves: the product row first, then the pricing lock.
+    match super::fields::Doc::lock(
+        tx,
+        super::fields::EntityType::Product,
+        &product_id.to_string(),
+    )
+    .await
+    {
+        Ok(()) => {}
+        Err(Error::NotFound) => return Ok(false),
+        Err(e) => return Err(e),
+    }
     let product = match products::get(tx, product_id).await {
         Ok(p) => p,
         Err(Error::NotFound) => return Ok(false),
