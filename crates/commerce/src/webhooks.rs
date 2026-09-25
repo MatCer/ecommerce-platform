@@ -435,10 +435,15 @@ pub async fn deliveries(
     Ok(DeliveryPage { items, next_cursor })
 }
 
+/// The job of one attempt. Its key names the retry window, so a redelivery (new window) never
+/// collides with a job of an earlier window. Infrastructure failures (database, missing
+/// `SECRETS_KEY`) are retried by the queue for well over the 24 h window (50 attempts, backoff
+/// up to an hour); an attempt started after the window ends records the delivery as `dead`.
 fn deliver_job(
     tenant: Uuid,
     delivery: Uuid,
     attempt: i32,
+    window: DateTime<Utc>,
     run_at: Option<DateTime<Utc>>,
 ) -> NewJob<'static> {
     let mut job = NewJob::new(
@@ -447,19 +452,25 @@ fn deliver_job(
     );
     job.tenant_id = Some(tenant);
     job.run_at = run_at;
-    job.max_attempts = 5;
-    job.idempotency_key = Some(format!("webhook:{delivery}:{attempt}"));
+    job.max_attempts = 50;
+    job.idempotency_key = Some(format!(
+        "webhook:{delivery}:{}:{attempt}",
+        window.timestamp_micros()
+    ));
     job
 }
 
-/// Sends a delivery again now, with a fresh 24 h retry window.
+/// Sends a delivery again now, with a fresh 24 h retry window: a finished one (succeeded or
+/// dead), or one whose next attempt is over an hour overdue (its job was lost).
 pub async fn redeliver(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Delivery, Error> {
     let row = sqlx::query!(
         "UPDATE webhook_deliveries
          SET status = CASE WHEN attempts = 0 THEN 'pending' ELSE 'retrying' END,
              next_at = now(), window_started_at = now(), updated_at = now()
-         WHERE id = $1 AND status IN ('succeeded', 'dead')
-         RETURNING attempts",
+         WHERE id = $1
+           AND (status IN ('succeeded', 'dead')
+                OR (status IN ('pending', 'retrying') AND next_at < now() - interval '1 hour'))
+         RETURNING attempts, window_started_at",
         id
     )
     .fetch_optional(&mut **tx)
@@ -476,7 +487,13 @@ pub async fn redeliver(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Deliv
             }),
         };
     };
-    let job = deliver_job(tx.tenant_id(), id, row.attempts + 1, None);
+    let job = deliver_job(
+        tx.tenant_id(),
+        id,
+        row.attempts + 1,
+        row.window_started_at,
+        None,
+    );
     queue::enqueue(&mut **tx, &job).await?;
     audit::record(
         tx,
@@ -518,21 +535,25 @@ pub async fn fanout(
         "created_at": Utc::now(),
         "data": data,
     });
-    let created = sqlx::query_scalar!(
+    let created = sqlx::query!(
         "INSERT INTO webhook_deliveries (tenant_id, subscription_id, event_id, event_type, payload,
                                          next_at)
          SELECT tenant_id, id, $1, $2, $3, now() FROM webhook_subscriptions
          WHERE active AND $2 = ANY (events)
          ON CONFLICT (tenant_id, subscription_id, event_id) DO NOTHING
-         RETURNING id",
+         RETURNING id, window_started_at",
         event_id,
         event_type,
         body
     )
     .fetch_all(&mut *tx)
     .await?;
-    for id in &created {
-        queue::enqueue(&mut *tx, &deliver_job(tenant, *id, 1, None)).await?;
+    for d in &created {
+        queue::enqueue(
+            &mut *tx,
+            &deliver_job(tenant, d.id, 1, d.window_started_at, None),
+        )
+        .await?;
     }
     tx.commit().await?;
     Ok(created.len())
@@ -611,7 +632,17 @@ pub async fn deliver(
         return Ok(Attempt::Skipped);
     }
 
-    let outcome = if row.active {
+    let window_end =
+        row.window_started_at + chrono::Duration::from_std(RETRY_WINDOW).unwrap_or_default();
+    let outcome = if Utc::now() >= window_end {
+        // A late job (queue backlog, worker outage): never send after the window.
+        Err((
+            None,
+            "the 24 h retry window ended before this attempt ran".to_owned(),
+        ))
+    } else if hooks.require_https && !row.url.starts_with("https://") {
+        Err((None, "webhook URLs must use https".to_owned()))
+    } else if row.active {
         let secret = hooks
             .secrets
             .open(&row.secret_ciphertext, &aad(row.subscription_id))
@@ -686,7 +717,8 @@ pub async fn deliver(
             .rows_affected()
                 == 1;
             if recorded && let Some(at) = next {
-                queue::enqueue(&mut *tx, &deliver_job(tenant, id, attempt + 1, Some(at))).await?;
+                let job = deliver_job(tenant, id, attempt + 1, row.window_started_at, Some(at));
+                queue::enqueue(&mut *tx, &job).await?;
             }
             recorded.then_some(match next {
                 Some(at) => Attempt::Retrying(at),

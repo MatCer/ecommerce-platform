@@ -66,7 +66,7 @@ impl Extra {
 pub const LINK_GUEST_ORDERS: &str = "orders.link_guest";
 /// Payment timeouts (A10): cancel unpaid orders whose payment window closed. Every minute.
 pub const PAYMENTS_EXPIRE: &str = "payments.expire";
-pub use commerce::analytics::{PARTITIONS_JOB, PURCHASE_JOB, ROLLUP_JOB};
+pub use commerce::analytics::{PARTITIONS_JOB, ROLLUP_JOB};
 pub use commerce::ops::SWEEP_JOB;
 pub use commerce::webhooks::{DELIVER_JOB, FANOUT_JOB};
 
@@ -122,7 +122,6 @@ pub fn all(
         .register(intervals::TRANSITION_JOB, price_transition)
         .register(LINK_GUEST_ORDERS, link_guest_orders)
         .register(PAYMENTS_EXPIRE, payments_expire)
-        .register(PURCHASE_JOB, analytics_purchase)
         .register(ROLLUP_JOB, analytics_rollup)
         .register(PARTITIONS_JOB, analytics_partitions)
         .register(FANOUT_JOB, webhooks_fanout)
@@ -376,10 +375,6 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         sqlx::query_scalar!(r#"SELECT platform.purge_search_zero_results() AS "n!""#)
             .fetch_one(&ctx.db)
             .await?;
-    let search_queries =
-        sqlx::query_scalar!(r#"SELECT platform.purge_search_query_counts() AS "n!""#)
-            .fetch_one(&ctx.db)
-            .await?;
     let customer_auth = sqlx::query_scalar!(r#"SELECT platform.purge_customer_auth() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
@@ -395,7 +390,6 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         stalled_emails = stalled.len(),
         idempotency_keys = keys,
         zero_results,
-        search_queries,
         customer_auth,
         "cleanup done"
     );
@@ -491,38 +485,23 @@ async fn payments_expire(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     Ok(())
 }
 
-/// A field of the outbox event's payload (`{event_id, type, payload}` from the dispatcher).
-fn event_uuid(job: &Job, field: &str) -> Result<Uuid, JobError> {
-    job.payload
-        .pointer(&format!("/payload/{field}"))
-        .and_then(|v| v.as_str())
-        .and_then(|s| Uuid::parse_str(s).ok())
-        .ok_or_else(|| JobError::Permanent(format!("payload has no {field}")))
-}
-
-/// `order.created` → the authoritative `purchase` analytics event (A20).
-async fn analytics_purchase(ctx: Ctx, job: Job) -> Result<(), JobError> {
-    let tenant = job
-        .tenant_id
-        .ok_or_else(|| JobError::Permanent("purchase without tenant".into()))?;
-    let order = event_uuid(&job, "order_id")?;
-    let mut tx = platform::db::tenant_tx(&ctx.db, tenant).await?;
-    commerce::analytics::record_purchase(&mut tx, order)
-        .await
-        .map_err(|e| JobError::Retry(e.to_string()))?;
-    tx.commit().await?;
-    Ok(())
-}
-
-/// Hourly: today's and yesterday's `daily_metrics` of every tenant.
-async fn analytics_rollup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
+/// Hourly: today's and yesterday's `daily_metrics` of every tenant; once a day (02:00 UTC
+/// slot) the last 14 days, so an outage or late events leave no permanent gap.
+async fn analytics_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
     let today = chrono::Utc::now().date_naive();
+    let slot = job.payload.get("slot").and_then(serde_json::Value::as_i64);
+    let days: u64 = if slot.is_some_and(|s| s.rem_euclid(24) == 2) {
+        14
+    } else {
+        2
+    };
     let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
         .fetch_all(&ctx.db)
         .await?;
     for tenant in &tenants {
         let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
-        for day in [today - chrono::Days::new(1), today] {
+        for back in 0..days {
+            let day = today - chrono::Days::new(back);
             commerce::analytics::rollup(&mut tx, day)
                 .await
                 .map_err(|e| JobError::Retry(e.to_string()))?;

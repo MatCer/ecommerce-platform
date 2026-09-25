@@ -68,13 +68,16 @@ pub async fn sweep(
 }
 
 /// Dead `media.process` jobs whose asset is still `processing` (newest 200 dead jobs per run;
-/// dead jobs are kept 30 days).
+/// dead jobs are kept 30 days). Only when the job died after the asset last changed, so an
+/// old dead job never fails a later processing run of the same asset; a requeued job is no
+/// longer dead and not considered.
 pub async fn fail_stuck_assets(db: &PgPool) -> Result<u64, Error> {
     let dead = queue::list(db, Some("dead"), Some(media::PROCESS_JOB), None, 200).await?;
     let mut failed = 0;
     for job in dead {
-        let (Some(tenant), Some(asset)) = (
+        let (Some(tenant), Some(finished), Some(asset)) = (
             job.tenant_id,
+            job.finished_at,
             job.payload
                 .get("asset_id")
                 .and_then(|v| v.as_str())
@@ -85,9 +88,10 @@ pub async fn fail_stuck_assets(db: &PgPool) -> Result<u64, Error> {
         let mut tx = tenant_tx(db, tenant).await?;
         failed += sqlx::query!(
             "UPDATE assets SET status = 'failed', error = $2, updated_at = now()
-             WHERE id = $1 AND status = 'processing'",
+             WHERE id = $1 AND status = 'processing' AND updated_at <= $3",
             asset,
-            STUCK_REASON
+            STUCK_REASON,
+            finished
         )
         .execute(&mut *tx)
         .await?
@@ -115,6 +119,17 @@ pub async fn abandoned_uploads(
     let mut deleted = 0;
     for id in stale {
         let mut tx = tenant_tx(db, tenant).await?;
+        // Re-checked under the row lock: a completion that raced the listing wins.
+        let still = sqlx::query_scalar!(
+            "SELECT id FROM assets WHERE id = $1 AND status = 'pending'
+               AND created_at < now() - interval '1 day' FOR UPDATE",
+            id
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if still.is_none() {
+            continue;
+        }
         match media::delete(&mut tx, storage, ACTOR, id).await {
             Ok(()) => {
                 tx.commit().await?;

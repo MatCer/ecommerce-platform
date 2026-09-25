@@ -1,17 +1,15 @@
 //! Analytics (spec §7.6, §11.3, A20).
 //!
-//! Three sources, three levels of trust:
+//! Two sources, two levels of trust:
 //! - **Counters** (before or without consent): the edge counts page requests per market,
-//!   route template and UTC day, plus search queries, with no identifiers at all
-//!   ([`record_counters`]).
-//! - **Browser events** (`page_view`, `view_item`, `add_to_cart`, `begin_checkout`,
-//!   `web_vitals`) via the beacon: stored only when the server-side consent records grant
-//!   `analytics` to the anonymous subject of the request ([`ingest`]). Whatever purposes the
-//!   beacon claims are ignored; props are allowlisted per type. The stored `anon_id` is
-//!   derived from the subject (a keyed hash), never the subject itself.
-//! - **Server events** (`purchase`, later `refund`) from the outbox: authoritative, one per
-//!   order ([`record_purchase`]); a consented checkout links it to the visitor's session
-//!   ([`link_purchase`]).
+//!   route template and UTC day, with no identifiers and no query text ([`record_counters`]).
+//! - **Consented events**, stored only when the server-side consent records grant `analytics`
+//!   to the request's anonymous subject: the browser events (`page_view`, `view_item`,
+//!   `add_to_cart`, `begin_checkout`, `search`, `web_vitals`) from the beacon ([`ingest`];
+//!   claimed purposes are ignored, props are allowlisted per type) and the `purchase` the API
+//!   records from the placed order ([`link_purchase`]). The stored `anon_id` is derived from
+//!   the subject (a keyed hash), never the subject itself. Orders of visitors without consent
+//!   leave no analytics trace; sales figures come from `orders` directly.
 //!
 //! Hourly rollups ([`rollup`]) aggregate events into `daily_metrics`; the dashboard
 //! ([`dashboard`]) reads money from `orders` (authoritative) and traffic from counters and
@@ -39,12 +37,10 @@ pub const TEMPLATES: [&str; 8] = [
 pub const MAX_BATCH: usize = 50;
 /// A visitor's events closer than this belong to one session.
 pub const SESSION_GAP_MINUTES: i64 = 30;
-/// Hourly rollups (today and yesterday).
+/// Hourly rollups (today and yesterday; the last two weeks once a day).
 pub const ROLLUP_JOB: &str = "analytics.rollup";
 /// Nightly partition maintenance and retention (13 months, §14).
 pub const PARTITIONS_JOB: &str = "analytics.partitions";
-/// `order.created` → the authoritative `purchase` event.
-pub const PURCHASE_JOB: &str = "analytics.purchase";
 
 const MAX_COUNTERS: usize = 10_000;
 
@@ -57,14 +53,15 @@ fn invalid(detail: impl Into<String>) -> Error {
 
 // --- counters (edge) ---------------------------------------------------------------------------
 
-/// What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`).
+/// What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`). The edge
+/// resends a failed batch unchanged with the same `batch_id`; tenants that already counted it
+/// skip it, so a retry never counts twice.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CounterBatch {
+    pub batch_id: Uuid,
     #[serde(default)]
     pub counters: Vec<PageCounter>,
-    #[serde(default)]
-    pub searches: Vec<SearchCounter>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -77,21 +74,12 @@ pub struct PageCounter {
     pub requests: i64,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SearchCounter {
-    pub tenant_id: Uuid,
-    pub day: NaiveDate,
-    pub locale: String,
-    /// Raw query text; minimized before storage like the zero-result log (A20).
-    pub query: String,
-    pub count: i64,
-}
-
 #[derive(Debug, Default, Serialize, ToSchema)]
 pub struct CountersRecorded {
+    /// Rows added now.
     pub counters: usize,
-    pub searches: usize,
+    /// Tenants that had counted this batch already (a retry).
+    pub replayed_tenants: usize,
 }
 
 fn plausible_day(day: NaiveDate, today: NaiveDate) -> bool {
@@ -99,31 +87,24 @@ fn plausible_day(day: NaiveDate, today: NaiveDate) -> bool {
 }
 
 /// Adds the edge's counts. Rows for unknown markets or implausible days are skipped (the edge
-/// may flush after a market was removed); each tenant is written in its own transaction.
+/// may flush after a market was removed); each tenant is written in its own transaction
+/// together with the batch id, so a resent batch is skipped by the tenants that have it.
 pub async fn record_counters(db: &PgPool, batch: &CounterBatch) -> Result<CountersRecorded, Error> {
-    if batch.counters.len() > MAX_COUNTERS || batch.searches.len() > MAX_COUNTERS {
-        return Err(invalid(format!("at most {MAX_COUNTERS} rows per list")));
+    if batch.counters.len() > MAX_COUNTERS {
+        return Err(invalid(format!("at most {MAX_COUNTERS} rows per batch")));
     }
     let today = Utc::now().date_naive();
-    let mut tenants: BTreeMap<Uuid, (Vec<&PageCounter>, Vec<&SearchCounter>)> = BTreeMap::new();
+    let mut tenants: BTreeMap<Uuid, Vec<&PageCounter>> = BTreeMap::new();
     for c in &batch.counters {
         if !TEMPLATES.contains(&c.template.as_str()) || !(1..=100_000_000).contains(&c.requests) {
             return Err(invalid("unknown template or count out of range"));
         }
         if plausible_day(c.day, today) {
-            tenants.entry(c.tenant_id).or_default().0.push(c);
-        }
-    }
-    for s in &batch.searches {
-        if !(1..=100_000_000).contains(&s.count) || s.locale.len() > 8 || s.query.len() > 512 {
-            return Err(invalid("search count out of range"));
-        }
-        if plausible_day(s.day, today) {
-            tenants.entry(s.tenant_id).or_default().1.push(s);
+            tenants.entry(c.tenant_id).or_default().push(c);
         }
     }
     let mut out = CountersRecorded::default();
-    for (tenant, (counters, searches)) in tenants {
+    for (tenant, counters) in tenants {
         let exists = sqlx::query_scalar!(
             r#"SELECT EXISTS (SELECT 1 FROM platform.tenants WHERE id = $1) AS "ok!""#,
             tenant
@@ -134,13 +115,28 @@ pub async fn record_counters(db: &PgPool, batch: &CounterBatch) -> Result<Counte
             continue;
         }
         let mut tx = tenant_tx(db, tenant).await?;
+        let first = sqlx::query!(
+            "INSERT INTO analytics_counter_batches (tenant_id, batch_id) VALUES ($1, $2)
+             ON CONFLICT DO NOTHING",
+            tenant,
+            batch.batch_id
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected()
+            == 1;
+        if !first {
+            out.replayed_tenants += 1;
+            continue;
+        }
+        sqlx::query!(
+            "DELETE FROM analytics_counter_batches WHERE received_at < now() - interval '2 days'"
+        )
+        .execute(&mut *tx)
+        .await?;
         let markets: Vec<Uuid> = sqlx::query_scalar!("SELECT id FROM markets")
             .fetch_all(&mut *tx)
             .await?;
-        let locales: Vec<String> =
-            sqlx::query_scalar!(r#"SELECT DISTINCT unnest(locales) AS "l!" FROM markets"#)
-                .fetch_all(&mut *tx)
-                .await?;
         for c in counters.iter().filter(|c| markets.contains(&c.market_id)) {
             sqlx::query!(
                 "INSERT INTO analytics_counters (tenant_id, market_id, day, template, requests)
@@ -156,26 +152,6 @@ pub async fn record_counters(db: &PgPool, batch: &CounterBatch) -> Result<Counte
             .execute(&mut *tx)
             .await?;
             out.counters += 1;
-        }
-        for s in searches.iter().filter(|s| locales.contains(&s.locale)) {
-            let Some(query) = crate::search::query::loggable_query(&s.query) else {
-                continue;
-            };
-            let count = i32::try_from(s.count).unwrap_or(i32::MAX);
-            sqlx::query!(
-                "INSERT INTO search_query_counts (tenant_id, day, locale, query, count)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (tenant_id, day, locale, query)
-                 DO UPDATE SET count = LEAST(search_query_counts.count::bigint + EXCLUDED.count, 2147483647)::int",
-                tenant,
-                s.day,
-                s.locale,
-                query,
-                count
-            )
-            .execute(&mut *tx)
-            .await?;
-            out.searches += 1;
         }
         tx.commit().await?;
     }
@@ -215,6 +191,12 @@ pub fn clean_event(raw: &Value) -> Option<CleanEvent> {
     let (kind, props) = match kind {
         "page_view" => ("page_view", json!({ "template": template })),
         "begin_checkout" => ("begin_checkout", json!({ "template": template })),
+        // Consented visitors only (never counted before consent), minimized like the
+        // zero-result log: short product-like text, folded; contact-like text is dropped.
+        "search" => {
+            let query = crate::search::query::loggable_query(raw.get("query")?.as_str()?)?;
+            ("search", json!({ "template": template, "query": query }))
+        }
         "view_item" => (
             "view_item",
             json!({ "template": template, "product_id": uuid_of(raw, "product_id")? }),
@@ -265,8 +247,16 @@ pub fn anon_id(tenant_id: Uuid, subject: &str) -> String {
     hex::encode(&digest[..16])
 }
 
-/// The visitor's current session (last event under 30 minutes ago), or a new one.
+/// The visitor's current session (last event under 30 minutes ago), or a new one. A
+/// transaction-scoped lock per visitor keeps two concurrent first beacons from opening two
+/// sessions (the second waits and sees the first one's events).
 async fn session_for(tx: &mut TenantTx, anon: &str, now: DateTime<Utc>) -> Result<Uuid, Error> {
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        format!("analytics-session:{}:{anon}", tx.tenant_id())
+    )
+    .execute(&mut **tx)
+    .await?;
     let since = now - chrono::Duration::minutes(SESSION_GAP_MINUTES);
     let last = sqlx::query_scalar!(
         "SELECT session_id FROM events
@@ -365,10 +355,10 @@ pub async fn ingest(
     Ok(events.len())
 }
 
-// --- server events -----------------------------------------------------------------------------
+// --- purchases ---------------------------------------------------------------------------------
 
-/// One purchase event per order: a fixed id and the order's placement time, so the outbox
-/// handler and the checkout link write the same row.
+/// One purchase event per order (a fixed id and the order's placement time): a retried
+/// placement links nothing twice.
 fn purchase_id(order_id: Uuid) -> Uuid {
     let digest = Sha256::digest(format!("purchase:{order_id}"));
     let mut bytes = [0u8; 16];
@@ -376,25 +366,10 @@ fn purchase_id(order_id: Uuid) -> Uuid {
     Uuid::from_bytes(bytes)
 }
 
-/// Records the authoritative `purchase` event of an order (idempotent).
-pub async fn record_purchase(tx: &mut TenantTx, order_id: Uuid) -> Result<bool, Error> {
-    let done = sqlx::query!(
-        "INSERT INTO events (id, tenant_id, at, type, market_id, props)
-         SELECT $1, tenant_id, placed_at, 'purchase', market_id,
-                jsonb_build_object('order_id', id, 'total_minor', total_minor, 'currency', currency)
-         FROM orders WHERE id = $2
-         ON CONFLICT (tenant_id, at, id) DO NOTHING",
-        purchase_id(order_id),
-        order_id
-    )
-    .execute(&mut **tx)
-    .await?;
-    Ok(done.rows_affected() == 1)
-}
-
-/// Links an order's purchase to the visitor's session when the checkout request carried a
-/// consent subject that grants `analytics` (the funnel's last step). Safe in any order with
-/// [`record_purchase`]; a missing grant links nothing.
+/// Records the `purchase` of a placed order for the visitor's analytics session, only when
+/// the checkout request carried a consent subject whose records grant `analytics` (A20). The
+/// amounts come from the order, never from the client. Without the grant nothing is stored:
+/// sales figures come from `orders` directly.
 pub async fn link_purchase(
     tx: &mut TenantTx,
     order_id: Uuid,
@@ -413,10 +388,7 @@ pub async fn link_purchase(
                 jsonb_build_object('order_id', id, 'total_minor', total_minor, 'currency', currency),
                 $5
          FROM orders WHERE id = $2
-         ON CONFLICT (tenant_id, at, id) DO UPDATE
-         SET anon_id = EXCLUDED.anon_id, session_id = EXCLUDED.session_id,
-             consent_purposes = EXCLUDED.consent_purposes
-         WHERE events.anon_id IS NULL",
+         ON CONFLICT (tenant_id, at, id) DO NOTHING",
         purchase_id(order_id),
         order_id,
         anon,
@@ -435,8 +407,10 @@ fn day_bounds(day: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
     (start, start + chrono::Duration::days(1))
 }
 
-/// Recomputes one UTC day of `daily_metrics` from the events (idempotent): consented
-/// sessions, page views, the funnel (sessions reaching each step) and product views/adds.
+/// Recomputes one UTC day of `daily_metrics` from the events (idempotent). Sessions and the
+/// funnel count each session once, on the day it started (its steps may continue after
+/// midnight), so summing days never double-counts a session; page views and product
+/// views/adds count by event time.
 pub async fn rollup(tx: &mut TenantTx, day: NaiveDate) -> Result<(), Error> {
     let (start, end) = day_bounds(day);
     sqlx::query!("DELETE FROM daily_metrics WHERE date = $1", day)
@@ -444,26 +418,49 @@ pub async fn rollup(tx: &mut TenantTx, day: NaiveDate) -> Result<(), Error> {
         .await?;
     sqlx::query!(
         r#"INSERT INTO daily_metrics (tenant_id, date, market_id, metric, dims, value)
-           SELECT $1, $2, market_id, m.metric, '{}'::jsonb, m.value
+           SELECT $1, $2, s.market_id, m.metric, '{}'::jsonb, m.value
            FROM (
                SELECT market_id,
-                      count(DISTINCT session_id) AS sessions,
-                      count(*) FILTER (WHERE type = 'page_view') AS page_views,
-                      count(DISTINCT session_id) FILTER (WHERE type = 'view_item') AS view_item,
-                      count(DISTINCT session_id) FILTER (WHERE type = 'add_to_cart') AS add_to_cart,
-                      count(DISTINCT session_id) FILTER (WHERE type = 'begin_checkout') AS begin_checkout,
-                      count(DISTINCT session_id) FILTER (WHERE type = 'purchase') AS purchase
-               FROM events
-               WHERE at >= $3 AND at < $4 AND session_id IS NOT NULL AND market_id IS NOT NULL
+                      count(*) AS sessions,
+                      count(*) FILTER (WHERE view_item) AS view_item,
+                      count(*) FILTER (WHERE add_to_cart) AS add_to_cart,
+                      count(*) FILTER (WHERE begin_checkout) AS begin_checkout,
+                      count(*) FILTER (WHERE purchase) AS purchase
+               FROM (
+                   SELECT session_id,
+                          (array_agg(market_id ORDER BY at))[1] AS market_id,
+                          bool_or(type = 'view_item') AS view_item,
+                          bool_or(type = 'add_to_cart') AS add_to_cart,
+                          bool_or(type = 'begin_checkout') AS begin_checkout,
+                          bool_or(type = 'purchase') AS purchase
+                   FROM events
+                   WHERE session_id IS NOT NULL AND market_id IS NOT NULL
+                     AND at >= $3::timestamptz - interval '1 day' AND at < $4::timestamptz + interval '1 day'
+                   GROUP BY session_id
+                   HAVING min(at) >= $3 AND min(at) < $4
+               ) started
                GROUP BY market_id
            ) s
            CROSS JOIN LATERAL (VALUES
-               ('sessions', s.sessions::float8), ('page_views', s.page_views::float8),
+               ('sessions', s.sessions::float8),
                ('funnel.view_item', s.view_item::float8),
                ('funnel.add_to_cart', s.add_to_cart::float8),
                ('funnel.begin_checkout', s.begin_checkout::float8),
                ('funnel.purchase', s.purchase::float8)
            ) AS m(metric, value)"#,
+        tx.tenant_id(),
+        day,
+        start,
+        end
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query!(
+        r#"INSERT INTO daily_metrics (tenant_id, date, market_id, metric, dims, value)
+           SELECT $1, $2, market_id, 'page_views', '{}'::jsonb, count(*)::float8
+           FROM events
+           WHERE at >= $3 AND at < $4 AND type = 'page_view' AND market_id IS NOT NULL
+           GROUP BY market_id"#,
         tx.tenant_id(),
         day,
         start,
@@ -549,7 +546,8 @@ pub struct Traffic {
     pub page_requests: i64,
     pub consented_sessions: i64,
     pub consented_page_views: i64,
-    /// Consented sessions with a purchase / consented sessions; `None` without sessions.
+    /// Consented sessions with a purchase / consented sessions (by session start day);
+    /// `None` without sessions.
     pub conversion_rate: Option<f64>,
     /// Labelled "consented sessions" (A20): visitors without consent are not in it.
     pub funnel: Vec<FunnelStep>,
@@ -590,7 +588,9 @@ pub struct Dashboard {
     pub daily_traffic: Vec<DailyTraffic>,
     pub traffic: Traffic,
     pub top_products: Vec<TopProduct>,
+    /// Searches of consented visitors (minimized text).
     pub top_searches: Vec<QueryCount>,
+    /// Searches without results (the search log, minimized; filtered by the market's locales).
     pub zero_result_searches: Vec<QueryCount>,
     pub web_vitals: Vec<VitalP75>,
 }
@@ -731,15 +731,16 @@ pub async fn dashboard(tx: &mut TenantTx, q: &DashboardQuery) -> Result<Dashboar
     .fetch_all(&mut **tx)
     .await?;
 
+    // Consented visitors' searches (never collected before consent, A20).
     let top_searches = sqlx::query_as!(
         QueryCount,
-        r#"SELECT query AS "query!", sum(count)::bigint AS "count!"
-           FROM search_query_counts
-           WHERE day BETWEEN $1 AND $2
-             AND ($3::uuid IS NULL OR locale = ANY (SELECT unnest(locales) FROM markets WHERE id = $3))
-           GROUP BY query ORDER BY 2 DESC, 1 LIMIT $4"#,
-        q.from,
-        q.to,
+        r#"SELECT props->>'query' AS "query!", count(*) AS "count!"
+           FROM events
+           WHERE type = 'search' AND at >= $1 AND at < $2 AND props ? 'query'
+             AND ($3::uuid IS NULL OR market_id = $3)
+           GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT $4"#,
+        start,
+        end,
         m,
         TOP
     )

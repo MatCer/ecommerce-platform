@@ -16,15 +16,13 @@ CREATE TABLE analytics_counters (
     FOREIGN KEY (tenant_id, market_id) REFERENCES markets (tenant_id, id) ON DELETE CASCADE
 );
 
--- Search queries per day, counted by the edge (every request, edge-cached pages included) and
--- minimized like `search_zero_results` (product-like text only, folded, 90 days).
-CREATE TABLE search_query_counts (
-    tenant_id uuid NOT NULL REFERENCES platform.tenants (id),
-    day       date NOT NULL,
-    locale    text NOT NULL CHECK (locale ~ '^[a-z]{2}(-[A-Z]{2})?$'),
-    query     text NOT NULL CHECK (length(query) BETWEEN 1 AND 200),
-    count     integer NOT NULL CHECK (count > 0),
-    PRIMARY KEY (tenant_id, day, locale, query)
+-- Counter batches already added, so an edge retry of a batch (lost answer, partial failure)
+-- is not counted twice. Kept two days.
+CREATE TABLE analytics_counter_batches (
+    tenant_id   uuid NOT NULL REFERENCES platform.tenants (id),
+    batch_id    uuid NOT NULL,
+    received_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, batch_id)
 );
 
 -- Consented browser events and authoritative server events (purchase, refund). Monthly
@@ -37,8 +35,8 @@ CREATE TABLE events (
     tenant_id        uuid NOT NULL REFERENCES platform.tenants (id),
     at               timestamptz NOT NULL,
     type             text NOT NULL CHECK (type IN ('page_view', 'view_item', 'add_to_cart',
-                                                   'begin_checkout', 'web_vitals', 'purchase',
-                                                   'refund')),
+                                                   'begin_checkout', 'search', 'web_vitals',
+                                                   'purchase', 'refund')),
     anon_id          text CHECK (anon_id ~ '^[0-9a-f]{32}$'),
     customer_id      uuid,
     session_id       uuid,
@@ -121,20 +119,6 @@ $$;
 
 SELECT platform.ensure_event_partitions();
 
--- 90-day retention of the search query log, like the zero-result log (A20).
-CREATE POLICY retention_read ON search_query_counts FOR SELECT TO app_owner USING (true);
-CREATE POLICY retention_purge ON search_query_counts FOR DELETE TO app_owner
-    USING (day < current_date - 90);
-CREATE FUNCTION platform.purge_search_query_counts() RETURNS bigint
-LANGUAGE sql VOLATILE SECURITY DEFINER
-SET search_path = ''
-AS $$
-    WITH gone AS (
-        DELETE FROM public.search_query_counts WHERE day < current_date - 90 RETURNING 1
-    )
-    SELECT count(*) FROM gone
-$$;
-
 -- ---------------------------------------------------------------------------------------
 -- Outbound webhooks (§8.5, A21). The signing secret is encrypted at rest
 -- (`platform::crypto::SecretBox`, AES-256-GCM, nonce || ciphertext) and returned only when
@@ -188,7 +172,7 @@ DO $$
 DECLARE
     t text;
 BEGIN
-    FOREACH t IN ARRAY ARRAY['analytics_counters', 'search_query_counts', 'events',
+    FOREACH t IN ARRAY ARRAY['analytics_counters', 'analytics_counter_batches', 'events',
                              'daily_metrics', 'webhook_subscriptions', 'webhook_deliveries']
     LOOP
         EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
@@ -281,9 +265,9 @@ $$;
 
 REVOKE ALL ON FUNCTION queue.stats(), queue.outbox_lag_seconds(),
     queue.list_jobs(text, text, bigint, integer), queue.requeue(bigint),
-    platform.ensure_event_partitions(integer), platform.drop_event_partitions(integer),
-    platform.purge_search_query_counts() FROM PUBLIC;
+    platform.ensure_event_partitions(integer), platform.drop_event_partitions(integer)
+    FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION queue.stats(), queue.outbox_lag_seconds(),
     queue.list_jobs(text, text, bigint, integer), queue.requeue(bigint),
-    platform.ensure_event_partitions(integer), platform.drop_event_partitions(integer),
-    platform.purge_search_query_counts() TO app_runtime;
+    platform.ensure_event_partitions(integer), platform.drop_event_partitions(integer)
+    TO app_runtime;

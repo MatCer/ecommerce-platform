@@ -360,12 +360,7 @@ export function createGateway(opts: GatewayOptions) {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     // A20: counted before the cache, without identifiers (template + day only).
-    if (req.method === "GET" && opts.counters) {
-      const template = templateOf(url.pathname);
-      opts.counters.page(site, template);
-      const q = template === "search" ? url.searchParams.get("q") : null;
-      if (q) opts.counters.search(site, q);
-    }
+    if (req.method === "GET") opts.counters?.page(site, templateOf(url.pathname));
     const artifact = site.theme_artifact;
     if (!artifact)
       return text(503, "This shop has not been published yet", { "retry-after": "60" });

@@ -3,7 +3,7 @@
 #![allow(clippy::unwrap_used)]
 
 use chrono::{Duration, Utc};
-use commerce::analytics::{self, CounterBatch, DashboardQuery, PageCounter, SearchCounter};
+use commerce::analytics::{self, CounterBatch, DashboardQuery, PageCounter};
 use commerce::consent::{self, ConsentChoice, Purposes, Source, Subject, new_anon_id};
 use platform::db::tenant_tx;
 use serde_json::json;
@@ -39,6 +39,8 @@ fn beacon(shop: &Shop) -> Vec<u8> {
             { "type": "add_to_cart", "variant_id": shop.variants[0], "quantity": 2 },
             { "type": "web_vital", "template": "product", "name": "LCP", "value": 1800 },
             { "type": "web_vital", "template": "product", "name": "LCP", "value": 2600 },
+            { "type": "search", "template": "search", "query": "Modré  TRIČKO" },
+            { "type": "search", "template": "search", "query": "jan.novak@example.com" },
             { "type": "identify", "email": "a@b.cz" }
         ],
         // Claimed purposes are ignored (A20).
@@ -86,7 +88,7 @@ async fn events_need_server_side_analytics_consent(db: PgPool) {
     assert_eq!(ingest(&runtime, &shop, Some("not-a-subject"), now).await, 0);
     assert_eq!(events(&runtime, &shop).await, 0, "nothing without consent");
 
-    assert_eq!(ingest(&runtime, &shop, Some(&yes), now).await, 5);
+    assert_eq!(ingest(&runtime, &shop, Some(&yes), now).await, 6);
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     let rows: Vec<(String, String, Vec<String>)> =
         sqlx::query_as("SELECT DISTINCT anon_id, session_id::text, consent_purposes FROM events")
@@ -151,77 +153,67 @@ async fn purchases_rollups_and_the_dashboard(db: PgPool) {
     raw_order(&runtime, &shop, shop.sk, "EUR", 1_000, 1, "confirmed").await;
     raw_order(&runtime, &other, other.cz, "CZK", 77_700, 7, "confirmed").await;
 
+    let unconsented = new_anon_id();
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-    // The outbox handler and the checkout link write one row, in either order.
+    // The purchase joins the consented buyer's session once; without a grant nothing is kept.
     assert!(
         analytics::link_purchase(&mut tx, paid, &buyer, now)
             .await
             .unwrap()
     );
-    assert!(!analytics::record_purchase(&mut tx, paid).await.unwrap());
     assert!(
-        !analytics::link_purchase(&mut tx, paid, &browser, now)
+        !analytics::link_purchase(&mut tx, paid, &buyer, now)
+            .await
+            .unwrap(),
+        "a retried placement links nothing twice"
+    );
+    let other_order = raw_order(&runtime, &shop, shop.cz, "CZK", 5_000, 1, "confirmed").await;
+    assert!(
+        !analytics::link_purchase(&mut tx, other_order, &unconsented, now)
             .await
             .unwrap()
     );
-    let purchases: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM events WHERE type = 'purchase' AND anon_id IS NOT NULL",
-    )
-    .fetch_one(&mut *tx)
-    .await
-    .unwrap();
+    let purchases: i64 = sqlx::query_scalar("SELECT count(*) FROM events WHERE type = 'purchase'")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
     assert_eq!(purchases, 1);
     analytics::rollup(&mut tx, today).await.unwrap();
     analytics::rollup(&mut tx, today).await.unwrap(); // idempotent
     tx.commit().await.unwrap();
 
-    analytics::record_counters(
-        &runtime,
-        &CounterBatch {
-            counters: vec![
-                PageCounter {
-                    tenant_id: shop.tenant,
-                    market_id: shop.cz,
-                    day: today,
-                    template: "product".into(),
-                    requests: 40,
-                },
-                PageCounter {
-                    tenant_id: shop.tenant,
-                    market_id: shop.cz,
-                    day: today,
-                    template: "home".into(),
-                    requests: 60,
-                },
-                // Another tenant's market under this tenant: skipped, not an error.
-                PageCounter {
-                    tenant_id: shop.tenant,
-                    market_id: other.cz,
-                    day: today,
-                    template: "home".into(),
-                    requests: 1_000,
-                },
-            ],
-            searches: vec![
-                SearchCounter {
-                    tenant_id: shop.tenant,
-                    day: today,
-                    locale: "cs".into(),
-                    query: "Modré TRIČKO".into(),
-                    count: 3,
-                },
-                SearchCounter {
-                    tenant_id: shop.tenant,
-                    day: today,
-                    locale: "cs".into(),
-                    query: "jan.novak@example.com".into(),
-                    count: 1,
-                },
-            ],
-        },
-    )
-    .await
-    .unwrap();
+    let batch = CounterBatch {
+        batch_id: uuid::Uuid::now_v7(),
+        counters: vec![
+            PageCounter {
+                tenant_id: shop.tenant,
+                market_id: shop.cz,
+                day: today,
+                template: "product".into(),
+                requests: 40,
+            },
+            PageCounter {
+                tenant_id: shop.tenant,
+                market_id: shop.cz,
+                day: today,
+                template: "home".into(),
+                requests: 60,
+            },
+            // Another tenant's market under this tenant: skipped, not an error.
+            PageCounter {
+                tenant_id: shop.tenant,
+                market_id: other.cz,
+                day: today,
+                template: "home".into(),
+                requests: 1_000,
+            },
+        ],
+    };
+    let first = analytics::record_counters(&runtime, &batch).await.unwrap();
+    assert_eq!((first.counters, first.replayed_tenants), (2, 0));
+    // The edge resends a batch whose answer it lost: not counted twice.
+    let again = analytics::record_counters(&runtime, &batch).await.unwrap();
+    assert_eq!((again.counters, again.replayed_tenants), (0, 1));
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     let d = analytics::dashboard(
@@ -242,7 +234,7 @@ async fn purchases_rollups_and_the_dashboard(db: PgPool) {
             d.sales[0].orders,
             d.sales[0].aov_minor
         ),
-        ("CZK", 40_000, 2, 20_000)
+        ("CZK", 45_000, 3, 15_000)
     );
     assert_eq!(d.daily_traffic.len(), 7);
     assert_eq!(d.traffic.page_requests, 100);
@@ -251,7 +243,7 @@ async fn purchases_rollups_and_the_dashboard(db: PgPool) {
     assert_eq!(d.traffic.conversion_rate, Some(0.5));
     let funnel: Vec<i64> = d.traffic.funnel.iter().map(|s| s.sessions).collect();
     assert_eq!(funnel, [2, 2, 2, 0, 1]);
-    assert_eq!(d.top_products[0].units, 3);
+    assert_eq!(d.top_products[0].units, 4);
     assert_eq!(
         d.top_searches.len(),
         1,
@@ -259,7 +251,7 @@ async fn purchases_rollups_and_the_dashboard(db: PgPool) {
     );
     assert_eq!(
         (d.top_searches[0].query.as_str(), d.top_searches[0].count),
-        ("modre tricko", 3)
+        ("modre tricko", 2)
     );
     let lcp = &d.web_vitals[0];
     assert_eq!(
@@ -301,7 +293,7 @@ async fn purchases_rollups_and_the_dashboard(db: PgPool) {
         "events",
         "daily_metrics",
         "analytics_counters",
-        "search_query_counts",
+        "analytics_counter_batches",
     ] {
         let n: i64 =
             sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))

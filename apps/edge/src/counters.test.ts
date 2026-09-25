@@ -20,45 +20,31 @@ test("route templates", () => {
   expect(templateOf("/nope")).toBe("other");
 });
 
-test("counts per template and day without identifiers, searches folded", () => {
-  const c = new Counters();
-  c.page(site, "product", now);
-  c.page(site, "product", now);
-  c.page(site, "home", now);
-  c.search(site, "  Modré   Tričko ", now);
-  c.search(site, "modré tričko", now);
-  c.search(site, "   ", now);
-  const batch = c.drain();
-  expect(batch.counters).toEqual([
-    { tenant_id: "t1", market_id: "m1", day: "2026-10-01", template: "product", requests: 2 },
-    { tenant_id: "t1", market_id: "m1", day: "2026-10-01", template: "home", requests: 1 },
-  ]);
-  expect(batch.searches).toEqual([
-    { tenant_id: "t1", day: "2026-10-01", locale: "cs", query: "modré tričko", count: 2 },
-  ]);
-  expect(c.size).toBe(0);
-});
+type Sent = { batch_id: string; counters: { template: string; requests: number }[] };
 
-test("a failed flush keeps the counts for the next one", async () => {
+test("counts per template and day; a failed batch is resent unchanged, then new counts", async () => {
   const c = new Counters();
+  c.page(site, "product", now);
+  c.page(site, "product", now);
   c.page(site, "home", now);
-  const sent: unknown[] = [];
-  await expect(
-    c.flush("http://api", "tok", async () => new Response(null, { status: 503 })),
-  ).rejects.toThrow();
-  c.page(site, "home", now);
-  await c.flush("http://api", "tok", async (req) => {
+  const sent: Sent[] = [];
+  const answer = (status: number) => async (req: Request) => {
     expect(req.headers.get("authorization")).toBe("Bearer tok");
-    sent.push(await req.json());
-    return new Response("{}", { status: 200 });
-  });
-  expect(sent).toEqual([
-    {
-      counters: [
-        { tenant_id: "t1", market_id: "m1", day: "2026-10-01", template: "home", requests: 2 },
-      ],
-      searches: [],
-    },
-  ]);
+    sent.push((await req.json()) as Sent);
+    return new Response(null, { status });
+  };
+  await expect(c.flush("http://api", "tok", answer(503))).rejects.toThrow();
+  expect(c.size).toBe(2);
+  c.page(site, "home", now);
+  await c.flush("http://api", "tok", answer(200));
   expect(c.size).toBe(0);
+  const [failed, resent, next] = sent;
+  expect(resent?.batch_id).toBe(failed?.batch_id);
+  expect(resent?.counters.map((r) => [r.template, r.requests])).toEqual([
+    ["product", 2],
+    ["home", 1],
+  ]);
+  expect(next?.batch_id).not.toBe(failed?.batch_id);
+  expect(next?.counters.map((r) => [r.template, r.requests])).toEqual([["home", 1]]);
+  expect(JSON.stringify(sent)).not.toMatch(/ip|cookie|query/i);
 });

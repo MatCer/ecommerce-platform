@@ -269,7 +269,17 @@ pub fn app(state: AppState, docs: bool) -> Router {
 /// ids and tokens in paths never become labels).
 async fn record_latency(req: Request, next: Next) -> Response {
     let started = std::time::Instant::now();
-    let method = req.method().to_string();
+    // A fixed label set: extension methods must not mint new series.
+    let method = match *req.method() {
+        Method::GET => "GET",
+        Method::POST => "POST",
+        Method::PUT => "PUT",
+        Method::PATCH => "PATCH",
+        Method::DELETE => "DELETE",
+        Method::HEAD => "HEAD",
+        Method::OPTIONS => "OPTIONS",
+        _ => "OTHER",
+    };
     let route = req
         .extensions()
         .get::<MatchedPath>()

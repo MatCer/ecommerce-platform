@@ -34,11 +34,6 @@ pub fn subscribers(event_type: &str) -> &'static [&'static str] {
         commerce::customers::EMAIL_VERIFIED_EVENT => {
             &[handlers::EVENTS_LOG, handlers::LINK_GUEST_ORDERS]
         }
-        commerce::orders::CREATED_EVENT => &[
-            handlers::EVENTS_LOG,
-            handlers::PURCHASE_JOB,
-            handlers::FANOUT_JOB,
-        ],
         // ponytail: a fan-out job per event even for tenants without subscriptions (it finds
         // none and finishes); filter here if event volume makes that noticeable.
         t if commerce::webhooks::is_event(t) => &[handlers::EVENTS_LOG, handlers::FANOUT_JOB],
@@ -113,14 +108,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn webhook_events_fan_out_and_orders_feed_analytics() {
+    fn webhook_events_fan_out() {
         assert_eq!(
             subscribers("order.created"),
-            [
-                handlers::EVENTS_LOG,
-                handlers::PURCHASE_JOB,
-                handlers::FANOUT_JOB
-            ]
+            [handlers::EVENTS_LOG, handlers::FANOUT_JOB]
         );
         for t in commerce::webhooks::EVENTS {
             assert!(subscribers(t).contains(&handlers::FANOUT_JOB), "{t}");

@@ -169,7 +169,7 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
     assert_eq!(payload["data"]["number"], "1");
     assert!(headers.get("cookie").is_none() && headers.get("authorization").is_none());
 
-    // Redeliver a succeeded delivery; then fail it past the 24 h window → dead.
+    // Redeliver a succeeded delivery (a new window: its job key differs from earlier ones).
     let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
     let again = webhooks::redeliver(&mut tx, "staff", d).await.unwrap();
     assert_eq!(again.status, "retrying");
@@ -177,16 +177,21 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
         webhooks::redeliver(&mut tx, "staff", d).await.is_err(),
         "in progress"
     );
+    tx.commit().await.unwrap();
+    assert_eq!(jobs(&db, d).await.len(), 3);
+    // An attempt that only runs after the 24 h window (backlog, outage) sends nothing: dead.
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
     sqlx::query("UPDATE webhook_deliveries SET window_started_at = now() - interval '25 hours'")
         .execute(&mut *tx)
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    *rx.status.lock().unwrap() = 503;
+    let received = rx.got.lock().unwrap().len();
     assert_eq!(
         webhooks::deliver(&runtime, &h, tenant, d, 3).await.unwrap(),
         Attempt::Dead
     );
+    assert_eq!(rx.got.lock().unwrap().len(), received, "nothing sent late");
     let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
     let dead = &webhooks::deliveries(&mut tx, Some(created.subscription.id), None, 10)
         .await
@@ -194,8 +199,20 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
         .items[0];
     assert_eq!(
         (dead.status.as_str(), dead.attempts, dead.response_code),
-        ("dead", 3, Some(503))
+        ("dead", 3, None)
     );
+    // A delivery whose job was lost (overdue by over an hour) can be redelivered too.
+    sqlx::query(
+        "UPDATE webhook_deliveries SET status = 'retrying', next_at = now() - interval '2 hours'",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    webhooks::redeliver(&mut tx, "staff", d).await.unwrap();
+    sqlx::query("UPDATE webhook_deliveries SET status = 'dead', attempts = 3")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
 
     // Rotation: the next delivery is signed with the new secret.
     let rotated = webhooks::rotate_secret(&mut tx, &h, "staff", created.subscription.id)

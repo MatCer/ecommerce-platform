@@ -77,6 +77,6 @@ const CONSENT_KEYS = [
     </main>
     <Footer shop={shop} alternates={seo.alternates} />
     <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} textVersion={shop.consent.text_version} labels={pick(CONSENT_KEYS)} />
-    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} template={template} productId={productId} />
+    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} template={template} productId={productId} query={template === "search" ? q || undefined : undefined} />
   </body>
 </html>

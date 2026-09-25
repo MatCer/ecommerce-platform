@@ -103,21 +103,26 @@ async fn counters_need_the_service_token_and_feed_the_dashboard(db: PgPool) {
     let c = setup(db).await;
     let today = Utc::now().date_naive();
     let batch = json!({
+        "batch_id": uuid::Uuid::now_v7(),
         "counters": [{ "tenant_id": c.shop.tenant, "market_id": c.shop.cz, "day": today,
                        "template": "product", "requests": 12 }],
-        "searches": [{ "tenant_id": c.shop.tenant, "day": today, "locale": "cs",
-                       "query": "triko", "count": 4 }],
     });
     let (status, _, _) = Call::post("/internal/v1/analytics/counters", batch.clone())
         .send(&c.s)
         .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    let (status, body, _) = Call::post("/internal/v1/analytics/counters", batch)
-        .header("authorization", format!("Bearer {SERVICE_TOKEN}"))
-        .send(&c.s)
-        .await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body, json!({ "counters": 1, "searches": 1 }));
+    for expected in [
+        json!({ "counters": 1, "replayed_tenants": 0 }),
+        // The same batch again (a lost answer): not counted twice.
+        json!({ "counters": 0, "replayed_tenants": 1 }),
+    ] {
+        let (status, body, _) = Call::post("/internal/v1/analytics/counters", batch.clone())
+            .header("authorization", format!("Bearer {SERVICE_TOKEN}"))
+            .send(&c.s)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body, expected);
+    }
 
     let uri = format!("/admin/v1/analytics/dashboard?from={today}&to={today}");
     let (status, _, _) = Call::get(&uri).send(&c.s).await;
@@ -129,10 +134,7 @@ async fn counters_need_the_service_token_and_feed_the_dashboard(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::OK, "{d}");
     assert_eq!(d["traffic"]["page_requests"], 12);
-    assert_eq!(
-        d["top_searches"][0],
-        json!({ "query": "triko", "count": 4 })
-    );
+    assert_eq!(d["top_searches"], json!([]), "no consented searches yet");
     assert_eq!(d["traffic"]["funnel"][0]["step"], "sessions");
     let bad = format!("/admin/v1/analytics/dashboard?from={today}&to=2020-01-01");
     let (status, _, _) = Call::get(&bad)

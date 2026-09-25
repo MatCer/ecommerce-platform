@@ -5,8 +5,9 @@
 #   minio/public    mirror of the public bucket (image variants)
 #   minio/private   mirror of the private bucket (originals, theme/checkout artifacts, ...)
 #   manifest.txt    timestamp, git commit, compose project, checksums, object counts
-# Online: the stack keeps running (pg_dump is a consistent snapshot; the buckets are copied
-# after it, so objects created meanwhile may be included, which a restore tolerates).
+# Consistent pair: the writers (api, worker) are stopped while the database and the buckets are
+# copied, so no object the dump references can be purged (media.purge jobs) or appear between
+# the two copies. Local downtime is a few seconds; prod uses provider PITR + versioned buckets.
 # Not included: Meilisearch (rebuilt on restore), Mailpit, the edge artifact cache (refilled).
 source "$(dirname "$0")/lib/ops.sh"
 
@@ -17,6 +18,15 @@ require_running postgres minio
 mkdir -p "$dir/minio/public" "$dir/minio/private"
 dir=$(cd "$dir" && pwd)
 start=$SECONDS
+
+writers=$("${compose[@]}" ps --status running --services | grep -xE 'api|worker' || true)
+if [[ -n $writers ]]; then
+  log "stopping writers for a consistent copy: $(echo $writers)"
+  # shellcheck disable=SC2086 # word splitting intended: one service per word
+  "${compose[@]}" stop $writers >/dev/null
+  # shellcheck disable=SC2086
+  trap '"${compose[@]}" start $writers >/dev/null && log "writers restarted"' EXIT
+fi
 
 log "pg_dump app -> $dir/app.dump"
 "${compose[@]}" exec -T postgres pg_dump -U postgres -d app -Fc >"$dir/app.dump"

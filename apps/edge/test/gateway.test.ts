@@ -956,13 +956,21 @@ describe("analytics (A20) and client addresses (§8.1)", () => {
       await hit("http://demo.localhost:8280/", ip); // edge cache hit: still a request
       await hit("http://demo.localhost:8280/search?q=Modr%C3%A9%20triko", ip);
       await hit("http://demo.localhost:8280/_astro/app.v1.js");
-      const batch = counters.drain();
+      const flushed: string[] = [];
+      await counters.flush("http://api.test", "tok", async (req) => {
+        flushed.push(await req.text());
+        return new Response("{}");
+      });
+      const batch = JSON.parse(flushed[0] ?? "{}") as {
+        counters: { template: string; requests: number }[];
+      };
       expect(batch.counters.map((c) => [c.template, c.requests])).toEqual([
         ["home", 2],
         ["search", 1],
       ]);
-      expect(batch.searches.map((s) => [s.query, s.count])).toEqual([["modré triko", 1]]);
-      expect(JSON.stringify(batch)).not.toContain("198.51.100.4");
+      // No address, no query text: template and day only (A20).
+      expect(flushed.join()).not.toContain("198.51.100.4");
+      expect(flushed.join().toLowerCase()).not.toContain("triko");
       // SSR binding calls carry the client address (rate limits per token + IP).
       const ssr = api.calls.find((c) => c.url.includes("/storefront/v1/"));
       expect(ssr?.headers["x-client-ip"]).toBe("198.51.100.4");
