@@ -12,6 +12,7 @@ object_store.workspace = true
 platform.workspace = true
 reqwest.workspace = true
 sqlx.workspace = true
+tokio.workspace = true
 uuid.workspace = true
 
 [lints]

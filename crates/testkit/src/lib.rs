@@ -9,6 +9,7 @@
 
 pub mod catalog;
 pub mod pricing;
+pub mod smtp;
 pub mod storefront;
 
 use std::sync::Arc;
