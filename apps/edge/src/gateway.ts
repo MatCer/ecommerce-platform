@@ -837,6 +837,8 @@ ${
           "x-cart-token": token,
           ...(body ? { "content-type": "application/json" } : {}),
           ...(key ? { "idempotency-key": key } : {}),
+          // A20: the API records add-to-cart for a consented visitor (server-resolved).
+          ...consentSubject(req),
         }),
         body,
       }),
@@ -881,7 +883,7 @@ ${
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/cart/handoff`, {
         method: "POST",
-        headers: apiHeaders(site, { "x-cart-token": token }),
+        headers: apiHeaders(site, { "x-cart-token": token, ...consentSubject(req) }),
       }),
     );
     const h = res.ok ? ((await res.json()) as { token?: unknown }).token : undefined;
@@ -1335,6 +1337,12 @@ function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Prom
       }, ms);
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+/** The anonymous consent subject from its cookie, as an API header (A20). */
+function consentSubject(req: Request): Record<string, string> {
+  const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+  return subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {};
 }
 
 /** API answers keep a rate limit's `Retry-After` (spec §8.1) when proxied. */

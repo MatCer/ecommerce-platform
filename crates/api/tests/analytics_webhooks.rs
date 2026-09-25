@@ -92,10 +92,35 @@ async fn beacon_events_follow_server_side_consent(db: PgPool) {
     assert_eq!(status, StatusCode::ACCEPTED);
     assert_eq!(c.events().await, 1);
 
+    // Cart steps are recorded by the API itself for a consented visitor (no client script).
+    let (_, _, created) = c.sf(Call::post("/storefront/v1/cart", json!({}))).await;
+    let cart = created.headers()["x-cart-token"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let (status, _, _) = c
+        .sf(Call::post(
+            "/storefront/v1/cart/lines",
+            json!({ "variant_id": c.shop.variants[0], "quantity": 1 }),
+        )
+        .header("x-cart-token", cart.clone())
+        .header("x-consent-subject", subject.clone()))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _, _) = c
+        .sf(Call::post(
+            "/storefront/v1/cart/lines",
+            json!({ "variant_id": c.shop.variants[1] }),
+        )
+        .header("x-cart-token", cart))
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(c.events().await, 2, "only the consented add is recorded");
+
     // Without the subject header nothing is stored, whatever the beacon claims.
     let claimed = json!({ "events": [{ "type": "page_view" }], "consent": ["analytics"] });
     c.sf(Call::post("/storefront/v1/events", claimed)).await;
-    assert_eq!(c.events().await, 1);
+    assert_eq!(c.events().await, 2);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

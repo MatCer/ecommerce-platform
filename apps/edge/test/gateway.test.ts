@@ -992,6 +992,20 @@ describe("analytics (A20) and client addresses (§8.1)", () => {
       expect(sent?.headers["x-consent-subject"]).toBe("c".repeat(32)); // the cookie, not a header
       expect(sent?.headers["x-client-ip"]).toBe("198.51.100.4");
 
+      // Cart writes carry the subject too: the API records add-to-cart for consented visitors.
+      api.calls.length = 0;
+      await hit(
+        "http://demo.localhost:8280/_p/cart/lines",
+        {
+          origin: "http://demo.localhost:8280",
+          "content-type": "application/json",
+          cookie: `__Secure-consent_id=${"c".repeat(32)}`,
+        },
+        { method: "POST", body: JSON.stringify({ variant_id: "v1", quantity: 1 }) },
+      );
+      const lines = api.calls.find((c) => c.url.endsWith("/storefront/v1/cart/lines"));
+      expect(lines?.headers["x-consent-subject"]).toBe("c".repeat(32));
+
       // A rate-limited API answer keeps its Retry-After through the edge (§8.1).
       const limited = await hit("http://demo.localhost:8280/_p/public/pages/product/limited");
       expect(limited.status).toBe(429);

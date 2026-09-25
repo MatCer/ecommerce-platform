@@ -13,6 +13,7 @@ use commerce::storefront::Context;
 use platform::Error;
 use platform::db::TenantTx;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -175,7 +176,7 @@ async fn add_line(
     body: Bytes,
 ) -> Result<Response, Error> {
     let line: NewLine = parse_json(&body)?;
-    with_cart(
+    let res = with_cart(
         &s,
         &shopper,
         &headers,
@@ -183,7 +184,33 @@ async fn add_line(
         mutation("POST /cart/lines", &body),
         async |tx, ctx, c| cart::add_line(tx, ctx, c, &line).await,
     )
-    .await
+    .await?;
+    if !res.headers().contains_key(REPLAYED) {
+        let event = json!({ "type": "add_to_cart", "variant_id": line.variant_id,
+                            "quantity": line.quantity, "template": "product" });
+        track(&s, &shopper, &headers, &event).await;
+    }
+    Ok(res)
+}
+
+/// A20: a consented visitor's cart step joins their analytics session, recorded here (no
+/// client script needed). Best effort after the change; nothing is stored unless the consent
+/// records of the subject (`X-Consent-Subject`, the edge's cookie) grant `analytics`.
+async fn track(s: &AppState, shopper: &Shopper, headers: &HeaderMap, event: &serde_json::Value) {
+    let Some(subject) =
+        super::customer::header_str(headers, super::customer::CONSENT_SUBJECT_HEADER)
+    else {
+        return;
+    };
+    let body = json!({ "events": [event] }).to_string();
+    let stored = with_ctx(s, shopper, async |tx, ctx| {
+        commerce::analytics::ingest(tx, ctx.market.id, Some(subject), body.as_bytes(), ctx.now)
+            .await
+    })
+    .await;
+    if let Err(e) = stored {
+        tracing::warn!(error = %e, "recording a cart analytics event failed");
+    }
 }
 
 fn line_id(path: Result<Path<Uuid>, PathRejection>) -> Result<Uuid, Error> {
@@ -333,6 +360,13 @@ async fn start_handoff(
         cart::start_handoff(tx, &c).await
     })
     .await?;
+    track(
+        &s,
+        &shopper,
+        &headers,
+        &json!({ "type": "begin_checkout", "template": "other" }),
+    )
+    .await;
     Ok(no_store(
         Json(HandoffToken { token: handoff }).into_response(),
     ))
