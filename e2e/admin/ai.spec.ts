@@ -73,7 +73,11 @@ const panel = () => page.getByRole("region", { name: "AI assistant" });
 async function openProduct(): Promise<void> {
   await page.goto("/products");
   await page.getByLabel("Search by name or SKU").fill(productName);
-  await page.getByRole("link", { name: productName, exact: true }).first().click();
+  // The list shows the English name once a previous run translated the product.
+  await page
+    .getByRole("link", { name: new RegExp(`^${productName}( \\[en\\])?$`) })
+    .first()
+    .click();
   await expect(panel()).toBeVisible();
 }
 
@@ -112,11 +116,15 @@ test("generates a description, previews it and accepts it with an AI label", asy
   await ai.getByRole("button", { name: "Generate proposal" }).click();
   const changes = ai.getByRole("list", { name: "Proposed changes" });
   await expect(changes).toBeVisible({ timeout: 30_000 });
-  await expect(changes.getByText(/ukázkový popis od demo AI \(premium, short\)/)).toBeVisible();
+  await expect(
+    changes.getByText(/ukázkový popis od demo AI \(premium, short\)/).last(),
+  ).toBeVisible();
   expect(saves).toEqual([]);
   await expectAccessible(page, "ai-proposal");
   // Accept the description only.
-  await ai.getByRole("checkbox", { name: "Short description (CS)" }).uncheck();
+  // Kobalte checkboxes: the visually hidden input is toggled through its label.
+  await ai.locator("label").filter({ hasText: "Short description (CS)" }).click();
+  await expect(ai.getByRole("checkbox", { name: "Short description (CS)" })).not.toBeChecked();
   await ai.getByRole("button", { name: "Accept selected" }).click();
   await expect(page.getByText("AI proposal saved")).toBeVisible();
   await expect(ai.getByText("AI-generated: Description (CS)")).toBeVisible();
@@ -157,15 +165,23 @@ test("translates the product cs → sk/en and keeps glossary terms", async () =>
   await expect(ai.getByRole("checkbox", { name: "Name (SK)" })).toBeVisible();
   await expect(ai.getByRole("checkbox", { name: "Name (EN)" })).toBeVisible();
   // The accepted description names the brand; the glossary keeps it in both languages.
-  const enDescription = changes.getByRole("listitem").filter({ hasText: "Description (EN)" });
+  const enDescription = changes.getByRole("listitem").filter({ hasText: /^Description \(EN\)/ });
   await expect(enDescription).toContainText("Lnen & Co.");
   await expect(ai.getByText("Check before accepting")).toBeHidden();
   // Accept the English fields only (the demo's Slovak texts stay as seeded).
-  for (const box of await ai.getByRole("checkbox", { name: /\(SK\)$/ }).all()) await box.uncheck();
+  for (const label of await ai
+    .locator("label")
+    .filter({ hasText: /\(SK\)$/ })
+    .all())
+    await label.click();
+  for (const box of await ai.getByRole("checkbox", { name: /\(SK\)$/ }).all())
+    await expect(box).not.toBeChecked();
   await ai.getByRole("button", { name: "Accept selected" }).click();
   await expect(page.getByText("AI proposal saved")).toBeVisible();
   await page.getByRole("tab", { name: /English/ }).click();
-  await expect(page.getByLabel("Name", { exact: true })).toHaveValue(`${productName} [en]`);
+  await expect(
+    page.getByRole("tabpanel", { name: "English" }).getByRole("textbox", { name: "Name" }),
+  ).toHaveValue(`${productName} [en]`);
   await expect(ai.getByText("AI-generated: Name (EN)")).toBeVisible();
 });
 
