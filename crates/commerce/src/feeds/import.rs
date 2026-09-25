@@ -97,6 +97,9 @@ pub struct NewImport {
     pub url: Option<String>,
     /// Or upload a file of this many bytes (at most 100 MB) with the returned presigned PUT.
     pub upload_size: Option<u64>,
+    /// Publish new products right away instead of creating drafts (the default, A28).
+    #[serde(default)]
+    pub activate: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -192,6 +195,8 @@ pub struct ImportRun {
     pub source: Source,
     pub market_id: Uuid,
     pub url: Option<String>,
+    /// New products are published (`active`) instead of drafts.
+    pub activate: bool,
     pub status: RunStatus,
     pub report: Option<ImportReport>,
     pub progress: Progress,
@@ -272,6 +277,7 @@ struct RunRow {
     market_id: Uuid,
     url: Option<String>,
     object_key: String,
+    activate: bool,
     status: String,
     report: Option<Value>,
     progress: Value,
@@ -289,6 +295,7 @@ impl From<RunRow> for ImportRun {
             source: Source::parse(&r.source),
             market_id: r.market_id,
             url: r.url,
+            activate: r.activate,
             status: RunStatus::parse(&r.status),
             report: r.report.and_then(|v| serde_json::from_value(v).ok()),
             progress: serde_json::from_value(r.progress).unwrap_or_default(),
@@ -305,7 +312,7 @@ async fn row(tx: &mut TenantTx, id: Uuid, lock: bool) -> Result<RunRow, Error> {
     let q = if lock {
         sqlx::query_as!(
             RunRow,
-            "SELECT id, source, market_id, url, object_key, status, report, progress, error,
+            "SELECT id, source, market_id, url, object_key, activate, status, report, progress, error,
                     created_by, created_at, updated_at, applied_at
              FROM import_runs WHERE id = $1 FOR UPDATE",
             id
@@ -315,7 +322,7 @@ async fn row(tx: &mut TenantTx, id: Uuid, lock: bool) -> Result<RunRow, Error> {
     } else {
         sqlx::query_as!(
             RunRow,
-            "SELECT id, source, market_id, url, object_key, status, report, progress, error,
+            "SELECT id, source, market_id, url, object_key, activate, status, report, progress, error,
                     created_by, created_at, updated_at, applied_at
              FROM import_runs WHERE id = $1",
             id
@@ -334,7 +341,7 @@ pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<ImportRun, Error> {
 pub async fn list(tx: &mut TenantTx) -> Result<ImportRunList, Error> {
     let items = sqlx::query_as!(
         RunRow,
-        "SELECT id, source, market_id, url, object_key, status, report, progress, error,
+        "SELECT id, source, market_id, url, object_key, activate, status, report, progress, error,
                 created_by, created_at, updated_at, applied_at
          FROM import_runs ORDER BY id DESC LIMIT 50"
     )
@@ -364,8 +371,8 @@ pub async fn create(
     };
     sqlx::query!(
         "INSERT INTO import_runs (id, tenant_id, source, market_id, url, object_key, status,
-                                  created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                                  created_by, activate)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         id,
         tenant_id,
         input.source.as_str(),
@@ -373,7 +380,8 @@ pub async fn create(
         input.url,
         key.as_ref(),
         status,
-        actor
+        actor,
+        input.activate
     )
     .execute(&mut **tx)
     .await
@@ -622,6 +630,7 @@ pub async fn run_step(
         source,
         target: &t,
         actor: &actor,
+        activate: r.activate,
     };
     for (i, group) in plan.iter().enumerate() {
         if let Err(e) = ctx.apply_group(group, &mut progress, &mut report).await {
@@ -933,6 +942,7 @@ struct ApplyCtx<'a> {
     source: Source,
     target: &'a Target,
     actor: &'a str,
+    activate: bool,
 }
 
 async fn mapped(
@@ -1404,7 +1414,11 @@ impl ApplyCtx<'_> {
                     report.collision("slug", &first.item_id, &slug);
                 }
                 ProductInput {
-                    status: ProductStatus::Draft,
+                    status: if self.activate {
+                        ProductStatus::Active
+                    } else {
+                        ProductStatus::Draft
+                    },
                     brand: first.brand.clone(),
                     gpsr: Default::default(),
                     unit_measure: None,
@@ -1458,10 +1472,15 @@ impl ApplyCtx<'_> {
                 let imported_params: HashSet<Uuid> =
                     param_values.iter().map(|v| v.parameter_id).collect();
                 let mut parameters = param_values;
-                parameters.extend(p.parameters.iter().cloned().filter(|v| {
-                    !imported_params.contains(&v.parameter_id)
-                        && v.variant_sku.as_deref().is_none_or(|s| skus.contains(s))
-                }));
+                parameters.extend(
+                    p.parameters
+                        .iter()
+                        .filter(|v| {
+                            !imported_params.contains(&v.parameter_id)
+                                && v.variant_sku.as_deref().is_none_or(|s| skus.contains(s))
+                        })
+                        .cloned(),
+                );
                 let mut all_media = media;
                 for m in &p.media {
                     if !all_media.iter().any(|x| x.asset_id == m.asset_id)
@@ -1673,6 +1692,7 @@ mod tests {
             market_id: Uuid::now_v7(),
             url: None,
             upload_size: None,
+            activate: false,
         };
         assert!(base.validate().is_err());
         let url = NewImport {

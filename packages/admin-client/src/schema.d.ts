@@ -2305,6 +2305,8 @@ export interface components {
             variants: number;
         };
         ImportRun: {
+            /** @description New products are published (`active`) instead of drafts. */
+            activate: boolean;
             /** Format: date-time */
             applied_at?: string | null;
             /** Format: date-time */
@@ -2655,6 +2657,8 @@ export interface components {
             translations: components["schemas"]["CategoryTranslation"][];
         };
         NewImport: {
+            /** @description Publish new products right away instead of creating drafts (the default, A28). */
+            activate?: boolean;
             /**
              * Format: uuid
              * @description Prices go into this market's price list; names into its default locale.

@@ -109,6 +109,8 @@ export const sk: Dictionary = {
     urlMode: "Z URL adresy",
     file: "XML súbor",
     startImport: "Spustiť skúšobný import",
+    activate: "Rovno zverejniť nové produkty",
+    activateHint: "Inak vzniknú ako koncepty, ktoré zverejníte po kontrole.",
     history: "História importov",
     emptyImports: "Zatiaľ žiadne importy",
     created: "Vytvorené",

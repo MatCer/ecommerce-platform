@@ -107,6 +107,8 @@ export const en = {
     urlMode: "From URL",
     file: "XML file",
     startImport: "Start dry run",
+    activate: "Publish new products right away",
+    activateHint: "Otherwise they are created as drafts you publish after review.",
     history: "Import history",
     emptyImports: "No imports yet",
     created: "Created",

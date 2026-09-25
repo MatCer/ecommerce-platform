@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  Checkbox,
   ConfirmDialog,
   EmptyState,
   PermissionDenied,
@@ -181,6 +182,7 @@ function ImportList() {
     [mode, setMode] = createSignal("file"),
     [file, setFile] = createSignal<File>(),
     [url, setUrl] = createSignal(""),
+    [activate, setActivate] = createSignal(false),
     [progress, setProgress] = createSignal(0),
     [error, setError] = createSignal<string>();
   const marketId = () =>
@@ -201,6 +203,7 @@ function ImportList() {
       const body: Schemas["NewImport"] = {
         source: source(),
         market_id: marketId(),
+        activate: activate(),
         ...(mode() === "file" ? { upload_size: f?.size } : { url: url().trim() }),
       };
       const result = await unwrap(api.POST("/admin/v1/imports", { params: { header }, body }));
@@ -303,6 +306,12 @@ function ImportList() {
             </label>
           </Show>
         </fieldset>
+        <Checkbox
+          label={t("content.activate")}
+          description={t("content.activateHint")}
+          checked={activate()}
+          onChange={setActivate}
+        />
         <Show when={start.isPending}>
           <div role="status">
             <progress max={1} value={progress()} aria-label={t("content.fileMode")} />{" "}

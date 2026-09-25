@@ -108,6 +108,8 @@ export const cs: Dictionary = {
     urlMode: "Z URL adresy",
     file: "XML soubor",
     startImport: "Spustit zkušební import",
+    activate: "Rovnou zveřejnit nové produkty",
+    activateHint: "Jinak vzniknou jako koncepty, které zveřejníte po kontrole.",
     history: "Historie importů",
     emptyImports: "Zatím žádné importy",
     created: "Vytvořeno",

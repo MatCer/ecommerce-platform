@@ -82,6 +82,8 @@ CREATE TABLE import_runs (
     -- The merchant's URL (downloaded through the SSRF-safe client) or NULL for an upload.
     url         text CHECK (length(url) <= 2000),
     object_key  text NOT NULL,
+    -- New products are drafts unless the merchant chose to publish them right away (A28).
+    activate    boolean NOT NULL DEFAULT false,
     status      text NOT NULL DEFAULT 'pending'
                 CHECK (status IN ('pending', 'analyzing', 'analyzed', 'applying', 'applied',
                                   'failed')),

@@ -390,6 +390,11 @@ pub async fn items(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<ExportItem>, 
     Ok(out)
 }
 
+/// (product, variant or `None` for product level).
+type MediaKey = (Uuid, Option<Uuid>);
+/// Option code, option name, value code -> value name.
+type OptionLabels = (String, String, HashMap<String, String>);
+
 async fn items_of(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -423,7 +428,7 @@ async fn items_of(
                 .push(url);
         }
     }
-    let mut params: HashMap<(Uuid, Option<Uuid>), Vec<(String, String)>> = HashMap::new();
+    let mut params: HashMap<MediaKey, Vec<(String, String)>> = HashMap::new();
     for r in sqlx::query!(
         "SELECT v.product_id, v.variant_id, v.value, p.name_i18n, p.kind, p.unit
          FROM product_parameter_values v JOIN parameters p ON p.id = v.parameter_id
@@ -445,7 +450,7 @@ async fn items_of(
             .push((name, value));
     }
     // Option labels: product -> option code -> (option name, value code -> value name).
-    let mut options: HashMap<Uuid, Vec<(String, String, HashMap<String, String>)>> = HashMap::new();
+    let mut options: HashMap<Uuid, Vec<OptionLabels>> = HashMap::new();
     for r in sqlx::query!(
         r#"SELECT product_id, code, name_i18n, "values" AS vals FROM product_options
            WHERE product_id = ANY($1) ORDER BY product_id, position"#,

@@ -96,9 +96,8 @@ impl LegalEntity {
                 return Err(invalid(CODE, format!("{name} contains control characters")));
             }
         }
-        if !self.country.is_empty()
-            && !(self.country.len() == 2 && self.country.bytes().all(|b| b.is_ascii_uppercase()))
-        {
+        let iso2 = self.country.len() == 2 && self.country.bytes().all(|b| b.is_ascii_uppercase());
+        if !self.country.is_empty() && !iso2 {
             return Err(invalid(CODE, "country must be an ISO 3166-1 alpha-2 code"));
         }
         if !self.email.is_empty() && crate::staff::normalize_email(&self.email).is_err() {

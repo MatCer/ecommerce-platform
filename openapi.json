@@ -10910,6 +10910,7 @@
           "id",
           "source",
           "market_id",
+          "activate",
           "status",
           "progress",
           "created_by",
@@ -10917,6 +10918,10 @@
           "updated_at"
         ],
         "properties": {
+          "activate": {
+            "type": "boolean",
+            "description": "New products are published (`active`) instead of drafts."
+          },
           "applied_at": {
             "type": [
               "string",
@@ -12003,6 +12008,10 @@
           "market_id"
         ],
         "properties": {
+          "activate": {
+            "type": "boolean",
+            "description": "Publish new products right away instead of creating drafts (the default, A28)."
+          },
           "market_id": {
             "type": "string",
             "format": "uuid",

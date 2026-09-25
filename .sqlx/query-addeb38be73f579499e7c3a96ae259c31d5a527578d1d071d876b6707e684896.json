@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, source, market_id, url, object_key, status, report, progress, error,\n                    created_by, created_at, updated_at, applied_at\n             FROM import_runs WHERE id = $1 FOR UPDATE",
+  "query": "SELECT id, source, market_id, url, object_key, activate, status, report, progress, error,\n                    created_by, created_at, updated_at, applied_at\n             FROM import_runs WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -60,6 +60,17 @@
       },
       {
         "ordinal": 5,
+        "name": "activate",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "import_runs",
+            "name": "activate"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -70,7 +81,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "report",
         "type_info": "Jsonb",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "progress",
         "type_info": "Jsonb",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "error",
         "type_info": "Text",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_by",
         "type_info": "Text",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -136,7 +147,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "applied_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -159,6 +170,7 @@
       true,
       false,
       false,
+      false,
       true,
       false,
       true,
@@ -168,5 +180,5 @@
       true
     ]
   },
-  "hash": "be59b7a3a4c81e1c928e5860bf444db0c614b1b08f4c0cc0bf08a87127f6ad0c"
+  "hash": "addeb38be73f579499e7c3a96ae259c31d5a527578d1d071d876b6707e684896"
 }

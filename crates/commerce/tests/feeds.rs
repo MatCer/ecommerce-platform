@@ -69,6 +69,7 @@ impl Ctx {
                 market_id: self.shop.cz,
                 url: None,
                 upload_size: Some(self.feed.len() as u64),
+                activate: false,
             },
         )
         .await
@@ -128,7 +129,7 @@ async fn dry_run_then_apply_is_idempotent(db: PgPool) {
     assert!(r.products >= 40 && r.variants >= 100, "{r:?}");
     assert_eq!(r.missing.get("price"), Some(&1));
     assert_eq!(r.missing.get("image"), Some(&1));
-    assert!(r.missing.get("ean").is_some());
+    assert!(r.missing.contains_key("ean"));
     assert!(
         r.collisions.iter().any(|c| c.kind == "redirect"),
         "the duplicate old URL is reported: {:?}",
@@ -227,7 +228,7 @@ async fn dry_run_then_apply_is_idempotent(db: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn url_runs_download_through_the_safe_client(db: PgPool) {
     let c = setup(db).await;
-    let create = async |url: String| {
+    let create = async |url: String, activate: bool| {
         let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
         let created = import::create(
             &mut tx,
@@ -238,6 +239,7 @@ async fn url_runs_download_through_the_safe_client(db: PgPool) {
                 market_id: c.shop.cz,
                 url: Some(url),
                 upload_size: None,
+                activate,
             },
         )
         .await
@@ -245,7 +247,7 @@ async fn url_runs_download_through_the_safe_client(db: PgPool) {
         tx.commit().await.unwrap();
         created.run.id
     };
-    let ok = create(format!("{}/feed.xml", c.base)).await;
+    let ok = create(format!("{}/feed.xml", c.base), true).await;
     import::run_step(
         &c.runtime,
         &c.storage,
@@ -260,10 +262,23 @@ async fn url_runs_download_through_the_safe_client(db: PgPool) {
     let run = import::get(&mut tx, ok).await.unwrap();
     drop(tx);
     assert_eq!(run.status, RunStatus::Analyzed, "{:?}", run.error);
+    // `activate`: the merchant chose to publish new products right away.
+    let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
+    import::apply(&mut tx, "boss", ok).await.unwrap();
+    tx.commit().await.unwrap();
+    import::run_step(&c.runtime, &c.storage, &c.fetch, c.shop.tenant, ok, "apply")
+        .await
+        .unwrap();
+    assert!(
+        c.count("SELECT count(*) FROM products WHERE status = 'active'")
+            .await
+            >= 40,
+        "imported products are active"
+    );
 
     // Without the dev allowlist, a loopback URL is refused and the run fails (no retry).
     let strict = SafeClient::new(Vec::<String>::new()).unwrap();
-    let blocked = create(format!("{}/feed.xml", c.base)).await;
+    let blocked = create(format!("{}/feed.xml", c.base), false).await;
     import::run_step(
         &c.runtime,
         &c.storage,
