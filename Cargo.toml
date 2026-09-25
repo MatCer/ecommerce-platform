@@ -53,5 +53,12 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 unwrap_used = "deny"
 
+# Smaller debug artifacts: several agent worktrees build in parallel on one disk.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 strip = true
