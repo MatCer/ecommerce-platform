@@ -89,13 +89,14 @@ logs: ## Follow logs (`make logs s=api` for one service)
 ps: ## Show stack status
 	$(COMPOSE_FULL) ps
 
-theme-build: ## Build + pack the default theme and checkout (A22), upload + publish them for every tenant (A30)
+theme-build: ## Build + pack the default theme and checkout (A22), upload + publish them (+ the default theme source, WP23) for every tenant (A30)
 	scripts/build-artifacts.sh
 	node packages/theme-kit/src/cli.ts verify --root .artifacts \
 		"$$(cat .artifacts/channels/default-theme)" "$$(cat .artifacts/channels/checkout)"
 	$(COMPOSE_FULL) run --rm --no-deps -v "$(CURDIR)/.artifacts:/artifacts:ro" api \
 		/usr/local/bin/api admin publish-artifacts --root /artifacts \
-		--theme "$$(cat .artifacts/channels/default-theme)" --checkout "$$(cat .artifacts/channels/checkout)"
+		--theme "$$(cat .artifacts/channels/default-theme)" --checkout "$$(cat .artifacts/channels/checkout)" \
+		--theme-source /artifacts/sources/default-theme.tar.gz
 
 backup: ## Dump Postgres + mirror the MinIO buckets to backups/<UTC timestamp>/ (runbook §7)
 	scripts/backup.sh

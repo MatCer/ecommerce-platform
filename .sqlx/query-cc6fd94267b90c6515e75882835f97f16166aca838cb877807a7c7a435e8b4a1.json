@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE theme_revisions SET status = 'superseded', superseded_at = now(),\n                status_changed_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc6fd94267b90c6515e75882835f97f16166aca838cb877807a7c7a435e8b4a1"
+}

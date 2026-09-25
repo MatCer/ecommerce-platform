@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE platform.theme_artifacts SET source_key = $2 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "21b3027c8ce60fc6832021bd51291abf7dde3ae9255661ac782a4bedf3a05118"
+}

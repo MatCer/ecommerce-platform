@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM platform.theme_artifacts a\n         WHERE kind = 'theme' AND created_at < now() - make_interval(days => $1)\n           AND NOT EXISTS (SELECT 1 FROM platform.artifact_channels c WHERE c.artifact_id = a.id)\n         ORDER BY created_at LIMIT 200",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.theme_artifacts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f985ded4a65655189a4ed87324b8de5024d15bdb4649800cc270552f6c731d4d"
+}

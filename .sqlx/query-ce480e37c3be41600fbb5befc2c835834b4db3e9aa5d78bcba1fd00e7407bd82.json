@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.tokens FROM theme_active a JOIN theme_revisions r ON r.id = a.revision_id\n         JOIN platform.theme_artifacts t ON t.id = r.artifact_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tokens",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "platform.theme_artifacts",
+            "name": "tokens"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "ce480e37c3be41600fbb5befc2c835834b4db3e9aa5d78bcba1fd00e7407bd82"
+}

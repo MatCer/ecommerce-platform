@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.source_key, t.source_key AS artifact_source FROM theme_revisions r\n         LEFT JOIN platform.theme_artifacts t ON t.id = r.artifact_id WHERE r.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "source_key"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "artifact_source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.theme_artifacts",
+            "name": "source_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "4bf07fc1680b227bc39e381afefb8a930e3ba14a89e3910b5e9f0ae36ba17753"
+}
