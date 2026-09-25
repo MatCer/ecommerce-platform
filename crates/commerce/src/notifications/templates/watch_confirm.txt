@@ -1,0 +1,3 @@
+{{ t("watch_confirm.heading") }}
+{{ t("watch_confirm.intro", shop=brand.shop_name) }}
+{{ url }}

@@ -1,0 +1,5 @@
+{{ t("abandoned_cart.heading") }}
+{{ t("abandoned_cart.intro", shop=brand.shop_name) }}
+{{ url }}
+{% if coupon %}{{ t("abandoned_cart.coupon", coupon=coupon) }}{% endif %}
+{{ t("abandoned_cart.unsubscribe") }}: {{ unsubscribe_url }}

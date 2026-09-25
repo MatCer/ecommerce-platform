@@ -1,0 +1,4 @@
+{{ t("watch_alert.heading") }}
+{{ t("watch_alert.intro", shop=brand.shop_name) }}
+{{ url }}
+{{ t("watch_alert.unsubscribe") }}: {{ unsubscribe_url }}

@@ -1,0 +1,3 @@
+{{ t("review_invite.heading", product=product) }}
+{{ t("review_invite.intro", shop=brand.shop_name) }}
+{{ url }}

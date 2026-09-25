@@ -4,20 +4,16 @@
  * merchant publishes it with a reply, and the product page shows it with the verified-purchase
  * mark, the Omnibus disclosure and the rating in the Product JSON-LD.
  *
- * Review links are issued by WP19's invites (`commerce::reviews::issue_tokens`); until then
- * the test writes a delivered order line and its token straight into the database.
+ * WP19's invite flow issues the review link after the dev clock advances seven days.
  */
-import { createHash, randomBytes } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, run, signInOwner, sql } from "../admin/support";
-import { CZ, checkoutOf, newPage } from "./support";
+import { CZ, mail, newPage } from "./support";
 
 const SLUG = "tricko-henley";
 
-/** A delivered order with one line of the product and a review token for it. */
-function reviewLink(): string {
-  const token = randomBytes(32).toString("hex");
-  const hash = createHash("sha256").update(token).digest("hex");
+/** A delivered order with one line. WP19 sends the review link through Mailpit. */
+async function reviewLink(): Promise<string> {
   // Far above the shop's own order numbers (allocated from `order_numbers`).
   const number = 9_000_000_000 + Math.floor(Math.random() * 900_000_000);
   sql(`
@@ -43,11 +39,33 @@ function reviewLink(): string {
                                    total_minor, tax_rate, tax_minor, net_minor)
           SELECT o.tenant_id, o.id, 1, p.variant_id, p.product_id, p.sku, 'Tričko Henley', 1,
                  49900, 49900, 0, 49900, '21', 0, 49900 FROM o, p
-          RETURNING id, order_id, tenant_id, product_id)
-    INSERT INTO review_tokens (tenant_id, order_line_id, order_id, product_id, token_hash, expires_at)
-    SELECT tenant_id, id, order_id, product_id, decode('${hash}', 'hex'), now() + interval '90 days'
-    FROM l`);
-  return `${checkoutOf(CZ)}/review?token=${token}`;
+          RETURNING order_id, tenant_id),
+    shipment AS (INSERT INTO shipments (tenant_id, order_id, carrier, status, delivered_at, created_by)
+          SELECT tenant_id, order_id, 'personal_pickup', 'delivered', now(), 'e2e' FROM l
+          RETURNING tenant_id),
+    consent AS (INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose,
+                                            granted, text_version, source)
+          SELECT tenant_id, 'email', 'wp16-${run}@example.test', 'review_invites', true,
+                 '2026-09-25', 'checkout' FROM shipment RETURNING tenant_id)
+    SELECT tenant_id FROM consent`);
+
+  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString());
+  expect(auth.ok()).toBeTruthy();
+  const { token } = (await auth.json()) as { token: string };
+  const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
+  const api = new URL(admin.url());
+  api.hostname = api.hostname.replace(/^admin\./, "api.");
+  api.pathname = "/admin/v1/flows/test-clock/advance";
+  const advanced = await admin.request.post(api.toString(), {
+    headers: { authorization: `Bearer ${token}`, "x-tenant-id": tenant },
+    data: { hours: 8 * 24 },
+  });
+  expect(advanced.ok()).toBeTruthy();
+  const message = await mail(`wp16-${run}@example.test`, "Ohodnoťte svůj nákup");
+  const link = message.Text.match(/https?:\/\/[^\s]+\/review\?token=[0-9a-f]{64}/)?.[0];
+  expect(link).toBeDefined();
+  if (!link) throw new Error("review invite did not contain a link");
+  return link;
 }
 
 let admin: Page;
@@ -63,7 +81,7 @@ test.afterAll(async () => {
 test("review link → form → moderation → product page with rating JSON-LD", async ({ browser }) => {
   const name = `Jana ${run}`;
   const body = `Pohodlné tričko, sedí přesně. <b>${run}</b>`;
-  const link = reviewLink();
+  const link = await reviewLink();
   const page = await newPage(browser);
 
   await page.goto(link);

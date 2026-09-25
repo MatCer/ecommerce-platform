@@ -10,6 +10,7 @@ pub mod admin_catalog;
 pub mod admin_content;
 pub mod admin_email;
 pub mod admin_feeds;
+pub mod admin_flows;
 pub mod admin_fulfillment;
 pub mod admin_inventory;
 pub mod admin_marketing;
@@ -213,6 +214,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_email::routes())
         .merge(admin_portability::routes())
         .merge(admin_reviews::routes())
+        .merge(admin_flows::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())

@@ -25,6 +25,11 @@ pub struct Schedule {
 
 pub const SCHEDULES: &[Schedule] = &[
     Schedule {
+        name: "flows.tick",
+        kind: commerce::flows::TICK_JOB,
+        every: Duration::from_secs(60),
+    },
+    Schedule {
         name: "maintenance.cleanup",
         kind: handlers::MAINTENANCE_CLEANUP,
         every: Duration::from_secs(3600),

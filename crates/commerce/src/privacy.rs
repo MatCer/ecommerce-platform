@@ -215,6 +215,58 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
     )
     .fetch_one(&mut **tx)
     .await?;
+    let watches: Value = sqlx::query_scalar(
+        "SELECT coalesce(jsonb_agg(to_jsonb(w) - 'confirm_hash' - 'unsubscribe_hash'
+            ORDER BY w.created_at), '[]'::jsonb) FROM flow_watches w WHERE w.email=$1",
+    )
+    .bind(&s.email)
+    .fetch_one(&mut **tx)
+    .await?;
+    let flow_runs: Value = sqlx::query_scalar(
+        "SELECT coalesce(jsonb_agg((to_jsonb(r) - 'coupon_code') || jsonb_build_object(
+            'steps', (SELECT coalesce(jsonb_agg(to_jsonb(st) ORDER BY st.step_number), '[]'::jsonb)
+                      FROM flow_steps st WHERE st.run_id=r.id)) ORDER BY r.created_at), '[]'::jsonb)
+         FROM flow_runs r WHERE
+            (r.source_kind='cart' AND r.source_id IN
+                (SELECT c.id FROM carts c WHERE lower(btrim(c.email))=$1 OR c.customer_id=$2
+                 OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id=ANY($3))))
+            OR (r.source_kind='order' AND r.source_id=ANY($3))
+            OR (r.source_kind='watch' AND r.source_id IN
+                (SELECT w.id FROM flow_watches w WHERE w.email=$1))",
+    )
+    .bind(&s.email)
+    .bind(s.customer_id)
+    .bind(&ids)
+    .fetch_one(&mut **tx)
+    .await?;
+    let flow_restore_tokens: Value = sqlx::query_scalar(
+        "SELECT coalesce(jsonb_agg(jsonb_build_object('cart_id',t.cart_id,
+            'created_at',t.created_at,'expires_at',t.expires_at,'used_at',t.used_at)), '[]'::jsonb)
+         FROM flow_restore_tokens t WHERE t.cart_id IN
+            (SELECT c.id FROM carts c WHERE lower(btrim(c.email))=$1 OR c.customer_id=$2
+             OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id=ANY($3)))",
+    )
+    .bind(&s.email)
+    .bind(s.customer_id)
+    .bind(&ids)
+    .fetch_one(&mut **tx)
+    .await?;
+    let flow_unsubscribe_tokens: Value = sqlx::query_scalar(
+        "SELECT coalesce(jsonb_agg(jsonb_build_object('created_at',t.created_at,
+            'used_at',t.used_at)), '[]'::jsonb)
+         FROM flow_unsubscribe_tokens t WHERE t.email=$1",
+    )
+    .bind(&s.email)
+    .fetch_one(&mut **tx)
+    .await?;
+    let flow_watch_mail_quota: Value = sqlx::query_scalar(
+        "SELECT coalesce(jsonb_agg(jsonb_build_object('window_started_at',q.window_started_at,
+            'sent_count',q.sent_count)), '[]'::jsonb)
+         FROM flow_watch_mail_quotas q WHERE q.scope='recipient' AND q.identifier=$1",
+    )
+    .bind(&s.email)
+    .fetch_one(&mut **tx)
+    .await?;
     let shipments = sqlx::query_scalar!(
         r#"SELECT coalesce(jsonb_agg(to_jsonb(x) - 'label_key' ORDER BY x.created_at), '[]')
                   AS "v!"
@@ -293,6 +345,11 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
         "emails": emails,
         "analytics_events": events,
         "carts": carts,
+        "flow_watches": watches,
+        "flow_runs": flow_runs,
+        "flow_restore_tokens": flow_restore_tokens,
+        "flow_unsubscribe_tokens": flow_unsubscribe_tokens,
+        "flow_watch_mail_quota": flow_watch_mail_quota,
         "shipments": shipments,
         "payments": payments,
         "refunds": refunds,
@@ -380,6 +437,44 @@ pub async fn erase(
             ),
         });
     }
+    // Drop flow state and capabilities in the same transaction, before its cart/order links
+    // are cleared. Steps cascade from runs; queued mail is anonymized below before commit.
+    sqlx::query(
+        "DELETE FROM flow_runs r WHERE
+        (r.source_kind='cart' AND r.source_id IN
+            (SELECT c.id FROM carts c WHERE lower(btrim(c.email))=$1 OR c.customer_id=$2
+             OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id=ANY($3))))
+        OR (r.source_kind='order' AND r.source_id=ANY($3))
+        OR (r.source_kind='watch' AND r.source_id IN
+            (SELECT w.id FROM flow_watches w WHERE w.email=$1))",
+    )
+    .bind(&s.email)
+    .bind(s.customer_id)
+    .bind(&ids)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query(
+        "DELETE FROM flow_restore_tokens t WHERE t.cart_id IN
+        (SELECT c.id FROM carts c WHERE lower(btrim(c.email))=$1 OR c.customer_id=$2
+         OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id=ANY($3)))",
+    )
+    .bind(&s.email)
+    .bind(s.customer_id)
+    .bind(&ids)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query("DELETE FROM flow_unsubscribe_tokens WHERE email=$1")
+        .bind(&s.email)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("DELETE FROM flow_watches WHERE email=$1")
+        .bind(&s.email)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("DELETE FROM flow_watch_mail_quotas WHERE scope='recipient' AND identifier=$1")
+        .bind(&s.email)
+        .execute(&mut **tx)
+        .await?;
     let mut report = ErasureReport {
         customer_id: s.customer_id,
         ..ErasureReport::default()

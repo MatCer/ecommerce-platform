@@ -1,0 +1,8 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("abandoned_cart.heading") }}</mj-text>
+        <mj-text>{{ t("abandoned_cart.intro", shop=brand.shop_name) }}</mj-text>
+        <mj-button href="{{ url }}">{{ t("abandoned_cart.button") }}</mj-button>
+        {% if coupon %}<mj-text>{{ t("abandoned_cart.coupon", coupon=coupon) }}</mj-text>{% endif %}
+        <mj-text><a href="{{ unsubscribe_url }}">{{ t("abandoned_cart.unsubscribe") }}</a></mj-text>
+{% endblock %}
