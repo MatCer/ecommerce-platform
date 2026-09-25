@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM customer_auth_attempts\n               WHERE kind = 'review' AND ip_hash = $1 AND at > now() - interval '1 hour'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cdb99d912ec9a846733b4b866e0a5ad8cd6f130572f194a7b4cd757c3c5a0036"
+}

@@ -25,7 +25,8 @@ use crate::markets::invalid;
 pub const NOTICE: &str = "These templates are a starting point, not legal advice. Have them \
 reviewed by a lawyer before you publish them.";
 
-/// Legal types a shop must publish before going live (reviews only once reviews exist, M2).
+/// Legal types a shop must publish before going live; plus [`LegalType::Reviews`] once it
+/// shows reviews (see [`go_live`]).
 pub const REQUIRED: [LegalType; 5] = [
     LegalType::Terms,
     LegalType::Privacy,
@@ -597,8 +598,17 @@ pub async fn go_live(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<GoLiveRepo
         i64::from(tax.is_none()),
     ));
 
-    // Every required legal page, published, in the default locale of every market.
-    let required: Vec<&str> = REQUIRED.iter().map(|t| t.as_str()).collect();
+    // Every required legal page, published, in the default locale of every market. The review
+    // verification page (Omnibus) once the shop shows reviews.
+    let mut required: Vec<&str> = REQUIRED.iter().map(|t| t.as_str()).collect();
+    let shows_reviews = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM reviews WHERE status = 'published') AS "e!""#
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if shows_reviews {
+        required.push(LegalType::Reviews.as_str());
+    }
     let pages_missing: Vec<String> = sqlx::query_scalar!(
         r#"SELECT t.legal_type || ':' || l.locale AS "missing!"
            FROM unnest($1::text[]) AS t (legal_type)
@@ -620,7 +630,12 @@ pub async fn go_live(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<GoLiveRepo
            FROM pages p JOIN page_translations t ON t.page_id = p.id
            WHERE p.legal_type = ANY($1::text[]) AND p.status = 'published'
              AND (t.blocks = '[]'::jsonb OR t.blocks::text LIKE '%[DOPLŇTE:%'
-                  OR t.blocks::text LIKE '%[FILL IN:%')
+                  OR t.blocks::text LIKE '%[FILL IN:%'
+                  -- The pre-WP16 review template said the shop publishes no reviews.
+                  OR (p.legal_type = 'reviews'
+                      AND (t.blocks::text LIKE '%nezveřejňuje recenze%'
+                           OR t.blocks::text LIKE '%nezverejňuje recenzie%'
+                           OR t.blocks::text LIKE '%does not publish customer reviews%')))
            ORDER BY 1"#,
         &required as &[&str]
     )

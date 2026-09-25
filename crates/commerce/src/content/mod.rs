@@ -76,7 +76,7 @@ pub enum LegalType {
     Withdrawal,
     /// Complaints (warranty claims) procedure.
     Complaints,
-    /// How reviews are verified (placeholder until reviews exist, M2).
+    /// How reviews are verified (Omnibus; required once the shop publishes reviews).
     Reviews,
 }
 

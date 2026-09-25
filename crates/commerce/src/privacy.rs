@@ -44,6 +44,8 @@ pub async fn ip_hash(conn: &mut PgConnection, ip: IpAddr) -> Result<Vec<u8>, sql
 /// What erased addresses become (RFC 2606 `.invalid`: never deliverable).
 pub const ERASED_EMAIL: &str = "erased@erased.invalid";
 const ERASED: &str = "[erased]";
+/// The author shown on an erased person's reviews.
+const ANONYMOUS: &str = "Anonymous";
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -71,6 +73,8 @@ pub struct ErasureReport {
     pub subscribers_deleted: i64,
     pub consent_records_pseudonymized: i64,
     pub emails_anonymized: i64,
+    /// Reviews kept without the author's name, IP hash or order link.
+    pub reviews_anonymized: i64,
     /// Private files (labels, document sheets, exports, import CSVs) queued for deletion.
     pub files_deleted: i64,
 }
@@ -250,6 +254,15 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
     )
     .fetch_one(&mut **tx)
     .await?;
+    let reviews = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(r) - 'ip_hash' ORDER BY r.created_at), '[]')
+                  AS "v!"
+           FROM reviews r
+           WHERE r.order_line_id IN (SELECT l.id FROM order_lines l WHERE l.order_id = ANY($1))"#,
+        &ids
+    )
+    .fetch_one(&mut **tx)
+    .await?;
     let affinity = sqlx::query_scalar!(
         r#"SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.dim, a.key), '[]') AS "v!"
            FROM customer_affinity a WHERE a.customer_id = $1"#,
@@ -285,6 +298,7 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
         "refunds": refunds,
         "bank_transactions": bank_transactions,
         "campaign_sends": campaign_sends,
+        "reviews": reviews,
         "recommendation_affinity": affinity,
     }))
 }
@@ -301,7 +315,7 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
 /// a queued job, retried until done) label PDFs, packing-slip/label sheets, previous data
 /// exports and the files of imports not yet applied. Anonymized: orders and their addresses,
 /// notes and address-change events, archived orders, carts, withdrawals, the mail log, import
-/// reports. Consent records get a random subject id (anonymous evidence). Kept as issued:
+/// reports, reviews (author, IP hash and order link removed; review invites deleted). Consent records get a random subject id (anonymous evidence). Kept as issued:
 /// invoices, credit notes and bank transactions (tax and accounting law). Audited with counts
 /// only.
 pub async fn erase(
@@ -404,6 +418,23 @@ pub async fn erase(
     sqlx::query!("DELETE FROM order_tokens WHERE order_id = ANY($1)", &ids)
         .execute(&mut **tx)
         .await?;
+    sqlx::query!("DELETE FROM review_tokens WHERE order_id = ANY($1)", &ids)
+        .execute(&mut **tx)
+        .await?;
+    // Reviews stay (rating and text belong to the product page) but no longer name or point
+    // to the person: anonymous author, no IP hash, no order-line link.
+    report.reviews_anonymized = count(
+        sqlx::query!(
+            "UPDATE reviews SET customer_name = $2, ip_hash = NULL, order_line_id = NULL,
+                 updated_at = now()
+             WHERE order_line_id IN (SELECT id FROM order_lines WHERE order_id = ANY($1))",
+            &ids,
+            ANONYMOUS
+        )
+        .execute(&mut **tx)
+        .await?
+        .rows_affected(),
+    );
     // Files holding the subject's data: labels, packing-slip/label sheets, earlier exports,
     // the CSVs of imports not applied yet. Deleted by a retried job once this commits.
     let mut objects = sqlx::query_scalar!(

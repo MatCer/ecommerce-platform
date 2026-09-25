@@ -550,6 +550,7 @@ async fn tenant_export_zips_every_table_without_secrets(db: PgPool) {
     for never in [
         "customer_sessions.jsonl",
         "order_tokens.jsonl",
+        "review_tokens.jsonl",
         "data_exports.jsonl",
         "idempotency_keys.jsonl",
     ] {
@@ -614,6 +615,28 @@ async fn finished_order(c: &Ctx, email: &str) -> Uuid {
     .bind(c.shop.tenant)
     .bind(id)
     .bind(email)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO reviews (tenant_id, product_id, order_line_id, customer_name, rating, body,
+                              verified, locale, ip_hash)
+         SELECT tenant_id, product_id, id, 'Anna N.', 5, 'Great tee', true, 'cs', $2
+         FROM order_lines WHERE order_id = $1",
+    )
+    .bind(id)
+    .bind(vec![3u8; 32])
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO review_tokens (tenant_id, order_line_id, order_id, product_id, token_hash,
+                                    expires_at)
+         SELECT tenant_id, id, order_id, product_id, $2, now() + interval '30 days'
+         FROM order_lines WHERE order_id = $1",
+    )
+    .bind(id)
+    .bind(vec![4u8; 32])
     .execute(&mut *tx)
     .await
     .unwrap();
@@ -737,6 +760,8 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     assert_eq!(doc["carts"][0]["phone"], "+420 777 000 000");
     assert!(doc["carts"][0].get("shop_token_hash").is_none());
     assert_eq!(doc["shipments"][0]["carrier"], "ppl");
+    assert_eq!(doc["reviews"][0]["customer_name"], "Anna N.");
+    assert!(doc["reviews"][0].get("ip_hash").is_none());
 
     // Erasure: confirmation must match; an open order blocks it.
     let req = |confirm: &str| ErasureRequest {
@@ -792,6 +817,7 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
         (1, 1)
     );
     assert_eq!(report.consent_records_pseudonymized, 2);
+    assert_eq!(report.reviews_anonymized, 1);
     // Label, export zip, and both CSV keys of the three applied and the discarded import.
     assert_eq!(report.files_deleted, 10);
     let keys: serde_json::Value = sqlx::query_scalar(
@@ -847,6 +873,8 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     );
     assert_eq!(n("SELECT count(*) FROM carts WHERE email IS NOT NULL OR phone IS NOT NULL OR shipping_address IS NOT NULL").await, 0);
     assert_eq!(n("SELECT count(*) FROM data_exports").await, 0);
+    assert_eq!(n("SELECT count(*) FROM reviews WHERE customer_name = 'Anonymous' AND ip_hash IS NULL AND order_line_id IS NULL AND body = 'Great tee'").await, 1);
+    assert_eq!(n("SELECT count(*) FROM review_tokens").await, 0);
     // Applied import reports no longer quote the subject.
     assert_eq!(
         n("SELECT count(*) FROM data_imports WHERE strpos(report::text, 'anna@example.com') > 0")

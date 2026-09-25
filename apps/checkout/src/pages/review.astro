@@ -1,0 +1,119 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import { Button, controlClass } from "@platform/ui";
+import Checkout from "../layouts/Checkout.astro";
+import { checkoutApi, shopUrl } from "../lib/api";
+
+// Review form (WP16), reached through a review link (one per delivered order line, single
+// use). A plain POST form, no JS: `/_p/reviews` submits it and 303s back here with `done=1`,
+// or with the token and an `error` code when the link still works.
+const api = checkoutApi(Astro.request);
+const token = Astro.url.searchParams.get("token") ?? "";
+const done = Astro.url.searchParams.get("done") === "1";
+const error = Astro.url.searchParams.get("error");
+const [shop, invitation] = await Promise.all([
+  api.shop(),
+  done ? Promise.resolve(null) : api.reviewInvitation(token),
+]);
+const m = shop?.messages ?? {};
+const product = invitation
+  ? [invitation.product_name, invitation.options_label].filter(Boolean).join(", ")
+  : "";
+const errorText = error === "too_many_reviews" ? t(m, "review.error_rate") : t(m, "review.error");
+const label = "text-sm font-medium";
+const hint = "text-xs text-muted-foreground";
+---
+
+<Checkout
+  title={t(m, "review.title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid max-w-xl gap-4">
+    <h1 class="font-display text-2xl font-bold">{t(m, "review.title")}</h1>
+    {
+      done ? (
+        <p role="status" class="font-semibold">
+          {t(m, "review.done")}
+        </p>
+      ) : invitation ? (
+        <form method="post" action="/_p/reviews" class="grid gap-5">
+          <p>{t(m, "review.intro", { product })}</p>
+          {error && (
+            <p role="alert" class="font-medium text-error-700">
+              {errorText}
+            </p>
+          )}
+          <input type="hidden" name="token" value={token} />
+          <fieldset class="grid gap-2">
+            <legend class={`${label} mb-2`}>
+              {t(m, "review.rating")}
+              <span aria-hidden="true"> *</span>
+            </legend>
+            <div class="flex flex-wrap gap-2">
+              {[5, 4, 3, 2, 1].map((n) => (
+                <label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-input px-3 has-[:checked]:border-identity">
+                  <input type="radio" name="rating" value={n} required class="size-4" />
+                  <span aria-hidden="true">{"★".repeat(n)}</span>
+                  <span class="sr-only">{t(m, "review.stars", { n })}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div class="grid gap-1">
+            <label for="review-name" class={label}>
+              {t(m, "review.name")}
+              <span aria-hidden="true"> *</span>
+            </label>
+            <input
+              id="review-name"
+              name="name"
+              required
+              maxlength="60"
+              autocomplete="given-name"
+              aria-describedby="review-name-hint"
+              class={controlClass}
+            />
+            <p id="review-name-hint" class={hint}>
+              {t(m, "review.name_hint")}
+            </p>
+          </div>
+          <div class="grid gap-1">
+            <label for="review-headline" class={label}>
+              {t(m, "review.headline")}
+            </label>
+            <input id="review-headline" name="title" maxlength="120" class={controlClass} />
+          </div>
+          <div class="grid gap-1">
+            <label for="review-body" class={label}>
+              {t(m, "review.body")}
+              <span aria-hidden="true"> *</span>
+            </label>
+            <textarea
+              id="review-body"
+              name="body"
+              required
+              rows="6"
+              maxlength="4000"
+              aria-describedby="review-body-hint"
+              class={`${controlClass} h-auto min-h-36 py-2`}
+            />
+            <p id="review-body-hint" class={hint}>
+              {t(m, "review.body_hint")}
+            </p>
+          </div>
+          <div>
+            <Button type="submit" variant="primary">
+              {t(m, "review.submit")}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p role="alert">{t(m, "review.invalid")}</p>
+      )
+    }
+    <a href={shopUrl(Astro.url)} class="text-sm text-identity-ink underline">{t(m, "review.back")}</a>
+  </div>
+</Checkout>

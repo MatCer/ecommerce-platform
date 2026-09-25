@@ -73,7 +73,12 @@
 | WP13b | Backups (`make backup`) keep erased data until they rotate out; document the retention in the privacy policy template or re-apply erasures after a restore | pre-launch |
 | WP13b | Data exports have no automatic expiry (a new erasure deletes all of them); add a retention sweep (e.g. 7 days) to `ops.sweep` | later (ops) |
 | WP13b | The export's assets manifest lists public image variants only; merchant-uploaded originals and invoice PDFs (private bucket) are not in the zip | later |
-| WP13b | Reviews (WP16) and any later module holding customer data must be added to `privacy::access`/`erase` (a new FK to `customers` without `ON DELETE` would make erasure fail) | WP16 / WP19 |
+| WP13b | Any later module holding customer data (WP19 flows, watchdogs) must be added to `privacy::access`/`erase` (a new FK to `customers` without `ON DELETE` would make erasure fail) | WP19 |
 | WP13b | Re-importing an old CSV after an erasure brings the person back; the import cannot know (no tombstones by design) | later (privacy) |
 | WP13b | The admin has no customer list yet: imported customers are visible through the GDPR access export, subscribers, archived orders and orders | WP15 |
 | WP13b | The import UI maps columns only when a run is created; re-checking with a new mapping is API-only (`analyze` takes `mapping`) | later |
+| WP16 | Review invites: after delivery (default 7 days) and only with the `review_invites` consent, call `commerce::reviews::issue_tokens(tx, order_id, now)` and mail one `reviews::review_url(ctx, token)` per product (the e2e writes its token via SQL until then) | WP19 |
+| WP16 | ~~GDPR erasure/export must cover `reviews` and `review_tokens`~~ done in WP13b | done |
+| WP16 | The product page shows the 20 newest published reviews (summary and JSON-LD cover all); no pagination, sorting or filtering by rating yet | later |
+| WP16 | Tokens are issued per order, not per returned/withdrawn line: a line returned after delivery can still be reviewed while its token lives | later |
+| WP16 | Seeded demos keep the old "reviews" legal page text (templates install only missing pages); re-install or edit it | WP15 (seed polish) |

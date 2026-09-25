@@ -42,6 +42,7 @@ pub const SKIPPED_TABLES: &[&str] = &[
     "data_exports",
     "idempotency_keys",
     "order_tokens",
+    "review_tokens",
     "withdrawal_tokens",
 ];
 

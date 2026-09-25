@@ -38,6 +38,7 @@ pub mod promotions;
 pub mod recommendations;
 pub mod redirects;
 pub mod refunds;
+pub mod reviews;
 pub mod search;
 pub mod shipping;
 pub mod staff;

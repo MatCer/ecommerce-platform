@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.name, l.options_label, t.expires_at\n         FROM review_tokens t JOIN order_lines l ON l.id = t.order_line_id\n         WHERE t.token_hash = $1 AND t.used_at IS NULL AND t.expires_at > now()",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "options_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "options_label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "review_tokens",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4efc57eb8dceee7eca862167c0627271c63fcf74c5debe907a8d313616626aca"
+}

@@ -21,6 +21,14 @@ test.each(wp12Paths)("checkout binding permits only GET for %s", (path) => {
   expect(CHECKOUT_OPERATIONS.some((o) => o.path.test(invalid))).toBe(false);
 });
 
+test("review links: the checkout reads the invitation, nobody submits through a binding", () => {
+  const can = (ops: typeof CHECKOUT_OPERATIONS, method: string, path: string) =>
+    ops.some((o) => o.method === method && o.path.test(path));
+  expect(can(CHECKOUT_OPERATIONS, "GET", "/reviews/invitation")).toBe(true);
+  expect(can(CHECKOUT_OPERATIONS, "POST", "/reviews")).toBe(false);
+  expect(can(STOREFRONT_OPERATIONS, "GET", "/reviews/invitation")).toBe(false);
+});
+
 const site = (tenant: string) =>
   ({
     tenant_id: tenant,
