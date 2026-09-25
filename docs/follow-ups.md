@@ -18,3 +18,6 @@
 | WP5 | The staff invite email is sent before the membership commits (not via the outbox) | WP9 (mail core) |
 | WP5 | No invitation-accepted status in the staff list | WP15 |
 | WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
+| WP7 | Tenant synonyms + real popularity signal are placeholders | WP17 (popularity), WP13 (synonyms admin) |
+| WP7 | Indexes of locales removed from all markets are never dropped | WP14 |
+| WP7 | Zero-result log stores minimized query text (possible PII typed by users); reviewed and accepted with minimization + 90 d TTL | WP14 (dashboard) |
