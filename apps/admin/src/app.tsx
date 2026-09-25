@@ -19,6 +19,11 @@ const Markets = lazy(() => import("./pages/Markets.tsx"));
 const Staff = lazy(() => import("./pages/Staff.tsx"));
 const AuditLog = lazy(() => import("./pages/AuditLog.tsx"));
 const Security = lazy(() => import("./pages/Security.tsx"));
+const PriceLists = lazy(() => import("./pages/PriceLists.tsx"));
+const Sales = lazy(() => import("./pages/Sales.tsx"));
+const Coupons = lazy(() => import("./pages/Coupons.tsx"));
+const Inventory = lazy(() => import("./pages/Inventory.tsx"));
+const TaxProfile = lazy(() => import("./pages/TaxProfile.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -64,7 +69,12 @@ export function App() {
           <Route path="/products/:id" component={ProductEditor} />
           <Route path="/categories" component={Categories} />
           <Route path="/parameters" component={Parameters} />
+          <Route path="/inventory" component={Inventory} />
+          <Route path="/price-lists" component={PriceLists} />
+          <Route path="/sales" component={Sales} />
+          <Route path="/coupons" component={Coupons} />
           <Route path="/markets" component={Markets} />
+          <Route path="/settings/tax" component={TaxProfile} />
           <Route path="/staff" component={Staff} />
           <Route path="/audit-log" component={AuditLog} />
           <Route path="/account/security" component={Security} />

@@ -9,13 +9,14 @@ import {
   Tabs,
   TextField,
 } from "@platform/ui";
-import { useNavigate, useParams } from "@solidjs/router";
+import { A, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { MediaManager } from "../components/MediaManager.tsx";
 import { PageHeader, QueryState } from "../components/Page.tsx";
 import { ParameterValues } from "../components/ParameterValues.tsx";
+import { ProductPrices } from "../components/ProductPrices.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { VariantsEditor } from "../components/VariantsEditor.tsx";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
@@ -30,11 +31,28 @@ import {
   emptyDraft,
   type PartyDraft,
   type ProductDraft,
+  type ProductOption,
   type ProductStatus,
   slugify,
   type UnitMeasure,
 } from "../lib/product-form.ts";
 import { useCategoryTree, useParameters, useTaxCategories } from "../lib/queries.ts";
+
+/** "Red / M" from a variant's option values. */
+function variantLabel(
+  options: readonly ProductOption[],
+  values: Record<string, string> | undefined,
+): string {
+  return options
+    .map((o) => {
+      const v = o.values.find((x) => x.code === values?.[o.code]);
+      if (!v) return "";
+      for (const l of contentLocales()) if (v.name_i18n[l]) return v.name_i18n[l];
+      return v.code;
+    })
+    .filter(Boolean)
+    .join(" / ");
+}
 
 const STATUSES: ProductStatus[] = ["draft", "active", "archived"];
 const UNITS: UnitMeasure[] = ["kg", "l", "m", "m2", "pcs"];
@@ -222,6 +240,7 @@ export default function ProductEditor() {
     ["content", t("editor.content")],
     ["media", t("editor.media")],
     ["variants", t("editor.variants")],
+    ["prices", t("prices.title")],
     ["categories", t("editor.categories")],
     ["parameters", t("editor.parameters")],
     ["pricing", t("editor.pricing")],
@@ -370,6 +389,33 @@ export default function ProductEditor() {
           />
         </Section>
 
+        <Section id="prices" title={t("prices.title")}>
+          <p class="mb-3 text-xs text-muted-foreground">{t("prices.lead")}</p>
+          <Show
+            when={!isNew() && product.data}
+            fallback={<p class="text-sm text-muted-foreground">{t("prices.saveFirst")}</p>}
+          >
+            {(p) => (
+              <>
+                <ProductPrices
+                  productId={p().id}
+                  variants={p().variants.map((v) => ({
+                    id: v.id,
+                    sku: v.sku,
+                    label: variantLabel(p().options, v.option_values) || v.sku,
+                  }))}
+                />
+                <A
+                  href={`/inventory?product=${p().id}`}
+                  class="mt-3 inline-block text-sm text-accent-700 hover:underline"
+                >
+                  {t("inventory.openInventory")}
+                </A>
+              </>
+            )}
+          </Show>
+        </Section>
+
         <Section id="categories" title={t("editor.categories")}>
           <QueryState query={categories}>
             {(tree) => (
@@ -419,7 +465,6 @@ export default function ProductEditor() {
         </Section>
 
         <Section id="pricing" title={t("editor.pricing")}>
-          <p class="mb-3 text-xs text-muted-foreground">{t("editor.pricesLater")}</p>
           <div class="grid max-w-md gap-3 sm:grid-cols-2">
             <SelectField
               label={t("editor.unitMeasure")}

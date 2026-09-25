@@ -22,12 +22,22 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/products", label: () => t("nav.products"), min: "staff" },
       { href: "/categories", label: () => t("nav.categories"), min: "staff" },
       { href: "/parameters", label: () => t("nav.parameters"), min: "staff" },
+      { href: "/inventory", label: () => t("nav.inventory"), min: "staff" },
+    ],
+  },
+  {
+    label: () => t("nav.pricing"),
+    items: [
+      { href: "/price-lists", label: () => t("nav.priceLists"), min: "staff" },
+      { href: "/sales", label: () => t("nav.sales"), min: "staff" },
+      { href: "/coupons", label: () => t("nav.coupons"), min: "staff" },
     ],
   },
   {
     label: () => t("nav.settings"),
     items: [
       { href: "/markets", label: () => t("nav.markets"), min: "staff" },
+      { href: "/settings/tax", label: () => t("nav.taxProfile"), min: "staff" },
       { href: "/staff", label: () => t("nav.staff"), min: "admin" },
       { href: "/audit-log", label: () => t("nav.auditLog"), min: "admin" },
     ],

@@ -47,6 +47,13 @@ export function useTaxCategories() {
   }));
 }
 
+export function usePriceLists() {
+  return createQuery(() => ({
+    queryKey: tenantKey("price-lists"),
+    queryFn: () => unwrap(api.GET("/admin/v1/price-lists", { params: { header: tenantHeader() } })),
+  }));
+}
+
 export function useMarkets() {
   return createQuery(() => ({
     queryKey: tenantKey("markets"),

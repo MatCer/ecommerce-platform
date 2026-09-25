@@ -24,6 +24,7 @@ const productName = `Tričko E2E ${run}`;
 
 let context: BrowserContext;
 let page: Page;
+let productUrl = "";
 
 const nav = (p: Page, name: string) =>
   p.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name, exact: true });
@@ -139,6 +140,7 @@ test("creates a product with variants and an uploaded image", async () => {
   await page.getByRole("button", { name: "Save product" }).click();
   await expect(page.getByText("Product created")).toBeVisible();
   await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}$/);
+  productUrl = new URL(page.url()).pathname;
   await expect(page.getByRole("heading", { name: "Edit product" })).toBeVisible();
   await expectAccessible(page, "product-editor");
   await screenshot(page, "04-product-editor");
@@ -164,6 +166,88 @@ test("creates a product with variants and an uploaded image", async () => {
   await expect(row).toBeVisible();
   await screenshot(page, "05b-products-tablet");
   await page.setViewportSize({ width: 1280, height: 860 });
+});
+
+test("sets up tax, a price list, variant prices, a sale, a coupon and stock", async () => {
+  // Tax settings (owner/admin, fresh sign-in).
+  await nav(page, "Tax settings").click();
+  await expect(page.getByText("Tax settings are not configured yet")).toBeVisible();
+  await page.getByLabel("VAT ID (DIČ)").fill("CZ12345678");
+  await expectAccessible(page, "tax-settings");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Changes saved")).toBeVisible();
+  await expect(page.getByText("Tax settings are not configured yet")).toBeHidden();
+  await screenshot(page, "10-tax-settings");
+
+  // A CZK price list for the Czech market.
+  await nav(page, "Price lists").click();
+  await expect(page.getByText("No price lists yet")).toBeVisible();
+  await page.getByRole("button", { name: "New price list" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Name").fill("Retail CZ");
+  await dialog.getByLabel("Code").fill("retail-cz");
+  await dialog.getByText("Česko (cz)").click();
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("cell", { name: "Retail CZ", exact: true })).toBeVisible();
+  await expectAccessible(page, "price-lists");
+  await screenshot(page, "11-price-lists");
+
+  // Per-variant prices in the product editor.
+  await page.goto(productUrl);
+  const prices = page.getByRole("region", { name: "Prices" });
+  await prices.getByLabel("Price (CZK): S", { exact: true }).fill("499");
+  await prices.getByLabel("Price (CZK): M", { exact: true }).fill("549,90");
+  await prices.getByRole("button", { name: /Save prices/ }).click();
+  await expect(page.getByText("Prices saved")).toBeVisible();
+  await expect(prices.getByRole("row", { name: /^S/ })).toContainText("499.00");
+
+  // A running 10 % sale shows up in the prices and the Omnibus figures.
+  await nav(page, "Sales").click();
+  await page.getByRole("button", { name: "New sale" }).first().click();
+  await dialog.getByLabel("Name").fill("Autumn");
+  await dialog.getByLabel("Discount (%)").fill("10");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  const sale = page.getByRole("row", { name: /Autumn/ });
+  await expect(sale).toContainText("Running");
+  await expectAccessible(page, "sales");
+  await screenshot(page, "12-sales");
+  await page.goto(productUrl);
+  await expect(prices.getByRole("row", { name: /^S/ })).toContainText("On sale (−10 %)");
+  await prices.getByText("Price history: S").click();
+  await expect(prices.getByRole("cell", { name: "Sale", exact: true }).first()).toBeVisible();
+  await expectAccessible(page, "product-prices");
+  await prices.scrollIntoViewIfNeeded();
+  await screenshot(page, "13-product-prices");
+
+  // A coupon.
+  await nav(page, "Coupons").click();
+  await page.getByRole("button", { name: "New coupon" }).first().click();
+  await dialog.getByLabel("Code").fill("welcome10");
+  await dialog.getByLabel("Discount (%)").fill("10");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("cell", { name: "WELCOME10", exact: true })).toBeVisible();
+  await expectAccessible(page, "coupons");
+  await screenshot(page, "14-coupons");
+
+  // Stock: adjust with a reason, then read it in the movement log.
+  await page.goto(productUrl);
+  await page.getByRole("link", { name: "Stock of this product" }).click();
+  await expect(page.getByText("Showing one product.")).toBeVisible();
+  await page.getByRole("button", { name: /^Adjust.*-S$/ }).click();
+  await dialog.getByLabel("Units (+/−)").fill("+10");
+  await dialog.getByLabel("Reason").fill("Initial stock");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Stock updated")).toBeVisible();
+  const stock = page.getByRole("row", { name: /-S$/ });
+  await expect(stock.getByRole("cell").nth(0)).toHaveText("10");
+  await expectAccessible(page, "inventory");
+  await screenshot(page, "15-inventory");
+  await page.getByRole("button", { name: /^Movements.*-S$/ }).click();
+  await expect(dialog.getByRole("row", { name: /Adjusted/ })).toContainText("Initial stock");
+  await expect(dialog.getByRole("row", { name: /Adjusted/ })).toContainText("+10");
+  await expectAccessible(page, "movements");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 });
 
 test("invites a staff member by email", async () => {
@@ -206,6 +290,11 @@ test("a staff member sees only what their role allows", async ({ browser }) => {
   await expect(p.getByRole("button", { name: "New market" })).toBeDisabled();
   await expect(p.getByText("Only owners and admins can create markets.")).toBeVisible();
   await screenshot(p, "08-staff-role-markets");
+  await p.goto("/settings/tax");
+  await expect(p.getByText("Only owners and admins can change tax settings.")).toBeVisible();
+  await expect(p.getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+  await p.goto("/price-lists");
+  await expect(p.getByRole("button", { name: "New price list" })).toBeDisabled();
 
   // Catalog work is allowed: the product created by the owner is visible.
   await p.goto("/products");

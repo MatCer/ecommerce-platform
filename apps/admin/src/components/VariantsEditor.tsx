@@ -302,7 +302,7 @@ export function VariantsEditor(props: {
                         <input
                           type="radio"
                           name="default-variant"
-                          class="size-4 accent-accent-600"
+                          class="size-6 accent-accent-600"
                           aria-label={`${t("editor.isDefault")}: ${name()}`}
                           checked={v().is_default}
                           onChange={() =>
