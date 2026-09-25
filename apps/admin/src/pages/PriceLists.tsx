@@ -11,7 +11,7 @@ import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { errorMessage, t } from "../i18n/index.ts";
-import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
+import { api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
 import { CURRENCIES, type Currency } from "../lib/money.ts";
 import { useMarkets, usePriceLists } from "../lib/queries.ts";
@@ -41,19 +41,20 @@ export default function PriceLists() {
   const sameCurrency = () => (markets.data?.items ?? []).filter((m) => m.currency === currency());
   const marketName = (id: string) => markets.data?.items.find((m) => m.id === id)?.name ?? id;
 
+  const create = submission();
   const save = createMutation(() => ({
-    mutationFn: () => {
-      const current = editing();
-      if (current === "new" || current === null) {
+    mutationFn: (current: PriceList | "new") => {
+      if (current === "new") {
+        const body = {
+          name: name().trim(),
+          code: code().trim(),
+          currency: currency(),
+          market_ids: marketIds(),
+        };
         return unwrap(
           api.POST("/admin/v1/price-lists", {
-            params: { header: idempotencyKey() },
-            body: {
-              name: name().trim(),
-              code: code().trim(),
-              currency: currency(),
-              market_ids: marketIds(),
-            },
+            params: { header: create.header(body) },
+            body,
           }),
         );
       }
@@ -64,9 +65,10 @@ export default function PriceLists() {
         }),
       );
     },
-    onSuccess: async () => {
-      const created = editing() === "new";
-      setEditing(null);
+    onSuccess: async (_, current) => {
+      const created = current === "new";
+      if (created) create.done();
+      if (editing() === current) setEditing(null);
       await qc.invalidateQueries({ queryKey: tenantKey("price-lists") });
       await qc.invalidateQueries({ queryKey: tenantKey("markets") });
       showToast({
@@ -74,7 +76,9 @@ export default function PriceLists() {
         closeLabel: t("common.close"),
       });
     },
-    onError: (err) => setError(errorMessage(err)),
+    onError: (err, current) => {
+      if (editing() === current) setError(errorMessage(err));
+    },
   }));
 
   const newButton = () => (
@@ -148,7 +152,8 @@ export default function PriceLists() {
           class="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            save.mutate();
+            const current = editing();
+            if (current) save.mutate(current);
           }}
         >
           <TextField
@@ -185,6 +190,11 @@ export default function PriceLists() {
               {t("priceLists.markets")}
             </legend>
             <p class="text-xs text-faint-foreground">{t("priceLists.marketsHint")}</p>
+            <Show when={markets.isError}>
+              <p role="alert" class="text-xs text-error-700">
+                {errorMessage(markets.error)}
+              </p>
+            </Show>
             <For each={sameCurrency()}>
               {(m) => (
                 <Checkbox

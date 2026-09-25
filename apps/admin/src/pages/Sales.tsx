@@ -16,13 +16,13 @@ import { DateTimeField } from "../components/DateTimeField.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { ProductPicker } from "../components/ProductPicker.tsx";
 import { contentLocales, errorMessage, formatDateTime, locale, t } from "../i18n/index.ts";
-import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
+import { api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 import {
   CURRENCIES,
   type Currency,
   formatMoney,
-  fromLocalInput,
+  instant,
   minorToInput,
   parseMoney,
   parsePercent,
@@ -31,7 +31,8 @@ import {
 import { categoryOptions, useCategoryTree } from "../lib/queries.ts";
 
 type Sale = Schemas["Sale"];
-type Target = "all" | "categories" | "products";
+/** `selected`: the chosen categories and/or products (the API accepts both together). */
+type Target = "all" | "selected";
 
 interface Form {
   name: string;
@@ -69,11 +70,7 @@ function fromSale(s: Sale): Form {
     currency: d.type === "fixed" ? d.currency : "CZK",
     startsAt: toLocalInput(s.starts_at),
     endsAt: toLocalInput(s.ends_at),
-    target: s.targets.all
-      ? "all"
-      : (s.targets.category_ids?.length ?? 0) > 0
-        ? "categories"
-        : "products",
+    target: s.targets.all ? "all" : "selected",
     categoryIds: s.targets.category_ids ?? [],
     productIds: s.targets.product_ids ?? [],
   };
@@ -121,12 +118,24 @@ export default function Sales() {
   const targetText = (s: Sale) =>
     s.targets.all
       ? t("sales.targetAll")
-      : (s.targets.category_ids?.length ?? 0) > 0
-        ? t("sales.nCategories", { n: String(s.targets.category_ids?.length ?? 0) })
-        : t("sales.nProducts", { n: String(s.targets.product_ids?.length ?? 0) });
+      : [
+          (s.targets.category_ids?.length ?? 0) > 0 &&
+            t("sales.nCategories", { n: String(s.targets.category_ids?.length ?? 0) }),
+          (s.targets.product_ids?.length ?? 0) > 0 &&
+            t("sales.nProducts", { n: String(s.targets.product_ids?.length ?? 0) }),
+        ]
+          .filter(Boolean)
+          .join(", ");
+  /** A running sale keeps its start and discount (WP4 rule), so those fields are locked. */
+  const locked = () => {
+    const e = editing();
+    return e !== null && e !== "new" && saleState(e) === "running";
+  };
 
+  const create = submission();
   const save = createMutation(() => ({
-    mutationFn: () => {
+    // `target` is the sale being edited when Save was pressed (dialogs can change meanwhile).
+    mutationFn: (target: Sale | "new") => {
       const f = form();
       const discount =
         f.type === "percent"
@@ -139,35 +148,36 @@ export default function Sales() {
       const body = {
         name: f.name.trim(),
         discount,
-        starts_at: fromLocalInput(f.startsAt),
-        ends_at: fromLocalInput(f.endsAt),
+        // Untouched times keep their exact instant (the API compares a running sale's start).
+        starts_at: instant(f.startsAt, target === "new" ? null : target.starts_at),
+        ends_at: instant(f.endsAt, target === "new" ? null : target.ends_at),
         targets:
           f.target === "all"
             ? { all: true }
-            : f.target === "categories"
-              ? { category_ids: f.categoryIds }
-              : { product_ids: f.productIds },
+            : { category_ids: f.categoryIds, product_ids: f.productIds },
       };
-      const current = editing();
-      return current === "new" || current === null
-        ? unwrap(api.POST("/admin/v1/sales", { params: { header: idempotencyKey() }, body }))
+      return target === "new"
+        ? unwrap(api.POST("/admin/v1/sales", { params: { header: create.header(body) }, body }))
         : unwrap(
             api.PUT("/admin/v1/sales/{id}", {
-              params: { header: tenantHeader(), path: { id: current.id } },
+              params: { header: tenantHeader(), path: { id: target.id } },
               body,
             }),
           );
     },
-    onSuccess: async () => {
-      const created = editing() === "new";
-      setEditing(null);
+    onSuccess: async (_, target) => {
+      const created = target === "new";
+      if (created) create.done();
+      if (editing() === target) setEditing(null);
       await refresh();
       showToast({
         title: created ? t("common.created") : t("common.saved"),
         closeLabel: t("common.close"),
       });
     },
-    onError: (err) => setError(errorMessage(err)),
+    onError: (err, target) => {
+      if (editing() === target) setError(errorMessage(err));
+    },
   }));
 
   const remove = createMutation(() => ({
@@ -200,7 +210,8 @@ export default function Sales() {
     const f = form();
     const discountOk =
       f.type === "percent" ? parsePercent(f.percent) !== null : parseMoney(f.amount) !== null;
-    return f.name.trim() !== "" && discountOk;
+    const targetsOk = f.target === "all" || f.categoryIds.length + f.productIds.length > 0;
+    return f.name.trim() !== "" && discountOk && targetsOk;
   };
 
   return (
@@ -286,7 +297,8 @@ export default function Sales() {
           class="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            save.mutate();
+            const target = editing();
+            if (target) save.mutate(target);
           }}
         >
           <TextField
@@ -299,6 +311,7 @@ export default function Sales() {
           <div class="grid grid-cols-2 gap-2">
             <SelectField
               label={t("sales.discount")}
+              disabled={locked()}
               value={form().type}
               options={[
                 { value: "percent", label: t("sales.percent") },
@@ -311,6 +324,7 @@ export default function Sales() {
               fallback={
                 <TextField
                   label={t("sales.percentValue")}
+                  disabled={locked()}
                   value={form().percent}
                   onChange={(percent) => set({ percent })}
                   inputMode="decimal"
@@ -322,6 +336,7 @@ export default function Sales() {
               <div class="grid grid-cols-[1fr_6rem] gap-2">
                 <TextField
                   label={t("sales.amount")}
+                  disabled={locked()}
                   value={form().amount}
                   onChange={(amount) => set({ amount })}
                   inputMode="decimal"
@@ -330,6 +345,7 @@ export default function Sales() {
                 />
                 <SelectField
                   label={t("sales.currency")}
+                  disabled={locked()}
                   value={form().currency}
                   options={CURRENCIES.map((c) => ({ value: c, label: c }))}
                   onChange={(c) => set({ currency: c as Currency })}
@@ -340,6 +356,7 @@ export default function Sales() {
           <div class="grid grid-cols-2 gap-2">
             <DateTimeField
               label={t("sales.startsAt")}
+              disabled={locked()}
               hint={t("sales.startsHint")}
               value={form().startsAt}
               onChange={(startsAt) => set({ startsAt })}
@@ -356,14 +373,20 @@ export default function Sales() {
             value={form().target}
             options={[
               { value: "all", label: t("sales.targetAll") },
-              { value: "categories", label: t("sales.targetCategories") },
-              { value: "products", label: t("sales.targetProducts") },
+              { value: "selected", label: t("sales.targetSelected") },
             ]}
             onChange={(v) => set({ target: v as Target })}
           />
-          <Show when={form().target === "categories"}>
+          <Show when={form().target === "selected"}>
+            <Show when={categories.isError}>
+              <p role="alert" class="text-xs text-error-700">
+                {errorMessage(categories.error)}
+              </p>
+            </Show>
             <fieldset class="flex max-h-48 flex-col gap-1 overflow-y-auto">
-              <legend class="sr-only">{t("sales.targetCategories")}</legend>
+              <legend class="mb-1 text-xs font-medium text-muted-foreground">
+                {t("sales.targetCategories")}
+              </legend>
               <For each={categoryOptions(categories.data?.items ?? [], contentLocales())}>
                 {(c) => (
                   <Checkbox
@@ -381,11 +404,14 @@ export default function Sales() {
               </For>
             </fieldset>
           </Show>
-          <Show when={form().target === "products"}>
+          <Show when={form().target === "selected"}>
             <ProductPicker
               value={form().productIds}
               onChange={(productIds) => set({ productIds })}
             />
+          </Show>
+          <Show when={locked()}>
+            <p class="text-xs text-muted-foreground">{t("errors.sale_started")}</p>
           </Show>
           <Show when={error()}>
             <p role="alert" class="text-xs font-medium text-error-700">

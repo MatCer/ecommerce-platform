@@ -20,7 +20,7 @@ import { ProductPrices } from "../components/ProductPrices.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { VariantsEditor } from "../components/VariantsEditor.tsx";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
-import { ApiError, api, idempotencyKey, tenantHeader, unwrap } from "../lib/api.ts";
+import { ApiError, api, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import { categoryName, flatten } from "../lib/category-tree.ts";
 import { tenantKey } from "../lib/me.ts";
 import {
@@ -169,14 +169,16 @@ export default function ProductEditor() {
       .slice(0, 20)
       .toUpperCase();
 
+  const creation = submission();
   const save = createMutation(() => ({
     // The tenant is captured when the save starts: switching shops mid-request must neither
     // cache the answer under the new shop nor update this (by then unmounted) screen.
     mutationFn: async () => {
       const body = draftToInput(draft);
-      const header = idempotencyKey();
       const base = tenantKey();
+      const route = params.id;
       const created = isNew();
+      const header = created ? creation.header(body) : tenantHeader();
       const product = await (created
         ? unwrap(api.POST("/admin/v1/products", { params: { header }, body }))
         : unwrap(
@@ -185,9 +187,10 @@ export default function ProductEditor() {
               body,
             }),
           ));
-      return { product, base, created, route: params.id };
+      return { product, base, created, route };
     },
     onSuccess: ({ product: p, base, created, route }) => {
+      if (created) creation.done();
       qc.setQueryData([...base, "product", p.id], p);
       void qc.invalidateQueries({ queryKey: [...base, "products"] });
       // Only the screen that started the save reacts (same user, shop, product and still open).
@@ -454,12 +457,19 @@ export default function ProductEditor() {
         <Section id="parameters" title={t("editor.parameters")}>
           <QueryState query={parameters}>
             {(page) => (
-              <ParameterValues
-                parameters={page.items}
-                values={draft.parameters}
-                skus={skus()}
-                onChange={(v) => setDraft("parameters", reconcile(v))}
-              />
+              <>
+                <Show when={page.truncated}>
+                  <p role="status" class="mb-2 text-xs text-warning-700">
+                    {t("parameters.truncated", { count: page.items.length })}
+                  </p>
+                </Show>
+                <ParameterValues
+                  parameters={page.items}
+                  values={draft.parameters}
+                  skus={skus()}
+                  onChange={(v) => setDraft("parameters", reconcile(v))}
+                />
+              </>
             )}
           </QueryState>
         </Section>

@@ -51,6 +51,15 @@ export function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * The instant to send for a datetime field: the untouched original (full precision: the API
+ * compares running-sale starts exactly) or the edited local value.
+ */
+export function instant(local: string, original: string | null | undefined): string | null {
+  if (original && toLocalInput(original) === local) return original;
+  return fromLocalInput(local);
+}
+
 export function fromLocalInput(value: string): string | null {
   if (!value) return null;
   const d = new Date(value);

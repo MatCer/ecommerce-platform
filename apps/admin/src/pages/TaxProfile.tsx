@@ -82,9 +82,14 @@ export default function TaxProfile() {
     },
   }));
 
+  // Fill the form once per shop/user: later refetches (e.g. the save response) must not
+  // overwrite what the user is typing.
+  let loadedFor = "";
   createEffect(() => {
     const p = profile.data;
-    if (p === undefined) return;
+    const key = JSON.stringify(tenantKey("tax-profile"));
+    if (p === undefined || loadedFor === key) return;
+    loadedFor = key;
     setForm(
       p === null
         ? blank()
@@ -101,24 +106,30 @@ export default function TaxProfile() {
   });
 
   const save = createMutation(() => ({
-    mutationFn: () => {
+    // The cache key (user + shop) is fixed when the save starts, so a late answer can never be
+    // stored under another shop or account.
+    mutationFn: async () => {
+      const key = tenantKey("tax-profile");
       const f = form();
-      return unwrap(
+      const profile = await unwrap(
         api.PUT("/admin/v1/tax-profile", {
           params: { header: tenantHeader() },
           body: {
             ...f,
             vat_id: f.vat_id?.trim() || null,
-            sk_ic_dph: f.sk_ic_dph?.trim() || null,
+            // Only Slovak establishments have an IČ DPH (the API rejects it elsewhere).
+            sk_ic_dph: f.establishment_country === "SK" ? f.sk_ic_dph?.trim() || null : null,
             confirm_origin_threshold:
               f.distance_sales_mode === "origin_threshold" && f.confirm_origin_threshold,
           },
         }),
       );
+      return { profile, key };
     },
-    onSuccess: (p) => {
+    onSuccess: ({ profile: p, key }) => {
+      qc.setQueryData(key, p);
+      if (JSON.stringify(key) !== JSON.stringify(tenantKey("tax-profile"))) return;
       setError(undefined);
-      qc.setQueryData(tenantKey("tax-profile"), p);
       showToast({ title: t("common.saved"), closeLabel: t("common.close") });
     },
     onError: (err) => setError(errorMessage(err)),
@@ -146,7 +157,7 @@ export default function TaxProfile() {
             <Show when={readOnly()}>
               <p class="text-sm text-muted-foreground">{t("taxProfile.adminOnly")}</p>
             </Show>
-            <fieldset disabled={readOnly()} class="flex flex-col gap-3">
+            <fieldset disabled={readOnly() || save.isPending} class="flex flex-col gap-3">
               <Checkbox
                 label={t("taxProfile.vatPayer")}
                 checked={form().vat_payer}

@@ -1,6 +1,6 @@
 import { Badge, Button, SelectField, showToast, TextField, type Tone } from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
-import { createSignal, For, Index, Show } from "solid-js";
+import { createSignal, For, Index, onCleanup, Show } from "solid-js";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
 import { api, tenantHeader, unwrap } from "../lib/api.ts";
 import { mediaUrl } from "../lib/config.ts";
@@ -159,6 +159,11 @@ export function MediaManager(props: {
   const update = (id: string, progress: number) =>
     setUploads((list) => list.map((u) => (u.id === id ? { ...u, progress } : u)));
 
+  let alive = true;
+  onCleanup(() => {
+    alive = false;
+  });
+
   const onFiles = async (files: FileList | null) => {
     for (const file of Array.from(files ?? [])) {
       const check = checkFile(file);
@@ -175,14 +180,15 @@ export function MediaManager(props: {
       setUploads((list) => [...list, { id, name: file.name, progress: 0 }]);
       try {
         const asset = await uploadImage(file, (p) => update(id, p));
-        props.onChange([...props.media, { asset_id: asset.id, alt_i18n: {} }]);
+        if (alive) props.onChange([...props.media, { asset_id: asset.id, alt_i18n: {} }]);
       } catch (err) {
-        showToast({
-          title: t("editor.uploadFailed", { name: file.name }),
-          description: errorMessage(err),
-          tone: "error",
-          closeLabel: t("common.close"),
-        });
+        if (alive)
+          showToast({
+            title: t("editor.uploadFailed", { name: file.name }),
+            description: errorMessage(err),
+            tone: "error",
+            closeLabel: t("common.close"),
+          });
       } finally {
         setUploads((list) => list.filter((u) => u.id !== id));
       }

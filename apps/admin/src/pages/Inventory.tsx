@@ -13,7 +13,7 @@ import { createInfiniteQuery, createMutation, useQueryClient } from "@tanstack/s
 import { createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
-import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
+import { api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 import { claims } from "../lib/session.ts";
 
@@ -143,27 +143,35 @@ export default function Inventory() {
       showToast({ title: errorMessage(err), tone: "error", closeLabel: t("common.close") }),
   }));
 
+  // Pressing Save again after a lost response reuses the Idempotency-Key (no double +10).
+  const adjustment = submission();
   const adjust = createMutation(() => ({
     mutationFn: (row: Row) => {
       const n = parseCount(amount());
       if (n === null || (mode() === "count" && n < 0)) throw new Error("invalid_quantity");
+      const body =
+        mode() === "delta"
+          ? { delta: n, note: note().trim() || null }
+          : { on_hand: n, note: note().trim() || null };
       return unwrap(
         api.POST("/admin/v1/inventory/{variant_id}/adjustments", {
-          params: { header: idempotencyKey(), path: { variant_id: row.variant_id } },
-          body:
-            mode() === "delta"
-              ? { delta: n, note: note().trim() || null }
-              : { on_hand: n, note: note().trim() || null },
+          params: {
+            header: adjustment.header({ variant: row.variant_id, ...body }),
+            path: { variant_id: row.variant_id },
+          },
+          body,
         }),
       );
     },
     onSuccess: async (_, row) => {
-      setAdjusting(null);
+      adjustment.done();
+      if (adjusting() === row) setAdjusting(null);
       await refresh();
       await qc.invalidateQueries({ queryKey: tenantKey("movements", row.variant_id) });
       showToast({ title: t("inventory.adjusted"), closeLabel: t("common.close") });
     },
-    onError: (err) =>
+    onError: (err, row) =>
+      adjusting() === row &&
       setError(
         err instanceof Error && err.message === "invalid_quantity"
           ? t("errors.invalid_quantity")
@@ -244,6 +252,10 @@ export default function Inventory() {
                               <span class="sr-only">{`${t("inventory.tracked")}: ${r.sku}`}</span>
                             }
                             checked={r.track}
+                            disabled={
+                              settings.isPending &&
+                              settings.variables?.row.variant_id === r.variant_id
+                            }
                             onChange={(track) =>
                               settings.mutate({ row: r, track, allow_backorder: r.allow_backorder })
                             }
@@ -255,6 +267,10 @@ export default function Inventory() {
                               <span class="sr-only">{`${t("inventory.backorder")}: ${r.sku}`}</span>
                             }
                             checked={r.allow_backorder}
+                            disabled={
+                              settings.isPending &&
+                              settings.variables?.row.variant_id === r.variant_id
+                            }
                             onChange={(allow_backorder) =>
                               settings.mutate({ row: r, track: r.track, allow_backorder })
                             }

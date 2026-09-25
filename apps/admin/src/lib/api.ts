@@ -53,6 +53,25 @@ export function tenantHeader(): { "X-Tenant-Id": string } {
   return { "X-Tenant-Id": t };
 }
 
+/**
+ * One `Idempotency-Key` per logical submission of a form: pressing Save again with the same body
+ * (e.g. after a lost response) reuses the key, so the server replays instead of applying twice.
+ * A changed body gets a new key; call `done()` after success.
+ */
+export function submission() {
+  let last: { body: string; key: string } | null = null;
+  return {
+    header(body: unknown): { "X-Tenant-Id": string; "Idempotency-Key": string } {
+      const serialized = `${tenantId()}|${JSON.stringify(body)}`;
+      if (last?.body !== serialized) last = { body: serialized, key: crypto.randomUUID() };
+      return { ...tenantHeader(), "Idempotency-Key": last.key };
+    },
+    done(): void {
+      last = null;
+    },
+  };
+}
+
 /** Tenant header plus a fresh `Idempotency-Key` for one user action (retries reuse it). */
 export function idempotencyKey(): { "X-Tenant-Id": string; "Idempotency-Key": string } {
   return { ...tenantHeader(), "Idempotency-Key": crypto.randomUUID() };

@@ -190,6 +190,7 @@ export class DraftError extends Error {
 
 /** Number from a form field (decimal comma allowed); throws instead of sending NaN (-> null). */
 function num(s: string, code: string): number {
+  if (s.trim() === "") throw new DraftError(code);
   const n = Number(s.trim().replace(",", "."));
   if (!Number.isFinite(n)) throw new DraftError(code);
   return n;

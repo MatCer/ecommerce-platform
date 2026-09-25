@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatMoney,
   fromLocalInput,
+  instant,
   minorToInput,
   parseMoney,
   parsePercent,
@@ -37,6 +38,13 @@ describe("money", () => {
     expect(parsePercent("100")).toBe(10000);
     expect(parsePercent("0")).toBeNull();
     expect(parsePercent("101")).toBeNull();
+  });
+
+  it("keeps the original instant when the field was not edited", () => {
+    const original = "2026-09-25T10:15:37.123Z";
+    expect(instant(toLocalInput(original), original)).toBe(original);
+    expect(instant("2030-01-01T00:00", original)).toBe(fromLocalInput("2030-01-01T00:00"));
+    expect(instant("", original)).toBeNull();
   });
 
   it("round-trips datetime-local values", () => {

@@ -1,7 +1,7 @@
 import { Checkbox, TextField } from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
-import { contentLocales, t } from "../i18n/index.ts";
+import { createSignal, For } from "solid-js";
+import { contentLocales, errorMessage, t } from "../i18n/index.ts";
 import { api, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 
@@ -58,9 +58,15 @@ export function ProductPicker(props: { value: string[]; onChange: (ids: string[]
           )}
         </For>
       </ul>
-      <Show when={results.isPending}>
-        <span class="text-xs text-muted-foreground">{t("common.loading")}</span>
-      </Show>
+      <p role="status" class="text-xs text-muted-foreground">
+        {results.isPending
+          ? t("common.loading")
+          : results.isError
+            ? errorMessage(results.error)
+            : (results.data?.items.length ?? 0) === 0
+              ? t("products.noMatches")
+              : ""}
+      </p>
     </div>
   );
 }

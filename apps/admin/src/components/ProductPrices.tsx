@@ -105,6 +105,8 @@ function ListPrices(props: {
       showToast({ title: errorMessage(err), tone: "error", closeLabel: t("common.close") }),
   }));
 
+  /** Only changed rows are sent (the API needs 1-1000 items). */
+  const dirty = () => JSON.stringify(rows()) !== JSON.stringify(initial());
   const set = (id: string, patch: Partial<Row>) =>
     setRows({ ...rows(), [id]: { ...(rows()[id] ?? { price: "", compareAt: "" }), ...patch } });
 
@@ -166,10 +168,13 @@ function ListPrices(props: {
                         {money(h()?.omnibus.current_minor ?? 0)}
                         <Show when={h()?.omnibus.on_sale}>
                           {" "}
+                          {/* A percentage may only be advertised when the Omnibus claim holds. */}
                           <Badge tone="info">
-                            {t("prices.onSale", {
-                              percent: String(h()?.omnibus.discount_percent ?? ""),
-                            })}
+                            {h()?.omnibus.claim && h()?.omnibus.discount_percent != null
+                              ? t("prices.onSale", {
+                                  percent: String(h()?.omnibus.discount_percent),
+                                })
+                              : t("prices.onSaleNoClaim")}
                           </Badge>
                         </Show>
                       </Show>
@@ -204,7 +209,7 @@ function ListPrices(props: {
         </p>
       </Show>
       <div>
-        <Button onClick={() => save.mutate()} loading={save.isPending}>
+        <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty()}>
           {t("prices.save")}
           <span class="sr-only">: {props.list.name}</span>
         </Button>

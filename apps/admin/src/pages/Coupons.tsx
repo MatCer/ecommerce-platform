@@ -14,13 +14,13 @@ import { createSignal, For, Show } from "solid-js";
 import { DateTimeField } from "../components/DateTimeField.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { errorMessage, formatDateTime, locale, t } from "../i18n/index.ts";
-import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
+import { api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 import {
   CURRENCIES,
   type Currency,
   formatMoney,
-  fromLocalInput,
+  instant,
   minorToInput,
   parseMoney,
   parsePercent,
@@ -75,7 +75,29 @@ function fromCoupon(c: Coupon): Form {
   };
 }
 
-const count = (s: string): number | null => (/^\d+$/.test(s.trim()) ? Number(s.trim()) : null);
+/** Blank -> no restriction (`null`); otherwise a positive 32-bit count, or `undefined` if invalid. */
+export function limit(s: string): number | null | undefined {
+  const v = s.trim();
+  if (v === "") return null;
+  if (!/^\d+$/.test(v)) return undefined;
+  const n = Number(v);
+  return n >= 1 && n <= 2_147_483_647 ? n : undefined;
+}
+
+/** Blank -> no minimum; otherwise minor units, or `undefined` if invalid. */
+function minimum(s: string): number | null | undefined {
+  return s.trim() === "" ? null : (parseMoney(s) ?? undefined);
+}
+
+/** A published coupon that has started only accepts a new end and new limits (WP4 rule). */
+function isLocked(c: Coupon | "new" | null): boolean {
+  return (
+    c !== null &&
+    c !== "new" &&
+    c.published &&
+    (!c.starts_at || new Date(c.starts_at).getTime() <= Date.now())
+  );
+}
 
 export default function Coupons() {
   const qc = useQueryClient();
@@ -115,11 +137,20 @@ export default function Coupons() {
           ? parseMoney(f.amount) !== null
           : true;
     const needsCurrency = f.type === "fixed" || f.minSubtotal.trim() !== "";
-    return f.code.trim() !== "" && discountOk && (!needsCurrency || f.currency !== "");
+    return (
+      f.code.trim() !== "" &&
+      discountOk &&
+      (!needsCurrency || f.currency !== "") &&
+      minimum(f.minSubtotal) !== undefined &&
+      limit(f.usageLimit) !== undefined &&
+      limit(f.perCustomer) !== undefined
+    );
   };
 
+  const create = submission();
   const save = createMutation(() => ({
-    mutationFn: () => {
+    // `target` is the coupon being edited when Save was pressed (dialogs can change meanwhile).
+    mutationFn: (target: Coupon | "new") => {
       const f = form();
       const discount =
         f.type === "percent"
@@ -131,33 +162,35 @@ export default function Coupons() {
         code: f.code.trim(),
         discount,
         currency: f.currency === "" ? null : f.currency,
-        min_subtotal_minor: f.minSubtotal.trim() === "" ? null : parseMoney(f.minSubtotal),
-        usage_limit: count(f.usageLimit),
-        per_customer_limit: count(f.perCustomer),
-        starts_at: fromLocalInput(f.startsAt),
-        ends_at: fromLocalInput(f.endsAt),
+        min_subtotal_minor: minimum(f.minSubtotal) ?? null,
+        usage_limit: limit(f.usageLimit) ?? null,
+        per_customer_limit: limit(f.perCustomer) ?? null,
+        starts_at: instant(f.startsAt, target === "new" ? null : target.starts_at),
+        ends_at: instant(f.endsAt, target === "new" ? null : target.ends_at),
         published: f.published,
       };
-      const current = editing();
-      return current === "new" || current === null
-        ? unwrap(api.POST("/admin/v1/coupons", { params: { header: idempotencyKey() }, body }))
+      return target === "new"
+        ? unwrap(api.POST("/admin/v1/coupons", { params: { header: create.header(body) }, body }))
         : unwrap(
             api.PUT("/admin/v1/coupons/{id}", {
-              params: { header: tenantHeader(), path: { id: current.id } },
+              params: { header: tenantHeader(), path: { id: target.id } },
               body,
             }),
           );
     },
-    onSuccess: async () => {
-      const created = editing() === "new";
-      setEditing(null);
+    onSuccess: async (_, target) => {
+      const created = target === "new";
+      if (created) create.done();
+      if (editing() === target) setEditing(null);
       await refresh();
       showToast({
         title: created ? t("common.created") : t("common.saved"),
         closeLabel: t("common.close"),
       });
     },
-    onError: (err) => setError(errorMessage(err)),
+    onError: (err, target) => {
+      if (editing() === target) setError(errorMessage(err));
+    },
   }));
 
   const remove = createMutation(() => ({
@@ -232,7 +265,7 @@ export default function Coupons() {
                         </td>
                         <td class={tdClass}>
                           <Badge tone={c.published ? "success" : "neutral"}>
-                            {c.published ? t("coupons.live") : t("coupons.draft")}
+                            {c.published ? t("coupons.live") : t("coupons.private")}
                           </Badge>
                         </td>
                         <td class={`${tdClass} text-right whitespace-nowrap`}>
@@ -273,12 +306,14 @@ export default function Coupons() {
           class="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
-            save.mutate();
+            const target = editing();
+            if (target) save.mutate(target);
           }}
         >
           <div class="grid grid-cols-2 gap-2">
             <TextField
               label={t("coupons.code")}
+              disabled={isLocked(editing())}
               value={form().code}
               onChange={(code) => set({ code: code.toUpperCase() })}
               inputClass="figures"
@@ -287,6 +322,7 @@ export default function Coupons() {
             />
             <SelectField
               label={t("coupons.discount")}
+              disabled={isLocked(editing())}
               value={form().type}
               options={[
                 { value: "percent", label: t("sales.percent") },
@@ -298,6 +334,7 @@ export default function Coupons() {
             <Show when={form().type === "percent"}>
               <TextField
                 label={t("sales.percentValue")}
+                disabled={isLocked(editing())}
                 value={form().percent}
                 onChange={(percent) => set({ percent })}
                 inputMode="decimal"
@@ -308,6 +345,7 @@ export default function Coupons() {
             <Show when={form().type === "fixed"}>
               <TextField
                 label={t("sales.amount")}
+                disabled={isLocked(editing())}
                 value={form().amount}
                 onChange={(amount) => set({ amount })}
                 inputMode="decimal"
@@ -317,6 +355,7 @@ export default function Coupons() {
             </Show>
             <SelectField
               label={t("sales.currency")}
+              disabled={isLocked(editing())}
               description={t("coupons.currencyHint")}
               value={form().currency}
               options={[
@@ -327,6 +366,8 @@ export default function Coupons() {
             />
             <TextField
               label={t("coupons.minSubtotal")}
+              error={minimum(form().minSubtotal) === undefined && t("errors.invalid_min_subtotal")}
+              disabled={isLocked(editing())}
               value={form().minSubtotal}
               onChange={(minSubtotal) => set({ minSubtotal })}
               inputMode="decimal"
@@ -334,6 +375,7 @@ export default function Coupons() {
             />
             <TextField
               label={t("coupons.usageLimit")}
+              error={limit(form().usageLimit) === undefined && t("errors.invalid_quantity")}
               description={t("coupons.limitHint")}
               value={form().usageLimit}
               onChange={(usageLimit) => set({ usageLimit })}
@@ -342,6 +384,7 @@ export default function Coupons() {
             />
             <TextField
               label={t("coupons.perCustomer")}
+              error={limit(form().perCustomer) === undefined && t("errors.invalid_quantity")}
               description={t("coupons.limitHint")}
               value={form().perCustomer}
               onChange={(perCustomer) => set({ perCustomer })}
@@ -350,6 +393,7 @@ export default function Coupons() {
             />
             <DateTimeField
               label={t("sales.startsAt")}
+              disabled={isLocked(editing())}
               value={form().startsAt}
               onChange={(startsAt) => set({ startsAt })}
             />
@@ -361,9 +405,13 @@ export default function Coupons() {
           </div>
           <Checkbox
             label={t("coupons.published")}
+            disabled={isLocked(editing())}
             checked={form().published}
             onChange={(published) => set({ published })}
           />
+          <Show when={isLocked(editing())}>
+            <p class="text-xs text-muted-foreground">{t("errors.coupon_started")}</p>
+          </Show>
           <Show when={error()}>
             <p role="alert" class="text-xs font-medium text-error-700">
               {error()}
