@@ -514,6 +514,24 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect(call?.headers).toMatchObject({ "x-tenant": "t-demo", "x-market": "m-cz" });
   });
 
+  test("islands reach search (WP7) through /_p/public with the edge-injected context", async () => {
+    api.calls.length = 0;
+    const res = await get("http://demo.localhost/_p/public/search?q=tri&f.opt.size=m", {
+      "x-storefront-token": "sf_forged",
+    });
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const call = api.calls.at(-1);
+    expect(call?.url).toBe("http://api.test/storefront/v1/search?q=tri&f.opt.size=m");
+    expect(call?.headers).toMatchObject({
+      "x-tenant": "t-demo",
+      "x-market": "m-cz",
+      "x-storefront-token": "sf_demo_public",
+    });
+    await get("http://demo.localhost/_p/public/search/suggest?q=tr");
+    expect(api.calls.at(-1)?.url).toBe("http://api.test/storefront/v1/search/suggest?q=tr");
+    expect((await get("http://demo.localhost/_p/public/cart")).status).toBe(404);
+  });
+
   test("media is served only from the shop's own tenant prefix", async () => {
     api.calls.length = 0;
     expect((await get("http://demo.localhost/media/t-other/a/x.avif")).status).toBe(404);

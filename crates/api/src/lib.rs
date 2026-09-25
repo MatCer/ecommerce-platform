@@ -158,6 +158,7 @@ struct StorefrontDoc;
 pub fn openapi_storefront() -> OpenApiSpec {
     OpenApiRouter::<AppState>::with_openapi(StorefrontDoc::openapi())
         .merge(storefront::routes())
+        .merge(storefront_search::routes())
         .split_for_parts()
         .1
 }

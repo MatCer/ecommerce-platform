@@ -294,6 +294,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Product search with variant-correct facets (spec §11.1, A23).
+         * @description Results are distinct products; `variant_id` is the variant that matched best. Facets list
+         *     every value found for the query and category; `available: false` values would match
+         *     nothing with the other active filters and are shown disabled. No counts (A23).
+         */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/search/suggest": {
         parameters: {
             query?: never;
@@ -301,7 +323,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Typeahead: up to 5 products and 3 categories. */
+        /** Typeahead: up to 8 suggestions, matching categories (≤ 3) first, then products. */
         get: operations["suggest"];
         put?: never;
         post?: never;
@@ -336,6 +358,18 @@ export interface components {
             href: string;
             /** @description hreflang value (`cs-CZ`, `x-default`). */
             locale: string;
+        };
+        AssetVariant: {
+            /** Format: int64 */
+            bytes: number;
+            /** @description `avif`, `webp`, `jpeg` or `png`. */
+            format: string;
+            /** Format: int32 */
+            height: number;
+            /** @description Public-bucket key. */
+            key: string;
+            /** Format: int32 */
+            width: number;
         };
         /** @enum {string} */
         Badge: "sale" | "new";
@@ -411,6 +445,12 @@ export interface components {
              */
             version: number;
         };
+        CategorySuggestion: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+        };
         CategoryTile: {
             href: string;
             image?: components["schemas"]["Image"] | null;
@@ -449,8 +489,21 @@ export interface components {
             /** Format: date */
             to: string;
         };
+        Facet: {
+            /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
+            key: string;
+            label: string;
+            values: components["schemas"]["FacetValue"][];
+        };
         /** @enum {string} */
-        FacetKind: "option" | "parameter";
+        FacetKind: "option" | "parameter" | "brand";
+        FacetValue: {
+            /** @description Selecting it would still match something. Unavailable values are shown disabled (A23). */
+            available: boolean;
+            label: string;
+            selected: boolean;
+            value: string;
+        };
         FacetValueView: {
             /** @description Selecting it would give no result (counts are not shown, A23). */
             disabled: boolean;
@@ -612,6 +665,12 @@ export interface components {
             name: string;
             value: string;
         };
+        PriceRange: {
+            /** Format: int64 */
+            max_minor: number;
+            /** Format: int64 */
+            min_minor: number;
+        };
         /**
          * @description A selling price with its Omnibus reference (A18). `reference_price` and
          *     `discount_percent` are present only when a reduction may be claimed; they are computed
@@ -682,10 +741,39 @@ export interface components {
             code: number;
             to_path: string;
         };
-        SearchSuggest: {
-            categories: components["schemas"]["Link"][];
-            products: components["schemas"]["SuggestProduct"][];
-            query: string;
+        SearchHit: {
+            brand?: string | null;
+            /** @description The first product image, in the list-sized variants (up to 640 px). */
+            image: components["schemas"]["AssetVariant"][];
+            /** @description At least one variant can be bought now. */
+            in_stock: boolean;
+            name: string;
+            /** @description Current price of the matched variant in the market (gross). */
+            price: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            product_id: string;
+            slug: string;
+            /**
+             * Format: uuid
+             * @description The variant that matched best (e.g. the red one when filtering by red).
+             */
+            variant_id: string;
+        };
+        SearchResult: {
+            facets: components["schemas"]["Facet"][];
+            items: components["schemas"]["SearchHit"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            per_page: number;
+            price_range?: components["schemas"]["PriceRange"] | null;
+            /**
+             * Format: int64
+             * @description Matching products (before rehydration dropped any that just became unavailable).
+             */
+            total: number;
+            /** Format: int32 */
+            total_pages: number;
         };
         Seo: {
             alternates: components["schemas"]["Alternate"][];
@@ -724,7 +812,7 @@ export interface components {
             trust: components["schemas"]["Trust"];
         };
         /** @enum {string} */
-        Sort: "recommended" | "price_asc" | "price_desc" | "newest" | "name";
+        Sort: "recommended" | "price_asc" | "price_desc" | "newest";
         SortOption: {
             href: string;
             label: string;
@@ -733,11 +821,9 @@ export interface components {
         };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
-        SuggestProduct: {
-            image?: components["schemas"]["Image"] | null;
-            name: string;
-            price: components["schemas"]["MoneyView"];
-            slug: string;
+        Suggestions: {
+            categories: components["schemas"]["CategorySuggestion"][];
+            products: components["schemas"]["SearchHit"][];
         };
         Tracking: {
             /**
@@ -1427,11 +1513,29 @@ export interface operations {
             };
         };
     };
-    suggest: {
+    search: {
         parameters: {
             query?: {
-                /** @description At least 2 characters; at most 100 are used. */
+                /** @description Search text (≤ 200 characters). Empty: browse (e.g. a category listing). */
                 q?: string;
+                sort?: "relevance" | "price_asc" | "price_desc" | "newest";
+                /** @description 1-based page (results beyond the first 1000 are not available). */
+                page?: number;
+                /** @description 1-48, default 24. */
+                per_page?: number;
+                /** @description Only products in this category or its subcategories. */
+                category?: string;
+                /** @description Only variants that can be bought now. */
+                in_stock?: boolean;
+                /** @description Gross price bounds in minor units (inclusive). */
+                price_min?: number;
+                price_max?: number;
+                /**
+                 * @description Facet filters: `f.<facet key>=<value>`, repeatable (`f.opt.color=red&f.opt.color=blue`).
+                 *     Keys are the `facets[].key` of a previous response. Values of one facet are OR-ed,
+                 *     facets are AND-ed, and all of them must hold for one variant.
+                 */
+                "f.{facet}"?: string;
             };
             header: {
                 /** @description The tenant's public storefront token. */
@@ -1451,7 +1555,110 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SearchSuggest"];
+                    "application/json": components["schemas"]["SearchResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Search is temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    suggest: {
+        parameters: {
+            query: {
+                /** @description What the shopper typed so far (≤ 200 characters). */
+                q: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suggestions"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Search is temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

@@ -28,7 +28,7 @@ use commerce::promotions::coupons::{self, CouponInput};
 use commerce::promotions::sales::{self, SaleDiscount, SaleInput, SaleTargets};
 use commerce::storefront::listing::fold;
 use commerce::tax::{self, DistanceSalesMode, TaxProfileInput};
-use commerce::{tenancy, themes};
+use commerce::{search, tenancy, themes};
 use image::{DynamicImage, ImageFormat};
 use object_store::{ObjectStoreExt, PutPayload};
 use platform::db::{TenantTx, tenant_tx};
@@ -347,6 +347,10 @@ impl Seeder<'_> {
         self.promotions(tenant_id, &cats).await?;
         let mut tx = self.tx(tenant_id).await?;
         themes::assign_default(&mut tx, ACTOR).await?;
+        // A full search index build (WP7) for the demo catalog, run by the worker. Product
+        // events index incrementally too; the rebuild makes a rerun converge as well.
+        let version = search::next_version(&mut *tx).await?;
+        platform::queue::enqueue(&mut *tx, &search::manual_rebuild_job(tenant_id, version)).await?;
         tx.commit().await?;
         Ok(summary)
     }

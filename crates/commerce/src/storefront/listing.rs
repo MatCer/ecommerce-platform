@@ -40,16 +40,14 @@ pub enum Sort {
     PriceAsc,
     PriceDesc,
     Newest,
-    Name,
 }
 
 impl Sort {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 4] = [
         Self::Recommended,
         Self::PriceAsc,
         Self::PriceDesc,
         Self::Newest,
-        Self::Name,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -58,7 +56,16 @@ impl Sort {
             Self::PriceAsc => "price_asc",
             Self::PriceDesc => "price_desc",
             Self::Newest => "newest",
-            Self::Name => "name",
+        }
+    }
+
+    fn search(self) -> crate::search::query::Sort {
+        use crate::search::query::Sort as S;
+        match self {
+            Self::Recommended => S::Relevance,
+            Self::PriceAsc => S::PriceAsc,
+            Self::PriceDesc => S::PriceDesc,
+            Self::Newest => S::Newest,
         }
     }
 
@@ -86,6 +93,7 @@ pub struct ListingQuery {
 pub enum FacetKind {
     Option,
     Parameter,
+    Brand,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -229,7 +237,6 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
         Sort::PriceAsc => hits.sort_by_key(min_price),
         Sort::PriceDesc => hits.sort_by_key(|c| std::cmp::Reverse(min_price(c))),
         Sort::Newest => hits.sort_by_key(|c| std::cmp::Reverse(c.created_at)),
-        Sort::Name => hits.sort_by_cached_key(|c| fold(&c.name)),
     }
     let per_page = q.per_page.clamp(1, 100);
     let total = u32::try_from(hits.len()).unwrap_or(u32::MAX);
@@ -337,7 +344,12 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             .entry(v.product_id)
             .or_default()
             .push(CandidateVariant {
-                options: v.option_values,
+                // Facet keys are the search engine's (`opt.<code>`), so URLs work with both.
+                options: v
+                    .option_values
+                    .into_iter()
+                    .map(|(k, v)| (format!("opt.{k}"), v))
+                    .collect(),
                 price_minor: v.price.amount_minor,
             });
     }
@@ -357,7 +369,7 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             Some((_, i)) => *i,
             None => {
                 defs.push(FacetDef {
-                    key: o.code.clone(),
+                    key: format!("opt.{}", o.code),
                     label: ctx.text(&o.name_i18n).unwrap_or_else(|| o.code.clone()),
                     kind: FacetKind::Option,
                     values: Vec::new(),
@@ -398,14 +410,15 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
         let Some((value, label)) = param_value(ctx, &r.kind, r.unit.as_deref(), &r.value) else {
             continue;
         };
+        let key = format!("param.{}", r.key);
         params
             .entry(r.product_id)
             .or_default()
-            .entry(r.key.clone())
+            .entry(key.clone())
             .or_default()
             .insert(value.clone());
-        let def = param_defs.entry(r.key.clone()).or_insert_with(|| FacetDef {
-            key: r.key.clone(),
+        let def = param_defs.entry(key.clone()).or_insert_with(|| FacetDef {
+            key,
             label: ctx.text(&r.name_i18n).unwrap_or_else(|| r.key.clone()),
             kind: FacetKind::Parameter,
             values: Vec::new(),
@@ -434,6 +447,105 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
         })
         .collect();
     Ok(select(candidates, &defs, q))
+}
+
+/// The listing through the search engine (WP7, A23: variant-correct facets, results
+/// rehydrated from Postgres). `Err(Unavailable)` when search is degraded: callers fall back to
+/// [`listing`].
+pub async fn search_listing(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    search: super::Search<'_>,
+    q: &ListingQuery,
+) -> Result<Listing, Error> {
+    use crate::search::query as sq;
+    let scope = super::search_scope(tx, ctx).await?;
+    let req = sq::SearchRequest {
+        q: q.search.clone().unwrap_or_default(),
+        filters: q
+            .filters
+            .iter()
+            .map(|(k, vs)| (k.clone(), vs.iter().cloned().collect()))
+            .collect(),
+        category_id: q.category_id,
+        in_stock: false,
+        price_min: None,
+        price_max: None,
+        sort: q.sort.search(),
+        page: q.page.clamp(1, MAX_PAGE),
+        per_page: q.per_page.clamp(1, sq::MAX_PER_PAGE),
+    };
+    let found = sq::search(tx, search.meili, search.storage, &scope, &req).await?;
+    let mut product_ids: Vec<Uuid> = Vec::with_capacity(found.items.len());
+    for hit in &found.items {
+        if !product_ids.contains(&hit.product_id) {
+            product_ids.push(hit.product_id);
+        }
+    }
+    let facets: Vec<Facet> = found
+        .facets
+        .into_iter()
+        .map(|f| Facet {
+            kind: if f.key == "brand" {
+                FacetKind::Brand
+            } else if f.key.starts_with("param.") {
+                FacetKind::Parameter
+            } else {
+                FacetKind::Option
+            },
+            values: f
+                .values
+                .into_iter()
+                .map(|v| FacetValue {
+                    value: v.value,
+                    label: v.label,
+                    selected: v.selected,
+                    disabled: !v.available,
+                })
+                .collect(),
+            key: f.key,
+            label: f.label,
+        })
+        .collect();
+    let applied = facets
+        .iter()
+        .filter_map(|f| {
+            let selected: BTreeSet<String> = f
+                .values
+                .iter()
+                .filter(|v| v.selected)
+                .map(|v| v.value.clone())
+                .collect();
+            (!selected.is_empty()).then(|| (f.key.clone(), selected))
+        })
+        .collect();
+    Ok(Listing {
+        product_ids,
+        total: u32::try_from(found.total).unwrap_or(u32::MAX),
+        page: found.page,
+        pages: found.total_pages.max(1),
+        facets,
+        applied,
+    })
+}
+
+/// [`search_listing`] when search is available, the Postgres [`listing`] otherwise.
+pub async fn find(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    search: Option<super::Search<'_>>,
+    q: &ListingQuery,
+) -> Result<Listing, Error> {
+    if let Some(s) = search {
+        match search_listing(tx, ctx, s, q).await {
+            Ok(found) => return Ok(found),
+            Err(Error::Unavailable(reason)) => {
+                tracing::warn!(%reason, "search degraded; listing from Postgres");
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    listing(tx, ctx, q).await
 }
 
 /// A parameter value as a filter value and its label: localized text, `true`/`false`, or a
@@ -607,12 +719,6 @@ mod tests {
         assert_eq!(ids(&l), [2, 1, 3]);
         let l = select(catalog(), &defs(), &query(&[], Sort::PriceDesc));
         assert_eq!(ids(&l), [3, 1, 2]);
-        let l = select(catalog(), &defs(), &query(&[], Sort::Name));
-        assert_eq!(
-            ids(&l),
-            [3, 2, 1],
-            "čepice < tričko < žlutá (diacritics folded)"
-        );
         let l = select(catalog(), &defs(), &query(&[], Sort::Newest));
         assert_eq!(ids(&l), [3, 2, 1]);
         let mut q = query(&[], Sort::Recommended);

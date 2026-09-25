@@ -245,11 +245,11 @@ async fn category_listing_filters_sorts_and_marks_filtered_urls_noindex(db: PgPo
         .as_array()
         .unwrap()
         .iter()
-        .find(|f| f["key"] == "size")
+        .find(|f| f["key"] == "opt.size")
         .unwrap();
-    assert_eq!(size["values"][0]["href"], "/c/trika?size=v1");
+    assert_eq!(size["values"][0]["href"], "/c/trika?f.opt.size=v1");
     let (_, filtered) = c
-        .get("/storefront/v1/pages/category/trika?size=v2&sort=price_desc")
+        .get("/storefront/v1/pages/category/trika?f.opt.size=v2&sort=price_desc")
         .await;
     assert_eq!(filtered["total"], 1);
     assert_eq!(filtered["seo"]["robots"], "noindex,follow");
@@ -257,15 +257,18 @@ async fn category_listing_filters_sorts_and_marks_filtered_urls_noindex(db: PgPo
         filtered["seo"]["canonical"],
         "http://shop.localhost:8080/c/trika"
     );
-    let (_, none) = c.get("/storefront/v1/pages/category/trika?size=nope").await;
+    let (_, none) = c
+        .get("/storefront/v1/pages/category/trika?f.opt.size=nope")
+        .await;
     assert_eq!(none["total"], 1, "unknown values are ignored");
     let (status, _) = c.get("/storefront/v1/pages/category/missing").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     let (_, search) = c.get("/storefront/v1/pages/search?q=product%20tee").await;
     assert_eq!(search["total"], 1);
     assert_eq!(search["seo"]["robots"], "noindex,follow");
-    let (_, suggest) = c.get("/storefront/v1/search/suggest?q=produ").await;
-    assert_eq!(suggest["products"][0]["slug"], "tee-cs");
+    // Typeahead is the search engine's (WP7); it is down in this harness: 503, pages still work.
+    let (status, _) = c.get("/storefront/v1/search/suggest?q=produ").await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -29,6 +29,24 @@ use crate::money::{Currency, Locale, Money, MoneyView};
 
 pub use listing::{Listing, ListingQuery, listing};
 
+/// The search engine for listings (WP7): category and search pages use it and fall back to
+/// the Postgres [`listing`] when it is degraded (A27: search is not part of core readiness).
+#[derive(Clone, Copy)]
+pub struct Search<'a> {
+    pub meili: &'a crate::search::Meili,
+    pub storage: &'a platform::storage::Storage,
+}
+
+/// The search scope (WP7) of a storefront context: its market and locale.
+pub async fn search_scope(
+    tx: &mut TenantTx,
+    ctx: &Context,
+) -> Result<crate::search::query::Scope, Error> {
+    crate::search::query::scope(tx, ctx.market.id, &ctx.locale)
+        .await?
+        .ok_or(Error::NotFound)
+}
+
 /// How public storefront URLs are built (canonicals, hreflang, sitemaps). Never taken from
 /// request headers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -178,10 +196,8 @@ pub async fn context(
         .ok_or(Error::Forbidden {
             code: "market_mismatch",
         })?;
-    let base_url = market.base_url.clone().ok_or(Error::Conflict {
-        code: "market_without_domain",
-        detail: "the market has no verified domain".into(),
-    })?;
+    // A market without a verified domain is not published: nothing is revealed about it.
+    let base_url = market.base_url.clone().ok_or(Error::NotFound)?;
     let shop_name = sqlx::query_scalar!(
         "SELECT name FROM platform.tenants WHERE id = $1",
         tx.tenant_id()

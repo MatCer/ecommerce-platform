@@ -1,5 +1,5 @@
-import { suggest } from "@platform/storefront-sdk/client";
-import { imageUrl, type Messages, t } from "@platform/storefront-sdk/format";
+import { hitThumb, suggest } from "@platform/storefront-sdk/client";
+import { type Messages, t } from "@platform/storefront-sdk/format";
 import type { SearchSuggest } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 
@@ -88,7 +88,7 @@ export default function SearchBox(props: { q?: string; labels: Messages }) {
                 >
                   <a href={`/p/${p.slug}`} class="flex items-center gap-3 px-3 py-2 text-sm">
                     <img
-                      src={p.image ? imageUrl(p.image, 120) : undefined}
+                      src={hitThumb(p, 64)}
                       alt=""
                       width="32"
                       height="40"

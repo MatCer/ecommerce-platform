@@ -1,4 +1,11 @@
-import type { Cart, CartState, ConsentPurpose, SearchSuggest } from "./types.ts";
+import type {
+  Cart,
+  CartState,
+  ConsentPurpose,
+  SearchHit,
+  SearchResult,
+  SearchSuggest,
+} from "./types.ts";
 
 /**
  * Browser-side helpers for islands. Everything goes through same-origin gateway routes
@@ -37,6 +44,20 @@ export const suggest = (q: string, signal?: AbortSignal) =>
   fetch(`/_p/public/search/suggest?${new URLSearchParams({ q })}`, { signal }).then((r) =>
     json<SearchSuggest>(r),
   );
+
+/** Full search from an island: `params` as in `/storefront/v1/search` (`q`, `f.opt.color`, ...). */
+export const search = (params: URLSearchParams, signal?: AbortSignal) =>
+  fetch(`/_p/public/search?${params}`, { signal }).then((r) => json<SearchResult>(r));
+
+/** The smallest AVIF (else any) thumbnail of a search hit at least `width` px wide. */
+export function hitThumb(hit: SearchHit, width: number): string | undefined {
+  const sorted = [...hit.image].sort((a, b) => a.width - b.width);
+  const avif = sorted.filter((v) => v.format === "avif");
+  const pool = avif.length ? avif : sorted;
+  const v = pool.find((x) => x.width >= width) ?? pool.at(-1);
+  // Same-origin: the shop serves the public media bucket under /media (CSP img-src 'self').
+  return v && `/${v.key}`;
+}
 
 // --- consent (spec A20: before consent, no device storage and no beacons) ---------------------
 

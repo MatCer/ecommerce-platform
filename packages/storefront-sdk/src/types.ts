@@ -29,7 +29,11 @@ export type Facet = S["FacetView"];
 export type ListingPage = S["ListingPage"];
 export type HomePage = S["HomePage"];
 export type Recommendations = S["Recommendations"];
-export type SearchSuggest = S["SearchSuggest"];
+/** Typeahead (WP7): matching categories first, then products (`SearchHit`). */
+export type SearchSuggest = S["Suggestions"];
+/** Full search results with variant-correct facets (WP7, A23). */
+export type SearchResult = S["SearchResult"];
+export type SearchHit = S["SearchHit"];
 export type CartLine = S["CartLineView"];
 export type Cart = S["CartView"];
 

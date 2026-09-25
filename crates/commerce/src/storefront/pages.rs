@@ -14,7 +14,9 @@ use super::cards::{self, ProductCard};
 use super::images::Image;
 use super::listing::{self, Facet, FacetKind, ListingQuery, PER_PAGE, Sort};
 use super::product::{breadcrumb_ld, category_trail, home_link};
-use super::{Alternate, CacheHints, Context, Link, Seo, alternates, messages, plain_excerpt};
+use super::{
+    Alternate, CacheHints, Context, Link, Search, Seo, alternates, messages, plain_excerpt,
+};
 use crate::media::AssetVariant;
 use crate::money::MoneyView;
 use crate::themes;
@@ -392,17 +394,38 @@ impl ListingParams {
                 "sort" => out.sort = Sort::parse(v),
                 "page" => out.page = v.parse().unwrap_or(1).max(1),
                 "q" => out.q = Some(v.chars().take(100).collect()),
-                _ if k.len() <= 64
-                    && v.len() <= 200
-                    && !v.is_empty()
-                    && (out.filters.len() < MAX_FILTER_KEYS || out.filters.contains_key(k)) =>
-                {
-                    let set = out.filters.entry(k.clone()).or_default();
+                // Facet filters are `f.<facet key>` (the search engine's keys, WP7); anything
+                // else in the URL (utm_*, ...) is ignored.
+                _ => {
+                    let Some(key) = k.strip_prefix("f.") else {
+                        continue;
+                    };
+                    let valid_key = key == "brand"
+                        || key
+                            .strip_prefix("opt.")
+                            .or_else(|| key.strip_prefix("param."))
+                            .is_some_and(|c| {
+                                !c.is_empty()
+                                    && c.len() <= 64
+                                    && c.bytes().all(|b| {
+                                        b.is_ascii_lowercase()
+                                            || b.is_ascii_digit()
+                                            || b == b'_'
+                                            || b == b'-'
+                                    })
+                            });
+                    if !valid_key
+                        || v.is_empty()
+                        || v.len() > 200
+                        || (out.filters.len() >= MAX_FILTER_KEYS && !out.filters.contains_key(key))
+                    {
+                        continue;
+                    }
+                    let set = out.filters.entry(key.to_owned()).or_default();
                     if set.len() < MAX_FILTER_VALUES {
                         set.insert(v.clone());
                     }
                 }
-                _ => {}
             }
         }
         out
@@ -422,7 +445,7 @@ impl ListingParams {
         }
         for (k, vs) in filters {
             for v in vs {
-                ser.push((k.clone(), v.clone()));
+                ser.push((format!("f.{k}"), v.clone()));
             }
         }
         if sort != Sort::Recommended {
@@ -567,6 +590,7 @@ struct CategoryHit {
 async fn listing_page(
     tx: &mut TenantTx,
     ctx: &Context,
+    search: Option<Search<'_>>,
     path: &str,
     params: &ListingParams,
     category: Option<&CategoryHit>,
@@ -584,7 +608,7 @@ async fn listing_page(
         page: params.page,
         per_page: PER_PAGE,
     };
-    let found = listing::listing(tx, ctx, &q).await?;
+    let found = listing::find(tx, ctx, search, &q).await?;
     let products = cards::cards(tx, ctx, &found.product_ids).await?;
     let query = if category.is_none() {
         params.q.as_deref()
@@ -646,6 +670,7 @@ async fn listing_page(
 pub async fn category(
     tx: &mut TenantTx,
     ctx: &Context,
+    search: Option<Search<'_>>,
     slug: &str,
     params: &ListingParams,
 ) -> Result<Option<ListingPage>, Error> {
@@ -676,7 +701,7 @@ pub async fn category(
         return Ok(None);
     };
     let path = format!("/c/{}", cat.slug);
-    let (mut page, found) = listing_page(tx, ctx, &path, params, Some(&cat)).await?;
+    let (mut page, found) = listing_page(tx, ctx, search, &path, params, Some(&cat)).await?;
     let mut breadcrumbs = vec![home_link(ctx)];
     breadcrumbs.extend(category_trail(tx, ctx, cat.id).await?);
     page.subcategories = sqlx::query!(
@@ -758,13 +783,14 @@ pub async fn category(
     Ok(Some(page))
 }
 
-/// `GET /pages/search?q=`: name search over the catalog (WP7 replaces it with Meilisearch).
+/// `GET /pages/search?q=`: search results (WP7 engine, Postgres name search as fallback).
 pub async fn search(
     tx: &mut TenantTx,
     ctx: &Context,
+    search: Option<Search<'_>>,
     params: &ListingParams,
 ) -> Result<ListingPage, Error> {
-    let (mut page, _) = listing_page(tx, ctx, "/search", params, None).await?;
+    let (mut page, _) = listing_page(tx, ctx, search, "/search", params, None).await?;
     let q = params.q.clone().unwrap_or_default();
     page.title = messages::format(&ctx.locale, "search.results_for", &[("q", &q)]);
     page.breadcrumbs = vec![home_link(ctx)];
@@ -825,69 +851,6 @@ pub async fn recommendations(
     })
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct SuggestProduct {
-    pub slug: String,
-    pub name: String,
-    pub image: Option<Image>,
-    pub price: MoneyView,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct SearchSuggest {
-    pub query: String,
-    pub products: Vec<SuggestProduct>,
-    pub categories: Vec<Link>,
-}
-
-pub async fn suggest(tx: &mut TenantTx, ctx: &Context, q: &str) -> Result<SearchSuggest, Error> {
-    let query: String = q.chars().take(100).collect();
-    let folded = listing::fold(query.trim());
-    if folded.chars().count() < 2 {
-        return Ok(SearchSuggest {
-            query,
-            products: Vec::new(),
-            categories: Vec::new(),
-        });
-    }
-    let found = listing::listing(
-        tx,
-        ctx,
-        &ListingQuery {
-            search: Some(query.clone()),
-            page: 1,
-            per_page: 5,
-            ..ListingQuery::default()
-        },
-    )
-    .await?;
-    let products = cards::cards(tx, ctx, &found.product_ids)
-        .await?
-        .into_iter()
-        .map(|c| SuggestProduct {
-            slug: c.slug,
-            name: c.name,
-            image: c.images.into_iter().next(),
-            price: c.price.price,
-        })
-        .collect();
-    let categories = category_tree(tx, ctx)
-        .await?
-        .into_iter()
-        .filter(|c| listing::fold(&c.name).contains(&folded))
-        .take(3)
-        .map(|c| Link {
-            label: c.name,
-            href: format!("/c/{}", c.slug),
-        })
-        .collect();
-    Ok(SearchSuggest {
-        query,
-        products,
-        categories,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -899,20 +862,27 @@ mod tests {
     #[test]
     fn params_parse_and_links_roundtrip() {
         let p = ListingParams::from_pairs(&pairs(&[
-            ("color", "red"),
-            ("size", "m"),
-            ("color", "modrá"),
+            ("f.opt.color", "red"),
+            ("f.opt.size", "m"),
+            ("f.opt.color", "modrá"),
+            ("f.param.material", "len"),
             ("sort", "price_asc"),
             ("page", "x"),
-            ("utm_source", ""),
+            ("utm_source", "x"),
+            ("color", "legacy"),
+            ("f.nope", "x"),
+            ("f.opt.Bad Key", "x"),
         ]));
         assert_eq!(p.sort, Some(Sort::PriceAsc));
         assert_eq!(p.page, 1);
-        assert_eq!(p.filters.len(), 2);
+        assert_eq!(
+            p.filters.keys().collect::<Vec<_>>(),
+            ["opt.color", "opt.size", "param.material"]
+        );
         let href = ListingParams::href("/c/trika", None, &p.filters, Sort::PriceAsc, 2);
         assert_eq!(
             href,
-            "/c/trika?color=modr%C3%A1&color=red&size=m&sort=price_asc&page=2"
+            "/c/trika?f.opt.color=modr%C3%A1&f.opt.color=red&f.opt.size=m&f.param.material=len&sort=price_asc&page=2"
         );
         assert_eq!(
             ListingParams::href("/c/trika", None, &BTreeMap::new(), Sort::Recommended, 1),
@@ -932,7 +902,9 @@ mod tests {
 
     #[test]
     fn filter_params_are_bounded() {
-        let many: Vec<(String, String)> = (0..100).map(|i| (format!("k{i}"), "v".into())).collect();
+        let many: Vec<(String, String)> = (0..100)
+            .map(|i| (format!("f.opt.k{i}"), "v".into()))
+            .collect();
         assert_eq!(
             ListingParams::from_pairs(&many).filters.len(),
             MAX_FILTER_KEYS
@@ -963,6 +935,6 @@ mod tests {
         }];
         let views = facet_views("/c/x", None, facets, &applied, Sort::Recommended);
         let hrefs: Vec<&str> = views[0].values.iter().map(|v| v.href.as_str()).collect();
-        assert_eq!(hrefs, ["/c/x", "/c/x?color=blue&color=red"]);
+        assert_eq!(hrefs, ["/c/x", "/c/x?f.color=blue&f.color=red"]);
     }
 }

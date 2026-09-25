@@ -1,18 +1,20 @@
 //! Storefront search endpoints (`/storefront/v1`, spec §8.2, §11.1): full search with facets
-//! and typeahead. Public catalog data only; the tenant, market and locale come from the
-//! headers the edge injects (A4) and are re-validated here.
+//! and typeahead. Public catalog data only. Same authorization as every storefront call
+//! (A4, A7): the storefront token selects the tenant, the edge's market is loaded under that
+//! tenant's RLS (see [`crate::storefront::Shopper`]). Islands reach them as
+//! `/_p/public/search` and `/_p/public/search/suggest` through the edge.
 //!
 //! Meilisearch down → `503 service_unavailable` (search is a degraded component, A27); the
-//! rest of the storefront keeps working.
+//! rest of the storefront keeps working (category and search pages fall back to Postgres).
 
 use axum::Json;
 use axum::extract::rejection::QueryRejection;
-use axum::extract::{FromRequestParts, Query, State};
-use axum::http::request::Parts;
+use axum::extract::{Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
+use commerce::media::AssetVariant;
 use commerce::search::query::{
-    self, DEFAULT_PER_PAGE, Scope, SearchRequest, SearchResult, Sort, Suggestions,
+    self, DEFAULT_PER_PAGE, SearchHit, SearchRequest, SearchResult, Sort, Suggestions,
 };
 use platform::Error;
 use serde::Deserialize;
@@ -23,6 +25,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 use crate::admin::query_params;
+use crate::storefront::{Shopper, StorefrontHeaders, with_ctx};
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -30,41 +33,12 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(suggest))
 }
 
-/// Storefront context headers set by the edge (documentation only).
-#[derive(IntoParams)]
-#[into_params(parameter_in = Header)]
-#[allow(dead_code)]
-pub(crate) struct StorefrontHeaders {
-    /// Tenant resolved from the shop hostname.
-    #[param(rename = "X-Tenant")]
-    x_tenant: Uuid,
-    /// Market resolved from the shop hostname.
-    #[param(rename = "X-Market")]
-    x_market: Uuid,
-    /// One of the market's locales.
-    #[param(rename = "X-Locale", example = "cs")]
-    x_locale: String,
-}
-
-/// The validated storefront scope of a request. Unknown, unpublished or inconsistent contexts
-/// are `404` (nothing is revealed about tenants that are not public).
-pub struct Storefront(pub Scope);
-
-impl FromRequestParts<AppState> for Storefront {
-    type Rejection = Error;
-
-    async fn from_request_parts(parts: &mut Parts, s: &AppState) -> Result<Self, Error> {
-        let header = |name: &str| parts.headers.get(name).and_then(|v| v.to_str().ok());
-        let uuid = |name: &str| header(name).and_then(|v| Uuid::parse_str(v).ok());
-        let (Some(tenant), Some(market), Some(locale)) =
-            (uuid("x-tenant"), uuid("x-market"), header("x-locale"))
-        else {
-            return Err(Error::NotFound);
-        };
-        query::storefront_scope(&s.db, tenant, market, locale)
-            .await?
-            .map(Storefront)
-            .ok_or(Error::NotFound)
+/// Search hits link images by the public-bucket URL; storefront pages must use the shop's own
+/// origin (`/media/...`, CSP `img-src 'self'`).
+fn same_origin(items: &mut [SearchHit]) {
+    for v in items.iter_mut().flat_map(|h| h.image.iter_mut()) {
+        let AssetVariant { key, url, .. } = v;
+        *url = format!("/{key}");
     }
 }
 
@@ -78,7 +52,7 @@ fn cacheable(body: impl serde::Serialize) -> Response {
     );
     h.insert(
         header::VARY,
-        HeaderValue::from_static("x-tenant, x-market, x-locale"),
+        HeaderValue::from_static("x-storefront-token, x-market, x-locale"),
     );
     res
 }
@@ -175,20 +149,24 @@ fn parse_request(pairs: Vec<(String, String)>) -> Result<SearchRequest, Error> {
     responses(
         (status = 200, body = SearchResult),
         (status = 400, body = platform::Problem, content_type = "application/problem+json"),
-        (status = 404, description = "Unknown or unpublished storefront", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 401, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
         (status = 503, description = "Search is temporarily unavailable", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn search(
-    Storefront(scope): Storefront,
+    shopper: Shopper,
     State(s): State<AppState>,
     query: Result<Query<Vec<(String, String)>>, QueryRejection>,
 ) -> Result<Response, Error> {
     let req = parse_request(query_params(query)?)?;
-    let mut tx = platform::db::tenant_tx(&s.db, scope.tenant_id).await?;
-    let result = query::search(&mut tx, &s.meili, &s.storage, &scope, &req).await?;
-    tx.commit().await?;
+    let mut result = with_ctx(&s, &shopper, async |tx, ctx| {
+        let scope = commerce::storefront::search_scope(tx, ctx).await?;
+        query::search(tx, &s.meili, &s.storage, &scope, &req).await
+    })
+    .await?;
+    same_origin(&mut result.items);
     Ok(cacheable(result))
 }
 
@@ -208,19 +186,23 @@ pub struct SuggestParams {
     responses(
         (status = 200, body = Suggestions),
         (status = 400, body = platform::Problem, content_type = "application/problem+json"),
-        (status = 404, description = "Unknown or unpublished storefront", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 401, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
         (status = 503, description = "Search is temporarily unavailable", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn suggest(
-    Storefront(scope): Storefront,
+    shopper: Shopper,
     State(s): State<AppState>,
     query: Result<Query<SuggestParams>, QueryRejection>,
 ) -> Result<Response, Error> {
     let q = query_params(query)?.q;
-    let mut tx = platform::db::tenant_tx(&s.db, scope.tenant_id).await?;
-    let result = query::suggest(&mut tx, &s.meili, &s.storage, &scope, &q).await?;
-    tx.commit().await?;
+    let mut result = with_ctx(&s, &shopper, async |tx, ctx| {
+        let scope = commerce::storefront::search_scope(tx, ctx).await?;
+        query::suggest(tx, &s.meili, &s.storage, &scope, &q).await
+    })
+    .await?;
+    same_origin(&mut result.products);
     Ok(cacheable(result))
 }
 

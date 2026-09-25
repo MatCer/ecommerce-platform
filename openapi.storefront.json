@@ -1300,12 +1300,204 @@
         }
       }
     },
+    "/storefront/v1/search": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Product search with variant-correct facets (spec §11.1, A23).",
+        "description": "Results are distinct products; `variant_id` is the variant that matched best. Facets list\nevery value found for the query and category; `available: false` values would match\nnothing with the other active filters and are shown disabled. No counts (A23).",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Search text (≤ 200 characters). Empty: browse (e.g. a category listing).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevance",
+                "price_asc",
+                "price_desc",
+                "newest"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page (results beyond the first 1000 are not available).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "1-48, default 24.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Only products in this category or its subcategories.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "in_stock",
+            "in": "query",
+            "description": "Only variants that can be bought now.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "price_min",
+            "in": "query",
+            "description": "Gross price bounds in minor units (inclusive).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "price_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "f.{facet}",
+            "in": "query",
+            "description": "Facet filters: `f.<facet key>=<value>`, repeatable (`f.opt.color=red&f.opt.color=blue`).\nKeys are the `facets[].key` of a previous response. Values of one facet are OR-ed,\nfacets are AND-ed, and all of them must hold for one variant.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Search is temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/search/suggest": {
       "get": {
         "tags": [
           "storefront"
         ],
-        "summary": "Typeahead: up to 5 products and 3 categories.",
+        "summary": "Typeahead: up to 8 suggestions, matching categories (≤ 3) first, then products.",
         "operationId": "suggest",
         "parameters": [
           {
@@ -1342,8 +1534,8 @@
           {
             "name": "q",
             "in": "query",
-            "description": "At least 2 characters; at most 100 are used.",
-            "required": false,
+            "description": "What the shopper typed so far (≤ 200 characters).",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1354,7 +1546,44 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SearchSuggest"
+                  "$ref": "#/components/schemas/Suggestions"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Search is temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -1449,6 +1678,41 @@
           "locale": {
             "type": "string",
             "description": "hreflang value (`cs-CZ`, `x-default`)."
+          }
+        }
+      },
+      "AssetVariant": {
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "format",
+          "key",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "format": {
+            "type": "string",
+            "description": "`avif`, `webp`, `jpeg` or `png`."
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "key": {
+            "type": "string",
+            "description": "Public-bucket key."
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -1679,6 +1943,26 @@
           }
         }
       },
+      "CategorySuggestion": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        }
+      },
       "CategoryTile": {
         "type": "object",
         "required": [
@@ -1812,12 +2096,60 @@
           }
         }
       },
+      "Facet": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "values"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "`opt.<code>`, `param.<key>` or `brand`; the filter key to send back."
+          },
+          "label": {
+            "type": "string"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetValue"
+            }
+          }
+        }
+      },
       "FacetKind": {
         "type": "string",
         "enum": [
           "option",
-          "parameter"
+          "parameter",
+          "brand"
         ]
+      },
+      "FacetValue": {
+        "type": "object",
+        "required": [
+          "value",
+          "label",
+          "selected",
+          "available"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "Selecting it would still match something. Unavailable values are shown disabled (A23)."
+          },
+          "label": {
+            "type": "string"
+          },
+          "selected": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
       },
       "FacetValueView": {
         "type": "object",
@@ -2403,6 +2735,23 @@
           }
         }
       },
+      "PriceRange": {
+        "type": "object",
+        "required": [
+          "min_minor",
+          "max_minor"
+        ],
+        "properties": {
+          "max_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "min_minor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "PriceView": {
         "type": "object",
         "description": "A selling price with its Omnibus reference (A18). `reference_price` and\n`discount_percent` are present only when a reduction may be claimed; they are computed\nagainst the lowest price of the 30 days before the reduction, never `compare_at`.",
@@ -2682,28 +3031,110 @@
           }
         }
       },
-      "SearchSuggest": {
+      "SearchHit": {
         "type": "object",
         "required": [
-          "query",
-          "products",
-          "categories"
+          "product_id",
+          "variant_id",
+          "name",
+          "slug",
+          "price",
+          "in_stock",
+          "image"
         ],
         "properties": {
-          "categories": {
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "image": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Link"
-            }
+              "$ref": "#/components/schemas/AssetVariant"
+            },
+            "description": "The first product image, in the list-sized variants (up to 640 px)."
           },
-          "products": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SuggestProduct"
-            }
+          "in_stock": {
+            "type": "boolean",
+            "description": "At least one variant can be bought now."
           },
-          "query": {
+          "name": {
             "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/MoneyView",
+            "description": "Current price of the matched variant in the market (gross)."
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The variant that matched best (e.g. the red one when filtering by red)."
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "per_page",
+          "total_pages",
+          "facets"
+        ],
+        "properties": {
+          "facets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Facet"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "per_page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "price_range": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PriceRange",
+                "description": "Price span of the products matching the query and category (without facet filters)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching products (before rehydration dropped any that just became unavailable).",
+            "minimum": 0
+          },
+          "total_pages": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -2852,8 +3283,7 @@
           "recommended",
           "price_asc",
           "price_desc",
-          "newest",
-          "name"
+          "newest"
         ]
       },
       "SortOption": {
@@ -2888,32 +3318,24 @@
           "out_of_stock"
         ]
       },
-      "SuggestProduct": {
+      "Suggestions": {
         "type": "object",
         "required": [
-          "slug",
-          "name",
-          "price"
+          "categories",
+          "products"
         ],
         "properties": {
-          "image": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Image"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategorySuggestion"
+            }
           },
-          "name": {
-            "type": "string"
-          },
-          "price": {
-            "$ref": "#/components/schemas/MoneyView"
-          },
-          "slug": {
-            "type": "string"
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            }
           }
         }
       },

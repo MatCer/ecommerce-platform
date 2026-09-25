@@ -4,8 +4,9 @@ use axum::Json;
 use axum::extract::rejection::{PathRejection, QueryRejection};
 use axum::extract::{Path, Query, State};
 use commerce::redirects::{self, ResolvedRedirect};
+use commerce::storefront::Search;
 use commerce::storefront::pages::{
-    self, HomePage, ListingPage, ListingParams, Recommendations, SearchSuggest, ShopModel,
+    self, HomePage, ListingPage, ListingParams, Recommendations, ShopModel,
 };
 use commerce::storefront::product::{self, ProductPage};
 use platform::Error;
@@ -25,7 +26,6 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(category))
         .routes(routes!(product_page))
         .routes(routes!(search))
-        .routes(routes!(suggest))
         .routes(routes!(recommendations))
         .routes(routes!(resolve_redirect))
 }
@@ -72,6 +72,14 @@ pub struct ListingQueryDoc {
     page: Option<u32>,
 }
 
+/// The search engine (WP7) for listings; pages fall back to Postgres when it is degraded.
+fn engine(s: &AppState) -> Search<'_> {
+    Search {
+        meili: &s.meili,
+        storage: &s.storage,
+    }
+}
+
 fn listing_params(
     query: Result<Query<Vec<(String, String)>>, QueryRejection>,
 ) -> Result<ListingParams, Error> {
@@ -99,7 +107,7 @@ async fn category(
     let Path(slug) = slug.map_err(|_| Error::NotFound)?;
     let params = listing_params(query)?;
     with_ctx(&s, &shopper, async |tx, ctx| {
-        pages::category(tx, ctx, &slug, &params).await
+        pages::category(tx, ctx, Some(engine(&s)), &slug, &params).await
     })
     .await?
     .map(Json)
@@ -154,35 +162,7 @@ async fn search(
 ) -> Result<Json<ListingPage>, Error> {
     let params = listing_params(query)?;
     with_ctx(&s, &shopper, async |tx, ctx| {
-        pages::search(tx, ctx, &params).await
-    })
-    .await
-    .map(Json)
-}
-
-#[derive(Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct SuggestQuery {
-    /// At least 2 characters; at most 100 are used.
-    pub q: Option<String>,
-}
-
-/// Typeahead: up to 5 products and 3 categories.
-#[utoipa::path(
-    get,
-    path = "/storefront/v1/search/suggest",
-    tag = "storefront",
-    params(StorefrontHeaders, SuggestQuery),
-    responses((status = 200, body = SearchSuggest))
-)]
-async fn suggest(
-    shopper: Shopper,
-    State(s): State<AppState>,
-    query: Result<Query<SuggestQuery>, QueryRejection>,
-) -> Result<Json<SearchSuggest>, Error> {
-    let q = query_params(query)?.q.unwrap_or_default();
-    with_ctx(&s, &shopper, async |tx, ctx| {
-        pages::suggest(tx, ctx, &q).await
+        pages::search(tx, ctx, Some(engine(&s)), &params).await
     })
     .await
     .map(Json)
