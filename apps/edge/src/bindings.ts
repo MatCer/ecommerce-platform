@@ -119,6 +119,11 @@ export const CHECKOUT_OPERATIONS: Operation[] = [
   { method: "GET", path: /^\/customer\/me$/ },
   { method: "GET", path: /^\/customer\/addresses$/ },
   { method: "GET", path: /^\/consent$/ },
+  // WP10: the checkout, the order page (order capability in the path, A4), account orders.
+  { method: "GET", path: /^\/checkout$/ },
+  { method: "GET", path: /^\/orders\/[0-9a-f]{64}$/ },
+  { method: "GET", path: /^\/customer\/orders$/ },
+  { method: "GET", path: /^\/customer\/orders\/[0-9a-f-]{36}$/ },
 ];
 
 /**

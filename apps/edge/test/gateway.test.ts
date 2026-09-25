@@ -537,6 +537,128 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
   });
 });
 
+describe("checkout, order page and fake gateway (WP10)", () => {
+  const checkout = "http://checkout.demo.localhost:8280";
+  const json = { origin: checkout, "content-type": "application/json" };
+  const cookie = "__Host-cart=checkouttoken_000000000001; __Host-sid=sessiontoken_000000000001";
+  const order = "a".repeat(64);
+  const attempt = "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+
+  test("checkout calls carry the checkout cart, session and idempotency key", async () => {
+    api.calls.length = 0;
+    const res = await get(
+      `${checkout}/_p/checkout/place-order`,
+      { ...json, cookie, "idempotency-key": "k-1" },
+      { method: "POST", body: JSON.stringify({ version: 1 }) },
+    );
+    expect(res.status).toBe(201);
+    expect(res.headers.get("idempotent-replayed")).toBe("true");
+    expect(res.headers.get("set-cookie")).toBeNull(); // upstream cookies never pass
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const call = api.calls.at(-1);
+    expect(call?.url).toBe("http://api.test/storefront/v1/checkout/place-order");
+    expect(call?.headers).toMatchObject({
+      "x-cart-token": "checkouttoken_000000000001",
+      "x-customer-session": "sessiontoken_000000000001",
+      "idempotency-key": "k-1",
+      "x-tenant": "t-demo",
+    });
+    const view = await get(`${checkout}/_p/checkout`, { cookie });
+    expect(await view.json()).toMatchObject({ cart_seen: "checkouttoken_000000000001" });
+  });
+
+  test("only the checkout and order operations are exposed, same-origin JSON only", async () => {
+    const put = (path: string, headers: Record<string, string> = json) =>
+      get(`${checkout}${path}`, { ...headers, cookie }, { method: "PUT", body: "{}" });
+    expect((await put("/_p/checkout/contact")).status).toBe(200);
+    expect((await put("/_p/checkout/handoff")).status).toBe(404);
+    expect((await put("/_p/checkout/../account/me")).status).toBe(404);
+    expect(
+      (await put("/_p/checkout/contact", { ...json, origin: "http://evil.localhost" })).status,
+    ).toBe(403);
+    expect(
+      (await put("/_p/checkout/contact", { origin: checkout, "content-type": "text/plain" }))
+        .status,
+    ).toBe(415);
+    const badKey = await get(
+      `${checkout}/_p/checkout/place-order`,
+      { ...json, cookie, "idempotency-key": "has space" },
+      { method: "POST", body: "{}" },
+    );
+    expect(badKey.status).toBe(400);
+    // Orders: the capability is the path; nothing else.
+    expect((await get(`${checkout}/_p/orders/${order}/payment`)).status).toBe(200);
+    expect((await get(`${checkout}/_p/orders/short/payment`)).status).toBe(404);
+    const retry = await get(
+      `${checkout}/_p/orders/${order}/payment-attempts`,
+      json,
+      { method: "POST", body: "{}" },
+    );
+    expect(retry.status).toBe(200);
+    expect(retry.headers.get("referrer-policy")).toBe("no-referrer");
+    // The shop origin has none of it.
+    expect((await get(`http://demo.localhost:8280/_p/orders/${order}`)).status).toBe(404);
+  });
+
+  test("the fake pay page is escaped, script-free and returns to the order page only", async () => {
+    const page = await get(`${checkout}/_p/fake-pay/${attempt}?return=/o/${order}`);
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("&lt;b&gt;100001&lt;/b&gt;");
+    expect(html).not.toContain("<script");
+    expect(html).toContain(`action="/_p/fake-pay/${attempt}?return=/o/${order}"`);
+    expect(page.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect((await get(`${checkout}/_p/fake-pay/not-a-uuid`)).status).toBe(404);
+
+    const post = (ret: string, headers: Record<string, string>) =>
+      get(
+        `${checkout}/_p/fake-pay/${attempt}?return=${encodeURIComponent(ret)}`,
+        { ...headers, "content-type": "application/x-www-form-urlencoded" },
+        { method: "POST", body: "outcome=succeeded" },
+      );
+    const paid = await post(`/o/${order}`, { origin: checkout });
+    expect(paid.status).toBe(303);
+    expect(paid.headers.get("location")).toBe(`/o/${order}`);
+    expect(api.calls.at(-1)).toMatchObject({
+      method: "POST",
+      url: `http://api.test/storefront/v1/checkout/fake-pay/${attempt}`,
+      body: '{"outcome":"succeeded"}',
+    });
+    expect((await post("//evil.example/", { origin: checkout })).headers.get("location")).toBe(
+      "/",
+    );
+    expect((await post(`/o/${order}`, { origin: "http://evil.localhost" })).status).toBe(403);
+  });
+
+  test("the checkout CSP allows the configured widget origin, the theme CSP no frames", async () => {
+    const withWidget = createGateway({
+      artifactRoot: root,
+      resolver,
+      checkoutArtifact: checkoutId,
+      apiOrigin: "http://api.test",
+      mediaOrigin: "http://media.test",
+      scheme: "http",
+      purgeToken: PURGE_TOKEN,
+      upstream: api.fn,
+      log: () => {},
+      packetaWidgetUrl: "http://mocks.localhost:8280/packeta/library.js",
+    });
+    try {
+      const page = await withWidget.fetch(
+        new Request(`${checkout}/`, { headers: { host: "checkout.demo.localhost:8280" } }),
+      );
+      const csp = page.headers.get("content-security-policy") ?? "";
+      expect(csp).toMatch(/script-src [^;]*http:\/\/mocks\.localhost:8280/);
+      expect(csp).toMatch(/frame-src [^;]*http:\/\/mocks\.localhost:8280/);
+      expect(csp).not.toContain("widget.packeta.com");
+    } finally {
+      await withWidget.dispose();
+    }
+    const theme = await get("http://demo.localhost:8280/");
+    expect(theme.headers.get("content-security-policy")).toContain("frame-src 'none'");
+  });
+});
+
 describe("platform routes backed by the real API (WP6)", () => {
   test("a theme 404 asks for a redirect; only same-shop targets are followed", async () => {
     const moved = await get("http://demo.localhost/stary-produkt");
