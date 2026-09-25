@@ -24,6 +24,9 @@ infeasible, choose the best-practice alternative, record it in the PR under
 5. Verify through the real interface: bring the relevant part of the Docker stack up
    (`make up` / `make dev-infra` once they exist), exercise the flow (curl, Playwright, psql),
    and run the full check suite (`make lint test` + e2e/perf where the WP touches them).
+   If you touched config, Dockerfiles or binaries, also run `scripts/smoke-images.sh` against freshly
+   built images (CI runs it with no dependencies available: binaries must boot and report degraded
+   readiness rather than crash when optional config/deps are missing).
    Bring your compose stack down when finished (`docker compose -p <project> down`).
 6. Independent review before the PR: run an Astra review yourself via Codex, read-only:
    `codex exec -m gpt-6-astra -s read-only --skip-git-repo-check -C <worktree> -o /tmp/<wp>-review.md "<prompt>"`
