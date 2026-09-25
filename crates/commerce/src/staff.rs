@@ -50,7 +50,9 @@ pub async fn send_invitation(
     .fetch_optional(&mut *tx)
     .await?
     .unwrap_or_else(|| "cs".into());
-    let brand = crate::notifications::Brand::load(&mut tx, callback_url.to_owned()).await?;
+    let mut brand = crate::notifications::Brand::load(&mut tx, callback_url.to_owned()).await?;
+    // The logo is served by the shop origins, not by the admin URL this mail links to.
+    brand.logo_url = None;
     crate::notifications::enqueue(
         &mut tx,
         &brand,

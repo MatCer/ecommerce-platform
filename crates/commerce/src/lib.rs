@@ -19,6 +19,7 @@ pub mod feeds;
 pub mod id;
 pub mod idempotency;
 pub mod inventory;
+pub mod marketing;
 pub mod markets;
 pub mod media;
 pub mod money;

@@ -11,6 +11,7 @@
 
 use std::time::Duration;
 
+use lettre::message::header::{HeaderName, HeaderValue};
 use lettre::message::{Mailbox, MultiPart, header};
 use lettre::transport::smtp::Error as SmtpError;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
@@ -140,6 +141,9 @@ pub struct Outgoing<'a> {
     /// Stable per message: the Message-ID becomes `<id@from-domain>`, so a duplicate after an
     /// uncertain send can be recognised by the receiver (spec §13).
     pub id: &'a str,
+    /// Marketing mail: the one-click unsubscribe URL (RFC 8058), sent as `List-Unsubscribe`
+    /// with `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
+    pub list_unsubscribe: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,12 +220,28 @@ fn build(t: &Transport, msg: &Outgoing<'_>) -> Result<Message, String> {
         Some(msg.from_name.chars().filter(|c| !c.is_control()).collect()),
         t.from.email.clone(),
     );
-    Message::builder()
+    let mut builder = Message::builder()
         .from(from)
         .to(to)
         .subject(msg.subject)
         .message_id(Some(format!("<{}@{}>", msg.id, t.from.email.domain())))
-        .header(header::MIME_VERSION_1_0)
+        .header(header::MIME_VERSION_1_0);
+    if let Some(url) = msg.list_unsubscribe {
+        // Printable ASCII only (the URL carries a hex token): nothing to encode or inject.
+        if !url.bytes().all(|b| b.is_ascii_graphic()) || url.contains(['<', '>']) {
+            return Err("invalid List-Unsubscribe URL".into());
+        }
+        builder = builder
+            .raw_header(HeaderValue::new(
+                HeaderName::new_from_ascii_str("List-Unsubscribe"),
+                format!("<{url}>"),
+            ))
+            .raw_header(HeaderValue::new(
+                HeaderName::new_from_ascii_str("List-Unsubscribe-Post"),
+                "List-Unsubscribe=One-Click".into(),
+            ));
+    }
+    builder
         .multipart(MultiPart::alternative_plain_html(
             msg.text.to_owned(),
             msg.html.to_owned(),
@@ -299,6 +319,50 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    fn transport() -> Transport {
+        Transport::new(&StreamConfig {
+            url: "smtp://localhost:2525".into(),
+            from: "news@mail.example".into(),
+        })
+        .unwrap()
+    }
+
+    fn outgoing(list_unsubscribe: Option<&str>) -> Outgoing<'_> {
+        Outgoing {
+            stream: Stream::Marketing,
+            from_name: "Demo",
+            to: "a@example.com",
+            subject: "Novinky",
+            html: "<p>x</p>",
+            text: "x",
+            id: "0190a2b4-0000-7000-8000-000000000001",
+            list_unsubscribe,
+        }
+    }
+
+    #[test]
+    fn marketing_mail_carries_one_click_unsubscribe_headers() {
+        let url = "https://checkout.shop.example/_p/newsletter/unsubscribe?t=ab12";
+        let raw = String::from_utf8(
+            build(&transport(), &outgoing(Some(url)))
+                .unwrap()
+                .formatted(),
+        )
+        .unwrap();
+        assert!(
+            raw.contains(&format!("List-Unsubscribe: <{url}>\r\n")),
+            "{raw}"
+        );
+        assert!(raw.contains("List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n"));
+        assert!(raw.contains("Message-ID: <0190a2b4-0000-7000-8000-000000000001@mail.example>"));
+        let plain =
+            String::from_utf8(build(&transport(), &outgoing(None)).unwrap().formatted()).unwrap();
+        assert!(!plain.contains("List-Unsubscribe"));
+        // Header injection attempts are refused, not encoded.
+        assert!(build(&transport(), &outgoing(Some("https://x/\r\nBcc: a@b"))).is_err());
+        assert!(build(&transport(), &outgoing(Some("https://x/> <mailto:a@b"))).is_err());
     }
 
     #[test]

@@ -1,0 +1,13 @@
+{% extends "layout.txt" %}
+{% block content %}{% for b in blocks %}{% if b.type == "heading" %}{{ b.text }}
+{% elif b.type == "text" %}{{ b.plain }}
+{% elif b.type == "image" %}{% if b.alt %}[{{ b.alt }}]
+{% endif %}{% elif b.type == "button" %}{{ b.label }}: {{ b.href }}
+{% elif b.type == "products" %}{% if b.title %}{{ b.title }}
+{% endif %}{% for row in b.rows %}{% for p in row %}- {{ p.name }} ({{ p.price }}): {{ p.url }}
+{% endfor %}{% endfor %}{% endif %}
+{% endfor %}{% endblock %}
+{% block footer_extra %}
+{{ t("campaign.reason", shop=brand.shop_name) }}
+{{ t("campaign.preferences") }}: {{ preferences_url }}
+{{ t("campaign.unsubscribe") }}: {{ unsubscribe_url }}{% endblock %}

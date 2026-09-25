@@ -3,4 +3,4 @@
 {% block content %}{% endblock %}
 
 --
-{{ t("footer", shop=brand.shop_name) }} {{ brand.shop_url }}
+{{ t("footer", shop=brand.shop_name) }} {{ brand.shop_url }}{% block footer_extra %}{% endblock %}

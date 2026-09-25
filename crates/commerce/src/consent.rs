@@ -146,7 +146,7 @@ pub enum Source {
 }
 
 impl Source {
-    fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Banner => "banner",
             Self::Preferences => "preferences",
@@ -210,7 +210,30 @@ pub async fn record(
         subject,
         &choices,
         &choice.text_version,
-        choice.source,
+        choice.source.as_str(),
+        ip_hash,
+    )
+    .await
+}
+
+/// Records a choice made through a platform flow rather than a consent form: the newsletter
+/// double opt-in (`double_opt_in`), an unsubscribe link (`unsubscribe`), staff acting on a
+/// request (`admin`) or a spam complaint (`complaint`). `source` is `^[a-z_]{1,32}$`.
+pub async fn record_server(
+    tx: &mut TenantTx,
+    subject: &Subject,
+    purpose: ConsentPurpose,
+    granted: bool,
+    text_version: &str,
+    source: &'static str,
+    ip_hash: Option<&[u8]>,
+) -> Result<(), Error> {
+    insert(
+        tx,
+        subject,
+        &[(purpose, granted)],
+        text_version,
+        source,
         ip_hash,
     )
     .await
@@ -221,7 +244,7 @@ async fn insert(
     subject: &Subject,
     choices: &[(ConsentPurpose, bool)],
     text_version: &str,
-    source: Source,
+    source: &str,
     ip_hash: Option<&[u8]>,
 ) -> Result<(), Error> {
     let (kind, id) = subject.parts();
@@ -237,7 +260,7 @@ async fn insert(
         &purposes as &[&str],
         &granted,
         text_version,
-        source.as_str(),
+        source,
         ip_hash
     )
     .execute(&mut **tx)
@@ -245,6 +268,9 @@ async fn insert(
     // A20: a withdrawal stops what is still queued for the subject.
     if choices.contains(&(ConsentPurpose::Ads, false)) {
         crate::adtracking::cancel_for_subject(tx, subject).await?;
+    }
+    if choices.contains(&(ConsentPurpose::EmailMarketing, false)) {
+        crate::marketing::subscribers::on_withdrawal(tx, subject).await?;
     }
     Ok(())
 }
@@ -302,6 +328,29 @@ pub async fn latest(
          ORDER BY at DESC, id DESC LIMIT 1",
         kind,
         id,
+        purpose.as_str()
+    )
+    .fetch_optional(&mut **tx)
+    .await?)
+}
+
+/// The latest choice for `purpose` over several subjects of one person (a newsletter address
+/// and the customer account with that address): the most recent decision wins. `None` when
+/// none of them was ever asked.
+pub async fn latest_any(
+    tx: &mut TenantTx,
+    subjects: &[Subject],
+    purpose: ConsentPurpose,
+) -> Result<Option<bool>, Error> {
+    let (kinds, ids): (Vec<&str>, Vec<String>) = subjects.iter().map(Subject::parts).unzip();
+    Ok(sqlx::query_scalar!(
+        "SELECT c.granted FROM consent_records c
+         JOIN unnest($1::text[], $2::text[]) AS s(kind, id)
+           ON c.subject_type = s.kind AND c.subject_id = s.id
+         WHERE c.purpose = $3
+         ORDER BY c.at DESC, c.id DESC LIMIT 1",
+        &kinds as &[&str],
+        &ids,
         purpose.as_str()
     )
     .fetch_optional(&mut **tx)

@@ -1,0 +1,43 @@
+{#- Newsletter campaign (WP18): blocks prepared by commerce::marketing::render. Every value is
+    escaped except `html` of text blocks: rich text sanitized on write, links rewritten. -#}
+{% extends "layout.mjml" %}
+{% block content %}
+{% for b in blocks %}
+{% if b.type == "heading" %}
+        <mj-text font-size="22px" font-weight="700" padding="10px 0 4px">{{ b.text }}</mj-text>
+{% elif b.type == "text" %}
+        <mj-text>{{ b.html|safe }}</mj-text>
+{% elif b.type == "image" %}
+        <mj-image src="{{ b.src }}" alt="{{ b.alt }}"{% if b.href %} href="{{ b.href }}"{% endif %} padding="10px 0" />
+{% elif b.type == "button" %}
+        <mj-button href="{{ b.href }}">{{ b.label }}</mj-button>
+{% elif b.type == "products" %}
+{% if b.title %}
+        <mj-text font-size="18px" font-weight="700" padding="14px 0 4px">{{ b.title }}</mj-text>
+{% endif %}
+        <mj-table padding="4px 0" table-layout="fixed">
+{% for row in b.rows %}
+          <tr>
+{% for p in row %}
+            <td style="width: 50%; padding: 8px; vertical-align: top;">
+              <a href="{{ p.url }}" style="color: {{ brand.colors.ink }}; text-decoration: none;">
+{% if p.image %}
+                <img src="{{ p.image }}" alt="{{ p.name }}" width="252" style="display: block; width: 100%; max-width: 252px; height: auto; border-radius: 6px;" />
+{% endif %}
+                <span style="display: block; padding-top: 8px; font-weight: 700;">{{ p.name }}</span>
+                <span style="display: block; color: {{ brand.colors.muted }};">{{ p.price }}</span>
+              </a>
+            </td>
+{% endfor %}
+{% if row|length == 1 %}
+            <td style="width: 50%;"></td>
+{% endif %}
+          </tr>
+{% endfor %}
+        </mj-table>
+{% endif %}
+{% endfor %}
+{% endblock %}
+{% block footer_extra %}
+        <mj-text font-size="12px" color="{{ brand.colors.muted }}" padding="8px 0 0">{{ t("campaign.reason", shop=brand.shop_name) }} <a href="{{ preferences_url }}" style="color: {{ brand.colors.muted }};">{{ t("campaign.preferences") }}</a> · <a href="{{ unsubscribe_url }}" style="color: {{ brand.colors.muted }};">{{ t("campaign.unsubscribe") }}</a></mj-text>
+{% endblock %}

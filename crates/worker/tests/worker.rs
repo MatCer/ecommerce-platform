@@ -595,6 +595,7 @@ async fn mail_jobs_deliver_and_retry_an_uncertain_transactional_send(db: PgPool)
             shop_name: "Mailer".into(),
             shop_url: "http://mailer.localhost".into(),
             colors: Colors::default(),
+            ..Brand::default()
         },
         Email {
             template: Template::PasswordChanged,

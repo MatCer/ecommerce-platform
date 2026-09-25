@@ -1,0 +1,8 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("newsletter_confirm.heading") }}</mj-text>
+        <mj-text>{{ t("newsletter_confirm.intro", shop=brand.shop_name) }}</mj-text>
+        <mj-button href="{{ url }}">{{ t("newsletter_confirm.button") }}</mj-button>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("newsletter_confirm.expiry", hours=hours) }}</mj-text>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("newsletter_confirm.ignore") }}</mj-text>
+{% endblock %}

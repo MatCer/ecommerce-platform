@@ -1,5 +1,8 @@
-//! Tenant branding for emails: the shop name and colours from the active theme's design tokens
-//! (A6). Email clients do not understand `oklch()`, so token colours are converted to hex.
+//! Tenant branding for emails: the shop name, the logo (§11.4, WP18), colours from the active
+//! theme's design tokens (A6) and the tenant's own subject/intro texts per template and locale.
+//! Email clients do not understand `oklch()`, so token colours are converted to hex.
+
+use std::collections::BTreeMap;
 
 use platform::Error;
 use platform::db::TenantTx;
@@ -32,16 +35,26 @@ impl Default for Colors {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Brand {
     pub shop_name: String,
     /// The shop's public URL (`https://shop.example`).
     pub shop_url: String,
     pub colors: Colors,
+    /// Absolute URL of the tenant's email logo (a PNG/JPEG variant served by the shop origin);
+    /// `None` = the shop name is the wordmark.
+    pub logo_url: Option<String>,
+    /// Tenant texts: `"<locale>:<template>.<subject|intro>"` → text (templates only see them
+    /// through `t()` and the subject).
+    #[serde(skip)]
+    pub texts: BTreeMap<String, String>,
 }
 
+/// Widest logo variant an email uses (displayed at up to 160 px, 2x for sharp screens).
+const LOGO_MAX_WIDTH: i64 = 320;
+
 impl Brand {
-    /// The tenant's name and the colours of its active theme.
+    /// The tenant's name, logo, texts and the colours of its active theme.
     pub async fn load(tx: &mut TenantTx, shop_url: String) -> Result<Self, Error> {
         let shop_name = sqlx::query_scalar!(
             "SELECT name FROM platform.tenants WHERE id = $1",
@@ -50,11 +63,48 @@ impl Brand {
         .fetch_one(&mut **tx)
         .await?;
         let tokens = themes::active_tokens(tx).await?;
+        // The largest PNG/JPEG variant up to LOGO_MAX_WIDTH (else the smallest one).
+        let logo = sqlx::query_scalar!(
+            r#"SELECT v->>'key' AS "key!"
+               FROM email_settings s
+               JOIN assets a ON a.id = s.logo_asset_id AND a.status = 'ready'
+               CROSS JOIN LATERAL jsonb_array_elements(a.variants) v
+               WHERE v->>'format' IN ('png', 'jpeg') AND v->>'key' IS NOT NULL
+               ORDER BY ((v->>'width')::bigint <= $1) DESC,
+                        CASE WHEN (v->>'width')::bigint <= $1 THEN -(v->>'width')::bigint
+                             ELSE (v->>'width')::bigint END
+               LIMIT 1"#,
+            LOGO_MAX_WIDTH
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        let texts =
+            sqlx::query!("SELECT template, locale, subject, intro FROM email_template_texts")
+                .fetch_all(&mut **tx)
+                .await?
+                .into_iter()
+                .flat_map(|r| {
+                    [("subject", r.subject), ("intro", r.intro)]
+                        .into_iter()
+                        .filter_map(move |(field, text)| {
+                            text.map(|t| (format!("{}:{}.{field}", r.locale, r.template), t))
+                        })
+                })
+                .collect();
+        let base = shop_url.trim_end_matches('/').to_owned();
         Ok(Self {
             shop_name,
+            logo_url: logo.map(|key| format!("{base}/{key}")),
             shop_url,
             colors: tokens.as_ref().map(colors).unwrap_or_default(),
+            texts,
         })
+    }
+
+    /// The tenant's text for `key` (`order_confirmation.subject`) in `locale`, if it set one.
+    pub fn text(&self, locale: &str, key: &str) -> Option<&str> {
+        let lang = locale.split('-').next().unwrap_or(locale);
+        self.texts.get(&format!("{lang}:{key}")).map(String::as_str)
     }
 }
 
