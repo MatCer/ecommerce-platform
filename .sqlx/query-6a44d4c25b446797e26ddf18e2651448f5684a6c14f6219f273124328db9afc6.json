@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.legal_type || ':' || t.locale || ' (unfinished)' AS \"missing!\"\n           FROM pages p JOIN page_translations t ON t.page_id = p.id\n           WHERE p.legal_type = ANY($1::text[]) AND p.status = 'published'\n             AND (t.blocks = '[]'::jsonb OR t.blocks::text LIKE '%[DOPLŇTE:%'\n                  OR t.blocks::text LIKE '%[FILL IN:%'\n                  -- The pre-WP16 review template said the shop publishes no reviews.\n                  OR (p.legal_type = 'reviews'\n                      AND (t.blocks::text LIKE '%nezveřejňuje recenze%'\n                           OR t.blocks::text LIKE '%nezverejňuje recenzie%'\n                           OR t.blocks::text LIKE '%does not publish customer reviews%')))\n           ORDER BY 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "missing!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6a44d4c25b446797e26ddf18e2651448f5684a6c14f6219f273124328db9afc6"
+}

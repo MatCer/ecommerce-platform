@@ -178,6 +178,51 @@ async fn concurrent_submissions_consume_a_token_once(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn the_ip_cap_holds_under_concurrent_submissions(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 8).await;
+    let shop = testkit::storefront::shop(&runtime, "wp16-rate-race").await;
+    let ip = [7_u8; 32];
+    run(&runtime, shop.tenant, async |tx| {
+        for _ in 1..reviews::MAX_SUBMISSIONS_PER_IP_HOUR {
+            sqlx::query(
+                "INSERT INTO customer_auth_attempts (tenant_id, kind, email, ip_hash)
+                 VALUES ($1, 'review', '', $2)",
+            )
+            .bind(tx.tenant_id())
+            .bind(&ip[..])
+            .execute(&mut **tx)
+            .await?;
+        }
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let mut set = tokio::task::JoinSet::new();
+    for _ in 0..4 {
+        let order = raw_order(&runtime, &shop, shop.cz, "CZK", 12_900, 1, "delivered").await;
+        let token = issue(&runtime, &shop, order).await.unwrap().remove(0).token;
+        let (runtime, tenant, market) = (runtime.clone(), shop.tenant, shop.cz);
+        set.spawn(async move {
+            let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+            let c = storefront::context(&mut tx, &PublicUrls::default(), market, None, Utc::now())
+                .await
+                .unwrap();
+            let out = reviews::submit(&mut tx, &c, &input(&token, 5), Some(&ip)).await;
+            tx.commit().await.unwrap();
+            out
+        });
+    }
+    let results = set.join_all().await;
+    assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+    assert!(
+        results
+            .iter()
+            .filter_map(|r| r.as_ref().err())
+            .all(|e| matches!(e, Error::TooManyRequests { .. }))
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn submissions_are_rate_limited_per_ip(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "wp16-rate").await;
@@ -429,6 +474,24 @@ async fn product_page_carries_reviews_json_ld_and_the_disclosure(db: PgPool) {
     .await
     .unwrap();
     assert!(!missing().await.iter().any(|m| m.starts_with("reviews:")));
+    // A page still carrying the pre-WP16 template ("publishes no reviews") is flagged.
+    run(&runtime, shop.tenant, async |tx| {
+        sqlx::query(
+            r#"UPDATE page_translations
+               SET blocks = '[{"type": "rich_text", "html": "<p>E-shop zatiaľ nezverejňuje recenzie zákazníkov.</p>"}]'
+               WHERE locale = 'sk' AND page_id IN (SELECT id FROM pages WHERE legal_type = 'reviews')"#,
+        )
+        .execute(&mut **tx)
+        .await?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    assert!(
+        missing()
+            .await
+            .contains(&"reviews:sk (unfinished)".to_owned())
+    );
 
     let p = page().await;
     let s = p.reviews.summary.unwrap();

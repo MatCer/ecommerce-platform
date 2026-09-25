@@ -136,14 +136,15 @@ pub async fn issue_tokens(
     let mut out = Vec::with_capacity(lines.len());
     for l in lines {
         let minted = capability::mint();
-        sqlx::query!(
+        let stored = sqlx::query_scalar!(
             "INSERT INTO review_tokens (tenant_id, order_line_id, order_id, product_id,
                                         token_hash, expires_at)
              VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (tenant_id, order_line_id) DO UPDATE
                  SET token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at,
                      created_at = now()
-                 WHERE review_tokens.used_at IS NULL",
+                 WHERE review_tokens.used_at IS NULL
+             RETURNING order_line_id",
             tx.tenant_id(),
             l.id,
             order_id,
@@ -151,8 +152,12 @@ pub async fn issue_tokens(
             minted.hash,
             expires_at
         )
-        .execute(&mut **tx)
+        .fetch_optional(&mut **tx)
         .await?;
+        // Consumed by a submission since the lines were read: nothing to hand out.
+        if stored.is_none() {
+            continue;
+        }
         out.push(IssuedToken {
             order_line_id: l.id,
             product_id: l.product_id,
@@ -311,6 +316,15 @@ pub async fn submit(
     }
     let clean = validate(input)?;
     if let Some(ip) = ip_hash {
+        // Serializes count + insert per tenant and IP (until commit), so parallel submissions
+        // cannot all slip under the cap.
+        sqlx::query!(
+            "SELECT pg_advisory_xact_lock(hashtextextended('review:' || $1::text || ':' || encode($2, 'hex'), 0))",
+            tx.tenant_id().to_string(),
+            ip
+        )
+        .execute(&mut **tx)
+        .await?;
         let recent = sqlx::query_scalar!(
             r#"SELECT count(*) AS "n!" FROM customer_auth_attempts
                WHERE kind = 'review' AND ip_hash = $1 AND at > now() - interval '1 hour'"#,

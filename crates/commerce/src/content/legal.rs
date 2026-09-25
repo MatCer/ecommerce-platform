@@ -630,7 +630,12 @@ pub async fn go_live(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<GoLiveRepo
            FROM pages p JOIN page_translations t ON t.page_id = p.id
            WHERE p.legal_type = ANY($1::text[]) AND p.status = 'published'
              AND (t.blocks = '[]'::jsonb OR t.blocks::text LIKE '%[DOPLŇTE:%'
-                  OR t.blocks::text LIKE '%[FILL IN:%')
+                  OR t.blocks::text LIKE '%[FILL IN:%'
+                  -- The pre-WP16 review template said the shop publishes no reviews.
+                  OR (p.legal_type = 'reviews'
+                      AND (t.blocks::text LIKE '%nezveřejňuje recenze%'
+                           OR t.blocks::text LIKE '%nezverejňuje recenzie%'
+                           OR t.blocks::text LIKE '%does not publish customer reviews%')))
            ORDER BY 1"#,
         &required as &[&str]
     )
