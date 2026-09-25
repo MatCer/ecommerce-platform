@@ -6,7 +6,20 @@ import {
   normalizeHost,
   type Site,
   StaticResolver,
+  splitLocale,
 } from "./sites.ts";
+
+test("splitLocale strips only a non-default locale of the market (spec §9.1)", () => {
+  const s = { locale: "sk", locales: ["sk", "cs"] };
+  expect(splitLocale(s, "/cs/c/trika")).toEqual({ locale: "cs", path: "/c/trika" });
+  expect(splitLocale(s, "/cs")).toEqual({ locale: "cs", path: "/" });
+  expect(splitLocale(s, "/cs/")).toEqual({ locale: "cs", path: "/" });
+  expect(splitLocale(s, "/cs/_p/public/shop")).toEqual({ locale: "cs", path: "/_p/public/shop" });
+  expect(splitLocale(s, "/sk/c/x")).toBeNull(); // the default locale has no prefix
+  expect(splitLocale(s, "/en/c/x")).toBeNull(); // not a locale of this market
+  expect(splitLocale(s, "/csx/c")).toBeNull();
+  expect(splitLocale(s, "/c/trika")).toBeNull();
+});
 
 test("the API resolver maps the resolve response and caches nothing on errors", async () => {
   const seen: string[] = [];
@@ -23,7 +36,7 @@ test("the API resolver maps the resolve response and caches nothing on errors", 
       market_code: "sk",
       currency: "EUR",
       default_locale: "sk",
-      locales: ["sk"],
+      locales: ["sk", "cs"],
       country_codes: ["SK"],
       storefront_token: "sf_x",
       theme_artifact: "0123456789abcdef0123456789abcdef",
@@ -36,6 +49,7 @@ test("the API resolver maps the resolve response and caches nothing on errors", 
     tenant_id: "t1",
     market_id: "m-sk",
     locale: "sk",
+    locales: ["sk", "cs"],
     shop_host: "demo-sk.localhost",
     storefront_token: "sf_x",
     theme_artifact: "0123456789abcdef0123456789abcdef",

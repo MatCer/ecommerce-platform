@@ -187,7 +187,7 @@ pub(crate) async fn category_trail(
     .into_iter()
     .map(|r| Link {
         label: r.name,
-        href: format!("/c/{}", r.slug),
+        href: ctx.path(&format!("/c/{}", r.slug)),
     })
     .collect())
 }
@@ -195,7 +195,7 @@ pub(crate) async fn category_trail(
 pub(crate) fn home_link(ctx: &Context) -> Link {
     Link {
         label: messages::text(&ctx.locale, "nav.home").to_owned(),
-        href: "/".into(),
+        href: ctx.path("/"),
     }
 }
 
@@ -351,7 +351,7 @@ pub async fn product_page(
     }
     breadcrumbs.push(Link {
         label: p.name.clone(),
-        href: format!("/p/{}", p.slug),
+        href: ctx.path(&format!("/p/{}", p.slug)),
     });
 
     let slugs: BTreeMap<String, String> = sqlx::query!(
@@ -377,7 +377,7 @@ pub async fn product_page(
     .into_iter()
     .collect();
 
-    let path = format!("/p/{}", p.slug);
+    let path = ctx.path(&format!("/p/{}", p.slug));
     let canonical = ctx.url(&path);
     let best = variant_views
         .iter()
@@ -431,10 +431,11 @@ pub async fn product_page(
     let seo = Seo {
         title,
         description,
-        alternates: alternates(ctx, |m| {
-            let sold = m.price_list_id.is_some_and(|l| sold_in.contains(&l));
+        alternates: alternates(ctx, |m, l| {
+            let sold = m.price_list_id.is_some_and(|list| sold_in.contains(&list));
             slugs
-                .get(&m.default_locale)
+                .get(l)
+                .or_else(|| slugs.get(&m.default_locale))
                 .filter(|_| sold)
                 .map(|s| format!("/p/{s}"))
         }),

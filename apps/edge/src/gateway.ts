@@ -27,6 +27,7 @@ import {
   normalizeHost,
   type Site,
   type SiteResolver,
+  splitLocale,
 } from "./sites.ts";
 
 export interface GatewayOptions {
@@ -609,6 +610,19 @@ export function createGateway(opts: GatewayOptions) {
     port: string,
   ): Promise<Response> {
     const p = url.pathname;
+    // `/<locale>/…` of a non-default market locale (spec §9.1): theme pages and island reads
+    // render in that locale from the unprefixed path. The locale is part of the cache key; the
+    // cart keeps its unprefixed routes (cookie `Path=/_p`).
+    const split = splitLocale(site, p);
+    if (split) {
+      const localized = { ...site, locale: split.locale };
+      const inner = new URL(`${split.path}${url.search}`, url);
+      if (split.path.startsWith("/_p/public/"))
+        return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
+      if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))
+        return renderTheme(localized, inner, req, port);
+      return text(404, "Not found");
+    }
     if (p === "/_p/cart" || p.startsWith("/_p/cart/"))
       return cartProxy(site, req, p.slice("/_p/cart".length), host, port);
     if (p === "/_p/checkout/start") return checkoutStart(site, req, host, port);

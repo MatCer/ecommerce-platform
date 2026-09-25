@@ -532,6 +532,43 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect((await get("http://demo.localhost/_p/public/cart")).status).toBe(404);
   });
 
+  test("a non-default locale prefix renders in that locale, cached apart (spec §9.1)", async () => {
+    resolver.set(
+      "demo-sk.localhost",
+      site({
+        market_id: "m-sk",
+        locale: "sk",
+        locales: ["sk", "cs"],
+        shop_host: "demo-sk.localhost",
+        theme_artifact: v1,
+      }),
+    );
+    api.calls.length = 0;
+    const cs = await get("http://demo-sk.localhost/cs");
+    expect([cs.status, cs.headers.get("x-edge-cache")]).toEqual([200, "MISS"]);
+    expect(api.calls.at(-1)?.headers["x-locale"]).toBe("cs");
+    // The default locale renders separately (the locale is part of the cache key).
+    const sk = await get("http://demo-sk.localhost/");
+    expect([sk.status, sk.headers.get("x-edge-cache")]).toEqual([200, "MISS"]);
+    expect(api.calls.at(-1)?.headers["x-locale"]).toBe("sk");
+    expect((await get("http://demo-sk.localhost/cs/")).headers.get("x-edge-cache")).toBe("HIT");
+    // The theme sees the unprefixed path.
+    const seen = (await (await get("http://demo-sk.localhost/cs/pages/headers")).json()) as {
+      url: string;
+    };
+    expect(seen.url).toBe("http://demo-sk.localhost/pages/headers");
+    // Islands read in the prefixed locale; the cart has no prefixed routes.
+    await get("http://demo-sk.localhost/cs/_p/public/search/suggest?q=tr");
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/search/suggest?q=tr",
+      headers: { "x-locale": "cs", "x-market": "m-sk" },
+    });
+    expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
+    // Neither the default locale nor a locale of another market is a prefix.
+    expect((await get("http://demo-sk.localhost/sk/")).status).toBe(404);
+    expect((await get("http://demo-sk.localhost/en/")).status).toBe(404);
+  });
+
   test("media is served only from the shop's own tenant prefix", async () => {
     api.calls.length = 0;
     expect((await get("http://demo.localhost/media/t-other/a/x.avif")).status).toBe(404);

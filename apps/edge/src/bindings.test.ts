@@ -8,7 +8,13 @@ import {
 import type { Site } from "./sites.ts";
 
 const site = (tenant: string) =>
-  ({ tenant_id: tenant, market_id: "m", locale: "cs", storefront_token: `sf_${tenant}` }) as Site;
+  ({
+    tenant_id: tenant,
+    market_id: "m",
+    locale: "cs",
+    locales: ["cs"],
+    storefront_token: `sf_${tenant}`,
+  }) as Site;
 
 test("a tenant-scoped instance cannot use another tenant's request context", async () => {
   const registry = new ContextRegistry();

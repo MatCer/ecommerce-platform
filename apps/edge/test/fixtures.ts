@@ -122,6 +122,7 @@ export const site = (over: Partial<Site> = {}): Site => ({
   tenant_id: "t-demo",
   market_id: "m-cz",
   locale: "cs",
+  locales: ["cs"],
   shop_host: "demo.localhost",
   storefront_token: "sf_demo_public",
   theme_artifact: "",

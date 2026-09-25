@@ -375,7 +375,8 @@ impl Seeder<'_> {
                         country_codes: vec!["SK".into()],
                         currency: "EUR".into(),
                         default_locale: "sk".into(),
-                        locales: vec!["sk".into()],
+                        // A second locale exercises locale prefixes (`demo-sk.localhost/cs/...`).
+                        locales: vec!["sk".into(), "cs".into()],
                         tax_mode: TaxMode::Gross,
                         is_default: false,
                     },
