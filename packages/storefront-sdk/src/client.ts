@@ -69,24 +69,38 @@ export const search = (
   );
 
 /**
- * Private recommendations for islands (WP17): `context` is `cart` (cross-sell for the cart),
- * `home` (personal picks with the `personalization` consent, else the public ones) or `recent`
- * with `ids` (recently viewed from the device, rehydrated with live prices; empty without
- * consent). The edge adds the cart and consent cookies; the answer is never cached (A2). The
- * cart has no locale-prefixed route, so leave `base` out for `cart`.
+ * Private recommendations for islands (WP17): `context` is `cart` (cross-sell for the cart) or
+ * `home` (personal picks while the server-side records grant `personalization`, else the public
+ * ones). The edge adds the cart and consent cookies; the answer is never cached (A2). Always the
+ * unprefixed route (the cart cookie is `Path=/_p`); `locale` picks the page's language.
  */
 export const recommendations = (
-  query: { context: string; limit?: number; ids?: string[] },
-  opts: { base?: string; signal?: AbortSignal } = {},
+  query: { context: string; limit?: number },
+  opts: { locale?: string; signal?: AbortSignal } = {},
 ) => {
   const p = new URLSearchParams({ context: query.context });
   if (query.limit !== undefined) p.set("limit", String(query.limit));
-  if (query.ids?.length) p.set("ids", query.ids.join(","));
-  return fetch(`${opts.base ?? ""}/_p/recommendations?${p}`, {
+  if (opts.locale) p.set("locale", opts.locale);
+  return fetch(`/_p/recommendations?${p}`, {
     credentials: "same-origin",
     signal: opts.signal,
   }).then((r) => json<Recommendations>(r));
 };
+
+/**
+ * Recently viewed products with live prices and availability (WP17). The device keeps the ids
+ * (only while `personalization` is granted, A20); they are rehydrated through the public route,
+ * without cookies or any identity, so the server never links the history to anyone.
+ */
+export const recentlyViewed = (ids: string[], opts: { base?: string; signal?: AbortSignal } = {}) =>
+  fetch(
+    `${opts.base ?? ""}/_p/public/recommendations?${new URLSearchParams({
+      context: "recent",
+      ids: ids.join(","),
+      limit: String(Math.max(1, ids.length)),
+    })}`,
+    { credentials: "omit", signal: opts.signal },
+  ).then((r) => json<Recommendations>(r));
 
 /** The smallest AVIF (else any) thumbnail of a search hit at least `width` px wide. */
 export function hitThumb(hit: SearchHit, width: number): string | undefined {

@@ -406,6 +406,8 @@ export const cs: Dictionary = {
     requiredHint: "Pole označená * jsou povinná.",
   },
   errors: {
+    market_unpublished:
+      "Tento trh zatím nemá ověřenou doménu, takže nemá zákazníky, kterým by se doporučovalo.",
     unknown_product: "Vybraný produkt už neexistuje.",
     too_many_products: "Kolekce může mít nejvýše 200 produktů.",
     too_many_exclusions: "Vyloučit lze nejvýše 500 produktů.",

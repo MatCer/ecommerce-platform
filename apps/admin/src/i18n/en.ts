@@ -405,6 +405,8 @@ export const en = {
     requiredHint: "Fields marked * are required.",
   },
   errors: {
+    market_unpublished:
+      "This market has no verified domain yet, so it has no shoppers to recommend to.",
     unknown_product: "A selected product no longer exists.",
     too_many_products: "A collection holds at most 200 products.",
     too_many_exclusions: "At most 500 products can be excluded.",

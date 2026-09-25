@@ -52,7 +52,7 @@ export default function CartDrawer(props: {
       (key) => {
         if (!key) return;
         const mine = ++asked;
-        recommendations({ context: "cart", limit: 4 })
+        recommendations({ context: "cart", limit: 4 }, { locale: props.locale })
           .then((r) => mine === asked && setCrossSell(r.products))
           .catch(() => mine === asked && setCrossSell([]));
       },

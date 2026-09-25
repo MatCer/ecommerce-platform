@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.product_id AS \"id!\", s.sales_score AS \"score!\"\n                   FROM product_scores s JOIN products p ON p.id = s.product_id\n                   WHERE s.market_id = $1 AND s.sales_score > 0 AND p.status = 'active'\n                     AND ($2::uuid[] IS NULL OR EXISTS (\n                         SELECT 1 FROM product_categories pc\n                         WHERE pc.product_id = s.product_id AND pc.category_id = ANY($2)))\n                   ORDER BY s.sales_score DESC, s.product_id LIMIT $3",
+  "query": "SELECT s.product_id AS \"id!\", s.sales_score AS \"score!\"\n                   FROM product_scores s JOIN products p ON p.id = s.product_id\n                   WHERE s.market_id = $1 AND s.sales_score > 0 AND p.status = 'active'\n                     AND ($2::uuid[] IS NULL OR EXISTS (\n                         SELECT 1 FROM product_categories pc\n                         WHERE pc.product_id = s.product_id AND pc.category_id = ANY($2)))\n                   ORDER BY s.sales_score DESC, s.product_id LIMIT $3 OFFSET $4",
   "describe": {
     "columns": [
       {
@@ -30,6 +30,7 @@
       "Left": [
         "Uuid",
         "UuidArray",
+        "Int8",
         "Int8"
       ]
     },
@@ -38,5 +39,5 @@
       false
     ]
   },
-  "hash": "5d0d5bff718564e9fb44cd7387c9ac65b35561c40a9f42805cce0ea79452de02"
+  "hash": "99557de7b48b9be15a5728e9e4412f8f7ac74c6e717b2448d230e47b74adfc67"
 }

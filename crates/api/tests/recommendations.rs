@@ -109,34 +109,29 @@ async fn public_variant_is_cacheable_and_private_variant_is_not(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn recently_viewed_needs_personalization_consent(db: PgPool) {
+async fn recently_viewed_is_rehydrated_without_identity(db: PgPool) {
     let c = setup(db).await;
     let uri = format!(
-        "/storefront/v1/recommendations?context=recent&ids={},{}",
+        "/storefront/v1/recommendations?context=recent&ids={},{},garbage",
         c.shop.product,
         Uuid::now_v7()
     );
-    // No subject (SSR, /_p/public): nothing, whatever ids are sent.
-    let (_, body, _) = sf(Call::get(&uri), &c.shop).send(&c.s).await;
-    assert_eq!(product_ids(&body), Vec::<String>::new());
-
-    let subject = new_anon_id();
-    grant(&c, &subject, false).await;
-    let call = |subject: &str| {
-        sf(Call::get(&uri), &c.shop).header("x-consent-subject", subject.to_owned())
-    };
-    let (_, body, _) = call(&subject).send(&c.s).await;
-    assert_eq!(
-        product_ids(&body),
-        Vec::<String>::new(),
-        "analytics alone is not enough"
-    );
-
-    grant(&c, &subject, true).await;
-    let (_, body, res) = call(&subject).send(&c.s).await;
+    let (status, body, res) = sf(Call::get(&uri), &c.shop).send(&c.s).await;
+    assert_eq!(status, StatusCode::OK);
     assert_eq!(product_ids(&body), [c.shop.product.to_string()]);
     assert_eq!(body["strategy"], json!("recently_viewed"));
-    assert_eq!(res.headers()["cache-control"], "private, no-store");
+    assert!(res.headers().get("cache-control").is_none());
+
+    // A consent subject sent along is ignored: the history is never linked to a visitor.
+    let subject = new_anon_id();
+    grant(&c, &subject, true).await;
+    let (_, body, res) = sf(Call::get(&uri), &c.shop)
+        .header("x-consent-subject", subject)
+        .send(&c.s)
+        .await;
+    assert_eq!(product_ids(&body), [c.shop.product.to_string()]);
+    assert_eq!(body["cache"]["public"], json!(true));
+    assert!(res.headers().get("cache-control").is_none());
 }
 
 #[sqlx::test(migrations = "../../migrations")]

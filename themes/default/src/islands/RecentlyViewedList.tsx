@@ -1,5 +1,4 @@
-import { consentStorage, recommendations } from "@platform/storefront-sdk/client";
-import { CONSENT_CHANGED } from "@platform/storefront-sdk/consent";
+import { consentStorage, recentlyViewed } from "@platform/storefront-sdk/client";
 import type { Messages } from "@platform/storefront-sdk/format";
 import type { ProductCard } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
@@ -11,31 +10,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * "Recently viewed" (A20: needs the `personalization` purpose). The device keeps product ids
- * only; the platform rehydrates them with live prices and availability and drops anything no
- * longer sold (`/_p/recommendations?context=recent`, which also checks the consent on the
- * server). Without consent it stores and shows nothing; withdrawing consent clears the list
- * (SDK). Loaded by the `RecentlyViewed` island only when the visitor granted personalization.
+ * only, and only with consent (SDK storage; withdrawing clears it). They are rehydrated with
+ * live prices and availability through the public route, without cookies or any identity, so
+ * the server never links the history to a visitor (§11.2). Loaded by the `RecentlyViewed`
+ * gate, which unmounts it on withdrawal (aborting a pending request).
  */
 export default function RecentlyViewedList(props: Props) {
   const [items, setItems] = createSignal<ProductCard[]>([]);
   const store = consentStorage("personalization");
   const KEY = "recent";
 
-  const sync = () => {
+  onMount(() => {
+    const abort = new AbortController();
+    onCleanup(() => abort.abort());
     // Earlier theme versions stored {slug, name, image}; only ids are kept now.
     const seen = (store.get<unknown[]>(KEY) ?? []).filter(
       (x): x is string => typeof x === "string" && UUID.test(x) && x !== props.current,
     );
     store.set(KEY, [props.current, ...seen].slice(0, 12));
-    if (seen.length === 0) return setItems([]);
-    recommendations({ context: "recent", ids: seen.slice(0, 8), limit: 8 }, { base: props.base })
+    if (seen.length === 0) return;
+    recentlyViewed(seen.slice(0, 8), { base: props.base, signal: abort.signal })
       .then((r) => setItems(r.products))
       .catch(() => setItems([]));
-  };
-  onMount(() => {
-    sync();
-    addEventListener(CONSENT_CHANGED, sync);
-    onCleanup(() => removeEventListener(CONSENT_CHANGED, sync));
   });
 
   return (

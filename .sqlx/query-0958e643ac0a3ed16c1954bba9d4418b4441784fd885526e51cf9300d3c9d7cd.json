@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT d.product_id AS \"id!\", sum(d.purchases)::float8 AS \"score!\"\n                   FROM product_stats_daily d JOIN products p ON p.id = d.product_id\n                   WHERE d.market_id = $1 AND d.date >= $2 AND d.date < $3\n                     AND p.status = 'active'\n                   GROUP BY d.product_id HAVING sum(d.purchases) > 0\n                   ORDER BY 2 DESC, 1 LIMIT $4",
+  "query": "SELECT d.product_id AS \"id!\", sum(d.purchases)::float8 AS \"score!\"\n                   FROM product_stats_daily d JOIN products p ON p.id = d.product_id\n                   WHERE d.market_id = $1 AND d.date >= $2 AND d.date < $3\n                     AND p.status = 'active'\n                   GROUP BY d.product_id HAVING sum(d.purchases) > 0\n                   ORDER BY 2 DESC, 1 LIMIT $4 OFFSET $5",
   "describe": {
     "columns": [
       {
@@ -26,6 +26,7 @@
         "Uuid",
         "Date",
         "Date",
+        "Int8",
         "Int8"
       ]
     },
@@ -34,5 +35,5 @@
       null
     ]
   },
-  "hash": "fba3e26f2a64760588d7e840171f217cf5db9f60e067d6984e31f3a47bc09f45"
+  "hash": "0958e643ac0a3ed16c1954bba9d4418b4441784fd885526e51cf9300d3c9d7cd"
 }

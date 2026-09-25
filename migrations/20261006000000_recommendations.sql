@@ -47,13 +47,17 @@ CREATE INDEX product_scores_sales ON product_scores (tenant_id, market_id, sales
 
 -- The popularity currently in the search documents (all markets together). Rewritten only
 -- when it moves noticeably, so the hourly rollup does not reindex the whole catalog.
+-- `reindex`: changed, reindex job not enqueued yet. Set in the rollup's transaction and cleared
+-- in the one that enqueues the jobs, so a crash in between only delays the reindex.
 CREATE TABLE product_popularity (
     tenant_id  uuid NOT NULL REFERENCES platform.tenants (id),
     product_id uuid NOT NULL,
     popularity integer NOT NULL CHECK (popularity >= 0),
+    reindex    boolean NOT NULL DEFAULT true,
     PRIMARY KEY (tenant_id, product_id),
     FOREIGN KEY (tenant_id, product_id) REFERENCES products (tenant_id, id) ON DELETE CASCADE
 );
+CREATE INDEX product_popularity_reindex ON product_popularity (tenant_id) WHERE reindex;
 
 -- Merchant-curated product lists. `seasonal` ones have a schedule window and feed the home
 -- page while it is open; `manual` ones are always available (optionally scheduled) and are

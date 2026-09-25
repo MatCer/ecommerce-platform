@@ -2,8 +2,8 @@
  * WP17 acceptance: recommendations on the seeded demo shop (`make seed` adds 90 days of order
  * history and runs the backfill rollup). Bought together on the product page, bestsellers on
  * the home page for everyone, personal picks only with the server-side `personalization`
- * consent (A20), the cart drawer cross-sell, recently viewed with live prices, and private
- * answers never cached (A2). Needs `make up && make seed && make theme-build`.
+ * consent (A20), the cart drawer cross-sell, recently viewed with live prices (rehydrated
+ * without identity), and private answers never cached (A2). Needs `make up && make seed && make theme-build`.
  */
 import { expect, type Page, test } from "@playwright/test";
 import { CZ, decideConsent, expectAccessible, grantConsent, hydrated } from "./support";
@@ -82,23 +82,21 @@ test("cart drawer: cross-sell for the cart's products", async ({ page, context }
   await expectAccessible(page, "cart drawer with cross-sell");
 });
 
-test("recently viewed: live prices, only with the server-side consent", async ({ page }) => {
-  await grantConsent(page, CZ, ["personalization"]);
+test("recently viewed: live prices, rehydrated without identity", async ({ page, context }) => {
+  // The device keeps the history only with personalization (A20, the SDK's consent storage).
+  await decideConsent(context, CZ, "personalization");
   await page.goto(`${CZ}/p/mikina-fleece`);
   await hydrated(page);
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("sf:personalization:recent")))
     .toMatch(/[0-9a-f-]{36}/);
+  const rehydrate = page.waitForRequest((r) => r.url().includes("context=recent"));
   await page.goto(`${CZ}/p/cepice-merino`);
+  // The ids go to the public route: no cookies, nothing links them to the visitor.
+  const request = await rehydrate;
+  expect(request.url()).toContain("/_p/public/recommendations?");
+  expect(await request.headerValue("cookie")).toBeNull();
   const recent = page.getByRole("region", { name: "Naposledy prohlížené" });
   await expect(recent.getByRole("link", { name: /Mikina Fleece/ })).toBeVisible();
   await expect(recent.getByText(/Kč/).first()).toBeVisible();
-
-  // Withdrawn on the server: the ids alone rehydrate nothing.
-  await grantConsent(page, CZ, []);
-  const ids = await page.evaluate(() => localStorage.getItem("sf:personalization:recent"));
-  const res = await page.request.get(
-    `${CZ}/_p/recommendations?context=recent&ids=${JSON.parse(ids ?? "[]").join(",")}`,
-  );
-  expect(((await res.json()) as Recs).products).toEqual([]);
 });

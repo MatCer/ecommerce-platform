@@ -289,7 +289,16 @@ async fn explain(
     let limit = engine::limit(q.limit);
     let now = q.at.unwrap_or_else(Utc::now);
     let out = in_tx(&s, staff.tenant_id, async |tx| {
-        let ctx = storefront::context(tx, &s.public_urls, q.market_id, None, now).await?;
+        // Shoppers only reach markets with a verified domain; say so instead of a bare 404.
+        let ctx = storefront::context(tx, &s.public_urls, q.market_id, None, now)
+            .await
+            .map_err(|e| match e {
+                Error::NotFound | Error::Forbidden { .. } => Error::Validation {
+                    code: "market_unpublished",
+                    detail: "the market does not exist or has no verified domain yet".into(),
+                },
+                e => e,
+            })?;
         let mut visitor = Visitor::default();
         if target == Target::Cart {
             visitor.cart = ids(q.ids.as_deref());

@@ -73,7 +73,7 @@ const lcp = tile
     }
   </section>
 
-  <ForYou client:idle title={t("home.for_you")} base={shop.base_path} labels={pick(["product.price_from"])} />
+  <ForYou client:idle title={t("home.for_you")} base={shop.base_path} locale={shop.locale} labels={pick(["product.price_from"])} />
 
   {
     home.featured.length > 0 && (

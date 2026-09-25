@@ -107,12 +107,17 @@ async fn order(
     tx.commit().await.unwrap();
 }
 
+/// A rollup run and, as the worker does, a second transaction taking the reindex marks.
 async fn run(runtime: &PgPool, shop: &Shop, now: DateTime<Utc>) -> Vec<Uuid> {
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
-    let changed = rollup::run(&mut tx, now, rollup::BACKFILL_DAYS)
+    rollup::run(&mut tx, now, rollup::BACKFILL_DAYS)
         .await
         .unwrap();
     tx.commit().await.unwrap();
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    let mut changed = rollup::take_reindex(&mut tx).await.unwrap();
+    tx.commit().await.unwrap();
+    changed.sort();
     changed
 }
 
@@ -307,6 +312,22 @@ async fn bestsellers_decay_and_popularity_is_debounced(db: PgPool) {
         order(&runtime, &shop, &[fresh], now, "confirmed").await;
     }
     assert_eq!(run(&runtime, &shop, now).await, [fresh.0]);
+
+    // A crash after the rollup committed but before the jobs were enqueued: the marks stay,
+    // so the next run still reindexes the product.
+    for _ in 0..6 {
+        order(&runtime, &shop, &[old], now, "confirmed").await;
+    }
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    assert_eq!(
+        rollup::run(&mut tx, now, rollup::BACKFILL_DAYS)
+            .await
+            .unwrap(),
+        1
+    );
+    tx.commit().await.unwrap();
+    assert_eq!(run(&runtime, &shop, now).await, [old.0]);
+    assert!(run(&runtime, &shop, now).await.is_empty(), "taken once");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -487,18 +508,9 @@ async fn personalization_uses_only_consented_signals(db: PgPool) {
     };
     let got = recommend(&runtime, &shop, shop.cz, Target::Home, &not_granted, 2).await;
     assert_ne!(got.strategy, Some(Strategy::Personalized));
+    // Recently viewed: the device's ids, validated and rehydrated without any identity.
     let recent = Target::Recent(vec![viewed.0, Uuid::now_v7()]);
-    assert!(
-        recommend(&runtime, &shop, shop.cz, recent.clone(), &not_granted, 4)
-            .await
-            .items
-            .is_empty()
-    );
-    let granted = Visitor {
-        personalization: true,
-        ..Visitor::default()
-    };
-    let got = recommend(&runtime, &shop, shop.cz, recent, &granted, 4).await;
+    let got = recommend(&runtime, &shop, shop.cz, recent, &Visitor::default(), 4).await;
     assert_eq!(ids(&got), [viewed.0], "unknown ids are dropped");
     assert_eq!(got.skipped[0].reason, SkipReason::NotSold);
 }
@@ -696,6 +708,32 @@ async fn recommendation_tables_are_tenant_isolated(db: PgPool) {
         )
         .await;
     }
+    // A consenting customer of A, so A has affinity rows too.
+    let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
+    let customer: Uuid = sqlx::query_scalar(
+        "INSERT INTO customers (tenant_id, email, locale) VALUES ($1, 'iso@example.com', 'cs')
+         RETURNING id",
+    )
+    .bind(a.tenant)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE orders SET customer_id = $1")
+        .bind(customer)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    consent(
+        &runtime,
+        a.tenant,
+        Subject::Customer(customer),
+        Purposes {
+            personalization: Some(true),
+            ..Purposes::default()
+        },
+    )
+    .await;
     run(&runtime, &a, now).await;
     let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
     collections::create(
@@ -737,9 +775,7 @@ async fn recommendation_tables_are_tenant_isolated(db: PgPool) {
             tx.commit().await.unwrap();
             n
         };
-        if t != "customer_affinity" {
-            assert!(count(a.tenant).await > 0, "{t} filled for A");
-        }
+        assert!(count(a.tenant).await > 0, "{t} filled for A");
         assert_eq!(count(b.tenant).await, 0, "{t} leaks into B");
     }
     // B's rollup and engine never see A's pairs.
@@ -755,6 +791,15 @@ async fn recommendation_tables_are_tenant_isolated(db: PgPool) {
     )
     .await;
     assert!(!ids(&got).contains(&x.0));
+    let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
+    assert!(
+        engine::customer_affinity(&mut tx, customer)
+            .await
+            .unwrap()
+            .is_empty(),
+        "A's customer affinity is invisible to B"
+    );
+    tx.commit().await.unwrap();
     // Writing a row for another tenant is refused.
     let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
     let denied =
@@ -805,5 +850,76 @@ async fn last_years_month_fills_in_after_current_bestsellers(db: PgPool) {
         strategies,
         [Strategy::Bestsellers, Strategy::Seasonal, Strategy::Newest],
         "this year's best sellers first, last year's month next"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn nightly_window_corrects_late_cancellations(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = shop(&runtime, "reco-cancel").await;
+    let now = Utc::now();
+    order(
+        &runtime,
+        &shop,
+        &[(shop.product, shop.variants[0])],
+        now - Duration::days(20),
+        "confirmed",
+    )
+    .await;
+    run(&runtime, &shop, now).await;
+    let units = async || {
+        let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+        let n: Option<i64> =
+            sqlx::query_scalar("SELECT sum(purchases)::bigint FROM product_stats_daily")
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        tx.commit().await.unwrap();
+        n.unwrap_or(0)
+    };
+    assert_eq!(units().await, 1);
+    // Cancelled three weeks after placement: the hourly run (2 days) does not see it...
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("UPDATE orders SET status = 'cancelled'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    rollup::run(&mut tx, now, 2).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(units().await, 1);
+    // ...the nightly run recomputes the whole scoring window.
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    rollup::run(&mut tx, now, rollup::NIGHTLY_DAYS)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(units().await, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_catalog_full_of_unsellable_products_does_not_starve_the_slot(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = shop(&runtime, "reco-pages").await;
+    // 25 newer products without an SK price: the newest-products fallback must page past them
+    // to the one product sold in the SK market.
+    for i in 0..25 {
+        catalog::product(&runtime, shop.tenant, &format!("CZONLY{i}"), 1).await;
+    }
+    let got = recommend(
+        &runtime,
+        &shop,
+        shop.sk,
+        Target::Home,
+        &Visitor::default(),
+        1,
+    )
+    .await;
+    assert_eq!(ids(&got), [shop.product]);
+    assert!(
+        got.skipped
+            .iter()
+            .filter(|s| s.reason == SkipReason::NotSold)
+            .count()
+            >= 25
     );
 }

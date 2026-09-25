@@ -8,7 +8,7 @@
 //! - `product_scores`: decayed sums over the last 90 days (half-life [`HALF_LIFE_DAYS`]).
 //! - `product_popularity`: the scores summed over markets, for the search documents; written
 //!   only when a value moves by at least 10 % (or from/to zero), and the changed products are
-//!   returned for reindexing.
+//!   marked for reindexing ([`take_reindex`]).
 //! - `customer_affinity`: categories/brands from the orders of customers whose current
 //!   `personalization` consent is granted.
 
@@ -22,6 +22,9 @@ use super::{HALF_LIFE_DAYS, MIN_SUPPORT, WINDOW_DAYS};
 /// A first run (or an explicit backfill) reads this many days: enough for last year's month
 /// (seasonal) and the 90-day window.
 pub const BACKFILL_DAYS: u32 = 400;
+/// The nightly run recomputes the whole scoring window, so late changes to older orders
+/// (a cancellation weeks later) leave the scores.
+pub const NIGHTLY_DAYS: u32 = 91;
 /// Stats older than this are pruned.
 pub const KEEP_DAYS: i64 = 400;
 /// Customer affinity looks back one year, with a slower decay than the scores.
@@ -144,10 +147,10 @@ pub async fn scores(tx: &mut TenantTx, today: NaiveDate) -> Result<(), Error> {
     Ok(())
 }
 
-/// Updates the search popularity from the scores (debounced) and returns the products whose
-/// stored value changed, which need reindexing.
-pub async fn popularity(tx: &mut TenantTx) -> Result<Vec<Uuid>, Error> {
-    Ok(sqlx::query_scalar!(
+/// Updates the search popularity from the scores (debounced) and marks the changed products
+/// for reindexing ([`take_reindex`]); returns how many changed.
+pub async fn popularity(tx: &mut TenantTx) -> Result<u64, Error> {
+    Ok(sqlx::query!(
         r#"WITH fresh AS (
                SELECT product_id, round(sum(popularity))::int AS p
                FROM product_scores GROUP BY product_id
@@ -156,14 +159,25 @@ pub async fn popularity(tx: &mut TenantTx) -> Result<Vec<Uuid>, Error> {
                       coalesce(f.p, 0) AS p, o.popularity AS old
                FROM fresh f FULL JOIN product_popularity o ON o.product_id = f.product_id
            )
-           INSERT INTO product_popularity (tenant_id, product_id, popularity)
-           SELECT $1, product_id, p FROM merged
+           INSERT INTO product_popularity (tenant_id, product_id, popularity, reindex)
+           SELECT $1, product_id, p, true FROM merged
            WHERE (old IS NULL AND p > 0)
               OR (old IS NOT NULL AND abs(p - old) >= greatest(1, ceil(old * $2::float8)))
-           ON CONFLICT (tenant_id, product_id) DO UPDATE SET popularity = EXCLUDED.popularity
-           RETURNING product_id"#,
+           ON CONFLICT (tenant_id, product_id)
+           DO UPDATE SET popularity = EXCLUDED.popularity, reindex = true"#,
         tx.tenant_id(),
         POPULARITY_STEP
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected())
+}
+
+/// Takes the products marked for reindexing (clears the marks). Run it in the transaction
+/// that enqueues their jobs: either both happen or the marks stay for the next run.
+pub async fn take_reindex(tx: &mut TenantTx) -> Result<Vec<Uuid>, Error> {
+    Ok(sqlx::query_scalar!(
+        "UPDATE product_popularity SET reindex = false WHERE reindex RETURNING product_id"
     )
     .fetch_all(&mut **tx)
     .await?)
@@ -213,8 +227,9 @@ pub async fn customer_affinity(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<
 }
 
 /// One rollup run for the tenant: the stats of the last `days` days (today included), then
-/// everything derived from them. Returns the products whose search popularity changed.
-pub async fn run(tx: &mut TenantTx, now: DateTime<Utc>, days: u32) -> Result<Vec<Uuid>, Error> {
+/// everything derived from them. Returns how many products' search popularity changed (they
+/// are marked for [`take_reindex`]).
+pub async fn run(tx: &mut TenantTx, now: DateTime<Utc>, days: u32) -> Result<u64, Error> {
     let today = now.date_naive();
     let from = today - chrono::Days::new(u64::from(days.max(1) - 1));
     stats(tx, from, today).await?;

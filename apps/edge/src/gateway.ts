@@ -931,16 +931,19 @@ ${
    * here does the API get the visitor's cart capability (cross-sell for the cart) and consent
    * subject (A20: personalization and recently viewed only while its records grant
    * `personalization`); SSR and `/_p/public/*` never carry either, so they stay public. Never
-   * cached (A2). The cart cookie is `Path=/_p`, so a locale-prefixed call reads without it.
+   * cached (A2). Unprefixed only, like the cart (its cookie is `Path=/_p`): `?locale=` picks
+   * one of the market's locales instead of a path prefix.
    */
   async function recommendationsProxy(site: Site, req: Request, url: URL): Promise<Response> {
     if (req.method !== "GET") return text(405, "Method not allowed", { allow: "GET" });
     if (url.search.length > MAX_RECOMMENDATIONS_QUERY)
       return problem(414, "uri_too_long", "recommendations query too long");
+    const locale = url.searchParams.get("locale");
+    const localized = locale && site.locales.includes(locale) ? { ...site, locale } : site;
     const token = readCookie(req.headers, SHOP_CART_COOKIE);
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/recommendations${url.search}`, {
-        headers: apiHeaders(site, {
+        headers: apiHeaders(localized, {
           accept: "application/json",
           ...(token && TOKEN_RE.test(token) ? { "x-cart-token": token } : {}),
           ...consentSubject(req),
@@ -1057,7 +1060,6 @@ ${
       const inner = new URL(`${split.path}${url.search}`, url);
       if (split.path.startsWith("/_p/public/"))
         return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
-      if (split.path === "/_p/recommendations") return recommendationsProxy(localized, req, inner);
       if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))
         return renderTheme(localized, inner, req, port, `/${split.locale}`);
       return text(404, "Not found");

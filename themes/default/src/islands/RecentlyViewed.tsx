@@ -4,23 +4,26 @@ import { type Component, createSignal, onCleanup, onMount, Show } from "solid-js
 import type { Props } from "./RecentlyViewedList";
 
 /**
- * "Recently viewed" island: a small gate that loads the list (`RecentlyViewedList`) only once
- * the visitor has granted `personalization` (A20), so everyone else downloads almost nothing.
- * Renders nothing on the server: hydrate with client:idle, never client:visible.
+ * "Recently viewed" island: a small gate that loads the list (`RecentlyViewedList`) only while
+ * the visitor grants `personalization` (A20), so everyone else downloads almost nothing; a
+ * withdrawal unmounts it (the SDK clears the stored ids). Renders nothing on the server:
+ * hydrate with client:idle, never client:visible.
  */
 export default function RecentlyViewed(props: Props) {
   const [List, setList] = createSignal<Component<Props>>();
+  const [granted, setGranted] = createSignal(false);
   onMount(() => {
-    const load = () => {
-      if (List() || !hasConsent("personalization")) return;
-      void import("./RecentlyViewedList").then((m) => setList(() => m.default));
+    const sync = () => {
+      setGranted(hasConsent("personalization"));
+      if (granted() && !List())
+        void import("./RecentlyViewedList").then((m) => setList(() => m.default));
     };
-    load();
-    addEventListener(CONSENT_CHANGED, load);
-    onCleanup(() => removeEventListener(CONSENT_CHANGED, load));
+    sync();
+    addEventListener(CONSENT_CHANGED, sync);
+    onCleanup(() => removeEventListener(CONSENT_CHANGED, sync));
   });
   return (
-    <Show when={List()}>
+    <Show when={granted() && List()}>
       {(L) => {
         const Loaded = L();
         return <Loaded {...props} />;

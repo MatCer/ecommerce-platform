@@ -2125,7 +2125,7 @@ export interface paths {
          *     visibility, status and availability, falling back to bestsellers. Without visitor headers
          *     the answer is public and cacheable; with a cart or consent subject it is private
          *     (`Cache-Control: private, no-store`, A2). Personal signals are used only while the
-         *     subject's `personalization` consent is granted (A20).
+         *     subject's `personalization` consent is granted (A20). `recent` ignores visitor headers.
          */
         get: operations["recommendations"];
         put?: never;
@@ -11432,7 +11432,10 @@ export interface operations {
                 context?: string;
                 /** @description Products, 1-24 (default 8). */
                 limit?: number;
-                /** @description `recent` only: the device's recently viewed product ids, comma-separated (at most 12). */
+                /**
+                 * @description `recent` only: the device's recently viewed product ids, comma-separated (at most 12);
+                 *     validated and rehydrated with live prices, never linked to a visitor.
+                 */
                 ids?: string;
             };
             header: {

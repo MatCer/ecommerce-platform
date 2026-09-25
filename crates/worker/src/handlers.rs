@@ -517,10 +517,11 @@ async fn analytics_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
 /// Above this many changed products one index rebuild replaces the per-product jobs.
 const REINDEX_REBUILD_OVER: usize = 1000;
 
-/// Hourly (WP17): product stats of today and yesterday (the last 14 days at the 03:00 UTC slot,
-/// 400 days on a tenant's first run or a `backfill` request), co-purchases, scores, customer
-/// affinity; then reindexes the products whose search popularity moved. The reindex jobs are
-/// enqueued after the rollup committed, so their version is drawn after the change (A27).
+/// Hourly (WP17): product stats of today and yesterday (the whole 91-day scoring window at the
+/// 03:00 UTC slot, 400 days on a tenant's first run or a `backfill` request), co-purchases,
+/// scores, customer affinity; then reindexes the products whose search popularity moved. The
+/// rollup marks them; a second transaction takes the marks and enqueues the jobs, so their
+/// version is drawn after the change committed (A27) and a crash in between only delays them.
 async fn recommendations_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
     use commerce::recommendations::rollup;
     let now = chrono::Utc::now();
@@ -541,16 +542,18 @@ async fn recommendations_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
         let days = if backfill || !rollup::has_stats(&mut tx).await.map_err(retry)? {
             rollup::BACKFILL_DAYS
         } else if nightly {
-            14
+            rollup::NIGHTLY_DAYS
         } else {
             2
         };
-        let changed = rollup::run(&mut tx, now, days).await.map_err(retry)?;
+        rollup::run(&mut tx, now, days).await.map_err(retry)?;
         tx.commit().await?;
+
+        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
+        let changed = rollup::take_reindex(&mut tx).await.map_err(retry)?;
         if changed.is_empty() {
             continue;
         }
-        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
         let version = search::next_version(&mut *tx).await?;
         if changed.len() > REINDEX_REBUILD_OVER {
             queue::enqueue(&mut *tx, &search::rebuild_job(*tenant, version)).await?;

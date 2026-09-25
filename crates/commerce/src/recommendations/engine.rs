@@ -29,6 +29,8 @@ pub const MAX_RECENT: usize = 12;
 const AFFINITY_EVENTS: i64 = 200;
 /// Products a personalized ranking considers.
 const PERSONAL_POOL: i64 = 200;
+/// Candidate pages per strategy before moving on to the next one.
+const MAX_ROUNDS: usize = 5;
 
 /// What the recommendations are for (`context` query parameter).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,7 +41,9 @@ pub enum Target {
     Home,
     /// The visitor's cart (private variant only).
     Cart,
-    /// Recently viewed product ids from the device (A20: needs `personalization`).
+    /// Recently viewed product ids from the device. The history exists only while the
+    /// visitor grants `personalization` (A20, kept on the device) and is sent without any
+    /// identity, so the server never links it to anyone.
     Recent(Vec<Uuid>),
 }
 
@@ -298,6 +302,14 @@ enum Step {
 }
 
 impl Step {
+    /// Read page by page (the others are complete lists read at once).
+    fn paged(&self) -> bool {
+        matches!(
+            self,
+            Self::BoughtTogether(_) | Self::Bestsellers(_) | Self::LastYear | Self::Newest
+        )
+    }
+
     fn strategy(&self) -> Strategy {
         match self {
             Self::BoughtTogether(_) => Strategy::BoughtTogether,
@@ -340,9 +352,10 @@ fn chain(target: &Target, settings: &RecommendationSettings, visitor: &Visitor) 
             }
             s
         }
-        // Not a recommendation: the visitor's own history, never padded with other products.
+        // Not a recommendation: the device's own history (kept only with `personalization`,
+        // A20), rehydrated without any identity, never padded with other products.
         Target::Recent(ids) => {
-            return if visitor.personalization && settings.recently_viewed {
+            return if settings.recently_viewed {
                 vec![Step::Recent(ids.clone())]
             } else {
                 Vec::new()
@@ -468,14 +481,20 @@ fn last_year_month(now: DateTime<Utc>) -> Option<(NaiveDate, NaiveDate)> {
     Some((first, first.checked_add_months(Months::new(1))?))
 }
 
-/// Candidates of a step (ordered, best first) and the heading a collection gives them.
+/// Candidates of a step (ordered, best first), `n` from `offset` on, and the heading a
+/// collection gives them. Lists that are complete in one read (collections, personalized,
+/// recently viewed) answer only the first page.
 async fn candidates(
     tx: &mut TenantTx,
     ctx: &Context,
     step: &Step,
     visitor: &Visitor,
     n: i64,
+    offset: i64,
 ) -> Result<(Vec<Candidate>, Option<String>), Error> {
+    if offset > 0 && !step.paged() {
+        return Ok((Vec::new(), None));
+    }
     let scored = |rows: Vec<(Uuid, f64)>| {
         rows.into_iter()
             .map(|(id, score)| Candidate { id, score })
@@ -495,9 +514,10 @@ async fn candidates(
             let rows = sqlx::query!(
                 r#"SELECT product_b AS "id!", sum(count_90d)::float8 AS "score!"
                    FROM co_purchases WHERE product_a = ANY($1)
-                   GROUP BY product_b ORDER BY 2 DESC, 1 LIMIT $2"#,
+                   GROUP BY product_b ORDER BY 2 DESC, 1 LIMIT $2 OFFSET $3"#,
                 sources,
-                n
+                n,
+                offset
             )
             .fetch_all(&mut **tx)
             .await?;
@@ -518,10 +538,11 @@ async fn candidates(
                      AND ($2::uuid[] IS NULL OR EXISTS (
                          SELECT 1 FROM product_categories pc
                          WHERE pc.product_id = s.product_id AND pc.category_id = ANY($2)))
-                   ORDER BY s.sales_score DESC, s.product_id LIMIT $3"#,
+                   ORDER BY s.sales_score DESC, s.product_id LIMIT $3 OFFSET $4"#,
                 ctx.market.id,
                 cats.as_deref(),
-                n
+                n,
+                offset
             )
             .fetch_all(&mut **tx)
             .await?;
@@ -533,8 +554,9 @@ async fn candidates(
         Step::Newest => {
             let ids = sqlx::query_scalar!(
                 "SELECT id FROM products WHERE status = 'active'
-                 ORDER BY created_at DESC, id LIMIT $1",
-                n
+                 ORDER BY created_at DESC, id LIMIT $1 OFFSET $2",
+                n,
+                offset
             )
             .fetch_all(&mut **tx)
             .await?;
@@ -594,11 +616,12 @@ async fn candidates(
                    WHERE d.market_id = $1 AND d.date >= $2 AND d.date < $3
                      AND p.status = 'active'
                    GROUP BY d.product_id HAVING sum(d.purchases) > 0
-                   ORDER BY 2 DESC, 1 LIMIT $4"#,
+                   ORDER BY 2 DESC, 1 LIMIT $4 OFFSET $5"#,
                 ctx.market.id,
                 from,
                 to,
-                n
+                n,
+                offset
             )
             .fetch_all(&mut **tx)
             .await?;
@@ -677,70 +700,80 @@ pub async fn recommend(
     let mut taken: HashSet<Uuid> = HashSet::new();
 
     for step in &steps {
-        if out.items.len() >= limit {
-            break;
-        }
         let strategy = step.strategy();
-        // Over-fetch: some candidates are filtered out below. ponytail: one round per step;
-        // loop with an offset if long runs of unavailable products starve a slot.
-        let want = i64::try_from((limit - out.items.len()) * 3 + excluded.len() + cart.len() + 4)
-            .unwrap_or(i64::MAX);
-        let (found, title) = candidates(tx, ctx, step, visitor, want).await?;
-        let mut fresh: Vec<Candidate> = Vec::new();
-        for c in found {
-            let reason = if Some(c.id) == current {
-                Some(SkipReason::Current)
-            } else if cart.contains(&c.id) {
-                Some(SkipReason::InCart)
-            } else if excluded.contains(&c.id) {
-                Some(SkipReason::Excluded)
-            } else if taken.contains(&c.id) || fresh.iter().any(|f| f.id == c.id) {
-                Some(SkipReason::Duplicate)
-            } else {
-                None
-            };
-            match reason {
-                Some(reason) => out.skipped.push(Skipped {
-                    product_id: c.id,
-                    strategy,
-                    reason,
-                }),
-                None => fresh.push(c),
-            }
-        }
-        let ids: Vec<Uuid> = fresh.iter().map(|c| c.id).collect();
-        let mut cards: HashMap<Uuid, ProductCard> = cards::cards(tx, ctx, &ids)
-            .await?
-            .into_iter()
-            .map(|c| (c.id, c))
-            .collect();
-        for c in fresh {
+        let mut offset = 0_i64;
+        // Pages until the slot is full or the step runs dry; bounded, so a catalog full of
+        // unsellable products cannot turn one request into a scan.
+        for _ in 0..MAX_ROUNDS {
             if out.items.len() >= limit {
                 break;
             }
-            let reason = match cards.remove(&c.id) {
-                None => Some(SkipReason::NotSold),
-                Some(card) if !card.stock.purchasable() => Some(SkipReason::OutOfStock),
-                Some(card) => {
-                    if out.items.is_empty() {
-                        out.strategy = Some(strategy);
-                        out.title.clone_from(&title);
-                    }
-                    taken.insert(c.id);
-                    out.items.push(ExplainedItem {
-                        product: card,
-                        strategy,
-                        score: c.score,
-                    });
+            // Over-fetch: some candidates are filtered out below.
+            let want =
+                i64::try_from((limit - out.items.len()) * 3 + excluded.len() + cart.len() + 4)
+                    .unwrap_or(i64::MAX);
+            let (found, title) = candidates(tx, ctx, step, visitor, want, offset).await?;
+            let exhausted = !step.paged() || i64::try_from(found.len()).unwrap_or(0) < want;
+            offset = offset.saturating_add(want);
+            let mut fresh: Vec<Candidate> = Vec::new();
+            for c in found {
+                let reason = if Some(c.id) == current {
+                    Some(SkipReason::Current)
+                } else if cart.contains(&c.id) {
+                    Some(SkipReason::InCart)
+                } else if excluded.contains(&c.id) {
+                    Some(SkipReason::Excluded)
+                } else if taken.contains(&c.id) || fresh.iter().any(|f| f.id == c.id) {
+                    Some(SkipReason::Duplicate)
+                } else {
                     None
+                };
+                match reason {
+                    Some(reason) => out.skipped.push(Skipped {
+                        product_id: c.id,
+                        strategy,
+                        reason,
+                    }),
+                    None => fresh.push(c),
                 }
-            };
-            if let Some(reason) = reason {
-                out.skipped.push(Skipped {
-                    product_id: c.id,
-                    strategy,
-                    reason,
-                });
+            }
+            let ids: Vec<Uuid> = fresh.iter().map(|c| c.id).collect();
+            let mut cards: HashMap<Uuid, ProductCard> = cards::cards(tx, ctx, &ids)
+                .await?
+                .into_iter()
+                .map(|c| (c.id, c))
+                .collect();
+            for c in fresh {
+                if out.items.len() >= limit {
+                    break;
+                }
+                let reason = match cards.remove(&c.id) {
+                    None => Some(SkipReason::NotSold),
+                    Some(card) if !card.stock.purchasable() => Some(SkipReason::OutOfStock),
+                    Some(card) => {
+                        if out.items.is_empty() {
+                            out.strategy = Some(strategy);
+                            out.title.clone_from(&title);
+                        }
+                        taken.insert(c.id);
+                        out.items.push(ExplainedItem {
+                            product: card,
+                            strategy,
+                            score: c.score,
+                        });
+                        None
+                    }
+                };
+                if let Some(reason) = reason {
+                    out.skipped.push(Skipped {
+                        product_id: c.id,
+                        strategy,
+                        reason,
+                    });
+                }
+            }
+            if exhausted {
+                break;
             }
         }
     }
@@ -861,18 +894,17 @@ mod tests {
             strategies(&chain(&Target::Home, &s, &not_granted)),
             [Seasonal, Bestsellers, Seasonal, Newest]
         );
+        // Recently viewed is the device's own list: no identity, no padding.
         let recent = Target::Recent(vec![u(1)]);
-        assert!(chain(&recent, &s, &not_granted).is_empty());
-        let granted = Visitor {
-            personalization: true,
-            ..Visitor::default()
-        };
-        assert_eq!(strategies(&chain(&recent, &s, &granted)), [RecentlyViewed]);
+        assert_eq!(
+            strategies(&chain(&recent, &s, &Visitor::default())),
+            [RecentlyViewed]
+        );
         let off = RecommendationSettings {
             recently_viewed: false,
             ..s.clone()
         };
-        assert!(chain(&recent, &off, &granted).is_empty());
+        assert!(chain(&recent, &off, &Visitor::default()).is_empty());
     }
 
     #[test]

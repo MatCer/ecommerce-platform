@@ -408,6 +408,8 @@ export const sk: Dictionary = {
     requiredHint: "Polia označené * sú povinné.",
   },
   errors: {
+    market_unpublished:
+      "Tento trh zatiaľ nemá overenú doménu, takže nemá zákazníkov, ktorým by sa odporúčalo.",
     unknown_product: "Vybraný produkt už neexistuje.",
     too_many_products: "Kolekcia môže mať najviac 200 produktov.",
     too_many_exclusions: "Vylúčiť možno najviac 500 produktov.",

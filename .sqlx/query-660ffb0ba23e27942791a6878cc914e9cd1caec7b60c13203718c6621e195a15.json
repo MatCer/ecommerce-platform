@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH fresh AS (\n               SELECT product_id, round(sum(popularity))::int AS p\n               FROM product_scores GROUP BY product_id\n           ), merged AS (\n               SELECT coalesce(f.product_id, o.product_id) AS product_id,\n                      coalesce(f.p, 0) AS p, o.popularity AS old\n               FROM fresh f FULL JOIN product_popularity o ON o.product_id = f.product_id\n           )\n           INSERT INTO product_popularity (tenant_id, product_id, popularity, reindex)\n           SELECT $1, product_id, p, true FROM merged\n           WHERE (old IS NULL AND p > 0)\n              OR (old IS NOT NULL AND abs(p - old) >= greatest(1, ceil(old * $2::float8)))\n           ON CONFLICT (tenant_id, product_id)\n           DO UPDATE SET popularity = EXCLUDED.popularity, reindex = true",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "660ffb0ba23e27942791a6878cc914e9cd1caec7b60c13203718c6621e195a15"
+}

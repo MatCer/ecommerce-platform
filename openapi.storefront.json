@@ -3946,7 +3946,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),\nseasonal collections, personalized picks and recently viewed, each filtered by market\nvisibility, status and availability, falling back to bestsellers. Without visitor headers\nthe answer is public and cacheable; with a cart or consent subject it is private\n(`Cache-Control: private, no-store`, A2). Personal signals are used only while the\nsubject's `personalization` consent is granted (A20).",
+        "summary": "Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),\nseasonal collections, personalized picks and recently viewed, each filtered by market\nvisibility, status and availability, falling back to bestsellers. Without visitor headers\nthe answer is public and cacheable; with a cart or consent subject it is private\n(`Cache-Control: private, no-store`, A2). Personal signals are used only while the\nsubject's `personalization` consent is granted (A20). `recent` ignores visitor headers.",
         "operationId": "recommendations",
         "parameters": [
           {
@@ -4027,7 +4027,7 @@
           {
             "name": "ids",
             "in": "query",
-            "description": "`recent` only: the device's recently viewed product ids, comma-separated (at most 12).",
+            "description": "`recent` only: the device's recently viewed product ids, comma-separated (at most 12);\nvalidated and rehydrated with live prices, never linked to a visitor.",
             "required": false,
             "schema": {
               "type": "string"

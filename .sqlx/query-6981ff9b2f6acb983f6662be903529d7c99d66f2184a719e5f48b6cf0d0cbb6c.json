@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT product_b AS \"id!\", sum(count_90d)::float8 AS \"score!\"\n                   FROM co_purchases WHERE product_a = ANY($1)\n                   GROUP BY product_b ORDER BY 2 DESC, 1 LIMIT $2",
+  "query": "SELECT product_b AS \"id!\", sum(count_90d)::float8 AS \"score!\"\n                   FROM co_purchases WHERE product_a = ANY($1)\n                   GROUP BY product_b ORDER BY 2 DESC, 1 LIMIT $2 OFFSET $3",
   "describe": {
     "columns": [
       {
@@ -24,6 +24,7 @@
     "parameters": {
       "Left": [
         "UuidArray",
+        "Int8",
         "Int8"
       ]
     },
@@ -32,5 +33,5 @@
       null
     ]
   },
-  "hash": "cab45bda71b8e758f7767d9ef5c7ad2ba51649bb49e8dccb00047f4cd588249d"
+  "hash": "6981ff9b2f6acb983f6662be903529d7c99d66f2184a719e5f48b6cf0d0cbb6c"
 }

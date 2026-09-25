@@ -763,12 +763,16 @@ describe("platform routes backed by the real API (WP6)", () => {
       headers: { "x-locale": "cs", "x-market": "m-sk" },
     });
     expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
-    // Personal islands read in the prefixed locale too (the consent cookie is `Path=/`).
-    await get("http://demo-sk.localhost/cs/_p/recommendations?context=home");
+    // Private recommendations stay unprefixed like the cart (cookie `Path=/_p`); `?locale=`
+    // picks one of the market's locales, anything else falls back to the default.
+    expect((await get("http://demo-sk.localhost/cs/_p/recommendations")).status).toBe(404);
+    await get("http://demo-sk.localhost/_p/recommendations?context=home&locale=cs");
     expect(api.calls.at(-1)).toMatchObject({
-      url: "http://api.test/storefront/v1/recommendations?context=home",
+      url: "http://api.test/storefront/v1/recommendations?context=home&locale=cs",
       headers: { "x-locale": "cs", "x-market": "m-sk" },
     });
+    await get("http://demo-sk.localhost/_p/recommendations?context=home&locale=de");
+    expect(api.calls.at(-1)?.headers["x-locale"]).toBe("sk");
     // Redirects: as typed first, else the unprefixed rule with the target kept in the locale.
     const typed = await get("http://demo-sk.localhost/cs/stary");
     expect([typed.status, typed.headers.get("location")]).toEqual([301, "/cs/c/novy"]);

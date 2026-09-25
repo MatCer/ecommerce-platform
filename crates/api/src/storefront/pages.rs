@@ -182,7 +182,8 @@ pub struct RecommendationsQuery {
     pub context: Option<String>,
     /// Products, 1-24 (default 8).
     pub limit: Option<u32>,
-    /// `recent` only: the device's recently viewed product ids, comma-separated (at most 12).
+    /// `recent` only: the device's recently viewed product ids, comma-separated (at most 12);
+    /// validated and rehydrated with live prices, never linked to a visitor.
     pub ids: Option<String>,
 }
 
@@ -206,7 +207,7 @@ pub(crate) struct VisitorHeaders {
 /// visibility, status and availability, falling back to bestsellers. Without visitor headers
 /// the answer is public and cacheable; with a cart or consent subject it is private
 /// (`Cache-Control: private, no-store`, A2). Personal signals are used only while the
-/// subject's `personalization` consent is granted (A20).
+/// subject's `personalization` consent is granted (A20). `recent` ignores visitor headers.
 #[utoipa::path(
     get,
     path = "/storefront/v1/recommendations",
@@ -226,8 +227,12 @@ async fn recommendations(
     let q = query_params(query)?;
     let target = Target::parse(q.context.as_deref().unwrap_or("home"), q.ids.as_deref())?;
     let limit = engine::limit(q.limit);
-    let cart_token = header_str(&headers, CART_HEADER);
-    let subject = header_str(&headers, CONSENT_SUBJECT_HEADER).filter(|s| well_formed_anon(s));
+    // Recently viewed is rehydrated without any identity (the history stays on the device):
+    // visitor headers are ignored for it, even if a client sends them.
+    let anonymous = matches!(target, Target::Recent(_));
+    let cart_token = header_str(&headers, CART_HEADER).filter(|_| !anonymous);
+    let subject =
+        header_str(&headers, CONSENT_SUBJECT_HEADER).filter(|s| !anonymous && well_formed_anon(s));
     let private = cart_token.is_some() || subject.is_some();
     let recs = with_ctx(&s, &shopper, async |tx, ctx| {
         let mut visitor = Visitor::default();
