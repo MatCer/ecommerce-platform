@@ -66,11 +66,9 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
     if (!attempt) return;
     setBusy(true);
     setError("");
-    const r = await call<OrderPayment>(
-      "POST",
-      `${base}/payment-attempts/${attempt.id}/simulate`,
-      { outcome },
-    );
+    const r = await call<OrderPayment>("POST", `${base}/payment-attempts/${attempt.id}/simulate`, {
+      outcome,
+    });
     setBusy(false);
     if (!r.ok || !r.data) return setError(t(m, "checkout.error"));
     setP(r.data);
@@ -110,10 +108,18 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
                 </h3>
                 <p class="text-sm text-muted-foreground">{t(m, "order.stripe_sim_note")}</p>
                 <div class="flex flex-wrap gap-2">
-                  <Button variant="primary" loading={busy()} onClick={() => void simulate("succeeded")}>
+                  <Button
+                    variant="primary"
+                    loading={busy()}
+                    onClick={() => void simulate("succeeded")}
+                  >
                     {t(m, "order.stripe_sim_succeed")}
                   </Button>
-                  <Button variant="secondary" disabled={busy()} onClick={() => void simulate("failed")}>
+                  <Button
+                    variant="secondary"
+                    disabled={busy()}
+                    onClick={() => void simulate("failed")}
+                  >
                     {t(m, "order.stripe_sim_fail")}
                   </Button>
                 </div>
@@ -137,7 +143,9 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
         </div>
       </Show>
       <Show
-        when={p().can_pay && open() && p().method !== "cod" && p().method !== "stripe" && p().attempt}
+        when={
+          p().can_pay && open() && p().method !== "cod" && p().method !== "stripe" && p().attempt
+        }
       >
         {(a) => (
           <div>

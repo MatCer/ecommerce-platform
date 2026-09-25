@@ -4729,6 +4729,33 @@ export interface components {
             role: components["schemas"]["Role"];
             user_id: string;
         };
+        StatementImport: {
+            /**
+             * Format: int32
+             * @description Debits (outgoing payments) are not stored.
+             */
+            debits: number;
+            /**
+             * Format: int32
+             * @description Lines already imported earlier (same bank transaction id): ignored.
+             */
+            duplicates: number;
+            /**
+             * Format: int32
+             * @description New lines waiting in the exceptions queue.
+             */
+            exceptions: number;
+            /**
+             * Format: int32
+             * @description New credit lines stored.
+             */
+            imported: number;
+            /**
+             * Format: int32
+             * @description New lines that paid an order.
+             */
+            matched: number;
+        };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
         StorefrontToken: {
@@ -5275,7 +5302,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImportReport"];
+                    "application/json": components["schemas"]["StatementImport"];
                 };
             };
             403: {

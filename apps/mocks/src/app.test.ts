@@ -89,8 +89,11 @@ test("fio API mock: scripted incoming payments in the statement format", async (
     "/fio/v1/rest/periods/mockToken123/2026-10-01/2026-10-02/transactions.json",
   );
   expect(
-    ((await outside.json()) as { accountStatement: { transactionList: { transaction: unknown[] } } })
-      .accountStatement.transactionList.transaction,
+    (
+      (await outside.json()) as {
+        accountStatement: { transactionList: { transaction: unknown[] } };
+      }
+    ).accountStatement.transactionList.transaction,
   ).toEqual([]);
   const bad = await app.request("/fio/v1/rest/periods/x/2026-10-01/2026-10-02/transactions.json");
   expect(bad.status).toBe(400);

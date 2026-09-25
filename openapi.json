@@ -475,7 +475,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportReport"
+                  "$ref": "#/components/schemas/StatementImport"
                 }
               }
             }
@@ -19782,6 +19782,48 @@
           },
           "user_id": {
             "type": "string"
+          }
+        }
+      },
+      "StatementImport": {
+        "type": "object",
+        "required": [
+          "imported",
+          "duplicates",
+          "debits",
+          "matched",
+          "exceptions"
+        ],
+        "properties": {
+          "debits": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Debits (outgoing payments) are not stored.",
+            "minimum": 0
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines already imported earlier (same bank transaction id): ignored.",
+            "minimum": 0
+          },
+          "exceptions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New lines waiting in the exceptions queue.",
+            "minimum": 0
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New credit lines stored.",
+            "minimum": 0
+          },
+          "matched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New lines that paid an order.",
+            "minimum": 0
           }
         }
       },

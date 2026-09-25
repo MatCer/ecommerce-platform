@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum Format {
+pub enum StatementFormat {
     /// ISO 20022 bank-to-customer statement (`camt.053.001.02` … `.08`).
     Camt053,
     /// Fio banka CSV (web export or `transactions.csv` from the API), `;`-separated.
@@ -27,7 +27,7 @@ pub enum Format {
     Gpc,
 }
 
-impl Format {
+impl StatementFormat {
     pub fn source(self) -> &'static str {
         match self {
             Self::Camt053 => "camt053",
@@ -73,11 +73,11 @@ fn bad(detail: impl Into<String>) -> Error {
     }
 }
 
-pub fn parse(format: Format, bytes: &[u8]) -> Result<Statement, Error> {
+pub fn parse(format: StatementFormat, bytes: &[u8]) -> Result<Statement, Error> {
     let statement = match format {
-        Format::Camt053 => camt053(bytes)?,
-        Format::FioCsv => fio_csv(bytes)?,
-        Format::Gpc => gpc(bytes)?,
+        StatementFormat::Camt053 => camt053(bytes)?,
+        StatementFormat::FioCsv => fio_csv(bytes)?,
+        StatementFormat::Gpc => gpc(bytes)?,
     };
     if statement.lines.len() > MAX_LINES {
         return Err(bad(format!("at most {MAX_LINES} lines per statement")));
@@ -700,7 +700,7 @@ mod tests {
 
     #[test]
     fn camt053_credits_debits_and_batches() {
-        let s = parse(Format::Camt053, &fixture("camt053.xml")).unwrap();
+        let s = parse(StatementFormat::Camt053, &fixture("camt053.xml")).unwrap();
         assert_eq!(s.iban.as_deref(), Some("CZ6508000000192000145399"));
         let lines: Vec<_> = s
             .lines
@@ -736,16 +736,16 @@ mod tests {
     #[test]
     fn camt053_refuses_doctype_and_garbage() {
         let xxe = br#"<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><Document><BkToCstmrStmt/></Document>"#;
-        assert!(parse(Format::Camt053, xxe).is_err());
-        assert!(parse(Format::Camt053, b"<Document><Other/></Document>").is_err());
-        assert!(parse(Format::Camt053, b"not xml <<").is_err());
+        assert!(parse(StatementFormat::Camt053, xxe).is_err());
+        assert!(parse(StatementFormat::Camt053, b"<Document><Other/></Document>").is_err());
+        assert!(parse(StatementFormat::Camt053, b"not xml <<").is_err());
         let deep = format!("{}{}", "<a>".repeat(100), "</a>".repeat(100));
-        assert!(parse(Format::Camt053, deep.as_bytes()).is_err());
+        assert!(parse(StatementFormat::Camt053, deep.as_bytes()).is_err());
     }
 
     #[test]
     fn fio_csv_export() {
-        let s = parse(Format::FioCsv, &fixture("fio.csv")).unwrap();
+        let s = parse(StatementFormat::FioCsv, &fixture("fio.csv")).unwrap();
         assert_eq!(s.iban.as_deref(), Some("CZ7920100000002000000000"));
         assert_eq!(s.lines.len(), 3);
         let l = &s.lines[0];
@@ -756,12 +756,12 @@ mod tests {
         assert_eq!(l.counterparty_name.as_deref(), Some("Novák; Jan"));
         assert_eq!(s.lines[1].amount_minor, -20_000);
         assert_eq!(s.lines[2].variable_symbol, None);
-        assert!(parse(Format::FioCsv, b"a;b\n1;2").is_err());
+        assert!(parse(StatementFormat::FioCsv, b"a;b\n1;2").is_err());
     }
 
     #[test]
     fn gpc_records() {
-        let s = parse(Format::Gpc, &fixture("statement.gpc")).unwrap();
+        let s = parse(StatementFormat::Gpc, &fixture("statement.gpc")).unwrap();
         assert_eq!(s.domestic.as_deref(), Some("0000002000000000"));
         assert_eq!(s.lines.len(), 2);
         assert_eq!(s.lines[0].amount_minor, 150_000);

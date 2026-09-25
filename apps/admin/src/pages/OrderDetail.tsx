@@ -1,12 +1,15 @@
+import { Button, SelectField, showToast, TextField } from "@platform/ui";
 import { useParams } from "@solidjs/router";
-import { createQuery } from "@tanstack/solid-query";
-import { For, type JSX, Show } from "solid-js";
+import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
+import { createSignal, For, type JSX, Show } from "solid-js";
+import { ApiProblem } from "../components/CheckoutSettings.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { formatDateTime, locale, t } from "../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
 import { formatMoney } from "../lib/money.ts";
 import { OrderException } from "./Orders.tsx";
+import { ResolveOrderException } from "./PaymentExceptions.tsx";
 
 function Section(props: { title: string; children: JSX.Element }) {
   return (
@@ -69,6 +72,16 @@ export default function OrderDetail() {
               {t("orders.fulfillment")}: {t(`fulfillmentStatuses.${data.order.fulfillment_status}`)}
             </span>
             <OrderException exception={data.order.exception} />
+            <Show when={data.order.exception && !data.exception_resolved_at}>
+              <ResolveOrderException orderId={data.order.id} />
+            </Show>
+            <Show when={data.exception_resolved_at}>
+              {(at) => (
+                <span class="text-muted-foreground">
+                  {t("pay.resolved")} {formatDateTime(at())}: {data.exception_note}
+                </span>
+              )}
+            </Show>
           </div>
           <div class="flex flex-col gap-4">
             <Section title={t("orders.lines")}>
@@ -271,6 +284,9 @@ export default function OrderDetail() {
                 </dl>
               </Section>
             </div>
+            <Show when={data.attempts.find((a) => a.method === "cod")}>
+              {(a) => <CodPanel orderId={data.order.id} attempt={a()} />}
+            </Show>
             <Section title={t("orders.attempts")}>
               <Show
                 when={data.attempts.length}
@@ -355,5 +371,123 @@ export default function OrderDetail() {
         </>
       )}
     </QueryState>
+  );
+}
+
+const tenders = ["cash", "card"] as const;
+const collectors = ["carrier", "merchant"] as const;
+
+/** Cash on delivery (A16): delivered → collected (tender, collector, cash rounding) → remitted. */
+function CodPanel(props: { orderId: string; attempt: Schemas["Attempt"] }) {
+  const qc = useQueryClient();
+  const [tender, setTender] = createSignal<(typeof tenders)[number]>("cash");
+  const [collector, setCollector] = createSignal<(typeof collectors)[number]>("carrier");
+  const [note, setNote] = createSignal("");
+  const state = () => props.attempt.cod_status ?? "pending";
+  const act = createMutation(() => ({
+    mutationFn: (action: "deliver" | "collect" | "remit") => {
+      const params = { header: tenantHeader(), path: { id: props.orderId } };
+      if (action === "deliver")
+        return unwrap(api.POST("/admin/v1/orders/{id}/cod/deliver", { params }));
+      if (action === "collect")
+        return unwrap(
+          api.POST("/admin/v1/orders/{id}/cod/collect", {
+            params,
+            body: { tender: tender(), collector: collector() },
+          }),
+        );
+      return unwrap(
+        api.POST("/admin/v1/orders/{id}/cod/remit", {
+          params,
+          body: { note: note().trim() || null },
+        }),
+      );
+    },
+    onSuccess: () => {
+      showToast({ title: t("common.saved"), closeLabel: t("common.close") });
+      void qc.invalidateQueries({ queryKey: tenantKey("order", props.orderId) });
+    },
+  }));
+  return (
+    <Section title={t("pay.codTitle")}>
+      <div class="grid gap-3 text-sm">
+        <dl class="grid max-w-md grid-cols-2 gap-1">
+          <dt>{t("pay.codState")}</dt>
+          <dd data-testid="cod-state">{t(`codStates.${state()}`)}</dd>
+          <Show when={props.attempt.tender && props.attempt.tender !== "unknown"}>
+            <dt>{t("pay.tender")}</dt>
+            <dd>{t(`tenders.${props.attempt.tender ?? "unknown"}`)}</dd>
+          </Show>
+          <Show when={props.attempt.collector}>
+            {(c) => (
+              <>
+                <dt>{t("pay.collector")}</dt>
+                <dd>{t(`collectors.${c()}`)}</dd>
+              </>
+            )}
+          </Show>
+          <dt>{t("orders.total")}</dt>
+          <dd class="figures">
+            {formatMoney(props.attempt.amount_minor, props.attempt.currency, locale())}
+          </dd>
+        </dl>
+        <Show when={state() === "pending"}>
+          <div>
+            <Button loading={act.isPending} onClick={() => act.mutate("deliver")}>
+              {t("pay.markDelivered")}
+            </Button>
+          </div>
+        </Show>
+        <Show when={state() === "pending" || state() === "delivered"}>
+          <form
+            class="grid gap-3 sm:grid-cols-3 sm:items-end"
+            onSubmit={(e) => {
+              e.preventDefault();
+              act.mutate("collect");
+            }}
+          >
+            <SelectField
+              label={t("pay.tender")}
+              value={tender()}
+              options={tenders.map((v) => ({ value: v, label: t(`tenders.${v}`) }))}
+              onChange={(v) => setTender(tenders.find((x) => x === v) ?? "cash")}
+            />
+            <SelectField
+              label={t("pay.collector")}
+              value={collector()}
+              options={collectors.map((v) => ({ value: v, label: t(`collectors.${v}`) }))}
+              onChange={(v) => setCollector(collectors.find((x) => x === v) ?? "carrier")}
+            />
+            <div>
+              <Button type="submit" variant="primary" loading={act.isPending}>
+                {t("pay.collect")}
+              </Button>
+            </div>
+          </form>
+        </Show>
+        <Show when={state() === "collected"}>
+          <form
+            class="grid gap-3 sm:grid-cols-2 sm:items-end"
+            onSubmit={(e) => {
+              e.preventDefault();
+              act.mutate("remit");
+            }}
+          >
+            <TextField
+              label={t("pay.remitNote")}
+              value={note()}
+              onChange={setNote}
+              maxLength={500}
+            />
+            <div>
+              <Button type="submit" variant="primary" loading={act.isPending}>
+                {t("pay.remit")}
+              </Button>
+            </div>
+          </form>
+        </Show>
+        <ApiProblem error={act.error} />
+      </div>
+    </Section>
   );
 }

@@ -462,7 +462,7 @@ pub struct BankTransaction {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
-pub struct ImportReport {
+pub struct StatementImport {
     /// New credit lines stored.
     pub imported: u32,
     /// Lines already imported earlier (same bank transaction id): ignored.
@@ -483,7 +483,7 @@ pub async fn import(
     account_id: Uuid,
     source: &str,
     statement: &Statement,
-) -> Result<ImportReport, Error> {
+) -> Result<StatementImport, Error> {
     let acc = account_by_id(tx, account_id).await?;
     let mismatch = || Error::Validation {
         code: "statement_account_mismatch",
@@ -501,7 +501,7 @@ pub async fn import(
     {
         return Err(mismatch());
     }
-    let mut report = ImportReport::default();
+    let mut report = StatementImport::default();
     for line in &statement.lines {
         if line.amount_minor <= 0 {
             report.debits += 1;
@@ -993,7 +993,7 @@ pub async fn poll_fio(
     base_url: &str,
     acc: &FioAccount,
     now: DateTime<Utc>,
-) -> Result<ImportReport, Error> {
+) -> Result<StatementImport, Error> {
     let mut tx = platform::db::tenant_tx(db, acc.tenant_id).await?;
     let row = sqlx::query!(
         "SELECT fio_token, fio_synced_at FROM bank_accounts WHERE id = $1",

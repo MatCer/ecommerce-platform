@@ -336,7 +336,7 @@ async fn import(
     tenant: Uuid,
     account: Uuid,
     lines: Vec<StatementLine>,
-) -> Result<bank::ImportReport, Error> {
+) -> Result<bank::StatementImport, Error> {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let r = bank::import(
         &mut tx,

@@ -18,7 +18,11 @@ interface NavItem {
 const groups: { label: () => string; items: NavItem[] }[] = [
   {
     label: () => t("orders.title"),
-    items: [{ href: "/orders", label: () => t("orders.title"), min: "staff" }],
+    items: [
+      { href: "/orders", label: () => t("orders.title"), min: "staff" },
+      { href: "/payments/exceptions", label: () => t("nav.exceptions"), min: "staff" },
+      { href: "/payments/bank", label: () => t("nav.bank"), min: "staff" },
+    ],
   },
   {
     label: () => t("nav.catalog"),

@@ -13,11 +13,11 @@ use axum::http::StatusCode;
 use commerce::orders::{self, OrderSummary};
 use commerce::payments::Attempt;
 use commerce::payments::bank::{
-    self, BankAccount, BankAccountInput, BankTransaction, BankTransactionPage, ImportReport,
+    self, BankAccount, BankAccountInput, BankTransaction, BankTransactionPage, StatementImport,
     ResolveInput, TxFilter, TxStatus,
 };
 use commerce::payments::cod::{self, CodReport, CollectInput};
-use commerce::payments::statements::{self, Format};
+use commerce::payments::statements::{self, StatementFormat};
 use commerce::payments::stripe::{self, StripeAccount};
 use commerce::tenancy::Role;
 use platform::Error;
@@ -123,7 +123,7 @@ async fn put_bank_account(
 pub struct StatementQuery {
     /// `camt053` (ISO 20022 XML), `fio_csv` or `gpc` (ABO).
     #[param(inline)]
-    pub format: Format,
+    pub format: StatementFormat,
 }
 
 /// Imports a bank statement (the raw file as the body, at most 1 MB) into the account and
@@ -138,7 +138,7 @@ pub struct StatementQuery {
     params(TenantHeader, IdParam, StatementQuery),
     request_body(content = Vec<u8>, content_type = "application/octet-stream"),
     responses(
-        (status = 200, body = ImportReport),
+        (status = 200, body = StatementImport),
         (status = 403, body = platform::Problem, content_type = "application/problem+json"),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
         (status = 422, description = "invalid_statement | statement_account_mismatch", body = platform::Problem, content_type = "application/problem+json"),
@@ -150,7 +150,7 @@ async fn upload_statement(
     id: Result<Path<Uuid>, PathRejection>,
     query: Result<Query<StatementQuery>, QueryRejection>,
     body: Bytes,
-) -> Result<Json<ImportReport>, Error> {
+) -> Result<Json<StatementImport>, Error> {
     staff.require(Role::Admin)?;
     let account = path_id(id)?;
     let q = query_params(query)?;

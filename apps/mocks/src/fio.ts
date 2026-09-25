@@ -47,7 +47,8 @@ export function fioRoutes(app: Hono) {
       const t = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
       const amount = typeof t.amount === "number" && Number.isFinite(t.amount) ? t.amount : null;
       const date = typeof t.date === "string" && DATE_RE.test(t.date) ? t.date : null;
-      if (amount === null || date === null) return c.json({ error: "amount and date required" }, 400);
+      if (amount === null || date === null)
+        return c.json({ error: "amount and date required" }, 400);
       if (txs.length >= MAX_TX) return c.json({ error: "full" }, 507);
       txs.push({
         id: nextId++,

@@ -20,11 +20,14 @@ const placedAt = order
     }).format(new Date(order.placed_at))
   : "";
 // Bank transfer (A25): the instructions stay visible until the money is matched.
-const bank = order?.payment.bank_transfer && order.payment.status === "unpaid" && order.status === "pending"
-  ? order.payment.bank_transfer
-  : null;
+const bank =
+  order?.payment.bank_transfer && order.payment.status === "unpaid" && order.status === "pending"
+    ? order.payment.bank_transfer
+    : null;
 const due = order?.payment.expires_at
-  ? new Intl.DateTimeFormat(shop?.locale ?? "cs", { dateStyle: "medium" }).format(new Date(order.payment.expires_at))
+  ? new Intl.DateTimeFormat(shop?.locale ?? "cs", { dateStyle: "medium" }).format(
+      new Date(order.payment.expires_at),
+    )
   : null;
 ---
 
