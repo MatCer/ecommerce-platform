@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE orders SET exception = $2, exception_resolved_at = NULL, exception_note = NULL,\n             updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "126650ba58143fd623ef265cbed9b9fa1b6e6735db6f6944b3b262d2900e001d"
+}

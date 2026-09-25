@@ -100,5 +100,7 @@ export type PaymentStart = S["PaymentStart"];
 export type NextAction = S["NextAction"];
 export type Order = S["OrderView"];
 export type OrderPayment = S["PaymentView"];
+/** Bank-transfer instructions with the QR code (WP11, A25). */
+export type BankTransfer = S["BankTransferView"];
 export type OrderSummary = S["OrderSummary"];
 export type OrderPage = S["OrderPage"];

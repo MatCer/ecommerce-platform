@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- camt.053 test statement: a credit with a structured VS, a debit, a batch entry with two
+     transactions (VS in EndToEndId and in the unstructured text), a pending entry, a v08-style
+     status and a reversal. Used by commerce::payments::statements tests. -->
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02">
+  <BkToCstmrStmt>
+    <GrpHdr><MsgId>STMT-2026-09-25</MsgId><CreDtTm>2026-09-25T18:00:00</CreDtTm></GrpHdr>
+    <Stmt>
+      <Id>2026-09-25</Id>
+      <Acct><Id><IBAN>CZ6508000000192000145399</IBAN></Id><Ccy>CZK</Ccy></Acct>
+      <Ntry>
+        <Amt Ccy="CZK">480.50</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-09-25</Dt></BookgDt>
+        <ValDt><Dt>2026-09-25</Dt></ValDt>
+        <AcctSvcrRef>20260925-0001</AcctSvcrRef>
+        <NtryDtls><TxDtls>
+          <Refs><EndToEndId>NOTPROVIDED</EndToEndId></Refs>
+          <RltdPties>
+            <Dbtr><Nm>Jan Novák &amp; syn</Nm></Dbtr>
+            <DbtrAcct><Id><IBAN>CZ5855000000001265098001</IBAN></Id></DbtrAcct>
+          </RltdPties>
+          <RmtInf>
+            <Ustrd>Objednavka 100001</Ustrd>
+            <Strd><CdtrRefInf><Ref>100001</Ref></CdtrRefInf></Strd>
+          </RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CZK">1200.00</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-09-25</Dt></BookgDt>
+        <AcctSvcrRef>20260925-0002</AcctSvcrRef>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CZK">300.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-09-25</Dt></BookgDt>
+        <AcctSvcrRef>20260925-0003</AcctSvcrRef>
+        <NtryDtls>
+          <TxDtls>
+            <Refs><AcctSvcrRef>B-1</AcctSvcrRef><EndToEndId>VS100002</EndToEndId></Refs>
+            <AmtDtls><TxAmt><Amt Ccy="CZK">100.00</Amt></TxAmt></AmtDtls>
+          </TxDtls>
+          <TxDtls>
+            <Refs><AcctSvcrRef>B-2</AcctSvcrRef></Refs>
+            <Amt Ccy="CZK">200.00</Amt>
+            <RmtInf><Ustrd>platba VS:100003</Ustrd></RmtInf>
+          </TxDtls>
+        </NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CZK">999.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts>PDNG</Sts>
+        <BookgDt><Dt>2026-09-25</Dt></BookgDt>
+        <AcctSvcrRef>20260925-PENDING</AcctSvcrRef>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CZK">50.00</Amt>
+        <CdtDbtInd>CRDT</CdtDbtInd>
+        <Sts><Cd>BOOK</Cd></Sts>
+        <BookgDt><DtTm>2026-09-25T10:15:00+02:00</DtTm></BookgDt>
+        <AcctSvcrRef>20260925-0004</AcctSvcrRef>
+        <NtryDtls><TxDtls>
+          <RmtInf><Strd><CdtrRefInf><Ref>0000100004</Ref></CdtrRefInf></Strd></RmtInf>
+        </TxDtls></NtryDtls>
+      </Ntry>
+      <Ntry>
+        <Amt Ccy="CZK">480.50</Amt>
+        <CdtDbtInd>DBIT</CdtDbtInd>
+        <RvslInd>true</RvslInd>
+        <Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-09-25</Dt></BookgDt>
+        <AcctSvcrRef>20260925-REVERSAL</AcctSvcrRef>
+      </Ntry>
+    </Stmt>
+  </BkToCstmrStmt>
+</Document>

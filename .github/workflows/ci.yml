@@ -36,15 +36,27 @@ jobs:
           MEILI_MASTER_KEY: meili-local-master-key-0123456789
           MEILI_NO_ANALYTICS: "true"
         ports: ["7700:7700"]
+      # WP11: Stripe API stand-in for the Stripe adapter tests (same image as compose).
+      stripe-mock:
+        image: stripe/stripe-mock:v0.203.0
+        ports: ["12111:12111"]
     env:
       DATABASE_URL: postgres://app_owner:app-owner-ci@localhost:5432/app_test
+      STRIPE_MOCK_URL: http://localhost:12111
       # The .env.example keys (derived from the master key above), created like meili-init does.
       MEILI_URL: http://localhost:7700
       MEILI_SEARCH_KEY: 2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918
       MEILI_ADMIN_KEY: 39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6
     steps:
+      # The workspace's debug build (clippy + every integration test binary + the OpenAPI
+      # drift build) outgrew the runner's free disk ("No space left on device"). Drop
+      # preinstalled SDKs this job never uses (~25 GB).
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.1
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2

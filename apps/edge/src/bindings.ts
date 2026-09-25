@@ -182,6 +182,7 @@ export function restrictedBinding(opts: {
     if (ctx.cartToken) headers.set("x-cart-token", ctx.cartToken);
     if (ctx.sessionToken) headers.set("x-customer-session", ctx.sessionToken);
     if (ctx.consentSubject) headers.set("x-consent-subject", ctx.consentSubject);
+    if (ctx.site.clientIp) headers.set("x-client-ip", ctx.site.clientIp);
     const res = await opts.upstream(
       new Request(`${opts.apiOrigin}/storefront/v1${url.pathname}${url.search}`, {
         method: op.method,

@@ -1,15 +1,17 @@
-//! Payment provider webhooks (spec §10.4, A10, A11). WP10 has the fake gateway's
-//! (`PAYMENTS_FAKE=1`); Stripe's arrives with WP11 on the same pattern: verify the signature
-//! over the raw body before parsing, check the event against the attempt (tenant, amount,
-//! currency), then apply the outcome idempotently.
+//! Payment provider webhooks (spec §10.4, A10, A11): the fake gateway's (`PAYMENTS_FAKE=1`)
+//! and Stripe Connect's. Both verify the signature over the raw body before parsing. Stripe
+//! events are stored before the 200 and processed by a job (`payments.provider_event`).
 
+use axum::Json;
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use chrono::Utc;
-use commerce::payments::{self, FakeEvent};
+use commerce::payments::{self, FakeEvent, stripe};
 use platform::Error;
 use platform::db::tenant_tx;
+use serde::Serialize;
+use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
@@ -17,9 +19,56 @@ use crate::AppState;
 use crate::admin::parse_json;
 
 pub const FAKE_SIGNATURE_HEADER: &str = "x-fake-signature";
+pub const STRIPE_SIGNATURE_HEADER: &str = "stripe-signature";
 
 pub fn routes() -> OpenApiRouter<AppState> {
-    OpenApiRouter::new().routes(routes!(fake_webhook))
+    OpenApiRouter::new()
+        .routes(routes!(fake_webhook))
+        .routes(routes!(stripe_webhook))
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct Received {
+    pub received: bool,
+    /// `false` for a redelivery of an event already stored (a no-op).
+    pub new: bool,
+}
+
+/// Stripe Connect webhook endpoint (A11). `Stripe-Signature` (HMAC-SHA256 over
+/// `"<t>.<raw body>"` with the endpoint secret, 5 minutes tolerance) is verified before
+/// anything else; the event is stored (deduplicated by id) and its processing enqueued before
+/// the 200, so a crash afterwards loses nothing and a redelivery changes nothing. `404` when
+/// Stripe is not configured.
+#[utoipa::path(
+    post,
+    path = "/webhooks/stripe",
+    tag = "webhooks",
+    params(("Stripe-Signature" = String, Header)),
+    request_body(content = String, content_type = "application/json", description = "A Stripe event"),
+    responses(
+        (status = 200, body = Received),
+        (status = 401, description = "invalid_signature", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, description = "invalid_event", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn stripe_webhook(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Received>, Error> {
+    let stripe = s.checkout.payments.stripe.as_ref().ok_or(Error::NotFound)?;
+    let signature = headers
+        .get(STRIPE_SIGNATURE_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .ok_or(Error::Unauthorized {
+            code: "invalid_signature",
+        })?;
+    let new = stripe::receive(&s.db, stripe, signature, &body).await?;
+    Ok(Json(Received {
+        received: true,
+        new,
+    }))
 }
 
 /// Verifies and applies a fake provider event. The tenant comes from the signed body; the

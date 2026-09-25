@@ -38,6 +38,8 @@ pub struct Me {
     pub email: String,
     /// Tenants the user can act in (send one as `X-Tenant-Id`).
     pub memberships: Vec<Membership>,
+    /// Platform superadmin (the job queue view, `/admin/v1/platform/*`).
+    pub is_superadmin: bool,
 }
 
 /// The signed-in staff user and their tenants. Needs no `X-Tenant-Id`.
@@ -53,10 +55,12 @@ pub struct Me {
 )]
 async fn me(user: StaffUser, State(s): State<AppState>) -> Result<Json<Me>, Error> {
     let memberships = tenancy::memberships(&s.db, &user.user_id).await?;
+    let is_superadmin = crate::admin_platform::is_superadmin(&s.db, &user.user_id).await?;
     Ok(Json(Me {
         user_id: user.user_id,
         email: user.email,
         memberships,
+        is_superadmin,
     }))
 }
 

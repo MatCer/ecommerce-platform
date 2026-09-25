@@ -1,0 +1,7 @@
+{{ t("bank_transfer.heading") }}
+{{ t("bank_transfer.account") }}: {{ bank.iban }}{% if bank.bic %} ({{ bank.bic }}){% endif %}
+{{ t("bank_transfer.account_name") }}: {{ bank.account_name }}
+{{ t("bank_transfer.variable_symbol") }}: {{ bank.variable_symbol }}
+{{ t("bank_transfer.amount") }}: {{ bank.amount }}
+{{ t("bank_transfer.message") }}: {{ bank.message }}{% if bank.due %}
+{{ t("bank_transfer.due") }}: {{ bank.due }}{% endif %}

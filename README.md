@@ -67,6 +67,25 @@ after the method's payment window (fake: 60 min) and release their stock.
 AI helpers (WP22) use the Anthropic API when `ANTHROPIC_API_KEY` is set in `.env`; without it
 the admin runs them against a deterministic fake provider ("Demo AI"). Quotas, the threat model
 and a manual smoke test with a real key: [`docs/decisions/ai-helpers.md`](docs/decisions/ai-helpers.md).
+
+Payment adapters (WP11):
+- **Stripe**: without `STRIPE_SECRET_KEY` the API talks to stripe-mock and the order page shows
+  a "Stripe – testovací simulátor" box whose buttons make the API sign a Stripe-shaped event with
+  `STRIPE_WEBHOOK_SECRET` and receive it through the real webhook path (`POST
+  api.localhost/webhooks/stripe` → `platform.provider_events` → worker). `make seed` onboards the
+  demo shop through the same path. With a real **test** key (`STRIPE_SECRET_KEY=sk_test_…`,
+  `STRIPE_PUBLISHABLE_KEY`, and the Connect webhook secret from
+  `stripe listen --forward-connect-to http://api.localhost:8080/webhooks/stripe`) the admin's
+  "Connect Stripe" opens Stripe-hosted onboarding and the order page mounts the real Payment
+  Element.
+- **Bank transfer**: the demo markets have receiving accounts; the order page and email show the
+  variable symbol (= order number) with a SPAYD (CZK) or PAY by square (EUR) QR code. Pay an
+  order by uploading a statement (camt.053, Fio CSV, GPC) under Admin → Bank transactions, or
+  set a Fio API token on the account (the worker polls `FIO_API_URL`; locally the mock, where
+  `POST mocks:4010/fio/_transactions` adds incoming payments). Unmatched, short or excess
+  payments wait under Admin → Payment exceptions. Reminders go out on day 3 and 6.
+- **Cash on delivery**: the order detail records delivered → collected (tender, collector; cash
+  is rounded) → remitted; `POST /admin/v1/cod-reports` takes a carrier CSV.
 | https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
 First run of the demo shop: `make up && make seed && make theme-build`. The seed owner

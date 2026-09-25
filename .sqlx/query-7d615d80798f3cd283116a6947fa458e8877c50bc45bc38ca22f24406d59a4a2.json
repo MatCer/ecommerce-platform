@@ -1,0 +1,260 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.id, t.bank_account_id, t.bank_tx_id, t.booked_on, t.amount_minor, t.currency,\n                t.variable_symbol, t.counterparty, t.counterparty_name, t.message, t.source,\n                t.status, t.reason, t.note, t.resolved_by, t.resolved_at, t.created_at,\n                a.order_id AS \"order_id?\", o.number AS \"number?\",\n                a.amount_minor AS \"expected_minor?\"\n         FROM bank_transactions t\n         LEFT JOIN payment_attempts a ON a.id = t.attempt_id\n         LEFT JOIN orders o ON o.id = a.order_id\n         WHERE ($1::text IS NULL OR t.status = $1)\n           AND (NOT $2 OR t.status IN ('unmatched', 'partial', 'overpaid'))\n           AND ($3::uuid IS NULL OR t.bank_account_id = $3)\n           AND ($4::uuid IS NULL OR t.id < $4)\n         ORDER BY t.id DESC LIMIT $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "bank_account_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "bank_account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "bank_tx_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "bank_tx_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "booked_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "booked_on"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "variable_symbol",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "variable_symbol"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "counterparty",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "counterparty"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "counterparty_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "counterparty_name"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "message",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "message"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "resolved_by",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "resolved_by"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "resolved_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "resolved_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "order_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "number?",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "expected_minor?",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "amount_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bool",
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7d615d80798f3cd283116a6947fa458e8877c50bc45bc38ca22f24406d59a4a2"
+}

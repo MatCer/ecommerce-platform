@@ -1,0 +1,8 @@
+{% extends "order.txt" %}
+{% block heading %}{{ t("payment_reminder.heading", number=order.number) }}{% endblock %}
+{% block intro %}{{ t("payment_reminder.intro", shop=brand.shop_name) }}
+{% endblock %}
+{% block after_summary %}{% if bank %}
+{% include "bank_transfer.txt" %}{% endif %}
+{{ t("payment_reminder.cancel_note") }}
+{% endblock %}

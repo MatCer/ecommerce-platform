@@ -4,12 +4,14 @@
 pub mod ai;
 pub mod auth_service;
 pub mod config;
+pub mod crypto;
 pub mod db;
 pub mod edge;
 pub mod error;
 pub mod health;
 pub mod http;
 pub mod mail;
+pub mod metrics;
 pub mod queue;
 pub mod shutdown;
 pub mod storage;

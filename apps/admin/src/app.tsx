@@ -34,10 +34,14 @@ const ExportFeeds = lazy(() => import("./pages/ExportFeeds.tsx"));
 const SearchSynonyms = lazy(() => import("./pages/SearchSynonyms.tsx"));
 const ShippingMethods = lazy(() => import("./pages/ShippingMethods.tsx"));
 const PaymentMethods = lazy(() => import("./pages/PaymentMethods.tsx"));
+const PaymentExceptions = lazy(() => import("./pages/PaymentExceptions.tsx"));
+const BankTransactions = lazy(() => import("./pages/BankTransactions.tsx"));
 const Orders = lazy(() => import("./pages/Orders.tsx"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
 const AiBulkEdit = lazy(() => import("./pages/AiBulkEdit.tsx"));
 const AiSettings = lazy(() => import("./pages/AiSettings.tsx"));
+const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
+const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -105,11 +109,15 @@ export function App() {
           <Route path="/settings/ai" component={AiSettings} />
           <Route path="/orders" component={Orders} />
           <Route path="/orders/:id" component={OrderDetail} />
+          <Route path="/payments/exceptions" component={PaymentExceptions} />
+          <Route path="/payments/bank" component={BankTransactions} />
           <Route path="/settings/shipping" component={ShippingMethods} />
           <Route path="/settings/payments" component={PaymentMethods} />
           <Route path="/settings/tax" component={TaxProfile} />
           <Route path="/staff" component={Staff} />
           <Route path="/audit-log" component={AuditLog} />
+          <Route path="/settings/webhooks" component={Webhooks} />
+          <Route path="/platform/jobs" component={PlatformJobs} />
           <Route path="/account/security" component={Security} />
           <Route path="*" component={NotFound} />
         </Route>

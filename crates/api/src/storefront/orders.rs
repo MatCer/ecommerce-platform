@@ -6,6 +6,7 @@
 //! and forwards both.
 
 use axum::Json;
+use axum::body::Bytes;
 use axum::extract::rejection::PathRejection;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -13,10 +14,11 @@ use axum::response::{IntoResponse, Response};
 use commerce::checkout;
 use commerce::customers;
 use commerce::orders::{self, OrderView, PaymentView};
-use commerce::payments;
+use commerce::payments::{self, Outcome, stripe};
 use platform::Error;
 use platform::db::TenantTx;
-use utoipa::IntoParams;
+use serde::Deserialize;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
@@ -25,6 +27,7 @@ use super::checkout::{PaymentStart, start_payment};
 use super::customer::{SESSION_HEADER, header_str, no_store};
 use super::{CART_HEADER, Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
+use crate::admin::parse_json;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -32,6 +35,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(get_payment))
         .routes(routes!(new_attempt))
         .routes(routes!(init_attempt))
+        .routes(routes!(simulate_attempt))
 }
 
 /// What proves the right to pay (documentation only).
@@ -211,4 +215,69 @@ async fn init_attempt(
         })
         .into_response(),
     ))
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SimulateInput {
+    pub outcome: Outcome,
+}
+
+/// The "Stripe test simulator" (local mode without a real Stripe key; `404` otherwise): makes
+/// the API sign a Stripe-shaped `payment_intent.succeeded` / `payment_intent.payment_failed`
+/// event with the webhook secret and receive it like Stripe's, so verification, storage and
+/// asynchronous processing run for real. Needs the right to pay. Answers `202` with the
+/// payment as it is now; the order page polls until the event is processed.
+#[utoipa::path(
+    post,
+    path = "/storefront/v1/orders/{token}/payment-attempts/{attempt}/simulate",
+    tag = "storefront",
+    params(
+        StorefrontHeaders,
+        PayerHeaders,
+        ("token" = String, Path, description = "Order capability token"),
+        ("attempt" = Uuid, Path),
+    ),
+    request_body = SimulateInput,
+    responses(
+        (status = 202, body = PaymentView),
+        (status = 403, description = "payment_not_allowed", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "attempt_not_initialized", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn simulate_attempt(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<(String, Uuid)>, PathRejection>,
+    body: Bytes,
+) -> Result<Response, Error> {
+    let Path((t, attempt)) = path.map_err(|_| Error::NotFound)?;
+    let input: SimulateInput = parse_json(&body)?;
+    let stripe = s
+        .checkout
+        .payments
+        .stripe
+        .as_ref()
+        .filter(|s| s.simulator())
+        .ok_or(Error::NotFound)?;
+    with_ctx(&s, &shopper, async |tx, _| {
+        let order = orders::by_token(tx, &t).await?;
+        let a = payments::attempt(tx, attempt).await?;
+        if a.order_id != order || a.method != payments::MethodKind::Stripe {
+            return Err(Error::NotFound);
+        }
+        if !may_pay(tx, &headers, order).await? {
+            return Err(not_allowed());
+        }
+        Ok(())
+    })
+    .await?;
+    stripe::simulate_payment(&s.db, stripe, shopper.tenant_id, attempt, input.outcome).await?;
+    let view = with_ctx(&s, &shopper, async |tx, _| {
+        Ok(read(tx, &headers, &t).await?.payment)
+    })
+    .await?;
+    Ok(no_store((StatusCode::ACCEPTED, Json(view)).into_response()))
 }

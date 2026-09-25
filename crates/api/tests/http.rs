@@ -39,6 +39,38 @@ fn state(db: PgPool) -> AppState {
         edge: api::edge::EdgePurge::disabled(),
         checkout: Default::default(),
         ai: commerce::ai::Ai::fake(),
+        webhooks: None,
+        rate_limit: std::sync::Arc::new(api::rate_limit::StorefrontLimiter::new(1, 1)),
+    }
+}
+
+#[tokio::test]
+async fn storefront_calls_are_rate_limited_per_token_and_ip() {
+    let app = api::app(state(dead_db()), false);
+    let call = |ip: &str| {
+        Request::get("/storefront/v1/shop")
+            .header("x-storefront-token", "sf_test")
+            .header("x-client-ip", ip)
+            .body(Body::empty())
+            .unwrap()
+    };
+    let first = send(app.clone(), call("203.0.113.7")).await;
+    assert_ne!(first.status(), StatusCode::TOO_MANY_REQUESTS);
+    let second = send(app.clone(), call("203.0.113.7")).await;
+    assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(second.headers()["content-type"], "application/problem+json");
+    let retry: u64 = second.headers()["retry-after"]
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert!((1..=2).contains(&retry));
+    assert_eq!(json(second).await["code"], "rate_limited");
+    // Another client IP has its own bucket; other routes are not limited.
+    let other = send(app.clone(), call("198.51.100.9")).await;
+    assert_ne!(other.status(), StatusCode::TOO_MANY_REQUESTS);
+    for _ in 0..3 {
+        assert_eq!(get(app.clone(), "/healthz").await.status(), StatusCode::OK);
     }
 }
 

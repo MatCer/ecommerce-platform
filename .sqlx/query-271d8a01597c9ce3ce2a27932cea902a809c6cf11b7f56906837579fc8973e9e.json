@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bank_accounts SET fio_token = $2, fio_synced_at = NULL WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "271d8a01597c9ce3ce2a27932cea902a809c6cf11b7f56906837579fc8973e9e"
+}

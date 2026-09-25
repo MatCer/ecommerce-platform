@@ -35,6 +35,9 @@ pub const TOKEN_DAYS: i64 = 90;
 pub const CREATED_EVENT: &str = "order.created";
 pub const PAID_EVENT: &str = "order.paid";
 pub const CANCELLED_EVENT: &str = "order.cancelled";
+/// Published by fulfillment (WP12) and refunds (WP11/12); webhooks already offer them.
+pub const SHIPPED_EVENT: &str = "order.shipped";
+pub const REFUNDED_EVENT: &str = "order.refunded";
 /// A10: money arrived for an expired/cancelled order; a refund task for WP11/12.
 pub const EXCEPTION_EVENT: &str = "order.exception";
 
@@ -194,8 +197,17 @@ pub(crate) async fn apply_payment(
 pub(crate) async fn payment_succeeded(
     tx: &mut TenantTx,
     o: &mut OrderRow,
+    attempt_id: Uuid,
     actor: &str,
 ) -> Result<(), Error> {
+    // The payment the order keeps; refunds of any other attempt return extra money (A10).
+    sqlx::query!(
+        "UPDATE orders SET paid_attempt_id = $2 WHERE id = $1 AND paid_attempt_id IS NULL",
+        o.id,
+        attempt_id
+    )
+    .execute(&mut **tx)
+    .await?;
     let events = apply_payment(tx, o, PaymentCommand::Succeed, actor).await?;
     if events.contains(&PaymentEvent::LatePayment) {
         return flag_exception(tx, o, "late_payment", actor).await;
@@ -217,7 +229,9 @@ pub(crate) async fn flag_exception(
     actor: &str,
 ) -> Result<(), Error> {
     sqlx::query!(
-        "UPDATE orders SET exception = $2, updated_at = now() WHERE id = $1",
+        "UPDATE orders SET exception = $2, exception_resolved_at = NULL, exception_note = NULL,
+             updated_at = now()
+         WHERE id = $1",
         o.id,
         exception
     )
@@ -232,6 +246,56 @@ pub(crate) async fn flag_exception(
     )
     .await?;
     platform::queue::publish(&mut **tx, EXCEPTION_EVENT, &publish_payload(o)).await?;
+    Ok(())
+}
+
+/// A person settled an order's exception (refunded the money, or decided to keep it and ship):
+/// it leaves the refund work list (audited). `409 no_open_exception` otherwise.
+pub async fn resolve_exception(
+    tx: &mut TenantTx,
+    actor: &str,
+    order_id: Uuid,
+    note: &str,
+) -> Result<(), Error> {
+    let note = note.trim();
+    if note.is_empty() || note.chars().count() > 500 {
+        return Err(crate::markets::invalid(
+            "invalid_resolution",
+            "a note of 1-500 characters is required",
+        ));
+    }
+    let o = lock(tx, order_id).await?;
+    let open = sqlx::query_scalar!(
+        "SELECT exception FROM orders WHERE id = $1 AND exception IS NOT NULL
+             AND exception_resolved_at IS NULL",
+        o.id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .flatten()
+    .ok_or_else(|| Error::Conflict {
+        code: "no_open_exception",
+        detail: "the order has no open exception".into(),
+    })?;
+    sqlx::query!(
+        "UPDATE orders SET exception_resolved_at = now(), exception_note = $2, updated_at = now()
+         WHERE id = $1",
+        o.id,
+        note
+    )
+    .execute(&mut **tx)
+    .await?;
+    let data = json!({ "exception": open, "note": note });
+    event(tx, o.id, "exception_resolved", &data, actor).await?;
+    crate::audit::record(
+        tx,
+        actor,
+        "order.exception_resolved",
+        "order",
+        Some(&o.id.to_string()),
+        &data,
+    )
+    .await?;
     Ok(())
 }
 
@@ -404,6 +468,8 @@ pub struct PaymentView {
     pub can_pay: bool,
     /// Unpaid orders are cancelled after this.
     pub expires_at: Option<DateTime<Utc>>,
+    /// Bank transfer: account, variable symbol, amount and the QR code (A25).
+    pub bank_transfer: Option<payments::bank::BankTransferView>,
 }
 
 /// An order as its customer sees it (`/o/<token>`, the account).
@@ -545,6 +611,20 @@ pub async fn view(tx: &mut TenantTx, id: Uuid) -> Result<OrderView, Error> {
     let status: OrderStatus = stored(&o.status)?;
     let payment_status: PaymentStatus = stored(&o.payment_status)?;
     let latest = payments::attempts(tx, id).await?.pop();
+    let bank_transfer = match latest
+        .as_ref()
+        .filter(|a| a.method == MethodKind::BankTransfer)
+    {
+        Some(a) => sqlx::query_scalar!(
+            "SELECT instructions FROM payment_attempts WHERE id = $1",
+            a.id
+        )
+        .fetch_one(&mut **tx)
+        .await?
+        .map(|i| payments::bank::view(&i, locale))
+        .transpose()?,
+        None => None,
+    };
     let can_retry = status == OrderStatus::Pending
         && !method.is_cod()
         && matches!(
@@ -603,6 +683,7 @@ pub async fn view(tx: &mut TenantTx, id: Uuid) -> Result<OrderView, Error> {
             can_retry,
             can_pay: true,
             expires_at: o.payment_expires_at,
+            bank_transfer,
         },
         notes: o.notes,
     })
@@ -635,7 +716,8 @@ pub struct OrderPage {
 pub struct OrderFilter {
     pub customer_id: Option<Uuid>,
     pub status: Option<OrderStatus>,
-    /// Only orders with an exception (`late_payment`, `duplicate_payment`): the refund work list.
+    /// Only orders with an unresolved exception (`late_payment`, `duplicate_payment`): the
+    /// refund work list.
     pub exception: bool,
 }
 
@@ -654,7 +736,7 @@ pub async fn list(
          WHERE ($1::uuid IS NULL OR customer_id = $1)
            AND ($2::text IS NULL OR status = $2)
            AND ($3::uuid IS NULL OR id < $3)
-           AND (NOT $5 OR exception IS NOT NULL)
+           AND (NOT $5 OR (exception IS NOT NULL AND exception_resolved_at IS NULL))
          ORDER BY id DESC
          LIMIT $4",
         filter.customer_id,
@@ -709,6 +791,9 @@ pub struct OrderEventView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AdminOrder {
     pub order: OrderView,
+    /// When a person settled the exception (it then leaves the work list), and how.
+    pub exception_resolved_at: Option<DateTime<Utc>>,
+    pub exception_note: Option<String>,
     pub customer_id: Option<Uuid>,
     pub market_id: Uuid,
     pub ship_to_country: String,
@@ -719,7 +804,8 @@ pub struct AdminOrder {
 pub async fn admin_detail(tx: &mut TenantTx, id: Uuid) -> Result<AdminOrder, Error> {
     let order = view(tx, id).await?;
     let o = sqlx::query!(
-        "SELECT customer_id, market_id, ship_to_country FROM orders WHERE id = $1",
+        "SELECT customer_id, market_id, ship_to_country, exception_resolved_at, exception_note
+         FROM orders WHERE id = $1",
         id
     )
     .fetch_one(&mut **tx)
@@ -733,6 +819,8 @@ pub async fn admin_detail(tx: &mut TenantTx, id: Uuid) -> Result<AdminOrder, Err
     .await?;
     Ok(AdminOrder {
         order,
+        exception_resolved_at: o.exception_resolved_at,
+        exception_note: o.exception_note,
         customer_id: o.customer_id,
         market_id: o.market_id,
         ship_to_country: o.ship_to_country,

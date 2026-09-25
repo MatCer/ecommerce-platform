@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
+import { fioRoutes } from "./fio.ts";
 import { packetaRoutes } from "./packeta.ts";
+import { webhookRoutes } from "./webhooks.ts";
 
 /**
  * Local stand-ins for third-party APIs (Packeta, PPL, ČNB, bank, ad platforms, DNS).
@@ -11,6 +13,8 @@ export const app = new Hono();
 app.get("/healthz", (c) => c.json({ status: "ok" }));
 
 packetaRoutes(app);
+fioRoutes(app);
+webhookRoutes(app);
 
 /**
  * DNS TXT stub for custom-domain verification (spec A29). Tests and operators publish records

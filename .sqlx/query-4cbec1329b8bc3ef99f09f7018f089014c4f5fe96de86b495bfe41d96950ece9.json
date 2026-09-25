@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT instructions FROM payment_attempts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "instructions",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "instructions"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "4cbec1329b8bc3ef99f09f7018f089014c4f5fe96de86b495bfe41d96950ece9"
+}

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT application_fee_bps FROM platform.tenants WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "application_fee_bps",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "platform.tenants",
+            "name": "application_fee_bps"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "27c6fc82d784fec90ccf92ca153bab31dca09aaf697e80765e2f07f3797a27e1"
+}

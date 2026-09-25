@@ -2735,7 +2735,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events\nand server counters (A20).",
+        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nAlways `202`, so the answer does not reveal the consent state.",
         "operationId": "events",
         "parameters": [
           {
@@ -2761,6 +2761,42 @@
             "name": "X-Locale",
             "in": "header",
             "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous subject id from the consent cookie (32 hex characters).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Checkout origin only: the signed-in customer's session.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (stored as a salted hash with the record).",
             "required": false,
             "schema": {
               "type": [
@@ -3411,6 +3447,140 @@
           },
           "409": {
             "description": "attempt_not_pending | payment_window_closed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/simulate": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The \"Stripe test simulator\" (local mode without a real Stripe key; `404` otherwise): makes\nthe API sign a Stripe-shaped `payment_intent.succeeded` / `payment_intent.payment_failed`\nevent with the webhook secret and receive it like Stripe's, so verification, storage and\nasynchronous processing run for real. Needs the right to pay. Answers `202` with the\npayment as it is now; the order page polls until the event is processed.",
+        "operationId": "simulate_attempt",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "attempt_not_initialized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4618,6 +4788,58 @@
           "sale",
           "new"
         ]
+      },
+      "BankTransferView": {
+        "type": "object",
+        "description": "The payment instructions of a bank-transfer order, as the customer sees them.",
+        "required": [
+          "iban",
+          "account_name",
+          "variable_symbol",
+          "amount",
+          "message"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "iban": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "qr_kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QrKind",
+                "description": "`spayd` (CZK) or `pay_by_square` (EUR); `null` when the currency has no QR standard."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qr_svg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The QR code as an inline SVG element (server-generated; contains no script)."
+          },
+          "variable_symbol": {
+            "type": "string"
+          }
+        }
       },
       "BlockView": {
         "oneOf": [
@@ -6267,7 +6489,7 @@
           },
           {
             "type": "object",
-            "description": "Nothing to pay now (cash on delivery).",
+            "description": "Nothing to pay online now: cash on delivery, or a bank transfer (the order page shows\nthe instructions and the QR code).",
             "required": [
               "type"
             ],
@@ -6276,6 +6498,48 @@
                 "type": "string",
                 "enum": [
                   "none"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Stripe's Payment Element on the order page (loaded only for this action): the intent\nlives on the shop's connected account.",
+            "required": [
+              "publishable_key",
+              "account_id",
+              "client_secret",
+              "type"
+            ],
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "client_secret": {
+                "type": "string"
+              },
+              "publishable_key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stripe"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Local mode: no real Stripe key. The order page offers the \"Stripe test simulator\",\nwhose buttons make the API emit signed webhook events.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stripe_simulator"
                 ]
               }
             }
@@ -6870,6 +7134,17 @@
               }
             ]
           },
+          "bank_transfer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BankTransferView",
+                "description": "Bank transfer: account, variable symbol, amount and the QR code (A25)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "can_pay": {
             "type": "boolean",
             "description": "Whether this viewer may start or continue payments: the order token alone is read-only\n(A4); the browser that placed the order or its signed-in customer may pay."
@@ -7295,6 +7570,13 @@
         },
         "additionalProperties": false
       },
+      "QrKind": {
+        "type": "string",
+        "enum": [
+          "spayd",
+          "pay_by_square"
+        ]
+      },
       "Recommendations": {
         "type": "object",
         "required": [
@@ -7702,6 +7984,18 @@
             "description": "Relative path on the checkout origin to continue to."
           }
         }
+      },
+      "SimulateInput": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          }
+        },
+        "additionalProperties": false
       },
       "Sort": {
         "type": "string",

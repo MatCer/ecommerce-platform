@@ -156,6 +156,14 @@ export function fakeApi() {
       });
     if (p === "/pages/product/private")
       return Response.json({ cache: { public: false, max_age: 0, tags: [] } });
+    if (p === "/pages/product/limited")
+      return Response.json(
+        { code: "rate_limited", status: 429 },
+        {
+          status: 429,
+          headers: { "content-type": "application/problem+json", "retry-after": "7" },
+        },
+      );
     if (p === "/pages/product/short")
       return Response.json({ cache: { public: true, max_age: 5, tags: ["product:short"] } });
     if (p === "/cart" && req.method === "POST") {

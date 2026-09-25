@@ -91,6 +91,24 @@ pub enum AdminCommand {
         #[arg(long)]
         checkout: Option<String>,
     },
+    /// Queue a full search rebuild (index swap) for every tenant, or one (`--tenant <slug>`),
+    /// e.g. after a restore (Meilisearch is not backed up; A27, A29).
+    Reindex {
+        #[arg(long)]
+        tenant: Option<String>,
+    },
+    /// List dead jobs (newest first; spec §13).
+    DeadJobs {
+        #[arg(long)]
+        kind: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: i32,
+    },
+    /// Put a dead job back in the queue with fresh attempts.
+    RequeueJob {
+        #[arg(long)]
+        id: i64,
+    },
 }
 
 /// Settings only the CLI needs (read when a command runs).
@@ -136,6 +154,21 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
     if let AdminCommand::SetAiQuota { tenant, tokens } = &cmd {
         return set_ai_quota(db, tenant, *tokens).await;
     }
+    match &cmd {
+        AdminCommand::Reindex { tenant } => return reindex(db, tenant.as_deref()).await,
+        AdminCommand::DeadJobs { kind, limit } => {
+            let jobs =
+                platform::queue::list(db, Some("dead"), kind.as_deref(), None, *limit).await?;
+            return print_json(&serde_json::to_value(jobs)?);
+        }
+        AdminCommand::RequeueJob { id } => {
+            if !platform::queue::requeue(db, *id).await? {
+                bail!("job {id} is not dead");
+            }
+            return print_json(&json!({ "requeued": id }));
+        }
+        _ => {}
+    }
     let env = CliEnv::load()?;
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -157,6 +190,9 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
         AdminCommand::SeedDemo { owner_email } => seed_demo(db, &env, &owner_email).await,
         AdminCommand::PublishArtifacts { .. }
         | AdminCommand::SuppressEmail { .. }
+        | AdminCommand::Reindex { .. }
+        | AdminCommand::DeadJobs { .. }
+        | AdminCommand::RequeueJob { .. }
         | AdminCommand::SetAiQuota { .. } => Ok(()),
         AdminCommand::AddDomain {
             tenant,
@@ -431,6 +467,27 @@ async fn txt_records(http: &reqwest::Client, url: &Url, name: &str) -> anyhow::R
         .json()
         .await?;
     Ok(answer.records)
+}
+
+async fn reindex(db: &PgPool, tenant: Option<&str>) -> anyhow::Result<()> {
+    let tenants: Vec<(uuid::Uuid, String)> =
+        sqlx::query_as("SELECT id, slug FROM platform.tenants WHERE $1::text IS NULL OR slug = $1")
+            .bind(tenant)
+            .fetch_all(db)
+            .await?;
+    if tenants.is_empty() {
+        bail!("no such tenant");
+    }
+    let mut queued = Vec::new();
+    for (id, slug) in tenants {
+        let mut tx = platform::db::tenant_tx(db, id).await?;
+        let version = commerce::search::next_version(&mut *tx).await?;
+        let job = commerce::search::manual_rebuild_job(id, version);
+        let job_id = platform::queue::enqueue(&mut *tx, &job).await?;
+        tx.commit().await?;
+        queued.push(json!({ "tenant": slug, "job_id": job_id }));
+    }
+    print_json(&json!({ "queued": queued }))
 }
 
 fn print_json(value: &serde_json::Value) -> anyhow::Result<()> {

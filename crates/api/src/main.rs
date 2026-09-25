@@ -5,8 +5,8 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig,
-    StaffAuthConfig, StorefrontConfig,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, OpsConfig, PaymentsConfig, S3Config,
+    ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
@@ -65,8 +65,12 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-/// Payment gateways and the pickup-point widget from `CheckoutConfig`.
-fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
+/// Payment gateways and the pickup-point widget from `CheckoutConfig` and `PaymentsConfig`.
+fn checkout_settings(
+    c: &CheckoutConfig,
+    p: &PaymentsConfig,
+    ops: &OpsConfig,
+) -> anyhow::Result<commerce::checkout::Settings> {
     let fake = c.payments_fake.then(|| {
         tracing::warn!("PAYMENTS_FAKE=1: the fake payment gateway is enabled (local/e2e only)");
         let secret = c
@@ -86,10 +90,37 @@ fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
             None
         }
     };
-    commerce::checkout::Settings {
-        payments: commerce::payments::Payments { fake },
-        packeta,
+    let stripe = match &p.stripe {
+        Some(cfg) => {
+            if cfg.mode == platform::config::StripeMode::Simulator {
+                tracing::warn!(
+                    "no STRIPE_SECRET_KEY: Stripe runs against stripe-mock with the test simulator"
+                );
+            }
+            let http = reqwest::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .build()?;
+            Some(commerce::payments::stripe::Stripe::new(cfg, http))
+        }
+        None => {
+            tracing::warn!("Stripe is not configured (STRIPE_SECRET_KEY or STRIPE_MOCK_URL)");
+            None
+        }
+    };
+    let secrets = ops
+        .secrets_key
+        .map(|k| Arc::new(platform::crypto::SecretBox::new(&k)));
+    if secrets.is_none() {
+        tracing::warn!("SECRETS_KEY not set: Fio API tokens cannot be stored");
     }
+    Ok(commerce::checkout::Settings {
+        payments: commerce::payments::Payments {
+            fake,
+            stripe,
+            secrets,
+        },
+        packeta,
+    })
 }
 
 /// AI helpers from `AiConfig` (Anthropic with a key, else the fake provider; off in prod).
@@ -107,9 +138,23 @@ fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
 
+/// Webhook secrets + the SSRF-safe client (A21); `None` without `SECRETS_KEY`.
+fn webhooks(ops: &OpsConfig, env: AppEnv) -> anyhow::Result<Option<commerce::webhooks::Webhooks>> {
+    let Some(key) = ops.secrets_key else {
+        tracing::warn!("SECRETS_KEY not set: webhook subscriptions answer 503");
+        return Ok(None);
+    };
+    Ok(Some(commerce::webhooks::Webhooks {
+        secrets: platform::crypto::SecretBox::new(&key),
+        http: platform::http::SafeClient::from_env()?,
+        require_https: env == AppEnv::Prod,
+    }))
+}
+
 async fn serve() -> anyhow::Result<()> {
     init_tracing()?;
     let cfg = ApiConfig::from_env()?;
+    let ops = OpsConfig::from_env()?;
     let auth = StaffAuthConfig::from_env()?;
     let sf = StorefrontConfig::from_env()?;
     let db = platform::db::pool(&DbConfig::from_env()?)?;
@@ -144,9 +189,35 @@ async fn serve() -> anyhow::Result<()> {
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
-        checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
+        checkout: Arc::new(checkout_settings(
+            &CheckoutConfig::from_env(cfg.env)?,
+            &PaymentsConfig::from_env(cfg.env)?,
+            &ops,
+        )?),
+        webhooks: webhooks(&ops, cfg.env)?,
+        rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
+            ops.storefront_rate_per_second,
+            ops.storefront_rate_burst,
+        )),
         ai: ai_helpers()?,
     };
+    let limiter = state.rate_limit.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            limiter.prune();
+        }
+    });
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    if let Some(bind) = ops.metrics_bind {
+        let handle = platform::metrics::install().map_err(|e| anyhow!(e))?;
+        let shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            if let Err(e) = platform::metrics::serve(bind, handle, shutdown).await {
+                tracing::error!(error = %e, "metrics listener failed");
+            }
+        });
+    }
     let app = api::app(state, cfg.env == AppEnv::Dev);
 
     let listener = tokio::net::TcpListener::bind(cfg.bind)
@@ -154,7 +225,10 @@ async fn serve() -> anyhow::Result<()> {
         .with_context(|| format!("bind {}", cfg.bind))?;
     tracing::info!(addr = %cfg.bind, env = ?cfg.env, "api listening");
     axum::serve(listener, app)
-        .with_graceful_shutdown(platform::shutdown::signal())
+        .with_graceful_shutdown(async move {
+            platform::shutdown::signal().await;
+            let _ = stop.send(true);
+        })
         .await?;
     db.close().await;
     tracing::info!("api stopped");

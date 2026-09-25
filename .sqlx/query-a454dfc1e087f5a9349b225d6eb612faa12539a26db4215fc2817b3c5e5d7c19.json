@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO analytics_counters (tenant_id, market_id, day, template, requests)\n                 VALUES ($1, $2, $3, $4, $5)\n                 ON CONFLICT (tenant_id, market_id, day, template)\n                 DO UPDATE SET requests = analytics_counters.requests + EXCLUDED.requests",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a454dfc1e087f5a9349b225d6eb612faa12539a26db4215fc2817b3c5e5d7c19"
+}

@@ -15,6 +15,7 @@ MEILI_PORT ?= 57700
 MEILI_SEARCH_KEY ?= 2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918
 MEILI_ADMIN_KEY ?= 39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6
 HTTPS_PORT ?= 8443
+STRIPE_MOCK_PORT ?= 12111
 APP_OWNER_PASSWORD ?= app-owner-local
 OWNER_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/app
 TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/app_test
@@ -22,7 +23,7 @@ TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_P
 COMPOSE_FULL := COMPOSE_PROFILES=full docker compose
 COMPOSE_INFRA := COMPOSE_PROFILES=infra docker compose
 
-.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin seed logs ps theme-build perf e2e
+.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin seed logs ps theme-build perf e2e backup restore backup-drill
 
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -45,7 +46,8 @@ sqlx-prepare: ## Refresh .sqlx/ (offline query data) after SQL changes; needs `m
 test: test-rust test-ts ## Rust + TS tests (Rust integration tests need `make dev-infra`)
 
 test-rust:
-	DATABASE_URL="$(TEST_DATABASE_URL)" cargo test --workspace --locked
+	DATABASE_URL="$(TEST_DATABASE_URL)" STRIPE_MOCK_URL="http://localhost:$(STRIPE_MOCK_PORT)" \
+	cargo test --workspace --locked
 
 test-ts:
 	pnpm test
@@ -94,6 +96,15 @@ theme-build: ## Build + pack the default theme and checkout (A22), upload + publ
 	$(COMPOSE_FULL) run --rm --no-deps -v "$(CURDIR)/.artifacts:/artifacts:ro" api \
 		/usr/local/bin/api admin publish-artifacts --root /artifacts \
 		--theme "$$(cat .artifacts/channels/default-theme)" --checkout "$$(cat .artifacts/channels/checkout)"
+
+backup: ## Dump Postgres + mirror the MinIO buckets to backups/<UTC timestamp>/ (runbook §7)
+	scripts/backup.sh
+
+restore: ## Restore a backup into the running stack: make restore BACKUP=backups/<ts>
+	scripts/restore.sh "$(BACKUP)"
+
+backup-drill: ## A29 drill: backup, wipe volumes, make up, restore, verify (needs DRILL_CONFIRM=destroy)
+	scripts/backup-drill.sh
 
 e2e: ## Playwright suites against the running stack (`make up` first; at most 4 workers)
 	HTTP_PORT=$(or $(HTTP_PORT),8080) pnpm --filter @platform/e2e exec playwright test $(args)

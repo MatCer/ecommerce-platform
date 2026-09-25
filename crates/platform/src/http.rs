@@ -61,6 +61,9 @@ pub struct Fetched {
 #[derive(Clone)]
 pub struct SafeClient {
     http: reqwest::Client,
+    /// Same resolver, no redirects: a POST (webhook) must not be re-sent to another URL,
+    /// e.g. downgraded to plain http.
+    http_no_redirect: reqwest::Client,
     allow_hosts: Arc<BTreeSet<String>>,
 }
 
@@ -147,25 +150,33 @@ impl SafeClient {
                 .collect(),
         );
         let redirect_hosts = allow_hosts.clone();
-        let http = reqwest::Client::builder()
-            .no_proxy()
-            .dns_resolver(Arc::new(PublicResolver {
-                allow_hosts: allow_hosts.clone(),
-            }))
-            .redirect(redirect::Policy::custom(move |attempt| {
-                if attempt.previous().len() > MAX_REDIRECTS {
-                    attempt.error(FetchError::Request("too many redirects".into()))
-                } else if let Err(e) = check_url(attempt.url(), &redirect_hosts) {
-                    attempt.error(e)
-                } else {
-                    attempt.follow()
-                }
-            }))
-            .connect_timeout(Duration::from_secs(5))
-            .user_agent("commerce-platform-fetch/1")
-            .build()
-            .map_err(|e| FetchError::Request(e.to_string()))?;
-        Ok(Self { http, allow_hosts })
+        let build = |policy: redirect::Policy| {
+            reqwest::Client::builder()
+                .no_proxy()
+                .dns_resolver(Arc::new(PublicResolver {
+                    allow_hosts: allow_hosts.clone(),
+                }))
+                .redirect(policy)
+                .connect_timeout(Duration::from_secs(5))
+                .user_agent("commerce-platform-fetch/1")
+                .build()
+                .map_err(|e| FetchError::Request(e.to_string()))
+        };
+        let http = build(redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() > MAX_REDIRECTS {
+                attempt.error(FetchError::Request("too many redirects".into()))
+            } else if let Err(e) = check_url(attempt.url(), &redirect_hosts) {
+                attempt.error(e)
+            } else {
+                attempt.follow()
+            }
+        }))?;
+        let http_no_redirect = build(redirect::Policy::none())?;
+        Ok(Self {
+            http,
+            http_no_redirect,
+            allow_hosts,
+        })
     }
 
     /// `SAFE_FETCH_ALLOW_HOSTS` (comma-separated), honored only with `APP_ENV=dev`: the local
@@ -178,6 +189,43 @@ impl SafeClient {
             return Self::new(Vec::<String>::new());
         }
         Self::new(hosts.split(',').map(str::to_owned).collect::<Vec<_>>())
+    }
+
+    /// Checks a URL's form without sending anything (scheme, no credentials, IP literals).
+    pub fn check(&self, url: &str) -> Result<Url, FetchError> {
+        let url = Url::parse(url).map_err(|_| FetchError::InvalidUrl)?;
+        check_url(&url, &self.allow_hosts)?;
+        Ok(url)
+    }
+
+    /// POSTs `body` with `headers` (webhooks, §8.5) within `limits`. Any HTTP status is an
+    /// answer, not an error (a redirect included: it is not followed, so a signed payload is
+    /// never re-sent elsewhere); the response body is read up to the cap and dropped.
+    pub async fn post(
+        &self,
+        url: &str,
+        headers: reqwest::header::HeaderMap,
+        body: Vec<u8>,
+        limits: Limits,
+    ) -> Result<u16, FetchError> {
+        let url = self.check(url)?;
+        let mut res = self
+            .http_no_redirect
+            .post(url)
+            .headers(headers)
+            .body(body)
+            .timeout(limits.timeout)
+            .send()
+            .await
+            .map_err(request_error)?;
+        let mut read = 0u64;
+        while let Some(chunk) = res.chunk().await.map_err(request_error)? {
+            read += chunk.len() as u64;
+            if read > limits.max_bytes {
+                return Err(FetchError::TooLarge(limits.max_bytes));
+            }
+        }
+        Ok(res.status().as_u16())
     }
 
     /// GETs `url` within `limits`. Non-2xx answers are errors.
@@ -328,5 +376,47 @@ mod tests {
         ] {
             assert!(check(bad).is_err(), "{bad}");
         }
+    }
+
+    #[tokio::test]
+    async fn post_answers_any_status_and_blocks_private_hosts() {
+        use axum::Router;
+        use axum::http::StatusCode as S;
+        use axum::routing::post;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = Router::new()
+            .route(
+                "/ok",
+                post(|body: String| async move { (S::ACCEPTED, body) }),
+            )
+            .route("/fail", post(|| async { S::SERVICE_UNAVAILABLE }))
+            .route(
+                "/moved",
+                post(|| async { (S::TEMPORARY_REDIRECT, [("location", "/ok")]) }),
+            );
+        tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let allowed = SafeClient::new(["localhost".to_owned()]).unwrap();
+        let url = |p: &str| format!("http://localhost:{port}{p}");
+        let send = |c: &SafeClient, u: String| {
+            let c = c.clone();
+            async move {
+                c.post(&u, Default::default(), b"{}".to_vec(), Limits::IMAGE)
+                    .await
+            }
+        };
+        assert_eq!(send(&allowed, url("/ok")).await.unwrap(), 202);
+        assert_eq!(send(&allowed, url("/fail")).await.unwrap(), 503);
+        assert_eq!(
+            send(&allowed, url("/moved")).await.unwrap(),
+            307,
+            "redirects are answers, not followed"
+        );
+        let strict = SafeClient::new(Vec::<String>::new()).unwrap();
+        let blocked = send(&strict, url("/ok")).await;
+        assert!(
+            matches!(blocked, Err(FetchError::Blocked(_))),
+            "{blocked:?}"
+        );
     }
 }
