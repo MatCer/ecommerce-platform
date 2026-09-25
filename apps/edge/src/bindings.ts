@@ -13,7 +13,11 @@ export interface RequestContext {
   /** Artifact that is allowed to use this context (a worker cannot borrow another's). */
   artifactId: string;
   /** Checkout origin only: the checkout-scoped cart capability from the `__Host-cart` cookie. */
-  cartToken?: string;
+  cartToken?: string | undefined;
+  /** Checkout origin only: the customer session from the `__Host-sid` cookie (WP9). */
+  sessionToken?: string | undefined;
+  /** Checkout origin only: the anonymous consent subject (preferences page, A20). */
+  consentSubject?: string | undefined;
   /** Collected from page models (`cache` hints, spec §8.2) for the edge cache decision. */
   tags: Set<string>;
   anyPrivate: boolean;
@@ -73,6 +77,9 @@ const CREDENTIAL_HEADERS = [
   "x-storefront-token",
   "x-cart-token",
   "x-session",
+  "x-customer-session",
+  "x-consent-subject",
+  "x-client-ip",
 ];
 
 // Encoded separators/dots would let a path smuggle segments past the allowlist.
@@ -108,6 +115,10 @@ export const STOREFRONT_OPERATIONS: Operation[] = [
 export const CHECKOUT_OPERATIONS: Operation[] = [
   { method: "GET", path: /^\/shop$/ },
   { method: "GET", path: /^\/cart$/ },
+  // WP9: the signed-in customer (session from the context) and their consent.
+  { method: "GET", path: /^\/customer\/me$/ },
+  { method: "GET", path: /^\/customer\/addresses$/ },
+  { method: "GET", path: /^\/consent$/ },
 ];
 
 /**
@@ -164,6 +175,8 @@ export function restrictedBinding(opts: {
       "x-storefront-token": ctx.site.storefront_token,
     });
     if (ctx.cartToken) headers.set("x-cart-token", ctx.cartToken);
+    if (ctx.sessionToken) headers.set("x-customer-session", ctx.sessionToken);
+    if (ctx.consentSubject) headers.set("x-consent-subject", ctx.consentSubject);
     const res = await opts.upstream(
       new Request(`${opts.apiOrigin}/storefront/v1${url.pathname}${url.search}`, {
         method: op.method,

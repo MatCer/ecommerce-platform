@@ -55,6 +55,20 @@ pub enum AdminCommand {
         #[arg(long, default_value = "owner@lnen.example")]
         owner_email: String,
     },
+    /// Add an address to a tenant's email suppression list (§11.4, A29): nothing is sent to it
+    /// any more (`complaint` stops marketing mail only).
+    SuppressEmail {
+        /// Tenant slug.
+        #[arg(long)]
+        tenant: String,
+        #[arg(long)]
+        email: String,
+        /// `manual` (default), `bounce` or `complaint`.
+        #[arg(long, default_value = "manual")]
+        reason: String,
+        #[arg(long)]
+        note: Option<String>,
+    },
     /// Upload packed artifacts (`theme-kit pack` output under `--root`) to the private bucket,
     /// register them, publish the theme as the default for every tenant following it and set
     /// the checkout artifact (spec A22, A30). Then purges the edge.
@@ -101,6 +115,15 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
     {
         return publish_artifacts(db, root, theme.as_deref(), checkout.as_deref()).await;
     }
+    if let AdminCommand::SuppressEmail {
+        tenant,
+        email,
+        reason,
+        note,
+    } = &cmd
+    {
+        return suppress_email(db, tenant, email, reason, note.as_deref()).await;
+    }
     let env = CliEnv::load()?;
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -120,7 +143,7 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
             }))
         }
         AdminCommand::SeedDemo { owner_email } => seed_demo(db, &env, &owner_email).await,
-        AdminCommand::PublishArtifacts { .. } => Ok(()),
+        AdminCommand::PublishArtifacts { .. } | AdminCommand::SuppressEmail { .. } => Ok(()),
         AdminCommand::AddDomain {
             tenant,
             host,
@@ -180,6 +203,30 @@ async fn create_tenant(
         .await
         .context("tenant created, but sending the invitation failed; rerun the invite")?;
     Ok(created)
+}
+
+async fn suppress_email(
+    db: &PgPool,
+    tenant: &str,
+    email: &str,
+    reason: &str,
+    note: Option<&str>,
+) -> anyhow::Result<()> {
+    use commerce::notifications::{self, SuppressionReason};
+    let reason = match reason {
+        "manual" => SuppressionReason::Manual,
+        "bounce" => SuppressionReason::Bounce,
+        "complaint" => SuppressionReason::Complaint,
+        other => bail!("unknown reason {other:?} (manual, bounce, complaint)"),
+    };
+    let tenant_id = sqlx::query_scalar!("SELECT id FROM platform.tenants WHERE slug = $1", tenant)
+        .fetch_optional(db)
+        .await?
+        .with_context(|| format!("no tenant {tenant:?}"))?;
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    notifications::suppress(&mut tx, email, reason, note).await?;
+    tx.commit().await?;
+    print_json(&json!({ "tenant": tenant, "suppressed": email.trim().to_lowercase(), "reason": reason }))
 }
 
 async fn seed_demo(db: &PgPool, env: &CliEnv, owner_email: &str) -> anyhow::Result<()> {

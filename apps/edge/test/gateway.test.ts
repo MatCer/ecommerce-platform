@@ -584,6 +584,125 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect(api.calls.length).toBe(calls); // refused before any cart call
   });
 
+  test("account calls: same-origin JSON, session only as a host-only cookie, never in bodies", async () => {
+    const shop = "http://demo.localhost:8280";
+    const co = "http://checkout.demo.localhost:8280";
+    const json = { origin: co, "content-type": "application/json" };
+    const body = JSON.stringify({ email: "jana@example.cz", password: "correct horse battery" });
+    // CSRF: cross-origin, form posts and unknown operations are refused before the API.
+    const calls = api.calls.length;
+    expect(
+      (await get(`${co}/_p/account/login`, { ...json, origin: shop }, { method: "POST", body }))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await get(
+          `${co}/_p/account/login`,
+          { origin: co, "content-type": "application/x-www-form-urlencoded" },
+          { method: "POST", body: "email=x" },
+        )
+      ).status,
+    ).toBe(415);
+    expect((await get(`${co}/_p/account/admin`, json, { method: "POST", body })).status).toBe(
+      404,
+    );
+    // Account routes exist only on the checkout origin.
+    expect((await get(`${shop}/_p/account/login`, json, { method: "POST", body })).status).toBe(
+      404,
+    );
+    expect(api.calls.length).toBe(calls);
+
+    const login = await get(
+      `${co}/_p/account/login`,
+      {
+        ...json,
+        cookie: "__Host-cart=checkouttoken_000000000001",
+        "x-forwarded-for": "198.51.100.1, 203.0.113.9",
+        "x-customer-session": "forged_forged_forged_forged",
+      },
+      { method: "POST", body },
+    );
+    expect(login.status).toBe(200);
+    expect(login.headers.get("set-cookie")).toBe(
+      "__Host-sid=sessiontoken_000000000001; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000",
+    );
+    expect(login.headers.get("x-session-token")).toBeNull();
+    expect(await login.text()).not.toContain("sessiontoken");
+    const sent = api.calls.at(-1);
+    expect(sent?.url).toBe("http://api.test/storefront/v1/customer/login");
+    expect(sent?.headers).toMatchObject({
+      "x-tenant": "t-demo",
+      "x-cart-token": "checkouttoken_000000000001",
+      "x-client-ip": "203.0.113.9",
+    });
+    expect(sent?.headers["x-customer-session"]).toBeUndefined(); // client headers never pass
+
+    const cookie = "__Host-sid=sessiontoken_000000000001";
+    const me = await get(`${co}/_p/account/me`, { cookie });
+    expect(me.status).toBe(200);
+    expect(api.calls.at(-1)?.headers["x-customer-session"]).toBe("sessiontoken_000000000001");
+    expect(me.headers.get("set-cookie")).toContain("Max-Age=2592000"); // sliding
+    const stale = await get(`${co}/_p/account/me`, { cookie: "__Host-sid=sessiontoken_000000000999" });
+    expect(stale.status).toBe(401);
+    expect(stale.headers.get("set-cookie")).toMatch(/^__Host-sid=; .*Max-Age=0$/);
+    const out = await get(`${co}/_p/account/logout`, { ...json, cookie }, { method: "POST", body: "{}" });
+    expect(out.status).toBe(204);
+    expect(out.headers.get("set-cookie")).toMatch(/^__Host-sid=; .*Max-Age=0$/);
+
+    // Server-rendered account pages get the session through the CHECKOUT binding context.
+    api.calls.length = 0;
+    const page = await get(`${co}/account`, { cookie });
+    expect(await page.text()).toContain("session_seen");
+    expect(api.calls.find((c) => c.url.endsWith("/customer/me"))?.headers["x-customer-session"]).toBe(
+      "sessiontoken_000000000001",
+    );
+    // Sign-in links do not leak through Referer.
+    const verify = await get(`${co}/account/verify?token=${"a".repeat(64)}`);
+    expect(verify.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(verify.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("consent: first-party cookies for the shop host after a choice only", async () => {
+    const shop = "http://demo.localhost:8280";
+    const json = { origin: shop, "content-type": "application/json" };
+    const choice = JSON.stringify({ purposes: { analytics: true }, text_version: "2026-09-25" });
+    expect(
+      (await get(`${shop}/_p/consent`, { ...json, origin: "https://evil.example" }, { method: "POST", body: choice }))
+        .status,
+    ).toBe(403);
+    const read = await get(`${shop}/_p/consent`);
+    expect(read.headers.get("set-cookie")).toBeNull();
+    const res = await get(
+      `${shop}/_p/consent`,
+      { ...json, "x-forwarded-for": "203.0.113.5", "x-consent-subject": "f".repeat(32) },
+      { method: "POST", body: choice },
+    );
+    expect(res.status).toBe(200);
+    const sent = api.calls.at(-1);
+    expect(sent?.headers["x-consent-subject"]).toBeUndefined(); // only the cookie counts
+    expect(sent?.headers["x-client-ip"]).toBe("203.0.113.5");
+    const cookies = res.headers.getSetCookie();
+    expect(cookies).toEqual([
+      "__Secure-consent_id=0123456789abcdef0123456789abcdef; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400; HttpOnly",
+      "consent=2026-09-25.1----; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400",
+    ]);
+    // The checkout origin (preferences page) shares the subject and adds the session.
+    await get(
+      "http://checkout.demo.localhost:8280/_p/consent",
+      {
+        origin: "http://checkout.demo.localhost:8280",
+        "content-type": "application/json",
+        cookie: `__Secure-consent_id=${"a".repeat(32)}; __Host-sid=sessiontoken_000000000001`,
+      },
+      { method: "POST", body: choice },
+    );
+    expect(api.calls.at(-1)?.headers).toMatchObject({
+      "x-consent-subject": "a".repeat(32),
+      "x-customer-session": "sessiontoken_000000000001",
+    });
+  });
+
   test("the checkout artifact comes from the resolved site", async () => {
     resolver.set(
       "sk.localhost",
