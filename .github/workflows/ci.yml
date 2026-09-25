@@ -29,8 +29,19 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 2s --health-timeout 3s --health-retries 30
+      meilisearch:
+        image: getmeili/meilisearch:v1.54.0@sha256:0bf32debcbfa8ba4e418679025f4935884972171513c92f0584689ff994a61df
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: meili-local-master-key-0123456789
+          MEILI_NO_ANALYTICS: "true"
+        ports: ["7700:7700"]
     env:
       DATABASE_URL: postgres://app_owner:app-owner-ci@localhost:5432/app_test
+      # The .env.example keys (derived from the master key above), created like meili-init does.
+      MEILI_URL: http://localhost:7700
+      MEILI_SEARCH_KEY: 2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918
+      MEILI_ADMIN_KEY: 39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -49,6 +60,16 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - name: Search tests against Meilisearch (make test-search)
+        run: |
+          key() {
+            curl -fsS -X POST "$MEILI_URL/keys" -H 'Authorization: Bearer meili-local-master-key-0123456789' \
+              -H 'Content-Type: application/json' \
+              --data "{\"uid\":\"$1\",\"name\":\"$2\",\"actions\":$3,\"indexes\":$4,\"expiresAt\":null}" >/dev/null
+          }
+          key 4b3c2a10-6f1e-4d0a-9b7e-5c1f2e3d4a01 api-search '["search"]' '["t_*"]'
+          key 4b3c2a10-6f1e-4d0a-9b7e-5c1f2e3d4a02 worker-admin '["documents.*","indexes.*","settings.*","tasks.get"]' '["*"]'
+          cargo test --workspace --locked -- --ignored
       # Drift check lives here to reuse the compiled workspace.
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
