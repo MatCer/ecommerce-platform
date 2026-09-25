@@ -2,6 +2,7 @@
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use commerce::flows::{self, WatchInput, WatchStatus};
 use platform::Error;
@@ -9,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use super::customer::no_store;
+use super::customer::{ip_hash, no_store};
 use super::{Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
 use crate::admin::parse_json;
@@ -37,11 +38,13 @@ pub struct RestoreResult {
 async fn subscribe(
     shopper: Shopper,
     State(s): State<AppState>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response, Error> {
     let input: WatchInput = parse_json(&body)?;
     with_ctx(&s, &shopper, async |tx, ctx| {
-        flows::subscribe_watch(tx, ctx, &input).await
+        let ip = ip_hash(tx, &headers).await?;
+        flows::subscribe_watch_with_ip(tx, ctx, &input, ip.as_deref()).await
     })
     .await?;
     Ok(no_store(

@@ -767,6 +767,10 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let customer_auth = sqlx::query_scalar!(r#"SELECT platform.purge_customer_auth() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
+    let flow_watch_quotas: i64 =
+        sqlx::query_scalar("SELECT platform.purge_flow_watch_mail_quotas()")
+            .fetch_one(&ctx.db)
+            .await?;
     let ad_deliveries = sqlx::query_scalar!(r#"SELECT platform.purge_ad_deliveries() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
@@ -783,6 +787,7 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         idempotency_keys = keys,
         zero_results,
         customer_auth,
+        flow_watch_quotas,
         ad_deliveries,
         "cleanup done"
     );

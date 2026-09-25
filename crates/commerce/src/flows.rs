@@ -5,6 +5,7 @@ use chrono::{DateTime, Duration, Utc};
 use platform::Error;
 use platform::db::TenantTx;
 use platform::mail::Stream;
+use platform::queue::{self, NewJob};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::Row;
@@ -287,29 +288,31 @@ pub async fn advance_clock(tx: &mut TenantTx, hours: i64) -> Result<DateTime<Utc
 /// once a minute; unique keys make retries and concurrent leaders harmless.
 pub async fn enroll_due(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<(), Error> {
     ensure_defaults(tx).await?;
-    sqlx::query("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at)
-        SELECT c.tenant_id,d.id,'cart',c.id,c.last_activity_at + make_interval(hours => (d.config->'delays_hours'->>0)::int)
+    sqlx::query("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at,config_snapshot)
+        SELECT c.tenant_id,d.id,'cart',c.id,c.last_activity_at + make_interval(hours => (d.config->'delays_hours'->>0)::int),d.config
         FROM carts c JOIN flow_definitions d ON d.tenant_id=c.tenant_id AND d.kind='abandoned_cart' AND d.enabled
         WHERE c.status='open' AND c.email IS NOT NULL AND c.last_activity_at <= $1 - interval '1 hour'
           AND EXISTS(SELECT 1 FROM cart_lines l WHERE l.cart_id=c.id)
           AND NOT EXISTS(SELECT 1 FROM flow_runs r WHERE r.definition_id=d.id AND r.source_id=c.id)
-          AND (SELECT granted FROM consent_records cr WHERE cr.subject_type='email'
-               AND cr.subject_id=c.email AND cr.purpose='email_marketing'
+          AND (SELECT granted FROM consent_records cr WHERE cr.purpose='email_marketing'
+               AND ((cr.subject_type='email' AND cr.subject_id=c.email)
+                 OR (cr.subject_type='customer' AND cr.subject_id=c.customer_id::text))
                ORDER BY cr.at DESC,cr.id DESC LIMIT 1)=true
-        ORDER BY c.last_activity_at LIMIT $2 ON CONFLICT(tenant_id,definition_id,source_id) DO NOTHING")
+        ORDER BY c.last_activity_at LIMIT $2 ON CONFLICT DO NOTHING")
         .bind(now).bind(BATCH).execute(&mut **tx).await?;
-    sqlx::query("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at)
-        SELECT o.tenant_id,d.id,'order',o.id,min(s.delivered_at) + make_interval(hours => (d.config->'delays_hours'->>0)::int)
+    sqlx::query("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at,config_snapshot)
+        SELECT o.tenant_id,d.id,'order',o.id,min(s.delivered_at) + make_interval(hours => (d.config->'delays_hours'->>0)::int),d.config
         FROM orders o JOIN shipments s ON s.order_id=o.id AND s.delivered_at IS NOT NULL
         JOIN flow_definitions d ON d.tenant_id=o.tenant_id AND d.kind='review_invite' AND d.enabled
         WHERE o.status='delivered'
           AND NOT EXISTS(SELECT 1 FROM flow_runs r WHERE r.definition_id=d.id AND r.source_id=o.id)
-          AND (SELECT granted FROM consent_records cr WHERE cr.subject_type='email'
-               AND cr.subject_id=o.email AND cr.purpose='review_invites'
+          AND (SELECT granted FROM consent_records cr WHERE cr.purpose='review_invites'
+               AND ((cr.subject_type='email' AND cr.subject_id=o.email)
+                 OR (cr.subject_type='customer' AND cr.subject_id=o.customer_id::text))
                ORDER BY cr.at DESC,cr.id DESC LIMIT 1)=true
         GROUP BY o.tenant_id,d.id,o.id,d.config
         ORDER BY min(s.delivered_at) LIMIT $1
-        ON CONFLICT(tenant_id,definition_id,source_id) DO NOTHING")
+        ON CONFLICT DO NOTHING")
         .bind(BATCH).execute(&mut **tx).await?;
     Ok(())
 }
@@ -372,7 +375,9 @@ async fn execute_one(
     id: Uuid,
     now: DateTime<Utc>,
 ) -> Result<(), Error> {
-    let row = sqlx::query("SELECT r.source_kind,r.source_id,r.next_step,d.kind,d.enabled,d.config FROM flow_runs r JOIN flow_definitions d ON d.id=r.definition_id WHERE r.id=$1 AND r.status='active'")
+    let row = sqlx::query("SELECT r.source_kind,r.source_id,r.next_step,d.kind,d.enabled,
+        CASE WHEN r.config_snapshot='{}'::jsonb THEN d.config ELSE r.config_snapshot END AS config
+        FROM flow_runs r JOIN flow_definitions d ON d.id=r.definition_id WHERE r.id=$1 AND r.status='active'")
         .bind(id).fetch_one(&mut **tx).await?;
     let kind: String = row.try_get("kind")?;
     let source: Uuid = row.try_get("source_id")?;
@@ -434,7 +439,13 @@ async fn execute_cart(
         return finish(tx, id, "cancelled", "consent_withdrawn").await;
     }
     let activity: DateTime<Utc> = c.try_get("last_activity_at")?;
-    let eligible_at = activity + Duration::hours(config.delays_hours[step as usize]);
+    let Some(&delay) = usize::try_from(step)
+        .ok()
+        .and_then(|step| config.delays_hours.get(step))
+    else {
+        return finish(tx, id, "cancelled", "schedule_exhausted").await;
+    };
+    let eligible_at = activity + Duration::hours(delay);
     if eligible_at > now {
         sqlx::query("UPDATE flow_runs SET due_at=$2,updated_at=now() WHERE id=$1")
             .bind(id)
@@ -554,14 +565,23 @@ pub async fn delivery_refusal(
         .await?;
     let key: String = row.try_get("idempotency_key")?;
     if let Some(watch_text) = key.strip_prefix("watch:alert:") {
-        let Ok(watch) = Uuid::parse_str(watch_text) else {
+        let mut parts = watch_text.split(':');
+        let Ok(watch) = Uuid::parse_str(parts.next().unwrap_or_default()) else {
             return Ok(Some("invalid_watch"));
         };
-        let status: Option<String> =
-            sqlx::query_scalar("SELECT status FROM flow_watches WHERE id=$1")
-                .bind(watch)
-                .fetch_optional(&mut **tx)
-                .await?;
+        let generation = parts
+            .next()
+            .and_then(|n| n.parse::<i32>().ok())
+            .unwrap_or(1);
+        let status: Option<String> = sqlx::query_scalar(
+            "SELECT w.status FROM flow_watches w JOIN flow_definitions d
+                ON d.tenant_id=w.tenant_id AND d.kind='watchdog' AND d.enabled
+                WHERE w.id=$1 AND w.generation=$2",
+        )
+        .bind(watch)
+        .bind(generation)
+        .fetch_optional(&mut **tx)
+        .await?;
         return Ok(if status.as_deref() == Some("fired") {
             None
         } else {
@@ -576,7 +596,7 @@ pub async fn delivery_refusal(
     };
     let email: String = row.try_get("to_email")?;
     let run = sqlx::query(
-        "SELECT r.source_id,r.source_kind,d.enabled FROM flow_runs r
+        "SELECT r.source_id,r.source_kind,r.status,d.enabled FROM flow_runs r
         JOIN flow_definitions d ON d.id=r.definition_id WHERE r.id=$1",
     )
     .bind(run_id)
@@ -587,6 +607,9 @@ pub async fn delivery_refusal(
     };
     if !run.try_get::<bool, _>("enabled")? {
         return Ok(Some("flow_disabled"));
+    }
+    if matches!(run.try_get::<&str, _>("status")?, "cancelled" | "failed") {
+        return Ok(Some("flow_cancelled"));
     }
     let source: Uuid = run.try_get("source_id")?;
     let kind: String = run.try_get("source_kind")?;
@@ -643,10 +666,34 @@ async fn issue_coupon(
     percent: i32,
     now: DateTime<Utc>,
 ) -> Result<String, Error> {
-    let code = format!("FLOW{}", &run.simple().to_string()[..12]).to_uppercase();
-    sqlx::query("INSERT INTO coupons(tenant_id,code,kind,value,usage_limit,starts_at,ends_at,published) VALUES($1,$2,'percent',$3,1,$4,$5,false) ON CONFLICT(tenant_id,code) DO NOTHING")
-        .bind(tx.tenant_id()).bind(&code).bind(i64::from(percent)*100).bind(now).bind(now+Duration::days(14)).execute(&mut **tx).await?;
-    Ok(code)
+    if let Some(code) = sqlx::query_scalar("SELECT coupon_code FROM flow_runs WHERE id=$1")
+        .bind(run)
+        .fetch_one(&mut **tx)
+        .await?
+    {
+        return Ok(code);
+    }
+    for _ in 0..5 {
+        let code = format!(
+            "FLOW{}",
+            hex::encode(rand::random::<[u8; 14]>()).to_uppercase()
+        );
+        let inserted: Option<String> = sqlx::query_scalar("INSERT INTO coupons(tenant_id,code,kind,value,usage_limit,starts_at,ends_at,published)
+            VALUES($1,$2,'percent',$3,1,$4,$5,false) ON CONFLICT(tenant_id,code) DO NOTHING RETURNING code")
+            .bind(tx.tenant_id()).bind(&code).bind(i64::from(percent)*100)
+            .bind(now).bind(now+Duration::days(14)).fetch_optional(&mut **tx).await?;
+        if let Some(code) = inserted {
+            sqlx::query("UPDATE flow_runs SET coupon_code=$2 WHERE id=$1")
+                .bind(run)
+                .bind(&code)
+                .execute(&mut **tx)
+                .await?;
+            return Ok(code);
+        }
+    }
+    Err(Error::Internal(
+        "coupon code collision limit reached".into(),
+    ))
 }
 
 async fn execute_review(
@@ -745,6 +792,15 @@ pub async fn subscribe_watch(
     ctx: &storefront::Context,
     input: &WatchInput,
 ) -> Result<(), Error> {
+    subscribe_watch_with_ip(tx, ctx, input, None).await
+}
+
+pub async fn subscribe_watch_with_ip(
+    tx: &mut TenantTx,
+    ctx: &storefront::Context,
+    input: &WatchInput,
+    ip_hash: Option<&[u8]>,
+) -> Result<(), Error> {
     if !["back_in_stock", "price_drop"].contains(&input.kind.as_str())
         || input
             .target_minor
@@ -772,18 +828,33 @@ pub async fn subscribe_watch(
     }
     let confirm = capability::mint();
     let unsub = capability::mint();
+    sqlx::query("SAVEPOINT watch_subscription")
+        .execute(&mut **tx)
+        .await?;
     let watch_id: Option<Uuid> = sqlx::query_scalar("INSERT INTO flow_watches(tenant_id,market_id,variant_id,kind,target_minor,email,locale,confirm_hash,unsubscribe_hash,confirm_expires_at)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now()+interval '48 hours')
         ON CONFLICT(tenant_id,market_id,variant_id,kind,email) DO UPDATE SET
           target_minor=excluded.target_minor,status='pending',confirm_hash=excluded.confirm_hash,
           unsubscribe_hash=excluded.unsubscribe_hash,confirm_expires_at=excluded.confirm_expires_at,
-          updated_at=now() WHERE flow_watches.status='unsubscribed'
+          generation=flow_watches.generation+1,updated_at=now() WHERE flow_watches.status='unsubscribed'
             OR (flow_watches.status='pending' AND flow_watches.updated_at < now()-interval '10 minutes')
         RETURNING id")
         .bind(tx.tenant_id()).bind(ctx.market.id).bind(input.variant_id).bind(&input.kind)
         .bind(input.target_minor).bind(&email).bind(&ctx.locale).bind(&confirm.hash).bind(&unsub.hash)
         .fetch_optional(&mut **tx).await?;
     if let Some(watch_id) = watch_id {
+        let ip = ip_hash.map(hex::encode).unwrap_or_else(|| "missing".into());
+        if !watch_mail_quota(tx, "recipient", &email, 2).await?
+            || !watch_mail_quota(tx, "ip", &ip, 20).await?
+        {
+            sqlx::query("ROLLBACK TO SAVEPOINT watch_subscription")
+                .execute(&mut **tx)
+                .await?;
+            sqlx::query("RELEASE SAVEPOINT watch_subscription")
+                .execute(&mut **tx)
+                .await?;
+            return Ok(());
+        }
         let brand = Brand::load(tx, ctx.base_url.clone()).await?;
         let url = format!(
             "{}/watch/confirm?token={}",
@@ -808,7 +879,29 @@ pub async fn subscribe_watch(
         )
         .await?;
     }
+    sqlx::query("RELEASE SAVEPOINT watch_subscription")
+        .execute(&mut **tx)
+        .await?;
     Ok(())
+}
+
+async fn watch_mail_quota(
+    tx: &mut TenantTx,
+    scope: &str,
+    identifier: &str,
+    limit: i32,
+) -> Result<bool, Error> {
+    let granted: Option<i32> = sqlx::query_scalar("INSERT INTO flow_watch_mail_quotas(tenant_id,scope,identifier)
+        VALUES($1,$2,$3) ON CONFLICT(tenant_id,scope,identifier) DO UPDATE SET
+          window_started_at=CASE WHEN flow_watch_mail_quotas.window_started_at < now()-interval '1 day'
+                                  THEN now() ELSE flow_watch_mail_quotas.window_started_at END,
+          sent_count=CASE WHEN flow_watch_mail_quotas.window_started_at < now()-interval '1 day'
+                          THEN 1 ELSE flow_watch_mail_quotas.sent_count+1 END
+        WHERE flow_watch_mail_quotas.window_started_at < now()-interval '1 day'
+           OR flow_watch_mail_quotas.sent_count < $4 RETURNING sent_count")
+        .bind(tx.tenant_id()).bind(scope).bind(identifier).bind(limit)
+        .fetch_optional(&mut **tx).await?;
+    Ok(granted.is_some())
 }
 
 pub async fn confirm_watch(
@@ -885,9 +978,41 @@ pub async fn watch_event(
     {
         return Ok(0);
     }
-    let rows = sqlx::query("SELECT id,market_id,email,locale,target_minor,unsubscribe_hash FROM flow_watches
-        WHERE variant_id=$1 AND kind=$2 AND status='confirmed' ORDER BY id LIMIT $3 FOR UPDATE SKIP LOCKED")
-        .bind(variant).bind(watch_kind).bind(BATCH).fetch_all(&mut **tx).await?;
+    let event_list = payload
+        .get("price_list_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    if kind == "price.changed" && event_list.is_none() {
+        return Ok(0);
+    }
+    let cursor = payload
+        .get("_watch_cursor")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let rows = sqlx::query(
+        "SELECT w.id,w.market_id,w.email,w.locale,w.target_minor,w.generation
+        FROM flow_watches w JOIN markets m ON m.id=w.market_id
+        WHERE w.variant_id=$1 AND w.kind=$2 AND w.status='confirmed'
+          AND ($3::uuid IS NULL OR w.id>$3)
+          AND ($4::uuid IS NULL OR m.price_list_id=$4)
+          AND (w.target_minor IS NULL OR w.target_minor>$5)
+        ORDER BY w.id LIMIT $6 FOR UPDATE OF w",
+    )
+    .bind(variant)
+    .bind(watch_kind)
+    .bind(cursor)
+    .bind(event_list)
+    .bind(after)
+    .bind(BATCH)
+    .fetch_all(&mut **tx)
+    .await?;
+    let next_cursor = if rows.len() == BATCH as usize {
+        rows.last()
+            .map(|row| row.try_get::<Uuid, _>("id"))
+            .transpose()?
+    } else {
+        None
+    };
     let mut fired = 0;
     for row in rows {
         let target: Option<i64> = row.try_get("target_minor")?;
@@ -895,21 +1020,8 @@ pub async fn watch_event(
             continue;
         }
         let id: Uuid = row.try_get("id")?;
+        let generation: i32 = row.try_get("generation")?;
         let market: Uuid = row.try_get("market_id")?;
-        if kind == "price.changed" {
-            let event_list = payload
-                .get("price_list_id")
-                .and_then(|v| v.as_str())
-                .and_then(|s| Uuid::parse_str(s).ok());
-            let market_list: Option<Uuid> =
-                sqlx::query_scalar("SELECT price_list_id FROM markets WHERE id=$1")
-                    .bind(market)
-                    .fetch_one(&mut **tx)
-                    .await?;
-            if event_list != market_list {
-                continue;
-            }
-        }
         let locale: String = row.try_get("locale")?;
         let email: String = row.try_get("email")?;
         let ctx = storefront::context(tx, urls, market, Some(&locale), now).await?;
@@ -957,16 +1069,16 @@ pub async fn watch_event(
                 to: &email,
                 locale: &locale,
                 vars: json!({"url":product_url,"unsubscribe_url":unsubscribe_url}),
-                idempotency_key: format!("watch:alert:{id}"),
+                idempotency_key: format!("watch:alert:{id}:{generation}"),
                 sensitive: true,
             },
         )
         .await?;
-        let run: Uuid = sqlx::query_scalar("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,status,next_step,due_at,exit_reason)
-            SELECT $1,id,'watch',$2,'completed',1,$3,'fired' FROM flow_definitions WHERE kind='watchdog'
-            ON CONFLICT(tenant_id,definition_id,source_id) DO UPDATE SET status='completed',exit_reason='fired'
+        let run: Uuid = sqlx::query_scalar("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,source_generation,status,next_step,due_at,exit_reason,config_snapshot)
+            SELECT $1,id,'watch',$2,$4,'completed',1,$3,'fired',config FROM flow_definitions WHERE kind='watchdog'
+            ON CONFLICT(tenant_id,definition_id,source_id,source_generation) DO UPDATE SET status='completed',exit_reason='fired'
             RETURNING id")
-            .bind(tx.tenant_id()).bind(id).bind(now).fetch_one(&mut **tx).await?;
+            .bind(tx.tenant_id()).bind(id).bind(now).bind(generation).fetch_one(&mut **tx).await?;
         sqlx::query(
             "INSERT INTO flow_steps(tenant_id,run_id,step_number,status,message_id)
             VALUES($1,$2,0,'sent',$3) ON CONFLICT(tenant_id,run_id,step_number) DO NOTHING",
@@ -977,6 +1089,13 @@ pub async fn watch_event(
         .execute(&mut **tx)
         .await?;
         fired += 1;
+    }
+    if let Some(cursor) = next_cursor {
+        let mut continuation = payload.clone();
+        continuation["_watch_cursor"] = json!(cursor);
+        let mut job = NewJob::new(EVENT_JOB, json!({"type": kind, "payload": continuation}));
+        job.tenant_id = Some(tx.tenant_id());
+        queue::enqueue(&mut **tx, &job).await?;
     }
     Ok(fired)
 }
@@ -1016,15 +1135,16 @@ pub async fn on_event(
 
 async fn enroll_cart(tx: &mut TenantTx, cart: Uuid) -> Result<(), Error> {
     ensure_defaults(tx).await?;
-    sqlx::query("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at)
-        SELECT c.tenant_id,d.id,'cart',c.id,c.last_activity_at + make_interval(hours => (d.config->'delays_hours'->>0)::int)
+    sqlx::query("INSERT INTO flow_runs(tenant_id,definition_id,source_kind,source_id,due_at,config_snapshot)
+        SELECT c.tenant_id,d.id,'cart',c.id,c.last_activity_at + make_interval(hours => (d.config->'delays_hours'->>0)::int),d.config
         FROM carts c JOIN flow_definitions d ON d.tenant_id=c.tenant_id AND d.kind='abandoned_cart' AND d.enabled
         WHERE c.id=$1 AND c.status='open' AND c.email IS NOT NULL
           AND EXISTS(SELECT 1 FROM cart_lines l WHERE l.cart_id=c.id)
-          AND (SELECT granted FROM consent_records cr WHERE cr.subject_type='email'
-               AND cr.subject_id=c.email AND cr.purpose='email_marketing'
+          AND (SELECT granted FROM consent_records cr WHERE cr.purpose='email_marketing'
+               AND ((cr.subject_type='email' AND cr.subject_id=c.email)
+                 OR (cr.subject_type='customer' AND cr.subject_id=c.customer_id::text))
                ORDER BY cr.at DESC,cr.id DESC LIMIT 1)=true
-        ON CONFLICT(tenant_id,definition_id,source_id) DO UPDATE SET
+        ON CONFLICT(tenant_id,definition_id,source_id,source_generation) DO UPDATE SET
           due_at=excluded.due_at,updated_at=now() WHERE flow_runs.status='active' AND flow_runs.next_step=0")
         .bind(cart).execute(&mut **tx).await?;
     Ok(())
