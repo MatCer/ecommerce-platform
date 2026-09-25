@@ -116,23 +116,23 @@ export function createBeacon({
 }
 
 /**
- * Web Vitals RUM (spec §9.6): only for consented, sampled page views; `web-vitals` is loaded
- * lazily, so unsampled visitors download nothing. The standard build, not `/attribution`
- * (2.5 kB gz less on the page; attribution can come back per metric if a p75 needs it).
- * `template` (`home`, `category`, `product`, ...) groups the dashboard's p75 per template.
+ * Web Vitals RUM (spec §9.6): only for consented, sampled page views. The reporter
+ * (`vitals.ts`, < 1 kB) loads lazily, so unsampled visitors download nothing; its metrics go
+ * out in one beacon when the page is hidden. `template` (`home`, `category`, `product`, ...)
+ * groups the dashboard's p75 per template.
  */
 export async function startRum(sampleRate: number, template: string, beacon = createBeacon()) {
   if (!hasConsent("analytics") || Math.random() >= sampleRate) return;
-  const { onCLS, onINP, onLCP } = await import("web-vitals");
-  const report = (m: { name: string; value: number; rating: string }) =>
-    beacon.track({
-      type: "web_vital",
-      template,
-      name: m.name,
-      value: Math.round(m.value * 1000) / 1000,
-      rating: m.rating,
-    });
-  onLCP(report);
-  onINP(report);
-  onCLS(report);
+  const { observeVitals } = await import("./vitals.ts");
+  observeVitals((metrics) => {
+    for (const m of metrics)
+      beacon.track({
+        type: "web_vital",
+        template,
+        name: m.name,
+        value: Math.round(m.value * 1000) / 1000,
+        rating: m.rating,
+      });
+    beacon.flush();
+  });
 }

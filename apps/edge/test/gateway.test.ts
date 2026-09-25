@@ -631,6 +631,9 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect([typed.status, typed.headers.get("location")]).toEqual([301, "/cs/c/novy"]);
     const inherited = await get("http://demo-sk.localhost/cs/stary-produkt");
     expect([inherited.status, inherited.headers.get("location")]).toEqual([301, "/cs/p/novy"]);
+    // An unprefixed rule whose target is already localized is not prefixed twice.
+    const targeted = await get("http://demo-sk.localhost/cs/do-cestiny");
+    expect([targeted.status, targeted.headers.get("location")]).toEqual([301, "/cs/p/novy"]);
     // Neither the default locale nor a locale of another market is a prefix.
     expect((await get("http://demo-sk.localhost/sk/")).status).toBe(404);
     expect((await get("http://demo-sk.localhost/en/")).status).toBe(404);

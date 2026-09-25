@@ -20,7 +20,7 @@ Code: `apps/edge`, `packages/theme-kit`, `packages/storefront-sdk`, `themes/defa
 | workerd | 1.20260921.1 | one copy in the lockfile |
 | @astrojs/check | 0.9.10 | |
 | playwright / lighthouse / @axe-core/playwright | 1.63.0 (Chromium 153) / 13.5.0 / 4.13.0 | theme-kit gates |
-| web-vitals | 6.2.2 | SDK, lazy-loaded RUM |
+| ~~web-vitals~~ | removed in WP8 | RUM uses the SDK's own `vitals.ts` (< 1 kB, §12) |
 | Caddy | 2.11.4 | HTTP + `tls internal` HTTP/2 listener |
 
 Why these exact versions: pnpm's supply-chain release-age policy resolves `@cloudflare/vite-plugin`
@@ -398,19 +398,22 @@ separate cache namespace, never cached (already bypassed by the policy).
   the edge answers 504 after 10 s). Browser-only setup and teardown belong inside `onMount`.
 - **Measured** (`make perf`, seeded demo shop, 3-run medians over h2, all islands wired):
 
-  | Page | LCP | TBT | CLS | JS gz (A26) | + RUM sampled | calls |
+  | Page | LCP | TBT | CLS | JS gz (A26) | all consents + RUM | calls |
   |---|---|---|---|---|---|---|
-  | `/` | 1277 ms | 0 | 0.000 | 22.5 kB | 24.5 kB | 2 |
-  | `/c/trika` | 1277 ms | 0 | 0.000 | 23.0 kB | 25.0 kB | 2 |
-  | `/p/tricko-basic` | 1427 ms | 0 | 0.000 | 27.5 kB | 29.5 kB | 3 |
-  | `/search?q=mikina` | 1126 ms | 0 | 0.000 | 23.0 kB | 25.0 kB | 2 |
+  | `/` | 1278 ms | 0 | 0.000 | 22.5 kB | 22.2 kB | 2 |
+  | `/c/trika` | 1277 ms | 0 | 0.000 | 23.0 kB | 22.7 kB | 2 |
+  | `/p/tricko-basic` | 1427 ms | 0 | 0.000 | 27.5 kB | 28.0 kB | 3 |
+  | `/search?q=mikina` | 1127 ms | 0 | 0.000 | 23.0 kB | 22.7 kB | 2 |
 
-  The gate now also judges the RUM-sampled visit (A26 counts every script a visit downloads).
+  The gate now also judges the worst-case visit: every consent purpose granted and the RUM
+  sample hit (A26 counts every script a visit downloads). That visit skips the consent panel,
+  so it can weigh less than the first visit.
   axe (WCAG 2.2 AA tags): 0 serious/critical, no CSP violations, no third-party origins. What
   it took: the cart drawer is a dynamic import on first open (not counted, never downloaded by
   most visitors; Solid's `lazy()` was avoided because it adds ~1 kB of Suspense runtime to every
   page), likewise the consent panel (only without a choice) and the recently-viewed list (only
   with `personalization`), the newsletter is a plain form (no island), extra gallery photos wait for the load
-  event, card srcsets are capped at 720 w (HTML weight), `web-vitals` standard build instead of
-  `/attribution` (−2.5 kB when sampled), and the listing's no-JS submit button lives in
+  event, card srcsets are capped at 720 w (HTML weight), an own PerformanceObserver reporter
+  (`vitals.ts`, LCP/CLS/INP, < 1 kB) instead of `web-vitals/attribution` (4.9 kB, the WP2
+  recommendation), and the listing's no-JS submit button lives in
   `<noscript>` (hiding it on hydration shifted the toolbar, CLS 0.03).

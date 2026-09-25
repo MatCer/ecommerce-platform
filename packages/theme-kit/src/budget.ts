@@ -19,7 +19,7 @@ export interface PageResult {
   cls: number;
   jsGzip: number;
   jsTransfer: number;
-  /** Worst case: analytics consent given and the 10 % RUM sample hit (web-vitals loaded). */
+  /** Worst case: every purpose granted and the 10 % RUM sample hit (the vitals reporter loaded). */
   jsGzipWithRum: number;
   thirdPartyOrigins: string[];
   axe: { id: string; impact: string; nodes: number }[];
@@ -36,6 +36,7 @@ export function judge(r: PageResult): string[] {
     TBT: r.tbtMs,
     CLS: r.cls,
     JS: r.jsGzip,
+    "JS with RUM": r.jsGzipWithRum,
     calls: r.subrequests,
   })) {
     if (!Number.isFinite(v)) fails.push(`${name} not measured`);

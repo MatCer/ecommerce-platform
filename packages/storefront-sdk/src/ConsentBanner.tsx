@@ -64,10 +64,12 @@ export default function ConsentBanner(props: ConsentBannerProps) {
   });
 
   return (
-    <Show when={mode() && Panel()}>
-      {(P) => {
-        const Loaded = P();
-        return <Loaded {...props} settings={mode() === "settings"} onClose={close} />;
+    // Keyed by mode: reopening from "Cookie settings" while the first-visit banner shows
+    // remounts the panel in settings mode (checkboxes visible, focus moved in).
+    <Show when={Panel() && mode()} keyed>
+      {(m) => {
+        const Loaded = Panel();
+        return Loaded && <Loaded {...props} settings={m === "settings"} onClose={close} />;
       }}
     </Show>
   );

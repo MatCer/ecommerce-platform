@@ -67,6 +67,7 @@ test("each purpose has its own storage; only withdrawn purposes lose theirs", as
   consentStorage("personalization").set("recent", ["a"]);
   expect([...store.keys()].sort()).toEqual(["sf:analytics:id", "sf:personalization:recent"]);
 
+  store.set("sf:recent", "unnamespaced");
   await saveConsent(["personalization"], post);
   expect([...store.keys()]).toEqual(["sf:personalization:recent"]);
   expect(consentStorage("personalization").get("recent")).toEqual(["a"]);

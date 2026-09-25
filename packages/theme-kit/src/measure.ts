@@ -69,7 +69,9 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ ...MOBILE, ignoreHTTPSErrors: LOCAL_TLS });
   if (opts.withRum) {
-    await ctx.addCookies([{ name: "consent", value: "analytics", url: base.origin }]);
+    // Worst case: every purpose granted (loads everything consent unlocks) + the RUM sample.
+    const all = "analytics,ads,personalization,email_marketing,review_invites";
+    await ctx.addCookies([{ name: "consent", value: encodeURIComponent(all), url: base.origin }]);
     await ctx.addInitScript(() => {
       Math.random = () => 0; // force the RUM sample
     });

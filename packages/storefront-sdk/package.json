@@ -17,8 +17,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "openapi-fetch": "catalog:",
-    "web-vitals": "catalog:"
+    "openapi-fetch": "catalog:"
   },
   "peerDependencies": {
     "solid-js": "catalog:"

@@ -24,8 +24,7 @@ test("within budget passes; each breach is reported", () => {
 });
 
 test("missing measurements fail instead of passing", () => {
-  expect(judge({ ...ok, lcpMs: median([]), subrequests: Number.NaN })).toEqual([
-    "LCP not measured",
-    "calls not measured",
-  ]);
+  expect(
+    judge({ ...ok, lcpMs: median([]), subrequests: Number.NaN, jsGzipWithRum: Number.NaN }),
+  ).toEqual(["LCP not measured", "JS with RUM not measured", "calls not measured"]);
 });

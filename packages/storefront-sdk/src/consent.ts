@@ -82,15 +82,17 @@ export async function saveConsent(
 /** Reopens the consent banner with the current choice (e.g. a footer button). */
 export const openConsentSettings = () => dispatchEvent(new Event(CONSENT_OPEN));
 
-/** Removes the device storage of every purpose that is not granted. */
+/**
+ * Removes every SDK key (`sf:…`) not covered by a granted purpose: the storage of withdrawn
+ * purposes, and anything unnamespaced or unknown (fail closed).
+ */
 function clearWithdrawn(granted: readonly ConsentPurpose[]) {
-  const withdrawn = PURPOSES.filter((p) => !granted.includes(p)).map(
-    (p) => `${STORAGE_PREFIX}${p}:`,
-  );
+  const kept = granted.map((p) => `${STORAGE_PREFIX}${p}:`);
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key && withdrawn.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
+      if (key?.startsWith(STORAGE_PREFIX) && !kept.some((prefix) => key.startsWith(prefix)))
+        localStorage.removeItem(key);
     }
   } catch {
     /* storage disabled */

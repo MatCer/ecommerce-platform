@@ -240,6 +240,42 @@ test("phone sheets (menu, filters): Escape closes, focus never stays behind an o
   await ctx.close();
 });
 
+test("RUM: a consented, sampled visit beacons its Web Vitals on leave; no consent, no beacon", async ({
+  browser,
+}) => {
+  for (const consent of ["analytics", ""]) {
+    const ctx = await browser.newContext();
+    await decideConsent(ctx, CZ, consent);
+    await ctx.addInitScript(() => {
+      Math.random = () => 0; // inside the 10 % sample
+    });
+    const beacons: string[] = [];
+    ctx.on("request", (r) => {
+      if (r.url().endsWith("/_p/e")) beacons.push(r.postData() ?? "");
+    });
+    const page = await ctx.newPage();
+    await page.goto(`${CZ}/p/mikina-fleece`);
+    await hydrated(page);
+    await page.waitForTimeout(500); // the reporter loads lazily after hydration
+    // Leaving the page (pagehide) sends one beacon; Playwright does not observe beacons sent
+    // while a document unloads, so the event is dispatched in place.
+    await page.evaluate(() => dispatchEvent(new Event("pagehide")));
+    await page.waitForTimeout(500);
+    const vitals = beacons
+      .flatMap(
+        (b) =>
+          (JSON.parse(b) as { events: { type: string; name: string; template: string }[] }).events,
+      )
+      .filter((e) => e.type === "web_vital");
+    if (consent) {
+      expect(vitals.map((v) => v.name)).toContain("LCP");
+      expect(vitals.map((v) => v.name)).toContain("CLS");
+      expect(vitals[0]?.template).toBe("product");
+    } else expect(beacons).toEqual([]);
+    await ctx.close();
+  }
+});
+
 test.describe("consent (A20)", () => {
   test("nothing is stored before a choice; reject and reopen from the footer", async ({
     page,

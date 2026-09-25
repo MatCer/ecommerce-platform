@@ -405,10 +405,12 @@ export function createGateway(opts: GatewayOptions) {
     const to = r?.to_path;
     // Same-shop paths only (the API enforces it too): never an open redirect.
     if (typeof to !== "string" || !SAME_SHOP_PATH.test(to)) return null;
+    // Keep the visitor's locale unless the rule already targets a localized path.
+    const localized = !prefix || to === prefix || to.startsWith(`${prefix}/`);
     return new Response(null, {
       status: r?.code === 302 ? 302 : 301,
       headers: {
-        location: prefix ? `${prefix}${to === "/" ? "" : to}` : to,
+        location: localized ? to : `${prefix}${to === "/" ? "" : to}`,
         "cache-control": "no-store",
       },
     });
