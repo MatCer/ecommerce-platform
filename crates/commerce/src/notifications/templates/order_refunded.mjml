@@ -1,0 +1,13 @@
+{% extends "order.mjml" %}
+{% block heading %}{{ t("order_refunded.heading", number=order.number) }}{% endblock %}
+{% block intro %}
+        <mj-text>{{ t("order_refunded.intro", shop=brand.shop_name, amount=refund.amount) }}</mj-text>
+        <mj-text>{{ t("order_refunded.method_" ~ refund.method, iban=refund.iban) }}</mj-text>
+{%- if refund.lines %}
+        <mj-table font-size="14px" color="{{ brand.colors.ink }}" padding="0 0 12px" cellpadding="4px">
+{%- for line in refund.lines %}
+          <tr><td>{{ line.quantity }}× {{ line.name }}</td><td style="text-align: right; white-space: nowrap;">{{ line.amount }}</td></tr>
+{%- endfor %}
+        </mj-table>
+{%- endif %}
+{% endblock %}

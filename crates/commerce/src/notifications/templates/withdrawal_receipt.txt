@@ -1,0 +1,9 @@
+{% extends "layout.txt" %}
+{% block content %}{{ t("withdrawal_receipt.heading", number=number) }}
+
+{{ t("withdrawal_receipt.intro", shop=brand.shop_name, declared_at=declared_at) }}
+
+{{ declaration }}
+
+{{ t("withdrawal_receipt.next", refund_due=refund_due) }}
+{{ t("withdrawal_receipt.keep") }}{% endblock %}

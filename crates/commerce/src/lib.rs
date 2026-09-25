@@ -7,16 +7,20 @@
 pub mod analytics;
 pub mod audit;
 pub mod capability;
+pub mod carriers;
 pub mod cart;
 pub mod catalog;
 pub mod checkout;
 pub mod consent;
 pub mod content;
 pub mod customers;
+pub mod documents;
 pub mod feeds;
+pub mod fulfillment;
 pub mod id;
 pub mod idempotency;
 pub mod inventory;
+pub mod invoicing;
 pub mod markets;
 pub mod media;
 pub mod money;
@@ -28,6 +32,7 @@ pub mod pricing;
 pub mod privacy;
 pub mod promotions;
 pub mod redirects;
+pub mod refunds;
 pub mod search;
 pub mod shipping;
 pub mod staff;
@@ -36,6 +41,7 @@ pub mod tax;
 pub mod tenancy;
 pub mod themes;
 pub mod webhooks;
+pub mod withdrawals;
 
 /// Postgres `unique_violation` (23505).
 fn unique_violation(e: &sqlx::Error) -> bool {

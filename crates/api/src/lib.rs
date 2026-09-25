@@ -7,6 +7,7 @@ pub mod admin_analytics;
 pub mod admin_catalog;
 pub mod admin_content;
 pub mod admin_feeds;
+pub mod admin_fulfillment;
 pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_orders;
@@ -85,6 +86,8 @@ pub struct AppState {
     pub webhooks: Option<commerce::webhooks::Webhooks>,
     /// Storefront API rate limits (§8.1).
     pub rate_limit: Arc<rate_limit::StorefrontLimiter>,
+    /// Packeta/PPL (WP12); `None` in tools and tests without carrier endpoints.
+    pub carriers: Option<commerce::carriers::Carriers>,
 }
 
 #[derive(OpenApi)]
@@ -107,6 +110,7 @@ pub struct AppState {
         (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
         (name = "payments", description = "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"),
+        (name = "fulfillment", description = "Admin API: order management, labels and shipments, invoices and credit notes, refunds, withdrawals, carrier accounts"),
         (name = "analytics", description = "Admin API: the analytics dashboard"),
         (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
         (name = "platform", description = "Admin API for platform superadmins: the job queue"),
@@ -158,6 +162,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_feeds::routes())
         .merge(admin_orders::routes())
         .merge(admin_payments::routes())
+        .merge(admin_fulfillment::routes())
         .merge(admin_analytics::routes())
         .merge(admin_webhooks::routes())
         .merge(admin_platform::routes())

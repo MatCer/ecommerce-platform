@@ -1,0 +1,77 @@
+{
+  "kind": "credit_note",
+  "number": "DB202600001",
+  "locale": "cs",
+  "order_number": "100001",
+  "issued_on": "2026-09-25",
+  "taxable_supply_date": "2026-09-25",
+  "due_on": "2026-09-25",
+  "currency": "CZK",
+  "vat_payer": true,
+  "supplier": {
+    "name": "Demo obchod s.r.o.",
+    "street": "Dlouhá 12",
+    "city": "Praha 1",
+    "postal_code": "110 00",
+    "country": "CZ",
+    "company_id": "12345678",
+    "vat_id": "CZ12345678",
+    "sk_ic_dph": null,
+    "registry": "C 12345 vedená u Městského soudu v Praze",
+    "email": "obchod@example.cz",
+    "phone": null
+  },
+  "customer": {
+    "name": "Jana Nováková",
+    "company": null,
+    "street": "Krátká 8",
+    "city": "Brno",
+    "postal_code": "602 00",
+    "country": "CZ",
+    "email": "jana@example.test"
+  },
+  "payment": {
+    "method": "bank_transfer",
+    "variable_symbol": "100001",
+    "paid": true,
+    "bank_account": {
+      "iban": "CZ6508000000192000145399",
+      "bic": "GIBACZPX",
+      "name": "Demo obchod s.r.o."
+    }
+  },
+  "lines": [
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Bavlněné tričko (modrá, M)",
+      "sku": "TEE-BLU-M",
+      "quantity": 1,
+      "unit_gross_minor": -11900,
+      "gross_minor": -11900,
+      "vat_rate": "21",
+      "vat_minor": -2066,
+      "net_minor": -9834
+    }
+  ],
+  "vat_recap": [
+    {
+      "rate": "21",
+      "net_minor": -9834,
+      "vat_minor": -2066,
+      "gross_minor": -11900
+    }
+  ],
+  "czk_recap": null,
+  "totals": {
+    "net_minor": -9834,
+    "vat_minor": -2066,
+    "gross_minor": -11900
+  },
+  "original": {
+    "id": "00000000-0000-0000-0000-000000000009",
+    "number": "FV202600001",
+    "issued_on": "2026-09-24"
+  },
+  "reason": "withdrawal"
+}

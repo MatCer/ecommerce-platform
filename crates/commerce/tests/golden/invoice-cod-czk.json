@@ -1,0 +1,139 @@
+{
+  "kind": "invoice",
+  "number": "FV202600002",
+  "locale": "cs",
+  "order_number": "100001",
+  "issued_on": "2026-09-25",
+  "taxable_supply_date": "2026-09-25",
+  "due_on": "2026-09-25",
+  "currency": "CZK",
+  "vat_payer": true,
+  "supplier": {
+    "name": "Demo obchod s.r.o.",
+    "street": "Dlouhá 12",
+    "city": "Praha 1",
+    "postal_code": "110 00",
+    "country": "CZ",
+    "company_id": "12345678",
+    "vat_id": "CZ12345678",
+    "sk_ic_dph": null,
+    "registry": "C 12345 vedená u Městského soudu v Praze",
+    "email": "obchod@example.cz",
+    "phone": null
+  },
+  "customer": {
+    "name": "Jana Nováková",
+    "company": null,
+    "street": "Krátká 8",
+    "city": "Brno",
+    "postal_code": "602 00",
+    "country": "CZ",
+    "email": "jana@example.test"
+  },
+  "payment": {
+    "method": "cod",
+    "variable_symbol": "100001",
+    "paid": false,
+    "bank_account": {
+      "iban": "CZ6508000000192000145399",
+      "bic": "GIBACZPX",
+      "name": "Demo obchod s.r.o."
+    }
+  },
+  "lines": [
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Bavlněné tričko (modrá, M)",
+      "sku": "TEE-BLU-M",
+      "quantity": 2,
+      "unit_gross_minor": 12900,
+      "gross_minor": 23800,
+      "vat_rate": "21",
+      "vat_minor": 4131,
+      "net_minor": 19669
+    },
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000002",
+      "name": "Keramický hrnek",
+      "sku": "MUG-01",
+      "quantity": 1,
+      "unit_gross_minor": 24900,
+      "gross_minor": 24900,
+      "vat_rate": "12",
+      "vat_minor": 2668,
+      "net_minor": 22232
+    },
+    {
+      "kind": "shipping",
+      "order_line_id": null,
+      "name": "Zásilkovna – výdejní místo",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 3861,
+      "gross_minor": 3861,
+      "vat_rate": "21",
+      "vat_minor": 670,
+      "net_minor": 3191
+    },
+    {
+      "kind": "shipping",
+      "order_line_id": null,
+      "name": "Zásilkovna – výdejní místo",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 4039,
+      "gross_minor": 4039,
+      "vat_rate": "12",
+      "vat_minor": 433,
+      "net_minor": 3606
+    },
+    {
+      "kind": "payment_fee",
+      "order_line_id": null,
+      "name": "Poplatek za způsob platby",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 1906,
+      "gross_minor": 1906,
+      "vat_rate": "21",
+      "vat_minor": 331,
+      "net_minor": 1575
+    },
+    {
+      "kind": "payment_fee",
+      "order_line_id": null,
+      "name": "Poplatek za způsob platby",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 1994,
+      "gross_minor": 1994,
+      "vat_rate": "12",
+      "vat_minor": 214,
+      "net_minor": 1780
+    }
+  ],
+  "vat_recap": [
+    {
+      "rate": "21",
+      "net_minor": 24435,
+      "vat_minor": 5132,
+      "gross_minor": 29567
+    },
+    {
+      "rate": "12",
+      "net_minor": 27618,
+      "vat_minor": 3315,
+      "gross_minor": 30933
+    }
+  ],
+  "czk_recap": null,
+  "totals": {
+    "net_minor": 52053,
+    "vat_minor": 8447,
+    "gross_minor": 60500
+  },
+  "original": null,
+  "reason": null
+}

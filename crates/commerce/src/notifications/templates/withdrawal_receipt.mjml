@@ -1,0 +1,8 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("withdrawal_receipt.heading", number=number) }}</mj-text>
+        <mj-text>{{ t("withdrawal_receipt.intro", shop=brand.shop_name, declared_at=declared_at) }}</mj-text>
+        <mj-text font-size="13px"><pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">{{ declaration }}</pre></mj-text>
+        <mj-text>{{ t("withdrawal_receipt.next", refund_due=refund_due) }}</mj-text>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("withdrawal_receipt.keep") }}</mj-text>
+{% endblock %}

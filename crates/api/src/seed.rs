@@ -348,6 +348,7 @@ impl Seeder<'_> {
         }
         self.promotions(tenant_id, &cats).await?;
         self.checkout_methods(tenant_id, cz, sk).await?;
+        self.carrier_accounts(tenant_id).await?;
         self.content(tenant_id).await?;
         let mut tx = self.tx(tenant_id).await?;
         themes::assign_default(&mut tx, ACTOR).await?;
@@ -1153,6 +1154,52 @@ impl Seeder<'_> {
         }
         tx.commit().await?;
         self.stripe_simulator(tenant_id).await
+    }
+
+    /// WP12: demo Packeta and PPL accounts (the local mocks accept these credentials). Needs
+    /// `SECRETS_KEY`; without it the shop simply has no carrier accounts.
+    async fn carrier_accounts(&self, tenant_id: Uuid) -> anyhow::Result<()> {
+        use commerce::carriers::{self, CarrierAccountInput, CarrierKind, Carriers};
+        let Some(key) = platform::config::OpsConfig::from_env()?.secrets_key else {
+            tracing::warn!("SECRETS_KEY not set: the demo shop gets no carrier accounts");
+            return Ok(());
+        };
+        let fc = platform::config::FulfillmentConfig::from_env()?;
+        let c = Carriers::new(
+            reqwest::Client::new(),
+            fc.packeta_api_url.to_string(),
+            fc.packeta_validate_url.to_string(),
+            fc.ppl_api_url.to_string(),
+            Some(std::sync::Arc::new(platform::crypto::SecretBox::new(&key))),
+        );
+        let mut tx = self.tx(tenant_id).await?;
+        let existing = carriers::accounts(&mut tx).await?;
+        for (kind, input) in [
+            (
+                CarrierKind::Packeta,
+                CarrierAccountInput {
+                    api_password: Some("0123456789abcdef0123456789abcdef".into()),
+                    client_id: None,
+                    client_secret: None,
+                    sender_label: "Demo obchod".into(),
+                },
+            ),
+            (
+                CarrierKind::Ppl,
+                CarrierAccountInput {
+                    api_password: None,
+                    client_id: Some("demo-ppl".into()),
+                    client_secret: Some("demo-ppl-secret".into()),
+                    sender_label: "Demo obchod".into(),
+                },
+            ),
+        ] {
+            if !existing.iter().any(|a| a.carrier == kind && a.configured) {
+                carriers::configure(&mut tx, &c, ACTOR, kind, &input).await?;
+            }
+        }
+        tx.commit().await?;
+        Ok(())
     }
 
     /// Local demo: with the Stripe simulator (no real key), the shop is onboarded right away,

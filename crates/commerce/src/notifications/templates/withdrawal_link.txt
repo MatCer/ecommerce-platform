@@ -1,0 +1,9 @@
+{% extends "layout.txt" %}
+{% block content %}{{ t("withdrawal_link.heading") }}
+
+{{ t("withdrawal_link.intro", shop=brand.shop_name, number=number) }}
+
+{{ t("withdrawal_link.button") }}: {{ url }}
+
+{{ t("withdrawal_link.expiry", hours=hours) }}
+{{ t("withdrawal_link.ignore") }}{% endblock %}

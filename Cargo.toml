@@ -64,6 +64,7 @@ mrml = { version = "6.0.1", default-features = false, features = ["parse", "rend
 # WP11 bank-transfer QR codes: QR matrix + SVG, CRC32 (already in the tree through png).
 qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 crc32fast = "1.5.0"
+base64 = "0.23.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

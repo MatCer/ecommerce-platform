@@ -3,6 +3,7 @@
 //! machines in [`status`] and writes an `order_events` row), the order capability tokens and
 //! the read models (the customer's order page, the account list, the admin list and detail).
 
+pub mod mail;
 pub mod status;
 
 use std::str::FromStr;
@@ -320,6 +321,13 @@ pub(crate) async fn expire_unpaid(
         apply_payment(tx, o, PaymentCommand::Expire, actor).await?;
     }
     apply_order(tx, o, OrderCommand::Cancel, actor).await?;
+    release_stock_and_coupon(tx, o).await?;
+    platform::queue::publish(&mut **tx, CANCELLED_EVENT, &publish_payload(o)).await?;
+    Ok(())
+}
+
+/// A13: a cancelled order's reservations and coupon redemption are released (idempotent).
+pub(crate) async fn release_stock_and_coupon(tx: &mut TenantTx, o: &OrderRow) -> Result<(), Error> {
     let lines = sqlx::query!(
         "SELECT variant_id AS \"variant_id!\", sum(quantity)::int AS \"quantity!\"
          FROM order_lines WHERE order_id = $1 AND variant_id IS NOT NULL
@@ -339,7 +347,6 @@ pub(crate) async fn expire_unpaid(
     if let Some(coupon) = o.coupon_id {
         coupons::release(tx, coupon, &ref_id).await?;
     }
-    platform::queue::publish(&mut **tx, CANCELLED_EVENT, &publish_payload(o)).await?;
     Ok(())
 }
 
@@ -787,7 +794,7 @@ pub struct OrderEventView {
     pub at: DateTime<Utc>,
 }
 
-/// The admin's read-only order detail (full management is WP12).
+/// The admin's order detail.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AdminOrder {
     pub order: OrderView,
@@ -799,6 +806,13 @@ pub struct AdminOrder {
     pub ship_to_country: String,
     pub attempts: Vec<Attempt>,
     pub events: Vec<OrderEventView>,
+    /// WP12: shipments (labels, tracking), invoices and credit notes, refunds, withdrawals and
+    /// what an admin can do now.
+    pub shipments: Vec<crate::fulfillment::ShipmentView>,
+    pub invoices: Vec<crate::invoicing::InvoiceSummary>,
+    pub refunds: Vec<crate::refunds::RefundView>,
+    pub withdrawals: Vec<crate::withdrawals::Withdrawal>,
+    pub actions: crate::fulfillment::OrderActions,
 }
 
 pub async fn admin_detail(tx: &mut TenantTx, id: Uuid) -> Result<AdminOrder, Error> {
@@ -826,5 +840,10 @@ pub async fn admin_detail(tx: &mut TenantTx, id: Uuid) -> Result<AdminOrder, Err
         ship_to_country: o.ship_to_country,
         attempts: payments::attempts(tx, id).await?,
         events,
+        shipments: crate::fulfillment::shipments(tx, id).await?,
+        invoices: crate::invoicing::list_for_order(tx, id).await?,
+        refunds: crate::refunds::list(tx, id).await?,
+        withdrawals: crate::withdrawals::for_order(tx, id).await?,
+        actions: crate::fulfillment::actions(tx, id).await?,
     })
 }

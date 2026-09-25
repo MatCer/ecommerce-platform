@@ -696,7 +696,12 @@ async fn a_transfer_after_expiry_is_a_late_payment_without_restock(db: PgPool) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert_eq!(checkout::expire_due(&runtime, 100).await.unwrap(), 1);
+    assert_eq!(
+        checkout::expire_due(&runtime, &PublicUrls::default(), 100)
+            .await
+            .unwrap(),
+        1
+    );
     let level = async || {
         let mut tx = tenant_tx(&runtime, t).await.unwrap();
         inventory::get(&mut tx, s.shop.variants[0]).await.unwrap()

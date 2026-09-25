@@ -1,0 +1,7 @@
+{% extends "order.txt" %}
+{% block heading %}{{ t("order_delivered.heading", number=order.number) }}{% endblock %}
+{% block intro %}{{ t("order_delivered.intro", shop=brand.shop_name) }}
+{% endblock %}
+{% block after_summary %}
+{{ t("order_delivered.withdrawal") }} {{ t("order_delivered.withdrawal_link") }}: {{ withdraw_url }}
+{% endblock %}

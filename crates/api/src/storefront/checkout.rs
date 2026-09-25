@@ -155,10 +155,41 @@ async fn put_shipping(
     body: Bytes,
 ) -> Result<Response, Error> {
     let input: ShippingInput = parse_json(&body)?;
+    if let Some(point) = &input.pickup_point {
+        verify_pickup_point(&s, &shopper, &point.id).await?;
+    }
     with_checkout(&s, &shopper, &headers, async |tx, ctx, c| {
         checkout::set_shipping(tx, ctx, c, &input).await
     })
     .await
+}
+
+/// WP12: the widget's choice is re-checked with Packeta (the tenant's key, else the
+/// platform's). An unknown point is refused; an unreachable service does not block checkout
+/// (the label call validates again).
+async fn verify_pickup_point(s: &AppState, shopper: &Shopper, point: &str) -> Result<(), Error> {
+    let Some(carriers) = &s.carriers else {
+        return Ok(());
+    };
+    let tenant_key = with_ctx(s, shopper, async |tx, _| {
+        commerce::carriers::packeta_public_key(tx).await
+    })
+    .await?;
+    let Some(key) = tenant_key.or_else(|| s.checkout.packeta.as_ref().map(|p| p.api_key.clone()))
+    else {
+        return Ok(());
+    };
+    match commerce::carriers::packeta::validate_point(carriers, &key, point).await {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(Error::Validation {
+            code: "invalid_pickup_point",
+            detail: "Packeta does not know this pickup point; choose another one".into(),
+        }),
+        Err(e) => {
+            tracing::warn!(error = %e, "pickup point validation unavailable; accepted");
+            Ok(())
+        }
+    }
 }
 
 #[utoipa::path(

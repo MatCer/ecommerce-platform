@@ -74,6 +74,7 @@ async fn main() -> anyhow::Result<()> {
         },
         webhooks,
         fio: fio_poller(env, &ops)?,
+        fulfillment: Some(fulfillment(&ops)?),
     };
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
@@ -110,6 +111,31 @@ async fn main() -> anyhow::Result<()> {
     db.close().await;
     tracing::info!("worker stopped");
     Ok(())
+}
+
+/// Carriers (tracking), the ČNB client and the Typst renderer (WP12).
+fn fulfillment(ops: &platform::config::OpsConfig) -> anyhow::Result<handlers::Fulfillment> {
+    let c = platform::config::FulfillmentConfig::from_env()?;
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
+    Ok(handlers::Fulfillment {
+        carriers: commerce::carriers::Carriers::new(
+            http.clone(),
+            c.packeta_api_url.to_string(),
+            c.packeta_validate_url.to_string(),
+            c.ppl_api_url.to_string(),
+            ops.secrets_key
+                .map(|k| std::sync::Arc::new(platform::crypto::SecretBox::new(&k))),
+        ),
+        rates: commerce::invoicing::Rates {
+            http,
+            url: c.cnb_rates_url.to_string(),
+        },
+        typst: commerce::documents::Typst {
+            bin: c.typst_bin.into(),
+        },
+    })
 }
 
 /// The Fio API poller when `SECRETS_KEY` is set (stored tokens are encrypted with it).

@@ -165,6 +165,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
             require_https: false,
         }),
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
+        carriers: None,
     }
 }
 

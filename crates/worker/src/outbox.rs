@@ -31,6 +31,12 @@ pub fn subscribers(event_type: &str) -> &'static [&'static str] {
         t if commerce::storefront::purge::EVENTS.contains(&t) => {
             &[handlers::EVENTS_LOG, handlers::EDGE_PURGE]
         }
+        // A17: prepaid orders are invoiced on payment, COD orders on dispatch.
+        commerce::orders::PAID_EVENT | commerce::orders::SHIPPED_EVENT => &[
+            handlers::EVENTS_LOG,
+            handlers::FANOUT_JOB,
+            commerce::invoicing::ISSUE_JOB,
+        ],
         commerce::customers::EMAIL_VERIFIED_EVENT => {
             &[handlers::EVENTS_LOG, handlers::LINK_GUEST_ORDERS]
         }

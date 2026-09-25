@@ -1,0 +1,7 @@
+{% extends "order.txt" %}
+{% block heading %}{{ t("order_shipped.heading", number=order.number) }}{% endblock %}
+{% block intro %}{{ t("order_shipped.intro", shop=brand.shop_name, carrier=shipment.carrier) }}
+{% if shipment.tracking_url %}{{ t("order_shipped.tracking_number") }}: {{ shipment.tracking_number }}
+{{ t("order_shipped.track") }}: {{ shipment.tracking_url }}
+{% endif %}{% if shipment.pickup_point %}{{ t("order_confirmation.pickup_point") }}: {{ shipment.pickup_point }}
+{% endif %}{% endblock %}

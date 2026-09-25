@@ -1,0 +1,8 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("withdrawal_link.heading") }}</mj-text>
+        <mj-text>{{ t("withdrawal_link.intro", shop=brand.shop_name, number=number) }}</mj-text>
+        <mj-button href="{{ url }}">{{ t("withdrawal_link.button") }}</mj-button>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("withdrawal_link.expiry", hours=hours) }}</mj-text>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("withdrawal_link.ignore") }}</mj-text>
+{% endblock %}
