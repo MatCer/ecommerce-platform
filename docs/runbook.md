@@ -86,7 +86,7 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 | Signature | `X-Signature: t=<unix>,v1=<hex>`, HMAC-SHA256 with the subscription secret over `<t>.<raw body>`. Receivers verify with a constant-time compare and reject `t` older than 5 min. |
 | Retries | exponential backoff for 24 h, then the delivery is `dead`; redeliver from the admin |
 | Delivery | at least once: receivers must be idempotent |
-| SSRF | the client connects to public IPs only (the resolved addresses are checked). `SAFE_HTTP_ALLOW_HOSTS` is a dev-only allowlist (e.g. the local mock) and is refused with `APP_ENV=prod`. |
+| SSRF | the client connects to public IPs only (the resolved addresses are checked). `SAFE_FETCH_ALLOW_HOSTS` is a dev-only allowlist (e.g. the local `mocks` service) and is ignored (with a warning) unless `APP_ENV=dev`. |
 | Secrets | stored encrypted (AES-256-GCM) with `SECRETS_KEY` (64 hex characters: `openssl rand -hex 32`). Rotating `SECRETS_KEY` means re-encrypting every secret: not supported yet (manual; see follow-ups). Losing it means every subscription needs a new secret. |
 
 ## 6. Analytics and privacy
@@ -182,8 +182,8 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
 - [ ] **Domain + TLS**: real domain on Cloudflare for SaaS, certificates issued, HSTS.
 - [ ] **Secrets**: `SECRETS_KEY`, `BETTER_AUTH_SECRET`, service tokens freshly generated, none
       from `.env.example`; stored in the secret manager.
-- [ ] **Prod mode**: `APP_ENV=prod` refuses the fake payment gateway and
-      `SAFE_HTTP_ALLOW_HOSTS`. Verify: boot with each set fails.
+- [ ] **Prod mode**: `APP_ENV=prod` refuses the fake payment gateway (boot fails) and ignores
+      `SAFE_FETCH_ALLOW_HOSTS` (warning in the log). Verify both.
 - [ ] **Backups**: PITR enabled, nightly dump running, a restore drill done (§7).
 - [ ] **Monitoring**: `/metrics` scraped, the alerts of §2 routed to on-call.
 - [ ] **Rate limits** reviewed for the expected traffic (storefront, auth, admin).

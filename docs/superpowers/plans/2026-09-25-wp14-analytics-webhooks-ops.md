@@ -20,7 +20,7 @@ Storefront API rate limits, a local backup + restore drill (A29) and the runbook
   and handoffs, stale locale indexes).
 - `platform::http::SafeClient` (A21): own DNS resolution, public unicast only (v4 + v6),
   pinned connect, redirects re-validated (max 3), no credentials/cookies, 20 MB body cap,
-  10 s timeout; dev-only host allowlist (`SAFE_HTTP_ALLOW_HOSTS`, refused in prod).
+  10 s timeout; dev-only host allowlist (`SAFE_FETCH_ALLOW_HOSTS` from WP13a).
 - `platform::crypto::SecretBox`: AES-256-GCM with a platform key from env (`SECRETS_KEY`),
   reused by WP20 for ad-platform credentials.
 - `platform::metrics`: Prometheus recorder; api request histogram middleware; worker queue
@@ -65,7 +65,7 @@ Storefront API rate limits, a local backup + restore drill (A29) and the runbook
    event upsert, `webhook_subscriptions`, `webhook_deliveries`, `assets.upload_purged_at`,
    `queue.stats()`, `queue.list_jobs()`, `queue.requeue()`, dead-job retention.
 2. **platform**: `http::SafeClient` (+ unit tests for IP classes, redirect limits),
-   `crypto::SecretBox`, `metrics`, config (`SECRETS_KEY`, `SAFE_HTTP_ALLOW_HOSTS`,
+   `crypto::SecretBox`, `metrics`, config (`SECRETS_KEY`,
    `METRICS_BIND`, rate limits), queue stats/list/requeue.
 3. **commerce::analytics** (+ tests: consent gate, props validation, sessionization,
    rollups, dashboard numbers, cross-tenant).
