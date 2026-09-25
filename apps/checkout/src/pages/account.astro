@@ -11,7 +11,11 @@ const [shop, me] = await Promise.all([api.shop(), api.me()]);
 const m = shop?.messages ?? {};
 const next = Astro.url.searchParams.get("next") ?? undefined;
 const links = [
-  { href: "/account/addresses", label: t(m, "account.addresses"), hint: t(m, "account.addresses_intro") },
+  {
+    href: "/account/addresses",
+    label: t(m, "account.addresses"),
+    hint: t(m, "account.addresses_intro"),
+  },
   { href: "/account/security", label: t(m, "account.security"), hint: t(m, "password.set_intro") },
   { href: "/consent", label: t(m, "account.privacy"), hint: t(m, "consent.preferences_intro") },
 ];

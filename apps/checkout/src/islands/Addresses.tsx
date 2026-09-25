@@ -69,7 +69,9 @@ export default function Addresses(props: {
       : await call("POST", "/_p/account/addresses", f);
     setBusy(false);
     if (!r.ok) {
-      return setError(r.code === "invalid_address" ? t(m, "address.invalid") : problemText(m, r.code));
+      return setError(
+        r.code === "invalid_address" ? t(m, "address.invalid") : problemText(m, r.code),
+      );
     }
     setEditing(undefined);
     setStatus(t(m, "address.saved"));
@@ -131,10 +133,18 @@ export default function Addresses(props: {
                   </Show>
                 </address>
                 <div class="flex gap-2">
-                  <Button variant="secondary" onClick={() => open(a)} aria-label={`${t(m, "address.edit")}: ${a.name}, ${a.street}`}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => open(a)}
+                    aria-label={`${t(m, "address.edit")}: ${a.name}, ${a.street}`}
+                  >
                     {t(m, "address.edit")}
                   </Button>
-                  <Button variant="ghost" onClick={() => remove(a)} aria-label={`${t(m, "address.delete")}: ${a.name}, ${a.street}`}>
+                  <Button
+                    variant="ghost"
+                    onClick={() => remove(a)}
+                    aria-label={`${t(m, "address.delete")}: ${a.name}, ${a.street}`}
+                  >
                     {t(m, "address.delete")}
                   </Button>
                 </div>
@@ -159,14 +169,68 @@ export default function Addresses(props: {
           noValidate
           onSubmit={save}
         >
-          <TextField class="sm:col-span-2" label={t(m, "address.name")} autocomplete="name" required value={form().name} onChange={(v) => set("name", v)} maxLength={200} />
-          <TextField class="sm:col-span-2" label={t(m, "address.company")} autocomplete="organization" value={form().company ?? ""} onChange={(v) => set("company", v || null)} maxLength={200} />
-          <TextField class="sm:col-span-2" label={t(m, "address.street")} autocomplete="street-address" required value={form().street} onChange={(v) => set("street", v)} maxLength={200} />
-          <TextField label={t(m, "address.postal_code")} autocomplete="postal-code" required value={form().postal_code} onChange={(v) => set("postal_code", v)} maxLength={20} />
-          <TextField label={t(m, "address.city")} autocomplete="address-level2" required value={form().city} onChange={(v) => set("city", v)} maxLength={100} />
-          <SelectField label={t(m, "address.country")} value={form().country} options={countryOptions()} onChange={(v) => set("country", v)} />
-          <TextField label={t(m, "address.phone")} type="tel" autocomplete="tel" value={form().phone ?? ""} onChange={(v) => set("phone", v || null)} maxLength={40} />
-          <Checkbox class="sm:col-span-2" label={t(m, "address.make_default")} checked={form().is_default ?? false} onChange={(v) => set("is_default", v)} />
+          <TextField
+            class="sm:col-span-2"
+            label={t(m, "address.name")}
+            autocomplete="name"
+            required
+            value={form().name}
+            onChange={(v) => set("name", v)}
+            maxLength={200}
+          />
+          <TextField
+            class="sm:col-span-2"
+            label={t(m, "address.company")}
+            autocomplete="organization"
+            value={form().company ?? ""}
+            onChange={(v) => set("company", v || null)}
+            maxLength={200}
+          />
+          <TextField
+            class="sm:col-span-2"
+            label={t(m, "address.street")}
+            autocomplete="street-address"
+            required
+            value={form().street}
+            onChange={(v) => set("street", v)}
+            maxLength={200}
+          />
+          <TextField
+            label={t(m, "address.postal_code")}
+            autocomplete="postal-code"
+            required
+            value={form().postal_code}
+            onChange={(v) => set("postal_code", v)}
+            maxLength={20}
+          />
+          <TextField
+            label={t(m, "address.city")}
+            autocomplete="address-level2"
+            required
+            value={form().city}
+            onChange={(v) => set("city", v)}
+            maxLength={100}
+          />
+          <SelectField
+            label={t(m, "address.country")}
+            value={form().country}
+            options={countryOptions()}
+            onChange={(v) => set("country", v)}
+          />
+          <TextField
+            label={t(m, "address.phone")}
+            type="tel"
+            autocomplete="tel"
+            value={form().phone ?? ""}
+            onChange={(v) => set("phone", v || null)}
+            maxLength={40}
+          />
+          <Checkbox
+            class="sm:col-span-2"
+            label={t(m, "address.make_default")}
+            checked={form().is_default ?? false}
+            onChange={(v) => set("is_default", v)}
+          />
           <Show when={error()}>
             <p role="alert" class="text-sm text-sale sm:col-span-2">
               {error()}

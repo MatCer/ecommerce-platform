@@ -157,7 +157,10 @@ test("consent from the shop origin, then changed on the preferences page", async
   await page.goto(`${shop}/`);
   const res = await page.request.post(`${shop}/_p/consent`, {
     headers: { origin: shop },
-    data: { purposes: { analytics: true, ads: false, personalization: false }, text_version: "2026-09-25" },
+    data: {
+      purposes: { analytics: true, ads: false, personalization: false },
+      text_version: "2026-09-25",
+    },
   });
   expect(res.status()).toBe(200);
   const cookies = await page.context().cookies(shop);

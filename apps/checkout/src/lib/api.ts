@@ -47,5 +47,7 @@ export function marketCountries(shop: ShopModel | null): string[] {
 
 /** The messages islands need (they serialize props into the page): keys under `prefixes`. */
 export function messages(m: Record<string, string>, ...prefixes: string[]): Record<string, string> {
-  return Object.fromEntries(Object.entries(m).filter(([k]) => prefixes.some((p) => k.startsWith(p))));
+  return Object.fromEntries(
+    Object.entries(m).filter(([k]) => prefixes.some((p) => k.startsWith(p))),
+  );
 }

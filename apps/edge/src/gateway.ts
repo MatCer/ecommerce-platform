@@ -542,8 +542,7 @@ export function createGateway(opts: GatewayOptions) {
       return text(405, "Method not allowed", { allow: "GET, POST" });
     let body: ArrayBuffer | undefined;
     if (req.method === "POST") {
-      if (!sameOrigin(req, host, port))
-        return problem(403, "cross_origin", "cross-origin request");
+      if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
       const b = await readJsonBody(req, MAX_JSON_BODY);
       if (b instanceof Response) return b;
       body = b;

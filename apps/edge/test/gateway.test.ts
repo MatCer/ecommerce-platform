@@ -604,9 +604,7 @@ describe("platform routes backed by the real API (WP6)", () => {
         )
       ).status,
     ).toBe(415);
-    expect((await get(`${co}/_p/account/admin`, json, { method: "POST", body })).status).toBe(
-      404,
-    );
+    expect((await get(`${co}/_p/account/admin`, json, { method: "POST", body })).status).toBe(404);
     // Account routes exist only on the checkout origin.
     expect((await get(`${shop}/_p/account/login`, json, { method: "POST", body })).status).toBe(
       404,
@@ -643,10 +641,16 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect(me.status).toBe(200);
     expect(api.calls.at(-1)?.headers["x-customer-session"]).toBe("sessiontoken_000000000001");
     expect(me.headers.get("set-cookie")).toContain("Max-Age=2592000"); // sliding
-    const stale = await get(`${co}/_p/account/me`, { cookie: "__Host-sid=sessiontoken_000000000999" });
+    const stale = await get(`${co}/_p/account/me`, {
+      cookie: "__Host-sid=sessiontoken_000000000999",
+    });
     expect(stale.status).toBe(401);
     expect(stale.headers.get("set-cookie")).toMatch(/^__Host-sid=; .*Max-Age=0$/);
-    const out = await get(`${co}/_p/account/logout`, { ...json, cookie }, { method: "POST", body: "{}" });
+    const out = await get(
+      `${co}/_p/account/logout`,
+      { ...json, cookie },
+      { method: "POST", body: "{}" },
+    );
     expect(out.status).toBe(204);
     expect(out.headers.get("set-cookie")).toMatch(/^__Host-sid=; .*Max-Age=0$/);
 
@@ -654,9 +658,9 @@ describe("platform routes backed by the real API (WP6)", () => {
     api.calls.length = 0;
     const page = await get(`${co}/account`, { cookie });
     expect(await page.text()).toContain("session_seen");
-    expect(api.calls.find((c) => c.url.endsWith("/customer/me"))?.headers["x-customer-session"]).toBe(
-      "sessiontoken_000000000001",
-    );
+    expect(
+      api.calls.find((c) => c.url.endsWith("/customer/me"))?.headers["x-customer-session"],
+    ).toBe("sessiontoken_000000000001");
     // Sign-in links do not leak through Referer.
     const verify = await get(`${co}/account/verify?token=${"a".repeat(64)}`);
     expect(verify.headers.get("referrer-policy")).toBe("no-referrer");
@@ -668,8 +672,13 @@ describe("platform routes backed by the real API (WP6)", () => {
     const json = { origin: shop, "content-type": "application/json" };
     const choice = JSON.stringify({ purposes: { analytics: true }, text_version: "2026-09-25" });
     expect(
-      (await get(`${shop}/_p/consent`, { ...json, origin: "https://evil.example" }, { method: "POST", body: choice }))
-        .status,
+      (
+        await get(
+          `${shop}/_p/consent`,
+          { ...json, origin: "https://evil.example" },
+          { method: "POST", body: choice },
+        )
+      ).status,
     ).toBe(403);
     const read = await get(`${shop}/_p/consent`);
     expect(read.headers.get("set-cookie")).toBeNull();

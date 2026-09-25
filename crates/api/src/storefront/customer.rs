@@ -66,7 +66,7 @@ pub(crate) async fn ip_hash(
     headers: &HeaderMap,
 ) -> Result<Option<Vec<u8>>, Error> {
     match client_ip(headers) {
-        Some(ip) => Ok(Some(privacy::ip_hash(&mut **tx, ip).await?)),
+        Some(ip) => Ok(Some(privacy::ip_hash(tx, ip).await?)),
         None => Ok(None),
     }
 }

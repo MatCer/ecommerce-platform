@@ -94,7 +94,9 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
       </div>
 
       <details class="rounded-md border border-border p-3">
-        <summary class="cursor-pointer text-sm font-semibold">{t(m, "account.with_password")}</summary>
+        <summary class="cursor-pointer text-sm font-semibold">
+          {t(m, "account.with_password")}
+        </summary>
         <form class="mt-3 grid gap-3" noValidate onSubmit={signIn}>
           <TextField
             label={t(m, "account.email")}
