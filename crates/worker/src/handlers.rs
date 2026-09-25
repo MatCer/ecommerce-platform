@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use commerce::media::{self, Processed};
+use commerce::pricing::intervals;
 use platform::queue::{self, Job};
 use platform::storage::Storage;
 use tokio::sync::Semaphore;
@@ -35,6 +36,28 @@ pub fn all(storage: Storage) -> Handlers {
         .register(media::PURGE_JOB, move |_ctx, job| {
             media_purge(job, purge_storage.clone())
         })
+        .register(intervals::TRANSITION_JOB, price_transition)
+}
+
+/// A scheduled price change (sale start/end) took effect: publish `price.changed` (A18).
+async fn price_transition(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("price transition without tenant".into()))?;
+    let at = job
+        .payload
+        .get("at")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no valid `at`".into()))?
+        .with_timezone(&chrono::Utc);
+    let mut tx = platform::db::tenant_tx(&ctx.db, tenant).await?;
+    let published = intervals::publish_transitions(&mut tx, at)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tx.commit().await?;
+    tracing::info!(%tenant, %at, published, "price transition published");
+    Ok(())
 }
 
 async fn events_log(_ctx: Ctx, job: Job) -> Result<(), JobError> {
