@@ -45,7 +45,7 @@ try {
   await page.goto(new URL("/", values.base).href);
   await budget(page);
   await page.getByRole("button", { name: /Odmítnout|Odmietnuť|Reject/ }).click();
-  await page.getByRole("navigation", { name: "Kategorie" }).getByRole("link").first().click();
+  await page.getByRole("navigation", { name: /^(Kategorie|Kategórie|Categories)$/ }).getByRole("link").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/category.png` });
   await budget(page);
