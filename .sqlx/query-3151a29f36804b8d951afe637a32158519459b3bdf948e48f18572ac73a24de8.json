@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO review_tokens (tenant_id, order_line_id, order_id, product_id,\n                                        token_hash, expires_at)\n             VALUES ($1, $2, $3, $4, $5, $6)\n             ON CONFLICT (tenant_id, order_line_id) DO UPDATE\n                 SET token_hash = EXCLUDED.token_hash, expires_at = EXCLUDED.expires_at,\n                     created_at = now()\n                 WHERE review_tokens.used_at IS NULL\n             RETURNING order_line_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_line_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_tokens",
+            "name": "order_line_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3151a29f36804b8d951afe637a32158519459b3bdf948e48f18572ac73a24de8"
+}

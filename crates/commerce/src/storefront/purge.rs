@@ -29,6 +29,7 @@ pub const EVENTS: &[&str] = &[
     "price_list.updated",
     crate::content::PAGE_CHANGED_EVENT,
     crate::content::MENU_CHANGED_EVENT,
+    crate::reviews::CHANGED_EVENT,
 ];
 
 pub fn for_event(event_type: &str, payload: &Value) -> Option<Purge> {
@@ -42,7 +43,10 @@ pub fn for_event(event_type: &str, payload: &Value) -> Option<Purge> {
     match event_type {
         // Price and stock changes show where the product already is. Product edits can change
         // status, categories and markets (new listings), so they purge the tenant.
-        "product.deleted" | "price.changed" | "inventory.changed" => product(),
+        "product.deleted"
+        | "price.changed"
+        | "inventory.changed"
+        | crate::reviews::CHANGED_EVENT => product(),
         t if EVENTS.contains(&t) => Some(Purge::Tenant),
         _ => None,
     }
@@ -57,7 +61,12 @@ mod tests {
     fn events_map_to_purges() {
         let id = Uuid::now_v7();
         let p = json!({ "product_id": id, "variant_id": Uuid::now_v7() });
-        for t in ["product.deleted", "price.changed", "inventory.changed"] {
+        for t in [
+            "product.deleted",
+            "price.changed",
+            "inventory.changed",
+            "review.changed",
+        ] {
             assert_eq!(
                 for_event(t, &p),
                 Some(Purge::Tags(vec![format!("product:{id}")])),

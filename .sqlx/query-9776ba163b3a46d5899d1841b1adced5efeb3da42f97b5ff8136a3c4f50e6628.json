@@ -1,0 +1,230 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.id, r.product_id,\n                  (SELECT pt.name FROM product_translations pt WHERE pt.product_id = r.product_id\n                   ORDER BY (pt.locale = r.locale) DESC, pt.locale LIMIT 1) AS product_name,\n                  o.id AS \"order_id?\", o.number AS \"order_number?\",\n                  r.customer_name, r.rating, r.title, r.body, r.status, r.verified, r.locale,\n                  r.reply, r.replied_at, r.moderated_at, r.moderated_by, r.published_at,\n                  r.created_at\n           FROM reviews r\n           LEFT JOIN order_lines l ON l.id = r.order_line_id\n           LEFT JOIN orders o ON o.id = l.order_id\n           WHERE ($1::text IS NULL OR r.status = $1)\n             AND ($2::uuid IS NULL OR r.product_id = $2)\n             AND ($3::uuid IS NULL OR r.id < $3)\n           ORDER BY r.id DESC LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "product_name",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "order_id?",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "order_number?",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "customer_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "customer_name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "rating",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "rating"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "verified"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "reply",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "reply"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "replied_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "replied_at"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "moderated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "moderated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "moderated_by",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "moderated_by"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "published_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "published_at"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "9776ba163b3a46d5899d1841b1adced5efeb3da42f97b5ff8136a3c4f50e6628"
+}

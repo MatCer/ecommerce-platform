@@ -10,6 +10,7 @@ import type {
   NewsletterPreferences,
   Order,
   OrderPage,
+  ReviewInvitation,
   ShopModel,
   WithdrawalForm,
 } from "@platform/storefront-sdk/types";
@@ -51,6 +52,11 @@ export function checkoutApi(request: Request) {
     newsletterPreferences: (token: string) =>
       TOKEN.test(token)
         ? get<NewsletterPreferences>(`/newsletter/preferences?t=${token}`)
+        : Promise.resolve(null),
+    // WP16: the order line behind a review link (404 = invalid, used or expired).
+    reviewInvitation: (token: string) =>
+      TOKEN.test(token)
+        ? get<ReviewInvitation>(`/reviews/invitation?token=${token}`)
         : Promise.resolve(null),
     withdrawalForm: (token: string) =>
       /^[0-9a-f]{64}$/.test(token)

@@ -18,6 +18,7 @@ mod files;
 mod newsletter;
 mod orders;
 mod pages;
+mod reviews;
 mod withdrawals;
 
 use axum::extract::FromRequestParts;
@@ -51,6 +52,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .merge(files::routes())
         .merge(newsletter::routes())
         .merge(withdrawals::routes())
+        .merge(reviews::routes())
 }
 
 fn header<'a>(parts: &'a Parts, name: &str) -> Option<&'a str> {

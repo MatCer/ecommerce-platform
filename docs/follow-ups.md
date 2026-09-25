@@ -75,3 +75,8 @@
 | WP24 | `ai_theme_runs` transcripts (the full API history, can be MBs) are kept indefinitely; add a retention rule to `ops.sweep` | later (ops) |
 | WP24 | No "retry" or "continue with feedback" on a failed/finished run (the merchant starts a new run with a refined prompt) | later |
 | WP24 | The agent cannot add storefront message-catalog keys (platform-owned): new copy is written in the shop's locale directly in markup, so multi-locale shops get one language for AI-added strings | later (theme-owned catalog overrides) |
+| WP16 | Review invites: after delivery (default 7 days) and only with the `review_invites` consent, call `commerce::reviews::issue_tokens(tx, order_id, now)` and mail one `reviews::review_url(ctx, token)` per product (the e2e writes its token via SQL until then) | WP19 |
+| WP16 | GDPR erasure/export must cover `reviews` (reviewer name, text, `ip_hash`) and `review_tokens`; erasing an order line keeps the review but drops its link (`order_line_id` → NULL) | WP13b |
+| WP16 | The product page shows the 20 newest published reviews (summary and JSON-LD cover all); no pagination, sorting or filtering by rating yet | later |
+| WP16 | Tokens are issued per order, not per returned/withdrawn line: a line returned after delivery can still be reviewed while its token lives | later |
+| WP16 | Seeded demos keep the old "reviews" legal page text (templates install only missing pages); re-install or edit it | WP15 (seed polish) |
