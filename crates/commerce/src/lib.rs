@@ -14,6 +14,7 @@ pub mod inventory;
 pub mod markets;
 pub mod media;
 pub mod money;
+pub mod orders;
 pub mod pricing;
 pub mod promotions;
 pub mod redirects;
