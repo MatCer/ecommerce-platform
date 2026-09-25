@@ -28,6 +28,11 @@ export interface Site {
    * limits per token + IP, salted hashes; spec §8.1).
    */
   clientIp?: string | undefined;
+  /**
+   * Set on `preview-<n>--<shop>` hosts (WP23, A21): the site carries the previewed revision's
+   * artifact; nothing is cached, counted or handed to the checkout.
+   */
+  preview?: { revision: number; expiresAt: number };
 }
 
 export interface SiteResolver {
@@ -122,18 +127,75 @@ export class ApiResolver implements SiteResolver {
     );
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`resolve ${shopHost}: ${res.status}`);
-    const r = (await res.json()) as Resolved;
-    return {
-      tenant_id: r.tenant_id,
-      market_id: r.market_id,
-      locale: r.default_locale,
-      locales: r.locales,
-      shop_host: r.hostname,
-      storefront_token: r.storefront_token,
-      theme_artifact: r.theme_artifact,
-      retained_artifacts: r.retained_artifacts,
-      checkout_artifact: r.checkout_artifact,
-    };
+    return toSite((await res.json()) as Resolved);
+  }
+}
+
+function toSite(r: Resolved): Site {
+  return {
+    tenant_id: r.tenant_id,
+    market_id: r.market_id,
+    locale: r.default_locale,
+    locales: r.locales,
+    shop_host: r.hostname,
+    storefront_token: r.storefront_token,
+    theme_artifact: r.theme_artifact,
+    retained_artifacts: r.retained_artifacts,
+    checkout_artifact: r.checkout_artifact,
+  };
+}
+
+/** `preview-<n>--<shop host>` (WP23). */
+export const PREVIEW_HOST_RE = /^preview-(\d{1,9})--([a-z0-9.-]+)$/;
+
+export interface PreviewResolver {
+  /** The site to serve on a preview host for a token; `null` if not authentic/expired. */
+  resolve(host: string, token: string, now?: number): Promise<Site | null>;
+}
+
+/**
+ * Preview tokens are verified by the API (`GET /internal/v1/previews/resolve`, A21): the HMAC
+ * secret never reaches the edge. Answers are cached per (host, token) for at most 60 s and
+ * never beyond the token's expiry.
+ */
+export class ApiPreviewResolver implements PreviewResolver {
+  readonly #apiOrigin: string;
+  readonly #token: string;
+  readonly #upstream: (r: Request) => Promise<Response>;
+  readonly #cache = new Map<string, { site: Site | null; until: number }>();
+  constructor(apiOrigin: string, token: string, upstream?: (r: Request) => Promise<Response>) {
+    this.#apiOrigin = apiOrigin;
+    this.#token = token;
+    this.#upstream = upstream ?? ((r) => fetch(r));
+  }
+  async resolve(host: string, token: string, now = Date.now()): Promise<Site | null> {
+    if (!PREVIEW_HOST_RE.test(host) || !/^[0-9a-f]{32}\.\d{1,12}\.[0-9a-f]{64}$/.test(token))
+      return null;
+    const key = `${host} ${token}`;
+    const hit = this.#cache.get(key);
+    if (hit && now < hit.until) return hit.site;
+    const res = await this.#upstream(
+      new Request(
+        `${this.#apiOrigin}/internal/v1/previews/resolve?${new URLSearchParams({ host, token })}`,
+        { headers: { authorization: `Bearer ${this.#token}`, accept: "application/json" } },
+      ),
+    );
+    let site: Site | null = null;
+    let until = now + 60_000;
+    if (res.ok) {
+      const r = (await res.json()) as {
+        site: Resolved;
+        revision_number: number;
+        expires_at: string;
+      };
+      const expiresAt = Date.parse(r.expires_at);
+      site = { ...toSite(r.site), preview: { revision: r.revision_number, expiresAt } };
+      until = Math.min(until, expiresAt);
+    } else if (res.status !== 404) throw new Error(`preview resolve: ${res.status}`);
+    this.#cache.delete(key);
+    if (this.#cache.size >= 1000) this.#cache.delete(this.#cache.keys().next().value ?? "");
+    this.#cache.set(key, { site, until });
+    return site;
   }
 }
 
