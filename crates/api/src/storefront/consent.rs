@@ -49,8 +49,9 @@ fn anon(headers: &HeaderMap) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// The current choice: the signed-in customer's (checkout origin), else the anonymous
-/// subject's. `text_version: null` means no choice yet.
+/// The current choice: cookie purposes from the anonymous subject (this browser), email
+/// purposes from the signed-in customer (checkout origin). `text_version: null` means no choice
+/// yet.
 #[utoipa::path(
     get,
     path = "/storefront/v1/consent",
@@ -71,7 +72,19 @@ async fn get_consent(
             None => None,
         };
         match (customer, anon) {
-            (Some(c), _) => consent::state(tx, &Subject::Customer(c.customer_id)).await,
+            // Cookie purposes are per browser (the anonymous subject); email purposes belong
+            // to the account.
+            (Some(c), Some(a)) => {
+                let mut device = consent::state(tx, &Subject::Anon(a)).await?;
+                let account = consent::state(tx, &Subject::Customer(c.customer_id)).await?;
+                device.purposes.email_marketing = account.purposes.email_marketing;
+                device.purposes.review_invites = account.purposes.review_invites;
+                if device.text_version.is_none() {
+                    device.text_version = account.text_version;
+                }
+                Ok(device)
+            }
+            (Some(c), None) => consent::state(tx, &Subject::Customer(c.customer_id)).await,
             (None, Some(a)) => consent::state(tx, &Subject::Anon(a)).await,
             (None, None) => Ok(ConsentState {
                 purposes: Purposes::default(),

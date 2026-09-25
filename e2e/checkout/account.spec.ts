@@ -17,11 +17,11 @@ test.describe.configure({ mode: "serial" });
 let page: Page;
 
 test.beforeAll(async ({ browser }) => {
-  page = await browser.newPage({ locale: "cs-CZ" });
+  page = await (await browser.newContext({ locale: "cs-CZ" })).newPage();
 });
 
 test.afterAll(async () => {
-  await page.close();
+  await page.context().close();
 });
 
 /** The newest sign-in link for `to` (the checkout's own mail, through the worker). */

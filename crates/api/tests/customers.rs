@@ -687,10 +687,30 @@ async fn consent_is_recorded_resolved_and_linked_at_sign_in(db: PgPool) {
         )
         .await;
     let (_, mine, _) = c
-        .call(Call::get("/storefront/v1/consent").header("x-customer-session", session))
+        .call(Call::get("/storefront/v1/consent").header("x-customer-session", session.clone()))
         .await;
     assert_eq!(mine["purposes"]["email_marketing"], true);
     assert_eq!(mine["purposes"]["personalization"], true);
+    // With both: this browser's cookie purposes, the account's email purposes.
+    let fresh = commerce::consent::new_anon_id();
+    c.call(
+        Call::post(
+            "/storefront/v1/consent",
+            json!({"purposes": {"analytics": true}, "text_version": "2026-09-25"}),
+        )
+        .header("x-consent-subject", fresh.clone()),
+    )
+    .await;
+    let (_, both, _) = c
+        .call(
+            Call::get("/storefront/v1/consent")
+                .header("x-consent-subject", fresh)
+                .header("x-customer-session", session.clone()),
+        )
+        .await;
+    assert_eq!(both["purposes"]["analytics"], true);
+    assert_eq!(both["purposes"]["personalization"], Value::Null);
+    assert_eq!(both["purposes"]["email_marketing"], true);
     let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
         .await
         .unwrap();

@@ -64,9 +64,10 @@ missing or its version differs from `consent.text_version`; start the RUM beacon
 
 ## Reading the state: `GET /_p/consent`
 
-Same routes, no body. Answers the `ConsentState` of the signed-in customer (checkout origin)
-or of the anonymous subject; `text_version: null` when there is no choice yet. Sets no
-cookies. Themes normally read the `consent` cookie instead (no request).
+Same routes, no body. Answers a `ConsentState`: the cookie purposes (`analytics`, `ads`,
+`personalization`) of this browser's anonymous subject and, when signed in on the checkout
+origin, the email purposes of the customer; `text_version: null` when there is no choice yet.
+Sets no cookies. Themes normally read the `consent` cookie instead (no request).
 
 ## Preferences page
 

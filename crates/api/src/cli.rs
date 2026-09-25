@@ -226,7 +226,9 @@ async fn suppress_email(
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
     notifications::suppress(&mut tx, email, reason, note).await?;
     tx.commit().await?;
-    print_json(&json!({ "tenant": tenant, "suppressed": email.trim().to_lowercase(), "reason": reason }))
+    print_json(
+        &json!({ "tenant": tenant, "suppressed": email.trim().to_lowercase(), "reason": reason }),
+    )
 }
 
 async fn seed_demo(db: &PgPool, env: &CliEnv, owner_email: &str) -> anyhow::Result<()> {
