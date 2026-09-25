@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM carts WHERE id IN (\n             SELECT c.id FROM carts c\n             WHERE c.status IN ('open', 'abandoned')\n               AND c.last_activity_at < now() - interval '30 days'\n               AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.cart_id = c.id)\n             LIMIT $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "47f03d5a71a6779ff41e43c03ed32199fef5bf8bf2c193c1787091f68921e389"
+}

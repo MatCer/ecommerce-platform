@@ -100,7 +100,7 @@ pub struct Payments {
     pub fake: Option<FakeGateway>,
     /// Stripe Connect (real, or stripe-mock + simulator locally).
     pub stripe: Option<stripe::Stripe>,
-    /// `PAYMENTS_SECRET_KEY`: encrypts stored provider credentials (Fio API tokens).
+    /// `SECRETS_KEY`: encrypts stored provider credentials (Fio API tokens).
     pub secrets: Option<Arc<SecretBox>>,
 }
 
@@ -1149,6 +1149,15 @@ pub(crate) async fn settle_refunds(
         && matches!(order.payment_status.as_str(), "paid" | "partially_refunded")
     {
         orders::apply_payment(tx, order, PaymentCommand::Refund { full }, actor).await?;
+        // Analytics and outbound webhooks (WP14) net refunds from here.
+        platform::queue::publish(
+            &mut **tx,
+            orders::REFUNDED_EVENT,
+            &json!({ "order_id": order.id, "number": order.number.to_string(),
+                     "total_minor": order.total_minor, "currency": order.currency,
+                     "refunded_minor": refunded, "full": full }),
+        )
+        .await?;
     }
     Ok(())
 }

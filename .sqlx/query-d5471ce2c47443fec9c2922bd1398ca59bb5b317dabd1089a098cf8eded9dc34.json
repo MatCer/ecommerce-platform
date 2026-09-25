@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM analytics_counter_batches WHERE received_at < now() - interval '5 days'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d5471ce2c47443fec9c2922bd1398ca59bb5b317dabd1089a098cf8eded9dc34"
+}

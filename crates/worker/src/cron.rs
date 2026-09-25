@@ -52,6 +52,21 @@ pub const SCHEDULES: &[Schedule] = &[
         kind: handlers::PAYMENTS_FIO_POLL,
         every: Duration::from_secs(600),
     },
+    Schedule {
+        name: "analytics.rollup",
+        kind: handlers::ROLLUP_JOB,
+        every: Duration::from_secs(3600),
+    },
+    Schedule {
+        name: "analytics.partitions",
+        kind: handlers::PARTITIONS_JOB,
+        every: Duration::from_secs(86_400),
+    },
+    Schedule {
+        name: "ops.sweep",
+        kind: handlers::SWEEP_JOB,
+        every: Duration::from_secs(900),
+    },
 ];
 
 /// A dedicated connection holding the leader lock, or `None` if another worker leads.

@@ -35,7 +35,7 @@ use testkit::storefront::Shop;
 use uuid::Uuid;
 
 const ACTOR: &str = "test";
-const KEY: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+const KEY: [u8; 32] = [7; 32];
 const CZ_IBAN: &str = "CZ6508000000192000145399";
 const SK_IBAN: &str = "SK9611000000002918599669";
 
@@ -60,7 +60,7 @@ fn settings() -> Settings {
         payments: Payments {
             fake: None,
             stripe: Some(stripe_client()),
-            secrets: Some(Arc::new(SecretBox::from_hex(KEY).unwrap())),
+            secrets: Some(Arc::new(SecretBox::new(&KEY))),
         },
         packeta: None,
     }
@@ -867,7 +867,7 @@ async fn fio_polling_imports_with_the_encrypted_token(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let s = setup(&runtime, "fio").await;
     let t = s.shop.tenant;
-    let secrets = SecretBox::from_hex(KEY).unwrap();
+    let secrets = SecretBox::new(&KEY);
     let mut tx = tenant_tx(&runtime, t).await.unwrap();
     let acc = bank::configure_account(
         &mut tx,
@@ -932,7 +932,7 @@ async fn fio_polling_imports_with_the_encrypted_token(db: PgPool) {
         orders::status::PaymentStatus::Paid
     );
     // Another key cannot decrypt it; the row binding protects copies.
-    let other = SecretBox::from_hex(&"ab".repeat(32)).unwrap();
+    let other = SecretBox::new(&[0xab; 32]);
     let err = bank::poll_fio(
         &runtime,
         &reqwest::Client::new(),

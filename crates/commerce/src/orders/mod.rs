@@ -35,6 +35,9 @@ pub const TOKEN_DAYS: i64 = 90;
 pub const CREATED_EVENT: &str = "order.created";
 pub const PAID_EVENT: &str = "order.paid";
 pub const CANCELLED_EVENT: &str = "order.cancelled";
+/// Published by fulfillment (WP12) and refunds (WP11/12); webhooks already offer them.
+pub const SHIPPED_EVENT: &str = "order.shipped";
+pub const REFUNDED_EVENT: &str = "order.refunded";
 /// A10: money arrived for an expired/cancelled order; a refund task for WP11/12.
 pub const EXCEPTION_EVENT: &str = "order.exception";
 

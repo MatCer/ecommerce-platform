@@ -1066,8 +1066,10 @@ mod tests {
         assert_eq!(value.len() % 2, 0);
         value
             .as_bytes()
-            .chunks_exact(2)
-            .map(|pair| digit(pair[0]) * 16 + digit(pair[1]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|[hi, lo]| digit(*hi) * 16 + digit(*lo))
             .collect()
     }
 

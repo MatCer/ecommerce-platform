@@ -10,6 +10,7 @@ pub mod error;
 pub mod health;
 pub mod http;
 pub mod mail;
+pub mod metrics;
 pub mod queue;
 pub mod shutdown;
 pub mod storage;

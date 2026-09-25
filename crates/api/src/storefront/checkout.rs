@@ -28,7 +28,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use super::customer::{SESSION_HEADER, header_str, ip_hash, no_store};
+use super::customer::{CONSENT_SUBJECT_HEADER, SESSION_HEADER, header_str, ip_hash, no_store};
 use super::{CART_HEADER, CartHeader, Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
 use crate::admin::{IdempotencyHeader, REPLAYED, idempotency_key, parse_json};
@@ -284,6 +284,9 @@ async fn place_order(
         .await
     })
     .await?;
+    if let Some(subject) = header_str(&headers, CONSENT_SUBJECT_HEADER) {
+        link_purchase(&s, shopper.tenant_id, placed.order_id, subject).await;
+    }
     let confirmation_url = format!("/o/{}", placed.token);
     let payment = start_payment(&s, shopper.tenant_id, placed.attempt_id, &confirmation_url).await;
     let mut res = (
@@ -301,6 +304,23 @@ async fn place_order(
             .insert(REPLAYED, HeaderValue::from_static("true"));
     }
     Ok(no_store(res))
+}
+
+/// A20: a consented visitor's purchase joins their analytics session (the funnel's last
+/// step). Best effort after the commit: the order stands regardless, and without an
+/// `analytics` grant in the consent records nothing is linked.
+async fn link_purchase(s: &AppState, tenant: Uuid, order: Uuid, subject: &str) {
+    let linked: Result<bool, Error> = async {
+        let mut tx = platform::db::tenant_tx(&s.db, tenant).await?;
+        let linked =
+            commerce::analytics::link_purchase(&mut tx, order, subject, Utc::now()).await?;
+        tx.commit().await?;
+        Ok(linked)
+    }
+    .await;
+    if let Err(e) = linked {
+        tracing::warn!(error = %e, "linking the purchase to analytics failed");
+    }
 }
 
 // ---------------------------------------------------------------------------------------

@@ -44,7 +44,7 @@ const BUY_KEYS = [
 ];
 ---
 
-<Base shop={shop} seo={page.seo} template="product" bottomBar lcp={firstImage && { image: firstImage, sizes: GALLERY_SIZES }}>
+<Base shop={shop} seo={page.seo} template="product" productId={p.id} bottomBar lcp={firstImage && { image: firstImage, sizes: GALLERY_SIZES }}>
   <div class="container-shop">
     <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
     <div class="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10 lg:gap-14">

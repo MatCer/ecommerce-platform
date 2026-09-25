@@ -2,12 +2,13 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use platform::config::{
-    AuthServiceConfig, DbConfig, MeiliConfig, S3Config, StorefrontConfig, WorkerConfig,
+    AppEnv, AuthServiceConfig, DbConfig, MeiliConfig, OpsConfig, S3Config, StorefrontConfig,
+    WorkerConfig,
 };
 use platform::mail::{MailConfig, Mailer};
 use platform::storage::Storage;
 use worker::runner::RunnerConfig;
-use worker::{cron, handlers, outbox, runner};
+use worker::{cron, handlers, metrics, outbox, runner};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,19 +35,58 @@ async fn main() -> anyhow::Result<()> {
         .map(|c| platform::auth_service::AuthService::new(c.base_url, c.token))
         .transpose()?;
 
-    // Edge purges and public URLs (export feeds); the SSRF-safe client for imports (A21).
+    // Webhook deliveries need the secrets key; without it they wait (retry) until it is set.
+    let ops = OpsConfig::from_env()?;
+    let env: AppEnv = std::env::var("APP_ENV")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(AppEnv::Prod);
+    let fetch = platform::http::SafeClient::from_env()?;
+    let webhooks = ops.secrets_key.map(|key| commerce::webhooks::Webhooks {
+        secrets: platform::crypto::SecretBox::new(&key),
+        http: fetch.clone(),
+        require_https: env == AppEnv::Prod,
+    });
+    if webhooks.is_none() {
+        tracing::warn!("SECRETS_KEY is not configured: webhook deliveries stay queued until it is");
+    }
+    // Event partitions exist before the first event of a new month even if the nightly job
+    // has not run yet (e.g. after downtime). In the background: startup (and SIGTERM
+    // handling) must not wait for a database that is down.
+    let partitions_db = db.clone();
+    tokio::spawn(async move {
+        if let Err(e) = sqlx::query("SELECT platform.ensure_event_partitions(2)")
+            .execute(&partitions_db)
+            .await
+        {
+            tracing::warn!(error = %e, "ensuring event partitions failed");
+        }
+    });
+    // Edge purges and public URLs (export feeds); the SSRF-safe client for imports and
+    // webhooks (A21).
     let sf = StorefrontConfig::from_env()?;
     let extra = handlers::Extra {
         edge: platform::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
-        fetch: platform::http::SafeClient::from_env()?,
+        fetch,
         urls: commerce::storefront::PublicUrls {
             scheme: sf.scheme,
             port: sf.port,
         },
-        fio: fio_poller()?,
+        webhooks,
+        fio: fio_poller(env, &ops)?,
     };
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
+    if let Some(bind) = ops.metrics_bind {
+        let handle = platform::metrics::install().map_err(|e| anyhow!(e))?;
+        tokio::spawn(metrics::refresh(db.clone(), shutdown.clone()));
+        let shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            if let Err(e) = platform::metrics::serve(bind, handle, shutdown).await {
+                tracing::error!(error = %e, "metrics listener failed");
+            }
+        });
+    }
     tokio::spawn(async move {
         platform::shutdown::signal().await;
         let _ = stop.send(true);
@@ -72,19 +112,18 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// The Fio API poller when `PAYMENTS_SECRET_KEY` is set (stored tokens are encrypted with it).
-fn fio_poller() -> anyhow::Result<Option<handlers::Fio>> {
-    let env = match std::env::var("APP_ENV").ok().as_deref() {
-        Some("prod") => platform::config::AppEnv::Prod,
-        _ => platform::config::AppEnv::Dev,
-    };
+/// The Fio API poller when `SECRETS_KEY` is set (stored tokens are encrypted with it).
+fn fio_poller(
+    env: platform::config::AppEnv,
+    ops: &platform::config::OpsConfig,
+) -> anyhow::Result<Option<handlers::Fio>> {
     let p = platform::config::PaymentsConfig::from_env(env)?;
-    let Some(key) = p.secret_key else {
-        tracing::warn!("PAYMENTS_SECRET_KEY not set: Fio API polling is off");
+    let Some(key) = ops.secrets_key else {
+        tracing::warn!("SECRETS_KEY not set: Fio API polling is off");
         return Ok(None);
     };
     Ok(Some(handlers::Fio {
-        secrets: std::sync::Arc::new(platform::crypto::SecretBox::from_hex(&key)?),
+        secrets: std::sync::Arc::new(platform::crypto::SecretBox::new(&key)),
         base_url: p.fio_api_url.to_string(),
         http: reqwest::Client::builder()
             .timeout(Duration::from_secs(20))

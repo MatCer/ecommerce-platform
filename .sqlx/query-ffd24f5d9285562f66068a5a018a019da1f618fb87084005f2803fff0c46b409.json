@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO daily_metrics (tenant_id, date, market_id, metric, dims, value)\n           SELECT $1, $2, market_id, 'page_views', '{}'::jsonb, count(*)::float8\n           FROM events\n           WHERE at >= $3 AND at < $4 AND type = 'page_view' AND market_id IS NOT NULL\n           GROUP BY market_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ffd24f5d9285562f66068a5a018a019da1f618fb87084005f2803fff0c46b409"
+}

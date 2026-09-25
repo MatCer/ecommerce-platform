@@ -255,12 +255,9 @@ pub async fn configure_account(
                     "the Fio token must be 8-200 letters or digits",
                 ));
             }
-            let secrets = secrets.ok_or_else(|| {
-                Error::Unavailable("PAYMENTS_SECRET_KEY is not configured".into())
-            })?;
-            let sealed = secrets
-                .seal(token.as_bytes(), &token_aad(tx.tenant_id(), id))
-                .map_err(|e| Error::Internal(e.to_string()))?;
+            let secrets = secrets
+                .ok_or_else(|| Error::Unavailable("SECRETS_KEY is not configured".into()))?;
+            let sealed = secrets.seal(token.as_bytes(), &token_aad(tx.tenant_id(), id));
             sqlx::query!(
                 "UPDATE bank_accounts SET fio_token = $2, fio_synced_at = NULL WHERE id = $1",
                 id,

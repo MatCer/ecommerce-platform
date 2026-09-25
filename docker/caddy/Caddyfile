@@ -28,10 +28,14 @@ http://s3.localhost {
 	reverse_proxy minio:9000
 }
 
-# Third-party stand-ins the browser loads (WP10: the Packeta pickup-point widget). The other
-# mock endpoints (DNS stub, ...) stay on the compose network.
+# Third-party stand-ins the browser loads (WP10: the Packeta pickup-point widget) and the
+# local webhook receiver that e2e tests read back (WP14). The other mock endpoints (DNS stub,
+# ...) stay on the compose network.
 http://mocks.localhost {
 	handle /packeta/* {
+		reverse_proxy mocks:4010
+	}
+	handle /webhooks/* {
 		reverse_proxy mocks:4010
 	}
 	respond "not found" 404

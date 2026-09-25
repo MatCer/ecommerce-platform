@@ -879,6 +879,14 @@ async fn apply_refund(tx: &mut TenantTx, charge: &Value) -> Result<Processed, Er
         return Ok(Processed::Ignored("already refunded".into()));
     }
     orders::apply_payment(tx, &mut order, PaymentCommand::Refund { full }, "stripe").await?;
+    platform::queue::publish(
+        &mut **tx,
+        orders::REFUNDED_EVENT,
+        &json!({ "order_id": order.id, "number": order.number.to_string(),
+                 "total_minor": order.total_minor, "currency": order.currency,
+                 "refunded_minor": refunded, "full": full }),
+    )
+    .await?;
     Ok(Processed::Applied(format!(
         "refunded {refunded} of {}",
         a.amount_minor

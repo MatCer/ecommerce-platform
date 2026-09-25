@@ -5,7 +5,7 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, PaymentsConfig, S3Config,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, OpsConfig, PaymentsConfig, S3Config,
     ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
@@ -69,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
 fn checkout_settings(
     c: &CheckoutConfig,
     p: &PaymentsConfig,
+    ops: &OpsConfig,
 ) -> anyhow::Result<commerce::checkout::Settings> {
     let fake = c.payments_fake.then(|| {
         tracing::warn!("PAYMENTS_FAKE=1: the fake payment gateway is enabled (local/e2e only)");
@@ -106,15 +107,12 @@ fn checkout_settings(
             None
         }
     };
-    let secrets = match &p.secret_key {
-        Some(k) => Some(Arc::new(
-            platform::crypto::SecretBox::from_hex(k).context("PAYMENTS_SECRET_KEY")?,
-        )),
-        None => {
-            tracing::warn!("PAYMENTS_SECRET_KEY not set: Fio API tokens cannot be stored");
-            None
-        }
-    };
+    let secrets = ops
+        .secrets_key
+        .map(|k| Arc::new(platform::crypto::SecretBox::new(&k)));
+    if secrets.is_none() {
+        tracing::warn!("SECRETS_KEY not set: Fio API tokens cannot be stored");
+    }
     Ok(commerce::checkout::Settings {
         payments: commerce::payments::Payments {
             fake,
@@ -129,9 +127,23 @@ fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
 
+/// Webhook secrets + the SSRF-safe client (A21); `None` without `SECRETS_KEY`.
+fn webhooks(ops: &OpsConfig, env: AppEnv) -> anyhow::Result<Option<commerce::webhooks::Webhooks>> {
+    let Some(key) = ops.secrets_key else {
+        tracing::warn!("SECRETS_KEY not set: webhook subscriptions answer 503");
+        return Ok(None);
+    };
+    Ok(Some(commerce::webhooks::Webhooks {
+        secrets: platform::crypto::SecretBox::new(&key),
+        http: platform::http::SafeClient::from_env()?,
+        require_https: env == AppEnv::Prod,
+    }))
+}
+
 async fn serve() -> anyhow::Result<()> {
     init_tracing()?;
     let cfg = ApiConfig::from_env()?;
+    let ops = OpsConfig::from_env()?;
     let auth = StaffAuthConfig::from_env()?;
     let sf = StorefrontConfig::from_env()?;
     let db = platform::db::pool(&DbConfig::from_env()?)?;
@@ -169,8 +181,31 @@ async fn serve() -> anyhow::Result<()> {
         checkout: Arc::new(checkout_settings(
             &CheckoutConfig::from_env(cfg.env)?,
             &PaymentsConfig::from_env(cfg.env)?,
+            &ops,
         )?),
+        webhooks: webhooks(&ops, cfg.env)?,
+        rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
+            ops.storefront_rate_per_second,
+            ops.storefront_rate_burst,
+        )),
     };
+    let limiter = state.rate_limit.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            limiter.prune();
+        }
+    });
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    if let Some(bind) = ops.metrics_bind {
+        let handle = platform::metrics::install().map_err(|e| anyhow!(e))?;
+        let shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            if let Err(e) = platform::metrics::serve(bind, handle, shutdown).await {
+                tracing::error!(error = %e, "metrics listener failed");
+            }
+        });
+    }
     let app = api::app(state, cfg.env == AppEnv::Dev);
 
     let listener = tokio::net::TcpListener::bind(cfg.bind)
@@ -178,7 +213,10 @@ async fn serve() -> anyhow::Result<()> {
         .with_context(|| format!("bind {}", cfg.bind))?;
     tracing::info!(addr = %cfg.bind, env = ?cfg.env, "api listening");
     axum::serve(listener, app)
-        .with_graceful_shutdown(platform::shutdown::signal())
+        .with_graceful_shutdown(async move {
+            platform::shutdown::signal().await;
+            let _ = stop.send(true);
+        })
         .await?;
     db.close().await;
     tracing::info!("api stopped");

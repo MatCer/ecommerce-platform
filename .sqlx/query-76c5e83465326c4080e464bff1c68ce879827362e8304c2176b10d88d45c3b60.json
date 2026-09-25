@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO webhook_deliveries (tenant_id, subscription_id, event_id, event_type, payload,\n                                         next_at)\n         SELECT tenant_id, id, $1, $2, $3, now() FROM webhook_subscriptions\n         WHERE active AND $2 = ANY (events)\n         ON CONFLICT (tenant_id, subscription_id, event_id) DO NOTHING\n         RETURNING id, window_started_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "window_started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "window_started_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "76c5e83465326c4080e464bff1c68ce879827362e8304c2176b10d88d45c3b60"
+}

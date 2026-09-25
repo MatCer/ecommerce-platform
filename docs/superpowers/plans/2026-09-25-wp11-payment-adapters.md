@@ -43,7 +43,7 @@ configured, a labelled simulator otherwise). `apps/mocks` serves a Fio API stand
   persisted `rounding` charge (outside the VAT base unless the tax profile says otherwise);
   `delivered → collected → remitted` via the WP9 COD machine, every manual action audited.
 - A21: the Fio token is encrypted at rest (AES-256-GCM, versioned, AAD = tenant + account id)
-  with `PAYMENTS_SECRET_KEY`; never returned by the API.
+  with the platform `SECRETS_KEY` (WP14's `platform::crypto`); never returned by the API.
 - New dependencies: `qrcode` (QR matrix + SVG), `liblzma` (raw LZMA1 encoder: its output is
   byte-identical to the LZMA SDK encoder `bysquare` uses; a pure-Rust encoder is not).
 - No `unwrap()` outside tests, sqlx macros with `.sqlx/` data, TS strict without `any`.
@@ -68,7 +68,7 @@ configured, a labelled simulator otherwise). `apps/mocks` serves a Fio API stand
    vectors script `fixtures/qr/generate.mjs` + committed JSON; tests byte-for-byte.
 3. **Statements** (`payments::statements`, pure): camt.053, Fio CSV, GPC (ABO), Fio API JSON →
    `StatementLine`; fixtures under `fixtures/bank/`.
-4. **Crypto + config**: `platform::crypto::SecretBox`; `StripeConfig`, `PAYMENTS_SECRET_KEY`,
+4. **Crypto + config**: `platform::crypto::SecretBox` (shared with WP14); `StripeConfig`, `SECRETS_KEY`,
    `FIO_API_URL`.
 5. **Bank transfer**: account per market (upsert, Fio token), availability, VS + instructions
    at placement, import + matching, exceptions + resolution, reminders (day 3/6), Fio polling.

@@ -381,7 +381,7 @@ async fn bank_accounts_statements_and_the_exceptions_queue(db: PgPool) {
     assert_eq!(
         status,
         StatusCode::SERVICE_UNAVAILABLE,
-        "no PAYMENTS_SECRET_KEY in tests"
+        "no SECRETS_KEY in tests"
     );
 
     let statement = std::fs::read(format!(

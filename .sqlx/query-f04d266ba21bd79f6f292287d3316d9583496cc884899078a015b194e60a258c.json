@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE webhook_deliveries\n         SET status = CASE WHEN attempts = 0 THEN 'pending' ELSE 'retrying' END,\n             next_at = now(), window_started_at = now(), updated_at = now()\n         WHERE id = $1\n           AND (status IN ('succeeded', 'dead')\n                OR (status IN ('pending', 'retrying') AND next_at < now() - interval '1 hour'))\n         RETURNING attempts, window_started_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "window_started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "window_started_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f04d266ba21bd79f6f292287d3316d9583496cc884899078a015b194e60a258c"
+}

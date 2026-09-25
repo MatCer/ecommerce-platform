@@ -22,6 +22,12 @@ export interface Site {
   retained_artifacts: string[];
   /** The platform checkout artifact (same for every tenant); `null` if none is published. */
   checkout_artifact?: string | null;
+  /**
+   * Request-scoped, set by the gateway (never by the resolver): the client address from the
+   * proxy's last `X-Forwarded-For` hop, forwarded as `X-Client-Ip` on every API call (rate
+   * limits per token + IP, salted hashes; spec §8.1).
+   */
+  clientIp?: string | undefined;
 }
 
 export interface SiteResolver {

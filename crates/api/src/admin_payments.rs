@@ -96,7 +96,7 @@ async fn get_bank_account(
         (status = 403, body = platform::Problem, content_type = "application/problem+json"),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
         (status = 422, description = "invalid_bank_account", body = platform::Problem, content_type = "application/problem+json"),
-        (status = 503, description = "PAYMENTS_SECRET_KEY missing for a Fio token", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 503, description = "SECRETS_KEY missing for a Fio token", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn put_bank_account(

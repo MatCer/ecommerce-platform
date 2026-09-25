@@ -470,9 +470,6 @@ pub struct StripeConfig {
 pub struct PaymentsConfig {
     /// `None`: Stripe is not offered.
     pub stripe: Option<StripeConfig>,
-    /// `PAYMENTS_SECRET_KEY` (64 hex characters): encrypts stored provider credentials (Fio
-    /// API tokens, A21). Unset: tokens cannot be saved or used.
-    pub secret_key: Option<String>,
     /// `FIO_API_URL`: the Fio banka API (`https://fioapi.fio.cz`, the local mock in compose).
     pub fio_api_url: Url,
 }
@@ -487,12 +484,6 @@ impl PaymentsConfig {
             name,
             reason: reason.into(),
         };
-        let secret_key = get(lookup, "PAYMENTS_SECRET_KEY");
-        if secret_key.as_ref().is_some_and(|k| {
-            k.trim().len() != 64 || !k.trim().bytes().all(|b| b.is_ascii_hexdigit())
-        }) {
-            return Err(invalid("PAYMENTS_SECRET_KEY", "must be 64 hex characters"));
-        }
         let fio_api_url = match get(lookup, "FIO_API_URL") {
             Some(_) => url(lookup, "FIO_API_URL")?,
             None => Url::parse("https://fioapi.fio.cz/")
@@ -553,8 +544,67 @@ impl PaymentsConfig {
         };
         Ok(Self {
             stripe,
-            secret_key,
             fio_api_url,
+        })
+    }
+}
+
+/// Operations and integrations shared by api and worker (WP14). Not `Debug`: holds the
+/// secrets key.
+#[derive(Clone)]
+pub struct OpsConfig {
+    /// `METRICS_BIND`: the internal Prometheus listener (`/metrics`), e.g. `0.0.0.0:9100`. It
+    /// is a separate port that the public proxy never routes; unset = no metrics endpoint.
+    pub metrics_bind: Option<SocketAddr>,
+    /// `SECRETS_KEY`: 64 hex characters (AES-256 key) encrypting stored integration secrets
+    /// (webhook signing secrets, Fio API tokens). Unset = webhook subscriptions are unavailable
+    /// and Fio tokens cannot be stored or used.
+    pub secrets_key: Option<[u8; 32]>,
+    /// `STOREFRONT_RATE_PER_SECOND` (default 20) and `STOREFRONT_RATE_BURST` (default 120):
+    /// Storefront API requests per storefront token + client IP (spec §8.1).
+    pub storefront_rate_per_second: u32,
+    pub storefront_rate_burst: u32,
+}
+
+impl OpsConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let metrics_bind = match get(lookup, "METRICS_BIND") {
+            None => None,
+            Some(_) => Some(parsed(
+                lookup,
+                "METRICS_BIND",
+                SocketAddr::from(([0, 0, 0, 0], 0)),
+            )?),
+        };
+        let secrets_key = match get(lookup, "SECRETS_KEY") {
+            None => None,
+            Some(raw) => {
+                let bytes = hex::decode(raw.trim())
+                    .ok()
+                    .and_then(|b| <[u8; 32]>::try_from(b).ok());
+                Some(bytes.ok_or(ConfigError::Invalid {
+                    name: "SECRETS_KEY",
+                    reason: "must be 64 hex characters (32 random bytes)".into(),
+                })?)
+            }
+        };
+        let storefront_rate_per_second = parsed(lookup, "STOREFRONT_RATE_PER_SECOND", 20u32)?;
+        let storefront_rate_burst = parsed(lookup, "STOREFRONT_RATE_BURST", 120u32)?;
+        if storefront_rate_per_second == 0 || storefront_rate_burst == 0 {
+            return Err(ConfigError::Invalid {
+                name: "STOREFRONT_RATE_PER_SECOND",
+                reason: "rate and burst must be positive".into(),
+            });
+        }
+        Ok(Self {
+            metrics_bind,
+            secrets_key,
+            storefront_rate_per_second,
+            storefront_rate_burst,
         })
     }
 }
@@ -621,10 +671,21 @@ mod tests {
             "a real key needs the publishable key and the webhook secret"
         );
         assert!(payments(&[("STRIPE_SECRET_KEY", "pk_test_abc")], AppEnv::Dev).is_err());
-        assert!(payments(&[("PAYMENTS_SECRET_KEY", "abc")], AppEnv::Dev).is_err());
-        assert!(payments(&[("PAYMENTS_SECRET_KEY", &"a".repeat(64))], AppEnv::Dev).is_ok());
     }
     use std::collections::HashMap;
+
+    #[test]
+    fn ops_config_validates_the_secrets_key() {
+        assert!(OpsConfig::from_lookup(&env(&[("SECRETS_KEY", "abcd")])).is_err());
+        let key = "11".repeat(32);
+        let c = OpsConfig::from_lookup(&env(&[("SECRETS_KEY", &key)])).unwrap();
+        assert_eq!(c.secrets_key, Some([0x11; 32]));
+        assert!(c.metrics_bind.is_none());
+        assert_eq!(
+            (c.storefront_rate_per_second, c.storefront_rate_burst),
+            (20, 120)
+        );
+    }
 
     #[test]
     fn checkout_config_refuses_the_fake_gateway_in_prod() {
