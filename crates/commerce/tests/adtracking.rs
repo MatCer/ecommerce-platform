@@ -682,7 +682,7 @@ async fn pause_holds_and_resume_requeues_and_refunds_follow_purchases(db: PgPool
             &runtime,
             s.tenant,
             42,
-            &json!({ "order_id": order, "amount_minor": 12_900 }),
+            &json!({ "order_id": order, "refunded_minor": 12_900, "full": false }),
         )
         .await
         .unwrap();

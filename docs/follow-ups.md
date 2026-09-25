@@ -54,4 +54,3 @@
 | WP20 | Google Ads gets purchases only (Data Manager API offline conversions / enhanced conversions for leads by hashed email/phone); no gclid capture, no refund retractions | later |
 | WP20 | Meta receives no `client_ip_address` (IPs are only stored hashed, §14) and no `fbp`/`fbc` (no Meta pixel); match quality relies on hashed email/phone/external_id + user agent | accepted |
 | WP20 | Ad-platform rate limits and Google access-token caches are per worker process | later (scale-out) |
-| WP20 | Refund forwarding (GA4 `refund`) waits for WP11/WP12 to publish `order.refunded` with `order_id` (and `amount_minor` for partial refunds) | WP11 / WP12 |

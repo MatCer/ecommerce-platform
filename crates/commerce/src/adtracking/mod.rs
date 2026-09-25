@@ -1118,7 +1118,7 @@ pub async fn capture_purchase(
 
 /// Worker step for [`REFUND_JOB`]: a refund of an order whose purchase was forwarded goes to
 /// the platforms that take refunds, for the same subject (consent is checked again).
-/// `amount_minor` is the refunded amount (the order total when absent).
+/// `refunded_minor` (as WP11 publishes it) is the refunded amount; the order total when absent.
 pub async fn capture_refund(
     db: &PgPool,
     tenant: Uuid,
@@ -1146,7 +1146,7 @@ pub async fn capture_refund(
     if platforms.is_empty() || !ads_allowed(&mut tx, &p.subject, p.customer_id).await? {
         return Ok(0);
     }
-    let amount = data["amount_minor"].as_i64().filter(|a| *a > 0);
+    let amount = data["refunded_minor"].as_i64().filter(|a| *a > 0);
     let n = insert(
         &mut tx,
         &platforms,
