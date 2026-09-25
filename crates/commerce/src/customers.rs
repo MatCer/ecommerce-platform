@@ -306,12 +306,29 @@ pub async fn me(tx: &mut TenantTx, session: &Session) -> Result<CustomerView, Er
 // ---------------------------------------------------------------------------------------
 // Rate limits
 
+/// Recent attempts of `kind` for the email and the IP. Takes transaction-scoped advisory
+/// locks on both first (email, then IP: one order, no deadlocks), so concurrent requests are
+/// counted one after another and the caller's `record_attempt` in the same transaction is
+/// visible to the next one: parallel requests cannot share one remaining allowance.
 async fn attempts(
     tx: &mut TenantTx,
     kind: &str,
     email: &str,
     ip_hash: Option<&[u8]>,
 ) -> Result<(i64, i64), Error> {
+    let tenant = tx.tenant_id();
+    let mut keys = vec![format!("customer_auth:{tenant}:{kind}:email:{email}")];
+    if let Some(ip) = ip_hash {
+        keys.push(format!(
+            "customer_auth:{tenant}:{kind}:ip:{}",
+            hex::encode(ip)
+        ));
+    }
+    for key in keys {
+        sqlx::query!("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", key)
+            .fetch_one(&mut **tx)
+            .await?;
+    }
     let r = sqlx::query!(
         "SELECT count(*) FILTER (WHERE email = $2) AS \"email!\",
                 count(*) FILTER (WHERE ip_hash = $3) AS \"ip!\"
@@ -520,8 +537,11 @@ pub async fn login(
     if by_email >= FAILED_LOGINS_PER_EMAIL || by_ip >= FAILED_LOGINS_PER_IP {
         return Err(too_many());
     }
+    // Locked until commit: a concurrent password change (which locks the same row, then
+    // revokes other sessions) cannot interleave, so an old password can never mint a session
+    // that outlives the change.
     let found = sqlx::query!(
-        "SELECT id, password_hash FROM customers WHERE email = $1",
+        "SELECT id, password_hash FROM customers WHERE email = $1 FOR UPDATE",
         email
     )
     .fetch_optional(&mut **tx)

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT send_token FROM email_messages WHERE id = $1 AND status = 'sending' FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "send_token",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "send_token"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "342b5c76b67693430d864059f5439e6ff8c73464d7987ed3a0b23183718ea77e"
+}

@@ -62,12 +62,11 @@ pub fn all(storage: Storage, meili: Meili, mailer: Mailer, auth: Option<AuthServ
         .register(intervals::TRANSITION_JOB, price_transition)
 }
 
-/// Delivers one email (A14). A message that could not be handed over is retried with backoff;
-/// on the last attempt it becomes `failed`.
+/// Delivers one email (A14). A message that could not be handed over is retried with backoff
+/// until the message itself gives up (`failed`, see `notifications::deliver`).
 async fn mail_send(ctx: Ctx, job: Job, mailer: Mailer) -> Result<(), JobError> {
     let (tenant, message) = tenant_and(&job, "message_id")?;
-    let last = job.attempts >= job.max_attempts;
-    match notifications::deliver(&ctx.db, &mailer, tenant, message, last).await {
+    match notifications::deliver(&ctx.db, &mailer, tenant, message).await {
         Ok(Step::Done) => Ok(()),
         Ok(Step::Retry(reason)) => Err(JobError::Retry(reason)),
         Err(e) => Err(JobError::Retry(e.to_string())),
@@ -207,8 +206,16 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let customer_auth = sqlx::query_scalar!(r#"SELECT platform.purge_customer_auth() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
+    // A14: deliveries whose job died (or whose worker died mid-send) get a new job.
+    let stalled = notifications::reconcile_jobs(&ctx.db)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    for job in &stalled {
+        queue::enqueue(&ctx.db, job).await?;
+    }
     tracing::info!(
         queue_rows,
+        stalled_emails = stalled.len(),
         idempotency_keys = keys,
         zero_results,
         customer_auth,

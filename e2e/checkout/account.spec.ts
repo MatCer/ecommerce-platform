@@ -119,6 +119,13 @@ test("adds an address", async () => {
   await expectAccessible(page, "addresses");
   await page.reload();
   await expect(page.locator("address")).toContainText("110 00 Praha");
+
+  await page.getByRole("button", { name: /^Upravit/ }).click();
+  await page.getByLabel("Telefon (nepovinné)").fill("+420 777 123 456");
+  await page.getByRole("button", { name: "Uložit adresu" }).click();
+  await expect(page.getByRole("status")).toHaveText("Adresa byla uložena.");
+  await page.reload();
+  await expect(page.locator("address")).toContainText("+420 777 123 456");
 });
 
 test("sets a password right after the email-link sign-in, then signs out", async () => {

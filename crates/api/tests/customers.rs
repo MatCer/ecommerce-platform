@@ -429,16 +429,58 @@ async fn a_session_is_useless_for_another_tenant(db: PgPool) {
     .send(&c.s)
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    // RLS: the other tenant's transaction sees none of it.
+
+    // Tenant A data in every new table.
+    let (_, address, _) = c
+        .call(
+            Call::post(
+                "/storefront/v1/customer/addresses",
+                json!({"name": "A", "street": "S 1", "city": "C", "postal_code": "1", "country": "CZ"}),
+            )
+            .header("x-customer-session", session.clone()),
+        )
+        .await;
+    c.call(Call::post(
+        "/storefront/v1/consent",
+        json!({"purposes": {"analytics": true}, "text_version": "v1"}),
+    ))
+    .await;
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    let customer: Uuid = sqlx::query_scalar("SELECT id FROM customers LIMIT 1")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO customer_groups (tenant_id, name) VALUES ($1, 'B2B')")
+        .bind(c.shop.tenant)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    commerce::notifications::suppress(
+        &mut tx,
+        "x@example.test",
+        commerce::notifications::SuppressionReason::Manual,
+        None,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    // RLS: the other tenant's transaction sees none of it and cannot write into tenant A.
     let mut tx = platform::db::tenant_tx(&c.runtime, c.other.tenant)
         .await
         .unwrap();
     for table in [
         "customers",
+        "customer_groups",
+        "customer_addresses",
         "customer_sessions",
         "customer_magic_links",
         "customer_auth_attempts",
+        "consent_records",
         "email_messages",
+        "email_suppressions",
     ] {
         let n: i64 =
             sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
@@ -446,14 +488,80 @@ async fn a_session_is_useless_for_another_tenant(db: PgPool) {
                 .await
                 .unwrap();
         assert_eq!(n, 0, "{table}");
+        // Refused outright (append-only tables) or matching nothing: either way nothing goes.
+        sqlx::query("SAVEPOINT probe")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let changed = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "DELETE FROM {table} WHERE tenant_id = $1"
+        )))
+        .bind(c.shop.tenant)
+        .execute(&mut *tx)
+        .await
+        .map(|r| r.rows_affected())
+        .unwrap_or(0);
+        sqlx::query("ROLLBACK TO SAVEPOINT probe")
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        assert_eq!(changed, 0, "{table}");
     }
-    let write = sqlx::query(
-        "INSERT INTO customers (tenant_id, email, locale) VALUES ($1, 'z@example.test', 'cs')",
+    let forged = [
+        (
+            "INSERT INTO customers (tenant_id, email, locale) VALUES ($1, 'z@example.test', 'cs')",
+            None,
+        ),
+        (
+            "INSERT INTO customer_groups (tenant_id, name) VALUES ($1, 'x')",
+            None,
+        ),
+        (
+            "INSERT INTO customer_addresses (tenant_id, customer_id, name, street, city, postal_code, country)
+             VALUES ($1, $2, 'n', 's', 'c', '1', 'CZ')",
+            Some(customer),
+        ),
+        (
+            "INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted, text_version, source)
+             VALUES ($1, 'anon', 'x', 'ads', true, 'v1', 'banner')",
+            None,
+        ),
+    ];
+    for (sql, customer) in forged {
+        let mut q = sqlx::query(sql).bind(c.shop.tenant);
+        if let Some(id) = customer {
+            q = q.bind(id);
+        }
+        assert!(q.execute(&mut *tx).await.is_err(), "{sql}");
+        // A failed statement aborts the transaction; start a fresh one.
+        tx.rollback().await.unwrap();
+        tx = platform::db::tenant_tx(&c.runtime, c.other.tenant)
+            .await
+            .unwrap();
+    }
+    // Tenant B's own row cannot point at tenant A's customer (composite FK).
+    let cross = sqlx::query(
+        "INSERT INTO customer_addresses (tenant_id, customer_id, name, street, city, postal_code, country)
+         VALUES ($1, $2, 'n', 's', 'c', '1', 'CZ')",
     )
-    .bind(c.shop.tenant)
+    .bind(c.other.tenant)
+    .bind(customer)
     .execute(&mut *tx)
     .await;
-    assert!(write.is_err());
+    assert!(cross.is_err());
+    // And tenant A's address id is unknown through tenant B's API.
+    let uri = format!(
+        "/storefront/v1/customer/addresses/{}",
+        address["id"].as_str().unwrap()
+    );
+    let (status, _, _) = sf(
+        Call::delete(&uri).header("x-customer-session", session),
+        &c.other,
+        c.other.cz,
+    )
+    .send(&c.s)
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

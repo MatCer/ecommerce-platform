@@ -297,15 +297,16 @@ pub async fn current(
 }
 
 /// At sign-in: the anonymous subject's choices that are newer than the customer's own become
-/// the customer's (source `linked`), so the latest decision of the person wins.
+/// the customer's (source `linked`), keeping the time the choice was made, so the latest
+/// decision of the person wins however the sign-ins interleave.
 pub async fn link_anonymous(tx: &mut TenantTx, anon: &str, customer: Uuid) -> Result<(), Error> {
     if !well_formed_anon(anon) {
         return Ok(());
     }
     sqlx::query!(
         "INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted,
-                                      text_version, source, ip_hash)
-         SELECT a.tenant_id, 'customer', $2, a.purpose, a.granted, a.text_version, 'linked', NULL
+                                      text_version, source, ip_hash, at)
+         SELECT a.tenant_id, 'customer', $2, a.purpose, a.granted, a.text_version, 'linked', NULL, a.at
          FROM (SELECT DISTINCT ON (purpose) tenant_id, purpose, granted, text_version, at
                FROM consent_records WHERE subject_type = 'anon' AND subject_id = $1
                ORDER BY purpose, at DESC, id DESC) a

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT salt FROM platform.ip_salts WHERE day = (now() AT TIME ZONE 'utc')::date",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "salt",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "platform.ip_salts",
+            "name": "salt"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ae0857525ea4011e4f7a99a2192884b2767539321d2ca8810d66ec9fa10d3927"
+}

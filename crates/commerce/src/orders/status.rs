@@ -1,4 +1,5 @@
-//! Order, payment, fulfillment and return-line status machines (spec §7.3, A10, A13, A16).
+//! Order, payment, cash-on-delivery, fulfillment and return-line status machines (spec §7.3,
+//! A10, A13, A16).
 //!
 //! Pure functions: `transition(state, command)` returns the next state plus the events to
 //! record (`order_events`, outbox), or a [`TransitionError`] when the command is not allowed
@@ -9,10 +10,14 @@
 //!   `returned` once every line is returned. Partial returns are not an order status (A13):
 //!   they are derived from the per-line return states ([`ReturnSummary`]).
 //! - COD orders are `confirmed` on placement (A13); prepaid ones wait for the payment.
-//! - Payment: `unpaid → authorized → paid → partially_refunded → refunded`, `failed`,
-//!   `expired`, and for cash on delivery `delivered → collected → remitted` (A16). A payment
-//!   that succeeds after the order expired or was cancelled is recorded, never refused, and
-//!   raises [`PaymentEvent::LatePayment`] (A10: order exception + refund task, stock untouched).
+//! - Payment (the customer's money): `unpaid → authorized → paid → partially_refunded →
+//!   refunded`, `failed`, `expired`. A payment that succeeds after the order expired or was
+//!   cancelled is recorded, never refused, and raises [`PaymentEvent::LatePayment`] (A10: order
+//!   exception + refund task, stock untouched).
+//! - Cash on delivery (A16) is tracked separately, because the carrier's cash movements are
+//!   independent of refunds to the customer: `pending → delivered → collected → remitted`.
+//!   Collection is when the payment becomes `paid` ([`CodEvent::Collected`] tells the caller to
+//!   apply [`PaymentCommand::Succeed`]); a later refund does not undo the carrier's remittance.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -179,12 +184,6 @@ pub enum PaymentStatus {
     Refunded,
     Failed,
     Expired,
-    /// COD: the parcel was delivered; the carrier holds the cash (A16).
-    Delivered,
-    /// COD: the carrier (or the merchant) reported the cash as collected.
-    Collected,
-    /// COD: the carrier paid the cash out to the merchant.
-    Remitted,
 }
 
 names!(PaymentStatus {
@@ -195,15 +194,12 @@ names!(PaymentStatus {
     Refunded => "refunded",
     Failed => "failed",
     Expired => "expired",
-    Delivered => "delivered",
-    Collected => "collected",
-    Remitted => "remitted",
 });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PaymentCommand {
     Authorize,
-    /// The provider confirmed the money (`payment_intent.succeeded`, a matched transfer).
+    /// The money is confirmed (`payment_intent.succeeded`, a matched transfer, COD collected).
     Succeed,
     Fail,
     /// The payment window ran out (payment timeouts, WP11).
@@ -213,9 +209,6 @@ pub enum PaymentCommand {
     Refund {
         full: bool,
     },
-    CodDelivered,
-    CodCollected,
-    CodRemitted,
 }
 
 impl PaymentCommand {
@@ -228,9 +221,6 @@ impl PaymentCommand {
             Self::Retry => "retry",
             Self::Refund { full: true } => "refund_full",
             Self::Refund { full: false } => "refund_partial",
-            Self::CodDelivered => "cod_delivered",
-            Self::CodCollected => "cod_collected",
-            Self::CodRemitted => "cod_remitted",
         }
     }
 }
@@ -245,9 +235,6 @@ pub enum PaymentEvent {
     RetryStarted,
     PartiallyRefunded,
     Refunded,
-    CodDelivered,
-    CodCollected,
-    CodRemitted,
     /// Money arrived for an expired or cancelled order: flag the order as an exception and
     /// open a refund task; never restore stock silently (A10).
     LatePayment,
@@ -277,17 +264,12 @@ pub fn payment_transition(
         (S::Unpaid | S::Authorized, C::Fail) => (S::Failed, vec![E::Failed]),
         (S::Unpaid | S::Authorized | S::Failed, C::Expire) => (S::Expired, vec![E::Expired]),
         (S::Failed, C::Retry) => (S::Unpaid, vec![E::RetryStarted]),
-        (S::Paid | S::PartiallyRefunded | S::Collected | S::Remitted, C::Refund { full }) => {
-            if full {
-                (S::Refunded, vec![E::Refunded])
-            } else {
-                (S::PartiallyRefunded, vec![E::PartiallyRefunded])
-            }
+        (S::Paid | S::PartiallyRefunded, C::Refund { full: true }) => {
+            (S::Refunded, vec![E::Refunded])
         }
-        (S::Unpaid, C::CodDelivered) => (S::Delivered, vec![E::CodDelivered]),
-        // The carrier's report can skip the delivery step; a manual confirmation too.
-        (S::Unpaid | S::Delivered, C::CodCollected) => (S::Collected, vec![E::CodCollected]),
-        (S::Collected, C::CodRemitted) => (S::Remitted, vec![E::CodRemitted]),
+        (S::Paid | S::PartiallyRefunded, C::Refund { full: false }) => {
+            (S::PartiallyRefunded, vec![E::PartiallyRefunded])
+        }
         _ => {
             return Err(TransitionError {
                 machine: "payment",
@@ -296,6 +278,74 @@ pub fn payment_transition(
             });
         }
     })
+}
+
+// ---------------------------------------------------------------------------------------
+// Cash on delivery (A16)
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CodStatus {
+    /// The parcel is on its way; nobody holds the cash yet.
+    Pending,
+    /// Delivered; the carrier took the cash (not yet reported).
+    Delivered,
+    /// The carrier (or the merchant) reported the cash as collected.
+    Collected,
+    /// The carrier paid the cash out to the merchant (payout import or manual, audited).
+    Remitted,
+}
+
+names!(CodStatus {
+    Pending => "pending",
+    Delivered => "delivered",
+    Collected => "collected",
+    Remitted => "remitted",
+});
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodCommand {
+    Deliver,
+    Collect,
+    Remit,
+}
+
+impl CodCommand {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Deliver => "deliver",
+            Self::Collect => "collect",
+            Self::Remit => "remit",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CodEvent {
+    Delivered,
+    /// The customer paid: apply [`PaymentCommand::Succeed`] to the payment.
+    Collected,
+    Remitted,
+}
+
+pub fn cod_transition(state: CodStatus, command: CodCommand) -> Outcome<CodStatus, CodEvent> {
+    use CodCommand as C;
+    use CodStatus as S;
+    let next = match (state, command) {
+        (S::Pending, C::Deliver) => (S::Delivered, CodEvent::Delivered),
+        // The carrier's report can skip the delivery step; a manual confirmation too.
+        (S::Pending | S::Delivered, C::Collect) => (S::Collected, CodEvent::Collected),
+        (S::Collected, C::Remit) => (S::Remitted, CodEvent::Remitted),
+        _ => {
+            return Err(TransitionError {
+                machine: "cod",
+                state: state.as_str(),
+                command: command.name(),
+            });
+        }
+    };
+    Ok((next.0, vec![next.1]))
 }
 
 // ---------------------------------------------------------------------------------------
@@ -386,9 +436,11 @@ pub enum ReturnLineStatus {
     Requested,
     /// Accepted by the merchant; waiting for the goods (or proof of dispatch).
     Approved,
-    /// The goods arrived (merchant-confirmed): restock (A13).
+    /// The goods arrived (merchant-confirmed): restocked (A13); the refund is still due.
     Received,
-    /// The money went back. A refund may precede the goods (A19: proof of dispatch).
+    /// Refunded on proof of dispatch (A19); the goods have not arrived yet.
+    RefundedAwaitingGoods,
+    /// Refunded and the goods are back: done.
     Refunded,
     Rejected,
 }
@@ -397,6 +449,7 @@ names!(ReturnLineStatus {
     Requested => "requested",
     Approved => "approved",
     Received => "received",
+    RefundedAwaitingGoods => "refunded_awaiting_goods",
     Refunded => "refunded",
     Rejected => "rejected",
 });
@@ -426,7 +479,7 @@ impl ReturnCommand {
 pub enum ReturnEvent {
     Approved,
     Rejected,
-    /// Restock the returned quantity (A13).
+    /// Restock the returned quantity (A13). Emitted exactly once per return line.
     GoodsReceived,
     Refunded,
 }
@@ -442,9 +495,9 @@ pub fn return_transition(
         (S::Requested, C::Approve) => (S::Approved, E::Approved),
         (S::Requested, C::Reject) => (S::Rejected, E::Rejected),
         (S::Approved, C::Receive) => (S::Received, E::GoodsReceived),
-        (S::Approved | S::Received, C::Refund) => (S::Refunded, E::Refunded),
-        // Refunded on proof of dispatch; the goods arrive afterwards and are restocked.
-        (S::Refunded, C::Receive) => (S::Refunded, E::GoodsReceived),
+        (S::Approved, C::Refund) => (S::RefundedAwaitingGoods, E::Refunded),
+        (S::Received, C::Refund) => (S::Refunded, E::Refunded),
+        (S::RefundedAwaitingGoods, C::Receive) => (S::Refunded, E::GoodsReceived),
         _ => {
             return Err(TransitionError {
                 machine: "return",
@@ -473,7 +526,14 @@ pub fn return_summary(lines: &[(u32, Vec<(u32, ReturnLineStatus)>)]) -> ReturnSu
     for (quantity, returns) in lines {
         let back: u64 = returns
             .iter()
-            .filter(|(_, s)| matches!(s, ReturnLineStatus::Received | ReturnLineStatus::Refunded))
+            .filter(|(_, s)| {
+                matches!(
+                    s,
+                    ReturnLineStatus::Received
+                        | ReturnLineStatus::RefundedAwaitingGoods
+                        | ReturnLineStatus::Refunded
+                )
+            })
             .map(|(q, _)| u64::from(*q))
             .sum();
         ordered += u64::from(*quantity);
@@ -573,9 +633,6 @@ mod tests {
         PaymentCommand::Retry,
         PaymentCommand::Refund { full: true },
         PaymentCommand::Refund { full: false },
-        PaymentCommand::CodDelivered,
-        PaymentCommand::CodCollected,
-        PaymentCommand::CodRemitted,
     ];
 
     #[test]
@@ -597,14 +654,6 @@ mod tests {
             ("paid", "refund_partial", "partially_refunded"),
             ("partially_refunded", "refund_full", "refunded"),
             ("partially_refunded", "refund_partial", "partially_refunded"),
-            ("collected", "refund_full", "refunded"),
-            ("collected", "refund_partial", "partially_refunded"),
-            ("remitted", "refund_full", "refunded"),
-            ("remitted", "refund_partial", "partially_refunded"),
-            ("unpaid", "cod_delivered", "delivered"),
-            ("unpaid", "cod_collected", "collected"),
-            ("delivered", "cod_collected", "collected"),
-            ("collected", "cod_remitted", "remitted"),
         ]
         .into();
         let mut seen = BTreeSet::new();
@@ -659,25 +708,51 @@ mod tests {
     }
 
     #[test]
-    fn cod_goes_delivered_collected_remitted() {
-        let mut s = PaymentStatus::Unpaid;
-        for (command, expected) in [
-            (PaymentCommand::CodDelivered, PaymentStatus::Delivered),
-            (PaymentCommand::CodCollected, PaymentStatus::Collected),
-            (PaymentCommand::CodRemitted, PaymentStatus::Remitted),
-        ] {
-            s = payment_transition(s, command, OrderStatus::Delivered)
-                .unwrap()
-                .0;
-            assert_eq!(s, expected);
+    fn cod_machine_is_exactly_the_spec() {
+        let commands = [CodCommand::Deliver, CodCommand::Collect, CodCommand::Remit];
+        let allowed: BTreeSet<(&str, &str, &str)> = [
+            ("pending", "deliver", "delivered"),
+            ("pending", "collect", "collected"),
+            ("delivered", "collect", "collected"),
+            ("collected", "remit", "remitted"),
+        ]
+        .into();
+        let mut seen = BTreeSet::new();
+        for &state in CodStatus::ALL {
+            for command in commands {
+                if let Ok((next, _)) = cod_transition(state, command) {
+                    seen.insert((state.as_str(), command.name(), next.as_str()));
+                }
+            }
         }
+        assert_eq!(seen, allowed);
+    }
+
+    /// A16 + refunds: collection pays the order, a refund to the customer does not stop the
+    /// carrier's payout from being recorded.
+    #[test]
+    fn cod_collection_refund_then_remittance() {
+        let (cod, events) = cod_transition(CodStatus::Delivered, CodCommand::Collect).unwrap();
+        assert_eq!(events, vec![CodEvent::Collected]);
+        let (payment, _) = payment_transition(
+            PaymentStatus::Unpaid,
+            PaymentCommand::Succeed,
+            OrderStatus::Delivered,
+        )
+        .unwrap();
+        let (payment, _) = payment_transition(
+            payment,
+            PaymentCommand::Refund { full: true },
+            OrderStatus::Returned,
+        )
+        .unwrap();
+        assert_eq!(payment, PaymentStatus::Refunded);
+        assert_eq!(
+            cod_transition(cod, CodCommand::Remit).unwrap().0,
+            CodStatus::Remitted
+        );
         assert!(
-            payment_transition(
-                PaymentStatus::Delivered,
-                PaymentCommand::CodRemitted,
-                OrderStatus::Delivered
-            )
-            .is_err(),
+            cod_transition(CodStatus::Delivered, CodCommand::Remit).is_err(),
             "cash must be collected before it can be remitted"
         );
     }
@@ -712,39 +787,58 @@ mod tests {
         assert_eq!(seen, allowed);
     }
 
+    const RETURN_COMMANDS: [ReturnCommand; 4] = [
+        ReturnCommand::Approve,
+        ReturnCommand::Reject,
+        ReturnCommand::Receive,
+        ReturnCommand::Refund,
+    ];
+
     #[test]
     fn return_machine_is_exactly_the_spec() {
-        let commands = [
-            ReturnCommand::Approve,
-            ReturnCommand::Reject,
-            ReturnCommand::Receive,
-            ReturnCommand::Refund,
-        ];
         let allowed: BTreeSet<(&str, &str, &str)> = [
             ("requested", "approve", "approved"),
             ("requested", "reject", "rejected"),
             ("approved", "receive", "received"),
-            ("approved", "refund", "refunded"),
+            ("approved", "refund", "refunded_awaiting_goods"),
             ("received", "refund", "refunded"),
-            ("refunded", "receive", "refunded"),
+            ("refunded_awaiting_goods", "receive", "refunded"),
         ]
         .into();
         let mut seen = BTreeSet::new();
         for &state in ReturnLineStatus::ALL {
-            for command in commands {
+            for command in RETURN_COMMANDS {
                 if let Ok((next, _)) = return_transition(state, command) {
                     seen.insert((state.as_str(), command.name(), next.as_str()));
                 }
             }
         }
         assert_eq!(seen, allowed);
-        // Goods arriving after an early refund still restock (A13, A19).
-        assert_eq!(
-            return_transition(ReturnLineStatus::Refunded, ReturnCommand::Receive)
-                .unwrap()
-                .1,
-            vec![ReturnEvent::GoodsReceived]
-        );
+    }
+
+    /// Both orders of receipt and refund restock exactly once and end `refunded`.
+    #[test]
+    fn goods_are_restocked_exactly_once_in_either_order() {
+        for order in [
+            [ReturnCommand::Receive, ReturnCommand::Refund],
+            [ReturnCommand::Refund, ReturnCommand::Receive],
+        ] {
+            let mut state = ReturnLineStatus::Approved;
+            let mut restocks = 0;
+            for command in order {
+                let (next, events) = return_transition(state, command).unwrap();
+                restocks += events
+                    .iter()
+                    .filter(|e| **e == ReturnEvent::GoodsReceived)
+                    .count();
+                state = next;
+            }
+            assert_eq!(state, ReturnLineStatus::Refunded);
+            assert_eq!(restocks, 1, "{order:?}");
+            for command in RETURN_COMMANDS {
+                assert!(return_transition(state, command).is_err(), "{command:?}");
+            }
+        }
     }
 
     #[test]
@@ -761,7 +855,7 @@ mod tests {
         );
         assert_eq!(
             return_summary(&[
-                (2, vec![(1, R::Received), (1, R::Refunded)]),
+                (2, vec![(1, R::Received), (1, R::RefundedAwaitingGoods)]),
                 (1, vec![(1, R::Refunded)])
             ]),
             ReturnSummary::Full
@@ -784,6 +878,9 @@ mod tests {
         }
         for s in PaymentStatus::ALL {
             assert_eq!(s.as_str().parse::<PaymentStatus>(), Ok(*s));
+        }
+        for s in CodStatus::ALL {
+            assert_eq!(s.as_str().parse::<CodStatus>(), Ok(*s));
         }
         for s in FulfillmentStatus::ALL {
             assert_eq!(s.as_str().parse::<FulfillmentStatus>(), Ok(*s));

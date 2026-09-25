@@ -53,7 +53,21 @@ export default function Addresses(props: {
     setError("");
     setStatus("");
     setEditing(a ? a.id : null);
-    setForm(a ? { ...a } : empty(props.countries[0] ?? "CZ"));
+    // Only the input fields: the API refuses unknown ones (`id`).
+    setForm(
+      a
+        ? {
+            name: a.name,
+            company: a.company,
+            street: a.street,
+            city: a.city,
+            postal_code: a.postal_code,
+            country: a.country,
+            phone: a.phone,
+            is_default: a.is_default,
+          }
+        : empty(props.countries[0] ?? "CZ"),
+    );
   }
 
   async function save(e: SubmitEvent) {

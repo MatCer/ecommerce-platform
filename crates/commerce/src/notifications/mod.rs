@@ -33,8 +33,12 @@ pub use brand::Brand;
 
 /// Job kind: deliver one `email_messages` row.
 pub const SEND_JOB: &str = "mail.send";
-/// Attempts before a message that could not be handed over is given up (`failed`).
-const SEND_ATTEMPTS: i32 = 8;
+/// SMTP attempts before a message that could not be handed over is given up (`failed`).
+const SMTP_ATTEMPTS: i32 = 8;
+/// Job attempts: more than SMTP attempts, so the job normally outlives the message's own
+/// decisions (the one uncertain retry included). If it still dies, the hourly reconciliation
+/// ([`reconcile_jobs`]) queues a new job.
+const SEND_JOB_ATTEMPTS: i32 = SMTP_ATTEMPTS + 4;
 
 // ---------------------------------------------------------------------------------------
 // Templates
@@ -268,7 +272,7 @@ pub async fn enqueue(tx: &mut TenantTx, brand: &Brand, email: Email<'_>) -> Resu
     };
     let mut job = NewJob::new(SEND_JOB, json!({ "message_id": id }));
     job.tenant_id = Some(tx.tenant_id());
-    job.max_attempts = SEND_ATTEMPTS;
+    job.max_attempts = SEND_JOB_ATTEMPTS;
     job.idempotency_key = Some(format!("mail:{id}"));
     queue::enqueue(&mut **tx, &job).await?;
     Ok(id)
@@ -337,81 +341,116 @@ pub async fn is_suppressed(tx: &mut TenantTx, email: &str, stream: Stream) -> Re
 /// What the job should do after [`deliver`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Step {
-    /// The message reached a final state (or needs nothing more).
+    /// The message reached a final state (or needs nothing more from this job).
     Done,
     /// Try again later (backoff); the reason is for the job log.
     Retry(String),
 }
 
-struct Loaded {
-    stream: Stream,
-    to: String,
-    subject: String,
-    html: String,
-    text: String,
-    uncertain_count: i16,
+/// A send in flight: `sending` was committed with `token`. Only the holder of the token may
+/// record the outcome, so a worker that lost its lease cannot overwrite a newer attempt.
+#[derive(Debug, Clone)]
+pub struct Sending {
+    pub tenant: Uuid,
+    pub id: Uuid,
+    pub token: Uuid,
+    pub stream: Stream,
+    pub to: String,
+    pub subject: String,
+    pub html: String,
+    pub text: String,
+    /// SMTP attempts including this one.
+    pub attempts: i32,
+    pub uncertain_count: i16,
 }
 
-/// Loads the message and decides whether to send it now; commits `sending` when it does.
-async fn begin(tx: &mut TenantTx, id: Uuid) -> Result<Option<Loaded>, Error> {
+/// Longest a send can legitimately stay `sending` (SMTP timeout 30 s, lease 60 s). Older
+/// `sending` rows belong to a worker that died mid-send.
+const SENDING_STALE_SECS: f64 = 120.0;
+
+/// Decides whether message `id` is sent now and, if so, commits `sending` with a fresh token.
+/// `Err(Step)` when there is nothing to send now (final state, suppressed, or another worker is
+/// sending it right now).
+pub async fn begin_send(
+    db: &PgPool,
+    tenant: Uuid,
+    id: Uuid,
+) -> Result<Result<Sending, Step>, Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
     let Some(m) = sqlx::query!(
-        "SELECT stream, to_email, subject, html, body_text, status, uncertain_count
-         FROM email_messages WHERE id = $1 FOR UPDATE",
-        id
+        r#"SELECT stream, to_email, subject, html, body_text, status, uncertain_count, attempts,
+                  updated_at < now() - make_interval(secs => $2) AS "stale!"
+           FROM email_messages WHERE id = $1 FOR UPDATE"#,
+        id,
+        SENDING_STALE_SECS
     )
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *tx)
     .await?
     else {
-        return Ok(None);
+        return Ok(Err(Step::Done));
     };
     let stream = Stream::parse(&m.stream)
         .ok_or_else(|| Error::Internal(format!("unknown stream {}", m.stream)))?;
     let mut uncertain = m.uncertain_count;
     match m.status.as_str() {
-        "pending" => {}
+        "pending" | "uncertain" => {}
+        // Another job is sending it right now (e.g. the reconciliation sweep overlapped).
+        "sending" if !m.stale => {
+            return Ok(Err(Step::Retry("the message is being sent".into())));
+        }
         // An earlier attempt died between `sending` and the SMTP answer.
         "sending" => {
             uncertain += 1;
             sqlx::query!(
                 "UPDATE email_messages SET status = 'uncertain', uncertain_count = $2,
-                     last_error = 'worker stopped while sending', updated_at = now()
+                     send_token = NULL, last_error = 'worker stopped while sending',
+                     updated_at = now()
                  WHERE id = $1",
                 id,
                 uncertain
             )
-            .execute(&mut **tx)
+            .execute(&mut *tx)
             .await?;
         }
-        "uncertain" => {}
-        _ => return Ok(None), // accepted, failed
+        _ => return Ok(Err(Step::Done)), // accepted, failed
     }
     // A14: one retry for transactional mail whose first send ended uncertain, none for
     // marketing, none after a second uncertain send.
-    if uncertain > 0 && !(stream == Stream::Transactional && uncertain == 1) {
-        finish(tx, id, "uncertain", None).await?;
-        return Ok(None);
-    }
-    if is_suppressed(tx, &m.to_email, stream).await? {
-        finish(tx, id, "failed", Some("suppressed")).await?;
-        return Ok(None);
-    }
-    let (Some(html), Some(text)) = (m.html, m.body_text) else {
-        finish(tx, id, "failed", Some("message body is gone")).await?;
-        return Ok(None);
+    let refusal = if uncertain > 0 && !(stream == Stream::Transactional && uncertain == 1) {
+        Some(("uncertain", None))
+    } else if is_suppressed(&mut tx, &m.to_email, stream).await? {
+        Some(("failed", Some("suppressed")))
+    } else if m.html.is_none() || m.body_text.is_none() {
+        Some(("failed", Some("message body is gone")))
+    } else {
+        None
     };
+    if let Some((status, error)) = refusal {
+        finish(&mut tx, id, status, error).await?;
+        tx.commit().await?;
+        return Ok(Err(Step::Done));
+    }
+    let token = Uuid::now_v7();
     sqlx::query!(
-        "UPDATE email_messages SET status = 'sending', attempts = attempts + 1, updated_at = now()
+        "UPDATE email_messages SET status = 'sending', send_token = $2, attempts = attempts + 1,
+             updated_at = now()
          WHERE id = $1",
-        id
+        id,
+        token
     )
-    .execute(&mut **tx)
+    .execute(&mut *tx)
     .await?;
-    Ok(Some(Loaded {
+    tx.commit().await?;
+    Ok(Ok(Sending {
+        tenant,
+        id,
+        token,
         stream,
         to: m.to_email,
         subject: m.subject,
-        html,
-        text,
+        html: m.html.unwrap_or_default(),
+        text: m.body_text.unwrap_or_default(),
+        attempts: m.attempts + 1,
         uncertain_count: uncertain,
     }))
 }
@@ -425,6 +464,7 @@ async fn finish(
 ) -> Result<(), Error> {
     sqlx::query!(
         "UPDATE email_messages SET status = $2, last_error = coalesce($3, last_error),
+             send_token = NULL,
              accepted_at = CASE WHEN $2 = 'accepted' THEN now() ELSE accepted_at END,
              html = CASE WHEN sensitive THEN NULL ELSE html END,
              body_text = CASE WHEN sensitive THEN NULL ELSE body_text END,
@@ -439,98 +479,131 @@ async fn finish(
     Ok(())
 }
 
-/// Sends message `id` of `tenant` if its state allows it (the `mail.send` job). `last_attempt`:
-/// the job will not run again, so a message that could not be handed over becomes `failed`.
-pub async fn deliver(
-    db: &PgPool,
-    mailer: &Mailer,
-    tenant: Uuid,
-    id: Uuid,
-    last_attempt: bool,
-) -> Result<Step, Error> {
-    let brand_name = {
-        let mut tx = tenant_tx(db, tenant).await?;
-        let loaded = begin(&mut tx, id).await?;
-        let name = match &loaded {
-            Some(_) => Some(
-                sqlx::query_scalar!("SELECT name FROM platform.tenants WHERE id = $1", tenant)
-                    .fetch_one(&mut *tx)
-                    .await?,
-            ),
-            None => None,
-        };
-        tx.commit().await?;
-        loaded.zip(name)
-    };
-    let Some((m, shop_name)) = brand_name else {
+/// Records the SMTP outcome of `s`, fenced by its token: if another attempt took the message
+/// over in the meantime, nothing is written and the job is done.
+pub async fn finish_send(db: &PgPool, s: &Sending, outcome: Delivery) -> Result<Step, Error> {
+    let mut tx = tenant_tx(db, s.tenant).await?;
+    let current = sqlx::query_scalar!(
+        "SELECT send_token FROM email_messages WHERE id = $1 AND status = 'sending' FOR UPDATE",
+        s.id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .flatten();
+    if current != Some(s.token) {
+        tracing::warn!(message = %s.id, "send outcome arrived after another attempt took over");
         return Ok(Step::Done);
-    };
-    let id_text = id.to_string();
-    let outcome = mailer
-        .send(&Outgoing {
-            stream: m.stream,
-            from_name: &shop_name,
-            to: &m.to,
-            subject: &m.subject,
-            html: &m.html,
-            text: &m.text,
-            id: &id_text,
-        })
-        .await;
-    let mut tx = tenant_tx(db, tenant).await?;
+    }
+    let error = |e: &str| e.chars().take(1000).collect::<String>();
     let step = match outcome {
         Delivery::Accepted => {
-            finish(&mut tx, id, "accepted", None).await?;
+            finish(&mut tx, s.id, "accepted", None).await?;
             Step::Done
         }
         Delivery::Rejected(e) => {
-            finish(&mut tx, id, "failed", Some(&e)).await?;
+            finish(&mut tx, s.id, "failed", Some(&e)).await?;
             Step::Done
         }
         // Nothing was handed over: back to where it was, or failed when out of attempts.
-        Delivery::NotSent(e) if last_attempt => {
-            finish(&mut tx, id, "failed", Some(&e)).await?;
+        Delivery::NotSent(e) if s.attempts >= SMTP_ATTEMPTS => {
+            finish(&mut tx, s.id, "failed", Some(&e)).await?;
             Step::Done
         }
         Delivery::NotSent(e) => {
-            let back = if m.uncertain_count > 0 {
+            let back = if s.uncertain_count > 0 {
                 "uncertain"
             } else {
                 "pending"
             };
             sqlx::query!(
-                "UPDATE email_messages SET status = $2, last_error = $3, updated_at = now()
+                "UPDATE email_messages SET status = $2, send_token = NULL, last_error = $3,
+                     updated_at = now()
                  WHERE id = $1",
-                id,
+                s.id,
                 back,
-                e.chars().take(1000).collect::<String>()
+                error(&e)
             )
             .execute(&mut *tx)
             .await?;
             Step::Retry(e)
         }
         Delivery::Uncertain(e) => {
-            let count = m.uncertain_count + 1;
+            let count = s.uncertain_count + 1;
             sqlx::query!(
                 "UPDATE email_messages SET status = 'uncertain', uncertain_count = $2,
-                     last_error = $3, updated_at = now()
+                     send_token = NULL, last_error = $3, updated_at = now()
                  WHERE id = $1",
-                id,
+                s.id,
                 count,
-                e.chars().take(1000).collect::<String>()
+                error(&e)
             )
             .execute(&mut *tx)
             .await?;
-            if m.stream == Stream::Transactional && count == 1 {
+            if s.stream == Stream::Transactional && count == 1 {
                 Step::Retry(e)
             } else {
-                finish(&mut tx, id, "uncertain", None).await?;
+                finish(&mut tx, s.id, "uncertain", None).await?;
                 Step::Done
             }
         }
     };
     tx.commit().await?;
     Ok(step)
+}
+
+/// The `mail.send` job: sends message `id` of `tenant` if its state allows it.
+pub async fn deliver(db: &PgPool, mailer: &Mailer, tenant: Uuid, id: Uuid) -> Result<Step, Error> {
+    let s = match begin_send(db, tenant, id).await? {
+        Ok(s) => s,
+        Err(step) => return Ok(step),
+    };
+    let shop_name = {
+        let mut tx = tenant_tx(db, tenant).await?;
+        let name = sqlx::query_scalar!("SELECT name FROM platform.tenants WHERE id = $1", tenant)
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        name
+    };
+    let id_text = id.to_string();
+    let outcome = mailer
+        .send(&Outgoing {
+            stream: s.stream,
+            from_name: &shop_name,
+            to: &s.to,
+            subject: &s.subject,
+            html: &s.html,
+            text: &s.text,
+            id: &id_text,
+        })
+        .await;
+    finish_send(db, &s, outcome).await
+}
+
+/// Messages whose delivery stalled (their job gave up, or a worker died mid-send), across
+/// tenants, for the hourly reconciliation in `maintenance.cleanup`: returns a `mail.send` job
+/// per message (idempotent per stall).
+pub async fn reconcile_jobs(db: &PgPool) -> Result<Vec<NewJob<'static>>, Error> {
+    let rows = sqlx::query!(
+        r#"SELECT tenant_id AS "tenant_id!", id AS "id!", stalled_since AS "stalled_since!"
+           FROM platform.stalled_email_messages(500)"#
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            let mut job = NewJob::new(SEND_JOB, json!({ "message_id": r.id }));
+            job.tenant_id = Some(r.tenant_id);
+            job.max_attempts = SEND_JOB_ATTEMPTS;
+            job.idempotency_key = Some(format!(
+                "mail:{}:{}",
+                r.id,
+                r.stalled_since.timestamp_micros()
+            ));
+            job
+        })
+        .collect())
 }
 
 #[cfg(test)]
