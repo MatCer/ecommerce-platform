@@ -11,7 +11,7 @@ cart drawer cross-sell, recently viewed with live prices) and admin settings + a
 recommended" view.
 
 **Architecture:**
-- Migration `20261006000000_recommendations.sql`: `product_stats_daily` (per market),
+- Migration `20261008000000_recommendations.sql`: `product_stats_daily` (per market),
   `co_purchases` (symmetric, support ≥ 3), `product_scores` (decayed sales score and
   popularity per market), `product_popularity` (the value in the search documents),
   `collections` (manual | seasonal with a schedule window), `customer_affinity`,
