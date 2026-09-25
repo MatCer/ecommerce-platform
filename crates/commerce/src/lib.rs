@@ -19,6 +19,7 @@ pub mod markets;
 pub mod media;
 pub mod money;
 pub mod notifications;
+pub mod ops;
 pub mod orders;
 pub mod payments;
 pub mod pricing;

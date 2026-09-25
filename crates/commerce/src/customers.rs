@@ -43,6 +43,8 @@ pub const MAX_ADDRESSES: i64 = 20;
 /// Outbox event after an address is proven (hook for guest-order linking, WP10). Payload:
 /// `{customer_id}`.
 pub const EMAIL_VERIFIED_EVENT: &str = "customer.email_verified";
+/// A new customer account (first verified sign-in link, §8.5 webhooks).
+pub const CREATED_EVENT: &str = "customer.created";
 /// Where sign-in lands by default.
 pub const DEFAULT_REDIRECT: &str = "/account";
 
@@ -453,15 +455,20 @@ pub async fn consume_magic_link(
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(invalid_link)?;
-    sqlx::query!(
+    let created = sqlx::query_scalar!(
         "INSERT INTO customers (tenant_id, email, locale) VALUES ($1, $2, $3)
-         ON CONFLICT ON CONSTRAINT customers_email_unique DO NOTHING",
+         ON CONFLICT ON CONSTRAINT customers_email_unique DO NOTHING
+         RETURNING id",
         tx.tenant_id(),
         link.email,
         link.locale
     )
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
+    if let Some(id) = created {
+        // Ids only: webhook receivers fetch details through the API (§8.5).
+        queue::publish(&mut **tx, CREATED_EVENT, &json!({ "customer_id": id })).await?;
+    }
     let c = sqlx::query!(
         "SELECT id, email_verified_at FROM customers WHERE email = $1 FOR UPDATE",
         link.email
