@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE customer_sessions\n         SET last_seen_at = now(), expires_at = now() + make_interval(days => $2)\n         WHERE token_hash = $1 AND expires_at > now()\n         RETURNING customer_id, email_verified_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "customer_sessions",
+            "name": "customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email_verified_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "customer_sessions",
+            "name": "email_verified_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "4556227978fca2d19bc6fd2a8e0a529af2c7101f2785e1c164dce75881118d1a"
+}

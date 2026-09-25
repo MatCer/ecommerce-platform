@@ -1,9 +1,16 @@
 import { env } from "cloudflare:workers";
-import type { Cart, ShopModel } from "@platform/storefront-sdk/types";
+import type {
+  Address,
+  Cart,
+  ConsentState,
+  Customer,
+  ShopModel,
+} from "@platform/storefront-sdk/types";
 
 /**
- * CHECKOUT binding calls. The edge injects tenant, market and the checkout-scoped cart
- * capability from the `__Host-cart` cookie; this app never sees credentials.
+ * CHECKOUT binding calls. The edge injects tenant, market, the checkout-scoped cart capability
+ * (`__Host-cart`), the customer session (`__Host-sid`) and the consent subject; this app never
+ * sees credentials.
  */
 export function checkoutApi(request: Request) {
   const ctx = request.headers.get("x-platform-ctx") ?? "";
@@ -11,12 +18,36 @@ export function checkoutApi(request: Request) {
     const res = await env.CHECKOUT.fetch(`https://checkout${path}`, {
       headers: { "x-platform-ctx": ctx },
     });
-    if (res.status === 404) return null;
+    // 404: no cart; 401: not signed in.
+    if (res.status === 404 || res.status === 401) return null;
     if (!res.ok) throw new Error(`checkout API ${res.status}`);
     return (await res.json()) as T;
   };
   return {
     shop: () => get<ShopModel>("/shop"),
     cart: () => get<Cart>("/cart"),
+    me: () => get<Customer>("/customer/me"),
+    addresses: async () => (await get<{ items: Address[] }>("/customer/addresses"))?.items ?? [],
+    consent: () => get<ConsentState>("/consent"),
   };
+}
+
+/** The shop origin of this checkout origin (`checkout.demo.localhost` → `demo.localhost`). */
+export function shopUrl(url: URL): string {
+  return `${url.protocol}//${url.host.replace(/^checkout\./, "")}/`;
+}
+
+/** Countries of the tenant's markets (`cs-CZ` → `CZ`), for address forms. */
+export function marketCountries(shop: ShopModel | null): string[] {
+  const codes = (shop?.markets ?? [])
+    .map((m) => m.locale.split("-")[1])
+    .filter((c): c is string => typeof c === "string" && /^[A-Z]{2}$/.test(c));
+  return codes.length > 0 ? [...new Set(codes)] : ["CZ", "SK"];
+}
+
+/** The messages islands need (they serialize props into the page): keys under `prefixes`. */
+export function messages(m: Record<string, string>, ...prefixes: string[]): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(m).filter(([k]) => prefixes.some((p) => k.startsWith(p))),
+  );
 }

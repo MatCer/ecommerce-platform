@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { consentStorage, readConsent, saveConsent } from "./consent.ts";
 
+const asked = {
+  offered: ["analytics", "ads", "personalization"] as const,
+  textVersion: "2026-09-25",
+};
+
 // A minimal browser: a cookie jar that keeps only the last `consent=` write, localStorage,
 // and window events.
 let jar = "";
@@ -46,7 +51,7 @@ test("nothing is stored before a choice; storage follows the personalization pur
   expect(recent.get("recent")).toBeNull();
 
   const post = vi.fn(async () => new Response(null, { status: 404 }));
-  await saveConsent(["personalization", "analytics"], post);
+  await saveConsent(["personalization", "analytics"], asked, post);
   expect(readConsent()).toEqual(["analytics", "personalization"]);
   expect(events).toEqual(["platform:consent"]);
   recent.set("recent", ["a"]);
@@ -55,20 +60,20 @@ test("nothing is stored before a choice; storage follows the personalization pur
 
   // Withdrawing personalization removes what it allowed to store.
   store.set("other-app", "kept");
-  await saveConsent(["analytics"], post);
+  await saveConsent(["analytics"], asked, post);
   expect([...store.keys()]).toEqual(["other-app"]);
   expect(recent.get("recent")).toBeNull();
 });
 
 test("each purpose has its own storage; only withdrawn purposes lose theirs", async () => {
   const post = vi.fn(async () => new Response(null, { status: 202 }));
-  await saveConsent(["analytics", "personalization"], post);
+  await saveConsent(["analytics", "personalization"], asked, post);
   consentStorage("analytics").set("id", "anon-1");
   consentStorage("personalization").set("recent", ["a"]);
   expect([...store.keys()].sort()).toEqual(["sf:analytics:id", "sf:personalization:recent"]);
 
   store.set("sf:recent", "unnamespaced");
-  await saveConsent(["personalization"], post);
+  await saveConsent(["personalization"], asked, post);
   expect([...store.keys()]).toEqual(["sf:personalization:recent"]);
   expect(consentStorage("personalization").get("recent")).toEqual(["a"]);
   expect(consentStorage("analytics").get("id")).toBeNull();
@@ -80,11 +85,16 @@ test("the choice goes out as a JSON beacon when the browser has sendBeacon", asy
     sendBeacon: (url: string, data: Blob) => beacons.push([url, data]) > 0,
   });
   const post = vi.fn();
-  await saveConsent(["analytics"], post);
+  await saveConsent(["analytics"], asked, post);
   expect(post).not.toHaveBeenCalled();
   expect(beacons[0]?.[0]).toBe("/_p/consent");
   expect(beacons[0]?.[1].type).toBe("application/json");
-  expect(await beacons[0]?.[1].text()).toBe('{"purposes":["analytics"]}');
+  // The platform contract: every offered purpose, granted or not, and the text version.
+  expect(JSON.parse((await beacons[0]?.[1].text()) ?? "null")).toEqual({
+    purposes: { analytics: true, ads: false, personalization: false },
+    text_version: "2026-09-25",
+    source: "banner",
+  });
 });
 
 test("without sendBeacon the choice is posted and survives a missing endpoint", async () => {
@@ -92,9 +102,14 @@ test("without sendBeacon the choice is posted and survives a missing endpoint", 
   const post = vi.fn(async (_url: string, _init?: RequestInit) => {
     throw new TypeError("offline");
   });
-  await expect(saveConsent(["ads"], post as typeof fetch)).resolves.toBeUndefined();
+  await expect(saveConsent(["ads"], asked, post as typeof fetch)).resolves.toBeUndefined();
   expect(readConsent()).toEqual(["ads"]);
   const [url, init] = post.mock.calls[0] ?? [];
   expect(url).toBe("/_p/consent");
-  expect(init).toMatchObject({ method: "POST", body: '{"purposes":["ads"]}' });
+  expect(init).toMatchObject({ method: "POST" });
+  expect(JSON.parse(String(init?.body)).purposes).toEqual({
+    analytics: false,
+    ads: true,
+    personalization: false,
+  });
 });

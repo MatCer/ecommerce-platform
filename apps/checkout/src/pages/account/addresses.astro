@@ -1,0 +1,33 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import Addresses from "../../islands/Addresses";
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, marketCountries, messages, shopUrl } from "../../lib/api";
+
+const api = checkoutApi(Astro.request);
+const [shop, me] = await Promise.all([api.shop(), api.me()]);
+if (!me) return Astro.redirect("/account?next=/account/addresses");
+const addresses = await api.addresses();
+const m = shop?.messages ?? {};
+---
+
+<Checkout
+  title={t(m, "account.addresses")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid gap-4">
+    <a href="/account" class="text-sm text-identity-ink underline">← {t(m, "account.back")}</a>
+    <h1 class="font-display text-2xl font-bold">{t(m, "account.addresses")}</h1>
+    <p class="text-sm text-muted-foreground">{t(m, "account.addresses_intro")}</p>
+    <Addresses
+      client:load
+      m={messages(m, "address.", "account.error", "account.too_many")}
+      locale={shop?.locale ?? "cs"}
+      countries={marketCountries(shop)}
+      initial={addresses}
+    />
+  </div>
+</Checkout>

@@ -4,7 +4,7 @@
 
 /** Routing/identity headers a client must never be able to supply (spec A2). */
 const UNTRUSTED =
-  /^(x-tenant|x-market|x-locale|x-storefront-.*|x-forwarded-.*|forwarded|x-real-ip|x-platform-.*|x-cart-token|cf-connecting-ip|true-client-ip)$/i;
+  /^(x-tenant|x-market|x-locale|x-storefront-.*|x-forwarded-.*|forwarded|x-real-ip|x-platform-.*|x-cart-token|x-customer-session|x-consent-.*|x-client-ip|x-session-.*|cf-connecting-ip|true-client-ip)$/i;
 
 export function stripUntrusted(headers: Headers): Headers {
   const out = new Headers();

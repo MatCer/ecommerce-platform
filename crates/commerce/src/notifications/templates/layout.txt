@@ -1,0 +1,6 @@
+{{ brand.shop_name }}
+
+{% block content %}{% endblock %}
+
+--
+{{ t("footer", shop=brand.shop_name) }} {{ brand.shop_url }}

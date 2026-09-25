@@ -104,6 +104,26 @@ describe("internal endpoints", () => {
     const bad = internal("/internal/users", { email: "not-an-email" });
     expect((await app.request(bad.path, bad.init)).status).toBe(400);
   });
+
+  test("invite with deliver=false returns the link instead of mailing it", async () => {
+    const { app, outbox } = setup();
+    const create = internal("/internal/users", { email: "staff@example.test" });
+    await app.request(create.path, create.init);
+    const invite = internal("/internal/users/invite", {
+      email: "staff@example.test",
+      callback_url: cfg.adminOrigin,
+      deliver: false,
+    });
+    const res = await app.request(invite.path, invite.init);
+    expect(res.status).toBe(200);
+    const { url } = (await res.json()) as { url: string };
+    expect(url).toContain("/api/auth/magic-link/verify?token=");
+    expect(outbox).toHaveLength(0);
+    // The returned link signs in like an emailed one.
+    const verify = await app.request(new URL(url).pathname + new URL(url).search);
+    expect(verify.status).toBe(302);
+    expect(verify.headers.get("set-cookie")).toContain("session_token=");
+  });
 });
 
 describe("staff sign-in", () => {

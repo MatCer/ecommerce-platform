@@ -297,11 +297,20 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
       S3_BUCKET_PUBLIC: public
       S3_BUCKET_PRIVATE: private
+      # Mail streams (spec §11.4): separate credentials and senders in prod; Mailpit locally.
+      MAIL_TRANSACTIONAL_SMTP_URL: smtp://mailpit:1025
+      MAIL_TRANSACTIONAL_FROM: shop@mail.localhost
+      MAIL_MARKETING_SMTP_URL: smtp://mailpit:1025
+      MAIL_MARKETING_FROM: news@mail.localhost
+      # Staff invitation links (outbox → mail pipeline).
+      AUTH_INTERNAL_URL: http://auth:3000/
+      AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
       # Local stack only (prod provisions the keys out of band).
       meili-init: { condition: service_completed_successfully }
+      mailpit: { condition: service_started }
 
 volumes:
   edge-artifacts:

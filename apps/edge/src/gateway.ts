@@ -77,10 +77,43 @@ const CART_OPS: { method: string; path: RegExp }[] = [
   { method: "DELETE", path: /^\/coupons\/[A-Za-z0-9_-]{1,64}$/ },
 ];
 
+/** Customer account operations on the checkout origin (`/_p/account/*`, WP9, A4, A5). */
+const ACCOUNT_OPS: { method: string; path: RegExp }[] = [
+  { method: "POST", path: /^\/magic-link$/ },
+  { method: "POST", path: /^\/magic-link\/consume$/ },
+  { method: "POST", path: /^\/login$/ },
+  { method: "POST", path: /^\/logout$/ },
+  { method: "GET", path: /^\/me$/ },
+  { method: "POST", path: /^\/password$/ },
+  { method: "GET", path: /^\/addresses$/ },
+  { method: "POST", path: /^\/addresses$/ },
+  { method: "PUT", path: /^\/addresses\/[0-9a-f-]{36}$/ },
+  { method: "DELETE", path: /^\/addresses\/[0-9a-f-]{36}$/ },
+];
+
 const MAX_JSON_BODY = 16 * 1024;
 const MAX_EVENTS_BODY = 64 * 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
+/** Customer session (A1): checkout origin only, host-only via the `__Host-` prefix. */
+const SESSION_COOKIE = "__Host-sid";
+const SESSION_MAX_AGE = 30 * 86_400;
+const CLEAR_SESSION_COOKIE = `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+/**
+ * Consent (A20, `docs/decisions/consent-contract.md`): the anonymous subject id (HttpOnly) and a
+ * script-readable summary, both for the shop host and its checkout subdomain, set only after a
+ * choice. 13 months.
+ */
+const CONSENT_ID_COOKIE = "__Secure-consent_id";
+const CONSENT_COOKIE = "consent";
+const CONSENT_ID_MAX_AGE = 396 * 86_400;
+/** Same lifetime and format as the SDK's own write (`@platform/storefront-sdk/consent`). */
+const CONSENT_MAX_AGE = 180 * 86_400;
+const CONSENT_ID_RE = /^[0-9a-f]{32}$/;
+/** Granted purposes, comma-separated; empty = decided, nothing granted. */
+const CONSENT_SUMMARY_RE = /^([a-z_]{1,32}(,[a-z_]{1,32}){0,9})?$/;
+/** One address, as Caddy appends it to `X-Forwarded-For`. */
+const IP_RE = /^[0-9A-Fa-f:.]{2,45}$/;
 
 const text = (status: number, body: string, headers: Record<string, string> = {}) =>
   new Response(body, {
@@ -225,9 +258,18 @@ export function createGateway(opts: GatewayOptions) {
     artifactId: string,
     url: URL,
     site: Site,
-    extra: { cartToken?: string; scope?: string } = {},
+    extra: {
+      cartToken?: string | undefined;
+      sessionToken?: string | undefined;
+      consentSubject?: string | undefined;
+      scope?: string;
+    } = {},
   ) {
-    const ctxId = registry.open(site, artifactId, { cartToken: extra.cartToken });
+    const ctxId = registry.open(site, artifactId, {
+      cartToken: extra.cartToken,
+      sessionToken: extra.sessionToken,
+      consentSubject: extra.consentSubject,
+    });
     try {
       const headers = workerRequestHeaders();
       headers.set(CTX_HEADER, ctxId);
@@ -441,6 +483,126 @@ export function createGateway(opts: GatewayOptions) {
   const cartCookie = (token: string) =>
     `${SHOP_CART_COOKIE}=${token}; Path=/_p; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`;
 
+  const sessionCookie = (token: string) =>
+    `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`;
+
+  /** A cookie value that must look like one of our 64-hex capabilities. */
+  const capabilityCookie = (req: Request, name: string) => {
+    const v = readCookie(req.headers, name);
+    return v && TOKEN_RE.test(v) ? v : undefined;
+  };
+
+  /**
+   * `/_p/account/*` on the checkout origin → `/storefront/v1/customer/*`. Same-origin JSON only
+   * (CSRF, §14); the session, checkout cart and consent subject go to the API as headers, and
+   * only the edge ever sees the session token (it comes back in `x-session-token`).
+   */
+  async function accountProxy(
+    site: Site,
+    req: Request,
+    rest: string,
+    host: string,
+    port: string,
+    clientIp: string | undefined,
+  ): Promise<Response> {
+    const op = ACCOUNT_OPS.find((o) => o.method === req.method && o.path.test(rest));
+    if (!op) return problem(404, "not_found", "unknown account operation");
+    // CSRF (§14): SameSite=Lax plus a same-origin check on every state-changing call.
+    if (req.method !== "GET" && !sameOrigin(req, host, port))
+      return problem(403, "cross_origin", "cross-origin request");
+    let body: ArrayBuffer | undefined;
+    if (req.method === "POST" || req.method === "PUT") {
+      const b = await readJsonBody(req, MAX_JSON_BODY);
+      if (b instanceof Response) return b;
+      body = b;
+    }
+    const session = capabilityCookie(req, SESSION_COOKIE);
+    const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
+    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/customer${rest}`, {
+        method: req.method,
+        headers: apiHeaders(site, {
+          ...(body ? { "content-type": "application/json" } : {}),
+          ...(session ? { "x-customer-session": session } : {}),
+          ...(cart ? { "x-cart-token": cart } : {}),
+          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+          ...(clientIp ? { "x-client-ip": clientIp } : {}),
+        }),
+        body,
+      }),
+    );
+    const headers = new Headers({ "cache-control": "no-store" });
+    const type = res.headers.get("content-type");
+    if (type) headers.set("content-type", type);
+    const minted = res.headers.get("x-session-token");
+    if (minted && TOKEN_RE.test(minted)) headers.append("set-cookie", sessionCookie(minted));
+    else if (res.headers.get("x-session-clear") === "1" || res.status === 401)
+      headers.append("set-cookie", CLEAR_SESSION_COOKIE);
+    // 30 days sliding (§5.4): every successful use renews the cookie too.
+    else if (res.ok && session) headers.append("set-cookie", sessionCookie(session));
+    return new Response(res.status === 204 ? null : await res.arrayBuffer(), {
+      status: res.status,
+      headers,
+    });
+  }
+
+  /**
+   * `/_p/consent` on both origins (A20): the choice is recorded by the API, which mints the
+   * anonymous subject on the first one. The cookies are scoped to the shop host so the
+   * checkout subdomain (preferences page, sign-in linking) shares them.
+   */
+  async function consentProxy(
+    site: Site,
+    req: Request,
+    host: string,
+    port: string,
+    clientIp: string | undefined,
+    session: string | undefined,
+  ): Promise<Response> {
+    if (req.method !== "GET" && req.method !== "POST")
+      return text(405, "Method not allowed", { allow: "GET, POST" });
+    let body: ArrayBuffer | undefined;
+    if (req.method === "POST") {
+      if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+      const b = await readJsonBody(req, MAX_JSON_BODY);
+      if (b instanceof Response) return b;
+      body = b;
+    }
+    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/consent`, {
+        method: req.method,
+        headers: apiHeaders(site, {
+          ...(body ? { "content-type": "application/json" } : {}),
+          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+          ...(session ? { "x-customer-session": session } : {}),
+          ...(clientIp ? { "x-client-ip": clientIp } : {}),
+        }),
+        body,
+      }),
+    );
+    const headers = new Headers({
+      "content-type": res.headers.get("content-type") ?? "application/json",
+      "cache-control": "no-store",
+    });
+    const minted = res.headers.get("x-consent-subject");
+    const summary = res.headers.get("x-consent-summary");
+    const scope = `Domain=${site.shop_host}; Path=/; Secure; SameSite=Lax`;
+    const chose = res.ok && req.method === "POST";
+    if (chose && minted && CONSENT_ID_RE.test(minted))
+      headers.append(
+        "set-cookie",
+        `${CONSENT_ID_COOKIE}=${minted}; ${scope}; Max-Age=${CONSENT_ID_MAX_AGE}; HttpOnly`,
+      );
+    if (chose && summary !== null && CONSENT_SUMMARY_RE.test(summary))
+      headers.append(
+        "set-cookie",
+        `${CONSENT_COOKIE}=${encodeURIComponent(summary)}; ${scope}; Max-Age=${CONSENT_MAX_AGE}`,
+      );
+    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+  }
+
   async function cartProxy(
     site: Site,
     req: Request,
@@ -591,39 +753,6 @@ export function createGateway(opts: GatewayOptions) {
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   }
 
-  /**
-   * Consent record from the platform banner (A20): same-origin JSON, forwarded to the API.
-   * Until the API records consent (WP9) an unknown route is answered 202 "not recorded", so
-   * the banner stays quiet; the browser keeps its own copy of the choice either way.
-   */
-  async function consent(site: Site, req: Request, host: string, port: string): Promise<Response> {
-    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
-    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
-    const body = await readJsonBody(req, MAX_JSON_BODY);
-    if (body instanceof Response) return body;
-    const res = await upstream(
-      new Request(`${opts.apiOrigin}/storefront/v1/consent`, {
-        method: "POST",
-        headers: apiHeaders(site, { "content-type": "application/json" }),
-        body,
-      }),
-    );
-    if (res.status === 404 || res.status === 405) {
-      await res.body?.cancel();
-      return Response.json(
-        { recorded: false },
-        { status: 202, headers: { "cache-control": "no-store" } },
-      );
-    }
-    return new Response(await res.arrayBuffer(), {
-      status: res.status,
-      headers: {
-        "content-type": res.headers.get("content-type") ?? "application/json",
-        "cache-control": "no-store",
-      },
-    });
-  }
-
   /** Newsletter sign-up: same-origin JSON only; double opt-in is the API's job (§11.5). */
   async function newsletter(
     site: Site,
@@ -688,8 +817,10 @@ export function createGateway(opts: GatewayOptions) {
     url: URL,
     host: string,
     port: string,
+    clientIp: string | undefined,
   ): Promise<Response> {
     const p = url.pathname;
+    if (p === "/_p/consent") return consentProxy(site, req, host, port, clientIp, undefined);
     // `/<locale>/…` of a non-default market locale (spec §9.1): theme pages and island reads
     // render in that locale from the unprefixed path. The locale is part of the cache key; the
     // cart keeps its unprefixed routes (cookie `Path=/_p`).
@@ -710,7 +841,6 @@ export function createGateway(opts: GatewayOptions) {
       return publicProxy(site, req, url, p.slice("/_p/public".length));
     if (p === "/_p/e") return events(site, req, host, port);
     if (p === "/_p/newsletter") return newsletter(site, req, host, port);
-    if (p === "/_p/consent") return consent(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {
       return new Response(SPECULATION_RULES, {
         headers: {
@@ -760,8 +890,19 @@ export function createGateway(opts: GatewayOptions) {
     return renderTheme(site, url, req, port);
   }
 
-  async function checkout(site: Site, req: Request, url: URL, port: string): Promise<Response> {
+  async function checkout(
+    site: Site,
+    req: Request,
+    url: URL,
+    host: string,
+    port: string,
+    clientIp: string | undefined,
+  ): Promise<Response> {
     const p = url.pathname;
+    if (p.startsWith("/_p/account/"))
+      return accountProxy(site, req, p.slice("/_p/account".length), host, port, clientIp);
+    if (p === "/_p/consent")
+      return consentProxy(site, req, host, port, clientIp, capabilityCookie(req, SESSION_COOKIE));
     if (p === "/start") {
       const h = url.searchParams.get("h") ?? "";
       // Only the shop's own 303 (a same-site navigation) may redeem a handoff. A link planted by
@@ -826,12 +967,17 @@ export function createGateway(opts: GatewayOptions) {
     const asset = await serveAsset([checkoutArtifact], p, p.startsWith("/_astro/"));
     if (asset) return asset;
 
-    let cartToken = readCookie(req.headers, CHECKOUT_CART_COOKIE);
-    if (cartToken && !TOKEN_RE.test(cartToken)) cartToken = undefined;
     const m = await manifest(checkoutArtifact);
-    // The checkout binding (cart capability) is only ever handed to the platform checkout.
+    // The checkout binding (cart capability, session) is only ever handed to the platform
+    // checkout; the worker itself never sees the cookies, only the edge's context id.
     if (m.kind !== "checkout") throw new Error(`artifact ${checkoutArtifact} is not a checkout`);
-    const r = await render(checkoutArtifact, normalizeUrl(url), site, { cartToken });
+    const consentSubject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    const r = await render(checkoutArtifact, normalizeUrl(url), site, {
+      cartToken: capabilityCookie(req, CHECKOUT_CART_COOKIE),
+      sessionToken: capabilityCookie(req, SESSION_COOKIE),
+      consentSubject:
+        consentSubject && CONSENT_ID_RE.test(consentSubject) ? consentSubject : undefined,
+    });
     const headers = r.headers;
     const csp = contentSecurityPolicy("checkout", {
       scriptHashes: m.csp.script_hashes,
@@ -839,6 +985,8 @@ export function createGateway(opts: GatewayOptions) {
     });
     for (const [k, v] of Object.entries(securityHeaders("checkout", csp))) headers.set(k, v);
     headers.set("cache-control", "no-store");
+    // A sign-in link (`/account/verify?token=`) must not leak through Referer.
+    if (url.searchParams.has("token")) headers.set("referrer-policy", "no-referrer");
     return new Response(req.method === "HEAD" ? null : r.body, { status: r.status, headers });
   }
 
@@ -848,6 +996,10 @@ export function createGateway(opts: GatewayOptions) {
     const host = normalizeHost(rawHost);
     if (!host) return text(400, "Bad host");
     const port = /:\d{1,5}$/.exec(rawHost)?.[0] ?? "";
+    // Caddy appends the peer address to X-Forwarded-For; only that last entry is trustworthy.
+    // It feeds rate limits and salted hashes (never stored raw) and is stripped with the rest.
+    const lastHop = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
+    const clientIp = lastHop && IP_RE.test(lastHop) ? lastHop : undefined;
     const req = new Request(request, { headers: stripUntrusted(request.headers) });
     // Canonical URL the worker sees: public scheme + the validated host.
     const publicUrl = new URL(`${url.pathname}${url.search}`, `${scheme}://${host}${port}`);
@@ -857,8 +1009,8 @@ export function createGateway(opts: GatewayOptions) {
     const site = await resolver.resolve(origin.shopHost);
     if (!site) return text(404, "Unknown shop");
     return origin.kind === "shop"
-      ? shop(site, req, publicUrl, host, port)
-      : checkout(site, req, publicUrl, port);
+      ? shop(site, req, publicUrl, host, port, clientIp)
+      : checkout(site, req, publicUrl, host, port, clientIp);
   }
 
   async function fetchHandler(request: Request): Promise<Response> {

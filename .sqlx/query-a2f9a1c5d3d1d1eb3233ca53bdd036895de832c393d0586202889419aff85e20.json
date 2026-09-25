@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, company, street, city, postal_code, country, phone, is_default\n         FROM customer_addresses WHERE customer_id = $1\n         ORDER BY is_default DESC, created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "company",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "company"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "street",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "street"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "city",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "postal_code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "postal_code"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "country"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "phone",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "phone"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "is_default",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "customer_addresses",
+            "name": "is_default"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "a2f9a1c5d3d1d1eb3233ca53bdd036895de832c393d0586202889419aff85e20"
+}

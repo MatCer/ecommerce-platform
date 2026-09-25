@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET status = 'merged', shop_token_hash = NULL, checkout_token_hash = NULL,\n                 updated_at = now()\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9378fb33495bd6ba530fd8f320b551f5b44bf84f33c10759ff9b13067ad6dce4"
+}

@@ -515,6 +515,72 @@ pub async fn redeem_handoff(
     Ok((updated == 1).then_some(minted.token))
 }
 
+/// Sign-in on the checkout origin (A4): the cart being checked out is attached to the
+/// customer, and the customer's other open carts of the same market are merged into it (lines
+/// by variant, quantities added up to the per-line cap) and closed as `merged`.
+pub async fn attach_to_customer(
+    tx: &mut TenantTx,
+    cart: &CartRef,
+    customer_id: Uuid,
+) -> Result<(), Error> {
+    let others = sqlx::query_scalar!(
+        "SELECT id FROM carts
+         WHERE customer_id = $1 AND market_id = $2 AND status = 'open' AND id <> $3
+         ORDER BY last_activity_at
+         FOR UPDATE",
+        customer_id,
+        cart.market_id,
+        cart.id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    for other in &others {
+        // Existing variants add up; new ones join while the cart has room (MAX_LINES).
+        sqlx::query!(
+            "UPDATE cart_lines l SET quantity = least(l.quantity + o.quantity, $3), updated_at = now()
+             FROM cart_lines o
+             WHERE l.cart_id = $1 AND o.cart_id = $2 AND o.variant_id = l.variant_id",
+            cart.id,
+            other,
+            MAX_LINE_QUANTITY
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "INSERT INTO cart_lines (tenant_id, cart_id, variant_id, quantity)
+             SELECT o.tenant_id, $1, o.variant_id, o.quantity FROM cart_lines o
+             WHERE o.cart_id = $2
+               AND NOT EXISTS (SELECT 1 FROM cart_lines l WHERE l.cart_id = $1 AND l.variant_id = o.variant_id)
+             ORDER BY o.created_at
+             LIMIT greatest($3 - (SELECT count(*) FROM cart_lines WHERE cart_id = $1), 0)",
+            cart.id,
+            other,
+            MAX_LINES
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE carts SET status = 'merged', shop_token_hash = NULL, checkout_token_hash = NULL,
+                 updated_at = now()
+             WHERE id = $1",
+            other
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    sqlx::query!(
+        "UPDATE carts SET customer_id = $2 WHERE id = $1",
+        cart.id,
+        customer_id
+    )
+    .execute(&mut **tx)
+    .await?;
+    if !others.is_empty() {
+        touch(tx, cart.id).await?;
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------------------
 // Pricing and the view
 

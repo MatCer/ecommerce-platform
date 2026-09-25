@@ -1,0 +1,33 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import PasswordForm from "../../islands/PasswordForm";
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, messages, shopUrl } from "../../lib/api";
+
+const api = checkoutApi(Astro.request);
+const [shop, me] = await Promise.all([api.shop(), api.me()]);
+if (!me) return Astro.redirect("/account?next=/account/security");
+const m = shop?.messages ?? {};
+---
+
+<Checkout
+  title={t(m, "account.security")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid max-w-md gap-4">
+    <a href="/account" class="text-sm text-identity-ink underline">← {t(m, "account.back")}</a>
+    <h1 class="font-display text-2xl font-bold">{t(m, "account.security")}</h1>
+    <div class="rounded-lg border border-border bg-card p-4">
+      <PasswordForm
+        client:load
+        m={messages(m, "password.", "account.")}
+        email={me.email}
+        hasPassword={me.has_password}
+        recentlyVerified={me.recently_verified}
+      />
+    </div>
+  </div>
+</Checkout>

@@ -691,6 +691,1147 @@
         }
       }
     },
+    "/storefront/v1/consent": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The current choice: cookie purposes from the anonymous subject (this browser), email\npurposes from the signed-in customer (checkout origin). `text_version: null` means no choice\nyet.",
+        "operationId": "get_consent",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous subject id from the consent cookie (32 hex characters).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Checkout origin only: the signed-in customer's session.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentState"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Records a choice for the anonymous subject (minted on the first choice) and, when signed in\non the checkout origin, for the customer. Answers the anonymous subject's new state.",
+        "operationId": "post_consent",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous subject id from the consent cookie (32 hex characters).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Checkout origin only: the signed-in customer's session.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "headers": {
+              "X-Consent-Subject": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The anonymous subject id (for the edge's cookie)"
+              },
+              "X-Consent-Summary": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Granted purposes, comma-separated, for the script-readable `consent` cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentState"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/addresses": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "list_addresses",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "add_address",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Address"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/addresses/{id}": {
+      "put": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "update_address",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Address"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "delete_address",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/login": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Checkout cart capability (`__Host-cart`): the cart is attached to the customer (A4).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous consent subject (consent cookie): its choices move to the customer (A20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (rate limits; stored only as a salted hash).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "headers": {
+              "X-Session-Token": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New session (for the edge only)"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_credentials",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too_many_attempts",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/logout": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "logout",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "headers": {
+              "X-Session-Clear": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The edge deletes the cookie"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/magic-link": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "request_magic_link",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Checkout cart capability (`__Host-cart`): the cart is attached to the customer (A4).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous consent subject (consent cookie): its choices move to the customer (A20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (rate limits; stored only as a salted hash).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Sent if the address can receive mail (same answer for every address)"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too_many_attempts",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/magic-link/consume": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "consume_magic_link",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Checkout cart capability (`__Host-cart`): the cart is attached to the customer (A4).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous consent subject (consent cookie): its choices move to the customer (A20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (rate limits; stored only as a salted hash).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "headers": {
+              "X-Session-Token": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "New session (for the edge only)"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_magic_link",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/me": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "me",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "not_signed_in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/password": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Sets or changes the password (A5). Every other session is signed out; a notice is emailed.",
+        "operationId": "set_password",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "401": {
+            "description": "not_signed_in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "reauth_required | invalid_current_password",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "weak_password",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too_many_attempts",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/events": {
       "post": {
         "tags": [
@@ -1665,6 +2806,112 @@
   },
   "components": {
     "schemas": {
+      "Address": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "street",
+          "city",
+          "postal_code",
+          "country",
+          "is_default"
+        ],
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 (`CZ`)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          }
+        }
+      },
+      "AddressInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "street",
+          "city",
+          "postal_code",
+          "country"
+        ],
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": "string"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AddressList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        }
+      },
       "Alternate": {
         "type": "object",
         "required": [
@@ -2024,22 +3271,54 @@
           }
         }
       },
+      "ConsentChoice": {
+        "type": "object",
+        "description": "A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`).",
+        "required": [
+          "purposes",
+          "text_version"
+        ],
+        "properties": {
+          "purposes": {
+            "$ref": "#/components/schemas/Purposes"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source",
+            "description": "`banner` (default) or `preferences`."
+          },
+          "text_version": {
+            "type": "string",
+            "description": "The consent text version the person saw (`GET /shop` → `consent.text_version`)."
+          }
+        },
+        "additionalProperties": false
+      },
       "ConsentConfig": {
         "type": "object",
         "required": [
           "purposes",
-          "policy_url"
+          "policy_url",
+          "text_version",
+          "preferences_url"
         ],
         "properties": {
           "policy_url": {
             "type": "string"
+          },
+          "preferences_url": {
+            "type": "string",
+            "description": "The preferences page on the checkout origin."
           },
           "purposes": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ConsentPurpose"
             },
-            "description": "Purposes the banner asks for (placeholder until WP9's consent model, A20)."
+            "description": "Purposes the banner asks for (A20)."
+          },
+          "text_version": {
+            "type": "string",
+            "description": "Version of the consent texts; post it back with the choice (`POST /_p/consent`)."
           }
         }
       },
@@ -2052,6 +3331,25 @@
           "email_marketing",
           "review_invites"
         ]
+      },
+      "ConsentState": {
+        "type": "object",
+        "description": "Current consent of a subject.",
+        "required": [
+          "purposes"
+        ],
+        "properties": {
+          "purposes": {
+            "$ref": "#/components/schemas/Purposes"
+          },
+          "text_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Text version of the latest choice; `None` = no choice yet (show the banner)."
+          }
+        }
       },
       "CouponCode": {
         "type": "object",
@@ -2078,6 +3376,51 @@
           "RON",
           "SEK"
         ]
+      },
+      "CustomerView": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "locale",
+          "email_verified",
+          "has_password",
+          "recently_verified"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "email_verified": {
+            "type": "boolean"
+          },
+          "has_password": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recently_verified": {
+            "type": "boolean",
+            "description": "A password can be set without the current one right now (A5: signed in with an email\nlink within the last 10 minutes)."
+          }
+        }
       },
       "DeliveryEstimate": {
         "type": "object",
@@ -2509,6 +3852,37 @@
           }
         }
       },
+      "MagicLinkRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "redirect": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Relative path on the checkout origin to land on after sign-in (default `/account`)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MagicLinkToken": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "MarketLink": {
         "type": "object",
         "required": [
@@ -2734,6 +4108,47 @@
             "type": "string"
           }
         }
+      },
+      "PasswordChange": {
+        "type": "object",
+        "required": [
+          "new_password"
+        ],
+        "properties": {
+          "current_password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required unless the session signed in with an email link within the last 10 minutes."
+          },
+          "new_password": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PasswordLogin": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "redirect": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "PriceRange": {
         "type": "object",
@@ -2994,6 +4409,43 @@
             "$ref": "#/components/schemas/Seo"
           }
         }
+      },
+      "Purposes": {
+        "type": "object",
+        "description": "Per-purpose choices: `None` = not asked (or not part of this choice).",
+        "properties": {
+          "ads": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "analytics": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "email_marketing": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "personalization": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_invites": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "Recommendations": {
         "type": "object",
@@ -3287,6 +4739,22 @@
           }
         }
       },
+      "SignInResult": {
+        "type": "object",
+        "required": [
+          "customer",
+          "redirect"
+        ],
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerView"
+          },
+          "redirect": {
+            "type": "string",
+            "description": "Relative path on the checkout origin to continue to."
+          }
+        }
+      },
       "Sort": {
         "type": "string",
         "enum": [
@@ -3318,6 +4786,16 @@
             "$ref": "#/components/schemas/Sort"
           }
         }
+      },
+      "Source": {
+        "type": "string",
+        "description": "Where a choice was made.",
+        "enum": [
+          "banner",
+          "preferences",
+          "checkout",
+          "linked"
+        ]
       },
       "StockState": {
         "type": "string",

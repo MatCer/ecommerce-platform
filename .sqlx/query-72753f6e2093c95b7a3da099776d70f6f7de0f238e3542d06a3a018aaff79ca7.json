@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE cart_lines l SET quantity = least(l.quantity + o.quantity, $3), updated_at = now()\n             FROM cart_lines o\n             WHERE l.cart_id = $1 AND o.cart_id = $2 AND o.variant_id = l.variant_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "72753f6e2093c95b7a3da099776d70f6f7de0f238e3542d06a3a018aaff79ca7"
+}

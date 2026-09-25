@@ -1,0 +1,39 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import VerifyLink from "../../islands/VerifyLink";
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, messages, shopUrl } from "../../lib/api";
+
+// Landing page of the emailed sign-in link. Rendering does not consume the token (mail
+// scanners prefetch links); the button does. The edge sends it with `Referrer-Policy: no-referrer`.
+const api = checkoutApi(Astro.request);
+const shop = await api.shop();
+const m = shop?.messages ?? {};
+const raw = Astro.url.searchParams.get("token") ?? "";
+const token = /^[0-9a-f]{64}$/.test(raw) ? raw : "";
+---
+
+<Checkout
+  title={t(m, "account.verify_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="mx-auto grid max-w-md gap-4 rounded-lg border border-border bg-card p-6">
+    <h1 class="font-display text-2xl font-bold">{t(m, "account.verify_title")}</h1>
+    {
+      token ? (
+        <>
+          <p class="text-sm text-muted-foreground">{t(m, "account.verify_intro")}</p>
+          <VerifyLink client:load m={messages(m, "account.")} token={token} />
+        </>
+      ) : (
+        <p role="alert" class="text-sm text-sale">
+          {t(m, "account.link_invalid")}{" "}
+          <a href="/account" class="underline">{t(m, "account.send_link")}</a>
+        </p>
+      )
+    }
+  </div>
+</Checkout>

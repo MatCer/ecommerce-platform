@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO platform.ip_salts (day, salt) VALUES ((now() AT TIME ZONE 'utc')::date, $1)\n         ON CONFLICT (day) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a68f5b47987e53bcec532048e29806a808736f453372733ee6816a57695623dd"
+}

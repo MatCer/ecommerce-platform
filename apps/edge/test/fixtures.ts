@@ -80,7 +80,8 @@ export default {
   async fetch(request, env) {
     const ctx = request.headers.get("x-platform-ctx");
     const cart = await env.CHECKOUT.fetch("https://checkout/cart", { headers: { "x-platform-ctx": ctx } });
-    return new Response("<!doctype html><title>Pokladna</title><pre>" + (await cart.text()) + "</pre>", {
+    const me = await env.CHECKOUT.fetch("https://checkout/customer/me", { headers: { "x-platform-ctx": ctx } });
+    return new Response("<!doctype html><title>Pokladna</title><pre>" + (await cart.text()) + (await me.text()) + "</pre>", {
       headers: { "content-type": "text/html" },
     });
   },
@@ -189,6 +190,28 @@ export function fakeApi() {
       if (path === "/docasne") return Response.json({ to_path: "/c/akce?x=1", code: 302 });
       if (path === "/podvrh") return Response.json({ to_path: "//evil.example/", code: 301 });
     }
+    if (p === "/customer/login")
+      return Response.json(
+        { customer: { email: "jana@example.cz" }, redirect: "/account" },
+        { headers: { "x-session-token": "sessiontoken_000000000001" } },
+      );
+    if (p === "/customer/me")
+      return req.headers.get("x-customer-session") === "sessiontoken_000000000001"
+        ? Response.json({ email: "jana@example.cz", session_seen: true })
+        : Response.json({ code: "not_signed_in" }, { status: 401 });
+    if (p === "/customer/logout")
+      return new Response(null, { status: 204, headers: { "x-session-clear": "1" } });
+    if (p === "/consent")
+      return Response.json(
+        { purposes: { analytics: true }, text_version: "2026-09-25" },
+        {
+          headers: {
+            "x-consent-subject":
+              req.headers.get("x-consent-subject") ?? "0123456789abcdef0123456789abcdef",
+            "x-consent-summary": "analytics,personalization",
+          },
+        },
+      );
     if (p === "/events") return new Response(null, { status: 202 });
     if (p === "/newsletter/subscribe")
       return Response.json(

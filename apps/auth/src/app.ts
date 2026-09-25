@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { bearerAuth } from "hono/bearer-auth";
 import { cors } from "hono/cors";
-import type { Auth } from "./auth.ts";
+import { type Auth, linkCapture } from "./auth.ts";
 import type { Config } from "./config.ts";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,16 +55,25 @@ export function createApp(auth: Auth, cfg: Pick<Config, "adminOrigin" | "interna
     return c.json({ id: user.id, created: true }, 201);
   });
 
-  /** Email a magic link to an existing user; signing in with it also verifies the address. */
+  /**
+   * Magic link for an existing user; signing in with it also verifies the address. Emailed
+   * here, or with `deliver: false` returned as `{url}` for the platform's mail pipeline (the
+   * staff invitation goes through the outbox, WP9).
+   */
   internal.post("/users/invite", async (c) => {
     const input = await body(c.req.raw);
     const address = email(input.email);
     const callbackURL = typeof input.callback_url === "string" ? input.callback_url : "/";
     if (!address) return c.json({ error: "invalid email" }, 400);
-    await auth.api.signInMagicLink({
-      body: { email: address, callbackURL },
-      headers: new Headers(),
-    });
+    const request = () =>
+      auth.api.signInMagicLink({ body: { email: address, callbackURL }, headers: new Headers() });
+    if (input.deliver === false) {
+      const capture: { url?: string } = {};
+      await linkCapture.run(capture, request);
+      if (!capture.url) return c.json({ error: "no link issued" }, 500);
+      return c.json({ url: capture.url });
+    }
+    await request();
     return c.json({ invited: address }, 202);
   });
 

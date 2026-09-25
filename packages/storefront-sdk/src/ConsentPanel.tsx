@@ -5,6 +5,7 @@ import type { ConsentPurpose } from "./types.ts";
 export interface ConsentPanelProps {
   purposes: ConsentPurpose[];
   policyUrl: string;
+  textVersion: string;
   labels: Record<string, string>;
   /** Opened from "Cookie settings": the purpose checkboxes show at once, focus moves in. */
   settings: boolean;
@@ -22,7 +23,7 @@ export default function ConsentPanel(props: ConsentPanelProps) {
   let heading: HTMLHeadingElement | undefined;
   onMount(() => props.settings && heading?.focus());
   const save = (purposes: ConsentPurpose[]) => {
-    void saveConsent(purposes);
+    void saveConsent(purposes, { offered: props.purposes, textVersion: props.textVersion });
     props.onClose();
   };
 

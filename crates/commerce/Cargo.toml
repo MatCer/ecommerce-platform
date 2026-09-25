@@ -8,6 +8,8 @@ publish.workspace = true
 
 [dependencies]
 ammonia.workspace = true
+argon2.workspace = true
+minijinja.workspace = true
 chrono.workspace = true
 hex.workspace = true
 image.workspace = true

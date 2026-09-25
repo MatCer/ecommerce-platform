@@ -1,0 +1,33 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import ConsentForm from "../islands/ConsentForm";
+import Checkout from "../layouts/Checkout.astro";
+import { checkoutApi, messages, shopUrl } from "../lib/api";
+
+// Consent preferences (spec §9.4, A20): the same choices as the theme's banner, recorded
+// server-side; signed-in customers also manage their email consents here.
+const api = checkoutApi(Astro.request);
+const [shop, me, state] = await Promise.all([api.shop(), api.me(), api.consent()]);
+const m = shop?.messages ?? {};
+---
+
+<Checkout
+  title={t(m, "consent.preferences_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid max-w-xl gap-4">
+    {me && <a href="/account" class="text-sm text-identity-ink underline">← {t(m, "account.back")}</a>}
+    <h1 class="font-display text-2xl font-bold">{t(m, "consent.preferences_title")}</h1>
+    <p class="text-sm text-muted-foreground">{t(m, "consent.preferences_intro")}</p>
+    <ConsentForm
+      client:load
+      m={messages(m, "consent.", "account.error", "account.too_many")}
+      purposes={state?.purposes ?? {}}
+      textVersion={shop?.consent.text_version ?? "1"}
+      signedIn={me !== null}
+    />
+  </div>
+</Checkout>

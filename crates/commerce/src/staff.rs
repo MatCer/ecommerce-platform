@@ -7,6 +7,68 @@ use serde_json::json;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+/// Outbox event committed with a new membership: `{member_id, callback_url}`. The worker's
+/// `staff.invite_mail` job turns it into the invitation email ([`send_invitation`]).
+pub const INVITED_EVENT: &str = "staff.invited";
+/// Staff sign-in links from the auth service are valid this long.
+const INVITE_LINK_MINUTES: i64 = 15;
+
+/// Emails the invitation for membership `member_id` through the mail pipeline: a sign-in link
+/// from the auth service (which also verifies the address), rendered with the tenant's
+/// branding. Idempotent: once the email exists, nothing happens; a removed member gets nothing.
+pub async fn send_invitation(
+    db: &sqlx::PgPool,
+    auth: &platform::auth_service::AuthService,
+    tenant: Uuid,
+    member_id: Uuid,
+    callback_url: &str,
+) -> Result<(), Error> {
+    let key = format!("staff_invite:{member_id}");
+    let email = {
+        let mut tx = platform::db::tenant_tx(db, tenant).await?;
+        let sent = sqlx::query_scalar!(
+            "SELECT count(*) AS \"n!\" FROM email_messages WHERE idempotency_key = $1",
+            key
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let email = sqlx::query_scalar!("SELECT email FROM staff_members WHERE id = $1", member_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        match email {
+            Some(e) if sent == 0 => e,
+            _ => return Ok(()),
+        }
+    };
+    // Outside any transaction: an HTTP call must not hold row locks.
+    let url = auth.invite_link(&email, callback_url).await?;
+    let mut tx = platform::db::tenant_tx(db, tenant).await?;
+    let locale = sqlx::query_scalar!(
+        "SELECT default_locale FROM markets ORDER BY is_default DESC, created_at LIMIT 1"
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .unwrap_or_else(|| "cs".into());
+    let brand = crate::notifications::Brand::load(&mut tx, callback_url.to_owned()).await?;
+    crate::notifications::enqueue(
+        &mut tx,
+        &brand,
+        crate::notifications::Email {
+            template: crate::notifications::Template::StaffInvite,
+            stream: platform::mail::Stream::Transactional,
+            to: &email,
+            locale: &locale,
+            vars: json!({ "url": url, "minutes": INVITE_LINK_MINUTES }),
+            idempotency_key: key,
+            sensitive: true,
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct StaffMember {
     pub id: Uuid,

@@ -11,6 +11,8 @@ export interface ConsentBannerProps {
   purposes: ConsentPurpose[];
   /** Cookie policy page (`ShopModel.consent.policy_url`). */
   policyUrl: string;
+  /** Version of the consent wording (`ShopModel.consent.text_version`), recorded with the choice. */
+  textVersion: string;
   /** `consent.*` and `legal.cookies` messages of the active locale. */
   labels: Record<string, string>;
 }

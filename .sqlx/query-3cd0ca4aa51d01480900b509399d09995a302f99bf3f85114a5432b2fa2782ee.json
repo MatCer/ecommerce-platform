@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE customer_addresses SET is_default = false WHERE customer_id = $1 AND is_default",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3cd0ca4aa51d01480900b509399d09995a302f99bf3f85114a5432b2fa2782ee"
+}

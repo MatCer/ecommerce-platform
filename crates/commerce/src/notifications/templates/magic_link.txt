@@ -1,0 +1,9 @@
+{% extends "layout.txt" %}
+{% block content %}{{ t("magic_link.heading") }}
+
+{{ t("magic_link.intro", shop=brand.shop_name) }}
+
+{{ url }}
+
+{{ t("magic_link.expiry", minutes=minutes) }}
+{{ t("magic_link.ignore") }}{% endblock %}

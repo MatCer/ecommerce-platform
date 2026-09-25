@@ -142,7 +142,21 @@ pub struct Context {
     pub now: DateTime<Utc>,
 }
 
+/// The checkout origin (A1) of a shop base URL: `http://demo.localhost:8080` →
+/// `http://checkout.demo.localhost:8080`.
+pub fn checkout_base(shop_base: &str) -> String {
+    match shop_base.split_once("://") {
+        Some((scheme, rest)) => format!("{scheme}://checkout.{rest}"),
+        None => format!("checkout.{shop_base}"),
+    }
+}
+
 impl Context {
+    /// A URL on the market's checkout origin (A1).
+    pub fn checkout_url(&self, path: &str) -> String {
+        format!("{}{path}", checkout_base(&self.base_url))
+    }
+
     pub fn fmt_locale(&self) -> Locale {
         Locale::from_tag(&self.locale)
     }

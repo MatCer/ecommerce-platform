@@ -6,9 +6,12 @@
 //! market the edge resolved from the host (`X-Market`). The token selects the tenant; the
 //! market is loaded inside that tenant's RLS scope, so a market of another tenant is refused
 //! (`403 market_mismatch`). A client `X-Tenant` header that disagrees with the token is
-//! refused as well. Cart calls add the cart capability (`X-Cart-Token`).
+//! refused as well. Cart calls add the cart capability (`X-Cart-Token`), customer calls the
+//! session (`X-Customer-Session`, checkout origin only).
 
 mod cart;
+mod consent;
+pub mod customer;
 mod files;
 mod pages;
 
@@ -35,6 +38,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .merge(pages::routes())
         .merge(cart::routes())
+        .merge(customer::routes())
+        .merge(consent::routes())
         .merge(files::routes())
 }
 

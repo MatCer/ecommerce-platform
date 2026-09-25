@@ -1,0 +1,7 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("staff_invite.heading", shop=brand.shop_name) }}</mj-text>
+        <mj-text>{{ t("staff_invite.intro", shop=brand.shop_name) }}</mj-text>
+        <mj-button href="{{ url }}">{{ t("staff_invite.button") }}</mj-button>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("staff_invite.expiry", minutes=minutes) }}</mj-text>
+{% endblock %}

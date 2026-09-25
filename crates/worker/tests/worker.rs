@@ -322,7 +322,7 @@ async fn cleanup_job_runs_end_to_end(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili()),
+        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "done").await;
@@ -382,7 +382,7 @@ async fn media_jobs_process_and_purge_assets(db: PgPool) {
     };
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(storage.clone(), testkit::dead_meili()),
+        worker::handlers::all(storage.clone(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     wait_for_status(&db, job_id(media::PROCESS_JOB).await, "done").await;
@@ -456,7 +456,7 @@ async fn media_job_failing_every_attempt_marks_the_asset_failed(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(storage.clone(), testkit::dead_meili()),
+        worker::handlers::all(storage.clone(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "dead").await;
@@ -501,7 +501,7 @@ async fn scheduled_sale_start_publishes_price_changed(db: PgPool) {
 
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili()),
+        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     let mut found = None;
@@ -525,4 +525,147 @@ async fn scheduled_sale_start_publishes_price_changed(db: PgPool) {
     assert_eq!(event["before_minor"], 10_000);
     assert_eq!(event["after_minor"], 9_000);
     assert_eq!(event["variant_id"], variant.to_string());
+}
+
+async fn wait_for_email(runtime: &PgPool, tenant: uuid::Uuid, want: &str) {
+    for _ in 0..500 {
+        let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+        let status: Option<String> = sqlx::query_scalar(
+            "SELECT status FROM email_messages ORDER BY created_at DESC LIMIT 1",
+        )
+        .fetch_optional(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        if status.as_deref() == Some(want) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("no email reached {want}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn mail_jobs_deliver_and_retry_an_uncertain_transactional_send(db: PgPool) {
+    use commerce::notifications::{self, Brand, Email, Template, brand::Colors};
+    use testkit::smtp::{FakeSmtp, Mode};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "mailer").await;
+    let smtp = FakeSmtp::start(Mode::DropAfterData).await;
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    notifications::enqueue(
+        &mut tx,
+        &Brand {
+            shop_name: "Mailer".into(),
+            shop_url: "http://mailer.localhost".into(),
+            colors: Colors::default(),
+        },
+        Email {
+            template: Template::PasswordChanged,
+            stream: platform::mail::Stream::Transactional,
+            to: "jana@example.test",
+            locale: "sk",
+            vars: json!({"url": "http://checkout.mailer.localhost/account"}),
+            idempotency_key: "t1".into(),
+            sensitive: false,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            Some(smtp.mailer()),
+            None,
+        ),
+        fast_config(),
+    );
+    // The first send dies after DATA (uncertain); the one retry then meets a working server.
+    wait_for_email(&runtime, tenant, "uncertain").await;
+    smtp.set_mode(Mode::Accept);
+    wait_for_email(&runtime, tenant, "accepted").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let raw = smtp.received();
+    assert_eq!(raw.len(), 1);
+    assert!(raw[0].contains("To: jana@example.test"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn staff_invitation_email_leaves_through_the_outbox(db: PgPool) {
+    use testkit::smtp::{FakeSmtp, Mode};
+
+    // The auth service's internal invite endpoint, returning a link instead of mailing it.
+    let bodies = Arc::new(tokio::sync::Mutex::new(Vec::<serde_json::Value>::new()));
+    let seen = bodies.clone();
+    let app = axum::Router::new().route(
+        "/internal/users/invite",
+        axum::routing::post(move |axum::Json(body): axum::Json<serde_json::Value>| {
+            let seen = seen.clone();
+            async move {
+                seen.lock().await.push(body);
+                axum::Json(
+                    json!({"url": "http://auth.localhost/api/auth/magic-link/verify?token=abc"}),
+                )
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}/", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let auth =
+        platform::auth_service::AuthService::new(base.parse().unwrap(), "t".repeat(32)).unwrap();
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "invites").await;
+    testkit::staff(&runtime, tenant, "new-user", "staff").await;
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let member: uuid::Uuid = sqlx::query_scalar("SELECT id FROM staff_members")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    queue::publish(
+        &mut *tx,
+        commerce::staff::INVITED_EVENT,
+        &json!({"member_id": member, "callback_url": "http://admin.localhost:8080"}),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let smtp = FakeSmtp::start(Mode::Accept).await;
+    assert_eq!(outbox::dispatch_batch(&runtime).await.unwrap(), 1);
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            Some(smtp.mailer()),
+            Some(auth),
+        ),
+        fast_config(),
+    );
+    wait_for_email(&runtime, tenant, "accepted").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let requests = bodies.lock().await.clone();
+    assert_eq!(
+        requests,
+        vec![
+            json!({"email": "new-user@example.test", "callback_url": "http://admin.localhost:8080", "deliver": false})
+        ]
+    );
+    let raw = smtp.received();
+    assert_eq!(raw.len(), 1);
+    assert!(raw[0].contains("To: new-user@example.test"));
+    assert!(
+        raw[0].contains("magic-link/verify?token=3Dabc"),
+        "quoted-printable: {}",
+        raw[0]
+    );
 }

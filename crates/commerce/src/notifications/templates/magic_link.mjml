@@ -1,0 +1,8 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t("magic_link.heading") }}</mj-text>
+        <mj-text>{{ t("magic_link.intro", shop=brand.shop_name) }}</mj-text>
+        <mj-button href="{{ url }}">{{ t("magic_link.button") }}</mj-button>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("magic_link.expiry", minutes=minutes) }}</mj-text>
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("magic_link.ignore") }}</mj-text>
+{% endblock %}

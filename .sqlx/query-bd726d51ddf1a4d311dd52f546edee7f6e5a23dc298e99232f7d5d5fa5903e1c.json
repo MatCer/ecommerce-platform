@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE email_messages SET status = $2, send_token = NULL, last_error = $3,\n                     updated_at = now()\n                 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bd726d51ddf1a4d311dd52f546edee7f6e5a23dc298e99232f7d5d5fa5903e1c"
+}

@@ -68,13 +68,20 @@ async fn invite(
         Error::Unavailable("staff invitations need the auth service (AUTH_INTERNAL_URL)".into())
     })?;
     let user = auth.ensure_user(&email, &email).await?;
-    let mut tx = tenant_tx(&s.db, caller.tenant_id).await?;
-    let member = staff::invite(&mut tx, &caller.user.user_id, &user, &email, input.role).await?;
     let callback = s
         .admin_origin
         .to_str()
         .map_err(|_| Error::Internal("invalid admin origin".into()))?;
-    auth.invite(&email, callback).await?;
+    let mut tx = tenant_tx(&s.db, caller.tenant_id).await?;
+    let member = staff::invite(&mut tx, &caller.user.user_id, &user, &email, input.role).await?;
+    // The invitation email leaves through the outbox → mail pipeline once the membership has
+    // committed (worker `staff.invite_mail`), never before.
+    platform::queue::publish(
+        &mut *tx,
+        staff::INVITED_EVENT,
+        &serde_json::json!({ "member_id": member.id, "callback_url": callback }),
+    )
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(member)))
 }

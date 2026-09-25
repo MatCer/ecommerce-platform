@@ -1,0 +1,12 @@
+{% extends "layout.txt" %}
+{% block content %}{% block heading %}{{ t("order.heading", number=order.number) }}{% endblock %}
+{% block intro %}{% endblock %}
+{% for line in order.lines %}
+{{ line.quantity }}x {{ line.name }}{% if line.detail %} ({{ line.detail }}){% endif %}  {{ line.total }}
+{%- endfor %}
+{% for row in order.totals %}
+{{ row.label }}: {{ row.amount }}
+{%- endfor %}
+{{ t("order.total") }}: {{ order.total }}
+{% block after_summary %}{% endblock %}
+{{ t("order.button") }}: {{ order.url }}{% endblock %}

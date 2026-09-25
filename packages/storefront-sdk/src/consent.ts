@@ -42,23 +42,41 @@ export function readConsent(cookie = globalThis.document?.cookie ?? ""): Consent
 
 export const hasConsent = (purpose: ConsentPurpose) => readConsent()?.includes(purpose) ?? false;
 
+/** What the banner asked, for the record (`docs/decisions/consent-contract.md`). */
+export interface ConsentAsked {
+  /** The purposes offered (`ShopModel.consent.purposes`); the rest are left as they were. */
+  offered: readonly ConsentPurpose[];
+  /** The wording the visitor saw (`ShopModel.consent.text_version`). */
+  textVersion: string;
+}
+
 /**
- * Saves a choice (also "nothing"): the cookie for 180 days, then reports it to the platform.
- * The report is best effort: until the consent endpoint exists (or when offline) the choice
- * still applies on this device. Withdrawn purposes lose their device storage at once.
+ * Saves a choice (also "nothing"): the cookie for 180 days, then records it with the platform
+ * (`POST /_p/consent`, A20), which keeps the evidence and answers the anonymous subject cookie.
+ * The report is best effort: offline, the choice still applies on this device. Withdrawn
+ * purposes lose their device storage at once.
  */
 export async function saveConsent(
   purposes: readonly ConsentPurpose[],
+  asked: ConsentAsked,
   post: typeof fetch = globalThis.fetch,
 ): Promise<void> {
   const granted = PURPOSES.filter((p) => purposes.includes(p));
+  // Scoped to the shop host (not host-only) so it is the same cookie the edge writes for the
+  // checkout subdomain's preferences page.
+  const domain = globalThis.location?.hostname ? `; Domain=${location.hostname}` : "";
   // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is not available in Safari/Firefox
-  document.cookie = `${COOKIE}=${encodeURIComponent(granted.join(","))}; Path=/; Max-Age=15552000; SameSite=Lax; Secure`;
+  document.cookie = `${COOKIE}=${encodeURIComponent(granted.join(","))}; Path=/; Max-Age=15552000; SameSite=Lax; Secure${domain}`;
   clearWithdrawn(granted);
   dispatchEvent(new CustomEvent(CONSENT_CHANGED, { detail: granted }));
-  // A beacon survives navigation and its answer is not ours to handle (a 404 before the
-  // endpoint exists stays silent); fetch only where beacons are unavailable.
-  const body = JSON.stringify({ purposes: granted });
+  // The platform's contract: every offered purpose, granted or refused, and the text version.
+  const body = JSON.stringify({
+    purposes: Object.fromEntries(asked.offered.map((p) => [p, granted.includes(p)])),
+    text_version: asked.textVersion,
+    source: "banner",
+  });
+  // A beacon survives navigation and its answer is not ours to handle; fetch only where
+  // beacons are unavailable.
   if (
     globalThis.navigator?.sendBeacon?.(
       "/_p/consent",
@@ -75,7 +93,7 @@ export async function saveConsent(
       keepalive: true,
     });
   } catch {
-    /* offline or not deployed yet: the local choice stands */
+    /* offline: the local choice stands */
   }
 }
 

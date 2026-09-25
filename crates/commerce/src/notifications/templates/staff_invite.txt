@@ -1,0 +1,8 @@
+{% extends "layout.txt" %}
+{% block content %}{{ t("staff_invite.heading", shop=brand.shop_name) }}
+
+{{ t("staff_invite.intro", shop=brand.shop_name) }}
+
+{{ url }}
+
+{{ t("staff_invite.expiry", minutes=minutes) }}{% endblock %}

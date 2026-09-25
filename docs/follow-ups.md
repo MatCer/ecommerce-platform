@@ -13,7 +13,6 @@
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
 | WP4 | Allocations are not yet persisted on order lines/charges | WP10 |
-| WP5 | The staff invite email is sent before the membership commits (not via the outbox) | WP9 (mail core) |
 | WP5 | No invitation-accepted status in the staff list | WP15 |
 | WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
 | WP7 | Tenant synonyms + real popularity signal are placeholders | WP17 (popularity), WP13 (synonyms admin) |
@@ -25,9 +24,13 @@
 | WP6 | Catalog/content changes do not purge the edge; HTML ages out by `cache.max_age` (60 s) | WP13 |
 | WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
 | WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart) | WP10 |
-| WP8 | The edge forwards `POST /_p/consent` to `/storefront/v1/consent` and answers 202 `{recorded:false}` while the API has no such route; the consent record's subject (anon id / customer) is not passed yet | WP9 |
-| WP8 | The theme links `checkout.<host>/account` and `/withdraw` (A19); the checkout app must serve both | WP9 / WP13 |
+| WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | A market locale without product translations gets an empty search index (documents need a translation); a default-locale fallback would keep listings full. The demo uses `cs` on the SK market, which is fully translated | WP13 |
 | WP8 | Legal/CMS page slugs in `/shop` are Czech placeholders for every locale; payment/carrier marks are generic catalog text until payment and shipping methods exist; `free_shipping_threshold` stays null | WP13 / WP10 / WP11 |
 | WP8 | No cart cross-sell in the drawer yet (the PDP slot renders `/recommendations`; the drawer would need a client fetch) | WP17 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
+| WP9 | `customer.email_verified` is published but nothing links guest orders yet (A5 hook) | WP10 |
+| WP9 | Email suppressions are added manually (`api admin suppress-email`); no bounce/complaint ingestion from the provider (SES notifications) | WP14 / pre-launch |
+| WP9 | Per-tenant editable email subject/intro text (§11.4) and a tenant logo in emails (no logo in the data model yet; the shop name is the wordmark) | WP13 |
+| WP9 | Marketing stream has no `List-Unsubscribe` headers yet (no marketing mail exists) | M2 (newsletter) |
+| WP9 | No admin view of `email_messages` (states, failures) or of the suppression list | WP14 |

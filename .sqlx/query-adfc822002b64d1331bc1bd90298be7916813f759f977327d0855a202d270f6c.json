@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO customer_magic_links (tenant_id, token_hash, market_id, email, locale, redirect, expires_at)\n         VALUES ($1, $2, $3, $4, $5, $6, now() + make_interval(mins => $7))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "adfc822002b64d1331bc1bd90298be7916813f759f977327d0855a202d270f6c"
+}
