@@ -103,7 +103,8 @@ impl DataImportStatus {
     }
 }
 
-/// Our field name → the file's column header. Unmapped fields use the header of the same name.
+/// Our field name → the file's column header; an empty header ignores the field. Unmapped
+/// fields use the header of the same name.
 pub type Mapping = BTreeMap<String, String>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -379,10 +380,10 @@ fn check_mapping(kind: DataImportKind, mapping: &Mapping) -> Result<(), Error> {
                 format!("{field:?} is not a {} field", kind.as_str()),
             ));
         }
-        if header.trim().is_empty() || header.chars().count() > 200 {
+        if header.chars().count() > 200 {
             return Err(invalid(
                 "invalid_mapping",
-                format!("the column for {field} must be 1-200 characters"),
+                format!("the column for {field} must be at most 200 characters"),
             ));
         }
     }
@@ -590,7 +591,8 @@ pub async fn apply(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<DataImpor
         });
     }
     sqlx::query!(
-        "UPDATE data_imports SET status = 'applying', updated_at = now() WHERE id = $1",
+        "UPDATE data_imports SET status = 'applying', progress = '{}', updated_at = now()
+         WHERE id = $1",
         id
     )
     .execute(&mut **tx)
@@ -712,12 +714,20 @@ pub async fn run_step(
         return Ok(());
     }
 
-    let mut progress = DataImportProgress {
-        total: report.records,
-        ..DataImportProgress::default()
+    // Each batch commits with its progress, so a retried job resumes after the last committed
+    // batch (the records are re-derived from the same snapshot and mapping).
+    let mut progress = if r.progress.total == report.records {
+        r.progress.clone()
+    } else {
+        DataImportProgress {
+            total: report.records,
+            ..DataImportProgress::default()
+        }
     };
     let n = records.len();
-    let mut start = 0;
+    let mut start = usize::try_from(progress.done).unwrap_or(0).min(n);
+    // Nothing (left) to write: the loop below never marks the run applied.
+    let nothing_left = start == n;
     while start < n {
         let end = (start + BATCH).min(n);
         let mut tx = tenant_tx(db, tenant_id).await?;
@@ -756,7 +766,7 @@ pub async fn run_step(
         tx.commit().await?;
         start = end;
     }
-    if n == 0 {
+    if nothing_left {
         let mut tx = tenant_tx(db, tenant_id).await?;
         sqlx::query!(
             "UPDATE data_imports SET status = 'applied', applied_at = now(), updated_at = now(),

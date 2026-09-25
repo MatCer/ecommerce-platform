@@ -781,7 +781,7 @@ export interface paths {
         put?: never;
         /**
          * Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),
-         *     prepared in the background. One at a time.
+         *     prepared in the background. One at a time; needs a recent sign-in (A9).
          */
         post: operations["create_data_export"];
         delete?: never;
@@ -5750,6 +5750,11 @@ export interface components {
             customer_id?: string | null;
             /** Format: int64 */
             emails_anonymized: number;
+            /**
+             * Format: int64
+             * @description Private files (labels, document sheets, exports, import CSVs) queued for deletion.
+             */
+            files_deleted: number;
             /**
              * Format: int64
              * @description Invoices and credit notes of the subject's orders, kept unchanged (tax law).
@@ -11015,6 +11020,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DataExport"];
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description export_busy */

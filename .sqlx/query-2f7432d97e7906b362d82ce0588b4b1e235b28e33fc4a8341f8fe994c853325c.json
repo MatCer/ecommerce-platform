@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(x) - 'label_key' ORDER BY x.created_at), '[]')\n                  AS \"v!\"\n           FROM shipments x WHERE x.order_id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2f7432d97e7906b362d82ce0588b4b1e235b28e33fc4a8341f8fe994c853325c"
+}

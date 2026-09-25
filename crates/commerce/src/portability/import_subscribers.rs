@@ -259,8 +259,18 @@ pub async fn apply(
     };
     let subject = Subject::Email(r.email.clone());
     consent::record_imported_grant(tx, &subject, ConsentPurpose::EmailMarketing, &tv, e.at).await?;
+    // The person's decisions as a customer count too, linked or not: an account that
+    // withdrew after the imported consent keeps the address unmarketable.
+    let account = sqlx::query_scalar!("SELECT id FROM customers WHERE email = $1", r.email)
+        .fetch_optional(&mut **tx)
+        .await?;
     let mut subjects = vec![subject];
-    subjects.extend(s.customer_id.map(Subject::Customer));
+    subjects.extend(
+        s.customer_id
+            .into_iter()
+            .chain(account)
+            .map(Subject::Customer),
+    );
     let granted = consent::latest_any(tx, &subjects, ConsentPurpose::EmailMarketing)
         .await?
         .unwrap_or(false);

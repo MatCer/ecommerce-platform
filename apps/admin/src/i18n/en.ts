@@ -946,7 +946,7 @@ export const en = {
       "Everything linked to the address and its customer account, as a JSON file for the person (right of access).",
     erase: "Erase their data",
     eraseHint:
-      "Deletes the customer account, newsletter subscription and personal details, and anonymizes their orders. Invoices stay as issued (tax law). Not possible while an order is still in progress.",
+      "Deletes the customer account, newsletter subscription and personal details, and anonymizes their orders. Invoices stay as issued (tax law). Not possible while an order is still in progress or an import or export is running. Earlier data exports are deleted as they contain the data.",
     eraseTitle: "Erase personal data?",
     eraseConfirm: "This cannot be undone. Type the address again to confirm.",
     confirmEmail: "Email again",

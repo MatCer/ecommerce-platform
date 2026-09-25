@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (EXISTS (SELECT 1 FROM data_imports WHERE status IN ('analyzing', 'applying'))\n                   OR EXISTS (SELECT 1 FROM data_exports WHERE status IN ('pending', 'running')))\n                  AS \"busy!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "busy!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ea94906cbc1df76dd28a704a9fe719bc15d4b1d33df6d44c28dea2b4ad969ab7"
+}

@@ -45,8 +45,8 @@ pub const SKIPPED_TABLES: &[&str] = &[
     "withdrawal_tokens",
 ];
 
-/// Columns removed besides every `bytea` column (and the bodies of `email_messages`, which
-/// may hold live sign-in links).
+/// Columns removed besides every `bytea` column (and the bodies and unsubscribe URLs of
+/// `email_messages`, which hold live sign-in links and subscriber capability tokens).
 const SKIPPED_COLUMNS: &[&str] = &["password_hash"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -265,7 +265,7 @@ pub async fn tables(tx: &mut TenantTx) -> Result<Vec<ExportTable>, Error> {
                            FILTER (WHERE a.atttypid = 'bytea'::regtype
                                    OR a.attname::text = ANY($1)
                                    OR (c.relname = 'email_messages'
-                                       AND a.attname IN ('html', 'body_text'))),
+                                       AND a.attname IN ('html', 'body_text', 'list_unsubscribe'))),
                            '{}') AS "dropped!"
            FROM pg_class c
            JOIN pg_namespace n ON n.oid = c.relnamespace

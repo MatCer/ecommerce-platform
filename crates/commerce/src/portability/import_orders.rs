@@ -152,6 +152,11 @@ fn line(c: &mut Check<'_>) -> Option<Option<Line>> {
     }))
 }
 
+/// A later row's optional order column agrees when blank or equal to the first row's.
+fn agrees<T: PartialEq>(first: &Option<T>, later: &Option<T>) -> bool {
+    later.is_none() || later == first
+}
+
 pub fn validate(rows: &[Row], d: &Defaults, report: &mut DataImportReport) -> Vec<Record> {
     // Orders in first-appearance order; an order with any bad row is left out entirely.
     let mut order: Vec<String> = Vec::new();
@@ -185,10 +190,15 @@ pub fn validate(rows: &[Row], d: &Defaults, report: &mut DataImportReport) -> Ve
                     });
                 }
                 Some(r) => {
+                    // Later rows may repeat the optional order columns or leave them blank.
                     let same = r.placed_at == h.placed_at
                         && r.email == h.email
                         && r.currency == h.currency
-                        && r.total_minor == h.total_minor;
+                        && r.total_minor == h.total_minor
+                        && agrees(&r.status, &h.status)
+                        && agrees(&r.name, &h.name)
+                        && agrees(&r.phone, &h.phone)
+                        && agrees(&r.address, &h.address);
                     if !same {
                         c.fail(
                             None,
@@ -372,6 +382,28 @@ mod tests {
                 ]),
             ),
             row(
+                7,
+                &[
+                    ("order_number", "1005"),
+                    ("placed_at", "2024-03-02"),
+                    ("email", "e@example.com"),
+                    ("currency", "CZK"),
+                    ("total", "1"),
+                    ("name", "Eva"),
+                ],
+            ),
+            row(
+                8,
+                &[
+                    ("order_number", "1005"),
+                    ("placed_at", "2024-03-02"),
+                    ("email", "e@example.com"),
+                    ("currency", "CZK"),
+                    ("total", "1"),
+                    ("name", "Other"),
+                ],
+            ),
+            row(
                 4,
                 &[
                     ("order_number", "1001"),
@@ -414,6 +446,7 @@ mod tests {
         assert!(codes.contains(&(4, "conflicting_order")), "{codes:?}");
         assert!(codes.contains(&(5, "in_future")), "{codes:?}");
         assert!(codes.contains(&(6, "missing")), "{codes:?}");
-        assert_eq!(report.invalid_rows, 4);
+        assert!(codes.contains(&(8, "conflicting_order")), "{codes:?}");
+        assert_eq!(report.invalid_rows, 5);
     }
 }

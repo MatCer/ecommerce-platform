@@ -98,6 +98,17 @@ export function guessMapping(kind: ImportKind, headers: string[]): Record<string
   return out;
 }
 
+/**
+ * The mapping sent to the API: every field of the kind, `""` for "not in the file" (the
+ * server would otherwise fall back to a same-named column).
+ */
+export function fullMapping(
+  kind: ImportKind,
+  mapping: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(IMPORT_FIELDS[kind].map((x) => [x.name, mapping[x.name] ?? ""]));
+}
+
 /** Required fields without a column. */
 export function missingRequired(kind: ImportKind, mapping: Record<string, string>): string[] {
   return IMPORT_FIELDS[kind].filter((x) => x.required && !mapping[x.name]).map((x) => x.name);

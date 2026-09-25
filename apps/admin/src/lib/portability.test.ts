@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guessMapping, headerRow, missingRequired } from "./portability.ts";
+import { fullMapping, guessMapping, headerRow, missingRequired } from "./portability.ts";
 
 describe("headerRow", () => {
   it("reads comma and semicolon headers with quotes and a BOM", () => {
@@ -20,5 +20,17 @@ describe("guessMapping", () => {
     expect(m).toEqual({ order_number: "Order_Number", email: "EMAIL", total: "Total" });
     expect(missingRequired("orders", m)).toEqual(["placed_at", "currency"]);
     expect(missingRequired("subscribers", { email: "E-mail" })).toEqual([]);
+    expect(missingRequired("subscribers", { email: "" })).toEqual(["email"]);
+  });
+
+  it("sends an explicit empty column for every unmapped field", () => {
+    expect(fullMapping("subscribers", { email: "E-mail", locale: "" })).toEqual({
+      email: "E-mail",
+      locale: "",
+      consent_at: "",
+      consent_source: "",
+      consent_ip: "",
+      consent_text_version: "",
+    });
   });
 });

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_imports SET status = 'failed', report = NULL, updated_at = now(),\n             error = 'discarded by a personal-data erasure; upload the file again'\n         WHERE status IN ('pending', 'analyzed', 'failed')\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "data_imports",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "189bcafcf6826b09d163b33849209d300593f0597c9ac7fbfe827d3d1e89dbe8"
+}

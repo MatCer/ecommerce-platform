@@ -136,6 +136,7 @@ pub fn all(
     let purge_storage = storage.clone();
     let (import_storage, export_storage) = (storage.clone(), storage.clone());
     let (data_import_storage, data_export_storage) = (storage.clone(), storage.clone());
+    let erasure_storage = storage.clone();
     let sweep_storage = storage.clone();
     let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
     let webhooks = extra.webhooks.clone();
@@ -168,6 +169,9 @@ pub fn all(
         })
         .register(data_export::JOB, move |ctx, job| {
             data_export_job(ctx, job, data_export_storage.clone())
+        })
+        .register(commerce::privacy::DELETE_OBJECTS_JOB, move |_ctx, job| {
+            erasure_delete_objects(job, erasure_storage.clone())
         })
         .register(search::SYNONYMS_JOB, move |ctx, job| {
             search_synonyms(ctx, job, m4.clone())
@@ -515,6 +519,21 @@ async fn data_import(ctx: Ctx, job: Job, storage: Storage) -> Result<(), JobErro
         }
         Err(e) => Err(JobError::Retry(e.to_string())),
     }
+}
+
+/// Deletes the private files of a GDPR erasure (WP13b); retried until every one is gone.
+async fn erasure_delete_objects(job: Job, storage: Storage) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("erasure job without tenant".into()))?;
+    let keys: Vec<String> = job
+        .payload
+        .get("keys")
+        .and_then(|k| serde_json::from_value(k.clone()).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no keys".into()))?;
+    commerce::privacy::delete_objects(&storage, tenant, &keys)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
 }
 
 /// Full tenant export (WP13b).

@@ -946,7 +946,7 @@ export const cs: Dictionary = {
       "Vše spojené s adresou a jejím zákaznickým účtem jako soubor JSON pro danou osobu (právo na přístup).",
     erase: "Vymazat jejich údaje",
     eraseHint:
-      "Smaže zákaznický účet, odběr newsletteru a osobní údaje a anonymizuje objednávky. Faktury zůstávají beze změny (daňové předpisy). Nelze, dokud je nějaká objednávka rozpracovaná.",
+      "Smaže zákaznický účet, odběr newsletteru a osobní údaje a anonymizuje objednávky. Faktury zůstávají beze změny (daňové předpisy). Nelze, dokud je nějaká objednávka rozpracovaná nebo běží import či export. Dřívější exporty dat se smažou, protože údaje obsahují.",
     eraseTitle: "Vymazat osobní údaje?",
     eraseConfirm: "Tuto akci nelze vrátit. Pro potvrzení zadejte adresu znovu.",
     confirmEmail: "E-mail znovu",

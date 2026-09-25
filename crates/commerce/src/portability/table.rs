@@ -79,8 +79,9 @@ fn delimiter(bytes: &[u8]) -> u8 {
     }
 }
 
-/// Parses `bytes` and maps its columns to `fields`: `mapping` names the header for a field;
-/// unmapped fields use a header of the same name (case-insensitive). Every required field must
+/// Parses `bytes` and maps its columns to `fields`: `mapping` names the header for a field (an
+/// empty name ignores the field); unmapped fields use a header of the same name
+/// (case-insensitive). Every required field must
 /// resolve; headers must be unique; the file must be UTF-8 and within the limits.
 pub fn read(
     bytes: &[u8],
@@ -123,6 +124,16 @@ pub fn read(
     let mut columns: Vec<(&'static str, usize)> = Vec::new();
     for f in fields {
         let wanted = mapping.get(f.name).map_or(f.name, String::as_str);
+        // An empty mapping ignores the field even when a same-named column exists.
+        if wanted.trim().is_empty() {
+            if f.required {
+                return Err(FileError(format!(
+                    "the required field {} has no column; map it to one",
+                    f.name
+                )));
+            }
+            continue;
+        }
         match headers
             .iter()
             .position(|h| h.eq_ignore_ascii_case(wanted.trim()))
@@ -344,6 +355,9 @@ mod tests {
         assert_eq!(t.rows[0].get("email"), Some("a@x.cz"));
         assert_eq!(t.rows[0].line, 2);
         assert_eq!(t.rows[0].get("phone"), None);
+        // An empty mapping ignores a same-named column.
+        let t = read(b"email,name\na@x.cz,Anna\n", &FIELDS, &map(&[("name", "")])).unwrap();
+        assert_eq!(t.rows[0].get("name"), None);
 
         let t = read(
             "e-mail;jméno\n\"b@x.cz\";\"Bára; Nová\"\n".as_bytes(),
@@ -363,6 +377,7 @@ mod tests {
         assert!(err(b"email,name\na@x.cz\n", &[]).contains("malformed"));
         assert!(err(b"email\na@x.cz\n", &[("name", "Jmeno")]).contains("not in the file"));
         assert!(err(b"email\na@x.cz\n", &[("bogus", "email")]).contains("unknown field"));
+        assert!(err(b"email\na@x.cz\n", &[("email", "")]).contains("required field email"));
         let long = format!("email\n{}\n", "a".repeat(MAX_CELL + 1));
         assert!(err(long.as_bytes(), &[]).contains("longer than"));
         let many = format!("email\n{}", "a@x.cz\n".repeat(MAX_ROWS + 1));

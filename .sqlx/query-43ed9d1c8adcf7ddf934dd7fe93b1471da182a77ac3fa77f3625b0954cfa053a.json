@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(c) - 'token_hash' ORDER BY c.created_at), '[]')\n                  AS \"v!\"\n           FROM campaign_sends c JOIN subscribers s ON s.id = c.subscriber_id\n           WHERE s.email = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "43ed9d1c8adcf7ddf934dd7fe93b1471da182a77ac3fa77f3625b0954cfa053a"
+}

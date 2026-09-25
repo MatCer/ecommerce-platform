@@ -16,6 +16,7 @@ import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/
 import { contentError } from "../lib/content-api.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
 import {
+  fullMapping,
   guessMapping,
   headerRow,
   IMPORT_FIELDS,
@@ -322,7 +323,12 @@ function NewImport() {
       const result = await unwrap(
         api.POST("/admin/v1/data-imports", {
           params: { header },
-          body: { kind: kind(), market_id: marketId(), upload_size: f.size, mapping: mapping() },
+          body: {
+            kind: kind(),
+            market_id: marketId(),
+            upload_size: f.size,
+            mapping: fullMapping(kind(), mapping()),
+          },
         }),
       );
       await putFile(result.upload.url, result.upload.headers, f, setProgress);
@@ -400,8 +406,7 @@ function NewImport() {
                     ]}
                     onChange={(v) => {
                       const next = { ...mapping() };
-                      if (v) next[field.name] = v;
-                      else delete next[field.name];
+                      next[field.name] = v;
                       setMapping(next);
                     }}
                   />

@@ -175,6 +175,15 @@ async fn exports_and_privacy_requests_need_a_fresh_sign_in(db: PgPool) {
         .send(&c.s)
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, err, _) = Call::post("/admin/v1/data-exports", json!({}))
+        .tenant(c.shop.tenant)
+        .token(&stale("boss"))
+        .send(&c.s)
+        .await;
+    assert_eq!(
+        (status, err["code"].as_str()),
+        (StatusCode::UNAUTHORIZED, Some("reauth_required"))
+    );
     let (status, e, _) = Call::post("/admin/v1/data-exports", json!({}))
         .tenant(c.shop.tenant)
         .token(&boss)

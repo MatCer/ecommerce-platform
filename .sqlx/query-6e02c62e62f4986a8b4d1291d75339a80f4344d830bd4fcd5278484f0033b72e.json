@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET email = NULL, phone = NULL, billing_address = NULL,\n             shipping_address = NULL, pickup_point = NULL, customer_id = NULL, updated_at = now()\n         WHERE lower(btrim(email)) = $1 OR customer_id = $2\n            OR id IN (SELECT cart_id FROM orders WHERE id = ANY($3))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6e02c62e62f4986a8b4d1291d75339a80f4344d830bd4fcd5278484f0033b72e"
+}

@@ -3691,7 +3691,7 @@
         "tags": [
           "portability"
         ],
-        "summary": "Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),\nprepared in the background. One at a time.",
+        "summary": "Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),\nprepared in the background. One at a time; needs a recent sign-in (A9).",
         "operationId": "create_data_export",
         "parameters": [
           {
@@ -3711,6 +3711,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DataExport"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "reauth_required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -25144,7 +25154,8 @@
           "invoices_retained",
           "subscribers_deleted",
           "consent_records_pseudonymized",
-          "emails_anonymized"
+          "emails_anonymized",
+          "files_deleted"
         ],
         "properties": {
           "archived_orders_anonymized": {
@@ -25166,6 +25177,11 @@
           "emails_anonymized": {
             "type": "integer",
             "format": "int64"
+          },
+          "files_deleted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Private files (labels, document sheets, exports, import CSVs) queued for deletion."
           },
           "invoices_retained": {
             "type": "integer",

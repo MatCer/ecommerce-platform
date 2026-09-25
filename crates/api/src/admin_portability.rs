@@ -226,7 +226,7 @@ async fn list_data_exports(
 }
 
 /// Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),
-/// prepared in the background. One at a time.
+/// prepared in the background. One at a time; needs a recent sign-in (A9).
 #[utoipa::path(
     post,
     path = "/admin/v1/data-exports",
@@ -235,6 +235,7 @@ async fn list_data_exports(
     params(TenantHeader),
     responses(
         (status = 202, body = DataExport),
+        (status = 401, description = "reauth_required", body = platform::Problem, content_type = "application/problem+json"),
         (status = 409, description = "export_busy", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
@@ -243,6 +244,7 @@ async fn create_data_export(
     State(s): State<AppState>,
 ) -> Result<(StatusCode, Json<DataExport>), Error> {
     staff.require(Role::Admin)?;
+    staff.require_fresh_auth()?;
     let actor = &staff.user.user_id;
     let e = in_tx(&s, staff.tenant_id, async |tx| {
         export::create(tx, actor).await
@@ -373,6 +375,5 @@ async fn privacy_erasure(
         privacy::erase(tx, actor, &input).await
     })
     .await?;
-    privacy::delete_objects(&s.storage, &report.label_keys).await;
     Ok(Json(report))
 }

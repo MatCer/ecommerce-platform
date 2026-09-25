@@ -7,6 +7,7 @@ use std::net::IpAddr;
 use object_store::ObjectStoreExt;
 use platform::Error;
 use platform::db::TenantTx;
+use platform::queue;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -70,9 +71,8 @@ pub struct ErasureReport {
     pub subscribers_deleted: i64,
     pub consent_records_pseudonymized: i64,
     pub emails_anonymized: i64,
-    /// Private-bucket label PDFs the caller deletes after the commit.
-    #[serde(skip)]
-    pub label_keys: Vec<String>,
+    /// Private files (labels, document sheets, exports, import CSVs) queued for deletion.
+    pub files_deleted: i64,
 }
 
 struct Subject {
@@ -199,6 +199,56 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
     )
     .fetch_one(&mut **tx)
     .await?;
+    let carts = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(c) - 'shop_token_hash' - 'checkout_token_hash'
+                   ORDER BY c.created_at), '[]') AS "v!"
+           FROM carts c
+           WHERE lower(btrim(c.email)) = $1 OR c.customer_id = $2
+              OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id = ANY($3))"#,
+        s.email,
+        s.customer_id,
+        &ids
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let shipments = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(x) - 'label_key' ORDER BY x.created_at), '[]')
+                  AS "v!"
+           FROM shipments x WHERE x.order_id = ANY($1)"#,
+        &ids
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let payments = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.created_at), '[]') AS "v!"
+           FROM payment_attempts p WHERE p.order_id = ANY($1)"#,
+        &ids
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let refunds = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(r) ORDER BY r.created_at), '[]') AS "v!"
+           FROM refunds r WHERE r.order_id = ANY($1)"#,
+        &ids
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let campaign_sends = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(c) - 'token_hash' ORDER BY c.created_at), '[]')
+                  AS "v!"
+           FROM campaign_sends c JOIN subscribers s ON s.id = c.subscriber_id
+           WHERE s.email = $1"#,
+        s.email
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let affinity = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.dim, a.key), '[]') AS "v!"
+           FROM customer_affinity a WHERE a.customer_id = $1"#,
+        s.customer_id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
     crate::audit::record(
         tx,
         actor,
@@ -221,19 +271,30 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
         "consents": consents,
         "emails": emails,
         "analytics_events": events,
+        "carts": carts,
+        "shipments": shipments,
+        "payments": payments,
+        "refunds": refunds,
+        "campaign_sends": campaign_sends,
+        "recommendation_affinity": affinity,
     }))
 }
 
 /// Erases a data subject. Refused while something still needs the data: an order not yet
 /// delivered, cancelled or returned, an unrefunded withdrawal or a pending refund.
 ///
+/// Also refused while a CSV import is being checked or applied or a data export is being
+/// prepared (either could bring the data back).
+///
 /// Deleted: the customer account (addresses, sessions, affinity cascade), the newsletter
 /// subscriber (its campaign sends cascade), analytics and ad-forwarding rows, suppressions,
-/// sign-in links and rate-limit rows, delivered webhook payloads naming the subject, label
-/// PDFs (by the caller, after the commit). Anonymized: orders and their addresses, notes and
-/// address-change events, archived orders, carts, withdrawals, the mail log. Consent records
-/// get a random subject id (anonymous evidence). Kept as issued: invoices, credit notes and
-/// bank transactions (tax and accounting law). Audited with counts only.
+/// sign-in links and rate-limit rows, delivered webhook payloads naming the subject, and (by
+/// a queued job, retried until done) label PDFs, packing-slip/label sheets, previous data
+/// exports and the files of imports not yet applied. Anonymized: orders and their addresses,
+/// notes and address-change events, archived orders, carts, withdrawals, the mail log, import
+/// reports. Consent records get a random subject id (anonymous evidence). Kept as issued:
+/// invoices, credit notes and bank transactions (tax and accounting law). Audited with counts
+/// only.
 pub async fn erase(
     tx: &mut TenantTx,
     actor: &str,
@@ -250,7 +311,35 @@ pub async fn erase(
             detail: "confirm_email must repeat the address".into(),
         });
     }
-    let ids = order_ids(tx, &s).await?;
+    // The same row locks as refunds and withdrawals take (orders::lock), in a fixed order,
+    // so nothing can start on these orders between the checks and the anonymization.
+    sqlx::query!(
+        "SELECT id FROM customers WHERE id = $1 FOR UPDATE",
+        s.customer_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    let ids = sqlx::query_scalar!(
+        "SELECT id FROM orders WHERE email = $1 OR customer_id = $2 ORDER BY id FOR UPDATE",
+        s.email,
+        s.customer_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let busy = sqlx::query_scalar!(
+        r#"SELECT (EXISTS (SELECT 1 FROM data_imports WHERE status IN ('analyzing', 'applying'))
+                   OR EXISTS (SELECT 1 FROM data_exports WHERE status IN ('pending', 'running')))
+                  AS "busy!""#
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if busy {
+        return Err(Error::Conflict {
+            code: "erasure_blocked",
+            detail: "a CSV import or a data export is running; try again when it has finished"
+                .into(),
+        });
+    }
     let blocking = sqlx::query_scalar!(
         "SELECT o.number FROM orders o WHERE o.id = ANY($1) AND (
              o.status NOT IN ('delivered', 'cancelled', 'returned')
@@ -309,13 +398,60 @@ pub async fn erase(
     sqlx::query!("DELETE FROM order_tokens WHERE order_id = ANY($1)", &ids)
         .execute(&mut **tx)
         .await?;
-    report.label_keys = sqlx::query_scalar!(
+    // Files holding the subject's data: labels, packing-slip/label sheets, earlier exports,
+    // the CSVs of imports not applied yet. Deleted by a retried job once this commits.
+    let mut objects = sqlx::query_scalar!(
         r#"SELECT label_key AS "k!" FROM shipments
            WHERE order_id = ANY($1) AND label_key IS NOT NULL"#,
         &ids
     )
     .fetch_all(&mut **tx)
     .await?;
+    objects.extend(
+        sqlx::query_scalar!(
+            r#"UPDATE documents d SET status = 'failed', object_key = NULL,
+                   error = 'removed by a personal-data erasure', updated_at = now()
+               FROM documents old
+               WHERE old.id = d.id AND d.order_ids && $1 AND d.object_key IS NOT NULL
+               RETURNING old.object_key AS "k!""#,
+            &ids
+        )
+        .fetch_all(&mut **tx)
+        .await?,
+    );
+    objects.extend(
+        sqlx::query_scalar!("DELETE FROM data_exports RETURNING object_key")
+            .fetch_all(&mut **tx)
+            .await?,
+    );
+    let tenant = tx.tenant_id();
+    for id in sqlx::query_scalar!(
+        "UPDATE data_imports SET status = 'failed', report = NULL, updated_at = now(),
+             error = 'discarded by a personal-data erasure; upload the file again'
+         WHERE status IN ('pending', 'analyzed', 'failed')
+         RETURNING id"
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    {
+        objects.push(format!("data-import-uploads/{tenant}/{id}.csv"));
+        objects.push(format!("data-imports/{tenant}/{id}.csv"));
+    }
+    // Applied imports keep their counts; previews and row errors may quote the subject.
+    sqlx::query!(
+        r#"UPDATE data_imports SET report = report || '{"preview": [], "errors": []}'
+           WHERE status = 'applied' AND strpos(lower(report::text), $1) > 0"#,
+        s.email
+    )
+    .execute(&mut **tx)
+    .await?;
+    if !objects.is_empty() {
+        let mut job = queue::NewJob::new(DELETE_OBJECTS_JOB, json!({ "keys": objects }));
+        job.tenant_id = Some(tenant);
+        job.max_attempts = 10;
+        queue::enqueue(&mut **tx, &job).await?;
+    }
+    report.files_deleted = count(u64::try_from(objects.len()).unwrap_or(u64::MAX));
     report.invoices_retained = sqlx::query_scalar!(
         r#"SELECT count(*) AS "n!" FROM invoices WHERE order_id = ANY($1)"#,
         &ids
@@ -336,10 +472,13 @@ pub async fn erase(
         .rows_affected(),
     );
     sqlx::query!(
-        "UPDATE carts SET email = NULL, customer_id = NULL, updated_at = now()
-         WHERE lower(btrim(email)) = $1 OR customer_id = $2",
+        "UPDATE carts SET email = NULL, phone = NULL, billing_address = NULL,
+             shipping_address = NULL, pickup_point = NULL, customer_id = NULL, updated_at = now()
+         WHERE lower(btrim(email)) = $1 OR customer_id = $2
+            OR id IN (SELECT cart_id FROM orders WHERE id = ANY($3))",
         s.email,
-        s.customer_id
+        s.customer_id,
+        &ids
     )
     .execute(&mut **tx)
     .await?;
@@ -435,13 +574,30 @@ pub async fn erase(
     Ok(report)
 }
 
-/// Deletes private objects after an erasure committed (best effort: logged, not fatal).
-pub async fn delete_objects(storage: &platform::storage::Storage, keys: &[String]) {
+/// The job deleting the private objects of an erasure (payload `{"keys": [...]}`); a missing
+/// object counts as deleted, any other failure retries the job.
+pub const DELETE_OBJECTS_JOB: &str = "privacy.delete_objects";
+
+pub async fn delete_objects(
+    storage: &platform::storage::Storage,
+    tenant_id: Uuid,
+    keys: &[String],
+) -> Result<(), Error> {
     for k in keys {
+        // Only this tenant's objects, whatever the payload says.
+        if !k
+            .split('/')
+            .nth(1)
+            .is_some_and(|t| t == tenant_id.to_string())
+        {
+            tracing::warn!(key = %k, "erasure object of another tenant skipped");
+            continue;
+        }
         let path = object_store::path::Path::from(k.as_str());
         match storage.private.delete(&path).await {
             Ok(()) | Err(object_store::Error::NotFound { .. }) => {}
-            Err(e) => tracing::warn!(error = %e, "erased object not deleted"),
+            Err(e) => return Err(e.into()),
         }
     }
+    Ok(())
 }
