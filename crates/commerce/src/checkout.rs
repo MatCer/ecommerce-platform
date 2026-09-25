@@ -547,7 +547,7 @@ fn legal(ctx: &Context) -> Legal {
     }
 }
 
-fn payment_name(ctx: &Context, m: &payments::PaymentMethod) -> String {
+pub(crate) fn payment_name(ctx: &Context, m: &payments::PaymentMethod) -> String {
     let own = serde_json::to_value(&m.name_i18n)
         .ok()
         .and_then(|v| ctx.text(&v));
@@ -556,7 +556,7 @@ fn payment_name(ctx: &Context, m: &payments::PaymentMethod) -> String {
     })
 }
 
-fn i18n_text(ctx: &Context, v: &BTreeMap<String, String>) -> Option<String> {
+pub(crate) fn i18n_text(ctx: &Context, v: &BTreeMap<String, String>) -> Option<String> {
     serde_json::to_value(v).ok().and_then(|v| ctx.text(&v))
 }
 

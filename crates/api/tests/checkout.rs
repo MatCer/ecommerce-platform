@@ -848,3 +848,55 @@ async fn staff_list_and_search_their_own_customers(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_shop_model_names_only_the_methods_checkout_offers(db: PgPool) {
+    let c = setup(db).await;
+    let trust = async |shop: &Shop| {
+        let (status, body, _) = sf(Call::get("/storefront/v1/shop"), shop)
+            .header("x-market", shop.cz.to_string())
+            .send(&c.s)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        body["trust"].clone()
+    };
+    let t = trust(&c.shop).await;
+    let fake = t["payment_methods"][0]["label"].clone();
+    assert_eq!(
+        t["payment_methods"],
+        json!([{"kind": "fake", "label": fake}])
+    );
+    assert_eq!(t["payments"], json!([fake]));
+    assert_eq!(
+        t["carriers"],
+        json!([{"carrier": "packeta_pickup", "label": "Zásilkovna"}])
+    );
+    // Cash on delivery is offered once enabled; the other shop configured nothing.
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    commerce::payments::configure(
+        &mut tx,
+        "t",
+        &c.s.checkout.payments,
+        c.shop.cz,
+        MethodKind::Cod,
+        &PaymentMethodInput {
+            enabled: true,
+            name_i18n: [("cs".to_owned(), "Dobírka Zásilkovnou".to_owned())].into(),
+            timeout_minutes: None,
+            position: 1,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let t = trust(&c.shop).await;
+    assert_eq!(
+        t["payment_methods"][1],
+        json!({"kind": "cod", "label": "Dobírka Zásilkovnou"})
+    );
+    let t = trust(&c.other).await;
+    assert_eq!(t["payment_methods"], json!([]));
+    assert_eq!(t["carriers"], json!([]));
+}

@@ -17,6 +17,17 @@ test.describe("browsing", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "cs");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectAccessible(page, "home");
+    // Footer marks name the methods checkout offers in this market.
+    const footer = page.getByRole("contentinfo");
+    await expect(
+      footer
+        .getByRole("list", { name: "Platba" })
+        .getByRole("listitem")
+        .filter({ hasText: /^Dobírka$/ }),
+    ).toBeVisible();
+    await expect(
+      footer.getByRole("list", { name: "Doprava" }).getByText("Osobní odběr – Praha"),
+    ).toBeVisible();
 
     await page
       .getByRole("navigation", { name: "Kategorie" })

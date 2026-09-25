@@ -30,7 +30,10 @@ const rows = [
       : shop.trust.delivery,
   },
   { icon: "returns", text: shop.trust.returns },
-  { icon: "card", text: shop.trust.payments.join(" · ") },
+  // Only the methods checkout offers; no row when none is set up yet.
+  ...(shop.trust.payments.length > 0
+    ? [{ icon: "card", text: shop.trust.payments.join(" · ") } as const]
+    : []),
 ] as const;
 ---
 
@@ -45,7 +48,7 @@ const rows = [
       ))}
     </ul>
   ) : (
-    <ul class="grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-3">
+    <ul class={`grid gap-px overflow-hidden rounded-xl border border-border bg-border ${rows.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
       {rows.map((r) => (
         <li class="flex items-center gap-4 bg-card px-5 py-5 md:px-6 md:py-6">
           <span class="grid size-11 shrink-0 place-items-center rounded-full bg-identity-wash text-identity-ink"><Icon name={r.icon} class="size-6" /></span>

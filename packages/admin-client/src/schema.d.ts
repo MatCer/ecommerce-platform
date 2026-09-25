@@ -5426,6 +5426,11 @@ export interface components {
         };
         /** @enum {string} */
         CarrierKind: "packeta" | "ppl";
+        CarrierMark: {
+            carrier: components["schemas"]["Carrier"];
+            /** @description The merchant's name of the shipping method. */
+            label: string;
+        };
         CartCoupon: {
             /** @description Whether it applies to the cart right now. */
             applied: boolean;
@@ -7657,6 +7662,11 @@ export interface components {
         PaymentInput: {
             method: components["schemas"]["MethodKind"];
         };
+        PaymentMark: {
+            kind: components["schemas"]["MethodKind"];
+            /** @description The name checkout shows (the merchant's own or the platform's). */
+            label: string;
+        };
         PaymentMethod: {
             /** @description Whether the shop can take payments with it now (adapter present and configured). */
             available: boolean;
@@ -9233,7 +9243,12 @@ export interface components {
             page_requests: number;
         };
         Trust: {
+            /** @description The delivery methods checkout offers in this market, in checkout order. */
+            carriers: components["schemas"]["CarrierMark"][];
             delivery: string;
+            /** @description The payment methods checkout offers in this market, in checkout order. */
+            payment_methods: components["schemas"]["PaymentMark"][];
+            /** @description The labels of `payment_methods` (kept for themes written before the marks). */
             payments: string[];
             returns: string;
         };
