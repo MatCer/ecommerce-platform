@@ -108,9 +108,16 @@ mod tests {
             .connect_lazy("postgres://nobody:nothing@127.0.0.1:1/none")
             .unwrap();
         let meili = Url::parse("http://127.0.0.1:1").unwrap();
+        let cfg = crate::config::S3Config::from_lookup(&|k| {
+            k.starts_with("S3_")
+                .then(|| "http://s3.test".to_owned())
+                .filter(|_| k != "S3_REGION" && k != "S3_PUBLIC_ENDPOINT")
+        })
+        .unwrap();
         let storage = Storage {
             public: Arc::new(InMemory::new()),
             private: Arc::new(InMemory::new()),
+            ..Storage::s3(&cfg).unwrap()
         };
 
         let r = readiness(&db, &reqwest::Client::new(), &meili, &storage).await;

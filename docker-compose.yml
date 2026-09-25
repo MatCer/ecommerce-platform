@@ -176,6 +176,8 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
       S3_BUCKET_PUBLIC: public
       S3_BUCKET_PRIVATE: private
+      # Presigned upload URLs point here (Caddy forwards to MinIO with the Host intact).
+      S3_PUBLIC_ENDPOINT: http://s3.localhost:${HTTP_PORT:-8080}
       AUTH_JWKS_URL: http://auth:3000/api/auth/jwks
       AUTH_ISSUER: http://auth.localhost
       ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
@@ -201,8 +203,15 @@ services:
     environment:
       <<: *runtime-db
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://s3.localhost:${HTTP_PORT:-8080}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-app-local}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
+      S3_BUCKET_PUBLIC: public
+      S3_BUCKET_PRIVATE: private
     depends_on:
       migrate: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
 
 volumes:
   pg-data:

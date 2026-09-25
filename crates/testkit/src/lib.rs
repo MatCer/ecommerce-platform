@@ -10,16 +10,35 @@
 use std::sync::Arc;
 
 use object_store::memory::InMemory;
+use platform::config::S3Config;
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, PgPool};
 use uuid::Uuid;
 
-/// Object storage that is always reachable and starts empty.
+/// Object storage that is always reachable and starts empty. Presigned URLs point at
+/// `http://s3.test` (signing needs no server); media URLs at `http://media.test/`.
 pub fn memory_storage() -> Storage {
+    let cfg = S3Config::from_lookup(&|k| {
+        Some(
+            match k {
+                "S3_ENDPOINT" => "http://s3.test",
+                "S3_ACCESS_KEY_ID" => "test",
+                "S3_SECRET_ACCESS_KEY" => "test-secret",
+                "S3_BUCKET_PUBLIC" => "public",
+                "S3_BUCKET_PRIVATE" => "private",
+                "MEDIA_BASE_URL" => "http://media.test/",
+                _ => return None,
+            }
+            .to_owned(),
+        )
+    })
+    .unwrap();
+    let s3 = Storage::s3(&cfg).unwrap();
     Storage {
         public: Arc::new(InMemory::new()),
         private: Arc::new(InMemory::new()),
+        ..s3
     }
 }
 
