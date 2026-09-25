@@ -477,6 +477,44 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     ).toBe(415);
   });
 
+  test("newsletter as a plain HTML form: subscribes, then 303 back to the same page", async () => {
+    api.calls.length = 0;
+    const form = { ...origin, "content-type": "application/x-www-form-urlencoded" };
+    const ok = await get(
+      `${shop}/_p/newsletter`,
+      { ...form, referer: `${shop}/cs/c/trika?sort=price_asc` },
+      { method: "POST", body: "email=jana%40example.cz" },
+    );
+    expect(ok.status).toBe(303);
+    expect(ok.headers.get("location")).toBe("/cs/c/trika?sort=price_asc&newsletter=ok#newsletter");
+    expect(JSON.parse(api.calls.at(-1)?.body ?? "")).toEqual({ email: "jana@example.cz" });
+    expect(api.calls.at(-1)?.headers["x-tenant"]).toBe("t-demo");
+    // A foreign Referer never becomes the redirect target.
+    const foreign = await get(
+      `${shop}/_p/newsletter`,
+      { ...form, referer: "https://evil.example/x" },
+      { method: "POST", body: "email=a%40b.cz" },
+    );
+    expect(foreign.headers.get("location")).toBe("/?newsletter=ok#newsletter");
+    // Nor does a same-host Referer whose path is a network-path reference.
+    for (const referer of [`${shop}//evil.example/path`, `${shop}/\\evil.example`]) {
+      const sneaky = await get(
+        `${shop}/_p/newsletter`,
+        { ...form, referer },
+        { method: "POST", body: "email=a%40b.cz" },
+      );
+      expect(sneaky.headers.get("location")).toMatch(/^\/(?![/\\])/);
+      expect(sneaky.headers.get("location")).not.toContain("evil.example/");
+    }
+    // Still same-origin only.
+    const cross = await get(
+      `${shop}/_p/newsletter`,
+      { "content-type": "application/x-www-form-urlencoded" },
+      { method: "POST", body: "email=a%40b.cz" },
+    );
+    expect(cross.status).toBe(403);
+  });
+
   test("local http mode also accepts the https origin of the same host (Caddy tls internal)", async () => {
     const res = await get(
       `${shop}/_p/cart/lines`,
@@ -530,6 +568,51 @@ describe("platform routes backed by the real API (WP6)", () => {
     await get("http://demo.localhost/_p/public/search/suggest?q=tr");
     expect(api.calls.at(-1)?.url).toBe("http://api.test/storefront/v1/search/suggest?q=tr");
     expect((await get("http://demo.localhost/_p/public/cart")).status).toBe(404);
+  });
+
+  test("a non-default locale prefix renders in that locale, cached apart (spec §9.1)", async () => {
+    resolver.set(
+      "demo-sk.localhost",
+      site({
+        market_id: "m-sk",
+        locale: "sk",
+        locales: ["sk", "cs"],
+        shop_host: "demo-sk.localhost",
+        theme_artifact: v1,
+      }),
+    );
+    api.calls.length = 0;
+    const cs = await get("http://demo-sk.localhost/cs");
+    expect([cs.status, cs.headers.get("x-edge-cache")]).toEqual([200, "MISS"]);
+    expect(api.calls.at(-1)?.headers["x-locale"]).toBe("cs");
+    // The default locale renders separately (the locale is part of the cache key).
+    const sk = await get("http://demo-sk.localhost/");
+    expect([sk.status, sk.headers.get("x-edge-cache")]).toEqual([200, "MISS"]);
+    expect(api.calls.at(-1)?.headers["x-locale"]).toBe("sk");
+    expect((await get("http://demo-sk.localhost/cs/")).headers.get("x-edge-cache")).toBe("HIT");
+    // The theme sees the unprefixed path.
+    const seen = (await (await get("http://demo-sk.localhost/cs/pages/headers")).json()) as {
+      url: string;
+    };
+    expect(seen.url).toBe("http://demo-sk.localhost/pages/headers");
+    // Islands read in the prefixed locale; the cart has no prefixed routes.
+    await get("http://demo-sk.localhost/cs/_p/public/search/suggest?q=tr");
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/search/suggest?q=tr",
+      headers: { "x-locale": "cs", "x-market": "m-sk" },
+    });
+    expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
+    // Redirects: as typed first, else the unprefixed rule with the target kept in the locale.
+    const typed = await get("http://demo-sk.localhost/cs/stary");
+    expect([typed.status, typed.headers.get("location")]).toEqual([301, "/cs/c/novy"]);
+    const inherited = await get("http://demo-sk.localhost/cs/stary-produkt");
+    expect([inherited.status, inherited.headers.get("location")]).toEqual([301, "/cs/p/novy"]);
+    // An unprefixed rule whose target is already localized is not prefixed twice.
+    const targeted = await get("http://demo-sk.localhost/cs/do-cestiny");
+    expect([targeted.status, targeted.headers.get("location")]).toEqual([301, "/cs/p/novy"]);
+    // Neither the default locale nor a locale of another market is a prefix.
+    expect((await get("http://demo-sk.localhost/sk/")).status).toBe(404);
+    expect((await get("http://demo-sk.localhost/en/")).status).toBe(404);
   });
 
   test("media is served only from the shop's own tenant prefix", async () => {
@@ -694,7 +777,8 @@ describe("platform routes backed by the real API (WP6)", () => {
     const cookies = res.headers.getSetCookie();
     expect(cookies).toEqual([
       "__Secure-consent_id=0123456789abcdef0123456789abcdef; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400; HttpOnly",
-      "consent=2026-09-25.1----; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400",
+      // The SDK's own format (granted purposes), so the banner and the edge write one cookie.
+      "consent=analytics%2Cpersonalization; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=15552000",
     ]);
     // The checkout origin (preferences page) shares the subject and adds the session.
     await get(

@@ -735,7 +735,10 @@ async fn consent_is_recorded_resolved_and_linked_at_sign_in(db: PgPool) {
         .unwrap()
         .to_owned();
     assert_eq!(subject.len(), 32);
-    assert_eq!(res.headers()["x-consent-summary"], "2026-09-25.101--");
+    assert_eq!(
+        res.headers()["x-consent-summary"],
+        "analytics,personalization"
+    );
     assert_eq!(state["purposes"]["analytics"], true);
 
     // Later change: only analytics withdrawn.

@@ -322,20 +322,20 @@ pub async fn link_anonymous(tx: &mut TenantTx, anon: &str, customer: Uuid) -> Re
     Ok(())
 }
 
-/// The compact, script-readable summary the edge stores in the `consent` cookie so a theme can
-/// tell whether to show the banner: `<text_version>.<mask>`, one mask character per purpose in
-/// [`ConsentPurpose::ALL`] order: `1` granted, `0` refused, `-` not asked.
+/// The script-readable summary the edge stores in the `consent` cookie, in the SDK's format
+/// (`@platform/storefront-sdk/consent`): the granted purposes, comma-separated, in
+/// [`ConsentPurpose::ALL`] order (empty = decided, nothing granted). `None` before any choice.
+/// A UI hint for themes only; the server resolves consent from the records.
 pub fn summary(state: &ConsentState) -> Option<String> {
-    let version = state.text_version.as_ref()?;
-    let mask: String = ConsentPurpose::ALL
-        .into_iter()
-        .map(|p| match state.purposes.get(p) {
-            Some(true) => '1',
-            Some(false) => '0',
-            None => '-',
-        })
-        .collect();
-    Some(format!("{version}.{mask}"))
+    state.text_version.as_ref()?;
+    Some(
+        ConsentPurpose::ALL
+            .into_iter()
+            .filter(|p| state.purposes.get(*p) == Some(true))
+            .map(ConsentPurpose::as_str)
+            .collect::<Vec<_>>()
+            .join(","),
+    )
 }
 
 #[cfg(test)]
@@ -381,7 +381,14 @@ mod tests {
             },
             text_version: Some("2026-09-25".into()),
         };
-        assert_eq!(summary(&s).as_deref(), Some("2026-09-25.10---"));
+        assert_eq!(summary(&s).as_deref(), Some("analytics"));
+        s.purposes.personalization = Some(true);
+        assert_eq!(summary(&s).as_deref(), Some("analytics,personalization"));
+        s.purposes = Purposes {
+            ads: Some(false),
+            ..Purposes::default()
+        };
+        assert_eq!(summary(&s).as_deref(), Some(""), "decided, nothing granted");
         s.text_version = None;
         assert_eq!(summary(&s), None);
     }

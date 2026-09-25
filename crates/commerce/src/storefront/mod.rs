@@ -94,15 +94,38 @@ pub struct MarketCtx {
 impl MarketCtx {
     /// `cs-CZ`: the market's default language in its first country (hreflang value).
     pub fn hreflang(&self) -> String {
-        let lang = self
-            .default_locale
-            .split('-')
-            .next()
-            .unwrap_or(&self.default_locale);
+        self.hreflang_for(&self.default_locale)
+    }
+
+    /// hreflang of `locale` in this market (`en-CZ`).
+    pub fn hreflang_for(&self, locale: &str) -> String {
+        let lang = locale.split('-').next().unwrap_or(locale);
         match self.country_codes.first() {
             Some(c) => format!("{lang}-{c}"),
             None => lang.to_owned(),
         }
+    }
+
+    /// The market's locales, the default one first (only non-default locales get a prefix).
+    pub fn locales_default_first(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.default_locale.as_str()).chain(
+            self.locales
+                .iter()
+                .map(String::as_str)
+                .filter(|l| *l != self.default_locale),
+        )
+    }
+}
+
+/// A shop path in `locale` of a market whose default locale is `default_locale` (spec §9.1):
+/// unchanged for the default locale, `/en/c/x` otherwise (`/` becomes `/en`).
+pub fn locale_path(default_locale: &str, locale: &str, path: &str) -> String {
+    if locale == default_locale {
+        path.to_owned()
+    } else if path == "/" {
+        format!("/{locale}")
+    } else {
+        format!("/{locale}{path}")
     }
 }
 
@@ -142,8 +165,26 @@ impl Context {
         Money::new(minor, self.market.currency).view(self.fmt_locale())
     }
 
+    /// Absolute URL of `path` as is: media, files, or hrefs that went through [`Self::path`].
     pub fn url(&self, path: &str) -> String {
         format!("{}{path}", self.base_url)
+    }
+
+    /// A shop page path in the request locale (`/c/x` → `/en/c/x` for a non-default locale).
+    /// Every page-model href goes through it, so themes never build locale prefixes.
+    pub fn path(&self, path: &str) -> String {
+        locale_path(&self.market.default_locale, &self.locale, path)
+    }
+
+    /// Absolute URL of a shop page in the request locale (canonicals, JSON-LD).
+    pub fn page_url(&self, path: &str) -> String {
+        self.url(&self.path(path))
+    }
+
+    /// `""` for the market's default locale, else `/<locale>`: what themes put in front of
+    /// the links they build themselves (`/search`, `/p/<slug>`).
+    pub fn base_path(&self) -> String {
+        locale_path(&self.market.default_locale, &self.locale, "")
     }
 
     /// The price list of the market, or `409 market_not_priced` (set up by the merchant).
@@ -281,29 +322,36 @@ impl CacheHints {
     }
 }
 
-/// hreflang alternates: the path of the same page in every market that has one, plus
-/// `x-default` for the default market.
+/// hreflang alternates: the same page in every (market, locale) that has it, plus
+/// `x-default` for the default locale of the default market. `path_for` returns the
+/// unprefixed path in that market and locale (`/p/<slug in that locale>`).
 pub fn alternates(
     ctx: &Context,
-    path_for: impl Fn(&MarketCtx) -> Option<String>,
+    path_for: impl Fn(&MarketCtx, &str) -> Option<String>,
 ) -> Vec<Alternate> {
     let mut out = Vec::new();
     for m in &ctx.markets {
-        let (Some(base), Some(path)) = (&m.base_url, path_for(m)) else {
+        let Some(base) = &m.base_url else {
             continue;
         };
-        out.push(Alternate {
-            locale: m.hreflang(),
-            href: format!("{base}{path}"),
-        });
-        if m.is_default {
+        for locale in m.locales_default_first() {
+            let Some(path) = path_for(m, locale) else {
+                continue;
+            };
+            let href = format!("{base}{}", locale_path(&m.default_locale, locale, &path));
             out.push(Alternate {
-                locale: "x-default".into(),
-                href: format!("{base}{path}"),
+                locale: m.hreflang_for(locale),
+                href: href.clone(),
             });
+            if m.is_default && locale == m.default_locale {
+                out.push(Alternate {
+                    locale: "x-default".into(),
+                    href,
+                });
+            }
         }
     }
-    // A lone market has nothing to alternate with.
+    // A lone market in one locale has nothing to alternate with.
     if out.len() <= 2 && ctx.markets.len() <= 1 {
         out.clear();
     }
@@ -385,7 +433,7 @@ mod tests {
             market("cz", "cs", "CZ", true),
             market("sk", "sk", "SK", false),
         ]);
-        let alts = alternates(&c, |m| Some(format!("/p/{}", m.code)));
+        let alts = alternates(&c, |m, _| Some(format!("/p/{}", m.code)));
         let got: Vec<(&str, &str)> = alts
             .iter()
             .map(|a| (a.locale.as_str(), a.href.as_str()))
@@ -399,14 +447,50 @@ mod tests {
             ]
         );
         // A page missing in a market has no alternate there.
-        let alts = alternates(&c, |m| (m.code == "cz").then(|| "/x".to_owned()));
+        let alts = alternates(&c, |m, _| (m.code == "cz").then(|| "/x".to_owned()));
         assert_eq!(alts.len(), 2);
         // One market alone: nothing to alternate with.
         assert!(
-            alternates(&ctx(vec![market("cz", "cs", "CZ", true)]), |_| Some(
+            alternates(&ctx(vec![market("cz", "cs", "CZ", true)]), |_, _| Some(
                 "/".into()
             ))
             .is_empty()
+        );
+    }
+
+    #[test]
+    fn non_default_locales_get_a_prefix_everywhere() {
+        let mut cz = market("cz", "cs", "CZ", true);
+        cz.locales = vec!["cs".into(), "en".into()];
+        let mut c = ctx(vec![cz, market("sk", "sk", "SK", false)]);
+        assert_eq!(c.path("/c/x"), "/c/x");
+        assert_eq!(c.base_path(), "");
+        c.locale = "en".into();
+        assert_eq!(c.path("/c/x"), "/en/c/x");
+        assert_eq!(c.path("/"), "/en");
+        assert_eq!(c.base_path(), "/en");
+        assert_eq!(c.page_url("/p/y"), "https://cz.example/en/p/y");
+        assert_eq!(c.url("/media/a.avif"), "https://cz.example/media/a.avif");
+        let alts = alternates(&c, |_, l| Some(format!("/p/{l}")));
+        let got: Vec<(&str, &str)> = alts
+            .iter()
+            .map(|a| (a.locale.as_str(), a.href.as_str()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("cs-CZ", "https://cz.example/p/cs"),
+                ("x-default", "https://cz.example/p/cs"),
+                ("en-CZ", "https://cz.example/en/p/en"),
+                ("sk-SK", "https://sk.example/p/sk"),
+            ]
+        );
+        // One market with two locales still alternates between them.
+        let mut solo = market("cz", "cs", "CZ", true);
+        solo.locales = vec!["cs".into(), "en".into()];
+        assert_eq!(
+            alternates(&ctx(vec![solo]), |_, _| Some("/".into())).len(),
+            3
         );
     }
 

@@ -16,6 +16,8 @@ customers change them on the preferences page).
 ## Recording a choice: `POST /_p/consent`
 
 On the shop origin (`<shop>/_p/consent`) and the checkout origin (`checkout.<shop>/_p/consent`).
+The platform banner (`@platform/storefront-sdk/consent-banner`, `saveConsent`) sends it as a
+beacon; themes should use that component rather than post themselves.
 
 ```http
 POST /_p/consent
@@ -23,11 +25,11 @@ Content-Type: application/json
 Origin: https://<same origin>
 
 {"purposes": {"analytics": true, "ads": false, "personalization": true},
- "text_version": "2026-09-25"}
+ "text_version": "2026-09-25", "source": "banner"}
 ```
 
-- `purposes`: any subset of the five; omitted purposes are left as they are. Unknown keys are
-  refused (`422`). At least one purpose.
+- `purposes`: any subset of the five; the banner sends every purpose it offered, granted or
+  refused. Omitted purposes are left as they are. Unknown keys are refused (`422`). At least one.
 - `text_version`: the one from `GET /shop` → `consent.text_version` (the wording the person
   saw), `[A-Za-z0-9_-]{1,32}`.
 - `source` (optional): `banner` (default) or `preferences`.
@@ -42,25 +44,21 @@ Each purpose becomes one append-only `consent_records` row (`subject`, `purpose`
 `text_version`, `source`, IP hashed with the daily rotating salt, time). On the checkout origin a
 signed-in customer's choice is recorded for the customer as well.
 
-## Cookies (set by the edge, only after a choice)
+## Cookies (only after a choice)
 
-Before the first choice nothing is stored on the device (A20). The first `POST` sets:
+Before the first choice nothing is stored on the device (A20).
 
-| Cookie | Value | Attributes | Readable by scripts |
-|---|---|---|---|
-| `__Secure-consent_id` | anonymous subject id, 32 hex | `Domain=<shop host>; Path=/; Secure; SameSite=Lax; HttpOnly; Max-Age=13 months` | no |
-| `consent` | `<text_version>.<mask>` | same, without `HttpOnly` | yes |
+| Cookie | Value | Attributes | Readable by scripts | Written by |
+|---|---|---|---|---|
+| `__Secure-consent_id` | anonymous subject id, 32 hex | `Domain=<shop host>; Path=/; Secure; SameSite=Lax; HttpOnly; Max-Age=13 months` | no | edge, on the first `POST` |
+| `consent` | granted purposes, comma-separated, URL-encoded (`analytics%2Cpersonalization`; empty = decided, nothing granted) | `Domain=<shop host>; Path=/; Secure; SameSite=Lax; Max-Age=180 days` | yes | the SDK at once on the shop origin, and the edge after every recorded `POST` (same name, domain and path, so it is one cookie) |
 
 `Domain=<shop host>` makes both visible on `checkout.<shop host>` (the preferences page and
-sign-in linking run there).
+sign-in linking run there), and lets the preferences page update the banner's cookie.
 
-`mask` has one character per purpose in the order `analytics, ads, personalization,
-email_marketing, review_invites`: `1` granted, `0` refused, `-` not asked. Example:
-`consent=2026-09-25.101--`.
-
-A theme uses the `consent` cookie only to decide what to render (show the banner when it is
-missing or its version differs from `consent.text_version`; start the RUM beacon only with
-`analytics` granted). It is a UI hint, not an authorization.
+A theme uses the `consent` cookie (`readConsent`, `hasConsent`) only to decide what to render
+(banner shown while it is missing; RUM only with `analytics`; recently viewed only with
+`personalization`). It is a UI hint, not an authorization.
 
 ## Reading the state: `GET /_p/consent`
 

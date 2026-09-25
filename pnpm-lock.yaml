@@ -69,9 +69,6 @@ catalogs:
     vitest:
       specifier: 5.0.1
       version: 5.0.1
-    web-vitals:
-      specifier: 6.2.2
-      version: 6.2.2
     wrangler:
       specifier: 4.137.0
       version: 4.137.0
@@ -295,13 +292,13 @@ importers:
       openapi-fetch:
         specifier: 'catalog:'
         version: 0.17.0
-      web-vitals:
-        specifier: 'catalog:'
-        version: 6.2.2
     devDependencies:
       '@platform/config':
         specifier: workspace:*
         version: link:../config
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.15
 
   packages/theme-kit:
     devDependencies:
@@ -3655,9 +3652,6 @@ packages:
   web-features@3.39.0:
     resolution: {integrity: sha512-4DgSV2sNjlLMZg1XqaKceUhbKfdUPOXQ63v9XdKOv0EOB4zBIfNh16tvrxlTFAL21HIOxtk2/e+49uBK9WF+xg==}
 
-  web-vitals@6.2.2:
-    resolution: {integrity: sha512-oto5x6dLEgrRqfcWed+pZEUb2q6ikbFmqF54CRDhI/QGbn+qxC49b4C4OkbH+kb9C3a8shpFD3SgR9kRcs80ZQ==}
-
   webdriver-bidi-protocol@0.4.3:
     resolution: {integrity: sha512-uuN0goWfxP22B7J/uAgBpOYNPttC+XVseYE+rSY5+rQ+YBeVz/VORw8WbmLVcqW78zNg5A4qnjNXYUWR3il2ig==}
 
@@ -6879,8 +6873,6 @@ snapshots:
   vscode-uri@3.2.0: {}
 
   web-features@3.39.0: {}
-
-  web-vitals@6.2.2: {}
 
   webdriver-bidi-protocol@0.4.3: {}
 

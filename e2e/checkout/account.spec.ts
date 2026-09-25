@@ -1,7 +1,8 @@
 /**
  * Customer account on the checkout origin (WP9, spec A1, A4, A5, A20) against the seeded demo
  * shop (`make up && make seed && make theme-build`): email-link sign-in via Mailpit, addresses,
- * password, sign-out, password sign-in, cart merge, consent from the shop origin.
+ * password, sign-out, password sign-in, cart merge, the theme's consent banner → the platform
+ * record → the preferences page.
  */
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, mailpit, run } from "../admin/support";
@@ -160,27 +161,34 @@ test("password sign-in merges the new cart with the account's earlier one", asyn
   await expect(page.getByRole("complementary")).toContainText("3× Tričko Basic");
 });
 
-test("consent from the shop origin, then changed on the preferences page", async () => {
-  await page.goto(`${shop}/`);
-  const res = await page.request.post(`${shop}/_p/consent`, {
-    headers: { origin: shop },
-    data: {
-      purposes: { analytics: true, ads: false, personalization: false },
-      text_version: "2026-09-25",
-    },
-  });
-  expect(res.status()).toBe(200);
-  const cookies = await page.context().cookies(shop);
-  expect(cookies.find((c) => c.name === "consent")?.value).toBe("2026-09-25.100--");
-  expect(cookies.find((c) => c.name === "__Secure-consent_id")?.httpOnly).toBe(true);
+test("the theme's consent banner is recorded, then changed on the preferences page", async () => {
+  await page.goto(`${shop}/p/tricko-basic`);
+  const banner = page.getByRole("region", { name: "Souhlas s cookies" });
+  await expect(banner).toBeVisible();
+  await banner.getByRole("button", { name: "Přijmout vše" }).click();
+  await expect(banner).toBeHidden();
+  // The platform recorded it: the edge answered with the anonymous subject (HttpOnly).
+  await expect
+    .poll(async () =>
+      (await page.context().cookies(shop)).find((c) => c.name === "__Secure-consent_id"),
+    )
+    .toMatchObject({ httpOnly: true, domain: "demo.localhost" });
+  const consentCookies = (await page.context().cookies(shop)).filter((c) => c.name === "consent");
+  expect(consentCookies.map((c) => c.value)).toEqual(["analytics%2Cads%2Cpersonalization"]);
 
+  // The checkout origin's preferences page shows the server's record and changes it.
   await page.goto(`${checkout}/consent`);
   await expect(page.getByRole("heading", { level: 1, name: "Nastavení souhlasů" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: "Měření návštěvnosti" })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Reklama" })).toBeChecked();
   await expectAccessible(page, "consent");
-  await page.getByText("Personalizace", { exact: true }).click();
+  await page.getByText("Reklama", { exact: true }).click();
   await page.getByRole("button", { name: "Uložit výběr" }).click();
   await expect(page.getByRole("status")).toHaveText("Uloženo.");
-  const after = await page.context().cookies(shop);
-  expect(after.find((c) => c.name === "consent")?.value).toBe("2026-09-25.10100");
+  // One `consent` cookie for the shop, now without ads; the banner stays closed there.
+  const after = (await page.context().cookies(shop)).filter((c) => c.name === "consent");
+  expect(after.map((c) => c.value)).toEqual(["analytics%2Cpersonalization"]);
+  await page.goto(`${shop}/p/tricko-basic`);
+  await expect(page.getByRole("button", { name: "Nastavení cookies" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Souhlas s cookies" })).toBeHidden();
 });

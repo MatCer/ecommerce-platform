@@ -107,7 +107,7 @@ async fn get_consent(
     responses(
         (status = 200, body = ConsentState, headers(
             ("X-Consent-Subject" = String, description = "The anonymous subject id (for the edge's cookie)"),
-            ("X-Consent-Summary" = String, description = "`<text_version>.<mask>` for the script-readable cookie"),
+            ("X-Consent-Summary" = String, description = "Granted purposes, comma-separated, for the script-readable `consent` cookie"),
         )),
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )

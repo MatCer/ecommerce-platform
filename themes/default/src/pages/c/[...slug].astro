@@ -1,17 +1,18 @@
 ---
 import Listing from "../../components/Listing.astro";
 import Base from "../../layouts/Base.astro";
-import { storefront } from "../../lib/storefront";
+import { CARD_SIZES, cardImage } from "../../lib/images";
+import { listingQuery, storefront } from "../../lib/storefront";
 
 const sf = storefront(Astro.request);
-const query = Object.fromEntries(
-  [...new Set(Astro.url.searchParams.keys())].map((k) => [k, Astro.url.searchParams.getAll(k)]),
-);
-const [shop, page] = await Promise.all([sf.shop(), sf.category(Astro.params.slug ?? "", query)]);
+const [shop, page] = await Promise.all([
+  sf.shop(),
+  sf.category(Astro.params.slug ?? "", listingQuery(Astro.url)),
+]);
 if (!page) return Astro.rewrite("/404");
-const first = page.products[0]?.images[0];
+const first = page.products[0]?.images[0] && cardImage(page.products[0].images[0]);
 ---
 
-<Base shop={shop} seo={page.seo} lcp={first && { image: first, sizes: "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)" }}>
-  <Listing page={page} action={Astro.url.pathname} messages={shop.messages} />
+<Base shop={shop} seo={page.seo} template="category" lcp={first && { image: first, sizes: CARD_SIZES }}>
+  <Listing page={page} shop={shop} action={`${shop.base_path}${Astro.url.pathname}`} />
 </Base>

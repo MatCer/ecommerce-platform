@@ -15,7 +15,8 @@ use super::images::Image;
 use super::listing::{self, Facet, FacetKind, ListingQuery, PER_PAGE, Sort};
 use super::product::{breadcrumb_ld, category_trail, home_link};
 use super::{
-    Alternate, CacheHints, Context, Link, Search, Seo, alternates, messages, plain_excerpt,
+    Alternate, CacheHints, Context, Link, Search, Seo, alternates, locale_path, messages,
+    plain_excerpt,
 };
 use crate::media::AssetVariant;
 use crate::money::MoneyView;
@@ -81,8 +82,15 @@ pub struct ShopModel {
     /// Active locale (`cs`); also the `lang` of pages.
     pub locale: String,
     pub currency: String,
-    /// Locales of this market (M1: the market's default locale; prefixes arrive with WP8).
+    /// `""` in the market's default locale, else `/<locale>` (spec §9.1). Page-model hrefs
+    /// already carry it; themes prefix the links they build themselves (`/search`,
+    /// `/p/<slug>`, `/_p/public/*`).
+    pub base_path: String,
+    /// Locales of this market, the default first, each with its home page URL.
     pub locales: Vec<Alternate>,
+    /// The checkout origin (`https://checkout.<shop host>`, A1): account, order status and the
+    /// withdrawal form (`/withdraw`, A19) live there, not on the theme's origin.
+    pub checkout_url: String,
     pub currencies: Vec<String>,
     /// The tenant's markets (other shops of the same merchant).
     pub markets: Vec<MarketLink>,
@@ -109,7 +117,7 @@ fn t(ctx: &Context, key: &str) -> String {
 fn link(ctx: &Context, key: &str, href: &str) -> Link {
     Link {
         label: t(ctx, key),
-        href: href.into(),
+        href: ctx.path(href),
     }
 }
 
@@ -149,13 +157,13 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
         .filter(|c| c.parent_id.is_none())
         .map(|c| MenuItem {
             label: c.name.clone(),
-            href: format!("/c/{}", c.slug),
+            href: ctx.path(&format!("/c/{}", c.slug)),
             children: tree
                 .iter()
                 .filter(|k| k.parent_id == Some(c.id))
                 .map(|k| Link {
                     label: k.name.clone(),
-                    href: format!("/c/{}", k.slug),
+                    href: ctx.path(&format!("/c/{}", k.slug)),
                 })
                 .collect(),
         })
@@ -168,7 +176,7 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
     .iter()
     .map(|(k, href)| MenuItem {
         label: t(ctx, k),
-        href: (*href).into(),
+        href: ctx.path(href),
         children: Vec::new(),
     })
     .collect();
@@ -191,10 +199,16 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
         name: ctx.shop_name.clone(),
         locale: ctx.locale.clone(),
         currency: ctx.market.currency.code().into(),
-        locales: vec![Alternate {
-            locale: ctx.locale.clone(),
-            href: ctx.url("/"),
-        }],
+        base_path: ctx.base_path(),
+        checkout_url: ctx.base_url.replacen("://", "://checkout.", 1),
+        locales: ctx
+            .market
+            .locales_default_first()
+            .map(|l| Alternate {
+                locale: l.to_owned(),
+                href: ctx.url(&locale_path(&ctx.market.default_locale, l, "/")),
+            })
+            .collect(),
         currencies: vec![ctx.market.currency.code().into()],
         markets,
         menus: Menus { main, footer },
@@ -208,7 +222,7 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
                 ConsentPurpose::Ads,
                 ConsentPurpose::Personalization,
             ],
-            policy_url: "/pages/cookies".into(),
+            policy_url: ctx.path("/pages/cookies"),
             text_version: crate::consent::TEXT_VERSION.into(),
             preferences_url: ctx.checkout_url("/consent"),
         },
@@ -229,13 +243,13 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
         seo: Seo {
             title: ctx.shop_name.clone(),
             description: String::new(),
-            canonical: ctx.url("/"),
-            alternates: alternates(ctx, |_| Some("/".into())),
+            canonical: ctx.page_url("/"),
+            alternates: alternates(ctx, |_, _| Some("/".into())),
             json_ld: vec![serde_json::json!({
                 "@context": "https://schema.org",
                 "@type": "Organization",
                 "name": ctx.shop_name,
-                "url": ctx.url("/"),
+                "url": ctx.page_url("/"),
             })],
             robots: None,
         },
@@ -311,7 +325,7 @@ pub async fn home(tx: &mut TenantTx, ctx: &Context) -> Result<HomePage, Error> {
         };
         categories.push(CategoryTile {
             label: c.name.clone(),
-            href: format!("/c/{}", c.slug),
+            href: ctx.path(&format!("/c/{}", c.slug)),
             image,
         });
     }
@@ -346,16 +360,16 @@ pub async fn home(tx: &mut TenantTx, ctx: &Context) -> Result<HomePage, Error> {
         seo: Seo {
             title: ctx.shop_name.clone(),
             description: t(ctx, "trust.delivery"),
-            canonical: ctx.url("/"),
-            alternates: alternates(ctx, |_| Some("/".into())),
+            canonical: ctx.page_url("/"),
+            alternates: alternates(ctx, |_, _| Some("/".into())),
             json_ld: vec![serde_json::json!({
                 "@context": "https://schema.org",
                 "@type": "WebSite",
                 "name": ctx.shop_name,
-                "url": ctx.url("/"),
+                "url": ctx.page_url("/"),
                 "potentialAction": {
                     "@type": "SearchAction",
-                    "target": ctx.url("/search?q={query}"),
+                    "target": ctx.page_url("/search?q={query}"),
                     "query-input": "required name=query",
                 },
             })],
@@ -492,7 +506,8 @@ pub struct FacetValueView {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct FacetView {
-    /// Query parameter name.
+    /// Facet key (`opt.color`, `param.material`, `brand`); the listing query parameter is
+    /// `f.<key>` (`?f.opt.color=red`).
     pub key: String,
     pub label: String,
     pub kind: FacetKind,
@@ -692,7 +707,7 @@ pub async fn category(
     else {
         return Ok(None);
     };
-    let path = format!("/c/{}", cat.slug);
+    let path = ctx.path(&format!("/c/{}", cat.slug));
     let (mut page, found) = listing_page(tx, ctx, search, &path, params, Some(&cat)).await?;
     let mut breadcrumbs = vec![home_link(ctx)];
     breadcrumbs.extend(category_trail(tx, ctx, cat.id).await?);
@@ -712,7 +727,7 @@ pub async fn category(
     .into_iter()
     .map(|r| Link {
         label: r.name,
-        href: format!("/c/{}", r.slug),
+        href: ctx.path(&format!("/c/{}", r.slug)),
     })
     .collect();
     let slugs: BTreeMap<String, String> = sqlx::query!(
@@ -764,8 +779,11 @@ pub async fn category(
         alternates: if filtered || found.page > 1 {
             Vec::new()
         } else {
-            alternates(ctx, |m| {
-                slugs.get(&m.default_locale).map(|s| format!("/c/{s}"))
+            alternates(ctx, |m, l| {
+                slugs
+                    .get(l)
+                    .or_else(|| slugs.get(&m.default_locale))
+                    .map(|s| format!("/c/{s}"))
             })
         },
         json_ld: vec![breadcrumb_ld(ctx, &breadcrumbs)],
@@ -782,14 +800,15 @@ pub async fn search(
     search: Option<Search<'_>>,
     params: &ListingParams,
 ) -> Result<ListingPage, Error> {
-    let (mut page, _) = listing_page(tx, ctx, search, "/search", params, None).await?;
+    let path = ctx.path("/search");
+    let (mut page, _) = listing_page(tx, ctx, search, &path, params, None).await?;
     let q = params.q.clone().unwrap_or_default();
     page.title = messages::format(&ctx.locale, "search.results_for", &[("q", &q)]);
     page.breadcrumbs = vec![home_link(ctx)];
     page.seo = Seo {
         title: format!("{} | {}", page.title, ctx.shop_name),
         description: String::new(),
-        canonical: ctx.url("/search"),
+        canonical: ctx.url(&path),
         alternates: Vec::new(),
         json_ld: Vec::new(),
         robots: Some("noindex,follow".into()),
