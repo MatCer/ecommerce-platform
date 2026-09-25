@@ -7,7 +7,7 @@
 import { Badge, Button, Spinner, TextField } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
 import { ApiError, api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
@@ -103,6 +103,15 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
       RUN_ACTIVE.has(q.state.data?.run.status ?? "") ? 2000 : false,
   }));
   const busy = () => items().some((r) => RUN_ACTIVE.has(r.status));
+  // Each check run creates a revision and a run's end changes the list: keep the table above
+  // (which polls only while one of its own revisions is pending) in step.
+  createEffect(
+    on(
+      () => [detail.data?.run.checks_run, detail.data?.run.status],
+      () => void qc.invalidateQueries({ queryKey: tenantKey("theme-revisions") }),
+      { defer: true },
+    ),
+  );
   const refresh = async () => {
     await qc.invalidateQueries({ queryKey: tenantKey("theme-ai-runs") });
     await qc.invalidateQueries({ queryKey: tenantKey("theme-ai-run") });
