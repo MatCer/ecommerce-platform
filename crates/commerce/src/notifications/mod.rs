@@ -300,7 +300,11 @@ pub fn render(
 ) -> Result<Rendered, Error> {
     let name = template.name();
     let mut subject_args = vec![("shop", brand.shop_name.clone())];
-    if let Some(number) = vars.pointer("/order/number").and_then(Value::as_str) {
+    if let Some(number) = vars
+        .pointer("/order/number")
+        .or_else(|| vars.pointer("/number"))
+        .and_then(Value::as_str)
+    {
         subject_args.push(("number", number.to_owned()));
     }
     let subject = text(locale, &format!("{name}.subject"), &subject_args);

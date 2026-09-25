@@ -103,6 +103,10 @@ pub(crate) async fn create(
         },
         "shipmentSet": { "numberOfShipments": 1 },
     });
+    // Optional contact fields are left out rather than sent as null.
+    if let Some(r) = shipment["recipient"].as_object_mut() {
+        r.retain(|_, v| !v.is_null());
+    }
     if let Some(cod) = req.cod_minor {
         shipment["cashOnDelivery"] = json!({
             "codCurrency": req.currency,
