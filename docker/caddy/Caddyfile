@@ -28,6 +28,15 @@ http://s3.localhost {
 	reverse_proxy minio:9000
 }
 
+# Third-party stand-ins the browser loads (WP10: the Packeta pickup-point widget). The other
+# mock endpoints (DNS stub, ...) stay on the compose network.
+http://mocks.localhost {
+	handle /packeta/* {
+		reverse_proxy mocks:4010
+	}
+	respond "not found" 404
+}
+
 # Admin SPA (WP5). Better Auth is served on the admin origin too: `*.localhost` hosts are
 # separate sites, so a SameSite=Lax session cookie on auth.localhost would never reach fetches
 # from the SPA. On the admin origin the cookie is first-party (auth.localhost keeps JWKS).

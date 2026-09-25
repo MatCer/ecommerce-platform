@@ -1,0 +1,13 @@
+{% extends "order.txt" %}
+{% block intro %}{{ t("order_confirmation.intro", shop=brand.shop_name) }}
+{% endblock %}
+{% block after_summary %}{% for row in vat %}
+{{ t("order_confirmation.vat_rate") }} {{ row.rate }} %: {{ t("order_confirmation.vat_net") }} {{ row.net }}, {{ t("order_confirmation.vat_amount") }} {{ row.vat }}
+{%- endfor %}
+
+{{ t("order_confirmation.delivery") }}: {{ shipping.method }}{% if shipping.pickup_point %}
+{{ t("order_confirmation.pickup_point") }}: {{ shipping.pickup_point }}{% endif %}{% if shipping.address %}
+{{ shipping.address }}{% endif %}
+{{ t("order_confirmation.payment") }}: {{ payment.method }}
+{% if payment.bank_transfer %}{{ t("order_confirmation.bank_transfer") }}{% elif payment.cod %}{{ t("order_confirmation.cod") }}{% else %}{{ t("order_confirmation.prepaid") }}{% endif %}
+{% endblock %}

@@ -40,7 +40,13 @@ export type CspProfile = "theme" | "checkout";
  */
 export function contentSecurityPolicy(
   profile: CspProfile,
-  opts: { scriptHashes: string[]; styleHashes: string[]; checkoutOrigin?: string },
+  opts: {
+    scriptHashes: string[];
+    styleHashes: string[];
+    checkoutOrigin?: string;
+    /** Origin of the pickup-point widget (checkout only): Packeta's or the local mock. */
+    widgetOrigin?: string;
+  },
 ): string {
   const hashes = (h: string[]) => h.map((x) => ` '${x}'`).join("");
   const common = [
@@ -64,11 +70,12 @@ export function contentSecurityPolicy(
       `form-action 'self'${opts.checkoutOrigin ? ` ${opts.checkoutOrigin}` : ""}`,
     ].join("; ");
   }
+  const widget = opts.widgetOrigin ?? "https://widget.packeta.com";
   return [
-    ...common.map((d) => (d.startsWith("script-src") ? `${d} https://js.stripe.com` : d)),
+    ...common.map((d) => (d.startsWith("script-src") ? `${d} https://js.stripe.com ${widget}` : d)),
     "connect-src 'self' https://api.stripe.com",
     // Pickup-point widget and Stripe Payment Element (spec §9.4), loaded on interaction only.
-    "frame-src https://js.stripe.com https://hooks.stripe.com https://widget.packeta.com",
+    `frame-src https://js.stripe.com https://hooks.stripe.com ${widget}`,
     "form-action 'self'",
   ].join("; ");
 }

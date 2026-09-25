@@ -17,6 +17,10 @@ interface NavItem {
 
 const groups: { label: () => string; items: NavItem[] }[] = [
   {
+    label: () => t("orders.title"),
+    items: [{ href: "/orders", label: () => t("orders.title"), min: "staff" }],
+  },
+  {
     label: () => t("nav.catalog"),
     items: [
       { href: "/products", label: () => t("nav.products"), min: "staff" },
@@ -54,6 +58,8 @@ const groups: { label: () => string; items: NavItem[] }[] = [
     items: [
       { href: "/settings/search", label: () => t("content.search"), min: "staff" },
       { href: "/markets", label: () => t("nav.markets"), min: "staff" },
+      { href: "/settings/shipping", label: () => t("shipping.title"), min: "staff" },
+      { href: "/settings/payments", label: () => t("payments.title"), min: "staff" },
       { href: "/settings/tax", label: () => t("nav.taxProfile"), min: "staff" },
       { href: "/staff", label: () => t("nav.staff"), min: "admin" },
       { href: "/audit-log", label: () => t("nav.auditLog"), min: "admin" },

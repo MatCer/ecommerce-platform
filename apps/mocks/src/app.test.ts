@@ -26,6 +26,23 @@ test("dns txt stub stores and serves records", async () => {
   expect(await got.json()).toEqual({ name, records: ["commerce-verification=abc"] });
 });
 
+test("packeta widget mock: library entry point and a list that answers only the opener", async () => {
+  const lib = await app.request("/packeta/library.js");
+  expect(lib.headers.get("content-type")).toContain("javascript");
+  expect(await lib.text()).toContain("window.Packeta = { Widget: { pick");
+
+  const page = await app.request(
+    "/packeta/widget?country=sk&origin=http%3A%2F%2Fcheckout.demo.localhost%3A8080",
+  );
+  const html = await page.text();
+  expect(html).toContain("Z-BOX Bratislava");
+  expect(html).not.toContain("Praha");
+  expect(html).toContain('const target = "http://checkout.demo.localhost:8080"');
+  // A non-origin (path, script) is never used as the postMessage target.
+  const bad = await app.request("/packeta/widget?origin=javascript%3Aalert(1)");
+  expect(await bad.text()).toContain("const target = null");
+});
+
 test("dns txt stub rejects malformed input", async () => {
   expect((await app.request("/dns/txt?name=bad%20name")).status).toBe(400);
   const res = await app.request("/dns/txt", {

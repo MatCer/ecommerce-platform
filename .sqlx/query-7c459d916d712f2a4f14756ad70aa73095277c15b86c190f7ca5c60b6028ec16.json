@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kind, enabled, name_i18n, timeout_minutes, position FROM payment_methods\n         WHERE market_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_methods",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "enabled",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "payment_methods",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "payment_methods",
+            "name": "name_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "timeout_minutes",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "payment_methods",
+            "name": "timeout_minutes"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "payment_methods",
+            "name": "position"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "7c459d916d712f2a4f14756ad70aa73095277c15b86c190f7ca5c60b6028ec16"
+}

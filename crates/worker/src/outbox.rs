@@ -21,6 +21,9 @@ pub fn subscribers(event_type: &str) -> &'static [&'static str] {
         t if commerce::storefront::purge::EVENTS.contains(&t) => {
             &[handlers::EVENTS_LOG, handlers::EDGE_PURGE]
         }
+        commerce::customers::EMAIL_VERIFIED_EVENT => {
+            &[handlers::EVENTS_LOG, handlers::LINK_GUEST_ORDERS]
+        }
         _ => &[handlers::EVENTS_LOG],
     }
 }

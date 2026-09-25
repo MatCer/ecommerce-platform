@@ -22,6 +22,7 @@ const gateway = createGateway({
   mediaOrigin: required("MEDIA_ORIGIN"),
   scheme: process.env.PUBLIC_SCHEME === "http" ? "http" : "https",
   purgeToken: required("EDGE_PURGE_TOKEN"),
+  packetaWidgetUrl: process.env.PACKETA_WIDGET_URL || undefined,
 });
 
 const port = Number(process.env.PORT ?? 8787);

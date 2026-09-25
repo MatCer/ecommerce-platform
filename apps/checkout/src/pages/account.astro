@@ -8,6 +8,8 @@ import { checkoutApi, messages, shopUrl } from "../lib/api";
 // Customer accounts live on the checkout origin only (A1, A5).
 const api = checkoutApi(Astro.request);
 const [shop, me] = await Promise.all([api.shop(), api.me()]);
+const orders = me ? await api.orders() : [];
+const date = new Intl.DateTimeFormat(shop?.locale ?? "cs", { dateStyle: "medium" });
 const m = shop?.messages ?? {};
 const next = Astro.url.searchParams.get("next") ?? undefined;
 const links = [
@@ -57,7 +59,26 @@ const links = [
         </nav>
         <section aria-labelledby="orders" class="rounded-lg border border-border bg-card p-4">
           <h2 id="orders" class="mb-2 font-display text-lg font-bold">{t(m, "account.orders")}</h2>
-          <p class="text-sm text-muted-foreground">{t(m, "account.orders_empty")}</p>
+          {orders.length === 0 ? (
+            <p class="text-sm text-muted-foreground">{t(m, "account.orders_empty")}</p>
+          ) : (
+            <ul class="grid gap-2 text-sm" data-testid="account-orders">
+              {orders.map((o) => (
+                <li class="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 first:border-0 first:pt-0">
+                  <span>
+                    <span class="font-semibold">{t(m, "order.number")} {o.number}</span>
+                    <span class="text-muted-foreground"> · {date.format(new Date(o.placed_at))} · {t(m, `order.status.${o.status}`)}</span>
+                  </span>
+                  <span class="flex items-center gap-3">
+                    <span class="tabular-nums">{o.total.formatted}</span>
+                    <a href={`/account/orders/${o.id}`} class="text-identity-ink underline">
+                      {t(m, "order.detail")}<span class="sr-only"> {o.number}</span>
+                    </a>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     ) : (

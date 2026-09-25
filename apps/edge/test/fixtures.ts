@@ -213,6 +213,20 @@ export function fakeApi() {
         },
       );
     if (p === "/events") return new Response(null, { status: 202 });
+    // WP10: checkout, order page and the fake gateway.
+    if (p === "/checkout/place-order")
+      return Response.json(
+        { order_id: "o1", confirmation_url: `/o/${"a".repeat(64)}` },
+        { status: 201, headers: { "idempotent-replayed": "true", "set-cookie": "x=1" } },
+      );
+    if (p.startsWith("/checkout/fake-pay/") && req.method === "GET")
+      return Response.json({
+        order_number: "<b>100001</b>",
+        amount: { formatted: "10 Kč" },
+        status: "pending",
+      });
+    if (p.startsWith("/checkout") || p.startsWith("/orders/"))
+      return Response.json({ path: p, cart_seen: req.headers.get("x-cart-token") });
     if (p === "/newsletter/subscribe")
       return Response.json(
         { tenant, body: JSON.parse(calls.at(-1)?.body || "null") },

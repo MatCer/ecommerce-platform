@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, number, currency, status, payment_status, payment_method, total_minor,\n                coupon_id, payment_expires_at\n         FROM orders WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "payment_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payment_status"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "payment_method",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payment_method"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "total_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "total_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "coupon_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "coupon_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "payment_expires_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payment_expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "997ea0cd0ee295550c7fdb71680c36f9298153c19335d3b8c87e4917938565fa"
+}

@@ -114,6 +114,83 @@ export interface paths {
         patch: operations["update_line"];
         trace?: never;
     };
+    "/storefront/v1/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The checkout of the handed-off cart: lines and totals, the market's shipping methods with
+         *     live rates, payment methods, the selections so far and what is still missing.
+         */
+        get: operations["get_checkout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/checkout/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Billing and delivery address. The delivery country must be one the market ships to and
+         *     the tax profile covers (A3); VAT follows it.
+         */
+        put: operations["put_addresses"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/checkout/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["put_contact"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/checkout/fake-pay/{attempt}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the fake pay page shows. `404` unless `PAYMENTS_FAKE=1`. */
+        get: operations["fake_pay_page"];
+        put?: never;
+        /**
+         * The fake pay page's Succeed/Fail: the fake provider signs an event and it is processed
+         *     exactly like `POST /webhooks/fake` (signature, amount and currency checked first).
+         */
+        post: operations["fake_pay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/checkout/handoff": {
         parameters: {
             query?: never;
@@ -129,6 +206,61 @@ export interface paths {
          *     another market.
          */
         post: operations["redeem_handoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/checkout/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["put_payment"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/checkout/place-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Places the order (A12): one order per cart, `Idempotency-Key` required (a retry with the
+         *     same key answers the same order with `Idempotent-Replayed: true` and a fresh order token).
+         *     `version` and `total_minor` are what the customer saw: `409 cart_changed` /
+         *     `409 price_changed` when they no longer hold. Stock is reserved and the coupon redeemed in
+         *     the same transaction; then the payment attempt is initialized at the provider (A10).
+         */
+        post: operations["place_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/checkout/shipping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["put_shipping"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -272,6 +404,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/customer/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The signed-in customer's orders, newest first: placed while signed in, or guest orders
+         *     with the account's email once it was verified (A5).
+         */
+        get: operations["my_orders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["my_order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/customer/password": {
         parameters: {
             query?: never;
@@ -360,6 +528,80 @@ export interface paths {
          *     arrive with the newsletter module (M2).
          */
         post: operations["newsletter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/orders/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/orders/{token}/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The payment status (A10), polled by the order page while a payment is under way. */
+        get: operations["get_payment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/orders/{token}/payment-attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A new payment attempt after a failed one, within the order's payment window (A10). Needs
+         *     the right to pay (`403 payment_not_allowed`).
+         */
+        post: operations["new_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/init": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Initializes (again) a pending attempt at its provider (A10): idempotent, for when the
+         *     automatic init after placement failed or the customer comes back to pay. Needs the right
+         *     to pay; `409 payment_window_closed` after the order's payment deadline.
+         */
+        post: operations["init_attempt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -605,6 +847,10 @@ export interface components {
         AddressList: {
             items: components["schemas"]["Address"][];
         };
+        AddressesInput: {
+            billing: components["schemas"]["CheckoutAddress"];
+            shipping?: components["schemas"]["CheckoutAddress"] | null;
+        };
         Alternate: {
             href: string;
             /** @description hreflang value (`cs-CZ`, `x-default`). */
@@ -621,6 +867,15 @@ export interface components {
             key: string;
             /** Format: int32 */
             width: number;
+        };
+        /** @enum {string} */
+        AttemptStatus: "pending" | "succeeded" | "failed" | "expired";
+        AttemptView: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            status: components["schemas"]["AttemptStatus"];
         };
         /** @enum {string} */
         Badge: "sale" | "new";
@@ -691,6 +946,8 @@ export interface components {
             /** @description Purge tags (`product:<id>`, `category:<id>`, `shop`, ...). */
             tags: string[];
         };
+        /** @enum {string} */
+        Carrier: "packeta_pickup" | "packeta_home" | "ppl" | "personal_pickup";
         CartCoupon: {
             /** @description Whether it applies to the cart right now. */
             applied: boolean;
@@ -770,9 +1027,45 @@ export interface components {
             name: string;
             slug: string;
         };
+        /** @enum {string} */
+        ChargeKind: "shipping" | "payment_fee" | "rounding";
+        CheckoutAddress: {
+            city: string;
+            company?: string | null;
+            /** @description ISO 3166-1 alpha-2. */
+            country: string;
+            name: string;
+            phone?: string | null;
+            postal_code: string;
+            street: string;
+        };
         CheckoutCart: {
             /** @description Checkout-scoped cart capability (the edge sets it as the `__Host-cart` cookie). */
             cart_token: string;
+        };
+        /** @description Everything the one-page checkout renders. Recomputed on every read. */
+        CheckoutView: {
+            billing_address?: components["schemas"]["CheckoutAddress"] | null;
+            cart: components["schemas"]["CartView"];
+            email?: string | null;
+            legal: components["schemas"]["Legal"];
+            /**
+             * @description What is still missing before the order can be placed (`email`, `billing_address`,
+             *     `shipping_method`, `pickup_point`, `payment_method`, `cart_unavailable`).
+             */
+            missing: string[];
+            packeta?: components["schemas"]["PacketaWidget"] | null;
+            payment_method?: components["schemas"]["MethodKind"] | null;
+            payment_methods: components["schemas"]["PaymentOption"][];
+            phone?: string | null;
+            pickup_point?: components["schemas"]["PickupPoint"] | null;
+            /** @description A3: where this market delivers. */
+            ship_to_countries: string[];
+            shipping_address?: components["schemas"]["CheckoutAddress"] | null;
+            /** Format: uuid */
+            shipping_method_id?: string | null;
+            shipping_methods: components["schemas"]["ShippingOption"][];
+            totals: components["schemas"]["Totals"];
         };
         CmsPage: {
             blocks: components["schemas"]["BlockView"][];
@@ -805,6 +1098,10 @@ export interface components {
             purposes: components["schemas"]["Purposes"];
             /** @description Text version of the latest choice; `None` = no choice yet (show the banner). */
             text_version?: string | null;
+        };
+        ContactInput: {
+            email: string;
+            phone?: string | null;
         };
         CouponCode: {
             code: string;
@@ -870,11 +1167,23 @@ export interface components {
             label: string;
             values: components["schemas"]["FacetValueView"][];
         };
+        FakePayInput: {
+            outcome: components["schemas"]["Outcome"];
+        };
+        FakePayment: {
+            amount: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            attempt_id: string;
+            order_number: string;
+            status: components["schemas"]["AttemptStatus"];
+        };
         FaqItem: {
             /** @description Sanitized on write. */
             answer_html: string;
             question: string;
         };
+        /** @enum {string} */
+        FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
         GpsrPartyView: {
             address: string;
             email?: string | null;
@@ -926,6 +1235,13 @@ export interface components {
             srcset_webp: string;
             /** Format: int32 */
             width: number;
+        };
+        Legal: {
+            privacy_url: string;
+            terms_url: string;
+            /** @description Recorded with the optional consents (A20). */
+            text_version: string;
+            withdrawal_url: string;
         };
         LineUpdate: {
             /**
@@ -982,6 +1298,8 @@ export interface components {
             footer: components["schemas"]["MenuItem"][];
             main: components["schemas"]["MenuItem"][];
         };
+        /** @enum {string} */
+        MethodKind: "stripe" | "bank_transfer" | "cod" | "fake";
         /** @description The API shape of an amount (spec §8.1): `{amount_minor, currency, formatted}`. */
         MoneyView: {
             /** Format: int64 */
@@ -1006,6 +1324,15 @@ export interface components {
             /** @description `accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5). */
             status: string;
         };
+        /** @description What the customer does next. */
+        NextAction: {
+            /** @enum {string} */
+            type: "redirect";
+            url: string;
+        } | {
+            /** @enum {string} */
+            type: "none";
+        };
         OptionValueView: {
             code: string;
             name: string;
@@ -1014,6 +1341,104 @@ export interface components {
             code: string;
             name: string;
             values: components["schemas"]["OptionValueView"][];
+        };
+        OrderAddress: {
+            city: string;
+            company?: string | null;
+            country: string;
+            name: string;
+            phone?: string | null;
+            postal_code: string;
+            street: string;
+        };
+        OrderChargeView: {
+            kind: components["schemas"]["ChargeKind"];
+            tax: components["schemas"]["MoneyView"];
+            total: components["schemas"]["MoneyView"];
+        };
+        OrderLineView: {
+            /** @description This line's share of the coupon (A15). */
+            discount: components["schemas"]["MoneyView"];
+            name: string;
+            options_label: string;
+            /** Format: int32 */
+            quantity: number;
+            sku: string;
+            tax: components["schemas"]["MoneyView"];
+            tax_rate: string;
+            total: components["schemas"]["MoneyView"];
+            unit_price: components["schemas"]["MoneyView"];
+            /** Format: uuid */
+            variant_id?: string | null;
+        };
+        OrderPage: {
+            items: components["schemas"]["OrderSummary"][];
+            /**
+             * Format: uuid
+             * @description Pass as `cursor` for the next page; `null` on the last page.
+             */
+            next_cursor?: string | null;
+        };
+        /** @enum {string} */
+        OrderStatus: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled" | "returned";
+        /** @description One row of an order list. */
+        OrderSummary: {
+            email: string;
+            exception?: string | null;
+            fulfillment_status: components["schemas"]["FulfillmentStatus"];
+            /** Format: uuid */
+            id: string;
+            number: string;
+            payment_method: components["schemas"]["MethodKind"];
+            payment_status: components["schemas"]["PaymentStatus"];
+            /** Format: date-time */
+            placed_at: string;
+            status: components["schemas"]["OrderStatus"];
+            total: components["schemas"]["MoneyView"];
+        };
+        /** @description An order as its customer sees it (`/o/<token>`, the account). */
+        OrderView: {
+            billing_address?: components["schemas"]["OrderAddress"] | null;
+            charges: components["schemas"]["OrderChargeView"][];
+            coupon_code?: string | null;
+            currency: components["schemas"]["Currency"];
+            discount: components["schemas"]["MoneyView"];
+            email: string;
+            /** @description `late_payment` (A10) when money arrived for an expired or cancelled order. */
+            exception?: string | null;
+            fulfillment_status: components["schemas"]["FulfillmentStatus"];
+            /** Format: uuid */
+            id: string;
+            lines: components["schemas"]["OrderLineView"][];
+            locale: string;
+            notes?: string | null;
+            number: string;
+            payment: components["schemas"]["PaymentView"];
+            payment_fee: components["schemas"]["MoneyView"];
+            phone?: string | null;
+            /** Format: date-time */
+            placed_at: string;
+            rounding: components["schemas"]["MoneyView"];
+            shipping: components["schemas"]["ShippingSummary"];
+            shipping_address?: components["schemas"]["OrderAddress"] | null;
+            shipping_total: components["schemas"]["MoneyView"];
+            status: components["schemas"]["OrderStatus"];
+            subtotal: components["schemas"]["MoneyView"];
+            total: components["schemas"]["MoneyView"];
+            vat: components["schemas"]["VatRow"][];
+            vat_total: components["schemas"]["MoneyView"];
+        };
+        /**
+         * @description Outcome of a payment attempt reported by a provider.
+         * @enum {string}
+         */
+        Outcome: "succeeded" | "failed";
+        /** @description The Packeta pickup-point widget (spec §10.5): loaded on interaction on the checkout origin. */
+        PacketaWidget: {
+            /** @description The widget's public API key. */
+            api_key: string;
+            /** @description `library.js` of the widget (Packeta's, or the local mock). */
+            script_url: string;
         };
         Pagination: {
             next?: string | null;
@@ -1037,6 +1462,82 @@ export interface components {
             email: string;
             password: string;
             redirect?: string | null;
+        };
+        PaymentInput: {
+            method: components["schemas"]["MethodKind"];
+        };
+        PaymentOption: {
+            /** @description The fee charged with this method (COD: the shipping method's COD fee). */
+            fee: components["schemas"]["MoneyView"];
+            kind: components["schemas"]["MethodKind"];
+            name: string;
+            /** @description False when it cannot be chosen with the current shipping method (COD). */
+            selectable: boolean;
+        };
+        /** @description What the client does after placing the order or starting a payment attempt. */
+        PaymentStart: {
+            action?: components["schemas"]["NextAction"] | null;
+            /** Format: uuid */
+            attempt_id: string;
+        };
+        /** @enum {string} */
+        PaymentStatus: "unpaid" | "authorized" | "paid" | "partially_refunded" | "refunded" | "failed" | "expired";
+        PaymentView: {
+            attempt?: components["schemas"]["AttemptView"] | null;
+            /**
+             * @description Whether this viewer may start or continue payments: the order token alone is read-only
+             *     (A4); the browser that placed the order or its signed-in customer may pay.
+             */
+            can_pay: boolean;
+            /** @description Whether a new attempt can be started now (A10); only for a viewer who may pay. */
+            can_retry: boolean;
+            /**
+             * Format: date-time
+             * @description Unpaid orders are cancelled after this.
+             */
+            expires_at?: string | null;
+            method: components["schemas"]["MethodKind"];
+            status: components["schemas"]["PaymentStatus"];
+        };
+        /** @description A pickup point as chosen in the carrier's widget (snapshot). */
+        PickupPoint: {
+            city: string;
+            /** @description ISO 3166-1 alpha-2, upper case. */
+            country: string;
+            /** @description The carrier's point id. */
+            id: string;
+            name: string;
+            street: string;
+            zip: string;
+        };
+        PlaceOrderInput: {
+            /** @description Terms and conditions (required). */
+            accept_terms: boolean;
+            /** @description Information about the right of withdrawal (required). */
+            accept_withdrawal: boolean;
+            /** @description Optional, unchecked by default (A20). */
+            email_marketing?: boolean;
+            notes?: string | null;
+            /** @description Optional, unchecked by default (A20). */
+            review_invites?: boolean;
+            /**
+             * Format: int64
+             * @description The total (minor units) the customer agreed to.
+             */
+            total_minor: number;
+            /**
+             * Format: int32
+             * @description The cart `version` the summary was shown for.
+             */
+            version: number;
+        };
+        PlacedOrder: {
+            /** @description The order page on the checkout origin (`/o/<token>`, a read-only capability, A4). */
+            confirmation_url: string;
+            number: string;
+            /** Format: uuid */
+            order_id: string;
+            payment: components["schemas"]["PaymentStart"];
         };
         PriceRange: {
             /** Format: int64 */
@@ -1166,6 +1667,29 @@ export interface components {
             robots?: string | null;
             title: string;
         };
+        ShippingInput: {
+            /** Format: uuid */
+            method_id: string;
+            pickup_point?: components["schemas"]["PickupPoint"] | null;
+        };
+        ShippingOption: {
+            carrier: components["schemas"]["Carrier"];
+            cod_allowed: boolean;
+            cod_fee: components["schemas"]["MoneyView"];
+            description?: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @description Pickup-point carriers: the widget to choose the point with. */
+            needs_pickup_point: boolean;
+            price?: components["schemas"]["MoneyView"] | null;
+        };
+        ShippingSummary: {
+            carrier: components["schemas"]["Carrier"];
+            /** @description The method's name in the order's locale, as it was at placement. */
+            name: string;
+            pickup_point?: components["schemas"]["PickupPoint"] | null;
+        };
         ShopModel: {
             /**
              * @description `""` in the market's default locale, else `/<locale>` (spec §9.1). Page-model hrefs
@@ -1229,6 +1753,15 @@ export interface components {
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
             products: components["schemas"]["SearchHit"][];
+        };
+        Totals: {
+            discount: components["schemas"]["MoneyView"];
+            payment_fee: components["schemas"]["MoneyView"];
+            shipping: components["schemas"]["MoneyView"];
+            subtotal: components["schemas"]["MoneyView"];
+            total: components["schemas"]["MoneyView"];
+            vat: components["schemas"]["VatRow"][];
+            vat_total: components["schemas"]["MoneyView"];
         };
         Tracking: {
             /**
@@ -1580,6 +2113,227 @@ export interface operations {
             };
         };
     };
+    get_checkout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutView"];
+                };
+            };
+            /** @description No checkout cart */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    put_addresses: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressesInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutView"];
+                };
+            };
+            /** @description invalid_address | ship_to_not_allowed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    put_contact: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutView"];
+                };
+            };
+            /** @description invalid_email | invalid_phone */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    fake_pay_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                attempt: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FakePayment"];
+                };
+            };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    fake_pay: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                attempt: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FakePayInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FakePayment"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description attempt_finished */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     redeem_handoff: {
         parameters: {
             query?: never;
@@ -1609,6 +2363,158 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    put_payment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutView"];
+                };
+            };
+            /** @description unknown_payment_method | cod_not_allowed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    place_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaceOrderInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlacedOrder"];
+                };
+            };
+            /** @description idempotency_key_required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No checkout cart */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description order_already_placed | cart_changed | price_changed | insufficient_stock | out_of_stock | cart_unavailable | coupon_* | idempotency_conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description legal_consent_required | checkout_incomplete | ship_to_not_allowed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    put_shipping: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShippingInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutView"];
+                };
+            };
+            /** @description unknown_shipping_method | pickup_point_required | invalid_pickup_point */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2104,6 +3010,88 @@ export interface operations {
             };
         };
     };
+    my_orders: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderPage"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    my_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderView"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     set_password: {
         parameters: {
             query?: never;
@@ -2302,6 +3290,207 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_payment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    new_attempt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentStart"];
+                };
+            };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description retry_not_allowed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    init_attempt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+                attempt: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentStart"];
+                };
+            };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description attempt_not_pending | payment_window_closed */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE orders o SET customer_id = c.id, updated_at = now()\n         FROM customers c\n         WHERE c.id = $1 AND c.email_verified_at IS NOT NULL\n           AND o.customer_id IS NULL AND o.email = c.email",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "11203192ee395b36f03c113b293bd9694b240e831468e0d2a98538ca29805dbf"
+}

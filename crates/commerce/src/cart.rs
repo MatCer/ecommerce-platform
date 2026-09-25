@@ -3,8 +3,8 @@
 //! A cart is reached only through a capability token (256-bit, hashed at rest):
 //! - the **shop** capability lives in the shop origin's `cart` cookie and may read and edit;
 //! - at checkout handoff it is revoked and a single-use, 60 s handoff token is minted;
-//! - redeeming the handoff on the checkout origin mints the **checkout** capability (read-only
-//!   until WP10 adds checkout mutations).
+//! - redeeming the handoff on the checkout origin mints the **checkout** capability (checkout
+//!   mutations and order placement, `commerce::checkout`).
 //!
 //! Totals are recomputed on every read by `pricing::price_cart` from the effective prices in the
 //! market's price list; the client never sends prices. VAT follows the tax profile for the
@@ -117,7 +117,8 @@ pub struct CartView {
     pub vat_total: MoneyView,
     /// Country whose VAT applies (checkout sets it; the market's first country until then).
     pub ship_to_country: String,
-    /// `None` until shipping methods exist (WP10).
+    /// What is missing to the market's lowest free-shipping threshold (zero once reached);
+    /// `None` when no shipping method has a threshold.
     pub free_shipping_remaining: Option<MoneyView>,
 }
 
@@ -218,7 +219,42 @@ pub async fn find(
     })
 }
 
-async fn touch(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
+/// The cart behind a **checkout** capability for order placement, locked for the rest of the
+/// transaction (A12), whether still open or already converted (an idempotent replay of
+/// place-order must find it). Returns the cart and whether it is still open.
+pub async fn find_for_order(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<(CartRef, bool), Error> {
+    if !capability::well_formed(token) {
+        return Err(cart_not_found());
+    }
+    let row = sqlx::query!(
+        "SELECT id, market_id, status FROM carts
+         WHERE checkout_token_hash = $1 AND status IN ('open', 'converted')
+           AND last_activity_at > $2
+         FOR UPDATE",
+        capability::hash(token),
+        Utc::now() - Duration::days(IDLE_DAYS)
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(cart_not_found)?;
+    if row.market_id != ctx.market.id {
+        return Err(cart_not_found());
+    }
+    Ok((
+        CartRef {
+            id: row.id,
+            market_id: row.market_id,
+            scope: Scope::Checkout,
+        },
+        row.status == "open",
+    ))
+}
+
+pub(crate) async fn touch(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
     sqlx::query!(
         "UPDATE carts SET version = version + 1, last_activity_at = now(), updated_at = now()
          WHERE id = $1",
@@ -584,9 +620,33 @@ pub async fn attach_to_customer(
 // ---------------------------------------------------------------------------------------
 // Pricing and the view
 
-struct Priced {
-    view: CartView,
-    goods_before_coupon: i64,
+/// A priced cart: the view plus what checkout and order placement build on.
+pub(crate) struct Priced {
+    pub view: CartView,
+    pub goods_before_coupon: i64,
+    /// The goods-only pricing input (checkout adds shipping and the payment fee).
+    pub input: CartInput,
+    /// Goods after the coupon.
+    pub goods_minor: i64,
+    /// Order-line data of every cart line, in cart order.
+    pub lines: Vec<LineMeta>,
+    /// The attached coupon: id and whether it applies (`Err(code)` when it does not).
+    pub coupon: Option<(Uuid, Result<(), &'static str>)>,
+    /// Total weight of the available lines in grams (unknown weights count as 0).
+    pub weight_g: i64,
+    pub vat_payer: bool,
+}
+
+/// A cart line as it becomes an order line.
+pub(crate) struct LineMeta {
+    pub id: Uuid,
+    pub variant_id: Uuid,
+    pub product_id: Uuid,
+    pub sku: String,
+    pub name: String,
+    pub label: String,
+    pub quantity: u32,
+    pub available: bool,
 }
 
 /// The liable country's VAT for each product (A3), `ZERO` for a non-VAT-payer, plus the
@@ -628,7 +688,7 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
     .fetch_one(&mut **tx)
     .await?;
     let lines = sqlx::query!(
-        "SELECT cl.id, cl.variant_id, cl.quantity, v.product_id, v.sku, v.option_values
+        "SELECT cl.id, cl.variant_id, cl.quantity, v.product_id, v.sku, v.option_values, v.weight_g
          FROM cart_lines cl JOIN variants v ON v.id = cl.variant_id
          WHERE cl.cart_id = $1 ORDER BY cl.created_at, cl.id",
         cart_id
@@ -702,6 +762,7 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
         unit: Option<i64>,
         stock: StockState,
         rate: TaxRate,
+        weight_g: i64,
     }
     let lines: Vec<Line> = lines
         .into_iter()
@@ -739,6 +800,7 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
                     .get(&l.product_id)
                     .copied()
                     .unwrap_or(TaxRate::ZERO),
+                weight_g: i64::from(l.weight_g.unwrap_or(0)),
             }
         })
         .collect();
@@ -753,8 +815,8 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
     )
     .fetch_optional(&mut **tx)
     .await?;
-    let (applied, coupon_view) = match coupon_row {
-        None => (None, None),
+    let (applied, coupon_view, coupon_state) = match coupon_row {
+        None => (None, None, None),
         Some(id) => {
             let c = coupons::get(tx, id).await?;
             match coupons::evaluate(&c, ctx.market.currency, goods_before_coupon, 0, Utc::now()) {
@@ -765,6 +827,7 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
                         applied: true,
                         reason: None,
                     }),
+                    Some((id, Ok(()))),
                 ),
                 Err(e) => (
                     None,
@@ -773,12 +836,13 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
                         applied: false,
                         reason: Some(e.code().to_owned()),
                     }),
+                    Some((id, Err(e.code()))),
                 ),
             }
         }
     };
 
-    let priced = price_cart(&CartInput {
+    let input = CartInput {
         currency: ctx.market.currency,
         vat_payer,
         lines: lines
@@ -797,7 +861,8 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
         payment_fee_minor: None,
         fallback_rate,
         cash_rounding: None,
-    })?;
+    };
+    let priced = price_cart(&input)?;
     let by_line: HashMap<Uuid, &crate::pricing::cart::PricedLine> =
         priced.lines.iter().map(|l| (l.id, l)).collect();
 
@@ -863,12 +928,49 @@ async fn price(tx: &mut TenantTx, ctx: &Context, cart_id: Uuid) -> Result<Priced
             .collect(),
         vat_total: ctx.money(priced.vat_minor),
         ship_to_country: ship_to,
-        free_shipping_remaining: None,
+        free_shipping_remaining: crate::shipping::lowest_free_threshold(tx, ctx.market.id)
+            .await?
+            .map(|t| ctx.money((t - priced.total_minor).max(0))),
     };
+    let meta = lines
+        .iter()
+        .map(|l| LineMeta {
+            id: l.id,
+            variant_id: l.variant_id,
+            product_id: l.product_id,
+            sku: l.sku.clone(),
+            name: names
+                .get(&l.product_id)
+                .map(|(n, _)| n.clone())
+                .unwrap_or_default(),
+            label: l.label.clone(),
+            quantity: l.quantity,
+            available: by_line.contains_key(&l.id),
+        })
+        .collect();
     Ok(Priced {
         view,
         goods_before_coupon,
+        goods_minor: priced.total_minor,
+        weight_g: lines
+            .iter()
+            .filter(|l| l.unit.is_some())
+            .map(|l| l.weight_g * i64::from(l.quantity))
+            .sum(),
+        lines: meta,
+        coupon: coupon_state,
+        input,
+        vat_payer,
     })
+}
+
+/// The cart priced for checkout (`commerce::checkout`).
+pub(crate) async fn priced(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    cart_id: Uuid,
+) -> Result<Priced, Error> {
+    price(tx, ctx, cart_id).await
 }
 
 /// The cart with totals recomputed now.

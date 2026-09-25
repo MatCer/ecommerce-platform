@@ -34,6 +34,13 @@ pub const SCHEDULES: &[Schedule] = &[
         kind: commerce::feeds::export::ALL_JOB,
         every: Duration::from_secs(3600),
     },
+    // ponytail: one global scan per minute; an order expires up to ~1.5 min late (cron tick
+    // 30 s + slot). Schedule per order (`run_at`) if payment windows need to be exact.
+    Schedule {
+        name: "payments.expire",
+        kind: handlers::PAYMENTS_EXPIRE,
+        every: Duration::from_secs(60),
+    },
 ];
 
 /// A dedicated connection holding the leader lock, or `None` if another worker leads.

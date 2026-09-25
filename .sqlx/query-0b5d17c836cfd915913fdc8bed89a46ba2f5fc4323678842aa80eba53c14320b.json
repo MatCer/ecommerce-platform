@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kind, name, company, street, city, postal_code, country, phone\n         FROM order_addresses WHERE order_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "company",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "company"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "street",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "street"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "city",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "postal_code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "postal_code"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "country"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "phone",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "phone"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "0b5d17c836cfd915913fdc8bed89a46ba2f5fc4323678842aa80eba53c14320b"
+}

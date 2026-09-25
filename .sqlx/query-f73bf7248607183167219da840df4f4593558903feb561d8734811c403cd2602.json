@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO payment_methods (tenant_id, market_id, kind, enabled, name_i18n, timeout_minutes, position)\n         VALUES ($1, $2, $3, $4, $5, $6, $7)\n         ON CONFLICT (tenant_id, market_id, kind) DO UPDATE SET enabled = EXCLUDED.enabled,\n             name_i18n = EXCLUDED.name_i18n, timeout_minutes = EXCLUDED.timeout_minutes,\n             position = EXCLUDED.position, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bool",
+        "Jsonb",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f73bf7248607183167219da840df4f4593558903feb561d8734811c403cd2602"
+}

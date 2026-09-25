@@ -475,14 +475,15 @@ pub async fn consume_magic_link(
         )
         .execute(&mut **tx)
         .await?;
-        // A5: only now may guest orders with this address be linked to the account (WP10).
-        queue::publish(
-            &mut **tx,
-            EMAIL_VERIFIED_EVENT,
-            &json!({ "customer_id": c.id }),
-        )
-        .await?;
     }
+    // A5: the link proved control of the address, so guest orders placed with it (also those
+    // placed since an earlier verification) may join the account (`orders.link_guest`).
+    queue::publish(
+        &mut **tx,
+        EMAIL_VERIFIED_EVENT,
+        &json!({ "customer_id": c.id }),
+    )
+    .await?;
     let session_token = create_session(tx, c.id, true).await?;
     after_sign_in(tx, ctx, c.id, cart_token, consent_subject).await?;
     let session = authenticate(tx, &session_token)
@@ -689,17 +690,17 @@ pub struct AddressInput {
     pub is_default: bool,
 }
 
-struct CleanAddress {
-    name: String,
-    company: Option<String>,
-    street: String,
-    city: String,
-    postal_code: String,
-    country: String,
-    phone: Option<String>,
+pub(crate) struct CleanAddress {
+    pub(crate) name: String,
+    pub(crate) company: Option<String>,
+    pub(crate) street: String,
+    pub(crate) city: String,
+    pub(crate) postal_code: String,
+    pub(crate) country: String,
+    pub(crate) phone: Option<String>,
 }
 
-fn clean(a: &AddressInput) -> Result<CleanAddress, Error> {
+pub(crate) fn clean(a: &AddressInput) -> Result<CleanAddress, Error> {
     let field = |v: &str, name: &'static str, max: usize| -> Result<String, Error> {
         let v = v.trim();
         if v.is_empty() || v.chars().count() > max || v.chars().any(char::is_control) {
