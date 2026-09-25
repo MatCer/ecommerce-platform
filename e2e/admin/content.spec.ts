@@ -141,6 +141,84 @@ test("adds a URL to the main menu", async () => {
   await saved();
 });
 
+/**
+ * Acceptance (WP13a): a URL import from the old shop (served by the mocks host through the
+ * dev allowlist) into this new shop, published right away: products are live on the storefront,
+ * searchable, and the old product URLs answer 301 to the new pages.
+ */
+test("URL import goes live: storefront, search and old URLs", async ({ request }) => {
+  test.setTimeout(240_000);
+  const host = `content-${run}.localhost`;
+  // `create-tenant` registered `<slug>.localhost` (verified) for the default market.
+  const token: string = await page.evaluate(async () => {
+    const res = await fetch("/api/auth/token", { credentials: "same-origin" });
+    return ((await res.json()) as { token: string }).token;
+  });
+  const tenant = await page.evaluate(() => localStorage.getItem("admin.tenant") ?? "");
+  const port = new URL(page.url()).port;
+  const api = `http://api.localhost:${port}/admin/v1`;
+  const headers = { authorization: `Bearer ${token}`, "x-tenant-id": tenant };
+  const markets = (await (await request.get(`${api}/markets`, { headers })).json()) as {
+    items: { id: string; code: string }[];
+  };
+  const cz = markets.items.find((m) => m.code === "cz")?.id ?? "";
+  const tax = await request.put(`${api}/tax-profile`, {
+    headers,
+    data: {
+      establishment_country: "CZ",
+      vat_payer: true,
+      vat_id: "CZ12345678",
+      sk_ic_dph: null,
+      distance_sales_mode: "destination",
+    },
+  });
+  expect(tax.status()).toBe(200);
+  const list = await request.post(`${api}/price-lists`, {
+    headers,
+    data: { code: "czk", name: "CZK", currency: "CZK", market_ids: [cz] },
+  });
+  expect(list.status()).toBe(201);
+  const created = await request.post(`${api}/imports`, {
+    headers,
+    data: {
+      source: "heureka",
+      market_id: cz,
+      url: "http://mocks:4010/feeds/heureka-demo.xml",
+      activate: true,
+    },
+  });
+  expect(created.status()).toBe(201);
+  const id = ((await created.json()) as { run: { id: string } }).run.id;
+  const status = async () => {
+    const res = await request.get(`${api}/imports/${id}`, { headers });
+    return ((await res.json()) as { status: string }).status;
+  };
+  await expect.poll(status, { timeout: 60_000 }).toBe("analyzed");
+  expect((await request.post(`${api}/imports/${id}/apply`, { headers })).status()).toBe(202);
+  await expect.poll(status, { timeout: 180_000 }).toBe("applied");
+
+  const shop = `http://${host}:${port}`;
+  const product = await request.get(`${shop}/p/tricko-basic`);
+  expect(product.status()).toBe(200);
+  expect(await product.text()).toContain("Tričko Basic");
+  // Imported prices carry no reduction claim (A18): no reference price on the page.
+  const storefront = await context.newPage();
+  await storefront.goto(`${shop}/p/tricko-basic`);
+  await expect(storefront.getByRole("heading", { level: 1, name: "Tričko Basic" })).toBeVisible();
+  await expect(storefront.getByText(/Nejnižší cena za 30 dní/)).toHaveCount(0);
+  await storefront.close();
+  const old = await request.get(`${shop}/produkt/tricko-basic-cerna-s`, { maxRedirects: 0 });
+  expect(old.status()).toBe(301);
+  expect(old.headers().location).toMatch(/\/p\/tricko-basic$/);
+  // Indexed by the worker from the product events.
+  await expect
+    .poll(
+      async () => (await (await request.get(`${shop}/search?q=hrnek`)).text()).includes("Hrnek"),
+      { timeout: 60_000 },
+    )
+    .toBe(true);
+});
+
 test("uploads 107 feed items, reviews the collision and applies the import", async () => {
   test.setTimeout(240_000);
   await nav("Imports").click();
