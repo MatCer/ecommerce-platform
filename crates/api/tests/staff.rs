@@ -66,20 +66,26 @@ async fn invitation_calls_auth_and_audits_then_rejects_duplicate(db: PgPool) {
     assert_eq!(member["email"], "new@example.test");
     assert_eq!(member["role"], "admin");
     assert_eq!(member["user_id"], "auth:new@example.test");
+    // The API only makes sure the user exists; the invitation email leaves through the
+    // outbox once the membership committed (worker `staff.invite_mail`).
     let requests = jwks.auth_requests.read().await.clone();
-    assert_eq!(requests.len(), 2);
+    assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].0, "/internal/users");
-    assert_eq!(requests[1].0, "/internal/users/invite");
-    for request in &requests {
-        assert_eq!(request.1, format!("Bearer {SERVICE_TOKEN}"));
-    }
+    assert_eq!(requests[0].1, format!("Bearer {SERVICE_TOKEN}"));
     assert_eq!(
         requests[0].2,
         json!({"email":"new@example.test", "name":"new@example.test"})
     );
+    let event: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload FROM queue.outbox WHERE type = 'staff.invited' AND tenant_id = $1",
+    )
+    .bind(tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
     assert_eq!(
-        requests[1].2,
-        json!({"email":"new@example.test", "callback_url":ADMIN_ORIGIN})
+        event,
+        json!({"member_id": member["id"], "callback_url": ADMIN_ORIGIN})
     );
     assert_eq!(
         member_id(&s, tenant, "auth:new@example.test").await,
@@ -103,7 +109,7 @@ async fn invitation_calls_auth_and_audits_then_rejects_duplicate(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(body["code"], "already_member");
-    assert_eq!(jwks.auth_requests.read().await.len(), 3);
+    assert_eq!(jwks.auth_requests.read().await.len(), 2);
 }
 #[sqlx::test(migrations = "../../migrations")]
 async fn invitation_validation_freshness_and_auth_failures(db: PgPool) {
@@ -148,8 +154,9 @@ async fn invitation_validation_freshness_and_auth_failures(db: PgPool) {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(jwks.auth_requests.read().await.is_empty());
-    for stage in [1, 2] {
-        jwks.auth_failure.store(stage, Ordering::SeqCst);
+    // An auth-service failure while ensuring the user leaves nothing behind.
+    {
+        jwks.auth_failure.store(1, Ordering::SeqCst);
         let (status, body, _) = Call::post("/admin/v1/staff/invitations", input.clone())
             .tenant(tenant)
             .token(&token)

@@ -94,6 +94,28 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
             AutoEscape::None
         }
     });
+    // minijinja's HTML escaping also encodes `/`, which turns every link into
+    // `http:&#x2f;&#x2f;…`: valid, but mail clients and spam filters dislike it. Escape exactly
+    // what can break out of text or a quoted attribute.
+    env.set_formatter(|out, state, value| {
+        if state.auto_escape() != AutoEscape::Html || value.is_safe() {
+            return minijinja::escape_formatter(out, state, value);
+        }
+        let raw = value.to_string();
+        let mut escaped = String::with_capacity(raw.len());
+        for c in raw.chars() {
+            match c {
+                '&' => escaped.push_str("&amp;"),
+                '<' => escaped.push_str("&lt;"),
+                '>' => escaped.push_str("&gt;"),
+                '"' => escaped.push_str("&quot;"),
+                '\'' => escaped.push_str("&#39;"),
+                c => escaped.push(c),
+            }
+        }
+        std::fmt::Write::write_str(out, &escaped)
+            .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::WriteFailure, e.to_string()))
+    });
     env.add_function("t", t);
     for (name, source) in [
         ("layout.mjml", include_str!("templates/layout.mjml")),
@@ -546,7 +568,10 @@ mod tests {
             "shop name is escaped"
         );
         assert!(!r.html.contains("<Pes>"));
-        assert!(r.html.contains("verify?token=abc&amp;x=1"));
+        assert!(
+            r.html
+                .contains("http://checkout.demo.localhost:8080/account/verify?token=abc&amp;x=1")
+        );
         assert!(r.html.contains("Odkaz platí 15 minut"));
         assert!(
             r.text.contains("verify?token=abc&x=1"),

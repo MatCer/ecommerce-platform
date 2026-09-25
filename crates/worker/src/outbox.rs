@@ -15,8 +15,11 @@ const BATCH: i32 = 100;
 
 /// The job kinds subscribed to an event type. Later WPs add webhooks, emails, analytics and
 /// cache purges here. Search jobs are versioned per product (`commerce::search::job_for_event`).
-pub fn subscribers(_event_type: &str) -> &'static [&'static str] {
-    &[handlers::EVENTS_LOG]
+pub fn subscribers(event_type: &str) -> &'static [&'static str] {
+    match event_type {
+        commerce::staff::INVITED_EVENT => &[handlers::EVENTS_LOG, handlers::STAFF_INVITE_MAIL],
+        _ => &[handlers::EVENTS_LOG],
+    }
 }
 
 /// Dispatches one batch; returns the number of events dispatched.

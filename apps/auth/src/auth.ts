@@ -1,8 +1,15 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { jwt, magicLink, twoFactor } from "better-auth/plugins";
 import type { Config } from "./config.ts";
 import { type Mailer, templates } from "./mail.ts";
+
+/**
+ * Set around a magic-link request whose link the caller emails itself (the platform's mail
+ * pipeline, WP9): the link is stored here instead of being sent.
+ */
+export const linkCapture = new AsyncLocalStorage<{ url?: string }>();
 
 /** The `aud` of staff JWTs, verified by the Rust Admin API (spec A9). */
 export const AUDIENCE = "admin-api";
@@ -94,8 +101,11 @@ export function createAuth(cfg: Config, database: BetterAuthOptions["database"],
         disableSignUp: true,
         expiresIn: 15 * 60,
         storeToken: "hashed",
-        sendMagicLink: async ({ email, url }) =>
-          sendMail({ to: email, ...templates.magicLink(url) }),
+        sendMagicLink: async ({ email, url }) => {
+          const capture = linkCapture.getStore();
+          if (capture) capture.url = url;
+          else await sendMail({ to: email, ...templates.magicLink(url) });
+        },
       }),
       twoFactor({ issuer: "Commerce Platform" }),
       jwt({

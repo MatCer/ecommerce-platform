@@ -4,8 +4,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use commerce::media::{self, Processed};
+use commerce::notifications::{self, Step};
 use commerce::pricing::intervals;
 use commerce::search::{self, Meili, index::Rebuilt};
+use platform::auth_service::AuthService;
+use platform::mail::Mailer;
 use platform::queue::{self, Job};
 use platform::storage::Storage;
 use tokio::sync::Semaphore;
@@ -16,7 +19,8 @@ use crate::runner::{Ctx, Handlers, JobError};
 /// Structured log line per outbox event: the default subscriber of every event type.
 pub const EVENTS_LOG: &str = "events.log";
 /// Hourly retention: finished jobs, dispatched events, expired idempotency keys (A12),
-/// zero-result search queries older than 90 days (A20).
+/// zero-result search queries older than 90 days (A20), expired customer sessions and sign-in
+/// links, day-old rate-limit rows and IP salts (§14).
 pub const MAINTENANCE_CLEANUP: &str = "maintenance.cleanup";
 
 const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
@@ -26,11 +30,20 @@ const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
 /// when a dedicated media worker gets more cores.
 const MEDIA_CONCURRENCY: usize = 1;
 
-pub fn all(storage: Storage, meili: Meili) -> Handlers {
+/// Staff invitation email for a `staff.invited` event (spec §11.4, WP9).
+pub const STAFF_INVITE_MAIL: &str = "staff.invite_mail";
+
+pub fn all(storage: Storage, meili: Meili, mailer: Mailer, auth: Option<AuthService>) -> Handlers {
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
     let (m1, m3) = (meili.clone(), meili);
     Handlers::default()
+        .register(notifications::SEND_JOB, move |ctx, job| {
+            mail_send(ctx, job, mailer.clone())
+        })
+        .register(STAFF_INVITE_MAIL, move |ctx, job| {
+            staff_invite_mail(ctx, job, auth.clone())
+        })
         .register(search::INDEX_PRODUCT_JOB, move |ctx, job| {
             search_index_product(ctx, job, m1.clone())
         })
@@ -47,6 +60,40 @@ pub fn all(storage: Storage, meili: Meili) -> Handlers {
             media_purge(job, purge_storage.clone())
         })
         .register(intervals::TRANSITION_JOB, price_transition)
+}
+
+/// Delivers one email (A14). A message that could not be handed over is retried with backoff;
+/// on the last attempt it becomes `failed`.
+async fn mail_send(ctx: Ctx, job: Job, mailer: Mailer) -> Result<(), JobError> {
+    let (tenant, message) = tenant_and(&job, "message_id")?;
+    let last = job.attempts >= job.max_attempts;
+    match notifications::deliver(&ctx.db, &mailer, tenant, message, last).await {
+        Ok(Step::Done) => Ok(()),
+        Ok(Step::Retry(reason)) => Err(JobError::Retry(reason)),
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+/// `staff.invited` → the invitation email through the mail pipeline (idempotent).
+async fn staff_invite_mail(ctx: Ctx, job: Job, auth: Option<AuthService>) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("staff invitation without tenant".into()))?;
+    let event = job.payload.get("payload").cloned().unwrap_or_default();
+    let member = event
+        .get("member_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no member_id".into()))?;
+    let callback = event
+        .get("callback_url")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| JobError::Permanent("payload has no callback_url".into()))?;
+    // Retried until the auth service is configured and reachable.
+    let auth = auth.ok_or_else(|| JobError::Retry("AUTH_INTERNAL_URL is not configured".into()))?;
+    commerce::staff::send_invitation(&ctx.db, &auth, tenant, member, callback)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
 }
 
 /// A scheduled price change (sale start/end) took effect: publish `price.changed` (A18).
@@ -157,10 +204,14 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         sqlx::query_scalar!(r#"SELECT platform.purge_search_zero_results() AS "n!""#)
             .fetch_one(&ctx.db)
             .await?;
+    let customer_auth = sqlx::query_scalar!(r#"SELECT platform.purge_customer_auth() AS "n!""#)
+        .fetch_one(&ctx.db)
+        .await?;
     tracing::info!(
         queue_rows,
         idempotency_keys = keys,
         zero_results,
+        customer_auth,
         "cleanup done"
     );
     Ok(())
