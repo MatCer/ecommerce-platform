@@ -1025,6 +1025,8 @@ pub struct ProductFilter {
 pub const MAX_PAGE: i64 = 100;
 
 /// Newest first; UUIDv7 ids make the last id the cursor.
+/// ponytail: `q` is an unindexed ILIKE scan per tenant; add a pg_trgm index (or use the WP7
+/// search index) when admin lists of large catalogs get slow.
 pub async fn list(
     tx: &mut TenantTx,
     filter: &ProductFilter,

@@ -111,6 +111,18 @@ The admin SPA (and anything else) then gets a 5-minute JWT from
 `Idempotency-Key` header. `scripts/smoke-staff-flow.sh` runs the whole flow against the stack,
 including the cross-tenant 403.
 
+## Catalog and media
+
+Products are written as one document (`POST /admin/v1/products`, `PUT /admin/v1/products/{id}`):
+attributes, GPSR, translations, options, variants (kept by `id`), categories, media order,
+parameter values and per-country tax categories (`GET /admin/v1/tax-categories`, EU-27 rates
+seeded in the migration; unmapped countries use `standard`).
+
+Images: `POST /admin/v1/assets/uploads` returns a presigned `PUT` URL into the private bucket
+(`http://s3.localhost:8080/private/...`), `POST /admin/v1/assets/{id}/complete` verifies the file
+and the worker writes AVIF/WebP/JPEG (or PNG) variants at 160-1920 px to the public bucket
+(`http://s3.localhost:8080/public/media/...`). `scripts/smoke-catalog.sh` runs the whole flow.
+
 ## Database roles and tenancy
 
 `app_owner` owns the databases, every table and function, and runs migrations. `app_runtime` is
