@@ -1794,6 +1794,581 @@
         ]
       }
     },
+    "/admin/v1/campaigns": {
+      "get": {
+        "tags": [
+          "marketing"
+        ],
+        "operationId": "list_campaigns",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Creates a draft campaign. Honors `Idempotency-Key`.",
+        "operationId": "create_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/campaigns/{id}": {
+      "get": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "A campaign with its delivery numbers.",
+        "operationId": "get_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Edits a draft (`409 campaign_not_draft` otherwise).",
+        "operationId": "update_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "campaign_not_draft",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Deletes a draft.",
+        "operationId": "delete_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "campaign_not_draft",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/campaigns/{id}/cancel": {
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Stops a scheduled or sending campaign.",
+        "operationId": "cancel_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "campaign_not_active",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/campaigns/{id}/preview": {
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Renders the campaign for a subscriber or a language (links are not tracked).",
+        "operationId": "preview_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedEmail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/campaigns/{id}/schedule": {
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Schedules a draft (or moves a scheduled campaign). Sending runs in batches of 500 with the\ntenant's rate limit; everyone in the segment gets it once.",
+        "operationId": "schedule_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "campaign_not_schedulable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/campaigns/{id}/test": {
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Sends the campaign now to up to 5 addresses (subject marked `[TEST]`, not tracked, not in\nthe stats); audited.",
+        "operationId": "test_campaign",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestSendInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestSent"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/categories": {
       "get": {
         "tags": [
@@ -2824,6 +3399,535 @@
             }
           },
           "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/email-branding": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "The logo at the top of every email.",
+        "operationId": "get_branding",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailBranding"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Sets the email logo (a processed image asset of the shop) or clears it. Owner or admin.",
+        "operationId": "put_branding",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailBranding"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailBranding"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/email-suppressions": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Suppressed addresses (bounces, complaints, manual), alphabetically.",
+        "operationId": "list_suppressions",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Part of the address.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "`email` of the last row of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Suppresses an address for every stream (audited).",
+        "operationId": "add_suppression",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuppressionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suppression"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Removes a suppression (the address gets mail again; audited with what it was).",
+        "operationId": "remove_suppression",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/email-templates": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Editable email texts: every template and language with the platform default.",
+        "operationId": "list_texts",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateTextList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/email-templates/{template}/{locale}": {
+      "put": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Sets the subject/intro of a template in a language (both empty = platform default). Owner\nor admin.",
+        "operationId": "put_text",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "template",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateTextInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateText"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/emails": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Sent and queued emails, newest first (no bodies in the list).",
+        "operationId": "list_messages",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`pending`, `sending`, `accepted`, `uncertain` or `failed`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stream",
+            "in": "query",
+            "description": "`transactional` or `marketing`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Part of the recipient address.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/emails/{id}": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "One email; the body only for non-sensitive mail (never sign-in or order links).",
+        "operationId": "get_message",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageDetail"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7718,6 +8822,356 @@
         ]
       }
     },
+    "/admin/v1/segments": {
+      "get": {
+        "tags": [
+          "marketing"
+        ],
+        "operationId": "list_segments",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Creates a segment (rules validated against the allowlist). Honors `Idempotency-Key`.",
+        "operationId": "create_segment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "name_taken",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/segments/preview": {
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "How many subscribers the rules select right now, with a sample of 10.",
+        "operationId": "preview_segment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rules"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/segments/{id}": {
+      "get": {
+        "tags": [
+          "marketing"
+        ],
+        "operationId": "get_segment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "marketing"
+        ],
+        "operationId": "update_segment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SegmentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Segment"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Deletes a segment (`409 segment_in_use` while campaigns use it).",
+        "operationId": "delete_segment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "segment_in_use",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/shipping-methods": {
       "get": {
         "tags": [
@@ -8494,6 +9948,262 @@
             }
           },
           "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/subscribers": {
+      "get": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Subscribers, newest first, with filters.",
+        "operationId": "list_subscribers",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Status"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Part of the address (case-insensitive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "market_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriberPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/subscribers/export": {
+      "get": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Every subscriber matching the filters as CSV (UTF-8). Owner or admin, signed in within the\nlast 15 minutes (A9); audited.",
+        "operationId": "export_subscribers",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Status"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Part of the address (case-insensitive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "market_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "reauth_required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/subscribers/{id}/unsubscribe": {
+      "post": {
+        "tags": [
+          "marketing"
+        ],
+        "summary": "Unsubscribes a subscriber on their request (records the withdrawal, audited).",
+        "operationId": "unsubscribe_subscriber",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12297,13 +14007,388 @@
         }
       }
     },
+    "/storefront/v1/newsletter/click": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "A tracked campaign link: counts the click and returns the signed target; `404` for anything\nnot signed for this recipient (never an open redirect).",
+        "operationId": "click",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "description": "Recipient token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "u",
+            "in": "query",
+            "description": "Target URL.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "s",
+            "in": "query",
+            "description": "Signature (hex).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClickTarget"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/confirmation": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "What the confirmation page shows (reading changes nothing: link scanners cannot confirm).",
+        "operationId": "confirmation",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "The token from the email link.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Confirmation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, used or expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Confirms a sign-up (the button on the confirmation page): subscribed, consent recorded.",
+        "operationId": "confirm",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsletterStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, used or expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/preferences": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The preference page's view of the subscription behind a campaign email.",
+        "operationId": "preferences",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The recipient token from a campaign email.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/resubscribe": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Subscribing again from the preference page: a new double opt-in mail to the same address.",
+        "operationId": "resubscribe",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsletterStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/newsletter/subscribe": {
       "post": {
         "tags": [
           "storefront"
         ],
-        "summary": "Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail\narrive with the newsletter module (M2).",
-        "operationId": "newsletter",
+        "summary": "Newsletter sign-up (double opt-in, §11.5): always `202 accepted` for a valid address.",
+        "operationId": "subscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -12358,6 +14443,88 @@
             }
           },
           "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too_many_signups",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/unsubscribe": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Unsubscribes the recipient of a campaign email (RFC 8058 one-click, the preference page).\nIdempotent.",
+        "operationId": "unsubscribe",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14024,6 +16191,66 @@
           },
           "422": {
             "description": "event_mismatch",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/ses": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic\ncredentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). A permanent bounce suppresses\nthe message's recipient for every stream, a complaint for marketing; subscription messages\nare logged for the operator and never followed. `404` when not configured.",
+        "operationId": "ses_webhook",
+        "requestBody": {
+          "description": "An SNS message (JSON) carrying an SES notification",
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailEventReceived"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_credentials",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_event",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -16021,6 +18248,203 @@
           }
         }
       },
+      "Campaign": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "content",
+          "status",
+          "created_at",
+          "updated_at",
+          "stats"
+        ],
+        "properties": {
+          "content": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LocaleContent"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scheduled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "segment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CampaignStats"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CampaignInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "type": "object",
+            "description": "Content per language (`cs`, `sk`, `en`); a subscriber gets their language, else the\nmarket's default language, else the first one.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LocaleContent"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Recipients; `null` = every subscriber."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CampaignList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Campaign"
+            }
+          }
+        }
+      },
+      "CampaignStats": {
+        "type": "object",
+        "description": "Delivery numbers of a campaign.",
+        "required": [
+          "recipients",
+          "sent",
+          "skipped",
+          "accepted",
+          "failed",
+          "uncertain",
+          "clicked",
+          "clicks",
+          "unsubscribed",
+          "bounced",
+          "complained"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Accepted by the mail server (SMTP 250)."
+          },
+          "bounced": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clicked": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Recipients who clicked at least once."
+          },
+          "clicks": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Clicks in total."
+          },
+          "complained": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recipients": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Segment members handled so far (sent + skipped)."
+          },
+          "sent": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Messages created."
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Members not mailed (no consent, suppressed, unsubscribed meanwhile)."
+          },
+          "uncertain": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Outcome unknown (never resent, A14)."
+          },
+          "unsubscribed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CampaignStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "scheduled",
+          "sending",
+          "sent",
+          "cancelled"
+        ]
+      },
       "Carrier": {
         "type": "string",
         "enum": [
@@ -16717,6 +19141,18 @@
           }
         }
       },
+      "ClickTarget": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Where to redirect (exactly what the campaign linked to)."
+          }
+        }
+      },
       "CmsPage": {
         "type": "object",
         "required": [
@@ -17002,6 +19438,280 @@
           },
           "value": {
             "type": "string"
+          }
+        }
+      },
+      "Condition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The subscriber's language is one of `locales` (`cs`, `sk`, `en`).",
+            "required": [
+              "locales",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "locale"
+                ]
+              },
+              "locales": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Signed up on one of these markets.",
+            "required": [
+              "market_ids",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "market"
+                ]
+              },
+              "market_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Subscribed (confirmed) within the window; at least one bound.",
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "after": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "before": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "subscribed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Bought a product of one of these categories.",
+            "required": [
+              "category_ids",
+              "field"
+            ],
+            "properties": {
+              "category_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "purchased_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Bought a product of one of these brands.",
+            "required": [
+              "brands",
+              "field"
+            ],
+            "properties": {
+              "brands": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "purchased_brand"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Number of placed orders; at least one bound.",
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "order_count"
+                ]
+              },
+              "max": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64"
+              },
+              "min": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Sum of order totals in `currency` (minor units); at least one bound.",
+            "required": [
+              "currency",
+              "field"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "total_spent"
+                ]
+              },
+              "max_minor": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64"
+              },
+              "min_minor": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The newest order was placed within the window; at least one bound.",
+            "required": [
+              "field"
+            ],
+            "properties": {
+              "after": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "before": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "last_order"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Clicked a campaign link in the last `days` (1-365).",
+            "required": [
+              "days",
+              "field"
+            ],
+            "properties": {
+              "days": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "engaged"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Interest in categories (ids) or brands from the recommendation rollup (WP17); only for\ncustomers who grant `personalization`.",
+            "required": [
+              "dim",
+              "keys",
+              "field"
+            ],
+            "properties": {
+              "dim": {
+                "$ref": "#/components/schemas/AffinityDim"
+              },
+              "field": {
+                "type": "string",
+                "enum": [
+                  "affinity"
+                ]
+              },
+              "keys": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "description": "One allowlisted condition; `field` selects it."
+      },
+      "Confirmation": {
+        "type": "object",
+        "description": "What the confirmation page shows before the button is pressed (a read, no change).",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address, partly masked (`j***@example.com`)."
           }
         }
       },
@@ -17716,6 +20426,160 @@
           "origin_threshold",
           "destination"
         ]
+      },
+      "EmailBlock": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "text",
+              "type"
+            ],
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "heading"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Rich text (HTML), sanitized on write.",
+            "required": [
+              "html",
+              "type"
+            ],
+            "properties": {
+              "html": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An image asset of the tenant, optionally linked.",
+            "required": [
+              "asset_id",
+              "type"
+            ],
+            "properties": {
+              "alt": {
+                "type": "string"
+              },
+              "asset_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "href": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A shop path (`/c/tricka`) or an `https:`/`mailto:`/`tel:` URL.",
+            "required": [
+              "label",
+              "href",
+              "type"
+            ],
+            "properties": {
+              "href": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "button"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Chosen products (only those still sold in the recipient's market are shown).",
+            "required": [
+              "product_ids",
+              "type"
+            ],
+            "properties": {
+              "product_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "product_grid"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Per-recipient recommendations (WP17): category/brand affinity of subscribers who are\ncustomers granting `personalization`, else the shop's best sellers.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "personalized_products"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "One block of a campaign; `type` selects it."
+      },
+      "EmailBranding": {
+        "type": "object",
+        "properties": {
+          "logo_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "An image asset of the tenant shown at the top of every email (`null` = the shop name)."
+          }
+        },
+        "additionalProperties": false
       },
       "EntityType": {
         "type": "string",
@@ -19316,6 +22180,30 @@
           }
         }
       },
+      "LocaleContent": {
+        "type": "object",
+        "description": "The content in one language.",
+        "required": [
+          "subject",
+          "blocks"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmailBlock"
+            }
+          },
+          "preheader": {
+            "type": "string",
+            "description": "The inbox preview text (defaults to the subject)."
+          },
+          "subject": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "MagicLinkRequest": {
         "type": "object",
         "required": [
@@ -19346,6 +22234,18 @@
           }
         },
         "additionalProperties": false
+      },
+      "MailEventReceived": {
+        "type": "object",
+        "required": [
+          "applied"
+        ],
+        "properties": {
+          "applied": {
+            "type": "boolean",
+            "description": "A suppression was recorded (`false`: ignored, e.g. a transient bounce, or a\nsubscription message for the operator)."
+          }
+        }
       },
       "Market": {
         "type": "object",
@@ -19448,6 +22348,13 @@
             }
           }
         }
+      },
+      "Match": {
+        "type": "string",
+        "enum": [
+          "all",
+          "any"
+        ]
       },
       "Me": {
         "type": "object",
@@ -19703,6 +22610,124 @@
             "items": {
               "$ref": "#/components/schemas/MenuItem"
             }
+          }
+        }
+      },
+      "MessageDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MessageSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "sensitive"
+            ],
+            "properties": {
+              "html": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The HTML body (render it sandboxed); `None` for sensitive mail."
+              },
+              "list_unsubscribe": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sensitive": {
+                "type": "boolean",
+                "description": "`true` for sign-in/order links: the body is never shown."
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "MessagePage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "MessageSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "stream",
+          "template",
+          "to_email",
+          "locale",
+          "subject",
+          "status",
+          "attempts",
+          "created_at"
+        ],
+        "properties": {
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "stream": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "template": {
+            "type": "string"
+          },
+          "to_email": {
+            "type": "string"
           }
         }
       },
@@ -20135,9 +23160,22 @@
         "properties": {
           "status": {
             "type": "string",
-            "description": "`accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5)."
+            "description": "`accepted` (a confirmation mail is sent when one is due; the answer never tells whether\nthe address is already known) or `subscribed`."
           }
         }
+      },
+      "NewsletterToken": {
+        "type": "object",
+        "description": "A capability token from a newsletter email.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "NextAction": {
         "oneOf": [
@@ -21795,6 +24833,65 @@
           "failed"
         ]
       },
+      "Preferences": {
+        "type": "object",
+        "description": "The preference page's view of a subscription.",
+        "required": [
+          "email",
+          "status"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address, partly masked."
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        }
+      },
+      "Preview": {
+        "type": "object",
+        "required": [
+          "count",
+          "sample"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Subscribed members right now."
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleMember"
+            },
+            "description": "Up to 10 of them."
+          }
+        }
+      },
+      "PreviewInput": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Without a subscriber: the language (default market)."
+          },
+          "subscriber_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Render as this subscriber gets it (language, market, personalized products)."
+          }
+        },
+        "additionalProperties": false
+      },
       "PriceChangeReason": {
         "type": "string",
         "description": "Why the base prices change (recorded on the price intervals).",
@@ -23065,6 +26162,26 @@
         },
         "additionalProperties": false
       },
+      "RenderedEmail": {
+        "type": "object",
+        "required": [
+          "subject",
+          "html",
+          "text"
+        ],
+        "properties": {
+          "html": {
+            "type": "string",
+            "description": "Full HTML document (show it in a sandboxed iframe)."
+          },
+          "subject": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
       "ResolveAction": {
         "type": "string",
         "enum": [
@@ -23213,6 +26330,21 @@
         "properties": {
           "role": {
             "$ref": "#/components/schemas/Role"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Rules": {
+        "type": "object",
+        "properties": {
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Condition"
+            }
+          },
+          "match": {
+            "$ref": "#/components/schemas/Match"
           }
         },
         "additionalProperties": false
@@ -23455,6 +26587,26 @@
           }
         }
       },
+      "SampleMember": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "locale"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locale": {
+            "type": "string"
+          }
+        }
+      },
       "SampleRow": {
         "type": "object",
         "required": [
@@ -23477,6 +26629,20 @@
             "format": "uuid"
           }
         }
+      },
+      "ScheduleInput": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When to start; `null` or the past = now."
+          }
+        },
+        "additionalProperties": false
       },
       "SearchHit": {
         "type": "object",
@@ -23597,6 +26763,66 @@
               "$ref": "#/components/schemas/IndexStatus"
             },
             "description": "One index per locale the tenant's markets sell in."
+          }
+        }
+      },
+      "Segment": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "rules",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SegmentInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "rules"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SegmentList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            }
           }
         }
       },
@@ -24239,6 +27465,16 @@
           }
         }
       },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "subscribed",
+          "unsubscribed",
+          "bounced",
+          "complained"
+        ]
+      },
       "StockState": {
         "type": "string",
         "enum": [
@@ -24349,6 +27585,103 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "Subscriber": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "status",
+          "locale",
+          "market_id",
+          "requested_at",
+          "text_version",
+          "source",
+          "created_at"
+        ],
+        "properties": {
+          "confirmed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The customer account with the same (verified) address."
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Consent evidence: when the sign-up was requested and confirmed, and the consent text\nversion shown (the IP hashes are stored but never shown)."
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "text_version": {
+            "type": "string"
+          },
+          "unsubscribed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SubscriberPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subscriber"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching subscribers in total (all pages)."
           }
         }
       },
@@ -24487,6 +27820,71 @@
             "items": {
               "$ref": "#/components/schemas/SearchHit"
             }
+          }
+        }
+      },
+      "Suppression": {
+        "type": "object",
+        "required": [
+          "email",
+          "reason",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "`bounce`, `complaint` or `manual`."
+          }
+        }
+      },
+      "SuppressionInput": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SuppressionPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Suppression"
+            }
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -24703,6 +28101,77 @@
           }
         }
       },
+      "TemplateText": {
+        "type": "object",
+        "description": "One editable template text set in one language: the platform default and the tenant's.",
+        "required": [
+          "template",
+          "locale",
+          "default_subject",
+          "default_intro"
+        ],
+        "properties": {
+          "default_intro": {
+            "type": "string"
+          },
+          "default_subject": {
+            "type": "string"
+          },
+          "intro": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tenant's intro paragraph (`{shop}` is filled in)."
+          },
+          "locale": {
+            "type": "string"
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tenant's subject (`{shop}` and, for order mail, `{number}` are filled in)."
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      },
+      "TemplateTextInput": {
+        "type": "object",
+        "properties": {
+          "intro": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Empty or `null` = the platform default."
+          }
+        },
+        "additionalProperties": false
+      },
+      "TemplateTextList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateText"
+            }
+          }
+        }
+      },
       "Tender": {
         "type": "string",
         "enum": [
@@ -24710,6 +28179,40 @@
           "card",
           "unknown"
         ]
+      },
+      "TestSendInput": {
+        "type": "object",
+        "required": [
+          "emails"
+        ],
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "1-5 addresses."
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "TestSent": {
+        "type": "object",
+        "required": [
+          "queued"
+        ],
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
       },
       "Tone": {
         "type": "string",
@@ -25446,8 +28949,16 @@
       "description": "Admin API for platform superadmins: the job queue"
     },
     {
+      "name": "marketing",
+      "description": "Admin API: newsletter subscribers, segments, campaigns"
+    },
+    {
+      "name": "email",
+      "description": "Admin API: sent emails, suppressions, email logo and texts"
+    },
+    {
       "name": "webhooks",
-      "description": "Payment provider webhooks (signed)"
+      "description": "Provider webhooks: payments (signed), email bounces/complaints"
     },
     {
       "name": "storefront",

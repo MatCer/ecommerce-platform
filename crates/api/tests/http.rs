@@ -42,6 +42,7 @@ fn state(db: PgPool) -> AppState {
         webhooks: None,
         ads: None,
         rate_limit: std::sync::Arc::new(api::rate_limit::StorefrontLimiter::new(1, 1)),
+        mail_events: None,
     }
 }
 

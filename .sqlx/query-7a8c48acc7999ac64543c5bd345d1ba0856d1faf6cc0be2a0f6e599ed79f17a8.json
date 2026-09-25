@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM email_suppressions WHERE email = $1 RETURNING reason, note",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_suppressions",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_suppressions",
+            "name": "note"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "7a8c48acc7999ac64543c5bd345d1ba0856d1faf6cc0be2a0f6e599ed79f17a8"
+}

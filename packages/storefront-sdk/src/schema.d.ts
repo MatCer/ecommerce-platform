@@ -518,6 +518,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/newsletter/click": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A tracked campaign link: counts the click and returns the signed target; `404` for anything
+         *     not signed for this recipient (never an open redirect).
+         */
+        get: operations["click"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/confirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the confirmation page shows (reading changes nothing: link scanners cannot confirm). */
+        get: operations["confirmation"];
+        put?: never;
+        /** Confirms a sign-up (the button on the confirmation page): subscribed, consent recorded. */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The preference page's view of the subscription behind a campaign email. */
+        get: operations["preferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/resubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Subscribing again from the preference page: a new double opt-in mail to the same address. */
+        post: operations["resubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/newsletter/subscribe": {
         parameters: {
             query?: never;
@@ -527,11 +599,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Newsletter sign-up (double opt-in, §11.5): always `202 accepted` for a valid address. */
+        post: operations["subscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /**
-         * Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail
-         *     arrive with the newsletter module (M2).
+         * Unsubscribes the recipient of a campaign email (RFC 8058 one-click, the preference page).
+         *     Idempotent.
          */
-        post: operations["newsletter"];
+        post: operations["unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1114,12 +1203,21 @@ export interface components {
             shipping_methods: components["schemas"]["ShippingOption"][];
             totals: components["schemas"]["Totals"];
         };
+        ClickTarget: {
+            /** @description Where to redirect (exactly what the campaign linked to). */
+            url: string;
+        };
         CmsPage: {
             blocks: components["schemas"]["BlockView"][];
             breadcrumbs: components["schemas"]["Link"][];
             cache: components["schemas"]["CacheHints"];
             seo: components["schemas"]["Seo"];
             title: string;
+        };
+        /** @description What the confirmation page shows before the button is pressed (a read, no change). */
+        Confirmation: {
+            /** @description The address, partly masked (`j***@example.com`). */
+            email: string;
         };
         /** @description A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`). */
         ConsentChoice: {
@@ -1376,8 +1474,15 @@ export interface components {
             email: string;
         };
         NewsletterStatus: {
-            /** @description `accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5). */
+            /**
+             * @description `accepted` (a confirmation mail is sent when one is due; the answer never tells whether
+             *     the address is already known) or `subscribed`.
+             */
             status: string;
+        };
+        /** @description A capability token from a newsletter email. */
+        NewsletterToken: {
+            token: string;
         };
         /** @description What the customer does next. */
         NextAction: {
@@ -1604,6 +1709,12 @@ export interface components {
             order_id: string;
             payment: components["schemas"]["PaymentStart"];
         };
+        /** @description The preference page's view of a subscription. */
+        Preferences: {
+            /** @description The address, partly masked. */
+            email: string;
+            status: components["schemas"]["Status"];
+        };
         PriceRange: {
             /** Format: int64 */
             max_minor: number;
@@ -1825,6 +1936,8 @@ export interface components {
          * @enum {string}
          */
         Source: "banner" | "preferences" | "checkout" | "linked";
+        /** @enum {string} */
+        Status: "pending" | "subscribed" | "unsubscribed" | "bounced" | "complained";
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
         /**
@@ -3355,7 +3468,200 @@ export interface operations {
             };
         };
     };
-    newsletter: {
+    click: {
+        parameters: {
+            query: {
+                /** @description Recipient token. */
+                t: string;
+                /** @description Target URL. */
+                u: string;
+                /** @description Signature (hex). */
+                s: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClickTarget"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirmation: {
+        parameters: {
+            query: {
+                /** @description The token from the email link. */
+                token: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Confirmation"];
+                };
+            };
+            /** @description Invalid, used or expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterStatus"];
+                };
+            };
+            /** @description Invalid, used or expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    preferences: {
+        parameters: {
+            query: {
+                /** @description The recipient token from a campaign email. */
+                t: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preferences"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    resubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterToken"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterStatus"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    subscribe: {
         parameters: {
             query?: never;
             header: {
@@ -3384,6 +3690,53 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too_many_signups */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unsubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preferences"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

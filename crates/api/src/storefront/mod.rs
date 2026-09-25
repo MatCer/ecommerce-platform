@@ -15,6 +15,7 @@ mod consent;
 mod content;
 pub mod customer;
 mod files;
+mod newsletter;
 mod orders;
 mod pages;
 
@@ -47,6 +48,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .merge(orders::routes())
         .merge(consent::routes())
         .merge(files::routes())
+        .merge(newsletter::routes())
 }
 
 fn header<'a>(parts: &'a Parts, name: &str) -> Option<&'a str> {

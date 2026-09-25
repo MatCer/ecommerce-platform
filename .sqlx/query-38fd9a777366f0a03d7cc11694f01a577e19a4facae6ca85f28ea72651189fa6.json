@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers SET status = 'unsubscribed', unsubscribed_at = now(),\n             confirm_token_hash = NULL, confirm_expires_at = NULL, updated_at = now()\n         WHERE id = $1 AND status IN ('pending', 'subscribed')\n         RETURNING email",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "38fd9a777366f0a03d7cc11694f01a577e19a4facae6ca85f28ea72651189fa6"
+}

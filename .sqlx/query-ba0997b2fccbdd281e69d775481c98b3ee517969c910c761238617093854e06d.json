@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT platform.email_message_tenant($1) AS \"tenant\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ba0997b2fccbdd281e69d775481c98b3ee517969c910c761238617093854e06d"
+}

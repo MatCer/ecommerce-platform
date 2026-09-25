@@ -114,6 +114,7 @@ pub fn all(
     let (ai1, ai2) = (extra.ai.clone(), extra.ai.clone());
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
+    let campaign_urls = e4.urls.clone();
     Handlers::default()
         .register(EDGE_PURGE, move |_ctx, job| {
             edge_purge(job, e1.edge.clone())
@@ -151,6 +152,10 @@ pub fn all(
         })
         .register(intervals::TRANSITION_JOB, price_transition)
         .register(LINK_GUEST_ORDERS, link_guest_orders)
+        .register(
+            commerce::marketing::campaigns::BATCH_JOB,
+            move |ctx, job| campaign_batch(ctx, job, campaign_urls.clone()),
+        )
         .register(PAYMENTS_EXPIRE, payments_expire)
         .register(stripe::EVENT_JOB, provider_event)
         .register(PAYMENTS_REMIND, move |ctx, job| {
@@ -612,8 +617,30 @@ async fn link_guest_orders(ctx: Ctx, job: Job) -> Result<(), JobError> {
     let linked = commerce::orders::link_guest_orders(&mut tx, customer)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
+    // WP18: newsletter subscribers with the proven address join the customer too.
+    let subscribers = commerce::marketing::subscribers::link_customer(&mut tx, customer)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
     tx.commit().await?;
-    tracing::info!(%tenant, %customer, linked, "guest orders linked");
+    tracing::info!(%tenant, %customer, linked, subscribers, "guest orders linked");
+    Ok(())
+}
+
+/// One batch of a campaign (WP18): up to 500 members within the tenant's rate window; the
+/// next batch job is enqueued by the batch itself (same transaction).
+async fn campaign_batch(ctx: Ctx, job: Job, urls: PublicUrls) -> Result<(), JobError> {
+    let (tenant, campaign) = tenant_and(&job, "campaign_id")?;
+    let b = commerce::marketing::campaigns::run_batch(
+        &ctx.db,
+        &urls,
+        tenant,
+        campaign,
+        chrono::Utc::now(),
+    )
+    .await
+    .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::info!(%tenant, %campaign, sent = b.sent, skipped = b.skipped, done = b.done,
+        "campaign batch");
     Ok(())
 }
 

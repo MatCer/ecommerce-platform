@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.status, c.scheduled_at, c.content, c.link_key, s.rules AS \"rules?\"\n         FROM campaigns c LEFT JOIN segments s ON s.id = c.segment_id\n         WHERE c.id = $1 FOR UPDATE OF c",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "campaigns",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "scheduled_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "campaigns",
+            "name": "scheduled_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "content",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "campaigns",
+            "name": "content"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "link_key",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "campaigns",
+            "name": "link_key"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "rules?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "segments",
+            "name": "rules"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "47830b53cb48b5b237d3546814ed3c1e35b164225ebe5ed24d58343153fa9755"
+}

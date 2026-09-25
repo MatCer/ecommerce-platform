@@ -17,6 +17,7 @@ ammonia = "4.2.0"
 anyhow = "1.0.104"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
+base64 = "0.22.1"
 hex = "0.4.3"
 hmac = "0.13.0"
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs", "use_pem"] }

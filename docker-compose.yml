@@ -301,6 +301,8 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
       STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
+      # WP18: HTTP Basic password of POST /webhooks/ses (SES bounces/complaints via SNS).
+      MAIL_EVENTS_SECRET: ${MAIL_EVENTS_SECRET:-local-mail-events-secret-0123456789abcdef}
       # Dev only (WP20): ad-platform connection tests go to the vendor mocks, reached through
       # the SSRF-safe client's dev allowlist. Both are ignored unless APP_ENV=dev.
       AD_PLATFORMS_BASE_URL: http://mocks:4010/ads

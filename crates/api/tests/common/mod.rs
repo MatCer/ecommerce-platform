@@ -108,6 +108,9 @@ pub async fn jwks_server(keys: Value) -> Jwks {
     }
 }
 
+/// The SES/SNS bounce endpoint password in tests.
+pub const MAIL_EVENTS_SECRET: &str = "test-mail-events-secret-0123456789abcdef";
+
 pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
     AppState {
         db,
@@ -172,6 +175,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
             commerce::storefront::PublicUrls::default(),
         )),
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
+        mail_events: Some(api::auth::ServiceToken::new(MAIL_EVENTS_SECRET)),
     }
 }
 

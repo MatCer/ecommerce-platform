@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers SET status = $2, confirm_token_hash = NULL,\n             confirm_expires_at = NULL, updated_at = now()\n         WHERE email = lower(btrim($1)) AND status <> $2\n         RETURNING email",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c63c5752a440cbf0cb1c887be8634c0070a8894ff047f1d97c7833f8a6922d9e"
+}

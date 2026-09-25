@@ -1,0 +1,196 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, stream, template, to_email, locale, subject, status, attempts, last_error,\n                created_at, accepted_at, sensitive, html, body_text, list_unsubscribe\n         FROM email_messages WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "template",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "template"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "to_email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "to_email"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "last_error",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "last_error"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "accepted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "accepted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "sensitive",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "sensitive"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "html",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "html"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "body_text",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "body_text"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "list_unsubscribe",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "list_unsubscribe"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "53353d12eaa9e3876c7cfe14ff9714c14318db97bc29a243d839fc2ca273937a"
+}

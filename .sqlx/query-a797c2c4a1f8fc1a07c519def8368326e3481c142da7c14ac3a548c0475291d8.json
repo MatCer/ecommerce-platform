@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaign_sends SET unsubscribed_at = coalesce(unsubscribed_at, now()) WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a797c2c4a1f8fc1a07c519def8368326e3481c142da7c14ac3a548c0475291d8"
+}
