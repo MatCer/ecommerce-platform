@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.legal_type AS \"legal_type!\", t.title AS \"title!\", t.slug AS \"slug!\"\n           FROM pages p\n           CROSS JOIN LATERAL (\n               SELECT title, slug FROM page_translations pt WHERE pt.page_id = p.id\n               ORDER BY (pt.locale = $1) DESC, (pt.locale = $2) DESC, pt.locale LIMIT 1\n           ) t\n           WHERE p.kind = 'legal' AND p.status = 'published' AND p.published_at <= $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "legal_type!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "legal_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "title!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "79d531839d44fc1e9b31de43d4a8897ab8d6382ead5afa7137fda66043879655"
+}

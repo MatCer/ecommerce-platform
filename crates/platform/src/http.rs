@@ -168,9 +168,15 @@ impl SafeClient {
         Ok(Self { http, allow_hosts })
     }
 
-    /// `SAFE_FETCH_ALLOW_HOSTS` (comma-separated, dev only).
+    /// `SAFE_FETCH_ALLOW_HOSTS` (comma-separated), honored only with `APP_ENV=dev`: the local
+    /// stack serves fixture feeds and images from the `mocks` service on a private address.
     pub fn from_env() -> Result<Self, FetchError> {
         let hosts = std::env::var("SAFE_FETCH_ALLOW_HOSTS").unwrap_or_default();
+        let dev = std::env::var("APP_ENV").is_ok_and(|e| e == "dev");
+        if !dev && !hosts.trim().is_empty() {
+            tracing::warn!("SAFE_FETCH_ALLOW_HOSTS is ignored outside APP_ENV=dev");
+            return Self::new(Vec::<String>::new());
+        }
         Self::new(hosts.split(',').map(str::to_owned).collect::<Vec<_>>())
     }
 

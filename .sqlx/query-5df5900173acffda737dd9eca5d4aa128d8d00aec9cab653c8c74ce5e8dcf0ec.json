@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT f.object_key FROM feed_exports f JOIN markets m ON m.id = f.market_id\n         WHERE m.code = $1 AND f.channel = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "object_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "feed_exports",
+            "name": "object_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5df5900173acffda737dd9eca5d4aa128d8d00aec9cab653c8c74ce5e8dcf0ec"
+}

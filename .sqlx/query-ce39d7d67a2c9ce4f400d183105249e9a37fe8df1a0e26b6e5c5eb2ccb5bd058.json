@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT count(*) FROM categories WHERE id = ANY($1))\n                + (SELECT count(*) FROM products WHERE id = ANY($2))\n                + (SELECT count(*) FROM pages WHERE id = ANY($3)) AS \"n!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ce39d7d67a2c9ce4f400d183105249e9a37fe8df1a0e26b6e5c5eb2ccb5bd058"
+}

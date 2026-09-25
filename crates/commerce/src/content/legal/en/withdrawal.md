@@ -1,4 +1,4 @@
-# Right of withdrawal
+# Withdrawal instructions and form
 <!-- Platform template, not legal advice. Review with a lawyer before publishing. -->
 
 ## Withdrawal instructions

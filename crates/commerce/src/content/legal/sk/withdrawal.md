@@ -1,4 +1,4 @@
-# Odstúpenie od zmluvy
+# Poučenie o odstúpení od zmluvy
 <!-- Platform template, not legal advice. Review with a lawyer before publishing. -->
 
 ## Poučenie o práve na odstúpenie

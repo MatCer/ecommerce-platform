@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM page_translations WHERE page_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f113bf0e475cab02e530fecac2e8374c7be3d068ac2ed992cf45574fb1fc9bf4"
+}

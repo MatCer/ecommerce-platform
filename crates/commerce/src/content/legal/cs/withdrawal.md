@@ -1,4 +1,4 @@
-# Odstoupení od smlouvy
+# Poučení o odstoupení od smlouvy
 <!-- Platform template, not legal advice. Review with a lawyer before publishing. -->
 
 ## Poučení o právu na odstoupení

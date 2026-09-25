@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT page_id FROM page_translations WHERE locale = 'cs' AND slug = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "page_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "page_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "abdf4cbd3971cc98e7f888a1c48bfbf1be9afcb8145fc72b7fb2bdecf691b4bd"
+}

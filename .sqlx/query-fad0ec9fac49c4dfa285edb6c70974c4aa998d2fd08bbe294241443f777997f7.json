@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, code, price_list_id, locales FROM markets ORDER BY code",
+  "query": "SELECT id, code, price_list_id, locales, default_locale FROM markets ORDER BY code",
   "describe": {
     "columns": [
       {
@@ -46,6 +46,17 @@
             "name": "locales"
           }
         }
+      },
+      {
+        "ordinal": 4,
+        "name": "default_locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "default_locale"
+          }
+        }
       }
     ],
     "parameters": {
@@ -55,8 +66,9 @@
       false,
       false,
       true,
+      false,
       false
     ]
   },
-  "hash": "5043ef0ac0d6bc8fabcda0edbb7c10ed9b0baa111bbf23ae8b95e67cb523ba95"
+  "hash": "fad0ec9fac49c4dfa285edb6c70974c4aa998d2fd08bbe294241443f777997f7"
 }
