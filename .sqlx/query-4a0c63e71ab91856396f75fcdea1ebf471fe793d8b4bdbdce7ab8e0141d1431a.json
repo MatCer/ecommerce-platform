@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT session_id FROM events\n         WHERE anon_id = $1 AND at > $2 AND at <= $3 AND session_id IS NOT NULL\n         ORDER BY at DESC LIMIT 1",
+  "query": "SELECT e.session_id FROM events e\n         WHERE e.anon_id = $1 AND e.at > $2 AND e.session_id IS NOT NULL\n           AND NOT EXISTS (SELECT 1 FROM events f\n                           WHERE f.anon_id = $1 AND f.session_id = e.session_id\n                             AND f.at < $3::timestamptz - interval '1 day')\n         ORDER BY e.at DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       true
     ]
   },
-  "hash": "6796dbe24488489035973aba538f1da64895ef9c254398dddb8fedef16d5d935"
+  "hash": "4a0c63e71ab91856396f75fcdea1ebf471fe793d8b4bdbdce7ab8e0141d1431a"
 }

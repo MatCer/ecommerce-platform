@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE webhook_deliveries\n                 SET status = 'succeeded', attempts = $2, response_code = $3, last_error = NULL,\n                     next_at = NULL, delivered_at = now(), updated_at = now()\n                 WHERE id = $1 AND attempts = $2 - 1 AND status IN ('pending', 'retrying')\n                   AND window_started_at = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "950c9df2d12f9a34757fb2d26f3a7423043ac397ce5cde520f4e55c7b807ca83"
+}

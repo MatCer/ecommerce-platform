@@ -48,3 +48,24 @@ test("counts per template and day; a failed batch is resent unchanged, then new 
   expect(next?.counters.map((r) => [r.template, r.requests])).toEqual([["home", 1]]);
   expect(JSON.stringify(sent)).not.toMatch(/ip|cookie|query/i);
 });
+
+test("concurrent flushes send each batch once and never lose a failed one", async () => {
+  const c = new Counters();
+  c.page(site, "home", now);
+  let calls = 0;
+  const slow = async () => {
+    calls++;
+    await new Promise((r) => setTimeout(r, 20));
+    return new Response(null, { status: 200 });
+  };
+  await Promise.all([c.flush("http://api", "tok", slow), c.flush("http://api", "tok", slow)]);
+  expect(calls).toBe(1);
+  expect(c.size).toBe(0);
+  c.page(site, "home", now);
+  const failing = async () => new Response(null, { status: 503 });
+  await Promise.allSettled([
+    c.flush("http://api", "tok", failing),
+    c.flush("http://api", "tok", failing),
+  ]);
+  expect(c.size).toBe(1);
+});

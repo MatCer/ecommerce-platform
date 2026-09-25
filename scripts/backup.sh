@@ -21,11 +21,12 @@ start=$SECONDS
 
 writers=$("${compose[@]}" ps --status running --services | grep -xE 'api|worker' || true)
 if [[ -n $writers ]]; then
-  log "stopping writers for a consistent copy: $(echo $writers)"
+  # Registered first: a failed or interrupted stop/copy still restarts every writer.
   # shellcheck disable=SC2086 # word splitting intended: one service per word
-  "${compose[@]}" stop $writers >/dev/null
+  trap 'status=$?; "${compose[@]}" start $writers >/dev/null && log "writers restarted"; exit $status' EXIT INT TERM
+  log "stopping writers for a consistent copy: $(echo $writers)"
   # shellcheck disable=SC2086
-  trap '"${compose[@]}" start $writers >/dev/null && log "writers restarted"' EXIT
+  "${compose[@]}" stop $writers >/dev/null
 fi
 
 log "pg_dump app -> $dir/app.dump"

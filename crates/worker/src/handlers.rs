@@ -560,8 +560,15 @@ async fn webhooks_deliver(
         .and_then(serde_json::Value::as_i64)
         .and_then(|a| i32::try_from(a).ok())
         .ok_or_else(|| JobError::Permanent("payload has no attempt".into()))?;
+    let window = job
+        .payload
+        .get("window")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no window".into()))?
+        .with_timezone(&chrono::Utc);
     let hooks = webhooks.ok_or_else(|| JobError::Retry("SECRETS_KEY is not configured".into()))?;
-    let outcome = commerce::webhooks::deliver(&ctx.db, &hooks, tenant, delivery, attempt)
+    let outcome = commerce::webhooks::deliver(&ctx.db, &hooks, tenant, delivery, attempt, window)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
     tracing::info!(%tenant, %delivery, attempt, ?outcome, "webhook delivery");

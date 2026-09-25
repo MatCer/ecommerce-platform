@@ -55,6 +55,7 @@ const day = (now: Date) => now.toISOString().slice(0, 10);
 export class Counters {
   #pages = new Map<string, PageRow>();
   #pending: CounterBatch[] = [];
+  #inflight: Promise<void> | undefined;
   dropped = 0;
 
   page(site: Site, template: Template, now = new Date()) {
@@ -90,8 +91,21 @@ export class Counters {
     return [...this.#pending];
   }
 
-  /** Sends pending batches in order; a failure keeps it (and the later ones) for next time. */
+  /**
+   * Sends pending batches in order; a failure keeps it (and the later ones) for next time.
+   * One flush at a time: a call while another runs waits for it and then flushes again.
+   */
   async flush(apiOrigin: string, token: string, upstream: Upstream = (r) => fetch(r)) {
+    while (this.#inflight) await this.#inflight.catch(() => {});
+    this.#inflight = this.#send(apiOrigin, token, upstream);
+    try {
+      await this.#inflight;
+    } finally {
+      this.#inflight = undefined;
+    }
+  }
+
+  async #send(apiOrigin: string, token: string, upstream: Upstream) {
     for (const batch of this.#batches()) {
       const res = await upstream(
         new Request(`${apiOrigin}/internal/v1/analytics/counters`, {
@@ -104,7 +118,7 @@ export class Counters {
       // A 4xx will not get better by resending (bad rows): drop it and count the loss.
       if (res.status >= 500) throw new Error(`HTTP ${res.status}`);
       if (!res.ok) this.dropped += batch.counters.length;
-      this.#pending.shift();
+      this.#pending = this.#pending.filter((b) => b.batch_id !== batch.batch_id);
     }
   }
 }

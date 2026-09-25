@@ -131,6 +131,44 @@ async fn sessions_split_after_thirty_idle_minutes(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(sessions, 2);
+    tx.commit().await.unwrap();
+
+    // Out-of-order requests (the later timestamp wins the lock first) share one session.
+    let other = new_anon_id();
+    consent(&runtime, &shop, &other, true).await;
+    ingest(&runtime, &shop, Some(&other), t0 + Duration::minutes(5)).await;
+    ingest(&runtime, &shop, Some(&other), t0).await;
+    // A session lasts at most a day, even without a 30-minute gap.
+    let long = new_anon_id();
+    consent(&runtime, &shop, &long, true).await;
+    let start = Utc::now() - Duration::hours(26);
+    for step in 0..78 {
+        ingest(
+            &runtime,
+            &shop,
+            Some(&long),
+            start + Duration::minutes(20 * step),
+        )
+        .await;
+    }
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let per_anon: i64 =
+        sqlx::query_scalar("SELECT count(DISTINCT session_id) FROM events WHERE anon_id = $1")
+            .bind(analytics::anon_id(shop.tenant, &other))
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(per_anon, 1);
+    let long_sessions: i64 =
+        sqlx::query_scalar("SELECT count(DISTINCT session_id) FROM events WHERE anon_id = $1")
+            .bind(analytics::anon_id(shop.tenant, &long))
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(
+        long_sessions, 2,
+        "26 hours of activity: a new session after a day"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

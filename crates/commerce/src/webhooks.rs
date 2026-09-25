@@ -448,7 +448,7 @@ fn deliver_job(
 ) -> NewJob<'static> {
     let mut job = NewJob::new(
         DELIVER_JOB,
-        json!({ "delivery_id": delivery, "attempt": attempt }),
+        json!({ "delivery_id": delivery, "attempt": attempt, "window": window }),
     );
     job.tenant_id = Some(tenant);
     job.run_at = run_at;
@@ -603,15 +603,17 @@ pub fn after_failure(
     Some((now + delay).min(end))
 }
 
-/// Worker step for [`DELIVER_JOB`]: one HTTP attempt, recorded with a compare-and-set on
-/// `attempts` so a duplicate job cannot record twice. A crash between sending and recording
-/// re-sends the same attempt (at-least-once; receivers dedupe on `X-Webhook-Id`).
+/// Worker step for [`DELIVER_JOB`]: one HTTP attempt of one retry window, recorded with a
+/// compare-and-set on `attempts` and the window, so neither a duplicate job nor a job of an
+/// earlier window (after a redelivery) can record anything. A crash between sending and
+/// recording re-sends the same attempt (at-least-once; receivers dedupe on `X-Webhook-Id`).
 pub async fn deliver(
     db: &PgPool,
     hooks: &Webhooks,
     tenant: Uuid,
     id: Uuid,
     attempt: i32,
+    window: DateTime<Utc>,
 ) -> Result<Attempt, Error> {
     let mut tx = tenant_tx(db, tenant).await?;
     let row = sqlx::query!(
@@ -628,7 +630,10 @@ pub async fn deliver(
     let Some(row) = row else {
         return Ok(Attempt::Skipped); // subscription deleted
     };
-    if !matches!(row.status.as_str(), "pending" | "retrying") || row.attempts + 1 != attempt {
+    if !matches!(row.status.as_str(), "pending" | "retrying")
+        || row.attempts + 1 != attempt
+        || row.window_started_at != window
+    {
         return Ok(Attempt::Skipped);
     }
 
@@ -686,10 +691,12 @@ pub async fn deliver(
             "UPDATE webhook_deliveries
                  SET status = 'succeeded', attempts = $2, response_code = $3, last_error = NULL,
                      next_at = NULL, delivered_at = now(), updated_at = now()
-                 WHERE id = $1 AND attempts = $2 - 1 AND status IN ('pending', 'retrying')",
+                 WHERE id = $1 AND attempts = $2 - 1 AND status IN ('pending', 'retrying')
+                   AND window_started_at = $4",
             id,
             attempt,
-            code
+            code,
+            window
         )
         .execute(&mut *tx)
         .await?
@@ -704,13 +711,15 @@ pub async fn deliver(
                 "UPDATE webhook_deliveries
                  SET status = $3, attempts = $2, response_code = $4, last_error = $5,
                      next_at = $6, updated_at = now()
-                 WHERE id = $1 AND attempts = $2 - 1 AND status IN ('pending', 'retrying')",
+                 WHERE id = $1 AND attempts = $2 - 1 AND status IN ('pending', 'retrying')
+                   AND window_started_at = $7",
                 id,
                 attempt,
                 status,
                 code,
                 error,
-                next
+                next,
+                window
             )
             .execute(&mut *tx)
             .await?

@@ -130,7 +130,7 @@ pub async fn record_counters(db: &PgPool, batch: &CounterBatch) -> Result<Counte
             continue;
         }
         sqlx::query!(
-            "DELETE FROM analytics_counter_batches WHERE received_at < now() - interval '2 days'"
+            "DELETE FROM analytics_counter_batches WHERE received_at < now() - interval '5 days'"
         )
         .execute(&mut *tx)
         .await?;
@@ -257,11 +257,17 @@ async fn session_for(tx: &mut TenantTx, anon: &str, now: DateTime<Utc>) -> Resul
     )
     .execute(&mut **tx)
     .await?;
+    // No upper bound on `at`: a concurrent request with a later timestamp that took the lock
+    // first opened the session this one belongs to. A session lasts at most a day (the
+    // rollups attribute it to its start day and read a bounded range).
     let since = now - chrono::Duration::minutes(SESSION_GAP_MINUTES);
     let last = sqlx::query_scalar!(
-        "SELECT session_id FROM events
-         WHERE anon_id = $1 AND at > $2 AND at <= $3 AND session_id IS NOT NULL
-         ORDER BY at DESC LIMIT 1",
+        "SELECT e.session_id FROM events e
+         WHERE e.anon_id = $1 AND e.at > $2 AND e.session_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM events f
+                           WHERE f.anon_id = $1 AND f.session_id = e.session_id
+                             AND f.at < $3::timestamptz - interval '1 day')
+         ORDER BY e.at DESC LIMIT 1",
         anon,
         since,
         now
@@ -435,7 +441,8 @@ pub async fn rollup(tx: &mut TenantTx, day: NaiveDate) -> Result<(), Error> {
                           bool_or(type = 'purchase') AS purchase
                    FROM events
                    WHERE session_id IS NOT NULL AND market_id IS NOT NULL
-                     AND at >= $3::timestamptz - interval '1 day' AND at < $4::timestamptz + interval '1 day'
+                     AND at >= $3::timestamptz - interval '2 days'
+                     AND at < $4::timestamptz + interval '2 days'
                    GROUP BY session_id
                    HAVING min(at) >= $3 AND min(at) < $4
                ) started

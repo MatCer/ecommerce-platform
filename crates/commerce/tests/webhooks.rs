@@ -74,6 +74,29 @@ async fn jobs(owner: &PgPool, delivery: Uuid) -> Vec<(i32, String)> {
     .unwrap()
 }
 
+/// Runs attempt `attempt` of the delivery's current retry window (as its job would).
+async fn deliver_now(
+    runtime: &PgPool,
+    h: &Webhooks,
+    tenant: Uuid,
+    d: Uuid,
+    attempt: i32,
+) -> Result<Attempt, platform::Error> {
+    let window = window_of(runtime, tenant, d).await;
+    webhooks::deliver(runtime, h, tenant, d, attempt, window).await
+}
+
+async fn window_of(runtime: &PgPool, tenant: Uuid, d: Uuid) -> chrono::DateTime<chrono::Utc> {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    let w = sqlx::query_scalar("SELECT window_started_at FROM webhook_deliveries WHERE id = $1")
+        .bind(d)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    w
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 3).await;
@@ -144,10 +167,10 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
 
     // Failure → retry scheduled as attempt 2; a duplicate attempt-1 job is skipped.
     *rx.status.lock().unwrap() = 500;
-    let a1 = webhooks::deliver(&runtime, &h, tenant, d, 1).await.unwrap();
+    let a1 = deliver_now(&runtime, &h, tenant, d, 1).await.unwrap();
     assert!(matches!(a1, Attempt::Retrying(_)), "{a1:?}");
     assert_eq!(
-        webhooks::deliver(&runtime, &h, tenant, d, 1).await.unwrap(),
+        deliver_now(&runtime, &h, tenant, d, 1).await.unwrap(),
         Attempt::Skipped
     );
     assert_eq!(jobs(&db, d).await.len(), 2);
@@ -155,7 +178,7 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
     // Success on attempt 2, signed with the subscription's secret.
     *rx.status.lock().unwrap() = 204;
     assert_eq!(
-        webhooks::deliver(&runtime, &h, tenant, d, 2).await.unwrap(),
+        deliver_now(&runtime, &h, tenant, d, 2).await.unwrap(),
         Attempt::Succeeded
     );
     let (headers, body) = rx.got.lock().unwrap().last().cloned().unwrap();
@@ -171,6 +194,7 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
 
     // Redeliver a succeeded delivery (a new window: its job key differs from earlier ones).
     let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let old_window = window_of(&runtime, tenant, d).await;
     let again = webhooks::redeliver(&mut tx, "staff", d).await.unwrap();
     assert_eq!(again.status, "retrying");
     assert!(
@@ -179,6 +203,13 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
     );
     tx.commit().await.unwrap();
     assert_eq!(jobs(&db, d).await.len(), 3);
+    // A job of the earlier window (e.g. overdue) cannot act on the new one.
+    assert_eq!(
+        webhooks::deliver(&runtime, &h, tenant, d, 3, old_window)
+            .await
+            .unwrap(),
+        Attempt::Skipped
+    );
     // An attempt that only runs after the 24 h window (backlog, outage) sends nothing: dead.
     let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
     sqlx::query("UPDATE webhook_deliveries SET window_started_at = now() - interval '25 hours'")
@@ -188,7 +219,7 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
     tx.commit().await.unwrap();
     let received = rx.got.lock().unwrap().len();
     assert_eq!(
-        webhooks::deliver(&runtime, &h, tenant, d, 3).await.unwrap(),
+        deliver_now(&runtime, &h, tenant, d, 3).await.unwrap(),
         Attempt::Dead
     );
     assert_eq!(rx.got.lock().unwrap().len(), received, "nothing sent late");
@@ -223,7 +254,7 @@ async fn signed_delivery_retries_dead_and_redeliver(db: PgPool) {
     tx.commit().await.unwrap();
     *rx.status.lock().unwrap() = 200;
     assert_eq!(
-        webhooks::deliver(&runtime, &h, tenant, d, 4).await.unwrap(),
+        deliver_now(&runtime, &h, tenant, d, 4).await.unwrap(),
         Attempt::Succeeded
     );
     let (headers, body) = rx.got.lock().unwrap().last().cloned().unwrap();
@@ -282,7 +313,7 @@ async fn private_destinations_are_refused_at_delivery(db: PgPool) {
         .items[0]
         .id;
     tx.commit().await.unwrap();
-    let a = webhooks::deliver(&runtime, &h, tenant, d, 1).await.unwrap();
+    let a = deliver_now(&runtime, &h, tenant, d, 1).await.unwrap();
     assert!(matches!(a, Attempt::Retrying(_)));
     assert!(
         rx.got.lock().unwrap().is_empty(),

@@ -17,7 +17,7 @@ CREATE TABLE analytics_counters (
 );
 
 -- Counter batches already added, so an edge retry of a batch (lost answer, partial failure)
--- is not counted twice. Kept two days.
+-- is not counted twice. Kept five days: longer than counters are accepted (today - 2 days).
 CREATE TABLE analytics_counter_batches (
     tenant_id   uuid NOT NULL REFERENCES platform.tenants (id),
     batch_id    uuid NOT NULL,
