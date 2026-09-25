@@ -1,28 +1,36 @@
-import { consentStorage } from "@platform/storefront-sdk/client";
+import { consentStorage, recommendations } from "@platform/storefront-sdk/client";
 import { CONSENT_CHANGED } from "@platform/storefront-sdk/consent";
+import type { Messages } from "@platform/storefront-sdk/format";
+import type { ProductCard } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import MiniCard from "../lib/MiniCard";
 
-export type Item = { slug: string; name: string; image?: string };
-export type Props = { current: Item; title: string; base: string };
+export type Props = { current: string; title: string; base: string; labels: Messages };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
- * "Recently viewed" (A20: needs the `personalization` purpose). Without consent it stores and
- * shows nothing; withdrawing consent clears the list (SDK). Keeps name + photo only: a stored
- * price would go stale and read as a price claim. Renders nothing on the server, so it is
- * hydrated with client:idle (client:visible needs a box to observe). Loaded by the
- * `RecentlyViewed` island only when the visitor has granted personalization.
+ * "Recently viewed" (A20: needs the `personalization` purpose). The device keeps product ids
+ * only; the platform rehydrates them with live prices and availability and drops anything no
+ * longer sold (`/_p/recommendations?context=recent`, which also checks the consent on the
+ * server). Without consent it stores and shows nothing; withdrawing consent clears the list
+ * (SDK). Loaded by the `RecentlyViewed` island only when the visitor granted personalization.
  */
 export default function RecentlyViewedList(props: Props) {
-  const [items, setItems] = createSignal<Item[]>([]);
+  const [items, setItems] = createSignal<ProductCard[]>([]);
   const store = consentStorage("personalization");
   const KEY = "recent";
 
   const sync = () => {
-    const seen = (store.get<Item[]>(KEY) ?? []).filter(
-      (x) => typeof x?.slug === "string" && x.slug !== props.current.slug,
+    // Earlier theme versions stored {slug, name, image}; only ids are kept now.
+    const seen = (store.get<unknown[]>(KEY) ?? []).filter(
+      (x): x is string => typeof x === "string" && UUID.test(x) && x !== props.current,
     );
-    setItems(seen.slice(0, 8));
     store.set(KEY, [props.current, ...seen].slice(0, 12));
+    if (seen.length === 0) return setItems([]);
+    recommendations({ context: "recent", ids: seen.slice(0, 8), limit: 8 }, { base: props.base })
+      .then((r) => setItems(r.products))
+      .catch(() => setItems([]));
   };
   onMount(() => {
     sync();
@@ -38,21 +46,9 @@ export default function RecentlyViewedList(props: Props) {
         </h2>
         <ul class="flex snap-x gap-3 overflow-x-auto pb-2 md:gap-4">
           <For each={items()}>
-            {(item) => (
+            {(p) => (
               <li class="w-36 shrink-0 snap-start md:w-44">
-                <a href={`${props.base}/p/${encodeURIComponent(item.slug)}`} class="group block">
-                  <img
-                    src={item.image}
-                    alt=""
-                    width="176"
-                    height="220"
-                    loading="lazy"
-                    class="aspect-[4/5] w-full rounded-lg bg-muted object-cover"
-                  />
-                  <span class="mt-2 block text-sm font-medium group-hover:underline">
-                    {item.name}
-                  </span>
-                </a>
+                <MiniCard product={p} base={props.base} labels={props.labels} />
               </li>
             )}
           </For>

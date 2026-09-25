@@ -1,8 +1,10 @@
+import { recommendations } from "@platform/storefront-sdk/client";
 import { imageUrl, type Messages, t, tn } from "@platform/storefront-sdk/format";
-import type { CartLine, Money } from "@platform/storefront-sdk/types";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import type { CartLine, Money, ProductCard } from "@platform/storefront-sdk/types";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { cart, open, setOpen, updateLine } from "../lib/cart-store";
 import Icon from "../lib/Icon";
+import MiniCard from "../lib/MiniCard";
 
 // Local copies of lib/icons.ts paths: importing them would pull these drawer-only icons into
 // the icon chunk every page loads, while this module is fetched only when the cart opens.
@@ -35,6 +37,27 @@ export default function CartDrawer(props: {
     if (open() && !dialog.open) dialog.showModal();
     if (!open() && dialog.open) dialog.close();
   });
+
+  // Cross-sell (WP17): products bought together with the cart's, from the private
+  // `/_p/recommendations?context=cart` (the edge adds the cart capability). Refetched when the
+  // cart's content changes while the drawer is open; a late answer for an older cart is dropped.
+  const [crossSell, setCrossSell] = createSignal<ProductCard[]>([]);
+  let asked = 0;
+  createEffect(
+    on(
+      () => {
+        const c = cart();
+        return open() && c && "version" in c && c.lines.length > 0 ? `${c.id}:${c.version}` : null;
+      },
+      (key) => {
+        if (!key) return;
+        const mine = ++asked;
+        recommendations({ context: "cart", limit: 4 })
+          .then((r) => mine === asked && setCrossSell(r.products))
+          .catch(() => mine === asked && setCrossSell([]));
+      },
+    ),
+  );
 
   const count = () => cart()?.item_count ?? 0;
   const lines = () => cart()?.lines ?? [];
@@ -117,73 +140,94 @@ export default function CartDrawer(props: {
             </div>
           }
         >
-          <ul class="flex-1 divide-y divide-border overflow-y-auto px-5" aria-busy={busy()}>
-            <For each={lines()}>
-              {(line) => (
-                <li class="flex gap-4 py-4">
-                  <a href={`${props.base}/p/${line.slug}`} class="shrink-0" tabIndex={-1}>
-                    <img
-                      src={line.image ? imageUrl(line.image, 160) : undefined}
-                      alt=""
-                      width="64"
-                      height="80"
-                      loading="lazy"
-                      class="h-20 w-16 rounded-md bg-muted object-cover"
-                    />
-                  </a>
-                  <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                    <a href={`${props.base}/p/${line.slug}`} class="font-semibold hover:underline">
-                      {line.product_name}
+          <div class="flex-1 overflow-y-auto">
+            <ul class="divide-y divide-border px-5" aria-busy={busy()}>
+              <For each={lines()}>
+                {(line) => (
+                  <li class="flex gap-4 py-4">
+                    <a href={`${props.base}/p/${line.slug}`} class="shrink-0" tabIndex={-1}>
+                      <img
+                        src={line.image ? imageUrl(line.image, 160) : undefined}
+                        alt=""
+                        width="64"
+                        height="80"
+                        loading="lazy"
+                        class="h-20 w-16 rounded-md bg-muted object-cover"
+                      />
                     </a>
-                    <p class="text-muted-foreground">{line.variant_label}</p>
-                    <Show when={!line.available}>
-                      <p class="font-semibold text-sale">{l("cart.unavailable")}</p>
-                    </Show>
-                    <div class="mt-auto flex items-center justify-between gap-2 pt-1">
-                      <fieldset class="flex items-center rounded-md border border-border">
-                        <legend class="sr-only">
-                          {l("cart.quantity")}: {line.product_name}
-                        </legend>
-                        <button
-                          type="button"
-                          class="grid size-9 place-items-center disabled:text-subtle"
-                          disabled={busy() || line.quantity <= 1}
-                          onClick={() => change(line, line.quantity - 1)}
-                        >
-                          <Icon d={minus} class="size-4" />
-                          <span class="sr-only">{l("cart.decrease")}</span>
-                        </button>
-                        <span class="w-7 text-center tabular-nums" aria-live="polite">
-                          {line.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          class="grid size-9 place-items-center disabled:text-subtle"
-                          disabled={busy() || !line.available}
-                          onClick={() => change(line, line.quantity + 1)}
-                        >
-                          <Icon d={plus} class="size-4" />
-                          <span class="sr-only">{l("cart.increase")}</span>
-                        </button>
-                      </fieldset>
-                      <button
-                        type="button"
-                        class="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-sale"
-                        disabled={busy()}
-                        onClick={() => change(line, 0)}
+                    <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                      <a
+                        href={`${props.base}/p/${line.slug}`}
+                        class="font-semibold hover:underline"
                       >
-                        <Icon d={trash} class="size-4" />
-                        <span class="sr-only">
-                          {l("cart.remove")}: {line.product_name}
-                        </span>
-                      </button>
-                      <p class="price ml-auto text-base">{line.total.formatted}</p>
+                        {line.product_name}
+                      </a>
+                      <p class="text-muted-foreground">{line.variant_label}</p>
+                      <Show when={!line.available}>
+                        <p class="font-semibold text-sale">{l("cart.unavailable")}</p>
+                      </Show>
+                      <div class="mt-auto flex items-center justify-between gap-2 pt-1">
+                        <fieldset class="flex items-center rounded-md border border-border">
+                          <legend class="sr-only">
+                            {l("cart.quantity")}: {line.product_name}
+                          </legend>
+                          <button
+                            type="button"
+                            class="grid size-9 place-items-center disabled:text-subtle"
+                            disabled={busy() || line.quantity <= 1}
+                            onClick={() => change(line, line.quantity - 1)}
+                          >
+                            <Icon d={minus} class="size-4" />
+                            <span class="sr-only">{l("cart.decrease")}</span>
+                          </button>
+                          <span class="w-7 text-center tabular-nums" aria-live="polite">
+                            {line.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            class="grid size-9 place-items-center disabled:text-subtle"
+                            disabled={busy() || !line.available}
+                            onClick={() => change(line, line.quantity + 1)}
+                          >
+                            <Icon d={plus} class="size-4" />
+                            <span class="sr-only">{l("cart.increase")}</span>
+                          </button>
+                        </fieldset>
+                        <button
+                          type="button"
+                          class="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-sale"
+                          disabled={busy()}
+                          onClick={() => change(line, 0)}
+                        >
+                          <Icon d={trash} class="size-4" />
+                          <span class="sr-only">
+                            {l("cart.remove")}: {line.product_name}
+                          </span>
+                        </button>
+                        <p class="price ml-auto text-base">{line.total.formatted}</p>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              )}
-            </For>
-          </ul>
+                  </li>
+                )}
+              </For>
+            </ul>
+            <Show when={crossSell().length > 0}>
+              <section aria-labelledby="cart-cross-sell" class="border-t border-border px-5 py-4">
+                <h3 id="cart-cross-sell" class="mb-3 text-sm font-bold">
+                  {l("cart.cross_sell")}
+                </h3>
+                <ul class="flex snap-x gap-3 overflow-x-auto pb-1">
+                  <For each={crossSell()}>
+                    {(p) => (
+                      <li class="w-28 shrink-0 snap-start">
+                        <MiniCard product={p} base={props.base} labels={props.labels} />
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </section>
+            </Show>
+          </div>
           <footer class="border-t border-border bg-background px-5 py-4">
             <Show when={failed()}>
               <p role="alert" class="mb-3 text-sm font-medium text-sale">
