@@ -49,7 +49,7 @@ async fn receiver() -> (String, Receiver) {
 fn hooks(allow: &[&str]) -> Webhooks {
     Webhooks {
         secrets: SecretBox::new(&[42; 32]),
-        http: SafeClient::new(allow.iter().map(|h| (*h).to_owned()).collect()),
+        http: SafeClient::new(allow.iter().map(|h| (*h).to_owned())).unwrap(),
         require_https: false,
     }
 }
@@ -277,7 +277,7 @@ async fn private_destinations_are_refused_at_delivery(db: PgPool) {
         .unwrap()
         .items[0];
     assert!(
-        d.last_error.as_deref().unwrap().contains("not allowed"),
+        d.last_error.as_deref().unwrap().contains("not a public"),
         "{:?}",
         d.last_error
     );

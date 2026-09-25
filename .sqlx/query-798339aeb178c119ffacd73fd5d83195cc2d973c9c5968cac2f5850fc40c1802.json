@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT items FROM menus WHERE handle = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "items",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "menus",
+            "name": "items"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "798339aeb178c119ffacd73fd5d83195cc2d973c9c5968cac2f5850fc40c1802"
+}

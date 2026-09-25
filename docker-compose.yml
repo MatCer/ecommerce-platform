@@ -20,11 +20,8 @@ x-runtime-db: &runtime-db
   DATABASE_URL: postgres://app_runtime:${APP_RUNTIME_PASSWORD:-app-runtime-local}@postgres:5432/app
   APP_ENV: ${APP_ENV:-dev}
   RUST_LOG: ${RUST_LOG:-info}
-  # WP14: stored integration secrets (webhook signing secrets, AES-256-GCM), the SSRF-safe
-  # client's dev-only exception for the local webhook receiver (refused with APP_ENV=prod), and
-  # Prometheus /metrics on a separate internal port that Caddy never routes.
+  # WP14: key for stored integration secrets (webhook signing secrets, AES-256-GCM).
   SECRETS_KEY: ${SECRETS_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
-  SAFE_HTTP_ALLOW_HOSTS: ${SAFE_HTTP_ALLOW_HOSTS:-mocks}
 
 services:
   postgres:
@@ -323,6 +320,14 @@ services:
       # Staff invitation links (outbox → mail pipeline).
       AUTH_INTERNAL_URL: http://auth:3000/
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
+      # Export feed URLs and edge purges after catalog/content changes (WP13a, A2).
+      PUBLIC_STOREFRONT_SCHEME: http
+      PUBLIC_STOREFRONT_PORT: ${HTTP_PORT:-8080}
+      EDGE_PURGE_URL: http://edge:8788/_edge/purge
+      EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+      # Dev only: the SSRF-safe fetcher (A21) may reach the mocks service, which serves the
+      # demo feeds and images on the private Docker network. Ignored unless APP_ENV=dev.
+      SAFE_FETCH_ALLOW_HOSTS: mocks
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }

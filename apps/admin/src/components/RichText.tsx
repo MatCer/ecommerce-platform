@@ -7,7 +7,7 @@
  * is disproportionate here.
  */
 import DOMPurify from "dompurify";
-import { createSignal, createUniqueId, For, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, createUniqueId, For, onCleanup, onMount } from "solid-js";
 import { t } from "../i18n/index.ts";
 
 const ALLOWED = {
@@ -112,6 +112,13 @@ export function RichText(props: {
     props.onChange(sanitizeHtml(area.innerHTML));
     refreshState();
   };
+
+  // Reordering blocks or removing an FAQ row reuses this editor with another value.
+  // Avoid touching the DOM for our own input event so typing keeps its selection.
+  createEffect(() => {
+    const html = sanitizeHtml(props.value);
+    if (area && sanitizeHtml(area.innerHTML) !== html) area.innerHTML = html;
+  });
 
   onMount(() => {
     area.innerHTML = sanitizeHtml(props.value);

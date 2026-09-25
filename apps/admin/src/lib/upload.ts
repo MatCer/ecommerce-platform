@@ -19,7 +19,7 @@ export function checkFile(file: { type: string; size: number }): UploadCheck {
 }
 
 /** PUT with progress events (fetch has no upload progress). */
-function put(
+export function putFile(
   url: string,
   headers: Record<string, string>,
   file: File,
@@ -28,6 +28,9 @@ function put(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
+    xhr.timeout = 120_000;
+    xhr.ontimeout = () => reject(new Error("upload timed out"));
+    xhr.onabort = () => reject(new Error("upload aborted"));
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(e.loaded / e.total);
@@ -53,7 +56,7 @@ export async function uploadImage(
       body: { content_type: file.type, size: file.size, filename: file.name },
     }),
   );
-  await put(upload.url, upload.headers, file, onProgress);
+  await putFile(upload.url, upload.headers, file, onProgress);
   onProgress(1);
   await unwrap(
     api.POST("/admin/v1/assets/{id}/complete", {

@@ -18,8 +18,8 @@ use crate::auth::StaffUser;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(jobs))
-        .routes(routes!(requeue))
+        .routes(routes!(list_platform_jobs))
+        .routes(routes!(requeue_platform_job))
 }
 
 /// Whether a staff user is a platform superadmin.
@@ -80,7 +80,7 @@ pub struct JobPage {
         (status = 403, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn jobs(
+async fn list_platform_jobs(
     _admin: Superadmin,
     State(s): State<AppState>,
     query: Result<Query<JobQuery>, QueryRejection>,
@@ -119,7 +119,7 @@ async fn jobs(
         (status = 409, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn requeue(
+async fn requeue_platform_job(
     admin: Superadmin,
     State(s): State<AppState>,
     path: Result<Path<i64>, PathRejection>,

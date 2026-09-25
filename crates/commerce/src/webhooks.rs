@@ -19,7 +19,7 @@ use platform::crypto::SecretBox;
 use platform::db::{TenantTx, tenant_tx};
 use platform::http::SafeClient;
 use platform::queue::{self, NewJob};
-use reqwest::Method;
+
 use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue, USER_AGENT};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -51,6 +51,11 @@ pub const DELIVER_JOB: &str = "webhooks.deliver";
 pub const RETRY_WINDOW: Duration = Duration::from_secs(24 * 3600);
 const MAX_SUBSCRIPTIONS: i64 = 20;
 const PAGE_MAX: i64 = 100;
+/// A21: 10 s per attempt; the answer is read (at most 1 MB) and dropped.
+const RESPONSE_LIMITS: platform::http::Limits = platform::http::Limits {
+    max_bytes: 1024 * 1024,
+    timeout: Duration::from_secs(10),
+};
 
 /// Delivery dependencies: the secret box and the SSRF-safe client (A21).
 #[derive(Clone)]
@@ -153,7 +158,20 @@ fn check_url(url: &str, require_https: bool) -> Result<String, Error> {
     if !(10..=2048).contains(&url.len()) {
         return Err(invalid("invalid_url", "the URL must be 10-2048 characters"));
     }
-    let parsed = SafeClient::check_url(url).map_err(|e| invalid("invalid_url", e.to_string()))?;
+    let parsed = reqwest::Url::parse(url)
+        .ok()
+        .filter(|u| {
+            matches!(u.scheme(), "http" | "https")
+                && u.username().is_empty()
+                && u.password().is_none()
+                && u.host_str().is_some_and(|h| !h.is_empty())
+        })
+        .ok_or_else(|| {
+            invalid(
+                "invalid_url",
+                "an http(s) URL without credentials is required",
+            )
+        })?;
     if require_https && parsed.scheme() != "https" {
         return Err(invalid("invalid_url", "webhook URLs must use https"));
     }
@@ -619,14 +637,11 @@ pub async fn deliver(
         }
         match hooks
             .http
-            .send(Method::POST, &row.url, headers, Some(body))
+            .post(&row.url, headers, body, RESPONSE_LIMITS)
             .await
         {
-            Ok(r) if r.status.is_success() => Ok(i32::from(r.status.as_u16())),
-            Ok(r) => Err((
-                Some(i32::from(r.status.as_u16())),
-                format!("HTTP {}", r.status.as_u16()),
-            )),
+            Ok(code) if (200..300).contains(&code) => Ok(i32::from(code)),
+            Ok(code) => Err((Some(i32::from(code)), format!("HTTP {code}"))),
             Err(e) => Err((None, e.to_string())),
         }
     } else {

@@ -3,11 +3,16 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use commerce::feeds::{export, import};
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
 use commerce::pricing::intervals;
 use commerce::search::{self, Meili, index::Rebuilt};
+use commerce::storefront::PublicUrls;
+use commerce::storefront::purge::{self, Purge};
 use platform::auth_service::AuthService;
+use platform::edge::EdgePurge;
+use platform::http::SafeClient;
 use platform::mail::Mailer;
 use platform::queue::{self, Job};
 use platform::storage::Storage;
@@ -32,6 +37,30 @@ const MEDIA_CONCURRENCY: usize = 1;
 
 /// Staff invitation email for a `staff.invited` event (spec §11.4, WP9).
 pub const STAFF_INVITE_MAIL: &str = "staff.invite_mail";
+/// Purges the edge's cached pages an outbox event invalidates (A2, WP13a).
+pub const EDGE_PURGE: &str = "edge.purge";
+
+/// Services of the WP13a/WP14 jobs: edge purges, the SSRF-safe fetcher (imports), the public
+/// storefront URLs (export feeds) and webhook delivery (`None` without `SECRETS_KEY`).
+#[derive(Clone)]
+pub struct Extra {
+    pub edge: EdgePurge,
+    pub fetch: SafeClient,
+    pub urls: PublicUrls,
+    pub webhooks: Option<commerce::webhooks::Webhooks>,
+}
+
+impl Extra {
+    /// No edge, no allowlisted hosts, default URLs (tests, tools).
+    pub fn disabled() -> Result<Self, platform::http::FetchError> {
+        Ok(Self {
+            edge: EdgePurge::disabled(),
+            fetch: SafeClient::new(Vec::<String>::new())?,
+            urls: PublicUrls::default(),
+            webhooks: None,
+        })
+    }
+}
 
 /// `customer.email_verified` → link the guest orders placed with that email (A5, WP10).
 pub const LINK_GUEST_ORDERS: &str = "orders.link_guest";
@@ -46,13 +75,29 @@ pub fn all(
     meili: Meili,
     mailer: Option<Mailer>,
     auth: Option<AuthService>,
-    webhooks: Option<commerce::webhooks::Webhooks>,
+    extra: Extra,
 ) -> Handlers {
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
+    let (import_storage, export_storage) = (storage.clone(), storage.clone());
     let sweep_storage = storage.clone();
-    let (m1, m3, m4) = (meili.clone(), meili.clone(), meili);
+    let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
+    let webhooks = extra.webhooks.clone();
+    let (e1, e2, e3) = (extra.clone(), extra.clone(), extra);
     Handlers::default()
+        .register(EDGE_PURGE, move |_ctx, job| {
+            edge_purge(job, e1.edge.clone())
+        })
+        .register(import::JOB, move |ctx, job| {
+            feed_import(ctx, job, import_storage.clone(), e2.fetch.clone())
+        })
+        .register(export::JOB, move |ctx, job| {
+            feed_export(ctx, job, export_storage.clone(), e3.urls.clone())
+        })
+        .register(export::ALL_JOB, feed_export_all)
+        .register(search::SYNONYMS_JOB, move |ctx, job| {
+            search_synonyms(ctx, job, m4.clone())
+        })
         .register(notifications::SEND_JOB, move |ctx, job| {
             mail_send(ctx, job, mailer.clone())
         })
@@ -85,7 +130,7 @@ pub fn all(
             webhooks_deliver(ctx, job, webhooks.clone())
         })
         .register(SWEEP_JOB, move |ctx, job| {
-            ops_sweep(ctx, job, sweep_storage.clone(), m4.clone())
+            ops_sweep(ctx, job, sweep_storage.clone(), m5.clone())
         })
 }
 
@@ -123,6 +168,102 @@ async fn staff_invite_mail(ctx: Ctx, job: Job, auth: Option<AuthService>) -> Res
     // Retried until the auth service is configured and reachable.
     let auth = auth.ok_or_else(|| JobError::Retry("AUTH_INTERNAL_URL is not configured".into()))?;
     commerce::staff::send_invitation(&ctx.db, &auth, tenant, member, callback)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
+}
+
+/// Purges what an outbox event invalidates. Best effort: the edge TTLs bound staleness.
+async fn edge_purge(job: Job, edge: EdgePurge) -> Result<(), JobError> {
+    let Some(tenant) = job.tenant_id else {
+        return Ok(());
+    };
+    let event_type = job
+        .payload
+        .get("type")
+        .and_then(|t| t.as_str())
+        .unwrap_or("");
+    let payload = job.payload.get("payload").cloned().unwrap_or_default();
+    match purge::for_event(event_type, &payload) {
+        Some(Purge::Tenant) => edge.tenant(tenant).await,
+        Some(Purge::Tags(tags)) => edge.tags(tenant, &tags).await,
+        None => {}
+    }
+    Ok(())
+}
+
+/// A feed import step (`analyze` or `apply`); feed problems end the run as `failed`.
+async fn feed_import(
+    ctx: Ctx,
+    job: Job,
+    storage: Storage,
+    fetch: SafeClient,
+) -> Result<(), JobError> {
+    let (tenant, run) = tenant_and(&job, "run_id")?;
+    let step = job
+        .payload
+        .get("step")
+        .and_then(|s| s.as_str())
+        .unwrap_or("analyze")
+        .to_owned();
+    match import::run_step(&ctx.db, &storage, &fetch, tenant, run, &step).await {
+        Ok(()) => Ok(()),
+        Err(e) if job.attempts >= job.max_attempts => {
+            tracing::error!(%run, error = %e, "feed import gave up");
+            import::fail(
+                &ctx.db,
+                tenant,
+                run,
+                "the import failed repeatedly; try again",
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            Err(JobError::Permanent(e.to_string()))
+        }
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+async fn feed_export(
+    ctx: Ctx,
+    job: Job,
+    storage: Storage,
+    urls: PublicUrls,
+) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("feed export without tenant".into()))?;
+    let written = export::generate(&ctx.db, &storage, &urls, tenant)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::info!(%tenant, written, "export feeds generated");
+    Ok(())
+}
+
+/// Hourly: one export job per tenant (idempotent per hour).
+async fn feed_export_all(ctx: Ctx, _job: Job) -> Result<(), JobError> {
+    let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants WHERE status = 'active'")
+        .fetch_all(&ctx.db)
+        .await?;
+    let now = chrono::Utc::now();
+    for tenant in &tenants {
+        let mut job = export::job(*tenant, now, false);
+        job.idempotency_key = Some(format!(
+            "{}:{tenant}:h{}",
+            export::JOB,
+            now.timestamp() / 3600
+        ));
+        queue::enqueue(&ctx.db, &job).await?;
+    }
+    tracing::info!(tenants = tenants.len(), "export feed jobs queued");
+    Ok(())
+}
+
+/// Applies the tenant's synonyms to its indexes.
+async fn search_synonyms(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("synonyms without tenant".into()))?;
+    search::index::apply_synonyms(&ctx.db, &meili, tenant)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))
 }

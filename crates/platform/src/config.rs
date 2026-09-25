@@ -450,9 +450,6 @@ pub struct OpsConfig {
     /// `SECRETS_KEY`: 64 hex characters (AES-256 key) encrypting stored integration secrets
     /// (webhook signing secrets). Unset = webhook subscriptions are unavailable.
     pub secrets_key: Option<[u8; 32]>,
-    /// `SAFE_HTTP_ALLOW_HOSTS`: comma-separated host names the SSRF-safe client may reach
-    /// even on private addresses (local mocks). Refused with `APP_ENV=prod`.
-    pub safe_http_allow_hosts: Vec<String>,
     /// `STOREFRONT_RATE_PER_SECOND` (default 20) and `STOREFRONT_RATE_BURST` (default 120):
     /// Storefront API requests per storefront token + client IP (spec §8.1).
     pub storefront_rate_per_second: u32,
@@ -465,7 +462,6 @@ impl OpsConfig {
     }
 
     pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
-        let env = parsed(lookup, "APP_ENV", AppEnv::Prod)?;
         let metrics_bind = match get(lookup, "METRICS_BIND") {
             None => None,
             Some(_) => Some(parsed(
@@ -486,18 +482,6 @@ impl OpsConfig {
                 })?)
             }
         };
-        let safe_http_allow_hosts: Vec<String> = get(lookup, "SAFE_HTTP_ALLOW_HOSTS")
-            .unwrap_or_default()
-            .split(',')
-            .map(|h| h.trim().to_ascii_lowercase())
-            .filter(|h| !h.is_empty())
-            .collect();
-        if env == AppEnv::Prod && !safe_http_allow_hosts.is_empty() {
-            return Err(ConfigError::Invalid {
-                name: "SAFE_HTTP_ALLOW_HOSTS",
-                reason: "private-address exceptions are refused with APP_ENV=prod".into(),
-            });
-        }
         let storefront_rate_per_second = parsed(lookup, "STOREFRONT_RATE_PER_SECOND", 20u32)?;
         let storefront_rate_burst = parsed(lookup, "STOREFRONT_RATE_BURST", 120u32)?;
         if storefront_rate_per_second == 0 || storefront_rate_burst == 0 {
@@ -509,7 +493,6 @@ impl OpsConfig {
         Ok(Self {
             metrics_bind,
             secrets_key,
-            safe_http_allow_hosts,
             storefront_rate_per_second,
             storefront_rate_burst,
         })
@@ -522,13 +505,7 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
-    fn ops_config_refuses_private_exceptions_in_prod_and_bad_keys() {
-        let dev = env(&[("APP_ENV", "dev"), ("SAFE_HTTP_ALLOW_HOSTS", "Mocks, ,x")]);
-        assert_eq!(
-            OpsConfig::from_lookup(&dev).unwrap().safe_http_allow_hosts,
-            ["mocks", "x"]
-        );
-        assert!(OpsConfig::from_lookup(&env(&[("SAFE_HTTP_ALLOW_HOSTS", "mocks")])).is_err());
+    fn ops_config_validates_the_secrets_key() {
         assert!(OpsConfig::from_lookup(&env(&[("SECRETS_KEY", "abcd")])).is_err());
         let key = "11".repeat(32);
         let c = OpsConfig::from_lookup(&env(&[("SECRETS_KEY", &key)])).unwrap();

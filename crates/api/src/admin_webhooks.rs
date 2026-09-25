@@ -25,11 +25,11 @@ use crate::auth::TenantStaff;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(list, create))
-        .routes(routes!(update, remove))
-        .routes(routes!(rotate))
-        .routes(routes!(deliveries))
-        .routes(routes!(redeliver))
+        .routes(routes!(list_webhooks, create_webhook))
+        .routes(routes!(update_webhook, delete_webhook))
+        .routes(routes!(rotate_webhook_secret))
+        .routes(routes!(list_webhook_deliveries))
+        .routes(routes!(redeliver_webhook))
 }
 
 fn configured(s: &AppState) -> Result<&Webhooks, Error> {
@@ -58,7 +58,7 @@ fn admin(staff: &TenantStaff, sensitive: bool) -> Result<(), Error> {
         (status = 403, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn list(
+async fn list_webhooks(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<Json<SubscriptionList>, Error> {
@@ -85,7 +85,7 @@ async fn list(
         (status = 503, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn create(
+async fn create_webhook(
     staff: TenantStaff,
     State(s): State<AppState>,
     body: Bytes,
@@ -115,7 +115,7 @@ async fn create(
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn update(
+async fn update_webhook(
     staff: TenantStaff,
     State(s): State<AppState>,
     path: Result<Path<Uuid>, PathRejection>,
@@ -144,7 +144,7 @@ async fn update(
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn remove(
+async fn delete_webhook(
     staff: TenantStaff,
     State(s): State<AppState>,
     path: Result<Path<Uuid>, PathRejection>,
@@ -172,7 +172,7 @@ async fn remove(
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn rotate(
+async fn rotate_webhook_secret(
     staff: TenantStaff,
     State(s): State<AppState>,
     path: Result<Path<Uuid>, PathRejection>,
@@ -207,7 +207,7 @@ pub struct DeliveryQuery {
     params(TenantHeader, DeliveryQuery),
     responses((status = 200, body = DeliveryPage))
 )]
-async fn deliveries(
+async fn list_webhook_deliveries(
     staff: TenantStaff,
     State(s): State<AppState>,
     query: Result<Query<DeliveryQuery>, QueryRejection>,
@@ -234,7 +234,7 @@ async fn deliveries(
         (status = 409, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn redeliver(
+async fn redeliver_webhook(
     staff: TenantStaff,
     State(s): State<AppState>,
     path: Result<Path<Uuid>, PathRejection>,

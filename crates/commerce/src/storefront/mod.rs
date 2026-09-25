@@ -10,12 +10,14 @@
 //! (RLS) and the request fails with `403 market_mismatch`.
 
 pub mod cards;
+pub mod content;
 pub mod files;
 pub mod images;
 pub mod listing;
 pub mod messages;
 pub mod pages;
 pub mod product;
+pub mod purge;
 
 use chrono::{DateTime, Utc};
 use platform::Error;

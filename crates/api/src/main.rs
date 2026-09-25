@@ -97,16 +97,16 @@ fn init_tracing() -> anyhow::Result<()> {
 }
 
 /// Webhook secrets + the SSRF-safe client (A21); `None` without `SECRETS_KEY`.
-fn webhooks(ops: &OpsConfig, env: AppEnv) -> Option<commerce::webhooks::Webhooks> {
+fn webhooks(ops: &OpsConfig, env: AppEnv) -> anyhow::Result<Option<commerce::webhooks::Webhooks>> {
     let Some(key) = ops.secrets_key else {
         tracing::warn!("SECRETS_KEY not set: webhook subscriptions answer 503");
-        return None;
+        return Ok(None);
     };
-    Some(commerce::webhooks::Webhooks {
+    Ok(Some(commerce::webhooks::Webhooks {
         secrets: platform::crypto::SecretBox::new(&key),
-        http: platform::http::SafeClient::new(ops.safe_http_allow_hosts.clone()),
+        http: platform::http::SafeClient::from_env()?,
         require_https: env == AppEnv::Prod,
-    })
+    }))
 }
 
 async fn serve() -> anyhow::Result<()> {
@@ -148,7 +148,7 @@ async fn serve() -> anyhow::Result<()> {
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
         checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
-        webhooks: webhooks(&ops, cfg.env),
+        webhooks: webhooks(&ops, cfg.env)?,
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
             ops.storefront_rate_per_second,
             ops.storefront_rate_burst,

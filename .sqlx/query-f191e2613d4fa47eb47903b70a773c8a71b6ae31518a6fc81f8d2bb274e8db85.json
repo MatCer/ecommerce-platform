@@ -1,0 +1,138 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id, p.kind, p.published_at AS \"published_at!\", a.variants AS \"image?\",\n                  t.title, t.slug, t.excerpt, t.blocks, t.seo_title, t.seo_description\n           FROM pages p\n           CROSS JOIN LATERAL (\n               SELECT * FROM page_translations pt WHERE pt.page_id = p.id\n               ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1\n           ) t\n           LEFT JOIN assets a ON a.id = p.image_asset_id AND a.status = 'ready'\n           WHERE p.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "published_at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "published_at"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "image?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "variants"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "excerpt",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "excerpt"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "blocks",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "blocks"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "seo_title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "seo_title"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "seo_description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "seo_description"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "f191e2613d4fa47eb47903b70a773c8a71b6ae31518a6fc81f8d2bb274e8db85"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM products\n           WHERE status = 'active' AND jsonb_typeof(gpsr -> 'manufacturer') IS DISTINCT FROM 'object'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ca66bc238c17b88040b6f84e130cf293564475cad3b637fc881468065cc50e6e"
+}

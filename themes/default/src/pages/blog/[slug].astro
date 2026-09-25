@@ -1,13 +1,13 @@
 ---
 import { lcpImage } from "@platform/storefront-sdk/format";
+import Blocks from "../../components/Blocks.astro";
 import Breadcrumbs from "../../components/Breadcrumbs.astro";
-import Prose from "../../components/Prose.astro";
 import Base from "../../layouts/Base.astro";
 import { i18n } from "../../lib/i18n";
 import { GALLERY_SIZES } from "../../lib/images";
 import { storefront } from "../../lib/storefront";
 
-// Blog article. Content arrives with WP13; until then the API answers 404 and so does this route.
+// Blog article, built from content blocks (WP13).
 const sf = storefront(Astro.request);
 const [shop, post] = await Promise.all([sf.shop(), sf.blogPost(Astro.params.slug ?? "")]);
 if (!post) return Astro.rewrite("/404");
@@ -23,6 +23,6 @@ const cover = post.image && lcpImage(post.image, GALLERY_SIZES, 720).img;
       <h1 class="mt-2 text-4xl font-extrabold md:text-5xl">{post.title}</h1>
     </header>
     {cover && <img {...cover} class="mb-8 aspect-[16/9] w-full max-w-4xl rounded-xl object-cover" />}
-    <Prose content_html={post.content_html} />
+    <Blocks blocks={post.blocks} shop={shop} />
   </article>
 </Base>

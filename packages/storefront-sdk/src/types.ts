@@ -45,43 +45,16 @@ export type SearchHit = S["SearchHit"];
 export type CartLine = S["CartLineView"];
 export type Cart = S["CartView"];
 
-// --- CMS pages and blog: provisional shapes until WP13 ships these page models. Until then the
-// API answers 404 and themes render their 404 page. ---------------------------------------
-
-export interface CmsPage {
-  title: string;
-  /** Sanitized server-side, like `description_html`. */
-  content_html: string;
-  breadcrumbs: Link[];
-  seo: Seo;
-  cache: CacheHints;
-}
-
-export interface BlogPostSummary {
-  title: string;
-  href: string;
-  excerpt: string;
-  /** ISO date. */
-  published_at: string;
-  image?: Image | null;
-}
-
-export interface BlogIndex {
-  title: string;
-  posts: BlogPostSummary[];
-  seo: Seo;
-  cache: CacheHints;
-}
-
-export interface BlogPost {
-  title: string;
-  content_html: string;
-  published_at: string;
-  image?: Image | null;
-  breadcrumbs: Link[];
-  seo: Seo;
-  cache: CacheHints;
-}
+/** CMS and legal pages (`/pages/<slug>`) and the blog (WP13): content as typed blocks. */
+export type CmsPage = S["CmsPage"];
+export type BlogIndex = S["BlogIndex"];
+export type BlogPost = S["BlogPost"];
+export type BlogPostSummary = S["BlogPostSummary"];
+/**
+ * One content block. Render `rich_text.html` and `faq.items[].answer_html` unescaped (sanitized
+ * by the platform); everything else is plain text.
+ */
+export type ContentBlock = S["BlockView"];
 
 /** `GET /_p/cart` before anything was added: the edge answers without creating a cart. */
 export interface EmptyCart {

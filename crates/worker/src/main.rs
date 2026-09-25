@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use platform::config::{
-    AppEnv, AuthServiceConfig, DbConfig, MeiliConfig, OpsConfig, S3Config, WorkerConfig,
+    AppEnv, AuthServiceConfig, DbConfig, MeiliConfig, OpsConfig, S3Config, StorefrontConfig,
+    WorkerConfig,
 };
 use platform::mail::{MailConfig, Mailer};
 use platform::storage::Storage;
@@ -40,9 +41,10 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(AppEnv::Prod);
+    let fetch = platform::http::SafeClient::from_env()?;
     let webhooks = ops.secrets_key.map(|key| commerce::webhooks::Webhooks {
         secrets: platform::crypto::SecretBox::new(&key),
-        http: platform::http::SafeClient::new(ops.safe_http_allow_hosts.clone()),
+        http: fetch.clone(),
         require_https: env == AppEnv::Prod,
     });
     if webhooks.is_none() {
@@ -56,6 +58,18 @@ async fn main() -> anyhow::Result<()> {
     {
         tracing::warn!(error = %e, "ensuring event partitions failed");
     }
+    // Edge purges and public URLs (export feeds); the SSRF-safe client for imports and
+    // webhooks (A21).
+    let sf = StorefrontConfig::from_env()?;
+    let extra = handlers::Extra {
+        edge: platform::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
+        fetch,
+        urls: commerce::storefront::PublicUrls {
+            scheme: sf.scheme,
+            port: sf.port,
+        },
+        webhooks,
+    };
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
     if let Some(bind) = ops.metrics_bind {
@@ -80,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::join!(
         runner::run(
             db.clone(),
-            handlers::all(storage, meili, mailer, auth, webhooks),
+            handlers::all(storage, meili, mailer, auth, extra),
             RunnerConfig::new(owner, cfg.concurrency),
             shutdown.clone(),
         ),

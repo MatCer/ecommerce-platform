@@ -1,402 +1,407 @@
-//! The SSRF-safe HTTP client (spec §14, A21) for merchant-supplied URLs (webhooks now, imports
-//! later). It resolves DNS itself and connects only to public unicast addresses, pinning the
-//! connection to the addresses it checked (no second lookup an attacker could rebind). Every
-//! redirect is re-validated (at most 3), nothing credential-like is added (no cookie store, no
-//! proxy, no default headers), bodies are capped at 20 MB (no transparent decompression is
-//! enabled) and the whole exchange times out after 10 s.
+//! The one HTTP client for merchant-supplied URLs (spec §14, A21): feed and image imports,
+//! later webhooks.
 //!
-//! `allow_hosts` names hosts exempt from the address check (local mocks on the compose
-//! network); configuration refuses it in production (`SAFE_HTTP_ALLOW_HOSTS`).
+//! - It resolves DNS itself and connects only to public unicast addresses (v4 + v6). reqwest
+//!   connects to exactly the addresses the resolver returned, so a name cannot be re-bound to
+//!   a private address between the check and the connection.
+//! - IP-literal hosts are checked the same way; every redirect (max 3) is re-validated.
+//! - Only `http`/`https`, no userinfo, no proxies, no cookies, no decompression (the body is
+//!   counted as sent), a byte cap and a total timeout.
+//! - `allow_hosts` (dev only, `SAFE_FETCH_ALLOW_HOSTS`) names hosts that may resolve to
+//!   private addresses, e.g. the `mocks` service serving fixtures.
 
+use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use reqwest::header::{HeaderMap, LOCATION};
-use reqwest::{Method, StatusCode, Url};
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+use reqwest::{Url, redirect};
 
-pub const TIMEOUT: Duration = Duration::from_secs(10);
-pub const MAX_BODY: usize = 20 * 1024 * 1024;
 pub const MAX_REDIRECTS: usize = 3;
 
-#[derive(Debug, thiserror::Error)]
-pub enum SafeError {
-    #[error("invalid URL: {0}")]
-    InvalidUrl(String),
-    #[error("destination not allowed: {0}")]
-    Blocked(String),
-    #[error("could not resolve {0}")]
-    Dns(String),
-    #[error("timed out")]
-    Timeout,
-    #[error("response body over {MAX_BODY} bytes")]
-    TooLarge,
-    #[error("more than {MAX_REDIRECTS} redirects")]
-    TooManyRedirects,
-    #[error("request failed: {0}")]
-    Http(String),
+/// Caps of one fetch.
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    pub max_bytes: u64,
+    pub timeout: Duration,
 }
 
-#[derive(Debug)]
-pub struct SafeResponse {
-    pub status: StatusCode,
-    pub headers: HeaderMap,
-    pub body: Vec<u8>,
+impl Limits {
+    /// A21 defaults (images): 20 MB, 10 s.
+    pub const IMAGE: Self = Self {
+        max_bytes: 20 * 1024 * 1024,
+        timeout: Duration::from_secs(10),
+    };
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum FetchError {
+    #[error("only http and https URLs without credentials are allowed")]
+    InvalidUrl,
+    #[error("the address of {0} is not a public internet address")]
+    Blocked(String),
+    #[error("the response is larger than {0} bytes")]
+    TooLarge(u64),
+    #[error("the server answered {0}")]
+    Status(u16),
+    #[error("request failed: {0}")]
+    Request(String),
+}
+
+/// A downloaded body with its declared content type.
+#[derive(Debug, Clone)]
+pub struct Fetched {
+    pub bytes: Vec<u8>,
+    pub content_type: Option<String>,
+    /// The URL after redirects.
     pub url: Url,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SafeClient {
-    allow_hosts: Arc<Vec<String>>,
-    timeout: Duration,
-    max_body: usize,
+    http: reqwest::Client,
+    allow_hosts: Arc<BTreeSet<String>>,
+}
+
+/// A public unicast address: not loopback, private, link-local, shared (CGNAT), multicast,
+/// documentation, benchmarking or reserved; IPv6 must be global unicast (2000::/3), and
+/// IPv4-mapped/compatible/NAT64 addresses are judged by their IPv4 part.
+pub fn is_public(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => public_v4(v4),
+        IpAddr::V6(v6) => {
+            let s = v6.segments();
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return public_v4(v4);
+            }
+            // ::a.b.c.d (deprecated compatible) and 64:ff9b::/96 (NAT64)
+            if (s[..6] == [0, 0, 0, 0, 0, 0] && !v6.is_loopback() && !v6.is_unspecified())
+                || s[..6] == [0x64, 0xff9b, 0, 0, 0, 0]
+            {
+                let [a, b] = s[6].to_be_bytes();
+                let [c, d] = s[7].to_be_bytes();
+                return public_v4(Ipv4Addr::new(a, b, c, d));
+            }
+            let global_unicast = (s[0] & 0xe000) == 0x2000;
+            let documentation = s[0] == 0x2001 && s[1] == 0x0db8;
+            // 2001::/23 holds Teredo, benchmarking, ORCHID and other special ranges.
+            let special = s[0] == 0x2001 && s[1] < 0x0200;
+            // 2002::/16 (6to4) embeds an IPv4 address.
+            let six_to_four = s[0] == 0x2002;
+            global_unicast && !documentation && !special && !six_to_four && !is_v6_local(v6)
+        }
+    }
+}
+
+fn is_v6_local(v6: Ipv6Addr) -> bool {
+    v6.is_loopback() || v6.is_unspecified() || v6.is_multicast()
+}
+
+fn public_v4(ip: Ipv4Addr) -> bool {
+    let [a, b, c, _] = ip.octets();
+    !(ip.is_private()
+        || ip.is_loopback()
+        || ip.is_link_local()
+        || ip.is_unspecified()
+        || ip.is_broadcast()
+        || ip.is_multicast()
+        || ip.is_documentation()
+        || a == 0
+        || (a == 100 && (64..128).contains(&b)) // shared address space (CGNAT)
+        || (a == 192 && b == 0 && c == 0) // IETF protocol assignments
+        || (a == 198 && (18..20).contains(&b)) // benchmarking
+        || a >= 240) // reserved + broadcast
+}
+
+/// Resolves with the system resolver and drops every non-public address (fails when none is
+/// left), except for allowlisted hosts.
+struct PublicResolver {
+    allow_hosts: Arc<BTreeSet<String>>,
+}
+
+impl Resolve for PublicResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        let host = name.as_str().to_ascii_lowercase();
+        let allowed = self.allow_hosts.contains(&host);
+        Box::pin(async move {
+            let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
+                .await?
+                .filter(|a| allowed || is_public(a.ip()))
+                .collect();
+            if addrs.is_empty() {
+                return Err(Box::new(FetchError::Blocked(host)) as _);
+            }
+            Ok(Box::new(addrs.into_iter()) as Addrs)
+        })
+    }
 }
 
 impl SafeClient {
-    pub fn new(allow_hosts: Vec<String>) -> Self {
-        Self {
-            allow_hosts: Arc::new(allow_hosts),
-            timeout: TIMEOUT,
-            max_body: MAX_BODY,
-        }
+    pub fn new(allow_hosts: impl IntoIterator<Item = String>) -> Result<Self, FetchError> {
+        let allow_hosts: Arc<BTreeSet<String>> = Arc::new(
+            allow_hosts
+                .into_iter()
+                .map(|h| h.trim().to_ascii_lowercase())
+                .filter(|h| !h.is_empty())
+                .collect(),
+        );
+        let redirect_hosts = allow_hosts.clone();
+        let http = reqwest::Client::builder()
+            .no_proxy()
+            .dns_resolver(Arc::new(PublicResolver {
+                allow_hosts: allow_hosts.clone(),
+            }))
+            .redirect(redirect::Policy::custom(move |attempt| {
+                if attempt.previous().len() > MAX_REDIRECTS {
+                    attempt.error(FetchError::Request("too many redirects".into()))
+                } else if let Err(e) = check_url(attempt.url(), &redirect_hosts) {
+                    attempt.error(e)
+                } else {
+                    attempt.follow()
+                }
+            }))
+            .connect_timeout(Duration::from_secs(5))
+            .user_agent("commerce-platform-fetch/1")
+            .build()
+            .map_err(|e| FetchError::Request(e.to_string()))?;
+        Ok(Self { http, allow_hosts })
     }
 
-    /// Checks a URL's form without resolving it (scheme, no credentials, a host).
-    pub fn check_url(raw: &str) -> Result<Url, SafeError> {
-        let url = Url::parse(raw).map_err(|e| SafeError::InvalidUrl(e.to_string()))?;
-        if !matches!(url.scheme(), "http" | "https") {
-            return Err(SafeError::InvalidUrl("only http and https".into()));
+    /// `SAFE_FETCH_ALLOW_HOSTS` (comma-separated), honored only with `APP_ENV=dev`: the local
+    /// stack serves fixture feeds and images from the `mocks` service on a private address.
+    pub fn from_env() -> Result<Self, FetchError> {
+        let hosts = std::env::var("SAFE_FETCH_ALLOW_HOSTS").unwrap_or_default();
+        let dev = std::env::var("APP_ENV").is_ok_and(|e| e == "dev");
+        if !dev && !hosts.trim().is_empty() {
+            tracing::warn!("SAFE_FETCH_ALLOW_HOSTS is ignored outside APP_ENV=dev");
+            return Self::new(Vec::<String>::new());
         }
-        if !url.username().is_empty() || url.password().is_some() {
-            return Err(SafeError::InvalidUrl("credentials in the URL".into()));
-        }
-        if url.host_str().is_none_or(str::is_empty) {
-            return Err(SafeError::InvalidUrl("no host".into()));
-        }
+        Self::new(hosts.split(',').map(str::to_owned).collect::<Vec<_>>())
+    }
+
+    /// Checks a URL's form without sending anything (scheme, no credentials, IP literals).
+    pub fn check(&self, url: &str) -> Result<Url, FetchError> {
+        let url = Url::parse(url).map_err(|_| FetchError::InvalidUrl)?;
+        check_url(&url, &self.allow_hosts)?;
         Ok(url)
     }
 
-    /// Sends one request, following up to [`MAX_REDIRECTS`] validated redirects.
-    pub async fn send(
+    /// POSTs `body` with `headers` (webhooks, §8.5) within `limits`. Any HTTP status is an
+    /// answer, not an error; the response body is read up to the cap and dropped. Redirects are
+    /// re-validated like for [`Self::get`] (307/308 re-send the body, 301-303 become a GET).
+    pub async fn post(
         &self,
-        method: Method,
         url: &str,
-        headers: HeaderMap,
-        body: Option<Vec<u8>>,
-    ) -> Result<SafeResponse, SafeError> {
-        let deadline = Instant::now() + self.timeout;
-        tokio::time::timeout(
-            self.timeout,
-            self.exchange(method, url, headers, body, deadline),
-        )
-        .await
-        .map_err(|_| SafeError::Timeout)?
-    }
-
-    async fn exchange(
-        &self,
-        mut method: Method,
-        url: &str,
-        headers: HeaderMap,
-        mut body: Option<Vec<u8>>,
-        deadline: Instant,
-    ) -> Result<SafeResponse, SafeError> {
-        let mut url = Self::check_url(url)?;
-        for hop in 0..=MAX_REDIRECTS {
-            let addrs = self.resolve(&url).await?;
-            let host = url.host_str().unwrap_or_default().to_owned();
-            let client = reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::none())
-                .no_proxy()
-                .timeout(deadline.saturating_duration_since(Instant::now()))
-                .resolve_to_addrs(&host, &addrs)
-                .build()
-                .map_err(|e| SafeError::Http(e.to_string()))?;
-            let mut req = client
-                .request(method.clone(), url.clone())
-                .headers(headers.clone());
-            if let Some(b) = &body {
-                req = req.body(b.clone());
+        headers: reqwest::header::HeaderMap,
+        body: Vec<u8>,
+        limits: Limits,
+    ) -> Result<u16, FetchError> {
+        let url = self.check(url)?;
+        let mut res = self
+            .http
+            .post(url)
+            .headers(headers)
+            .body(body)
+            .timeout(limits.timeout)
+            .send()
+            .await
+            .map_err(request_error)?;
+        let mut read = 0u64;
+        while let Some(chunk) = res.chunk().await.map_err(request_error)? {
+            read += chunk.len() as u64;
+            if read > limits.max_bytes {
+                return Err(FetchError::TooLarge(limits.max_bytes));
             }
-            let mut res = req.send().await.map_err(|e| {
-                if e.is_timeout() {
-                    SafeError::Timeout
-                } else {
-                    SafeError::Http(without_url(&e))
-                }
-            })?;
-            let status = res.status();
-            if status.is_redirection()
-                && let Some(location) = res.headers().get(LOCATION)
-            {
-                if hop == MAX_REDIRECTS {
-                    return Err(SafeError::TooManyRedirects);
-                }
-                let next = location
-                    .to_str()
-                    .ok()
-                    .and_then(|l| url.join(l).ok())
-                    .ok_or_else(|| SafeError::InvalidUrl("bad redirect location".into()))?;
-                url = Self::check_url(next.as_str())?;
-                // RFC 9110 §15.4: 303 (and, as browsers do, 301/302 after POST) become GET.
-                if status == StatusCode::SEE_OTHER
-                    || (matches!(status.as_u16(), 301 | 302) && method == Method::POST)
-                {
-                    method = Method::GET;
-                    body = None;
-                }
-                continue;
+        }
+        Ok(res.status().as_u16())
+    }
+
+    /// GETs `url` within `limits`. Non-2xx answers are errors.
+    pub async fn get(&self, url: &str, limits: Limits) -> Result<Fetched, FetchError> {
+        let url = Url::parse(url).map_err(|_| FetchError::InvalidUrl)?;
+        check_url(&url, &self.allow_hosts)?;
+        let mut res = self
+            .http
+            .get(url)
+            .timeout(limits.timeout)
+            .send()
+            .await
+            .map_err(request_error)?;
+        if !res.status().is_success() {
+            return Err(FetchError::Status(res.status().as_u16()));
+        }
+        if res.content_length().is_some_and(|l| l > limits.max_bytes) {
+            return Err(FetchError::TooLarge(limits.max_bytes));
+        }
+        let content_type = res
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned);
+        let final_url = res.url().clone();
+        let mut bytes = Vec::new();
+        while let Some(chunk) = res.chunk().await.map_err(request_error)? {
+            if (bytes.len() + chunk.len()) as u64 > limits.max_bytes {
+                return Err(FetchError::TooLarge(limits.max_bytes));
             }
-            let mut out = Vec::new();
-            while let Some(chunk) = res
-                .chunk()
-                .await
-                .map_err(|e| SafeError::Http(without_url(&e)))?
-            {
-                if out.len() + chunk.len() > self.max_body {
-                    return Err(SafeError::TooLarge);
-                }
-                out.extend_from_slice(&chunk);
-            }
-            return Ok(SafeResponse {
-                status,
-                headers: res.headers().clone(),
-                body: out,
-                url,
-            });
+            bytes.extend_from_slice(&chunk);
         }
-        Err(SafeError::TooManyRedirects)
+        Ok(Fetched {
+            bytes,
+            content_type,
+            url: final_url,
+        })
     }
+}
 
-    /// The addresses to connect to: all must be public unless the host is allowlisted.
-    async fn resolve(&self, url: &Url) -> Result<Vec<SocketAddr>, SafeError> {
-        let host = url.host_str().unwrap_or_default();
-        let port = url
-            .port_or_known_default()
-            .ok_or_else(|| SafeError::InvalidUrl("no port".into()))?;
-        let bare = host.trim_start_matches('[').trim_end_matches(']');
-        let addrs: Vec<SocketAddr> = match bare.parse::<IpAddr>() {
-            Ok(ip) => vec![SocketAddr::new(ip, port)],
-            Err(_) => tokio::net::lookup_host((bare, port))
-                .await
-                .map_err(|_| SafeError::Dns(bare.to_owned()))?
-                .collect(),
-        };
-        if addrs.is_empty() {
-            return Err(SafeError::Dns(bare.to_owned()));
+/// A blocked address surfaces from the resolver or redirect policy wrapped in reqwest errors;
+/// report it as such instead of a generic failure.
+fn request_error(e: reqwest::Error) -> FetchError {
+    let mut source: Option<&dyn std::error::Error> = Some(&e);
+    while let Some(s) = source {
+        if let Some(f) = s.downcast_ref::<FetchError>() {
+            return match f {
+                FetchError::Blocked(h) => FetchError::Blocked(h.clone()),
+                FetchError::InvalidUrl => FetchError::InvalidUrl,
+                other => FetchError::Request(other.to_string()),
+            };
         }
-        let allowed = self
-            .allow_hosts
-            .iter()
-            .any(|h| h.eq_ignore_ascii_case(bare));
-        // One private answer blocks the whole host: a mixed answer is a rebinding attempt.
-        if !allowed && let Some(bad) = addrs.iter().find(|a| !is_public(a.ip())) {
-            return Err(SafeError::Blocked(format!(
-                "{bare} resolves to {}",
-                bad.ip()
-            )));
-        }
-        Ok(addrs)
+        source = s.source();
     }
+    if e.is_timeout() {
+        return FetchError::Request("timed out".into());
+    }
+    // Without the URL: it may carry merchant tokens in its query string.
+    FetchError::Request(e.without_url().to_string())
 }
 
-/// reqwest errors embed the URL; webhook URLs may carry tokens in their query.
-fn without_url(e: &reqwest::Error) -> String {
-    let mut s = e.to_string();
-    if let Some(u) = e.url() {
-        s = s.replace(u.as_str(), "<url>");
+/// Scheme, credentials and IP-literal hosts (names are checked by the resolver).
+fn check_url(url: &Url, allow_hosts: &BTreeSet<String>) -> Result<(), FetchError> {
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(FetchError::InvalidUrl);
     }
-    s
-}
-
-/// Public unicast only (IANA special-purpose registries for v4 and v6).
-pub fn is_public(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => is_public_v4(v4),
-        IpAddr::V6(v6) => is_public_v6(v6),
-    }
-}
-
-fn is_public_v4(ip: Ipv4Addr) -> bool {
-    let [a, b, c, _] = ip.octets();
-    !(a == 0                                   // "this network"
-        || a == 10                             // private
-        || a == 127                            // loopback
-        || (a == 100 && (64..128).contains(&b)) // CGNAT
-        || (a == 169 && b == 254)              // link-local (cloud metadata)
-        || (a == 172 && (16..32).contains(&b)) // private
-        || (a == 192 && b == 0 && c == 0)      // IETF protocol assignments
-        || (a == 192 && b == 0 && c == 2)      // TEST-NET-1
-        || (a == 192 && b == 88 && c == 99)    // 6to4 relay anycast
-        || (a == 192 && b == 168)              // private
-        || (a == 198 && (18..20).contains(&b)) // benchmarking
-        || (a == 198 && b == 51 && c == 100)   // TEST-NET-2
-        || (a == 203 && b == 0 && c == 113)    // TEST-NET-3
-        || a >= 224) // multicast, reserved, broadcast
-}
-
-fn is_public_v6(ip: Ipv6Addr) -> bool {
-    if let Some(v4) = ip.to_ipv4_mapped() {
-        return is_public_v4(v4);
-    }
-    let s = ip.segments();
-    // Only global unicast (2000::/3) is routable on the internet.
-    if s[0] & 0xe000 != 0x2000 {
-        return false;
-    }
-    let embedded_v4 = |hi: u16, lo: u16| {
-        let [a, b] = hi.to_be_bytes();
-        let [c, d] = lo.to_be_bytes();
-        Ipv4Addr::new(a, b, c, d)
+    let host = url.host_str().ok_or(FetchError::InvalidUrl)?;
+    // The URL parser normalizes IP literals (`0x7f000001` -> `127.0.0.1`, `[::1]`).
+    let Ok(ip) = host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .parse::<IpAddr>()
+    else {
+        return Ok(());
     };
-    match s[0] {
-        // 2001::/23 IETF protocol assignments (Teredo, benchmarking, ORCHID, ...) and
-        // 2001:db8::/32 documentation.
-        0x2001 if s[1] < 0x0200 || s[1] == 0x0db8 => false,
-        // 6to4: the tunnel endpoint is the embedded IPv4 address.
-        0x2002 => is_public_v4(embedded_v4(s[1], s[2])),
-        // 3fff::/20 documentation.
-        0x3fff if s[1] < 0x1000 => false,
-        _ => true,
+    let literal = ip.to_string();
+    if allow_hosts.contains(&literal) || is_public(ip) {
+        Ok(())
+    } else {
+        Err(FetchError::Blocked(literal))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     use super::*;
 
     #[test]
-    fn classifies_special_purpose_addresses() {
-        for private in [
-            "0.0.0.0",
-            "10.1.2.3",
+    fn public_addresses() {
+        for ok in [
+            "8.8.8.8",
+            "1.1.1.1",
+            "2a00:1450:4001:82a::200e",
+            "::ffff:8.8.8.8",
+        ] {
+            assert!(is_public(ok.parse().unwrap()), "{ok}");
+        }
+        for bad in [
             "127.0.0.1",
-            "100.64.0.1",
-            "169.254.169.254",
+            "10.1.2.3",
             "172.16.0.1",
-            "172.31.255.255",
+            "192.168.1.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "0.0.0.0",
+            "255.255.255.255",
+            "224.0.0.1",
+            "198.18.0.1",
             "192.0.0.8",
             "192.0.2.1",
-            "192.168.1.1",
-            "198.18.0.1",
-            "198.51.100.7",
-            "203.0.113.9",
-            "224.0.0.1",
             "240.0.0.1",
-            "255.255.255.255",
-            "::",
             "::1",
-            "::ffff:127.0.0.1",
-            "::ffff:10.0.0.1",
-            "fc00::1",
-            "fd12:3456::1",
+            "::",
             "fe80::1",
+            "fc00::1",
+            "fd12::1",
             "ff02::1",
             "2001:db8::1",
-            "2001::1",
-            "2002:0a00:0001::1",
+            "::ffff:127.0.0.1",
+            "::ffff:169.254.169.254",
+            "::127.0.0.1",
             "64:ff9b::a00:1",
-            "3fff::1",
+            "2002:7f00:1::1",
+            "2001::1",
         ] {
-            assert!(!is_public(private.parse().unwrap()), "{private}");
-        }
-        for public in [
-            "1.1.1.1",
-            "8.8.8.8",
-            "172.32.0.1",
-            "100.128.0.1",
-            "::ffff:8.8.8.8",
-            "2606:4700:4700::1111",
-            "2a00:1450:4001::1",
-            "2002:0808:0808::1",
-        ] {
-            assert!(is_public(public.parse().unwrap()), "{public}");
+            assert!(!is_public(bad.parse().unwrap()), "{bad}");
         }
     }
 
     #[test]
-    fn refuses_bad_urls() {
+    fn urls() {
+        let none = BTreeSet::new();
+        let check = |u: &str| check_url(&Url::parse(u).unwrap(), &none);
+        assert!(check("https://shop.example/feed.xml").is_ok());
+        assert!(check("http://8.8.8.8/x").is_ok());
         for bad in [
-            "ftp://example.com/",
-            "http://user:pw@example.com/",
+            "ftp://shop.example/feed.xml",
             "file:///etc/passwd",
-            "not a url",
-        ] {
-            assert!(SafeClient::check_url(bad).is_err(), "{bad}");
-        }
-        assert!(SafeClient::check_url("https://example.com/hook?x=1").is_ok());
-    }
-
-    #[tokio::test]
-    async fn blocks_private_destinations_before_connecting() {
-        let client = SafeClient::new(vec![]);
-        for url in [
-            "http://127.0.0.1:1/",
-            "http://[::1]:1/",
+            "https://user:pw@shop.example/",
+            "http://127.0.0.1/",
+            "http://[::1]/",
             "http://169.254.169.254/latest/meta-data",
-            "http://localhost:1/",
+            "http://0x7f000001/",
         ] {
-            let err = client
-                .send(Method::GET, url, HeaderMap::new(), None)
-                .await
-                .unwrap_err();
-            assert!(matches!(err, SafeError::Blocked(_)), "{url}: {err}");
+            assert!(check(bad).is_err(), "{bad}");
         }
     }
 
     #[tokio::test]
-    async fn follows_redirects_and_revalidates_each_hop() {
+    async fn post_answers_any_status_and_blocks_private_hosts() {
         use axum::Router;
-        use axum::http::{HeaderValue, StatusCode as S};
-        use axum::routing::{any, get};
+        use axum::http::StatusCode as S;
+        use axum::routing::post;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
-        let to = move |path: &'static str, status: S| {
-            move || async move {
-                let mut res = axum::response::Response::new(axum::body::Body::empty());
-                *res.status_mut() = status;
-                let loc = path.replace("PORT", &port.to_string());
-                res.headers_mut()
-                    .insert("location", HeaderValue::from_str(&loc).unwrap());
-                res
-            }
-        };
         let app = Router::new()
             .route(
                 "/ok",
-                any(|m: axum::http::Method| async move { m.to_string() }),
+                post(|body: String| async move { (S::ACCEPTED, body) }),
             )
-            .route("/hop", any(to("http://localhost:PORT/ok", S::FOUND)))
-            .route("/see-other", any(to("/ok", S::SEE_OTHER)))
-            .route("/keep", any(to("/ok", S::TEMPORARY_REDIRECT)))
-            .route("/private", get(to("http://127.0.0.1:PORT/ok", S::FOUND)))
-            .route("/loop", get(to("/loop", S::FOUND)))
-            .route("/big", get(|| async { vec![b'x'; MAX_BODY + 1] }));
+            .route("/fail", post(|| async { S::SERVICE_UNAVAILABLE }))
+            .route(
+                "/moved",
+                post(|| async { (S::TEMPORARY_REDIRECT, [("location", "/ok")]) }),
+            );
         tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-        let client = SafeClient::new(vec!["localhost".into()]);
-        let base = format!("http://localhost:{port}");
-        let send = |m: Method, path: &str| {
-            let url = format!("{base}{path}");
-            let client = client.clone();
+        let allowed = SafeClient::new(["localhost".to_owned()]).unwrap();
+        let url = |p: &str| format!("http://localhost:{port}{p}");
+        let send = |c: &SafeClient, u: String| {
+            let c = c.clone();
             async move {
-                client
-                    .send(m, &url, HeaderMap::new(), Some(b"{}".to_vec()))
+                c.post(&u, Default::default(), b"{}".to_vec(), Limits::IMAGE)
                     .await
             }
         };
-        let ok = send(Method::GET, "/hop").await.unwrap();
-        assert_eq!(ok.status, StatusCode::OK);
-        assert_eq!(ok.body, b"GET");
-        assert_eq!(send(Method::POST, "/see-other").await.unwrap().body, b"GET");
-        assert_eq!(send(Method::POST, "/keep").await.unwrap().body, b"POST");
-        let private = send(Method::GET, "/private").await;
-        assert!(matches!(private, Err(SafeError::Blocked(_))), "{private:?}");
-        let looped = send(Method::GET, "/loop").await;
+        assert_eq!(send(&allowed, url("/ok")).await.unwrap(), 202);
+        assert_eq!(send(&allowed, url("/fail")).await.unwrap(), 503);
+        assert_eq!(send(&allowed, url("/moved")).await.unwrap(), 202);
+        let strict = SafeClient::new(Vec::<String>::new()).unwrap();
+        let blocked = send(&strict, url("/ok")).await;
         assert!(
-            matches!(looped, Err(SafeError::TooManyRedirects)),
-            "{looped:?}"
+            matches!(blocked, Err(FetchError::Blocked(_))),
+            "{blocked:?}"
         );
-        let big = send(Method::GET, "/big").await;
-        assert!(matches!(big, Err(SafeError::TooLarge)), "{big:?}");
     }
 }

@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT groups, updated_at FROM search_synonyms",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "groups",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "search_synonyms",
+            "name": "groups"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "search_synonyms",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a393be11eae907b09d0f5d354f2ced50e747c9f473b9020efd35b020c553fe7c"
+}

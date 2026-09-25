@@ -55,7 +55,7 @@ const BUY_KEYS = [
           <h1 class="text-3xl leading-tight font-extrabold md:text-4xl">{p.name}</h1>
           {p.short_description && <p class="mt-2 text-muted-foreground">{p.short_description}</p>}
         </div>
-        <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} />
+        <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} selected={Astro.url.searchParams.get("variant")} />
         <div class="border-t border-border pt-5">
           <TrustRow shop={shop} layout="list" delivery={page.delivery_estimate} />
         </div>

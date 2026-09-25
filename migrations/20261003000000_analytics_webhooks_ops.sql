@@ -63,22 +63,30 @@ CREATE TABLE daily_metrics (
 );
 
 -- Creates the monthly partitions from last month to `p_months_ahead` months ahead (UTC).
+-- Each partition also gets forced RLS and the isolation policy (defense in depth: app_runtime
+-- has no grants on partitions and reaches rows only through the parent).
 CREATE FUNCTION platform.ensure_event_partitions(p_months_ahead integer DEFAULT 2) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
     m       timestamp;
+    part    text;
     created integer := 0;
 BEGIN
     FOR i IN -1..p_months_ahead LOOP
         m := date_trunc('month', now() AT TIME ZONE 'UTC') + make_interval(months => i);
-        IF to_regclass(format('public.events_%s', to_char(m, 'YYYY_MM'))) IS NULL THEN
+        part := format('events_%s', to_char(m, 'YYYY_MM'));
+        IF to_regclass('public.' || part) IS NULL THEN
             EXECUTE format(
                 'CREATE TABLE public.%I PARTITION OF public.events FOR VALUES FROM (%L) TO (%L)',
-                format('events_%s', to_char(m, 'YYYY_MM')),
-                m AT TIME ZONE 'UTC',
-                (m + interval '1 month') AT TIME ZONE 'UTC');
+                part, m AT TIME ZONE 'UTC', (m + interval '1 month') AT TIME ZONE 'UTC');
+            EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', part);
+            EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', part);
+            EXECUTE format(
+                'CREATE POLICY tenant_isolation ON public.%I TO app_runtime
+                     USING (tenant_id = current_setting(''app.tenant_id'')::uuid)
+                     WITH CHECK (tenant_id = current_setting(''app.tenant_id'')::uuid)', part);
             created := created + 1;
         END IF;
     END LOOP;

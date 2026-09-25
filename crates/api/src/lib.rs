@@ -5,6 +5,8 @@
 pub mod admin;
 pub mod admin_analytics;
 pub mod admin_catalog;
+pub mod admin_content;
+pub mod admin_feeds;
 pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_orders;
@@ -18,7 +20,7 @@ pub mod admin_webhooks;
 pub mod auth;
 pub mod auth_service;
 pub mod cli;
-pub mod edge;
+pub use platform::edge;
 pub mod internal;
 pub mod rate_limit;
 pub mod seed;
@@ -100,6 +102,8 @@ pub struct AppState {
         (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "search", description = "Admin API: search index status and rebuilds"),
         (name = "storefront-admin", description = "Admin API: redirects and the storefront token"),
+        (name = "feeds", description = "Admin API: feed imports (Heureka, Google) and export feeds"),
+        (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
         (name = "analytics", description = "Admin API: the analytics dashboard"),
         (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
@@ -148,6 +152,8 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_inventory::routes())
         .merge(admin_search::routes())
         .merge(admin_storefront::routes())
+        .merge(admin_content::routes())
+        .merge(admin_feeds::routes())
         .merge(admin_orders::routes())
         .merge(admin_analytics::routes())
         .merge(admin_webhooks::routes())

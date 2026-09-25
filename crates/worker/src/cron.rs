@@ -29,6 +29,11 @@ pub const SCHEDULES: &[Schedule] = &[
         kind: handlers::MAINTENANCE_CLEANUP,
         every: Duration::from_secs(3600),
     },
+    Schedule {
+        name: "feeds.export_all",
+        kind: commerce::feeds::export::ALL_JOB,
+        every: Duration::from_secs(3600),
+    },
     // ponytail: one global scan per minute; an order expires up to ~1.5 min late (cron tick
     // 30 s + slot). Schedule per order (`run_at`) if payment windows need to be exact.
     Schedule {

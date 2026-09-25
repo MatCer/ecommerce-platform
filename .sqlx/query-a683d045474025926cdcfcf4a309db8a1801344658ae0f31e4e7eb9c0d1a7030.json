@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id FROM page_translations t JOIN pages p ON p.id = t.page_id\n         WHERE t.slug = $1 AND p.kind = ANY($2) AND p.status = 'published'\n           AND p.published_at <= $3\n         ORDER BY (t.locale = $4) DESC, (t.locale = $5) DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a683d045474025926cdcfcf4a309db8a1801344658ae0f31e4e7eb9c0d1a7030"
+}

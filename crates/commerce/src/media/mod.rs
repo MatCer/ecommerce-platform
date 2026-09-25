@@ -350,6 +350,75 @@ pub async fn complete(
     Ok(asset)
 }
 
+/// Stores downloaded image bytes (feed imports) as a new asset: verified exactly like an
+/// upload (size, sniffed type, header dimensions), written to `originals/` and queued for
+/// re-encoding, so only re-encoded variants ever reach the public bucket (A21).
+pub async fn ingest(
+    tx: &mut TenantTx,
+    storage: &Storage,
+    actor: &str,
+    filename: Option<&str>,
+    bytes: Vec<u8>,
+) -> Result<Asset, Error> {
+    if bytes.is_empty() || bytes.len() as u64 > encode::MAX_BYTES {
+        return Err(invalid(
+            "file_too_large",
+            encode::Rejected::TooLarge.detail(),
+        ));
+    }
+    let checked = tokio::task::spawn_blocking(move || {
+        let sha = hex::encode(Sha256::digest(&bytes));
+        encode::verify(&bytes).map(|v| (v, sha, bytes))
+    })
+    .await
+    .map_err(internal)?;
+    let (verified, sha256, bytes) =
+        checked.map_err(|rejected| invalid(rejected.code(), rejected.detail()))?;
+    let tenant_id = tx.tenant_id();
+    let id = crate::id::new_id();
+    let original = original_key(tenant_id, id);
+    let size = i64::try_from(bytes.len()).map_err(internal)?;
+    let filename = filename
+        .map(|f| {
+            f.chars()
+                .filter(|c| !c.is_control())
+                .take(255)
+                .collect::<String>()
+        })
+        .filter(|f| !f.is_empty());
+    storage
+        .private
+        .put(&original, PutPayload::from(bytes))
+        .await?;
+    sqlx::query!(
+        "INSERT INTO assets (id, tenant_id, status, filename, key, mime, bytes, width, height, sha256)
+         VALUES ($1, $2, 'processing', $3, $4, $5, $6, $7, $8, $9)",
+        id,
+        tenant_id,
+        filename,
+        original.as_ref(),
+        verified.mime,
+        size,
+        i32::try_from(verified.width).map_err(internal)?,
+        i32::try_from(verified.height).map_err(internal)?,
+        sha256
+    )
+    .execute(&mut **tx)
+    .await?;
+    queue_processing(tx, id).await?;
+    let asset = get(tx, storage, id).await?;
+    audit::record(
+        tx,
+        actor,
+        "asset.imported",
+        "asset",
+        Some(&id.to_string()),
+        &json!({ "after": asset }),
+    )
+    .await?;
+    Ok(asset)
+}
+
 /// Queues [`PROCESS_JOB`]. The caller holds the asset row lock and has checked the status,
 /// so each call is a deliberate new run (first completion or a retry after failure).
 async fn queue_processing(tx: &mut TenantTx, id: Uuid) -> Result<(), Error> {

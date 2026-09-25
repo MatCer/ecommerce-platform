@@ -10,6 +10,8 @@ type Props = {
   options: ProductOption[];
   variants: Variant[];
   labels: Messages;
+  /** SKU from `?variant=` (feed links land on their offer). */
+  selected?: string | null;
 };
 
 const STOCK_CLASS: Record<StockState, string> = {
@@ -28,6 +30,7 @@ const STOCK_CLASS: Record<StockState, string> = {
 export default function BuyBox(props: Props) {
   const l = (key: string, args?: Record<string, string | number>) => t(props.labels, key, args);
   const first =
+    props.variants.find((v) => props.selected && v.sku === props.selected) ??
     props.variants.find((v) => v.is_default && v.stock !== "out_of_stock") ??
     props.variants.find((v) => v.stock !== "out_of_stock") ??
     props.variants[0];

@@ -1,0 +1,103 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id, p.published_at AS \"published_at!\", a.variants AS \"image?\",\n                  t.title, t.slug, t.excerpt, t.blocks\n           FROM pages p\n           CROSS JOIN LATERAL (\n               SELECT * FROM page_translations pt WHERE pt.page_id = p.id\n               ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1\n           ) t\n           LEFT JOIN assets a ON a.id = p.image_asset_id AND a.status = 'ready'\n           WHERE p.kind = 'blog_post' AND p.status = 'published' AND p.published_at <= $1\n           ORDER BY p.published_at DESC, p.id DESC LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "published_at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "published_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "image?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "variants"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "excerpt",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "excerpt"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "blocks",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "blocks"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7aa448235b0224d3637fa86881acebc7507fa342b835bbff73c4214e262c2165"
+}

@@ -109,6 +109,8 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
     await page.evaluate((top) => window.scrollTo(0, top), y);
     await page.waitForTimeout(120);
   }
+  // End at the very bottom (a fixed consent banner then covers only the page's end padding).
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await settle(ctx);
 
   const axe = opts.withRum

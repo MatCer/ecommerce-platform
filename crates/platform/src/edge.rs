@@ -1,5 +1,6 @@
-//! Purges of the edge's resolver and HTML caches (`POST /_edge/purge`, spec §9.3.1) after
-//! changes the edge must see before its TTLs run out (theme publish, token rotation).
+//! Purges of the edge's resolver and HTML caches (`POST /_edge/purge`, spec §9.3.1, A2) after
+//! changes the edge must see before its TTLs run out: theme publish and token rotation (API),
+//! catalog, price, stock and content changes (worker, from the outbox).
 //!
 //! Best effort: a failed purge is logged, and the edge's TTLs (60 s resolver, page-model
 //! `max_age`) bound how long it serves the old state.
@@ -33,6 +34,14 @@ impl EdgePurge {
 
     pub async fn tenant(&self, tenant_id: Uuid) {
         self.send(json!({ "tenant_id": tenant_id })).await;
+    }
+
+    /// Cached pages of `tenant_id` carrying any of `tags` (`product:<id>`, `page:<id>`, ...).
+    pub async fn tags(&self, tenant_id: Uuid, tags: &[String]) {
+        if !tags.is_empty() {
+            self.send(json!({ "tenant_id": tenant_id, "tags": tags }))
+                .await;
+        }
     }
 
     pub async fn all(&self) {

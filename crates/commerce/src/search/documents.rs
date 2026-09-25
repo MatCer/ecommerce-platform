@@ -1,7 +1,9 @@
 //! Postgres → Meilisearch documents (spec A23): one document per sellable variant and locale.
 //!
-//! A variant is indexed in a locale when its product is `active`, has a translation in that
-//! locale and the variant has an effective price in at least one market's price list.
+//! A variant is indexed in every market locale when its product is `active` and the variant has
+//! an effective price in at least one market's price list. A locale without a translation is
+//! indexed with the text of the market's default locale (else any translation), so a
+//! half-translated catalog still lists every product (WP8 follow-up).
 //! Loading is batched per set of products; [`build_product`] is the pure part.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -23,6 +25,7 @@ pub struct MarketRef {
     pub code: String,
     pub price_list_id: Option<Uuid>,
     pub locales: Vec<String>,
+    pub default_locale: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -48,6 +51,15 @@ impl Context {
             .collect()
     }
 
+    /// The locale whose text stands in for `locale` when a product lacks a translation: the
+    /// default locale of the first market selling in `locale`.
+    fn fallback_locale(&self, locale: &str) -> Option<&str> {
+        self.markets
+            .iter()
+            .find(|m| m.locales.iter().any(|l| l == locale))
+            .map(|m| m.default_locale.as_str())
+    }
+
     /// The category and its ancestors (bounded: the tree is acyclic, the cap guards bad data).
     fn with_ancestors(&self, id: Uuid) -> Vec<Uuid> {
         let mut out = vec![];
@@ -64,18 +76,20 @@ impl Context {
 }
 
 pub async fn load_context(tx: &mut TenantTx) -> Result<Context, Error> {
-    let markets =
-        sqlx::query!("SELECT id, code, price_list_id, locales FROM markets ORDER BY code")
-            .fetch_all(&mut **tx)
-            .await?
-            .into_iter()
-            .map(|r| MarketRef {
-                id: r.id,
-                code: r.code,
-                price_list_id: r.price_list_id,
-                locales: r.locales,
-            })
-            .collect();
+    let markets = sqlx::query!(
+        "SELECT id, code, price_list_id, locales, default_locale FROM markets ORDER BY code"
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|r| MarketRef {
+        id: r.id,
+        code: r.code,
+        price_list_id: r.price_list_id,
+        locales: r.locales,
+        default_locale: r.default_locale,
+    })
+    .collect();
     let mut categories: HashMap<Uuid, CategoryRef> =
         sqlx::query!("SELECT id, parent_id FROM categories")
             .fetch_all(&mut **tx)
@@ -335,7 +349,13 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
         }
     }
     for locale in ctx.locales() {
-        let Some((name, description_html)) = p.translations.get(&locale) else {
+        let fallback = ctx.fallback_locale(&locale);
+        let Some((name, description_html)) = p
+            .translations
+            .get(&locale)
+            .or_else(|| fallback.and_then(|f| p.translations.get(f)))
+            .or_else(|| p.translations.values().next())
+        else {
             continue;
         };
         let mut text = String::new();
@@ -344,7 +364,11 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
             text.push(' ');
         }
         for c in &category_ids {
-            if let Some(n) = ctx.categories.get(c).and_then(|c| c.names.get(&locale)) {
+            if let Some(n) = ctx.categories.get(c).and_then(|c| {
+                c.names
+                    .get(&locale)
+                    .or_else(|| fallback.and_then(|f| c.names.get(f)))
+            }) {
                 text.push_str(n);
                 text.push(' ');
             }
@@ -456,12 +480,14 @@ mod tests {
                     code: "cz".into(),
                     price_list_id: Some(cz_list),
                     locales: vec!["cs".into()],
+                    default_locale: "cs".into(),
                 },
                 MarketRef {
                     id: Uuid::from_u128(101),
                     code: "sk-eu".into(),
                     price_list_id: Some(sk_list),
                     locales: vec!["sk".into()],
+                    default_locale: "sk".into(),
                 },
             ],
             categories: HashMap::from([
@@ -545,8 +571,11 @@ mod tests {
     fn one_document_per_sellable_variant_and_translated_locale() {
         let (ctx, cz, sk) = ctx();
         let docs = build_product(&ctx, &product(cz, sk));
-        // No sk translation: nothing in sk. Variant 3 has no price: not indexed.
-        assert_eq!(docs.keys().collect::<Vec<_>>(), ["cs"]);
+        // No sk translation: sk documents fall back to the cs text (the index is never empty
+        // for a sold product). Variant 3 has no price: not indexed.
+        assert_eq!(docs.keys().collect::<Vec<_>>(), ["cs", "sk"]);
+        assert_eq!(docs["sk"].len(), 2);
+        assert_eq!(docs["sk"][0]["name_folded"], "tricko basic");
         let cs = &docs["cs"];
         assert_eq!(cs.len(), 2);
         let red = &cs[0];

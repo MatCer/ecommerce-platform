@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
 import { packetaRoutes } from "./packeta.ts";
 import { webhookRoutes } from "./webhooks.ts";
@@ -46,4 +47,30 @@ app.put("/dns/txt", async (c) => {
   if (!txt.has(name) && txt.size >= MAX_NAMES) return c.json({ error: "zone full" }, 507);
   txt.set(name, records as string[]);
   return c.json({ name, records });
+});
+
+/**
+ * Demo merchant feed host (WP13a): the old shop's Heureka/Google feeds and product photos, so a
+ * URL import runs end to end locally. The worker's SSRF-safe client reaches this host only via
+ * the dev allowlist (`SAFE_FETCH_ALLOW_HOSTS=mocks`, A21). Fixed file names only.
+ */
+const FIXTURES = new URL("../../../fixtures/", import.meta.url);
+const FEEDS = new Set(["heureka-demo.xml", "google-demo.xml"]);
+
+app.get("/feeds/:name", async (c) => {
+  const name = c.req.param("name");
+  if (!FEEDS.has(name)) return c.text("Not found", 404);
+  const body = await readFile(new URL(`feeds/${name}`, FIXTURES));
+  return c.body(body, 200, { "content-type": "application/xml; charset=utf-8" });
+});
+
+app.get("/images/demo/:name", async (c) => {
+  const name = c.req.param("name");
+  if (!/^[a-z0-9-]{1,64}\.jpg$/.test(name)) return c.text("Not found", 404);
+  try {
+    const body = await readFile(new URL(`images/demo/${name}`, FIXTURES));
+    return c.body(body, 200, { "content-type": "image/jpeg" });
+  } catch {
+    return c.text("Not found", 404);
+  }
 });

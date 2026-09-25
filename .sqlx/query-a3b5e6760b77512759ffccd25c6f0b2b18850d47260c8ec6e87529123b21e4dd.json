@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce((SELECT t.name FROM product_translations t WHERE t.product_id = p.id\n                            ORDER BY t.locale LIMIT 1), p.id::text) AS \"name!\"\n           FROM products p\n           WHERE p.status = 'active' AND jsonb_typeof(p.gpsr -> 'manufacturer') IS DISTINCT FROM 'object'\n           ORDER BY p.id LIMIT 50",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a3b5e6760b77512759ffccd25c6f0b2b18850d47260c8ec6e87529123b21e4dd"
+}

@@ -348,12 +348,19 @@ impl Seeder<'_> {
         }
         self.promotions(tenant_id, &cats).await?;
         self.checkout_methods(tenant_id, cz, sk).await?;
+        self.content(tenant_id).await?;
         let mut tx = self.tx(tenant_id).await?;
         themes::assign_default(&mut tx, ACTOR).await?;
         // A full search index build (WP7) for the demo catalog, run by the worker. Product
         // events index incrementally too; the rebuild makes a rerun converge as well.
         let version = search::next_version(&mut *tx).await?;
         platform::queue::enqueue(&mut *tx, &search::manual_rebuild_job(tenant_id, version)).await?;
+        // Export feeds right away instead of at the end of the debounce window (WP13a).
+        platform::queue::enqueue(
+            &mut *tx,
+            &commerce::feeds::export::job(tenant_id, Utc::now(), false),
+        )
+        .await?;
         tx.commit().await?;
         Ok(summary)
     }
@@ -1113,6 +1120,163 @@ impl Seeder<'_> {
                     .await?;
                 }
             }
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// WP13a: the seller's legal entity, the legal templates (published for the demo), shipping
+    /// and contact pages, a blog post and the footer menu.
+    async fn content(&self, tenant_id: Uuid) -> anyhow::Result<()> {
+        use commerce::content::blocks::FaqItem;
+        use commerce::content::legal::{self, InstallInput, LegalEntity};
+        use commerce::content::menus::{self, MenuEntry, MenuInput, MenuLink};
+        use commerce::content::{self, Block, PageInput, PageKind, PageStatus, PageTranslation};
+
+        let mut tx = self.tx(tenant_id).await?;
+        if legal::entity(&mut tx).await?.updated_at.is_none() {
+            legal::put_entity(
+                &mut tx,
+                ACTOR,
+                &LegalEntity {
+                    company_name: "Demo Shop s.r.o.".into(),
+                    company_id: "12345678".into(),
+                    street: "Dlouhá 1".into(),
+                    city: "Praha 1".into(),
+                    postal_code: "110 00".into(),
+                    country: "CZ".into(),
+                    email: "info@demo.localhost".into(),
+                    phone: "+420 800 123 456".into(),
+                    registry: "zapsaná v obchodním rejstříku vedeném Městským soudem v Praze, \
+                               oddíl C, vložka 000000 (demo)"
+                        .into(),
+                    returns_address: String::new(),
+                },
+            )
+            .await?;
+        }
+        // Demo only: the templates go live unreviewed. Real shops review them with a lawyer.
+        let installed = legal::install(&mut tx, ACTOR, &InstallInput::default()).await?;
+        for id in installed.created {
+            let p = content::get(&mut tx, id).await?;
+            let input = PageInput {
+                kind: p.kind,
+                legal_type: p.legal_type,
+                status: PageStatus::Published,
+                published_at: None,
+                image_asset_id: p.image_asset_id,
+                translations: p.translations,
+            };
+            content::update(&mut tx, ACTOR, id, &input).await?;
+        }
+
+        let text = |html: &str| Block::RichText { html: html.into() };
+        let tr = |locale: &str, title: &str, slug: &str, blocks: Vec<Block>| PageTranslation {
+            locale: locale.into(),
+            title: title.into(),
+            slug: slug.into(),
+            excerpt: String::new(),
+            blocks,
+            seo_title: None,
+            seo_description: None,
+        };
+        let pages = [
+            (
+                PageKind::Page,
+                vec![
+                    tr("cs", "Doprava a platba", "doprava-a-platba", vec![
+                        text("<p>Objednávky odesíláme do 24 hodin v pracovní dny. Nad 1 500 Kč je doprava zdarma.</p>"),
+                        Block::Heading { text: "Způsoby dopravy".into(), level: 2 },
+                        text("<ul><li>Zásilkovna – výdejní místa a boxy</li><li>PPL – doručení na adresu</li></ul>"),
+                        Block::Heading { text: "Platba".into(), level: 2 },
+                        text("<p>Kartou online, převodem nebo dobírkou.</p>"),
+                    ]),
+                    tr("sk", "Doprava a platba", "doprava-a-platba", vec![
+                        text("<p>Objednávky odosielame do 24 hodín v pracovné dni.</p>"),
+                        Block::Heading { text: "Spôsoby dopravy".into(), level: 2 },
+                        text("<ul><li>Packeta – výdajné miesta a boxy</li><li>PPL – doručenie na adresu</li></ul>"),
+                    ]),
+                ],
+            ),
+            (
+                PageKind::Page,
+                vec![
+                    tr("cs", "Kontakt", "kontakt", vec![
+                        text("<p>Demo Shop s.r.o., Dlouhá 1, 110 00 Praha 1</p><p>E-mail: <a href=\"mailto:info@demo.localhost\">info@demo.localhost</a>, telefon +420 800 123 456 (Po–Pá 9–17).</p>"),
+                        Block::Faq { items: vec![
+                            FaqItem { question: "Kdy mi přijde objednávka?".into(), answer_html: "<p>Obvykle do dvou pracovních dnů.</p>".into() },
+                            FaqItem { question: "Jak vrátit zboží?".into(), answer_html: "<p>Do 14 dnů bez udání důvodu, viz Odstoupení od smlouvy.</p>".into() },
+                        ]},
+                    ]),
+                    tr("sk", "Kontakt", "kontakt", vec![
+                        text("<p>Demo Shop s.r.o., Dlouhá 1, 110 00 Praha 1</p><p>E-mail: <a href=\"mailto:info@demo.localhost\">info@demo.localhost</a></p>"),
+                    ]),
+                ],
+            ),
+            (
+                PageKind::BlogPost,
+                vec![tr("cs", "Jak vybrat správnou velikost trička", "jak-vybrat-velikost-tricka", vec![
+                    text("<p>Změřte si obvod hrudníku a porovnejte ho s tabulkou velikostí u produktu. Když váháte mezi dvěma velikostmi, sáhněte po větší.</p>"),
+                    Block::Heading { text: "Naše oblíbená trička".into(), level: 2 },
+                    Block::Button { label: "Všechna trička".into(), href: "/c/tricka".into() },
+                ])],
+            ),
+        ];
+        let mut ids = Vec::new();
+        for (kind, translations) in pages {
+            let slug = translations[0].slug.clone();
+            let existing = sqlx::query_scalar!(
+                "SELECT page_id FROM page_translations WHERE locale = 'cs' AND slug = $1",
+                slug
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            let id = match existing {
+                Some(id) => id,
+                None => {
+                    content::create(
+                        &mut tx,
+                        ACTOR,
+                        &PageInput {
+                            kind,
+                            legal_type: None,
+                            status: PageStatus::Published,
+                            published_at: None,
+                            image_asset_id: None,
+                            translations,
+                        },
+                    )
+                    .await?
+                    .id
+                }
+            };
+            ids.push(id);
+        }
+        if menus::entries(&mut tx, "footer").await?.is_none() {
+            let page = |id: Uuid| MenuEntry {
+                label_i18n: I18n::new(),
+                link: MenuLink::Page { id },
+                children: Vec::new(),
+            };
+            menus::put(
+                &mut tx,
+                ACTOR,
+                "footer",
+                &MenuInput {
+                    items: vec![
+                        page(ids[0]),
+                        page(ids[1]),
+                        MenuEntry {
+                            label_i18n: i18n("Blog", "Blog"),
+                            link: MenuLink::Url {
+                                url: "/blog".into(),
+                            },
+                            children: Vec::new(),
+                        },
+                    ],
+                },
+            )
+            .await?;
         }
         tx.commit().await?;
         Ok(())

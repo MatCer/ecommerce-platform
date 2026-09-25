@@ -13,7 +13,7 @@ use crate::admin::{TenantHeader, in_tx, query_params};
 use crate::auth::TenantStaff;
 
 pub fn routes() -> OpenApiRouter<AppState> {
-    OpenApiRouter::new().routes(routes!(dashboard))
+    OpenApiRouter::new().routes(routes!(analytics_dashboard))
 }
 
 /// Sales (from orders: placed, not cancelled), traffic (edge page counters without
@@ -32,7 +32,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn dashboard(
+async fn analytics_dashboard(
     staff: TenantStaff,
     State(s): State<AppState>,
     query: Result<Query<DashboardQuery>, QueryRejection>,
