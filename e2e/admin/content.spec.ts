@@ -21,6 +21,9 @@ async function publish() {
 async function addBlock(name: string) {
   await page.getByRole("button", { name: "Add block", exact: true }).click();
   await page.getByRole("menuitem", { name, exact: true }).click();
+  // The menu hands focus back to its trigger as it closes; type only after that.
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Add block", exact: true })).toBeFocused();
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -36,7 +39,7 @@ test.afterAll(async () => {
 test("owner saves legal entity and installs Czech templates", async () => {
   await page.goto("/login");
   const since = new Date(Date.now() - 1000);
-  await page.getByLabel("Email", { exact: true }).fill(owner);
+  await page.getByLabel("Email").fill(owner);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByRole("status")).toContainText(owner);
   await page.goto(await magicLink(owner, since));

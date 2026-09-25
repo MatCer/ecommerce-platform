@@ -1,5 +1,5 @@
 import { Button, Menu, SelectField, TextField } from "@platform/ui";
-import { Index, Show } from "solid-js";
+import { Index, Match, Switch } from "solid-js";
 import { t } from "../i18n/index.ts";
 import {
   BLOCK_TYPES,
@@ -15,10 +15,9 @@ import { RichText } from "./RichText.tsx";
 
 function BlockFields(props: { block: Block; onChange: (block: Block) => void }) {
   return (
-    <Show when={props.block.type} keyed>
-      {(type) => {
-        switch (type) {
-          case "heading": {
+    <Switch>
+      <Match when={props.block.type === "heading"}>
+        {(() => {
             const b = () => props.block as Extract<Block, { type: "heading" }>;
             return (
               <>
@@ -38,8 +37,10 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 />
               </>
             );
-          }
-          case "rich_text": {
+        })()}
+      </Match>
+      <Match when={props.block.type === "rich_text"}>
+        {(() => {
             const b = () => props.block as Extract<Block, { type: "rich_text" }>;
             return (
               <RichText
@@ -48,8 +49,10 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 onChange={(html) => props.onChange({ ...b(), html })}
               />
             );
-          }
-          case "image": {
+        })()}
+      </Match>
+      <Match when={props.block.type === "image"}>
+        {(() => {
             const b = () => props.block as Extract<Block, { type: "image" }>;
             return (
               <>
@@ -70,8 +73,10 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 />
               </>
             );
-          }
-          case "button": {
+        })()}
+      </Match>
+      <Match when={props.block.type === "button"}>
+        {(() => {
             const b = () => props.block as Extract<Block, { type: "button" }>;
             return (
               <>
@@ -89,8 +94,10 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 />
               </>
             );
-          }
-          case "product_grid": {
+        })()}
+      </Match>
+      <Match when={props.block.type === "product_grid"}>
+        {(() => {
             const b = () => props.block as Extract<Block, { type: "product_grid" }>;
             return (
               <>
@@ -110,8 +117,10 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 />
               </>
             );
-          }
-          case "faq": {
+        })()}
+      </Match>
+      <Match when={props.block.type === "faq"}>
+        {(() => {
             const b = () => props.block as Extract<Block, { type: "faq" }>;
             return (
               <>
@@ -162,10 +171,9 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 </Button>
               </>
             );
-          }
-        }
-      }}
-    </Show>
+        })()}
+      </Match>
+    </Switch>
   );
 }
 export function BlockEditor(props: { blocks: Block[]; onChange: (blocks: Block[]) => void }) {
