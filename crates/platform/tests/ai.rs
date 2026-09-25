@@ -24,7 +24,8 @@ async fn messages(State(s): State<Stub>, headers: HeaderMap, Json(body): Json<Va
     s.seen.lock().unwrap().push((headers, body));
     let (status, body, retry_after) = s.script.lock().unwrap().remove(0);
     let mut res = (StatusCode::from_u16(status).unwrap(), Json(body)).into_response();
-    res.headers_mut().insert("request-id", "req_test".parse().unwrap());
+    res.headers_mut()
+        .insert("request-id", "req_test".parse().unwrap());
     if let Some(ra) = retry_after {
         res.headers_mut().insert("retry-after", ra.parse().unwrap());
     }
@@ -93,20 +94,31 @@ async fn sends_a_cached_structured_request() {
     assert_eq!(body["max_tokens"], 2000);
     assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
     assert_eq!(body["output_config"]["format"]["type"], "json_schema");
-    assert_eq!(body["output_config"]["format"]["schema"]["required"][0], "x");
+    assert_eq!(
+        body["output_config"]["format"]["schema"]["required"][0],
+        "x"
+    );
     // No sampling parameters, no prefill, no tools.
     assert!(body.get("temperature").is_none() && body.get("tools").is_none());
     assert_eq!(body["messages"].as_array().unwrap().len(), 1);
     let user = body["messages"][0]["content"].as_str().unwrap();
     assert!(user.starts_with("Write the title."));
-    assert_eq!(user.matches("</data>").count(), 1, "content cannot close the block");
+    assert_eq!(
+        user.matches("</data>").count(),
+        1,
+        "content cannot close the block"
+    );
 }
 
 #[tokio::test]
 async fn retries_overload_and_rate_limits_then_succeeds() {
     let (client, stub) = serve(vec![
         (529, overloaded(), None),
-        (429, json!({"error": {"type": "rate_limit_error"}}), Some("0")),
+        (
+            429,
+            json!({"error": {"type": "rate_limit_error"}}),
+            Some("0"),
+        ),
         (200, ok(r#"{"x": "ok"}"#), None),
     ])
     .await;

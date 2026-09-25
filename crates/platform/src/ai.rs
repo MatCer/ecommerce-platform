@@ -91,7 +91,10 @@ pub enum AiError {
 impl AiError {
     /// Usage was spent even though the call failed (the output was produced).
     pub fn spent(&self) -> bool {
-        matches!(self, Self::Refused | Self::Truncated | Self::InvalidOutput(_))
+        matches!(
+            self,
+            Self::Refused | Self::Truncated | Self::InvalidOutput(_)
+        )
     }
 }
 
@@ -361,9 +364,7 @@ impl Fake {
             .map_err(|e| AiError::InvalidOutput(format!("fixture {}: {e}", req.feature)))?;
         let estimate = |chars: usize| (chars as u64).div_ceil(4).max(1);
         let usage = Usage {
-            input_tokens: estimate(
-                req.system.len() + user_content(req.task, req.data).len(),
-            ),
+            input_tokens: estimate(req.system.len() + user_content(req.task, req.data).len()),
             output_tokens: estimate(rendered.len()),
             ..Usage::default()
         };
@@ -423,7 +424,10 @@ impl PriceTable {
                 .split_once(':')
                 .ok_or_else(|| format!("{entry:?}: expected model=input:output"))?;
             let micros = |s: &str| -> Result<u64, String> {
-                let v: f64 = s.trim().parse().map_err(|_| format!("{entry:?}: bad price"))?;
+                let v: f64 = s
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("{entry:?}: bad price"))?;
                 if !v.is_finite() || v < 0.0 || v > 10_000.0 {
                     return Err(format!("{entry:?}: price out of range"));
                 }
@@ -546,15 +550,21 @@ mod tests {
         assert!(matches!(f.error, AiError::Refused));
         assert_eq!(f.usage.input_tokens, 5);
         let cut = json!({"stop_reason": "max_tokens", "content": [], "usage": {"input_tokens": 1, "output_tokens": 1}});
-        assert!(matches!(parse_response(&cut).unwrap_err().error, AiError::Truncated));
+        assert!(matches!(
+            parse_response(&cut).unwrap_err().error,
+            AiError::Truncated
+        ));
         let prose = json!({"stop_reason": "end_turn", "content": [{"type": "text", "text": "sure!"}], "usage": {"input_tokens": 1, "output_tokens": 1}});
-        assert!(matches!(parse_response(&prose).unwrap_err().error, AiError::InvalidOutput(_)));
+        assert!(matches!(
+            parse_response(&prose).unwrap_err().error,
+            AiError::InvalidOutput(_)
+        ));
     }
 
     #[test]
     fn fake_renders_fixtures_with_data() {
-        let fake = Fake::new([("greet", r#"{"text": {{ ("Hi " ~ data.name) | tojson }}}"#)])
-            .unwrap();
+        let fake =
+            Fake::new([("greet", r#"{"text": {{ ("Hi " ~ data.name) | tojson }}}"#)]).unwrap();
         let data = json!({"name": "Ann \"A\""});
         let req = Request {
             feature: "greet",

@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.name FROM product_categories pc\n             JOIN product_translations t ON t.product_id = pc.product_id AND t.locale = $2\n             WHERE pc.category_id = $1 ORDER BY pc.position LIMIT 20",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9fd36c41a3459a93a6ec3aeffa7ca7db6df74776600810390c7887fb9a93475d"
+}

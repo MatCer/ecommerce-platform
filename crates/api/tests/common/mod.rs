@@ -144,6 +144,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
             },
             packeta: None,
         }),
+        ai: commerce::ai::Ai::fake(),
     }
 }
 

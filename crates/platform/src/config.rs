@@ -775,9 +775,8 @@ impl AiConfig {
         let model = |name: &'static str, default: &str| {
             let m = get(lookup, name).unwrap_or_else(|| default.into());
             let ok = (1..=100).contains(&m.len())
-                && m.bytes().all(|b| {
-                    b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b':')
-                });
+                && m.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b':'));
             ok.then_some(m).ok_or(ConfigError::Invalid {
                 name,
                 reason: "expected a model id".into(),

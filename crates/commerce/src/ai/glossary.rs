@@ -47,7 +47,9 @@ impl Glossary {
         for e in &self.entries {
             let len = e.term.trim().chars().count();
             if !(1..=100).contains(&len) || e.term.trim() != e.term {
-                return Err(invalid("terms are 1-100 characters without surrounding spaces"));
+                return Err(invalid(
+                    "terms are 1-100 characters without surrounding spaces",
+                ));
             }
             if !seen.insert(e.term.to_lowercase()) {
                 return Err(invalid(format!("{:?} is listed twice", e.term)));
@@ -106,7 +108,8 @@ pub async fn get(tx: &mut TenantTx) -> Result<Glossary, Error> {
 pub async fn put(tx: &mut TenantTx, actor: &str, input: &Glossary) -> Result<Glossary, Error> {
     input.validate()?;
     let before = get(tx).await?;
-    let entries = serde_json::to_value(&input.entries).map_err(|e| Error::Internal(e.to_string()))?;
+    let entries =
+        serde_json::to_value(&input.entries).map_err(|e| Error::Internal(e.to_string()))?;
     sqlx::query!(
         "INSERT INTO ai_glossaries (tenant_id, entries) VALUES ($1, $2)
          ON CONFLICT (tenant_id) DO UPDATE SET entries = EXCLUDED.entries, updated_at = now()",
@@ -150,7 +153,10 @@ mod tests {
     fn detects_dropped_or_translated_terms() {
         let g = glossary();
         let src = "Tričko Lnen & Co. z vlny Merino";
-        assert!(g.violations(src, "T-shirt Lnen & Co. of Merino wool", "en").is_empty());
+        assert!(
+            g.violations(src, "T-shirt Lnen & Co. of Merino wool", "en")
+                .is_empty()
+        );
         assert_eq!(
             g.violations(src, "T-shirt Linen & Co. of merino", "en"),
             vec!["Lnen & Co.".to_owned(), "Merino".to_owned()]
@@ -179,7 +185,9 @@ mod tests {
         bad.entries[0].term = " x".into();
         assert!(bad.validate().is_err());
         let mut locale = glossary();
-        locale.entries[0].translations.insert("english".into(), "x".into());
+        locale.entries[0]
+            .translations
+            .insert("english".into(), "x".into());
         assert!(locale.validate().is_err());
     }
 }

@@ -38,6 +38,7 @@ fn state(db: PgPool) -> AppState {
         public_urls: commerce::storefront::PublicUrls::default(),
         edge: api::edge::EdgePurge::disabled(),
         checkout: Default::default(),
+        ai: commerce::ai::Ai::fake(),
     }
 }
 

@@ -92,6 +92,17 @@ fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
     }
 }
 
+/// AI helpers from `AiConfig` (Anthropic with a key, else the fake provider; off in prod).
+fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
+    let ai = commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?;
+    match ai.provider() {
+        "fake" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers use the fake provider"),
+        "disabled" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers are disabled"),
+        _ => tracing::info!(model = %ai.helper_model, "AI helpers use the Anthropic API"),
+    }
+    Ok(ai)
+}
+
 fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
@@ -134,6 +145,7 @@ async fn serve() -> anyhow::Result<()> {
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
         checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
+        ai: ai_helpers()?,
     };
     let app = api::app(state, cfg.env == AppEnv::Dev);
 

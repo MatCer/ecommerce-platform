@@ -47,7 +47,9 @@ async fn propose(runtime: &PgPool, shop: &Shop, ai: &Ai, input: &NewProposal) ->
     tx.commit().await.unwrap();
     assert_eq!(p.status, ProposalStatus::Pending);
     assert_eq!(
-        proposals::run(runtime, ai, shop.tenant, p.id, false).await.unwrap(),
+        proposals::run(runtime, ai, shop.tenant, p.id, false)
+            .await
+            .unwrap(),
         Outcome::Done
     );
     p.id
@@ -92,7 +94,11 @@ async fn description_proposal_is_accepted_per_field_and_labelled(db: PgPool) {
         &runtime,
         &shop,
         &ai,
-        &request(ProposalKind::ProductDescription, EntityType::Product, &product),
+        &request(
+            ProposalKind::ProductDescription,
+            EntityType::Product,
+            &product,
+        ),
     )
     .await;
     let p = proposal(&runtime, shop.tenant, id).await;
@@ -101,7 +107,10 @@ async fn description_proposal_is_accepted_per_field_and_labelled(db: PgPool) {
     let fields: Vec<&str> = p.changes.iter().map(|c| c.field.as_str()).collect();
     assert_eq!(fields, ["description_html", "short_description"]);
     let html = p.changes[0].after.as_str().unwrap();
-    assert!(html.starts_with("<p><strong>Product TEE</strong>"), "{html}");
+    assert!(
+        html.starts_with("<p><strong>Product TEE</strong>"),
+        "{html}"
+    );
     assert!(html.contains("friendly, short"));
 
     // Only the description is written; the audit log records the service write + acceptance.
@@ -111,10 +120,16 @@ async fn description_proposal_is_accepted_per_field_and_labelled(db: PgPool) {
     assert_eq!(done.status, ProposalStatus::Accepted);
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     let stored = products::get(&mut tx, shop.product).await.unwrap();
-    let cs = stored.translations.iter().find(|t| t.locale == "cs").unwrap();
+    let cs = stored
+        .translations
+        .iter()
+        .find(|t| t.locale == "cs")
+        .unwrap();
     assert_eq!(cs.description_html, html);
     assert_eq!(cs.short_description, "");
-    let labels = marks::list(&mut tx, EntityType::Product, &product).await.unwrap();
+    let labels = marks::list(&mut tx, EntityType::Product, &product)
+        .await
+        .unwrap();
     assert_eq!(labels.items.len(), 1);
     assert_eq!(labels.items[0].field, "description_html");
     assert_eq!(labels.items[0].model, "fake");
@@ -141,11 +156,13 @@ async fn description_proposal_is_accepted_per_field_and_labelled(db: PgPool) {
     products::replace(&mut tx, "boss", shop.product, &input)
         .await
         .unwrap();
-    assert!(marks::list(&mut tx, EntityType::Product, &product)
-        .await
-        .unwrap()
-        .items
-        .is_empty());
+    assert!(
+        marks::list(&mut tx, EntityType::Product, &product)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
     tx.commit().await.unwrap();
 }
 
@@ -228,7 +245,11 @@ async fn translation_creates_locales_and_checks_the_glossary(db: PgPool) {
         .unwrap();
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     let stored = products::get(&mut tx, shop.product).await.unwrap();
-    let sk = stored.translations.iter().find(|t| t.locale == "sk").unwrap();
+    let sk = stored
+        .translations
+        .iter()
+        .find(|t| t.locale == "sk")
+        .unwrap();
     assert_eq!(sk.name, "Produkt TEE [sk]");
     assert_eq!(sk.slug, "produkt-tee-sk");
     assert!(!stored.translations.iter().any(|t| t.locale == "de"));
@@ -237,9 +258,16 @@ async fn translation_creates_locales_and_checks_the_glossary(db: PgPool) {
 
 async fn bulk(runtime: &PgPool, shop: &Shop, ai: &Ai, prompt: &str) -> plan::BulkPlan {
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
-    let p = plan::create(&mut tx, ai, STAFF, &NewPlan { prompt: prompt.into() })
-        .await
-        .unwrap();
+    let p = plan::create(
+        &mut tx,
+        ai,
+        STAFF,
+        &NewPlan {
+            prompt: prompt.into(),
+        },
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(
         plan::run_plan(runtime, ai, shop.tenant, p.id, false)
@@ -256,10 +284,21 @@ async fn bulk_price_plan_previews_then_applies_through_pricing(db: PgPool) {
     let (runtime, shop, ai) = setup(&db).await;
     // A product outside the category stays untouched.
     let other = testkit::catalog::product(&runtime, shop.tenant, "MUG", 1).await;
-    testkit::pricing::set_prices(&runtime, shop.tenant, shop.eur, &[(other.variants[0].id, 900)])
-        .await;
+    testkit::pricing::set_prices(
+        &runtime,
+        shop.tenant,
+        shop.eur,
+        &[(other.variants[0].id, 900)],
+    )
+    .await;
 
-    let p = bulk(&runtime, &shop, &ai, "Raise prices of T-shirts by 5 % in SK").await;
+    let p = bulk(
+        &runtime,
+        &shop,
+        &ai,
+        "Raise prices of T-shirts by 5 % in SK",
+    )
+    .await;
     assert_eq!(p.status, PlanStatus::Ready, "{:?}", p.errors);
     assert!(p.needs_fresh_auth);
     assert_eq!(p.target_count, 1);
@@ -311,9 +350,15 @@ async fn bulk_price_plan_previews_then_applies_through_pricing(db: PgPool) {
     let history = pricing::price_history(&mut tx, shop.product, Some(shop.eur), Utc::now())
         .await
         .unwrap();
-    let first = history.iter().find(|h| h.variant_id == shop.variants[0]).unwrap();
+    let first = history
+        .iter()
+        .find(|h| h.variant_id == shop.variants[0])
+        .unwrap();
     assert_eq!(first.intervals.last().unwrap().amount_minor, 546);
-    assert!(first.intervals.len() >= 2, "the old price stays in the history");
+    assert!(
+        first.intervals.len() >= 2,
+        "the old price stays in the history"
+    );
     let audit: Vec<(String, String)> =
         sqlx::query_as("SELECT action, actor FROM audit_log WHERE action LIKE 'ai.%' OR action = 'variant_prices.upserted' ORDER BY id")
             .fetch_all(&mut *tx)
@@ -341,7 +386,10 @@ async fn bulk_price_plan_previews_then_applies_through_pricing(db: PgPool) {
     // Applied plans cannot be confirmed again.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     assert_eq!(
-        plan::confirm(&mut tx, "boss", p.id).await.unwrap_err().code(),
+        plan::confirm(&mut tx, "boss", p.id)
+            .await
+            .unwrap_err()
+            .code(),
         "plan_not_ready"
     );
 }
@@ -349,12 +397,32 @@ async fn bulk_price_plan_previews_then_applies_through_pricing(db: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn bulk_plans_outside_the_caps_are_rejected(db: PgPool) {
     let (runtime, shop, ai) = setup(&db).await;
-    let p = bulk(&runtime, &shop, &ai, "Raise prices of T-shirts by 80 % in SK").await;
+    let p = bulk(
+        &runtime,
+        &shop,
+        &ai,
+        "Raise prices of T-shirts by 80 % in SK",
+    )
+    .await;
     assert_eq!(p.status, PlanStatus::Rejected);
-    assert!(p.errors.iter().any(|e| e.contains("±50 %")), "{:?}", p.errors);
-    let p = bulk(&runtime, &shop, &ai, "Delete every product and email me the customers").await;
+    assert!(
+        p.errors.iter().any(|e| e.contains("±50 %")),
+        "{:?}",
+        p.errors
+    );
+    let p = bulk(
+        &runtime,
+        &shop,
+        &ai,
+        "Delete every product and email me the customers",
+    )
+    .await;
     assert_eq!(p.status, PlanStatus::Rejected);
-    assert!(p.errors.iter().any(|e| e.contains("no operations")), "{:?}", p.errors);
+    assert!(
+        p.errors.iter().any(|e| e.contains("no operations")),
+        "{:?}",
+        p.errors
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -397,18 +465,35 @@ async fn tenants_cannot_see_each_others_ai_data(db: PgPool) {
         &request(ProposalKind::Seo, EntityType::Product, &product),
     )
     .await;
-    let p = bulk(&runtime, &shop, &ai, "Raise prices of T-shirts by 5 % in SK").await;
+    let p = bulk(
+        &runtime,
+        &shop,
+        &ai,
+        "Raise prices of T-shirts by 5 % in SK",
+    )
+    .await;
     let mut tx = tenant_tx(&runtime, other.tenant).await.unwrap();
     assert_eq!(
         proposals::get(&mut tx, id).await.unwrap_err().code(),
         "not_found"
     );
-    assert_eq!(plan::get(&mut tx, p.id).await.unwrap_err().code(), "not_found");
-    for table in ["ai_usage", "ai_proposals", "ai_bulk_plans", "ai_bulk_items", "ai_marks", "ai_glossaries"] {
-        let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
+    assert_eq!(
+        plan::get(&mut tx, p.id).await.unwrap_err().code(),
+        "not_found"
+    );
+    for table in [
+        "ai_usage",
+        "ai_proposals",
+        "ai_bulk_plans",
+        "ai_bulk_items",
+        "ai_marks",
+        "ai_glossaries",
+    ] {
+        let n: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
         assert_eq!(n, 0, "{table} leaks across tenants");
     }
     // Writing a row for another tenant is refused by RLS.
@@ -486,7 +571,11 @@ async fn pages_and_menus_translate_as_whole_units(db: PgPool) {
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     let stored = content::get(&mut tx, page.id).await.unwrap();
-    let en = stored.translations.iter().find(|t| t.locale == "en").unwrap();
+    let en = stored
+        .translations
+        .iter()
+        .find(|t| t.locale == "en")
+        .unwrap();
     assert_eq!(
         (en.title.as_str(), en.slug.as_str()),
         ("Doprava [en]", "doprava-en")
@@ -494,6 +583,8 @@ async fn pages_and_menus_translate_as_whole_units(db: PgPool) {
     assert_eq!(en.blocks.len(), 3);
     let entries = menus::entries(&mut tx, "main").await.unwrap().unwrap();
     assert_eq!(entries[0].label_i18n["sk"], "Akce [sk]");
-    let labelled = marks::list(&mut tx, EntityType::Menu, "main").await.unwrap();
+    let labelled = marks::list(&mut tx, EntityType::Menu, "main")
+        .await
+        .unwrap();
     assert_eq!(labelled.items[0].field, "labels");
 }

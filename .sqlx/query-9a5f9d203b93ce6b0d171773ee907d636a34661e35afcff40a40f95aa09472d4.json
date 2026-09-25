@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_bulk_plans SET status = $2, plan = $3, errors = $4, model = $5,\n                updated_at = now()\n         WHERE id = $1 AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9a5f9d203b93ce6b0d171773ee907d636a34661e35afcff40a40f95aa09472d4"
+}

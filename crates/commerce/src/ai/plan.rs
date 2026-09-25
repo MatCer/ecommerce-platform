@@ -225,7 +225,8 @@ impl Plan {
                         errors.push("the fixed price change is too large".into());
                     }
                     (None, Some(_)) => {}
-                    _ => errors.push("adjust_price needs exactly one of percent and amount_minor".into()),
+                    _ => errors
+                        .push("adjust_price needs exactly one of percent and amount_minor".into()),
                 },
                 Operation::AddCategory { category } => {
                     added.insert(category.as_str());
@@ -255,17 +256,16 @@ impl Plan {
 /// New price after an adjustment, or `None` when it leaves the ±50 % band or is not positive.
 pub fn adjusted(amount: i64, percent: Option<f64>, fixed: Option<i64>) -> Option<i64> {
     let new = match (percent.and_then(percent_bps), fixed) {
-        (Some(bps), None) => {
-            i64::try_from(div_round_half_up(
-                i128::from(amount) * i128::from(10_000 + bps),
-                10_000,
-            ))
-            .ok()?
-        }
+        (Some(bps), None) => i64::try_from(div_round_half_up(
+            i128::from(amount) * i128::from(10_000 + bps),
+            10_000,
+        ))
+        .ok()?,
         (None, Some(a)) => amount.checked_add(a)?,
         _ => return None,
     };
-    let within = i128::from((new - amount).abs()) * 100 <= i128::from(amount) * i128::from(MAX_PERCENT);
+    let within =
+        i128::from((new - amount).abs()) * 100 <= i128::from(amount) * i128::from(MAX_PERCENT);
     (new > 0 && within && new <= crate::pricing::cart::MAX_AMOUNT).then_some(new)
 }
 
@@ -406,7 +406,11 @@ pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<BulkPlan, Error> {
     .fetch_optional(&mut **tx)
     .await?
     .ok_or(Error::NotFound)?;
-    let plan: Option<Plan> = r.plan.map(serde_json::from_value).transpose().map_err(internal)?;
+    let plan: Option<Plan> = r
+        .plan
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(internal)?;
     Ok(BulkPlan {
         id: r.id,
         prompt: r.prompt,
@@ -571,13 +575,14 @@ fn check_refs(plan: &Plan, r: &Refs) -> Vec<String> {
             errors.push(format!("unknown market or price list {code:?}"));
         }
     };
-    let parameter = |key: &String, value: &str, errors: &mut Vec<String>| match r.parameters.get(key) {
-        None => errors.push(format!("unknown parameter {key:?}")),
-        Some((_, kind)) if parameter_value(kind, value).is_none() => {
-            errors.push(format!("{value:?} is not a valid {kind} value for {key}"));
-        }
-        Some(_) => {}
-    };
+    let parameter =
+        |key: &String, value: &str, errors: &mut Vec<String>| match r.parameters.get(key) {
+            None => errors.push(format!("unknown parameter {key:?}")),
+            Some((_, kind)) if parameter_value(kind, value).is_none() => {
+                errors.push(format!("{value:?} is not a valid {kind} value for {key}"));
+            }
+            Some(_) => {}
+        };
     for c in &plan.selector.categories {
         category(c, &mut errors);
     }
@@ -626,10 +631,11 @@ async fn targets(tx: &mut TenantTx, s: &Selector, r: &Refs) -> Result<Vec<Uuid>,
     };
     let brands: Vec<String> = s.brands.iter().map(|b| b.trim().to_lowercase()).collect();
     let statuses: Vec<String> = s.statuses.iter().map(|x| x.as_str().to_owned()).collect();
-    let price = s
-        .price
-        .as_ref()
-        .and_then(|p| r.lists.get(&p.market).map(|l| (l.0, p.min_minor, p.max_minor)));
+    let price = s.price.as_ref().and_then(|p| {
+        r.lists
+            .get(&p.market)
+            .map(|l| (l.0, p.min_minor, p.max_minor))
+    });
     let mut ids = sqlx::query_scalar!(
         r#"SELECT p.id FROM products p
            WHERE (cardinality($1::uuid[]) = 0 OR EXISTS (
@@ -951,7 +957,16 @@ pub async fn run_plan(
     errors.extend(check_refs(&plan, &r));
     if !errors.is_empty() {
         tx.commit().await?;
-        finish(db, tenant, id, "rejected", Some(&plan), &errors, Some(&model)).await?;
+        finish(
+            db,
+            tenant,
+            id,
+            "rejected",
+            Some(&plan),
+            &errors,
+            Some(&model),
+        )
+        .await?;
         return Ok(Outcome::Done);
     }
     let ids = targets(&mut tx, &plan.selector, &r).await?;
@@ -976,7 +991,16 @@ pub async fn run_plan(
     };
     if !errors.is_empty() {
         tx.commit().await?;
-        finish(db, tenant, id, "rejected", Some(&plan), &errors, Some(&model)).await?;
+        finish(
+            db,
+            tenant,
+            id,
+            "rejected",
+            Some(&plan),
+            &errors,
+            Some(&model),
+        )
+        .await?;
         return Ok(Outcome::Done);
     }
     // Preview (dry run): the first products with their before/after.
@@ -985,11 +1009,16 @@ pub async fn run_plan(
         let p = products::get(&mut tx, *pid).await?;
         let mut input = product_input(&p);
         let mut changes = apply_to_input(&plan.operations, &r, &mut input);
-        changes.extend(moves.iter().filter(|m| m.product_id == *pid).map(|m| SampleChange {
-            what: format!("price {} ({})", m.sku, m.currency),
-            before: money(m.before, m.currency),
-            after: money(m.after, m.currency),
-        }));
+        changes.extend(
+            moves
+                .iter()
+                .filter(|m| m.product_id == *pid)
+                .map(|m| SampleChange {
+                    what: format!("price {} ({})", m.sku, m.currency),
+                    before: money(m.before, m.currency),
+                    after: money(m.after, m.currency),
+                }),
+        );
         let name = r
             .locales
             .iter()
@@ -1044,7 +1073,9 @@ async fn finish(
          WHERE id = $1 AND status = 'pending'",
         id,
         status,
-        plan.map(serde_json::to_value).transpose().map_err(internal)?,
+        plan.map(serde_json::to_value)
+            .transpose()
+            .map_err(internal)?,
         json!(errors),
         model
     )
@@ -1115,7 +1146,11 @@ pub async fn run_apply(db: &PgPool, tenant: Uuid, id: Uuid) -> Result<Outcome, E
         };
         let status = match apply_one(&mut tx, &actor, &plan, &r, product_id).await {
             Ok(done) => {
-                if done { "done" } else { "skipped" }
+                if done {
+                    "done"
+                } else {
+                    "skipped"
+                }
             }
             Err(e) if e.status().is_client_error() => {
                 // Invalid for this product now (validation, a slug clash, ...): skip it in a
@@ -1228,8 +1263,13 @@ mod tests {
     #[test]
     fn unknown_operations_and_fields_are_rejected() {
         assert!(plan(json!([{"op": "delete_products"}])).is_err());
-        assert!(plan(json!([{"op": "set_field", "field": "price", "locale": null, "value": "1"}])).is_err());
-        assert!(plan(json!([{"op": "set_status", "status": "archived", "sql": "DROP TABLE"}])).is_err());
+        assert!(
+            plan(json!([{"op": "set_field", "field": "price", "locale": null, "value": "1"}]))
+                .is_err()
+        );
+        assert!(
+            plan(json!([{"op": "set_status", "status": "archived", "sql": "DROP TABLE"}])).is_err()
+        );
         assert!(plan(json!([{"op": "set_status", "status": "gone"}])).is_err());
         let extra: Result<Plan, _> = serde_json::from_value(json!({
             "explanation": "x", "operations": [], "tool": "exfiltrate",
@@ -1241,22 +1281,51 @@ mod tests {
     #[test]
     fn caps_and_shapes_are_enforced() {
         let errs = |ops: Value| plan(ops).unwrap().validate();
-        assert!(errs(json!([{"op": "adjust_price", "market": "sk", "percent": 5, "amount_minor": null}])).is_empty());
+        assert!(
+            errs(
+                json!([{"op": "adjust_price", "market": "sk", "percent": 5, "amount_minor": null}])
+            )
+            .is_empty()
+        );
         assert!(errs(json!([{"op": "adjust_price", "market": "sk", "percent": -50, "amount_minor": null}])).is_empty());
         assert!(!errs(json!([{"op": "adjust_price", "market": "sk", "percent": 50.01, "amount_minor": null}])).is_empty());
-        assert!(!errs(json!([{"op": "adjust_price", "market": "sk", "percent": 80, "amount_minor": null}])).is_empty());
-        assert!(!errs(json!([{"op": "adjust_price", "market": "sk", "percent": 5, "amount_minor": 100}])).is_empty());
+        assert!(
+            !errs(
+                json!([{"op": "adjust_price", "market": "sk", "percent": 80, "amount_minor": null}])
+            )
+            .is_empty()
+        );
+        assert!(
+            !errs(
+                json!([{"op": "adjust_price", "market": "sk", "percent": 5, "amount_minor": 100}])
+            )
+            .is_empty()
+        );
         assert!(!errs(json!([{"op": "adjust_price", "market": "sk", "percent": null, "amount_minor": null}])).is_empty());
         assert!(!errs(json!([{"op": "adjust_price", "market": "sk", "percent": 0.001, "amount_minor": null}])).is_empty());
         assert!(!errs(json!([])).is_empty(), "no operations");
-        let eleven: Vec<Value> = (0..11).map(|_| json!({"op": "set_status", "status": "draft"})).collect();
+        let eleven: Vec<Value> = (0..11)
+            .map(|_| json!({"op": "set_status", "status": "draft"}))
+            .collect();
         assert!(!errs(Value::Array(eleven)).is_empty());
-        assert!(!errs(json!([{"op": "set_field", "field": "seo_title", "locale": null, "value": "x"}])).is_empty());
-        assert!(!errs(json!([{"op": "set_field", "field": "brand", "locale": "cs", "value": "x"}])).is_empty());
-        assert!(errs(json!([{"op": "set_field", "field": "brand", "locale": null, "value": "Acme"}])).is_empty());
-        assert!(!errs(json!([
-            {"op": "add_category", "category": "a"}, {"op": "remove_category", "category": "a"}
-        ])).is_empty());
+        assert!(
+            !errs(json!([{"op": "set_field", "field": "seo_title", "locale": null, "value": "x"}]))
+                .is_empty()
+        );
+        assert!(
+            !errs(json!([{"op": "set_field", "field": "brand", "locale": "cs", "value": "x"}]))
+                .is_empty()
+        );
+        assert!(
+            errs(json!([{"op": "set_field", "field": "brand", "locale": null, "value": "Acme"}]))
+                .is_empty()
+        );
+        assert!(
+            !errs(json!([
+                {"op": "add_category", "category": "a"}, {"op": "remove_category", "category": "a"}
+            ]))
+            .is_empty()
+        );
     }
 
     #[test]
@@ -1268,8 +1337,16 @@ mod tests {
         assert_eq!(adjusted(1_000, None, Some(500)), Some(1_500));
         assert_eq!(adjusted(1_000, None, Some(501)), None, "over +50 %");
         assert_eq!(adjusted(1_000, None, Some(-600)), None, "under -50 %");
-        assert_eq!(adjusted(1, Some(-50.0), None), Some(1), "rounds half away from zero");
-        assert_eq!(adjusted(0, Some(5.0), None), None, "free items stay untouched");
+        assert_eq!(
+            adjusted(1, Some(-50.0), None),
+            Some(1),
+            "rounds half away from zero"
+        );
+        assert_eq!(
+            adjusted(0, Some(5.0), None),
+            None,
+            "free items stay untouched"
+        );
     }
 
     #[test]

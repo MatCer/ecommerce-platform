@@ -43,7 +43,9 @@ async fn main() -> anyhow::Result<()> {
             scheme: sf.scheme,
             port: sf.port,
         },
+        ai: commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?,
     };
+    tracing::info!(provider = extra.ai.provider(), "AI helpers");
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
     tokio::spawn(async move {

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT product_id AS \"id!\" FROM product_parameter_values\n               WHERE parameter_id = $1 AND (\n                   (jsonb_typeof(value) = 'object' AND EXISTS (\n                       SELECT 1 FROM jsonb_each_text(value) e WHERE lower(e.value) = lower($2)))\n                   OR (jsonb_typeof(value) <> 'object' AND value = $3))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "05b0592a865f84dc1278c569d8c46145c47bb5579e4739822d544409c977747b"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_proposals SET status = 'discarded', updated_at = now()\n         WHERE id = $1 AND status IN ('pending', 'ready', 'failed')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "10847b8a7c66f78e418454e6bcf682f028d29197c1c89ab44999e8b02754db62"
+}

@@ -8,8 +8,8 @@ pub mod fields;
 pub mod glossary;
 pub mod marks;
 pub mod plan;
-pub mod proposals;
 mod prompts;
+pub mod proposals;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

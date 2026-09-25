@@ -4,6 +4,188 @@
  */
 
 export interface paths {
+    "/admin/v1/ai/bulk-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts planning a bulk edit from the staff's request (a job): poll
+         *     `GET /ai/bulk-plans/{id}`; a `ready` plan carries the target count and a preview (the dry
+         *     run). Nothing changes until the plan is applied.
+         */
+        post: operations["create_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirms a `ready` plan and applies it in the background (progress on the plan). Plans that
+         *     change prices need a sign-in at most 15 minutes old (`401 reauth_required`, A9). Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["apply_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/glossary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Terms translations must keep (brand names) or translate one fixed way. */
+        get: operations["get_glossary"];
+        /** Replaces the glossary (at most 500 terms). Audited. */
+        put: operations["put_glossary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fields of an entity whose current text was written by AI (AI Act transparency labels). */
+        get: operations["list_marks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts generating a proposal (a job): poll `GET /ai/proposals/{id}` until it is `ready`
+         *     or `failed`. `402 ai_quota_exceeded` when the monthly allowance is used up.
+         */
+        post: operations["create_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_proposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Writes the chosen fields through the entity's service (audited) and labels them as
+         *     AI-generated. `409 proposal_stale` when a field changed since the proposal was made.
+         */
+        post: operations["accept_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["discard_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This month's AI usage of the shop, its token allowance and the provider in use. */
+        get: operations["usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/assets": {
         parameters: {
             query?: never;
@@ -1984,6 +2166,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptProposal: {
+            /**
+             * @description The fields to write (a subset of `changes`). Creating a translation always includes
+             *     its name/title and slug.
+             */
+            fields: components["schemas"]["FieldRef"][];
+        };
         Address: {
             city: string;
             company?: string | null;
@@ -2043,10 +2232,32 @@ export interface components {
             order: components["schemas"]["OrderView"];
             ship_to_country: string;
         };
+        AiMark: {
+            /** Format: date-time */
+            ai_generated_at: string;
+            feature: string;
+            field: string;
+            locale: string;
+            model: string;
+        };
+        AiMarkList: {
+            items: components["schemas"]["AiMark"][];
+        };
         Alternate: {
             href: string;
             /** @description hreflang value (`cs-CZ`, `x-default`). */
             locale: string;
+        };
+        ApplyProgress: {
+            /** Format: int64 */
+            done?: number;
+            /**
+             * Format: int64
+             * @description Products deleted meanwhile or no longer valid for a change.
+             */
+            skipped?: number;
+            /** Format: int64 */
+            total?: number;
         };
         Asset: {
             /** Format: int64 */
@@ -2231,6 +2442,32 @@ export interface components {
             published_at: string;
             title: string;
         };
+        BulkPlan: {
+            /** Format: date-time */
+            applied_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Why the plan was rejected (or failed). */
+            errors: string[];
+            /** Format: uuid */
+            id: string;
+            model?: string | null;
+            /** @description Confirming needs a sign-in at most 15 minutes old (price changes, A9). */
+            needs_fresh_auth: boolean;
+            plan?: components["schemas"]["Plan"] | null;
+            progress: components["schemas"]["ApplyProgress"];
+            prompt: string;
+            /** @description Before/after of the first products. */
+            sample: components["schemas"]["SampleRow"][];
+            status: components["schemas"]["PlanStatus"];
+            /**
+             * Format: int32
+             * @description Matching products (frozen at preview; the apply changes exactly these).
+             */
+            target_count: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
         /** @description Cache hints the edge reads from every page model (spec §8.2, A2). */
         CacheHints: {
             /**
@@ -2380,6 +2617,19 @@ export interface components {
          * @enum {string}
          */
         Cause: "base" | "sale" | "tax";
+        /** @description One proposed field value. */
+        Change: {
+            /** @description The proposed value: text, or the block/label list. */
+            after: Record<string, never>;
+            /** @description The value when the proposal was generated (`null`: none yet). */
+            before: Record<string, never>;
+            /**
+             * @description `name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`
+             *     for a menu's labels: `[{path, label}]`).
+             */
+            field: string;
+            locale: string;
+        };
         /** @enum {string} */
         Channel: "google" | "heureka" | "zbozi";
         /** @enum {string} */
@@ -2580,6 +2830,8 @@ export interface components {
         };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
+        /** @enum {string} */
+        EntityType: "product" | "category" | "page" | "menu";
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
             key: string;
@@ -2642,6 +2894,15 @@ export interface components {
             answer_html: string;
             question: string;
         };
+        FeatureUsage: {
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            cost_micros: number;
+            feature: string;
+            /** Format: int64 */
+            tokens: number;
+        };
         FeedFile: {
             /** Format: int64 */
             bytes?: number | null;
@@ -2659,8 +2920,26 @@ export interface components {
         FeedFileList: {
             items: components["schemas"]["FeedFile"][];
         };
+        FieldRef: {
+            field: string;
+            locale: string;
+        };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
+        Glossary: {
+            entries: components["schemas"]["GlossaryEntry"][];
+        };
+        GlossaryEntry: {
+            /**
+             * @description The term as written in the source text, e.g. `Lnen & Co.`.
+             * @example Lnen & Co.
+             */
+            term: string;
+            /** @description Locale -> the fixed translation; locales not listed keep the term unchanged. */
+            translations?: {
+                [key: string]: string;
+            };
+        };
         GoLiveCheck: {
             code: components["schemas"]["CheckCode"];
             /** @description What is missing: field names, `<legal type>:<locale>` pairs, or product names. */
@@ -2941,6 +3220,8 @@ export interface components {
          * @enum {string}
          */
         LegalType: "terms" | "privacy" | "cookies" | "withdrawal" | "complaints" | "reviews";
+        /** @enum {string} */
+        Length: "short" | "medium" | "long";
         Level: {
             /** @description Sell below zero. */
             allow_backorder: boolean;
@@ -3209,6 +3490,13 @@ export interface components {
             name: string;
             tax_mode?: components["schemas"]["TaxMode"];
         };
+        NewPlan: {
+            /**
+             * @description What to change, in the staff's words (1-2000 characters).
+             * @example Raise prices of T-shirts by 5 % in SK
+             */
+            prompt: string;
+        };
         NewPriceList: {
             /**
              * @description Lowercase identifier, unique per tenant.
@@ -3221,6 +3509,23 @@ export interface components {
             market_ids?: string[];
             /** @example Česko – maloobchod */
             name: string;
+        };
+        NewProposal: {
+            /** @description The entity's id (a menu's handle). */
+            entity_id: string;
+            entity_type: components["schemas"]["EntityType"];
+            kind: components["schemas"]["ProposalKind"];
+            /** @description Descriptions only. */
+            length?: components["schemas"]["Length"];
+            /**
+             * @description Language of the text to write; the source language for `translate`.
+             * @example cs
+             */
+            locale: string;
+            /** @description `translate` only: 1-5 languages to translate into. */
+            target_locales?: string[];
+            /** @description Descriptions only. */
+            tone?: components["schemas"]["Tone"];
         };
         NewUpload: {
             /**
@@ -3281,6 +3586,49 @@ export interface components {
              * @description Lowest price in the 30 days before `reduction_started_at`.
              */
             reference_minor?: number | null;
+        };
+        /** @description The allowlisted operations; anything else fails to parse. */
+        Operation: {
+            field: components["schemas"]["PlanField"];
+            /** @description Required for translated fields, `null` for `brand`. */
+            locale?: string | null;
+            /** @enum {string} */
+            op: "set_field";
+            value: string;
+        } | {
+            /**
+             * Format: int64
+             * @description Fixed change in minor units; exclusive with `percent`.
+             */
+            amount_minor?: number | null;
+            /** @description Market code or price list code. */
+            market: string;
+            /** @enum {string} */
+            op: "adjust_price";
+            /**
+             * Format: double
+             * @description Percent change (5 = +5 %); exclusive with `amount_minor`.
+             */
+            percent?: number | null;
+        } | {
+            category: string;
+            /** @enum {string} */
+            op: "add_category";
+        } | {
+            category: string;
+            /** @enum {string} */
+            op: "remove_category";
+        } | {
+            /** @description Text parameters: one locale, or `null` for every shop locale. */
+            locale?: string | null;
+            /** @enum {string} */
+            op: "set_parameter";
+            parameter: string;
+            value: string;
+        } | {
+            /** @enum {string} */
+            op: "set_status";
+            status: components["schemas"]["ProductStatus"];
         };
         OptionValue: {
             /** @example red */
@@ -3496,6 +3844,11 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        ParameterFilter: {
+            /** @description Parameter key. */
+            parameter: string;
+            value: string;
+        };
         ParameterInput: {
             filterable?: boolean;
             /**
@@ -3646,11 +3999,32 @@ export interface components {
             order_id: string;
             payment: components["schemas"]["PaymentStart"];
         };
+        Plan: {
+            /** @description The model's summary for the staff (plain text). */
+            explanation: string;
+            operations: components["schemas"]["Operation"][];
+            selector: components["schemas"]["Selector"];
+        };
+        /**
+         * @description Text fields a plan may set.
+         * @enum {string}
+         */
+        PlanField: "brand" | "short_description" | "seo_title" | "seo_description";
+        /** @enum {string} */
+        PlanStatus: "pending" | "ready" | "rejected" | "applying" | "applied" | "failed";
         /**
          * @description Why the base prices change (recorded on the price intervals).
          * @enum {string}
          */
         PriceChangeReason: "base" | "tax";
+        PriceFilter: {
+            /** @description Market code or price list code. */
+            market: string;
+            /** Format: int64 */
+            max_minor?: number | null;
+            /** Format: int64 */
+            min_minor?: number | null;
+        };
         PriceHistory: {
             items: components["schemas"]["VariantPriceHistory"][];
         };
@@ -3882,6 +4256,37 @@ export interface components {
             /** Format: int32 */
             updated: number;
         };
+        Proposal: {
+            changes: components["schemas"]["Change"][];
+            /** Format: date-time */
+            created_at: string;
+            entity_id: string;
+            entity_type: components["schemas"]["EntityType"];
+            /**
+             * @description Failure code: `ai_quota_exceeded`, `ai_unavailable`, `ai_refused`,
+             *     `ai_invalid_output`, `entity_missing`, `nothing_to_translate`.
+             */
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ProposalKind"];
+            length: components["schemas"]["Length"];
+            locale: string;
+            /** @description The model that wrote it (`fake` for the demo provider). */
+            model?: string | null;
+            progress: components["schemas"]["Progress"];
+            status: components["schemas"]["ProposalStatus"];
+            target_locales: string[];
+            tone: components["schemas"]["Tone"];
+            /** Format: date-time */
+            updated_at: string;
+            /** @description Things to check before accepting (e.g. a glossary term not kept). */
+            warnings: string[];
+        };
+        /** @enum {string} */
+        ProposalKind: "product_description" | "seo" | "category_description" | "translate";
+        /** @enum {string} */
+        ProposalStatus: "pending" | "ready" | "failed" | "accepted" | "discarded";
         /** @description Per-purpose choices: `None` = not asked (or not part of this choice). */
         Purposes: {
             ads?: boolean | null;
@@ -4038,6 +4443,21 @@ export interface components {
             category_ids?: string[];
             product_ids?: string[];
         };
+        SampleChange: {
+            after: string;
+            before: string;
+            /**
+             * @description `brand`, `seo_title (cs)`, `price TS-M (EUR)`, `category`, `parameter material`,
+             *     `status`.
+             */
+            what: string;
+        };
+        SampleRow: {
+            changes: components["schemas"]["SampleChange"][];
+            name: string;
+            /** Format: uuid */
+            product_id: string;
+        };
         SearchHit: {
             brand?: string | null;
             /** @description The first product image, in the list-sized variants (up to 640 px). */
@@ -4075,6 +4495,16 @@ export interface components {
         SearchStatus: {
             /** @description One index per locale the tenant's markets sell in. */
             indexes: components["schemas"]["IndexStatus"][];
+        };
+        /** @description Which products change: every non-empty condition must hold. */
+        Selector: {
+            /** @description Brand names (case-insensitive). */
+            brands?: string[];
+            /** @description Category slugs (any locale); subcategories included. */
+            categories?: string[];
+            parameters?: components["schemas"]["ParameterFilter"][];
+            price?: components["schemas"]["PriceFilter"] | null;
+            statuses?: components["schemas"]["ProductStatus"][];
         };
         Seo: {
             alternates: components["schemas"]["Alternate"][];
@@ -4329,6 +4759,11 @@ export interface components {
             vat_id?: string | null;
             vat_payer: boolean;
         };
+        /**
+         * @description Voice of generated descriptions.
+         * @enum {string}
+         */
+        Tone: "neutral" | "friendly" | "premium" | "technical" | "playful";
         Totals: {
             discount: components["schemas"]["MoneyView"];
             payment_fee: components["schemas"]["MoneyView"];
@@ -4376,6 +4811,32 @@ export interface components {
             /** @example PUT */
             method: string;
             url: string;
+        };
+        UsageSummary: {
+            by_feature: components["schemas"]["FeatureUsage"][];
+            /**
+             * Format: int64
+             * @description USD micros this month at the configured list prices.
+             */
+            cost_micros: number;
+            model: string;
+            /**
+             * Format: date-time
+             * @description Start of the metered calendar month (UTC).
+             */
+            month_start: string;
+            /** @description `anthropic`, `fake` (demo fixtures, no key configured) or `disabled`. */
+            provider: string;
+            /**
+             * Format: int64
+             * @description Monthly allowance: the plan default or a superadmin override.
+             */
+            tokens_quota: number;
+            /**
+             * Format: int64
+             * @description Tokens used this month (input incl. cache reads/writes + output).
+             */
+            tokens_used: number;
         };
         Variant: {
             ean?: string | null;
@@ -4493,6 +4954,432 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    create_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPlan"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    apply_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_glossary: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+        };
+    };
+    put_glossary: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Glossary"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_marks: {
+        parameters: {
+            query: {
+                entity_type: components["schemas"]["EntityType"];
+                /** @description The entity's id (a menu's handle). */
+                entity_id: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiMarkList"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProposal"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    accept_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptProposal"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    discard_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    usage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+        };
+    };
     list_assets: {
         parameters: {
             query?: {

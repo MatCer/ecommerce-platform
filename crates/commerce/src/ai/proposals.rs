@@ -261,7 +261,11 @@ pub async fn create(
     if !doc.has_locale(&input.locale) {
         return Err(invalid(
             "translation_missing",
-            format!("the {} has no content in {}", input.entity_type.as_str(), input.locale),
+            format!(
+                "the {} has no content in {}",
+                input.entity_type.as_str(),
+                input.locale
+            ),
         ));
     }
     let id = crate::id::new_id();
@@ -331,10 +335,13 @@ pub async fn accept(
     id: Uuid,
     input: &AcceptProposal,
 ) -> Result<Proposal, Error> {
-    let status = sqlx::query_scalar!("SELECT status FROM ai_proposals WHERE id = $1 FOR UPDATE", id)
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or(Error::NotFound)?;
+    let status = sqlx::query_scalar!(
+        "SELECT status FROM ai_proposals WHERE id = $1 FOR UPDATE",
+        id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
     if status != "ready" {
         return Err(Error::Conflict {
             code: "proposal_not_ready",
@@ -643,7 +650,12 @@ pub fn sanitize_translated(html: &str, source: &str) -> String {
 
 /// Cuts `s` to at most `max` characters.
 fn clip(s: &str, max: usize) -> String {
-    s.trim().chars().take(max).collect::<String>().trim().to_owned()
+    s.trim()
+        .chars()
+        .take(max)
+        .collect::<String>()
+        .trim()
+        .to_owned()
 }
 
 fn plain(html: &str, max: usize) -> String {
@@ -727,7 +739,10 @@ impl Gen<'_> {
         .map(|r| {
             (
                 r.id,
-                (serde_json::from_value(r.name_i18n).unwrap_or_default(), r.unit),
+                (
+                    serde_json::from_value(r.name_i18n).unwrap_or_default(),
+                    r.unit,
+                ),
             )
         })
         .collect();
@@ -803,11 +818,17 @@ impl Gen<'_> {
         let changes = vec![
             self.change(
                 "description_html",
-                clip(&sanitize_generated(&out.description_html), max_len("description_html")),
+                clip(
+                    &sanitize_generated(&out.description_html),
+                    max_len("description_html"),
+                ),
             )?,
             self.change(
                 "short_description",
-                clip(&plain(&out.short_description, 1000), max_len("short_description")),
+                clip(
+                    &plain(&out.short_description, 1000),
+                    max_len("short_description"),
+                ),
             )?,
         ];
         Ok((changes, vec![], model))
@@ -819,16 +840,17 @@ impl Gen<'_> {
         };
         let locale = self.p.locale.as_str();
         let mut tx = tenant_tx(self.db, self.tenant).await?;
-        let parent = match c.parent_id {
-            None => None,
-            Some(parent) => sqlx::query_scalar!(
-                "SELECT name FROM category_translations WHERE category_id = $1 AND locale = $2",
-                parent,
-                locale
-            )
-            .fetch_optional(&mut *tx)
-            .await?,
-        };
+        let parent =
+            match c.parent_id {
+                None => None,
+                Some(parent) => sqlx::query_scalar!(
+                    "SELECT name FROM category_translations WHERE category_id = $1 AND locale = $2",
+                    parent,
+                    locale
+                )
+                .fetch_optional(&mut *tx)
+                .await?,
+            };
         let products = sqlx::query_scalar!(
             "SELECT t.name FROM product_categories pc
              JOIN product_translations t ON t.product_id = pc.product_id AND t.locale = $2
@@ -865,7 +887,10 @@ impl Gen<'_> {
         let out: CategoryDescriptionOut = super::parse(out)?;
         let changes = vec![self.change(
             "description_html",
-            clip(&sanitize_generated(&out.description_html), max_len("description_html")),
+            clip(
+                &sanitize_generated(&out.description_html),
+                max_len("description_html"),
+            ),
         )?];
         Ok((changes, vec![], model))
     }
@@ -918,10 +943,16 @@ impl Gen<'_> {
             .await?;
         let out: SeoOut = super::parse(out)?;
         let changes = vec![
-            self.change("seo_title", clip(&plain(&out.seo_title, 500), max_len("seo_title")))?,
+            self.change(
+                "seo_title",
+                clip(&plain(&out.seo_title, 500), max_len("seo_title")),
+            )?,
             self.change(
                 "seo_description",
-                clip(&plain(&out.seo_description, 1000), max_len("seo_description")),
+                clip(
+                    &plain(&out.seo_description, 1000),
+                    max_len("seo_description"),
+                ),
             )?,
         ];
         Ok((changes, vec![], model))
@@ -942,7 +973,11 @@ impl Gen<'_> {
             tx.commit().await?;
             g
         };
-        let all_source: String = units.iter().map(|u| u.text.as_str()).collect::<Vec<_>>().join("\n");
+        let all_source: String = units
+            .iter()
+            .map(|u| u.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
         let mut changes = vec![];
         let mut warnings = vec![];
         let mut model = String::new();
@@ -993,7 +1028,12 @@ impl Gen<'_> {
             units.len()
         );
         let (out, model) = self
-            .call(super::TRANSLATE, &task, &data, &prompts::translation_schema())
+            .call(
+                super::TRANSLATE,
+                &task,
+                &data,
+                &prompts::translation_schema(),
+            )
             .await?;
         let out: TranslationOut = super::parse(out)?;
         let mut map = BTreeMap::new();
@@ -1032,7 +1072,10 @@ impl Gen<'_> {
                 u.key.rsplit('.').next().unwrap_or(&u.key)
             };
             let text = if u.html {
-                clip(&sanitize_translated(raw, &u.text), max_len("description_html"))
+                clip(
+                    &sanitize_translated(raw, &u.text),
+                    max_len("description_html"),
+                )
             } else {
                 clip(&plain(raw, 5000), max_len(leaf))
             };
@@ -1040,11 +1083,16 @@ impl Gen<'_> {
                 return Err(CallError::output(format!("{} is empty", u.key)));
             }
             for term in glossary.violations(&u.text, &text, target) {
-                warnings.push(format!("{target}: {}: glossary term \"{term}\" was not kept", u.key));
+                warnings.push(format!(
+                    "{target}: {}: glossary term \"{term}\" was not kept",
+                    u.key
+                ));
             }
             if let Some(rest) = u.key.strip_prefix("blocks.") {
                 let b = blocks.get_or_insert_with(|| {
-                    self.doc.get(&self.p.locale, "blocks").unwrap_or(Value::Null)
+                    self.doc
+                        .get(&self.p.locale, "blocks")
+                        .unwrap_or(Value::Null)
                 });
                 let pointer = format!("/{}", rest.replace('.', "/"));
                 if let Some(slot) = b.pointer_mut(&pointer) {
@@ -1080,7 +1128,10 @@ impl Gen<'_> {
         // A new translation gets a slug from its translated name/title.
         if let Some(title) = self.p.entity_type.title_field() {
             let current = self.doc.get(target, "slug");
-            let empty = current.as_ref().and_then(Value::as_str).is_none_or(str::is_empty);
+            let empty = current
+                .as_ref()
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty);
             let name = changes
                 .iter()
                 .find(|c| c.field == title)
@@ -1129,7 +1180,11 @@ fn units(doc: &Doc, locale: &str) -> Vec<Unit> {
                         push(format!("blocks.{i}.{k}"), b.get(k), k == "html");
                     }
                     for (j, item) in b["items"].as_array().into_iter().flatten().enumerate() {
-                        push(format!("blocks.{i}.items.{j}.question"), item.get("question"), false);
+                        push(
+                            format!("blocks.{i}.items.{j}.question"),
+                            item.get("question"),
+                            false,
+                        );
                         push(
                             format!("blocks.{i}.items.{j}.answer_html"),
                             item.get("answer_html"),
@@ -1146,7 +1201,11 @@ fn units(doc: &Doc, locale: &str) -> Vec<Unit> {
                     }
                 }
             }
-            f => push(f.to_owned(), doc.get(locale, f).as_ref(), f.ends_with("html")),
+            f => push(
+                f.to_owned(),
+                doc.get(locale, f).as_ref(),
+                f.ends_with("html"),
+            ),
         }
     }
     out
@@ -1171,7 +1230,10 @@ mod tests {
         let source = r#"<p>See <a href="https://shop.example/size">sizes</a></p>"#;
         let out = r#"<p>Pozri <a href="https://shop.example/size">veľkosti</a> a <a href="https://evil.example">toto</a><img src="https://evil.example/x.png"></p>"#;
         let clean = sanitize_translated(out, source);
-        assert!(clean.contains(r#"href="https://shop.example/size""#), "{clean}");
+        assert!(
+            clean.contains(r#"href="https://shop.example/size""#),
+            "{clean}"
+        );
         assert!(!clean.contains("evil"), "{clean}");
     }
 
@@ -1231,10 +1293,14 @@ mod tests {
             handle: "main".into(),
             items: vec![MenuEntry {
                 label_i18n: BTreeMap::from([("cs".into(), "Akce".into())]),
-                link: MenuLink::Url { url: "/akce".into() },
+                link: MenuLink::Url {
+                    url: "/akce".into(),
+                },
                 children: vec![MenuEntry {
                     label_i18n: BTreeMap::from([("cs".into(), "Léto".into())]),
-                    link: MenuLink::Url { url: "/leto".into() },
+                    link: MenuLink::Url {
+                        url: "/leto".into(),
+                    },
                     children: vec![],
                 }],
             }],

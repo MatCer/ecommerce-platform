@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id FROM products p\n           WHERE (cardinality($1::uuid[]) = 0 OR EXISTS (\n                     SELECT 1 FROM product_categories pc\n                     WHERE pc.product_id = p.id AND pc.category_id = ANY($1)))\n             AND (cardinality($2::text[]) = 0 OR lower(p.brand) = ANY($2))\n             AND (cardinality($3::text[]) = 0 OR p.status = ANY($3))\n             AND ($4::uuid IS NULL OR EXISTS (\n                     SELECT 1 FROM variants v\n                     JOIN variant_prices vp ON vp.variant_id = v.id AND vp.price_list_id = $4\n                     WHERE v.product_id = p.id\n                       AND ($5::bigint IS NULL OR vp.amount_minor >= $5)\n                       AND ($6::bigint IS NULL OR vp.amount_minor <= $6)))\n           ORDER BY p.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "TextArray",
+        "Uuid",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "33bff0625c8fe319228cee16f1577e6b9baea5984379f46b247e9453ac7412b4"
+}

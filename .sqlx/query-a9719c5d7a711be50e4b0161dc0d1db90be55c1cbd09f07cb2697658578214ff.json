@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status, plan, applied_by FROM ai_bulk_plans WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "plan",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "plan"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "applied_by",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "applied_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "a9719c5d7a711be50e4b0161dc0d1db90be55c1cbd09f07cb2697658578214ff"
+}

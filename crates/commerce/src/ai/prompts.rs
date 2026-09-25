@@ -66,7 +66,10 @@ fn string() -> Value {
 }
 
 fn object(props: Value) -> Value {
-    let required: Vec<&String> = props.as_object().map(|m| m.keys().collect()).unwrap_or_default();
+    let required: Vec<&String> = props
+        .as_object()
+        .map(|m| m.keys().collect())
+        .unwrap_or_default();
     json!({
         "type": "object",
         "additionalProperties": false,
@@ -173,15 +176,18 @@ mod tests {
             assert!(all_objects_closed(&s), "{s}");
         }
         let plan = plan_schema();
-        assert_eq!(plan["required"], json!(["explanation", "operations", "selector"]));
+        assert_eq!(
+            plan["required"],
+            json!(["explanation", "operations", "selector"])
+        );
         let ops = plan["properties"]["operations"]["items"]["anyOf"]
             .as_array()
             .unwrap();
         assert_eq!(ops.len(), 6);
-        assert!(ops.iter().all(|o| o["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("op"))));
+        assert!(
+            ops.iter()
+                .all(|o| o["required"].as_array().unwrap().contains(&json!("op")))
+        );
     }
 
     #[test]

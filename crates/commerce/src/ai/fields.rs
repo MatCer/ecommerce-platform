@@ -12,9 +12,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::catalog::categories::{self, Category, CategoryTranslation, CategoryUpdate};
-use crate::catalog::products::{
-    self, Product, ProductInput, ProductTranslation, VariantInput,
-};
+use crate::catalog::products::{self, Product, ProductInput, ProductTranslation, VariantInput};
 use crate::content::menus::{self, MenuEntry, MenuInput};
 use crate::content::{self, Page, PageInput, PageTranslation};
 
@@ -93,7 +91,10 @@ pub enum Doc {
     Product(Box<Product>),
     Category(Category),
     Page(Page),
-    Menu { handle: String, items: Vec<MenuEntry> },
+    Menu {
+        handle: String,
+        items: Vec<MenuEntry>,
+    },
 }
 
 fn bad_field(field: &str) -> Error {
@@ -104,7 +105,9 @@ fn bad_field(field: &str) -> Error {
 }
 
 fn text(v: &Value, field: &str) -> Result<String, Error> {
-    v.as_str().map(str::to_owned).ok_or_else(|| bad_field(field))
+    v.as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| bad_field(field))
 }
 
 fn opt(v: &Option<String>) -> Option<Value> {
