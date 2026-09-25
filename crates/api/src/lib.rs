@@ -18,6 +18,7 @@ pub mod admin_promotions;
 pub mod admin_search;
 pub mod admin_staff;
 pub mod admin_storefront;
+pub mod admin_themes;
 pub mod admin_webhooks;
 pub mod auth;
 pub mod auth_service;
@@ -48,7 +49,6 @@ use serde::Serialize;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
-use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::{DefaultOnResponse, TraceLayer};
 use tracing::Level;
@@ -88,6 +88,12 @@ pub struct AppState {
     pub webhooks: Option<commerce::webhooks::Webhooks>,
     /// Storefront API rate limits (§8.1).
     pub rate_limit: Arc<rate_limit::StorefrontLimiter>,
+    /// WP23: preview tokens + per-tenant `ASTRO_KEY` (`THEME_SECRET`); `None` = theme builder
+    /// features answer 503.
+    pub themes: Option<commerce::themes::ThemeKeys>,
+    /// WP23: the theme builder's service token (`THEME_BUILDER_TOKEN`, distinct from the
+    /// edge's, A7); `None` = builder callbacks are refused.
+    pub builder_token: Option<auth::ServiceToken>,
 }
 
 #[derive(OpenApi)]
@@ -106,6 +112,7 @@ pub struct AppState {
         (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "search", description = "Admin API: search index status and rebuilds"),
         (name = "storefront-admin", description = "Admin API: redirects and the storefront token"),
+        (name = "themes", description = "Admin API: theme revisions (fork, tokens, upload, reset), previews, publish and rollback"),
         (name = "feeds", description = "Admin API: feed imports (Heureka, Google) and export feeds"),
         (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
@@ -142,6 +149,17 @@ impl Modify for SecuritySchemes {
             "service_token",
             SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Bearer).build()),
         );
+        components.add_security_scheme(
+            "builder_token",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .description(Some(
+                        "THEME_BUILDER_TOKEN + X-Tenant-Id (theme builder only)",
+                    ))
+                    .build(),
+            ),
+        );
     }
 }
 
@@ -158,6 +176,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_inventory::routes())
         .merge(admin_search::routes())
         .merge(admin_storefront::routes())
+        .merge(admin_themes::routes())
         .merge(admin_content::routes())
         .merge(admin_feeds::routes())
         .merge(admin_orders::routes())
@@ -263,7 +282,7 @@ pub fn app(state: AppState, docs: bool) -> Router {
                 )
                 .layer(PropagateRequestIdLayer::new(REQUEST_ID))
                 .layer(map_response(problem_for_body_limit))
-                .layer(RequestBodyLimitLayer::new(BODY_LIMIT_BYTES)),
+                .layer(from_fn(limit_body)),
         )
         .layer(from_fn_with_state(state.clone(), rate_limit::storefront))
         .layer(from_fn(record_latency))
@@ -317,6 +336,37 @@ async fn drop_invalid_request_id(mut req: Request) -> Request {
         req.headers_mut().remove(&REQUEST_ID);
     }
     req
+}
+
+/// Request body limits (§8.1): 1 MB, except the theme archive upload (20 MB) and the theme
+/// builder's artifact and screenshot uploads, whose handlers read the body with the same cap.
+pub fn body_limit(path: &str) -> usize {
+    let internal_theme = path.strip_prefix("/internal/v1/themes/revisions/");
+    if path == "/admin/v1/themes/revisions/upload" {
+        commerce::themes::archive::MAX_UPLOAD_BYTES
+    } else if internal_theme.is_some_and(|p| p.ends_with("/artifact")) {
+        commerce::themes::MAX_ARTIFACT_BYTES + 8 * 1024 * 1024
+    } else if internal_theme.is_some_and(|p| p.contains("/screenshots/")) {
+        6 * 1024 * 1024
+    } else {
+        BODY_LIMIT_BYTES
+    }
+}
+
+/// Applies [`body_limit`]: a larger declared length is refused at once; the body is wrapped so
+/// a longer stream fails while it is read (413 either way).
+async fn limit_body(req: Request, next: Next) -> Response {
+    let limit = body_limit(req.uri().path());
+    let declared = req
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok());
+    if declared.is_some_and(|n| n > limit as u64) {
+        return Error::PayloadTooLarge.into_response();
+    }
+    next.run(req.map(|b| axum::body::Body::new(http_body_util::Limited::new(b, limit))))
+        .await
 }
 
 /// `RequestBodyLimitLayer` and axum's body extractors answer 413 in plain text; render it as

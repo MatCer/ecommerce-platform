@@ -63,6 +63,11 @@ pub const SCHEDULES: &[Schedule] = &[
         every: Duration::from_secs(86_400),
     },
     Schedule {
+        name: "themes.maintenance",
+        kind: commerce::themes::MAINTENANCE_JOB,
+        every: Duration::from_secs(3600),
+    },
+    Schedule {
         name: "ops.sweep",
         kind: handlers::SWEEP_JOB,
         every: Duration::from_secs(900),

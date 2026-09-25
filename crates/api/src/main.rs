@@ -157,6 +157,12 @@ async fn serve() -> anyhow::Result<()> {
     let ops = OpsConfig::from_env()?;
     let auth = StaffAuthConfig::from_env()?;
     let sf = StorefrontConfig::from_env()?;
+    let theme_cfg = platform::config::ThemeConfig::from_env()?;
+    if theme_cfg.secret.is_none() || theme_cfg.builder_token.is_none() {
+        tracing::warn!(
+            "THEME_SECRET/THEME_BUILDER_TOKEN not set: theme previews and builds answer 503"
+        );
+    }
     let db = platform::db::pool(&DbConfig::from_env()?)?;
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -200,6 +206,14 @@ async fn serve() -> anyhow::Result<()> {
             ops.storefront_rate_burst,
         )),
         ai: ai_helpers()?,
+        themes: theme_cfg
+            .secret
+            .as_deref()
+            .map(|s| commerce::themes::ThemeKeys::new(s.as_bytes())),
+        builder_token: theme_cfg
+            .builder_token
+            .as_deref()
+            .map(api::auth::ServiceToken::new),
     };
     let limiter = state.rate_limit.clone();
     tokio::spawn(async move {

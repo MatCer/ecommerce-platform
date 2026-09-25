@@ -248,6 +248,47 @@ pub fn write(source: &Source) -> Vec<u8> {
         .unwrap_or_default()
 }
 
+/// An artifact's files: relative path → bytes.
+pub type ArtifactFiles = Vec<(String, Vec<u8>)>;
+
+/// A built artifact sent by the builder as an uncompressed tar of the artifact directory
+/// (`manifest.json`, `server/**`, `client/**`): regular files at valid artifact paths only.
+/// Returns the artifact id named by the manifest and the files; `check_artifact` then checks
+/// them against the manifest.
+pub fn read_artifact_tar(tar_bytes: &[u8]) -> Result<(String, ArtifactFiles), ArchiveError> {
+    let mut archive = tar::Archive::new(tar_bytes);
+    let mut files = Vec::new();
+    let mut total: u64 = 0;
+    let broken = |e: io::Error| ArchiveError::one(format!("the artifact cannot be read: {e}"));
+    for entry in archive.entries().map_err(broken)? {
+        let mut entry = entry.map_err(broken)?;
+        let kind = entry.header().entry_type();
+        if kind.is_dir() || kind.is_pax_global_extensions() {
+            continue;
+        }
+        let name = String::from_utf8(entry.path_bytes().into_owned())
+            .map_err(|_| ArchiveError::one("a path is not valid UTF-8"))?;
+        let name = name.strip_prefix("./").unwrap_or(&name).to_owned();
+        if !(kind.is_file() || kind.is_contiguous()) || !super::artifact_path_valid(&name) {
+            return Err(ArchiveError::one(format!("{name:?}: not an artifact file")));
+        }
+        total = total.saturating_add(entry.size());
+        if total > super::MAX_ARTIFACT_BYTES as u64 || files.len() >= 20_000 {
+            return Err(ArchiveError::one("the artifact is larger than 50 MB"));
+        }
+        let mut bytes = Vec::new();
+        entry.read_to_end(&mut bytes).map_err(broken)?;
+        files.push((name, bytes));
+    }
+    let id = files
+        .iter()
+        .find(|(p, _)| p == "manifest.json")
+        .and_then(|(_, b)| serde_json::from_slice::<Value>(b).ok())
+        .and_then(|m| m["id"].as_str().map(str::to_owned))
+        .ok_or_else(|| ArchiveError::one("manifest.json with an id is missing"))?;
+    Ok((id, files))
+}
+
 // ---------------------------------------------------------------------------------------
 // Design tokens (`theme.tokens.json`, A6): the same allowlist as theme-kit's `validateTokens`.
 

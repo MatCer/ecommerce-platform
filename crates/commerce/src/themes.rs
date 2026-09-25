@@ -235,6 +235,39 @@ pub async fn register_artifact(
     Ok(())
 }
 
+/// Stores the default theme's source archive (validated, content-addressed key) and records it
+/// on the artifact built from it, so forks and resets start from exactly that source.
+pub async fn store_default_source(
+    db: &PgPool,
+    storage: &Storage,
+    artifact_id: &str,
+    gz: &[u8],
+) -> Result<String, Error> {
+    let source = archive::read(gz).map_err(|e| Error::Validation {
+        code: "invalid_archive",
+        detail: e.problems.join("; "),
+    })?;
+    let bytes = archive::write(&source);
+    let key = format!("theme-sources/default/{}.tar.gz", sha256_hex(&bytes));
+    storage
+        .private
+        .put(&Path::from(key.as_str()), PutPayload::from(bytes))
+        .await?;
+    sqlx::query!(
+        "UPDATE platform.theme_artifacts SET source_key = $2 WHERE id = $1",
+        artifact_id,
+        key
+    )
+    .execute(db)
+    .await?;
+    Ok(key)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::Digest;
+    hex::encode(sha2::Sha256::digest(bytes))
+}
+
 pub async fn artifact_exists(db: &PgPool, id: &str) -> Result<bool, Error> {
     Ok(sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM platform.theme_artifacts WHERE id = $1) AS "x!""#,

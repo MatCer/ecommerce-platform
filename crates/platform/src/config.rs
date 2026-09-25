@@ -381,6 +381,47 @@ impl StorefrontConfig {
     }
 }
 
+/// Theme builder pipeline (WP23). Every value is optional: without them the theme builder
+/// features answer 503 and nothing else is affected. Not `Debug`: holds secrets.
+#[derive(Clone, Default)]
+pub struct ThemeConfig {
+    /// `THEME_SECRET` (≥ 32 characters, API only): signs preview tokens (A21) and derives the
+    /// per-tenant `ASTRO_KEY`.
+    pub secret: Option<String>,
+    /// `THEME_BUILDER_TOKEN` (≥ 32 characters): the builder's service token for builder ↔ api
+    /// and worker → builder calls (distinct from the edge's tokens, A7).
+    pub builder_token: Option<String>,
+    /// `THEME_BUILDER_URL` (worker), e.g. `http://theme-builder:4020`.
+    pub builder_url: Option<Url>,
+}
+
+impl ThemeConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let long = |name: &'static str| -> Result<Option<String>, ConfigError> {
+            match get(lookup, name) {
+                Some(v) if v.len() < 32 => Err(ConfigError::Invalid {
+                    name,
+                    reason: "must be at least 32 characters".into(),
+                }),
+                v => Ok(v),
+            }
+        };
+        let builder_url = match get(lookup, "THEME_BUILDER_URL") {
+            None => None,
+            Some(_) => Some(url(lookup, "THEME_BUILDER_URL")?),
+        };
+        Ok(Self {
+            secret: long("THEME_SECRET")?,
+            builder_token: long("THEME_BUILDER_TOKEN")?,
+            builder_url,
+        })
+    }
+}
+
 /// Checkout integrations (WP10). Not `Debug`: it holds the fake gateway's signing key.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CheckoutConfig {

@@ -806,3 +806,81 @@ async fn catalog_events_purge_the_edge_and_debounce_feed_exports(db: PgPool) {
         "{bodies:?}"
     );
 }
+
+type Seen = Arc<std::sync::Mutex<Vec<(String, serde_json::Value)>>>;
+
+/// WP23: `themes.build` hands the revision to the builder with its service token; a builder
+/// that refuses the request (4xx) kills the job at once.
+#[sqlx::test(migrations = "../../migrations")]
+async fn theme_builds_are_handed_to_the_builder(db: PgPool) {
+    use axum::extract::State;
+    use axum::http::{HeaderMap, StatusCode};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "alpha").await;
+    let seen = Seen::default();
+    let app = axum::Router::new()
+        .route(
+            "/builds",
+            axum::routing::post(
+                |State(seen): State<Seen>,
+                 headers: HeaderMap,
+                 axum::Json(body): axum::Json<serde_json::Value>| async move {
+                    let auth = headers["authorization"].to_str().unwrap().to_owned();
+                    let refused = body["revision_id"] == "0192f000-0000-7000-8000-000000000002";
+                    seen.lock().unwrap().push((auth, body));
+                    if refused {
+                        StatusCode::BAD_REQUEST
+                    } else {
+                        StatusCode::ACCEPTED
+                    }
+                },
+            ),
+        )
+        .with_state(seen.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url: reqwest::Url = format!("http://{}/", listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let mut ids = Vec::new();
+    for revision in [
+        "0192f000-0000-7000-8000-000000000001",
+        "0192f000-0000-7000-8000-000000000002",
+    ] {
+        let mut job = NewJob::new(
+            commerce::themes::BUILD_JOB,
+            json!({ "revision_id": revision }),
+        );
+        job.tenant_id = Some(tenant);
+        job.max_attempts = 2;
+        ids.push(queue::enqueue(&runtime, &job).await.unwrap());
+    }
+    let mut extra = worker::handlers::Extra::disabled().unwrap();
+    extra.theme_builder = Some(worker::handlers::ThemeBuilder {
+        url,
+        token: "builder-token-0123456789abcdef0123456789".into(),
+        http: reqwest::Client::new(),
+    });
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            extra,
+        ),
+        fast_config(),
+    );
+    wait_for_status(&db, ids[0], "done").await;
+    let (attempts, err) = wait_for_status(&db, ids[1], "dead").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert_eq!(attempts, 1, "a refusal is not retried");
+    assert!(err.unwrap().contains("400"));
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen[0].0, "Bearer builder-token-0123456789abcdef0123456789");
+    assert_eq!(seen[0].1["tenant_id"], tenant.to_string());
+}

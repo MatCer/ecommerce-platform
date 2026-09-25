@@ -90,6 +90,10 @@ pub enum AdminCommand {
         /// Checkout artifact id.
         #[arg(long)]
         checkout: Option<String>,
+        /// The default theme's source archive (`.tar.gz`, WP23): stored with the theme
+        /// artifact so tenants can fork it and reset to it.
+        #[arg(long, requires = "theme")]
+        theme_source: Option<PathBuf>,
     },
     /// Queue a full search rebuild (index swap) for every tenant, or one (`--tenant <slug>`),
     /// e.g. after a restore (Meilisearch is not backed up; A27, A29).
@@ -138,9 +142,17 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
         root,
         theme,
         checkout,
+        theme_source,
     } = &cmd
     {
-        return publish_artifacts(db, root, theme.as_deref(), checkout.as_deref()).await;
+        return publish_artifacts(
+            db,
+            root,
+            theme.as_deref(),
+            checkout.as_deref(),
+            theme_source.as_deref(),
+        )
+        .await;
     }
     if let AdminCommand::SuppressEmail {
         tenant,
@@ -377,10 +389,11 @@ async fn publish_artifacts(
     root: &Path,
     theme: Option<&str>,
     checkout: Option<&str>,
+    theme_source: Option<&Path>,
 ) -> anyhow::Result<()> {
     let storage = Storage::s3(&S3Config::from_env()?)?;
     let mut out = serde_json::Map::new();
-    for (id, expected) in [
+    for (id, kind) in [
         (theme, ArtifactKind::Theme),
         (checkout, ArtifactKind::Checkout),
     ] {
@@ -389,50 +402,20 @@ async fn publish_artifacts(
             bail!("invalid artifact id {id:?}");
         }
         let dir = root.join(id);
-        let manifest: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(dir.join("manifest.json"))
-                .with_context(|| format!("read {}", dir.join("manifest.json").display()))?,
-        )?;
-        if manifest["id"] != id {
-            bail!("manifest id does not match the directory {id}");
-        }
-        let kind = manifest["kind"]
-            .as_str()
-            .and_then(ArtifactKind::parse)
-            .filter(|k| *k == expected)
-            .ok_or_else(|| anyhow!("artifact {id} is not a {} artifact", expected.as_str()))?;
         let mut files = Vec::new();
         read_tree(&dir, "", &mut files)?;
         // Exactly the files the manifest lists (the edge verifies the bytes against the content
         // address; `make theme-build` runs `theme-kit verify` before this).
-        let mut expected: std::collections::BTreeSet<String> = ["manifest.json".to_owned()].into();
-        if manifest["runtime"]["main"] != "entry.mjs" {
-            bail!("artifact {id}: the entry module must be entry.mjs");
-        }
-        for m in manifest["runtime"]["modules"]
-            .as_array()
-            .into_iter()
-            .flatten()
-        {
-            expected.insert(format!("server/{}", m.as_str().unwrap_or_default()));
-        }
-        for p in manifest["assets"]
-            .as_object()
-            .into_iter()
-            .flatten()
-            .map(|(p, _)| p)
-        {
-            expected.insert(format!("client{p}"));
-        }
-        let present: std::collections::BTreeSet<String> =
-            files.iter().map(|(p, _)| p.clone()).collect();
-        if present != expected {
-            bail!("artifact {id}: the files do not match the manifest");
-        }
-        let tokens = manifest.get("tokens").filter(|t| !t.is_null());
-        themes::register_artifact(db, &storage, id, kind, tokens, files).await?;
+        let tokens = themes::check_artifact(id, kind, &files).map_err(|e| anyhow!("{e}"))?;
+        themes::register_artifact(db, &storage, id, kind, tokens.as_ref(), files).await?;
         match kind {
             ArtifactKind::Theme => {
+                if let Some(path) = theme_source {
+                    let key = themes::store_default_source(db, &storage, id, &std::fs::read(path)?)
+                        .await
+                        .map_err(|e| anyhow!("{e}"))?;
+                    out.insert("theme_source".into(), json!(key));
+                }
                 let tenants =
                     themes::publish_default(db, commerce::audit::PLATFORM_ACTOR, id).await?;
                 out.insert(
