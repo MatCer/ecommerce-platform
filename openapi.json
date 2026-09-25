@@ -2241,6 +2241,281 @@
         ]
       }
     },
+    "/admin/v1/collections": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Collections, newest first.",
+        "operationId": "list_collections",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Creates a collection. `seasonal` needs a schedule window; `manual` may have one. Honors\n`Idempotency-Key`.",
+        "operationId": "create_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/collections/{id}": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "operationId": "get_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Replaces a collection.",
+        "operationId": "update_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "recommendations"
+        ],
+        "operationId": "delete_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/coupons": {
       "get": {
         "tags": [
@@ -6440,6 +6715,211 @@
             }
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/recommendations/explain": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Why these products: the strategy chain for a context, every recommended product with its\nstrategy and score, and every candidate that was left out with the reason (excluded, not\nsold in the market, out of stock, duplicate, ...).",
+        "operationId": "explain",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "market_id",
+            "in": "query",
+            "description": "The market to recommend in.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "As on the storefront: `product:<id>`, `category:<id>`, `collection:<id>`, `home`,\n`cart` or `recent`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1-24 (default 8).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "`recent`: product ids; `cart`: the cart's product ids (comma-separated).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "description": "Recommend for this customer: their affinity, only if their `personalization` consent\nis granted.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "description": "Evaluate as of this time (preview a scheduled collection). Default: now.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationExplain"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/recommendations/settings": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Which strategies run and which products are never recommended.",
+        "operationId": "get_settings",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Replaces the settings. Owner or admin.",
+        "operationId": "put_settings",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettings"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -12939,6 +13419,7 @@
         "tags": [
           "storefront"
         ],
+        "summary": "Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),\nseasonal collections, personalized picks and recently viewed, each filtered by market\nvisibility, status and availability, falling back to bestsellers. Without visitor headers\nthe answer is public and cacheable; with a cart or consent subject it is private\n(`Cache-Control: private, no-store`, A2). Personal signals are used only while the\nsubject's `personalization` consent is granted (A20). `recent` ignores visitor headers.",
         "operationId": "recommendations",
         "parameters": [
           {
@@ -12973,9 +13454,53 @@
             }
           },
           {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Shop cart capability (`cart` cookie): cross-sell for the cart's products.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous consent subject: personalization and recently viewed when its records grant\n`personalization` (A20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "context",
             "in": "query",
-            "description": "`product:<id>`, `cart` or `home`.",
+            "description": "`product:<id>`, `category:<id>`, `collection:<id>`, `home` (default), `cart` or\n`recent`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Products, 1-24 (default 8).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "`recent` only: the device's recently viewed product ids, comma-separated (at most 12);\nvalidated and rehydrated with live prices, never linked to a visitor.",
             "required": false,
             "schema": {
               "type": "string"
@@ -12988,6 +13513,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Recommendations"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -14204,6 +14738,58 @@
           },
           "ship_to_country": {
             "type": "string"
+          }
+        }
+      },
+      "Affinity": {
+        "type": "object",
+        "description": "A visitor's interests (only ever loaded with `personalization` consent, A20).",
+        "required": [
+          "scores",
+          "seen"
+        ],
+        "properties": {
+          "scores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AffinityScore"
+            }
+          },
+          "seen": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Products the visitor already looked at (ranked lower)."
+          }
+        }
+      },
+      "AffinityDim": {
+        "type": "string",
+        "enum": [
+          "category",
+          "brand"
+        ]
+      },
+      "AffinityScore": {
+        "type": "object",
+        "required": [
+          "dim",
+          "key",
+          "score"
+        ],
+        "properties": {
+          "dim": {
+            "$ref": "#/components/schemas/AffinityDim"
+          },
+          "key": {
+            "type": "string",
+            "description": "Category id or brand name."
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -16251,6 +16837,147 @@
         },
         "additionalProperties": false
       },
+      "Collection": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "title_i18n",
+          "kind",
+          "product_ids",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Open now (inside its window, or unscheduled)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CollectionKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "In display order."
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "title_i18n": {
+            "type": "object",
+            "description": "Shopper-facing heading per locale; the name where missing.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "product_ids"
+        ],
+        "properties": {
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Required for `seasonal`; after `starts_at`."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CollectionKind"
+          },
+          "name": {
+            "type": "string",
+            "example": "Vánoce"
+          },
+          "product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Products in display order (at most 200; duplicates are dropped)."
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Required for `seasonal`."
+          },
+          "title_i18n": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CollectionKind": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "seasonal"
+        ]
+      },
+      "CollectionList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Collection"
+            }
+          }
+        }
+      },
       "Collector": {
         "type": "string",
         "enum": [
@@ -16999,6 +17726,74 @@
           "menu"
         ]
       },
+      "Explained": {
+        "type": "object",
+        "required": [
+          "chain",
+          "items",
+          "skipped"
+        ],
+        "properties": {
+          "chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Strategy"
+            },
+            "description": "The strategies tried, in order."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplainedItem"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Skipped"
+            }
+          },
+          "strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "The strategy of the first product (what a theme titles the slot by)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A collection's heading when the first product comes from one."
+          }
+        }
+      },
+      "ExplainedItem": {
+        "type": "object",
+        "required": [
+          "product",
+          "strategy",
+          "score"
+        ],
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCard"
+          },
+          "score": {
+            "type": "number",
+            "format": "double",
+            "description": "Strategy-specific: orders together, decayed units, affinity, collection position."
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/Strategy"
+          }
+        }
+      },
       "Facet": {
         "type": "object",
         "required": [
@@ -17639,7 +18434,26 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductCard"
-            }
+            },
+            "description": "Public home recommendations: an open seasonal collection, else the market's best\nsellers (newest products in a shop without sales). Personal picks (\"for you\") are a\nseparate, private request (`/recommendations?context=home` via `/_p/recommendations`)."
+          },
+          "featured_strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "Where `featured` comes from (`seasonal`, `bestsellers`, `newest`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "featured_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The seasonal collection's heading, if `featured` is one."
           },
           "hero": {
             "$ref": "#/components/schemas/Hero",
@@ -22043,6 +22857,81 @@
           }
         }
       },
+      "RecommendationExplain": {
+        "type": "object",
+        "required": [
+          "personalization",
+          "result",
+          "names"
+        ],
+        "properties": {
+          "affinity": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Affinity",
+                "description": "The customer's interests, when personalization is allowed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "names": {
+            "type": "object",
+            "description": "Names of the skipped products (recommended ones carry theirs in the card).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "personalization": {
+            "type": "boolean",
+            "description": "The customer's `personalization` consent is granted (always false without one)."
+          },
+          "result": {
+            "$ref": "#/components/schemas/Explained"
+          }
+        }
+      },
+      "RecommendationSettings": {
+        "type": "object",
+        "required": [
+          "bestsellers",
+          "bought_together",
+          "seasonal",
+          "recently_viewed",
+          "personalized"
+        ],
+        "properties": {
+          "bestsellers": {
+            "type": "boolean"
+          },
+          "bought_together": {
+            "type": "boolean"
+          },
+          "excluded_product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Never recommended (gift cards, samples, ...). At most 500."
+          },
+          "personalized": {
+            "type": "boolean"
+          },
+          "recently_viewed": {
+            "type": "boolean"
+          },
+          "seasonal": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "Recommendations": {
         "type": "object",
         "required": [
@@ -22051,13 +22940,32 @@
         ],
         "properties": {
           "cache": {
-            "$ref": "#/components/schemas/CacheHints"
+            "$ref": "#/components/schemas/CacheHints",
+            "description": "Public for the anonymous variant; private (and `Cache-Control: private, no-store`)\nwhen the request carried a cart or a consent subject (A2)."
           },
           "products": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductCard"
             }
+          },
+          "strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "The strategy of the first product, so a theme can title the slot (\"Frequently bought\ntogether\", \"For you\", ...); absent when there are no products."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A merchant collection's heading when the products come from one."
           }
         }
       },
@@ -23175,6 +24083,37 @@
         },
         "additionalProperties": false
       },
+      "SkipReason": {
+        "type": "string",
+        "enum": [
+          "current",
+          "in_cart",
+          "excluded",
+          "duplicate",
+          "not_sold",
+          "out_of_stock"
+        ]
+      },
+      "Skipped": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "strategy",
+          "reason"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SkipReason"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/Strategy"
+          }
+        }
+      },
       "Sort": {
         "type": "string",
         "enum": [
@@ -23320,6 +24259,19 @@
             "description": "Public storefront token of the tenant (the edge sends it; it grants only public reads\nand cart operations of this tenant)."
           }
         }
+      },
+      "Strategy": {
+        "type": "string",
+        "description": "Where a recommended product came from.",
+        "enum": [
+          "bought_together",
+          "bestsellers",
+          "seasonal",
+          "collection",
+          "recently_viewed",
+          "personalized",
+          "newest"
+        ]
       },
       "StripeAccount": {
         "type": "object",
@@ -24440,6 +25392,10 @@
     {
       "name": "promotions",
       "description": "Admin API: sales and coupons"
+    },
+    {
+      "name": "recommendations",
+      "description": "Admin API: collections, recommendation settings, why-recommended explanations"
     },
     {
       "name": "inventory",

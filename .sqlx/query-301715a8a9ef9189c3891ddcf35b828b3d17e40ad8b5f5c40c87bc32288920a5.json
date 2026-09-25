@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT name, title_i18n, product_ids FROM collections\n                 WHERE kind = 'seasonal' AND starts_at <= $1 AND ends_at > $1\n                 ORDER BY starts_at DESC, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "collections",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "title_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "collections",
+            "name": "title_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "product_ids",
+        "type_info": "UuidArray",
+        "origin": {
+          "Table": {
+            "table": "collections",
+            "name": "product_ids"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "301715a8a9ef9189c3891ddcf35b828b3d17e40ad8b5f5c40c87bc32288920a5"
+}

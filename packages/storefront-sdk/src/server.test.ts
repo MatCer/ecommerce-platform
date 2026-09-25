@@ -21,9 +21,13 @@ test("forwards the request context and encodes slugs and queries", async () => {
   const sf = createStorefront({ binding: b, request });
   await sf.product("tričko?x=1");
   await sf.category("muzi/trika", { color: ["red", "blue"], sort: "price" });
+  await sf.recommendations("product:p1", { limit: 4 });
+  await sf.recommendations("home");
   expect(b.seen.map((s) => s.url)).toEqual([
     "https://storefront/pages/product/tri%C4%8Dko%3Fx%3D1",
     "https://storefront/pages/category/muzi/trika?color=red&color=blue&sort=price",
+    "https://storefront/recommendations?context=product%3Ap1&limit=4",
+    "https://storefront/recommendations?context=home",
   ]);
   expect(b.seen[0]?.headers["x-platform-ctx"]).toBe("ctx123");
 });

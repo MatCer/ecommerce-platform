@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM co_purchases",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "01cc138453f123e5f63310f853a103ccf2ca4367ed7fba19891c9e84cfbb4946"
+}

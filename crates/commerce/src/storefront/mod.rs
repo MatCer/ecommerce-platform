@@ -322,6 +322,15 @@ impl CacheHints {
             tags,
         }
     }
+
+    /// Per-visitor data: never cached anywhere (A2).
+    pub fn private() -> Self {
+        Self {
+            public: false,
+            max_age: 0,
+            tags: Vec::new(),
+        }
+    }
 }
 
 /// hreflang alternates: the same page in every (market, locale) that has it, plus

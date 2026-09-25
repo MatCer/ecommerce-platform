@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO co_purchases (tenant_id, product_a, product_b, count_90d)\n         SELECT $1, a.product_id, b.product_id, count(DISTINCT o.id)::int\n         FROM orders o\n         JOIN order_lines a ON a.order_id = o.id AND a.product_id IS NOT NULL\n         JOIN order_lines b ON b.order_id = o.id AND b.product_id IS NOT NULL\n                           AND b.product_id <> a.product_id\n         WHERE o.placed_at > $2 AND o.placed_at <= $3 AND o.status <> 'cancelled'\n         GROUP BY a.product_id, b.product_id\n         HAVING count(DISTINCT o.id) >= $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5b2886a3e9ed5f44040b3b98941f09cf9f45fb2daab8db104f406db0102ef5ee"
+}

@@ -697,6 +697,45 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect((await get("http://demo.localhost/_p/public/cart")).status).toBe(404);
   });
 
+  test("/_p/recommendations forwards the cart and consent subject, never cached (WP17, A2, A20)", async () => {
+    api.calls.length = 0;
+    const consentId = "d".repeat(32);
+    const cookie = `cart=carttoken_00000000000000000001; __Secure-consent_id=${consentId}`;
+    const res = await get("http://demo.localhost/_p/recommendations?context=cart&limit=4", {
+      cookie,
+      // A client cannot claim a subject or cart itself.
+      "x-consent-subject": "e".repeat(32),
+      "x-cart-token": "carttoken_forged_forged_forged",
+    });
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    const call = api.calls.at(-1);
+    expect(call?.url).toBe("http://api.test/storefront/v1/recommendations?context=cart&limit=4");
+    expect(call?.headers).toMatchObject({
+      "x-tenant": "t-demo",
+      "x-cart-token": "carttoken_00000000000000000001",
+      "x-consent-subject": consentId,
+    });
+    // Malformed cookies are dropped, not forwarded.
+    await get("http://demo.localhost/_p/recommendations?context=home", {
+      cookie: "cart=bad; __Secure-consent_id=nope",
+    });
+    expect(api.calls.at(-1)?.headers["x-cart-token"]).toBeUndefined();
+    expect(api.calls.at(-1)?.headers["x-consent-subject"]).toBeUndefined();
+    // The public route never carries visitor data.
+    await get("http://demo.localhost/_p/public/recommendations?context=home", { cookie });
+    expect(api.calls.at(-1)?.headers["x-cart-token"]).toBeUndefined();
+    expect(api.calls.at(-1)?.headers["x-consent-subject"]).toBeUndefined();
+    const post = await gw.fetch(
+      new Request("http://demo.localhost/_p/recommendations", {
+        method: "POST",
+        headers: { host: "demo.localhost", origin: "http://demo.localhost" },
+      }),
+    );
+    expect(post.status).toBe(405);
+    const long = await get(`http://demo.localhost/_p/recommendations?ids=${"a".repeat(2000)}`);
+    expect(long.status).toBe(414);
+  });
+
   test("a non-default locale prefix renders in that locale, cached apart (spec §9.1)", async () => {
     resolver.set(
       "demo-sk.localhost",
@@ -729,6 +768,16 @@ describe("platform routes backed by the real API (WP6)", () => {
       headers: { "x-locale": "cs", "x-market": "m-sk" },
     });
     expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
+    // Private recommendations stay unprefixed like the cart (cookie `Path=/_p`); `?locale=`
+    // picks one of the market's locales, anything else falls back to the default.
+    expect((await get("http://demo-sk.localhost/cs/_p/recommendations")).status).toBe(404);
+    await get("http://demo-sk.localhost/_p/recommendations?context=home&locale=cs");
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/recommendations?context=home&locale=cs",
+      headers: { "x-locale": "cs", "x-market": "m-sk" },
+    });
+    await get("http://demo-sk.localhost/_p/recommendations?context=home&locale=de");
+    expect(api.calls.at(-1)?.headers["x-locale"]).toBe("sk");
     // Redirects: as typed first, else the unprefixed rule with the target kept in the locale.
     const typed = await get("http://demo-sk.localhost/cs/stary");
     expect([typed.status, typed.headers.get("location")]).toEqual([301, "/cs/c/novy"]);

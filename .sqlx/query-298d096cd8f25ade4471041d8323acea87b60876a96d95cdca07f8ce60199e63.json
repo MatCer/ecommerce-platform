@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_stats_daily WHERE date >= $1 AND date <= $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "298d096cd8f25ade4471041d8323acea87b60876a96d95cdca07f8ce60199e63"
+}

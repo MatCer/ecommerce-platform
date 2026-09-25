@@ -20,6 +20,8 @@ use super::{
 };
 use crate::media::AssetVariant;
 use crate::money::MoneyView;
+use crate::recommendations::Strategy;
+use crate::recommendations::engine::{self, Target, Visitor};
 use crate::themes;
 
 // ---------------------------------------------------------------------------------------
@@ -280,7 +282,14 @@ pub struct HomePage {
     /// Placeholder built from the catalog until CMS blocks exist (WP13).
     pub hero: Hero,
     pub categories: Vec<CategoryTile>,
+    /// Public home recommendations: an open seasonal collection, else the market's best
+    /// sellers (newest products in a shop without sales). Personal picks ("for you") are a
+    /// separate, private request (`/recommendations?context=home` via `/_p/recommendations`).
     pub featured: Vec<ProductCard>,
+    /// Where `featured` comes from (`seasonal`, `bestsellers`, `newest`).
+    pub featured_strategy: Option<Strategy>,
+    /// The seasonal collection's heading, if `featured` is one.
+    pub featured_title: Option<String>,
     pub seo: Seo,
     pub cache: CacheHints,
 }
@@ -329,15 +338,9 @@ pub async fn home(tx: &mut TenantTx, ctx: &Context) -> Result<HomePage, Error> {
             image,
         });
     }
-    let newest = sqlx::query_scalar!(
-        "SELECT id FROM products WHERE status = 'active' ORDER BY created_at DESC, id LIMIT 24"
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    let mut featured = cards::cards(tx, ctx, &newest).await?;
-    // In-stock products first; the order is otherwise newest first.
-    featured.sort_by_key(|c| !c.stock.purchasable());
-    featured.truncate(8);
+    let recommended =
+        recommendations(tx, ctx, &Target::Home, &Visitor::default(), 8, false).await?;
+    let featured = recommended.products;
     let cta = categories.first().map_or_else(
         || link(ctx, "home.hero_cta", "/"),
         |c| Link {
@@ -357,6 +360,8 @@ pub async fn home(tx: &mut TenantTx, ctx: &Context) -> Result<HomePage, Error> {
         },
         categories,
         featured,
+        featured_strategy: recommended.strategy,
+        featured_title: recommended.title,
         seo: Seo {
             title: ctx.shop_name.clone(),
             description: t(ctx, "trust.delivery"),
@@ -821,43 +826,45 @@ pub async fn search(
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct Recommendations {
+    /// The strategy of the first product, so a theme can title the slot ("Frequently bought
+    /// together", "For you", ...); absent when there are no products.
+    pub strategy: Option<Strategy>,
+    /// A merchant collection's heading when the products come from one.
+    pub title: Option<String>,
     pub products: Vec<ProductCard>,
+    /// Public for the anonymous variant; private (and `Cache-Control: private, no-store`)
+    /// when the request carried a cart or a consent subject (A2).
     pub cache: CacheHints,
 }
 
-/// `context`: `product:<id>` (same category first), `cart` or `home`. Not personalized yet
-/// (M2), so the result is public.
+/// Recommendations for `target` (spec §11.2): the strategy chain with visibility filtering and
+/// the bestsellers fallback ([`engine::recommend`]). `private`: the request carried visitor
+/// data (cart, consent subject), so the result must not be cached.
 pub async fn recommendations(
     tx: &mut TenantTx,
     ctx: &Context,
-    context: &str,
+    target: &Target,
+    visitor: &Visitor,
+    limit: usize,
+    private: bool,
 ) -> Result<Recommendations, Error> {
-    let product = context
-        .strip_prefix("product:")
-        .and_then(|id| Uuid::parse_str(id).ok());
-    let ids = sqlx::query_scalar!(
-        "SELECT p.id FROM products p
-         LEFT JOIN product_categories pc ON pc.product_id = p.id
-             AND pc.category_id IN (SELECT category_id FROM product_categories WHERE product_id = $1)
-         WHERE p.status = 'active' AND p.id IS DISTINCT FROM $1
-         GROUP BY p.id
-         ORDER BY count(pc.category_id) DESC, max(p.created_at) DESC, p.id
-         LIMIT 12",
-        product
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    let mut products = cards::cards(tx, ctx, &ids).await?;
-    products.retain(|c| c.stock.purchasable());
-    products.truncate(4);
+    let settings = crate::recommendations::settings::get(tx).await?;
+    let found = engine::recommend(tx, ctx, &settings, target, visitor, limit).await?;
+    let products: Vec<ProductCard> = found.items.into_iter().map(|i| i.product).collect();
     Ok(Recommendations {
-        cache: CacheHints::public(
-            300,
-            products
-                .iter()
-                .map(|c| format!("product:{}", c.id))
-                .collect(),
-        ),
+        strategy: found.strategy,
+        title: found.title,
+        cache: if private {
+            CacheHints::private()
+        } else {
+            CacheHints::public(
+                300,
+                products
+                    .iter()
+                    .map(|c| format!("product:{}", c.id))
+                    .collect(),
+            )
+        },
         products,
     })
 }

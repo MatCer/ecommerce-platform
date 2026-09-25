@@ -122,6 +122,8 @@ const ORDER_PAGE_RE = /^\/o\/[0-9a-f]{64}$/;
 
 const MAX_JSON_BODY = 16 * 1024;
 const MAX_EVENTS_BODY = 64 * 1024;
+/** Context, limit and up to 12 recently viewed ids fit well under this. */
+const MAX_RECOMMENDATIONS_QUERY = 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
 /** Customer session (A1): checkout origin only, host-only via the `__Host-` prefix. */
@@ -926,6 +928,39 @@ ${
     });
   }
 
+  /**
+   * `/_p/recommendations` (WP17, shop origin): the private variant of `/recommendations`. Only
+   * here does the API get the visitor's cart capability (cross-sell for the cart) and consent
+   * subject (A20: personalization and recently viewed only while its records grant
+   * `personalization`); SSR and `/_p/public/*` never carry either, so they stay public. Never
+   * cached (A2). Unprefixed only, like the cart (its cookie is `Path=/_p`): `?locale=` picks
+   * one of the market's locales instead of a path prefix.
+   */
+  async function recommendationsProxy(site: Site, req: Request, url: URL): Promise<Response> {
+    if (req.method !== "GET") return text(405, "Method not allowed", { allow: "GET" });
+    if (url.search.length > MAX_RECOMMENDATIONS_QUERY)
+      return problem(414, "uri_too_long", "recommendations query too long");
+    const locale = url.searchParams.get("locale");
+    const localized = locale && site.locales.includes(locale) ? { ...site, locale } : site;
+    const token = readCookie(req.headers, SHOP_CART_COOKIE);
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/recommendations${url.search}`, {
+        headers: apiHeaders(localized, {
+          accept: "application/json",
+          ...(token && TOKEN_RE.test(token) ? { "x-cart-token": token } : {}),
+          ...consentSubject(req),
+        }),
+      }),
+    );
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+        "cache-control": "private, no-store",
+      }),
+    });
+  }
+
   async function events(site: Site, req: Request, host: string, port: string): Promise<Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
@@ -1036,6 +1071,7 @@ ${
     if (p === "/_p/checkout/start") return checkoutStart(site, req, host, port);
     if (p.startsWith("/_p/public/"))
       return publicProxy(site, req, url, p.slice("/_p/public".length));
+    if (p === "/_p/recommendations") return recommendationsProxy(site, req, url);
     if (p === "/_p/e") return events(site, req, host, port);
     if (p === "/_p/newsletter") return newsletter(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {

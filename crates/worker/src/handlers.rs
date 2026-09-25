@@ -94,6 +94,7 @@ pub const PAYMENTS_FIO_POLL: &str = "payments.fio_poll";
 pub use commerce::adtracking::{DELIVER_JOB as AD_DELIVER_JOB, REFUND_JOB as AD_REFUND_JOB};
 pub use commerce::analytics::{PARTITIONS_JOB, ROLLUP_JOB};
 pub use commerce::ops::SWEEP_JOB;
+pub use commerce::recommendations::ROLLUP_JOB as RECOMMENDATIONS_ROLLUP;
 pub use commerce::webhooks::{DELIVER_JOB, FANOUT_JOB};
 
 pub fn all(
@@ -160,6 +161,7 @@ pub fn all(
         })
         .register(ROLLUP_JOB, analytics_rollup)
         .register(PARTITIONS_JOB, analytics_partitions)
+        .register(RECOMMENDATIONS_ROLLUP, recommendations_rollup)
         .register(FANOUT_JOB, webhooks_fanout)
         .register(DELIVER_JOB, move |ctx, job| {
             webhooks_deliver(ctx, job, webhooks.clone())
@@ -650,6 +652,65 @@ async fn analytics_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
         tx.commit().await?;
     }
     tracing::info!(tenants = tenants.len(), "analytics rollup done");
+    Ok(())
+}
+
+/// Above this many changed products one index rebuild replaces the per-product jobs.
+const REINDEX_REBUILD_OVER: usize = 1000;
+
+/// Hourly (WP17): product stats of today and yesterday (everything retained, 400 days, at the
+/// 03:00 UTC slot, on a tenant's first run or on a `backfill` request), co-purchases,
+/// scores, customer affinity; then reindexes the products whose search popularity moved. The
+/// rollup marks them; a second transaction takes the marks and enqueues the jobs, so their
+/// version is drawn after the change committed (A27) and a crash in between only delays them.
+async fn recommendations_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    use commerce::recommendations::rollup;
+    let now = chrono::Utc::now();
+    let slot = job.payload.get("slot").and_then(serde_json::Value::as_i64);
+    let nightly = slot.is_some_and(|s| s.rem_euclid(24) == 3);
+    let backfill = job.payload.get("backfill") == Some(&serde_json::Value::Bool(true));
+    let tenants = match job.tenant_id {
+        Some(t) => vec![t],
+        None => {
+            sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+                .fetch_all(&ctx.db)
+                .await?
+        }
+    };
+    let retry = |e: platform::Error| JobError::Retry(e.to_string());
+    for tenant in &tenants {
+        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
+        let days = if backfill || !rollup::has_stats(&mut tx).await.map_err(retry)? {
+            rollup::BACKFILL_DAYS
+        } else if nightly {
+            rollup::NIGHTLY_DAYS
+        } else {
+            2
+        };
+        rollup::run(&mut tx, now, days).await.map_err(retry)?;
+        tx.commit().await?;
+
+        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
+        let changed = rollup::take_reindex(&mut tx).await.map_err(retry)?;
+        if changed.is_empty() {
+            continue;
+        }
+        let version = search::next_version(&mut *tx).await?;
+        if changed.len() > REINDEX_REBUILD_OVER {
+            queue::enqueue(&mut *tx, &search::rebuild_job(*tenant, version)).await?;
+        } else {
+            for product in &changed {
+                queue::enqueue(
+                    &mut *tx,
+                    &search::index_product_job(*tenant, *product, version),
+                )
+                .await?;
+            }
+        }
+        tx.commit().await?;
+        tracing::info!(%tenant, changed = changed.len(), "search popularity changed");
+    }
+    tracing::info!(tenants = tenants.len(), "recommendations rollup done");
     Ok(())
 }
 

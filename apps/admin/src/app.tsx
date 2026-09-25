@@ -32,6 +32,8 @@ const Redirects = lazy(() => import("./pages/Redirects.tsx"));
 const Imports = lazy(() => import("./pages/Imports.tsx"));
 const ExportFeeds = lazy(() => import("./pages/ExportFeeds.tsx"));
 const SearchSynonyms = lazy(() => import("./pages/SearchSynonyms.tsx"));
+const Collections = lazy(() => import("./pages/Collections.tsx"));
+const Recommendations = lazy(() => import("./pages/Recommendations.tsx"));
 const ShippingMethods = lazy(() => import("./pages/ShippingMethods.tsx"));
 const PaymentMethods = lazy(() => import("./pages/PaymentMethods.tsx"));
 const PaymentExceptions = lazy(() => import("./pages/PaymentExceptions.tsx"));
@@ -107,6 +109,8 @@ export function App() {
           <Route path="/imports/:id" component={Imports} />
           <Route path="/feeds" component={ExportFeeds} />
           <Route path="/settings/search" component={SearchSynonyms} />
+          <Route path="/collections" component={Collections} />
+          <Route path="/settings/recommendations" component={Recommendations} />
           <Route path="/settings/ai" component={AiSettings} />
           <Route path="/orders" component={Orders} />
           <Route path="/orders/:id" component={OrderDetail} />

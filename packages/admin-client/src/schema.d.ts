@@ -526,6 +526,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collections, newest first. */
+        get: operations["list_collections"];
+        put?: never;
+        /**
+         * Creates a collection. `seasonal` needs a schedule window; `manual` may have one. Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["create_collection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/collections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_collection"];
+        /** Replaces a collection. */
+        put: operations["update_collection"];
+        post?: never;
+        delete: operations["delete_collection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/coupons": {
         parameters: {
             query?: never;
@@ -1379,6 +1417,45 @@ export interface paths {
          */
         get: operations["price_history"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/recommendations/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Why these products: the strategy chain for a context, every recommended product with its
+         *     strategy and score, and every candidate that was left out with the reason (excluded, not
+         *     sold in the market, out of stock, duplicate, ...).
+         */
+        get: operations["explain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/recommendations/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which strategies run and which products are never recommended. */
+        get: operations["get_settings"];
+        /** Replaces the settings. Owner or admin. */
+        put: operations["put_settings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2603,6 +2680,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),
+         *     seasonal collections, personalized picks and recently viewed, each filtered by market
+         *     visibility, status and availability, falling back to bestsellers. Without visitor headers
+         *     the answer is public and cacheable; with a cart or consent subject it is private
+         *     (`Cache-Control: private, no-store`, A2). Personal signals are used only while the
+         *     subject's `personalization` consent is granted (A20). `recent` ignores visitor headers.
+         */
         get: operations["recommendations"];
         put?: never;
         post?: never;
@@ -2927,6 +3012,21 @@ export interface components {
             market_id: string;
             order: components["schemas"]["OrderView"];
             ship_to_country: string;
+        };
+        /** @description A visitor's interests (only ever loaded with `personalization` consent, A20). */
+        Affinity: {
+            scores: components["schemas"]["AffinityScore"][];
+            /** @description Products the visitor already looked at (ranked lower). */
+            seen: string[];
+        };
+        /** @enum {string} */
+        AffinityDim: "category" | "brand";
+        AffinityScore: {
+            dim: components["schemas"]["AffinityDim"];
+            /** @description Category id or brand name. */
+            key: string;
+            /** Format: double */
+            score: number;
         };
         AiMark: {
             /** Format: date-time */
@@ -3502,6 +3602,53 @@ export interface components {
             /** @description `cash` (rounded, A16) or `card`. */
             tender: components["schemas"]["Tender"];
         };
+        Collection: {
+            /** @description Open now (inside its window, or unscheduled). */
+            active: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            ends_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["CollectionKind"];
+            name: string;
+            /** @description In display order. */
+            product_ids: string[];
+            /** Format: date-time */
+            starts_at?: string | null;
+            /** @description Shopper-facing heading per locale; the name where missing. */
+            title_i18n: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CollectionInput: {
+            /**
+             * Format: date-time
+             * @description Required for `seasonal`; after `starts_at`.
+             */
+            ends_at?: string | null;
+            kind: components["schemas"]["CollectionKind"];
+            /** @example Vánoce */
+            name: string;
+            /** @description Products in display order (at most 200; duplicates are dropped). */
+            product_ids: string[];
+            /**
+             * Format: date-time
+             * @description Required for `seasonal`.
+             */
+            starts_at?: string | null;
+            title_i18n?: {
+                [key: string]: string;
+            };
+        };
+        /** @enum {string} */
+        CollectionKind: "manual" | "seasonal";
+        CollectionList: {
+            items: components["schemas"]["Collection"][];
+        };
         /** @enum {string} */
         Collector: "carrier" | "merchant";
         Collision: {
@@ -3739,6 +3886,24 @@ export interface components {
         DistanceSalesMode: "origin_threshold" | "destination";
         /** @enum {string} */
         EntityType: "product" | "category" | "page" | "menu";
+        Explained: {
+            /** @description The strategies tried, in order. */
+            chain: components["schemas"]["Strategy"][];
+            items: components["schemas"]["ExplainedItem"][];
+            skipped: components["schemas"]["Skipped"][];
+            strategy?: components["schemas"]["Strategy"] | null;
+            /** @description A collection's heading when the first product comes from one. */
+            title?: string | null;
+        };
+        ExplainedItem: {
+            product: components["schemas"]["ProductCard"];
+            /**
+             * Format: double
+             * @description Strategy-specific: orders together, decayed units, affinity, collection position.
+             */
+            score: number;
+            strategy: components["schemas"]["Strategy"];
+        };
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
             key: string;
@@ -3919,7 +4084,15 @@ export interface components {
         HomePage: {
             cache: components["schemas"]["CacheHints"];
             categories: components["schemas"]["CategoryTile"][];
+            /**
+             * @description Public home recommendations: an open seasonal collection, else the market's best
+             *     sellers (newest products in a shop without sales). Personal picks ("for you") are a
+             *     separate, private request (`/recommendations?context=home` via `/_p/recommendations`).
+             */
             featured: components["schemas"]["ProductCard"][];
+            featured_strategy?: components["schemas"]["Strategy"] | null;
+            /** @description The seasonal collection's heading, if `featured` is one. */
+            featured_title?: string | null;
             /** @description Placeholder built from the catalog until CMS blocks exist (WP13). */
             hero: components["schemas"]["Hero"];
             seo: components["schemas"]["Seo"];
@@ -5317,9 +5490,35 @@ export interface components {
             new: boolean;
             received: boolean;
         };
+        RecommendationExplain: {
+            affinity?: components["schemas"]["Affinity"] | null;
+            /** @description Names of the skipped products (recommended ones carry theirs in the card). */
+            names: {
+                [key: string]: string;
+            };
+            /** @description The customer's `personalization` consent is granted (always false without one). */
+            personalization: boolean;
+            result: components["schemas"]["Explained"];
+        };
+        RecommendationSettings: {
+            bestsellers: boolean;
+            bought_together: boolean;
+            /** @description Never recommended (gift cards, samples, ...). At most 500. */
+            excluded_product_ids?: string[];
+            personalized: boolean;
+            recently_viewed: boolean;
+            seasonal: boolean;
+        };
         Recommendations: {
+            /**
+             * @description Public for the anonymous variant; private (and `Cache-Control: private, no-store`)
+             *     when the request carried a cart or a consent subject (A2).
+             */
             cache: components["schemas"]["CacheHints"];
             products: components["schemas"]["ProductCard"][];
+            strategy?: components["schemas"]["Strategy"] | null;
+            /** @description A merchant collection's heading when the products come from one. */
+            title?: string | null;
         };
         Redirect: {
             /** Format: int32 */
@@ -5687,6 +5886,14 @@ export interface components {
             outcome: components["schemas"]["Outcome"];
         };
         /** @enum {string} */
+        SkipReason: "current" | "in_cart" | "excluded" | "duplicate" | "not_sold" | "out_of_stock";
+        Skipped: {
+            /** Format: uuid */
+            product_id: string;
+            reason: components["schemas"]["SkipReason"];
+            strategy: components["schemas"]["Strategy"];
+        };
+        /** @enum {string} */
         Sort: "recommended" | "price_asc" | "price_desc" | "newest";
         SortOption: {
             href: string;
@@ -5747,6 +5954,11 @@ export interface components {
              */
             token: string;
         };
+        /**
+         * @description Where a recommended product came from.
+         * @enum {string}
+         */
+        Strategy: "bought_together" | "bestsellers" | "seasonal" | "collection" | "recently_viewed" | "personalized" | "newest";
         StripeAccount: {
             account_id: string;
             /** @description `active`, `inactive` or `pending`. */
@@ -7451,6 +7663,171 @@ export interface operations {
             };
             /** @description invalid_cod_report */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_collections: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionList"];
+                };
+            };
+        };
+    };
+    create_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9991,6 +10368,119 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    explain: {
+        parameters: {
+            query: {
+                /** @description The market to recommend in. */
+                market_id: string;
+                /**
+                 * @description As on the storefront: `product:<id>`, `category:<id>`, `collection:<id>`, `home`,
+                 *     `cart` or `recent`.
+                 */
+                context?: string;
+                /** @description 1-24 (default 8). */
+                limit?: number;
+                /** @description `recent`: product ids; `cart`: the cart's product ids (comma-separated). */
+                ids?: string;
+                /**
+                 * @description Recommend for this customer: their affinity, only if their `personalization` consent
+                 *     is granted.
+                 */
+                customer_id?: string;
+                /** @description Evaluate as of this time (preview a scheduled collection). Default: now. */
+                at?: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationExplain"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationSettings"];
+                };
+            };
+        };
+    };
+    put_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecommendationSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationSettings"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13533,8 +14023,18 @@ export interface operations {
     recommendations: {
         parameters: {
             query?: {
-                /** @description `product:<id>`, `cart` or `home`. */
+                /**
+                 * @description `product:<id>`, `category:<id>`, `collection:<id>`, `home` (default), `cart` or
+                 *     `recent`.
+                 */
                 context?: string;
+                /** @description Products, 1-24 (default 8). */
+                limit?: number;
+                /**
+                 * @description `recent` only: the device's recently viewed product ids, comma-separated (at most 12);
+                 *     validated and rehydrated with live prices, never linked to a visitor.
+                 */
+                ids?: string;
             };
             header: {
                 /** @description The tenant's public storefront token. */
@@ -13543,6 +14043,13 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description Shop cart capability (`cart` cookie): cross-sell for the cart's products. */
+                "X-Cart-Token"?: string | null;
+                /**
+                 * @description Anonymous consent subject: personalization and recently viewed when its records grant
+                 *     `personalization` (A20).
+                 */
+                "X-Consent-Subject"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -13555,6 +14062,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Recommendations"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

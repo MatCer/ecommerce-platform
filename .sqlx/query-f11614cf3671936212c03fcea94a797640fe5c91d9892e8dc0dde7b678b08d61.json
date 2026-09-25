@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, status, brand, created_at FROM products WHERE id = ANY($1)",
+  "query": "SELECT p.id, p.status, p.brand, p.created_at,\n                  coalesce(pp.popularity, 0) AS \"popularity!\"\n           FROM products p LEFT JOIN product_popularity pp ON pp.product_id = p.id\n           WHERE p.id = ANY($1)",
   "describe": {
     "columns": [
       {
@@ -46,6 +46,12 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 4,
+        "name": "popularity!",
+        "type_info": "Int4",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -57,8 +63,9 @@
       false,
       false,
       true,
-      false
+      false,
+      null
     ]
   },
-  "hash": "1116e279e9e2d862bfdc79806b0e5e7bbd5bf4599c61a882f8e00730528b36a3"
+  "hash": "f11614cf3671936212c03fcea94a797640fe5c91d9892e8dc0dde7b678b08d61"
 }

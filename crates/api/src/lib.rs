@@ -16,6 +16,7 @@ pub mod admin_payments;
 pub mod admin_platform;
 pub mod admin_pricing;
 pub mod admin_promotions;
+pub mod admin_recommendations;
 pub mod admin_search;
 pub mod admin_staff;
 pub mod admin_storefront;
@@ -106,6 +107,7 @@ pub struct AppState {
         (name = "media", description = "Admin API: image assets (presigned uploads, variants)"),
         (name = "pricing", description = "Admin API: tax profile, price lists, variant prices, price history"),
         (name = "promotions", description = "Admin API: sales and coupons"),
+        (name = "recommendations", description = "Admin API: collections, recommendation settings, why-recommended explanations"),
         (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "search", description = "Admin API: search index status and rebuilds"),
         (name = "storefront-admin", description = "Admin API: redirects and the storefront token"),
@@ -159,6 +161,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_media::routes())
         .merge(admin_pricing::routes())
         .merge(admin_promotions::routes())
+        .merge(admin_recommendations::routes())
         .merge(admin_inventory::routes())
         .merge(admin_search::routes())
         .merge(admin_storefront::routes())
