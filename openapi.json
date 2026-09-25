@@ -27389,6 +27389,14 @@
             "items": {
               "$ref": "#/components/schemas/Definition"
             }
+          },
+          "test_clock_now": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The tenant's shifted test-clock time; absent when the clock is unavailable\n(production), so the admin hides its control."
           }
         }
       },

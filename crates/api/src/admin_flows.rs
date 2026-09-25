@@ -27,6 +27,9 @@ pub fn routes() -> OpenApiRouter<AppState> {
 #[derive(Serialize, ToSchema)]
 pub struct FlowList {
     pub items: Vec<Definition>,
+    /// The tenant's shifted test-clock time; absent when the clock is unavailable
+    /// (production), so the admin hides its control.
+    pub test_clock_now: Option<chrono::DateTime<chrono::Utc>>,
 }
 #[derive(Serialize, ToSchema)]
 pub struct RunList {
@@ -38,8 +41,19 @@ async fn list_flows(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<Json<FlowList>, Error> {
+    let (items, test_clock_now) = in_tx(&s, staff.tenant_id, async |tx| {
+        let items = flows::definitions(tx).await?;
+        let now = if flows::dev_clock_allowed() {
+            Some(flows::effective_now(tx).await?)
+        } else {
+            None
+        };
+        Ok((items, now))
+    })
+    .await?;
     Ok(Json(FlowList {
-        items: in_tx(&s, staff.tenant_id, async |tx| flows::definitions(tx).await).await?,
+        items,
+        test_clock_now,
     }))
 }
 

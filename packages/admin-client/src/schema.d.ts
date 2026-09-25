@@ -6376,6 +6376,12 @@ export interface components {
         };
         FlowList: {
             items: components["schemas"]["Definition"][];
+            /**
+             * Format: date-time
+             * @description The tenant's shifted test-clock time; absent when the clock is unavailable
+             *     (production), so the admin hides its control.
+             */
+            test_clock_now?: string | null;
         };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
