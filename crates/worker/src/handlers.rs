@@ -181,9 +181,22 @@ async fn feed_import(
         .and_then(|s| s.as_str())
         .unwrap_or("analyze")
         .to_owned();
-    import::run_step(&ctx.db, &storage, &fetch, tenant, run, &step)
-        .await
-        .map_err(|e| JobError::Retry(e.to_string()))
+    match import::run_step(&ctx.db, &storage, &fetch, tenant, run, &step).await {
+        Ok(()) => Ok(()),
+        Err(e) if job.attempts >= job.max_attempts => {
+            tracing::error!(%run, error = %e, "feed import gave up");
+            import::fail(
+                &ctx.db,
+                tenant,
+                run,
+                "the import failed repeatedly; try again",
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            Err(JobError::Permanent(e.to_string()))
+        }
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
 }
 
 async fn feed_export(

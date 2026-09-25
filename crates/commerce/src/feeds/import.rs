@@ -447,6 +447,26 @@ pub async fn apply(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<ImportRun
             detail: "only an analyzed import can be applied; run the dry run first".into(),
         });
     }
+    // One apply at a time per tenant: two runs mapping the same items concurrently could
+    // both create a product. Serialized on the tenant's lock, then checked.
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('import:' || $1::text, 0))",
+        tx.tenant_id().to_string()
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let busy = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM import_runs WHERE status = 'applying' AND id <> $1"#,
+        id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if busy > 0 {
+        return Err(Error::Conflict {
+            code: "import_busy",
+            detail: "another import is being applied; wait until it finishes".into(),
+        });
+    }
     set_status(tx, id, "applying", None).await?;
     let j = job(tx.tenant_id(), id, "apply");
     queue::enqueue(&mut **tx, &j).await?;
@@ -506,8 +526,9 @@ async fn target(tx: &mut TenantTx, market_id: Uuid) -> Result<Target, Error> {
     })
 }
 
-/// A run failed for a reason retrying cannot fix (bad file, blocked URL): record it.
-async fn fail(db: &PgPool, tenant_id: Uuid, id: Uuid, message: &str) -> Result<(), Error> {
+/// A run failed for a reason retrying cannot fix (bad file, blocked URL, or the job's last
+/// attempt failed): record it, so the run does not stay `analyzing`/`applying` forever.
+pub async fn fail(db: &PgPool, tenant_id: Uuid, id: Uuid, message: &str) -> Result<(), Error> {
     let mut tx = tenant_tx(db, tenant_id).await?;
     let message: String = message.chars().take(2000).collect();
     set_status(&mut tx, id, "failed", Some(&message)).await?;

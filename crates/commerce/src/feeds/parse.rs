@@ -191,6 +191,30 @@ fn push_capped(text: &mut String, s: &str) {
     }
 }
 
+/// Longest URL kept (longer ones cannot be mapped or redirected).
+const MAX_URL: usize = 2000;
+const MAX_CATEGORY_DEPTH: usize = 10;
+
+fn cut(s: &str, max: usize) -> String {
+    s.chars().take(max).collect()
+}
+
+/// Category path segments, capped in depth and length.
+fn category_path(text: &str, sep: char) -> Vec<String> {
+    text.split(sep)
+        .map(|s| cut(s.trim(), 150))
+        .filter(|s| !s.is_empty())
+        .take(MAX_CATEGORY_DEPTH + 1)
+        .collect()
+}
+
+fn urls<'a>(it: impl Iterator<Item = &'a str>) -> Vec<String> {
+    it.filter(|u| u.len() <= MAX_URL)
+        .take(MAX_IMAGES)
+        .map(str::to_owned)
+        .collect()
+}
+
 fn opt(s: Option<&str>) -> Option<String> {
     s.map(str::trim)
         .filter(|s| !s.is_empty())
@@ -206,12 +230,7 @@ fn heureka_item(raw: &Raw) -> FeedItem {
     let price = raw.get("PRICE_VAT").and_then(parse_price);
     let mut category: Vec<String> = raw
         .get("CATEGORYTEXT")
-        .map(|c| {
-            c.split('|')
-                .map(|s| s.trim().to_owned())
-                .filter(|s| !s.is_empty())
-                .collect()
-        })
+        .map(|c| category_path(c, '|'))
         .unwrap_or_default();
     // Heureka's own taxonomy starts with the portal name.
     let heureka_category = if category
@@ -223,12 +242,8 @@ fn heureka_item(raw: &Raw) -> FeedItem {
     } else {
         None
     };
-    let images = raw
-        .all("IMGURL")
-        .chain(raw.all("IMGURL_ALTERNATIVE"))
-        .take(MAX_IMAGES)
-        .map(str::to_owned)
-        .collect();
+    let images = urls(raw.all("IMGURL").chain(raw.all("IMGURL_ALTERNATIVE")));
+    category.truncate(MAX_CATEGORY_DEPTH);
     let params = raw
         .groups
         .iter()
@@ -239,7 +254,7 @@ fn heureka_item(raw: &Raw) -> FeedItem {
                     .find(|(n, _)| n == k)
                     .map(|(_, v)| v.trim().to_owned())
             };
-            Some((get("PARAM_NAME")?, get("VAL")?))
+            Some((cut(&get("PARAM_NAME")?, 200), cut(&get("VAL")?, 1000)))
         })
         .filter(|(n, v)| !n.is_empty() && !v.is_empty())
         .take(MAX_PARAMS)
@@ -253,7 +268,7 @@ fn heureka_item(raw: &Raw) -> FeedItem {
             .unwrap_or_default()
             .to_owned(),
         description: raw.get("DESCRIPTION").unwrap_or_default().to_owned(),
-        url: opt(raw.get("URL")),
+        url: opt(raw.get("URL")).filter(|u| u.len() <= MAX_URL),
         images,
         price_minor: price.as_ref().map(|p| p.0),
         currency: price.and_then(|p| p.1),
@@ -282,21 +297,15 @@ fn google_item(raw: &Raw, locale: &str) -> FeedItem {
     // The current selling price; the regular price is not a reduction basis (A18).
     let sale = raw.get("sale_price").and_then(parse_price);
     let price = sale.or(regular);
-    let category = raw
+    let mut category = raw
         .get("product_type")
-        .map(|c| {
-            c.split('>')
-                .map(|s| s.trim().to_owned())
-                .filter(|s| !s.is_empty())
-                .collect()
-        })
+        .map(|c| category_path(c, '>'))
         .unwrap_or_default();
-    let images = raw
-        .all("image_link")
-        .chain(raw.all("additional_image_link"))
-        .take(MAX_IMAGES)
-        .map(str::to_owned)
-        .collect();
+    category.truncate(MAX_CATEGORY_DEPTH);
+    let images = urls(
+        raw.all("image_link")
+            .chain(raw.all("additional_image_link")),
+    );
     let params = GOOGLE_PARAMS
         .iter()
         .filter_map(|(key, cs, sk, en)| {
@@ -305,7 +314,7 @@ fn google_item(raw: &Raw, locale: &str) -> FeedItem {
                 Some("sk") => sk,
                 _ => en,
             };
-            raw.get(key).map(|v| ((*name).to_owned(), v.to_owned()))
+            raw.get(key).map(|v| ((*name).to_owned(), cut(v, 1000)))
         })
         .collect();
     FeedItem {
@@ -313,7 +322,7 @@ fn google_item(raw: &Raw, locale: &str) -> FeedItem {
         group_id: opt(raw.get("item_group_id")),
         name: raw.get("title").unwrap_or_default().to_owned(),
         description: raw.get("description").unwrap_or_default().to_owned(),
-        url: opt(raw.get("link")),
+        url: opt(raw.get("link")).filter(|u| u.len() <= MAX_URL),
         images,
         price_minor: price.as_ref().map(|p| p.0),
         currency: price.and_then(|p| p.1),
