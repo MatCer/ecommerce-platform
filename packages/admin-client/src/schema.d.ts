@@ -193,6 +193,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/feeds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export feeds per market and channel (Google, Heureka, Zboží) with their public URLs. */
+        get: operations["list_feeds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/feeds/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerates the export feeds now (owner/admin; they also refresh hourly and after catalog
+         *     changes).
+         */
+        post: operations["regenerate_feeds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/go-live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Go-live checklist (A29): legal entity fields, tax profile, published legal pages in every
+         *     market's default locale, GPSR manufacturer on active products.
+         */
+        get: operations["go_live"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The 50 most recent imports. */
+        get: operations["list_imports"];
+        put?: never;
+        /**
+         * Starts a feed import (owner/admin): from a URL (downloaded through the SSRF-safe client and
+         *     analyzed right away) or an upload (PUT the file to `upload`, then call `analyze`). Nothing
+         *     is written to the catalog until `apply`. Honors `Idempotency-Key`.
+         */
+        post: operations["create_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_import"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/imports/{id}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Runs (or re-runs) the dry run: counts, missing fields, collisions. Writes nothing. */
+        post: operations["analyze_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/imports/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applies an analyzed import in the background (products as drafts, prices without
+         *     reduction claims, images through the media pipeline, redirects from old URLs).
+         */
+        post: operations["apply_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/inventory": {
         parameters: {
             query?: never;
@@ -259,6 +391,45 @@ export interface paths {
         get: operations["list_movements"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/legal-entity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The seller's legal identity (fills the legal templates; checked before go-live). */
+        get: operations["get_legal_entity"];
+        /** Saves the legal entity (owner/admin). Fields may be incomplete; go-live lists the gaps. */
+        put: operations["put_legal_entity"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/legal/templates/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Installs the platform legal templates (cs/sk/en) as draft legal pages filled from the legal
+         *     entity and tax profile (owner/admin). Existing legal pages are kept. The templates are not
+         *     legal advice: review them with a lawyer before publishing.
+         */
+        post: operations["install_legal_templates"];
         delete?: never;
         options?: never;
         head?: never;
@@ -344,6 +515,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/menus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_menus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/menus/{handle}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Creates or replaces a menu. The default theme shows `main` (header) and `footer`. */
+        put: operations["put_menu"];
+        post?: never;
+        delete: operations["delete_menu"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/orders": {
         parameters: {
             query?: never;
@@ -373,6 +577,44 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pages, legal pages and blog posts, newest first. */
+        get: operations["list_pages"];
+        put?: never;
+        /**
+         * Creates a page or blog post (rich text is sanitized, links validated). Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["create_page"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_page"];
+        /** Replaces the whole page document. */
+        put: operations["update_page"];
+        post?: never;
+        delete: operations["delete_page"];
         options?: never;
         head?: never;
         patch?: never;
@@ -660,6 +902,27 @@ export interface paths {
         /** State of the tenant's search indexes. */
         get: operations["status"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/search/synonyms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The tenant's search synonyms as entered. */
+        get: operations["get_synonyms"];
+        /**
+         * Replaces the synonyms (owner/admin); the worker applies them to every search index within
+         *     seconds.
+         */
+        put: operations["put_synonyms"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1356,6 +1619,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/files/feeds/{market}/{file}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An export feed of the tenant (`/feeds/<market code>/<google|heureka|zbozi>.xml`), as last
+         *     generated by the worker; 404 until the first generation.
+         */
+        get: operations["feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/files/{name}": {
         parameters: {
             query?: never;
@@ -1467,6 +1750,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/pages/blog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Published blog posts, newest first. */
+        get: operations["blog_index"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/blog/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One published blog post (`/blog/<slug>` in themes). */
+        get: operations["blog_post"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/pages/category/{slug}": {
         parameters: {
             query?: never;
@@ -1479,6 +1796,23 @@ export interface paths {
          *     are `noindex,follow` with a canonical to the category (spec §9.5).
          */
         get: operations["category"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/pages/cms/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A published CMS or legal page (`/pages/<slug>` in themes). */
+        get: operations["cms_page"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1808,6 +2142,95 @@ export interface components {
         };
         /** @enum {string} */
         Badge: "sale" | "new";
+        /** @description One block of a page. `type` selects the variant. */
+        Block: {
+            /** Format: int32 */
+            level?: number;
+            text: string;
+            /** @enum {string} */
+            type: "heading";
+        } | {
+            html: string;
+            /** @enum {string} */
+            type: "rich_text";
+        } | {
+            alt?: string;
+            /** Format: uuid */
+            asset_id: string;
+            caption?: string;
+            /** @enum {string} */
+            type: "image";
+        } | {
+            href: string;
+            label: string;
+            /** @enum {string} */
+            type: "button";
+        } | {
+            product_ids: string[];
+            title?: string;
+            /** @enum {string} */
+            type: "product_grid";
+        } | {
+            items: components["schemas"]["FaqItem"][];
+            /** @enum {string} */
+            type: "faq";
+        };
+        /** @description A block ready to render (images and products resolved, links localized). */
+        BlockView: {
+            /** Format: int32 */
+            level: number;
+            text: string;
+            /** @enum {string} */
+            type: "heading";
+        } | {
+            html: string;
+            /** @enum {string} */
+            type: "rich_text";
+        } | {
+            caption: string;
+            image: components["schemas"]["Image"];
+            /** @enum {string} */
+            type: "image";
+        } | {
+            href: string;
+            label: string;
+            /** @enum {string} */
+            type: "button";
+        } | {
+            products: components["schemas"]["ProductCard"][];
+            title: string;
+            /** @enum {string} */
+            type: "product_grid";
+        } | {
+            items: components["schemas"]["FaqItem"][];
+            /** @enum {string} */
+            type: "faq";
+        };
+        BlogIndex: {
+            cache: components["schemas"]["CacheHints"];
+            /** @description Newest first (at most 50). */
+            posts: components["schemas"]["BlogPostSummary"][];
+            seo: components["schemas"]["Seo"];
+            title: string;
+        };
+        BlogPost: {
+            blocks: components["schemas"]["BlockView"][];
+            breadcrumbs: components["schemas"]["Link"][];
+            cache: components["schemas"]["CacheHints"];
+            image?: components["schemas"]["Image"] | null;
+            /** Format: date-time */
+            published_at: string;
+            seo: components["schemas"]["Seo"];
+            title: string;
+        };
+        BlogPostSummary: {
+            excerpt: string;
+            href: string;
+            image?: components["schemas"]["Image"] | null;
+            /** Format: date-time */
+            published_at: string;
+            title: string;
+        };
         /** @description Cache hints the edge reads from every page model (spec §8.2, A2). */
         CacheHints: {
             /**
@@ -1958,7 +2381,11 @@ export interface components {
          */
         Cause: "base" | "sale" | "tax";
         /** @enum {string} */
+        Channel: "google" | "heureka" | "zbozi";
+        /** @enum {string} */
         ChargeKind: "shipping" | "payment_fee" | "rounding";
+        /** @enum {string} */
+        CheckCode: "legal_entity" | "tax_profile" | "legal_pages" | "gpsr";
         /** @enum {string} */
         CheckStatus: "ok" | "degraded" | "fail";
         CheckoutAddress: {
@@ -2003,6 +2430,22 @@ export interface components {
             database: components["schemas"]["CheckStatus"];
             meilisearch: components["schemas"]["CheckStatus"];
             storage: components["schemas"]["CheckStatus"];
+        };
+        CmsPage: {
+            blocks: components["schemas"]["BlockView"][];
+            breadcrumbs: components["schemas"]["Link"][];
+            cache: components["schemas"]["CacheHints"];
+            seo: components["schemas"]["Seo"];
+            title: string;
+        };
+        Collision: {
+            item_id: string;
+            /**
+             * @description `item_id` (repeated id, later items skipped), `redirect` (the old path already redirects:
+             *     the first redirect wins), `slug` (a new slug got a suffix).
+             */
+            kind: string;
+            value: string;
         };
         /** @description A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`). */
         ConsentChoice: {
@@ -2104,6 +2547,10 @@ export interface components {
              */
             next_cursor?: string | null;
         };
+        CreatedImport: {
+            run: components["schemas"]["ImportRun"];
+            upload?: components["schemas"]["UploadTarget"] | null;
+        };
         /**
          * @description Currencies used by EU markets: the euro and the member states' own currencies.
          *     `BGN` is historic (Bulgaria adopted the euro on 2026-01-01) and kept for old documents.
@@ -2190,8 +2637,46 @@ export interface components {
             order_number: string;
             status: components["schemas"]["AttemptStatus"];
         };
+        FaqItem: {
+            /** @description Sanitized on write. */
+            answer_html: string;
+            question: string;
+        };
+        FeedFile: {
+            /** Format: int64 */
+            bytes?: number | null;
+            channel: components["schemas"]["Channel"];
+            /** Format: date-time */
+            generated_at?: string | null;
+            /** Format: int32 */
+            items?: number | null;
+            market_code: string;
+            /** Format: uuid */
+            market_id: string;
+            /** @description Public URL (`https://<shop>/feeds/<market>/<channel>.xml`); `None` without a domain. */
+            url?: string | null;
+        };
+        FeedFileList: {
+            items: components["schemas"]["FeedFile"][];
+        };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
+        GoLiveCheck: {
+            code: components["schemas"]["CheckCode"];
+            /** @description What is missing: field names, `<legal type>:<locale>` pairs, or product names. */
+            missing: string[];
+            /**
+             * Format: int64
+             * @description Total count of missing items (lists are capped at 50).
+             */
+            missing_count: number;
+            ok: boolean;
+        };
+        GoLiveReport: {
+            checks: components["schemas"]["GoLiveCheck"][];
+            notice: string;
+            ready: boolean;
+        };
         /** @description EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19). */
         Gpsr: {
             eu_responsible_person?: components["schemas"]["GpsrParty"] | null;
@@ -2264,6 +2749,70 @@ export interface components {
             /** Format: int32 */
             width: number;
         };
+        /** @description Dry-run report, completed by the apply step. */
+        ImportReport: {
+            /** Format: int32 */
+            categories: number;
+            collisions: components["schemas"]["Collision"][];
+            /** Format: int32 */
+            images: number;
+            /** Format: int32 */
+            items: number;
+            /** @description Field -> number of items without it (`price`, `url`, `image`, `ean`, `category`, ...). */
+            missing: {
+                [key: string]: number;
+            };
+            /** Format: int32 */
+            new_categories: number;
+            /** Format: int32 */
+            new_images: number;
+            /** Format: int32 */
+            new_parameters: number;
+            /** Format: int32 */
+            new_products: number;
+            /** Format: int32 */
+            parameters: number;
+            problems: components["schemas"]["ItemProblem"][];
+            /** Format: int32 */
+            products: number;
+            /** Format: int32 */
+            redirects: number;
+            /**
+             * Format: int32
+             * @description Items that will not be imported (see `problems`).
+             */
+            skipped_items: number;
+            /** @description More problems or collisions than listed (200 each). */
+            truncated: boolean;
+            /** Format: int32 */
+            updated_products: number;
+            /** Format: int32 */
+            variants: number;
+        };
+        ImportRun: {
+            /** @description New products are published (`active`) instead of drafts. */
+            activate: boolean;
+            /** Format: date-time */
+            applied_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            market_id: string;
+            progress: components["schemas"]["Progress"];
+            report?: components["schemas"]["ImportReport"] | null;
+            source: components["schemas"]["Source"];
+            status: components["schemas"]["RunStatus"];
+            /** Format: date-time */
+            updated_at: string;
+            url?: string | null;
+        };
+        ImportRunList: {
+            items: components["schemas"]["ImportRun"][];
+        };
         /** @description Current state of a tenant's search indexes (admin status endpoint). */
         IndexStatus: {
             /**
@@ -2280,6 +2829,25 @@ export interface components {
             rebuilt_at?: string | null;
             /** Format: int32 */
             settings_version: number;
+        };
+        InstallInput: {
+            /**
+             * @description Template locales (cs, sk, en); default: those the tenant's markets use.
+             * @default []
+             */
+            locales: string[];
+            /**
+             * @description Types to install; default: all. Existing legal pages are never overwritten.
+             * @default []
+             */
+            types: components["schemas"]["LegalType"][];
+        };
+        InstallResult: {
+            /** @description Created draft pages (review, edit and publish them). */
+            created: string[];
+            notice: string;
+            /** @description Types that already had a page. */
+            skipped: components["schemas"]["LegalType"][];
         };
         /** @description A stored interval. */
         Interval: {
@@ -2301,6 +2869,15 @@ export interface components {
             email: string;
             role: components["schemas"]["Role"];
         };
+        ItemProblem: {
+            /**
+             * @description `invalid_item_id`, `missing_name`, `invalid_ean`, `currency_mismatch`, `sku_conflict`,
+             *     `image_failed`, `product_failed`, ...
+             */
+            code: string;
+            detail: string;
+            item_id: string;
+        };
         Legal: {
             privacy_url: string;
             terms_url: string;
@@ -2308,6 +2885,62 @@ export interface components {
             text_version: string;
             withdrawal_url: string;
         };
+        /**
+         * @description The seller as it must be identified to consumers (CZ Civil Code §435, §1811/§1820;
+         *     SK Act 108/2024 §3; GDPR art. 13). Fields may be saved incomplete; go-live lists the gaps.
+         */
+        LegalEntity: {
+            /** @default  */
+            city: string;
+            /**
+             * @description IČO.
+             * @default
+             * @example 12345678
+             */
+            company_id: string;
+            /**
+             * @description Registered business name (obchodní firma) or the trader's full name.
+             * @default
+             * @example Demo s.r.o.
+             */
+            company_name: string;
+            /**
+             * @description ISO 3166-1 alpha-2.
+             * @default
+             * @example CZ
+             */
+            country: string;
+            /**
+             * @description Customer contact email.
+             * @default
+             */
+            email: string;
+            /** @default  */
+            phone: string;
+            /** @default  */
+            postal_code: string;
+            /**
+             * @description Register entry ("zapsaná v OR vedeném Městským soudem v Praze, oddíl C, vložka 1").
+             * @default
+             */
+            registry: string;
+            /**
+             * @description Where returns and complaints are sent, if not the registered address.
+             * @default
+             */
+            returns_address: string;
+            /** @default  */
+            street: string;
+        };
+        LegalEntityView: components["schemas"]["LegalEntity"] & {
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        /**
+         * @description Legal page types (spec §14): each has a platform template (not legal advice).
+         * @enum {string}
+         */
+        LegalType: "terms" | "privacy" | "cookies" | "withdrawal" | "complaints" | "reviews";
         Level: {
             /** @description Sell below zero. */
             allow_backorder: boolean;
@@ -2417,10 +3050,52 @@ export interface components {
             /** Format: uuid */
             tenant_id: string;
         };
+        Menu: {
+            /** @example main */
+            handle: string;
+            /** Format: uuid */
+            id: string;
+            items: components["schemas"]["MenuEntry"][];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MenuEntry: {
+            /** @description Second level (entries here cannot have children). */
+            children?: components["schemas"]["MenuEntry"][];
+            /** @description Label per locale; empty = the target's own name (required for URLs). */
+            label_i18n?: components["schemas"]["BTreeMap"];
+            link: components["schemas"]["MenuLink"];
+        };
+        MenuInput: {
+            items: components["schemas"]["MenuEntry"][];
+        };
         MenuItem: {
             children: components["schemas"]["Link"][];
             href: string;
             label: string;
+        };
+        MenuLink: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "category";
+        } | {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "product";
+        } | {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            type: "page";
+        } | {
+            /** @enum {string} */
+            type: "url";
+            url: string;
+        };
+        MenuList: {
+            items: components["schemas"]["Menu"][];
         };
         Menus: {
             footer: components["schemas"]["MenuItem"][];
@@ -2474,6 +3149,23 @@ export interface components {
              */
             parent_id?: string | null;
             translations: components["schemas"]["CategoryTranslation"][];
+        };
+        NewImport: {
+            /** @description Publish new products right away instead of creating drafts (the default, A28). */
+            activate?: boolean;
+            /**
+             * Format: uuid
+             * @description Prices go into this market's price list; names into its default locale.
+             */
+            market_id: string;
+            source: components["schemas"]["Source"];
+            /**
+             * Format: int64
+             * @description Or upload a file of this many bytes (at most 100 MB) with the returned presigned PUT.
+             */
+            upload_size?: number | null;
+            /** @description Download the feed from this `http(s)` URL (public addresses only). */
+            url?: string | null;
         };
         NewLine: {
             /**
@@ -2709,6 +3401,79 @@ export interface components {
             api_key: string;
             /** @description `library.js` of the widget (Packeta's, or the local mock). */
             script_url: string;
+        };
+        Page: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            image_asset_id?: string | null;
+            kind: components["schemas"]["PageKind"];
+            legal_type?: components["schemas"]["LegalType"] | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            status: components["schemas"]["PageStatus"];
+            translations: components["schemas"]["PageTranslation"][];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description A page document as written by `POST /pages` and `PUT /pages/{id}`. */
+        PageInput: {
+            /**
+             * Format: uuid
+             * @description Cover image (blog cards, social previews).
+             */
+            image_asset_id?: string | null;
+            kind: components["schemas"]["PageKind"];
+            legal_type?: components["schemas"]["LegalType"] | null;
+            /**
+             * Format: date-time
+             * @description When a published page becomes visible; defaults to the first publication time.
+             */
+            published_at?: string | null;
+            status?: components["schemas"]["PageStatus"];
+            translations: components["schemas"]["PageTranslation"][];
+        };
+        /** @enum {string} */
+        PageKind: "page" | "legal" | "blog_post";
+        PageList: {
+            items: components["schemas"]["PageSummary"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
+        /** @enum {string} */
+        PageStatus: "draft" | "published";
+        PageSummary: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["PageKind"];
+            legal_type?: components["schemas"]["LegalType"] | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** @description locale -> slug */
+            slug: components["schemas"]["BTreeMap"];
+            status: components["schemas"]["PageStatus"];
+            /** @description locale -> title */
+            title: components["schemas"]["BTreeMap"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PageTranslation: {
+            blocks?: components["schemas"]["Block"][];
+            /** @description Blog cards and meta description fallback. */
+            excerpt?: string;
+            /** @example cs */
+            locale: string;
+            seo_description?: string | null;
+            seo_title?: string | null;
+            /**
+             * @description Unique per tenant and locale across pages and posts.
+             * @example doprava-a-platba
+             */
+            slug: string;
+            /** @example Doprava a platba */
+            title: string;
         };
         Pagination: {
             next?: string | null;
@@ -3096,6 +3861,27 @@ export interface components {
              */
             slug: string;
         };
+        /** @description Apply progress and outcome. */
+        Progress: {
+            /** Format: int32 */
+            created: number;
+            /** Format: int32 */
+            done: number;
+            /** Format: int32 */
+            failed: number;
+            /** Format: int32 */
+            images_downloaded: number;
+            /** Format: int32 */
+            images_failed: number;
+            /** Format: int32 */
+            redirects_created: number;
+            /** Format: int32 */
+            redirects_skipped: number;
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            updated: number;
+        };
         /** @description Per-purpose choices: `None` = not asked (or not part of this choice). */
         Purposes: {
             ads?: boolean | null;
@@ -3192,6 +3978,8 @@ export interface components {
         RoleChange: {
             role: components["schemas"]["Role"];
         };
+        /** @enum {string} */
+        RunStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
         Sale: {
             /** Format: date-time */
             created_at: string;
@@ -3393,7 +4181,10 @@ export interface components {
             currencies: string[];
             currency: string;
             free_shipping_threshold?: components["schemas"]["MoneyView"] | null;
-            /** @description Placeholders until CMS pages exist (WP13). */
+            /**
+             * @description Published legal pages (terms, privacy, withdrawal, complaints, ...), except the cookies
+             *     page, which is `consent.policy_url`.
+             */
             legal_pages: components["schemas"]["Link"][];
             /** @description Active locale (`cs`); also the `lang` of pages. */
             locale: string;
@@ -3427,10 +4218,10 @@ export interface components {
             value: components["schemas"]["Sort"];
         };
         /**
-         * @description Where a choice was made.
+         * @description Where a feed comes from (also the `import_mappings.source`).
          * @enum {string}
          */
-        Source: "banner" | "preferences" | "checkout" | "linked";
+        Source: "heureka" | "google";
         StaffList: {
             items: components["schemas"]["StaffMember"][];
         };
@@ -3455,6 +4246,28 @@ export interface components {
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
             products: components["schemas"]["SearchHit"][];
+        };
+        Synonyms: {
+            /**
+             * @description Each group lists 2-20 equivalent words or phrases.
+             * @example [
+             *       [
+             *         "mikina",
+             *         "hoodie"
+             *       ],
+             *       [
+             *         "tričko",
+             *         "triko",
+             *         "tílko"
+             *       ]
+             *     ]
+             */
+            groups: string[][];
+        };
+        SynonymsView: {
+            groups: string[][];
+            /** Format: date-time */
+            updated_at?: string | null;
         };
         TaxCategory: {
             /** @example reduced */
@@ -4344,6 +5157,233 @@ export interface operations {
             };
         };
     };
+    list_feeds: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedFileList"];
+                };
+            };
+        };
+    };
+    regenerate_feeds: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    go_live: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoLiveReport"];
+                };
+            };
+        };
+    };
+    list_imports: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportRunList"];
+                };
+            };
+        };
+    };
+    create_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewImport"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedImport"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportRun"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    analyze_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportRun"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    apply_import: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportRun"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_levels: {
         parameters: {
             query?: {
@@ -4501,6 +5541,112 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_legal_entity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalEntityView"];
+                };
+            };
+        };
+    };
+    put_legal_entity: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LegalEntity"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalEntityView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    install_legal_templates: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallResult"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4720,6 +5866,96 @@ export interface operations {
             };
         };
     };
+    list_menus: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MenuList"];
+                };
+            };
+        };
+    };
+    put_menu: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                /** @example main */
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MenuInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Menu"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_menu: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                handle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_orders: {
         parameters: {
             query?: {
@@ -4772,6 +6008,193 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminOrder"];
                 };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_pages: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["PageKind"];
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageList"];
+                };
+            };
+        };
+    };
+    create_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PageInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             404: {
                 headers: {
@@ -5925,6 +7348,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchStatus"];
+                };
+            };
+        };
+    };
+    get_synonyms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynonymsView"];
+                };
+            };
+        };
+    };
+    put_synonyms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Synonyms"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SynonymsView"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8044,6 +9523,46 @@ export interface operations {
             };
         };
     };
+    feed: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Market code, e.g. cz */
+                market: string;
+                /** @description google.xml, heureka.xml or zbozi.xml */
+                file: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The feed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": unknown;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     file: {
         parameters: {
             query?: never;
@@ -8321,6 +9840,68 @@ export interface operations {
             };
         };
     };
+    blog_index: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlogIndex"];
+                };
+            };
+        };
+    };
+    blog_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlogPost"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     category: {
         parameters: {
             query?: {
@@ -8350,6 +9931,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListingPage"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cms_page: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmsPage"];
                 };
             };
             404: {

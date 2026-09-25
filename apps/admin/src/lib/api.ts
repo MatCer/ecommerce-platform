@@ -42,7 +42,22 @@ export async function unwrap<T>(
   pending: Promise<{ data?: T; error?: unknown; response: Response }>,
 ): Promise<Exclude<T, undefined>> {
   const r = await pending;
-  if (r.error !== undefined || !r.response.ok) throw await problemOf(r.response);
+  if (r.error !== undefined || !r.response.ok) {
+    // openapi-fetch has already read the body into `error`; prefer it over re-reading.
+    const e: unknown = r.error;
+    if (typeof e === "object" && e !== null) {
+      const code = Reflect.get(e, "code");
+      const detail = Reflect.get(e, "detail");
+      if (typeof code === "string") {
+        throw new ApiError(
+          r.response.status,
+          code,
+          typeof detail === "string" ? detail : undefined,
+        );
+      }
+    }
+    throw await problemOf(r.response);
+  }
   return r.data as Exclude<T, undefined>;
 }
 

@@ -52,3 +52,15 @@ test("dns txt stub rejects malformed input", async () => {
   });
   expect(res.status).toBe(400);
 });
+
+test("demo feeds and images are served by fixed name only", async () => {
+  const feed = await app.request("/feeds/heureka-demo.xml");
+  expect(feed.status).toBe(200);
+  expect(await feed.text()).toContain("<SHOPITEM>");
+  const img = await app.request("/images/demo/tee-ink.jpg");
+  expect(img.headers.get("content-type")).toBe("image/jpeg");
+  for (const bad of ["/feeds/..%2F..%2Fpackage.json", "/feeds/other.xml", "/images/demo/x.png"]) {
+    expect((await app.request(bad)).status).toBe(404);
+  }
+  expect((await app.request("/images/demo/missing.jpg")).status).toBe(404);
+});

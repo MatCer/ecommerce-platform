@@ -1,0 +1,1753 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SHOP>
+  <SHOPITEM>
+    <ITEM_ID>TB-001</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic černá S</PRODUCTNAME>
+    <PRODUCT>Tričko Basic černá S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-cerna-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000015</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>S</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-002</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic černá M</PRODUCTNAME>
+    <PRODUCT>Tričko Basic černá M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-cerna-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000022</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>M</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-003</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic černá L</PRODUCTNAME>
+    <PRODUCT>Tričko Basic černá L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-cerna-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000039</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>L</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-004</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic černá XL</PRODUCTNAME>
+    <PRODUCT>Tričko Basic černá XL</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-cerna-xl</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000046</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>XL</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-005</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic bílá S</PRODUCTNAME>
+    <PRODUCT>Tričko Basic bílá S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-bila-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000053</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>S</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-006</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic bílá M</PRODUCTNAME>
+    <PRODUCT>Tričko Basic bílá M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-bila-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000060</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>M</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-007</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic bílá L</PRODUCTNAME>
+    <PRODUCT>Tričko Basic bílá L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-bila-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000077</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>L</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-008</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic bílá XL</PRODUCTNAME>
+    <PRODUCT>Tričko Basic bílá XL</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-bila-xl</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000084</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>XL</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-009</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic modrá S</PRODUCTNAME>
+    <PRODUCT>Tričko Basic modrá S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-modra-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000091</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>S</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-010</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic modrá M</PRODUCTNAME>
+    <PRODUCT>Tričko Basic modrá M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-modra-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000107</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>M</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-011</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic modrá L</PRODUCTNAME>
+    <PRODUCT>Tričko Basic modrá L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-modra-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000114</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>L</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-012</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic modrá XL</PRODUCTNAME>
+    <PRODUCT>Tričko Basic modrá XL</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-modra-xl</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000121</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>XL</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-013</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic zelená S</PRODUCTNAME>
+    <PRODUCT>Tričko Basic zelená S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-zelena-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-forest.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000138</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>zelená</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>S</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-014</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic zelená M</PRODUCTNAME>
+    <PRODUCT>Tričko Basic zelená M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-zelena-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-forest.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000145</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>zelená</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>M</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-015</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic zelená L</PRODUCTNAME>
+    <PRODUCT>Tričko Basic zelená L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-zelena-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-forest.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000152</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>zelená</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>L</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TB-016</ITEM_ID>
+    <PRODUCTNAME>Tričko Basic zelená XL</PRODUCTNAME>
+    <PRODUCT>Tričko Basic zelená XL</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Klasické tričko ze <b>100% bavlny</b>. Pratelné na 40 °C.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-basic-zelena-xl</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-forest.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Trička</CATEGORYTEXT>
+    <EAN>8590000000169</EAN>
+    <ITEMGROUP_ID>TB</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>zelená</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>XL</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>12</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-017</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí šedá S</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí šedá S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000176</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>šedá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>S</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-018</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí šedá M</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí šedá M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000183</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>šedá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>M</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-019</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí šedá L</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí šedá L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000190</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>šedá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>L</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-020</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí šedá XL</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí šedá XL</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-xl</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000206</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>šedá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>XL</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-021</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí cihlová S</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí cihlová S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000213</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>cihlová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>S</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-022</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí cihlová M</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí cihlová M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000220</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>cihlová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>M</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-023</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí cihlová L</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí cihlová L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000237</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>cihlová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>L</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>MK-024</ITEM_ID>
+    <PRODUCTNAME>Mikina s kapucí cihlová XL</PRODUCTNAME>
+    <PRODUCT>Mikina s kapucí cihlová XL</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Teplá mikina s kapucí a klokaní kapsou.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-xl</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>899</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Mikiny</CATEGORYTEXT>
+    <EAN>8590000000244</EAN>
+    <ITEMGROUP_ID>MK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>cihlová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>XL</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna s polyesterem</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>5</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>PO-025</ITEM_ID>
+    <PRODUCTNAME>Ponožky Merino antracit 39-42</PRODUCTNAME>
+    <PRODUCT>Ponožky Merino antracit 39-42</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivé ponožky z merino vlny.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ponozky-merino-antracit-39-42</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Ponožky</CATEGORYTEXT>
+    <EAN>8590000000251</EAN>
+    <ITEMGROUP_ID>PO</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>antracit</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>39-42</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>merino vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>PO-026</ITEM_ID>
+    <PRODUCTNAME>Ponožky Merino antracit 43-46</PRODUCTNAME>
+    <PRODUCT>Ponožky Merino antracit 43-46</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivé ponožky z merino vlny.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ponozky-merino-antracit-43-46</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Ponožky</CATEGORYTEXT>
+    <EAN>8590000000268</EAN>
+    <ITEMGROUP_ID>PO</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>antracit</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>43-46</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>merino vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>PO-027</ITEM_ID>
+    <PRODUCTNAME>Ponožky Merino béžová 39-42</PRODUCTNAME>
+    <PRODUCT>Ponožky Merino béžová 39-42</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivé ponožky z merino vlny.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ponozky-merino-bezova-39-42</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Ponožky</CATEGORYTEXT>
+    <EAN>8590000000275</EAN>
+    <ITEMGROUP_ID>PO</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>béžová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>39-42</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>merino vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>PO-028</ITEM_ID>
+    <PRODUCTNAME>Ponožky Merino béžová 43-46</PRODUCTNAME>
+    <PRODUCT>Ponožky Merino béžová 43-46</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivé ponožky z merino vlny.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ponozky-merino-bezova-43-46</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Ponožky</CATEGORYTEXT>
+    <EAN>8590000000282</EAN>
+    <ITEMGROUP_ID>PO</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>béžová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>43-46</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>merino vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>PO-029</ITEM_ID>
+    <PRODUCTNAME>Ponožky Merino vínová 39-42</PRODUCTNAME>
+    <PRODUCT>Ponožky Merino vínová 39-42</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivé ponožky z merino vlny.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ponozky-merino-vinova-39-42</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Ponožky</CATEGORYTEXT>
+    <EAN>8590000000299</EAN>
+    <ITEMGROUP_ID>PO</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>vínová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>39-42</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>merino vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>PO-030</ITEM_ID>
+    <PRODUCTNAME>Ponožky Merino vínová 43-46</PRODUCTNAME>
+    <PRODUCT>Ponožky Merino vínová 43-46</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivé ponožky z merino vlny.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ponozky-merino-vinova-43-46</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Ponožky</CATEGORYTEXT>
+    <EAN>8590000000305</EAN>
+    <ITEMGROUP_ID>PO</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>vínová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>43-46</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>merino vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>KS-031</ITEM_ID>
+    <PRODUCTNAME>Kšiltovka Urban olivová</PRODUCTNAME>
+    <PRODUCT>Kšiltovka Urban olivová</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Nastavitelná kšiltovka.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ksiltovka-urban-olivova</URL>
+    <IMGURL>http://mocks:4010/images/demo/cap-olive.jpg</IMGURL>
+    <PRICE_VAT>399</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Čepice</CATEGORYTEXT>
+    <EAN>8590000000312</EAN>
+    <ITEMGROUP_ID>KS</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>olivová</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>KS-032</ITEM_ID>
+    <PRODUCTNAME>Kšiltovka Urban černá</PRODUCTNAME>
+    <PRODUCT>Kšiltovka Urban černá</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Nastavitelná kšiltovka.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/ksiltovka-urban-cerna</URL>
+    <IMGURL>http://mocks:4010/images/demo/cap-olive.jpg</IMGURL>
+    <PRICE_VAT>399</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky | Čepice</CATEGORYTEXT>
+    <EAN>8590000000329</EAN>
+    <ITEMGROUP_ID>KS</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-033</ITEM_ID>
+    <PRODUCTNAME>Plátěná taška Hory</PRODUCTNAME>
+    <PRODUCT>Plátěná taška Hory</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Plátěná taška s potiskem Hory.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/platena-taska-hory</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>199</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Tašky</CATEGORYTEXT>
+    <EAN>8590000000336</EAN>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlněné plátno</VAL></PARAM>
+    <PARAM><PARAM_NAME>Rozměr</PARAM_NAME><VAL>38 × 42 cm</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-034</ITEM_ID>
+    <PRODUCTNAME>Plátěná taška Les</PRODUCTNAME>
+    <PRODUCT>Plátěná taška Les</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Plátěná taška s potiskem Les.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/platena-taska-les</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>199</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Tašky</CATEGORYTEXT>
+    <EAN>8590000000343</EAN>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlněné plátno</VAL></PARAM>
+    <PARAM><PARAM_NAME>Rozměr</PARAM_NAME><VAL>38 × 42 cm</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-035</ITEM_ID>
+    <PRODUCTNAME>Plátěná taška Město</PRODUCTNAME>
+    <PRODUCT>Plátěná taška Město</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Plátěná taška s potiskem Město.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/platena-taska-mesto</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>199</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Tašky</CATEGORYTEXT>
+    <EAN>8590000000350</EAN>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlněné plátno</VAL></PARAM>
+    <PARAM><PARAM_NAME>Rozměr</PARAM_NAME><VAL>38 × 42 cm</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-036</ITEM_ID>
+    <PRODUCTNAME>Plátěná taška Moře</PRODUCTNAME>
+    <PRODUCT>Plátěná taška Moře</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Plátěná taška s potiskem Moře.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/platena-taska-more</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>199</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Tašky</CATEGORYTEXT>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlněné plátno</VAL></PARAM>
+    <PARAM><PARAM_NAME>Rozměr</PARAM_NAME><VAL>38 × 42 cm</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-037</ITEM_ID>
+    <PRODUCTNAME>Plátěná taška Minimal</PRODUCTNAME>
+    <PRODUCT>Plátěná taška Minimal</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Plátěná taška s potiskem Minimal.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/platena-taska-minimal</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>199</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Tašky</CATEGORYTEXT>
+    <EAN>8590000000374</EAN>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlněné plátno</VAL></PARAM>
+    <PARAM><PARAM_NAME>Rozměr</PARAM_NAME><VAL>38 × 42 cm</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TK-038</ITEM_ID>
+    <PRODUCTNAME>Tričko Klasik biela S</PRODUCTNAME>
+    <PRODUCT>Tričko Klasik biela S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pohodlné tričko na každý deň.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-klasik-biela-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>279</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Tričká</CATEGORYTEXT>
+    <EAN>8590000000381</EAN>
+    <ITEMGROUP_ID>TK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>biela</VAL></PARAM>
+    <PARAM><PARAM_NAME>Veľkosť</PARAM_NAME><VAL>S</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TK-039</ITEM_ID>
+    <PRODUCTNAME>Tričko Klasik biela M</PRODUCTNAME>
+    <PRODUCT>Tričko Klasik biela M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pohodlné tričko na každý deň.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-klasik-biela-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>279</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Tričká</CATEGORYTEXT>
+    <EAN>8590000000398</EAN>
+    <ITEMGROUP_ID>TK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>biela</VAL></PARAM>
+    <PARAM><PARAM_NAME>Veľkosť</PARAM_NAME><VAL>M</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TK-040</ITEM_ID>
+    <PRODUCTNAME>Tričko Klasik biela L</PRODUCTNAME>
+    <PRODUCT>Tričko Klasik biela L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pohodlné tričko na každý deň.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-klasik-biela-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>279</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Tričká</CATEGORYTEXT>
+    <EAN>8590000000404</EAN>
+    <ITEMGROUP_ID>TK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>biela</VAL></PARAM>
+    <PARAM><PARAM_NAME>Veľkosť</PARAM_NAME><VAL>L</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TK-041</ITEM_ID>
+    <PRODUCTNAME>Tričko Klasik čierna S</PRODUCTNAME>
+    <PRODUCT>Tričko Klasik čierna S</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pohodlné tričko na každý deň.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-klasik-cierna-s</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>279</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Tričká</CATEGORYTEXT>
+    <EAN>8590000000411</EAN>
+    <ITEMGROUP_ID>TK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>čierna</VAL></PARAM>
+    <PARAM><PARAM_NAME>Veľkosť</PARAM_NAME><VAL>S</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TK-042</ITEM_ID>
+    <PRODUCTNAME>Tričko Klasik čierna M</PRODUCTNAME>
+    <PRODUCT>Tričko Klasik čierna M</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pohodlné tričko na každý deň.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-klasik-cierna-m</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>279</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Tričká</CATEGORYTEXT>
+    <EAN>8590000000428</EAN>
+    <ITEMGROUP_ID>TK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>čierna</VAL></PARAM>
+    <PARAM><PARAM_NAME>Veľkosť</PARAM_NAME><VAL>M</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TK-043</ITEM_ID>
+    <PRODUCTNAME>Tričko Klasik čierna L</PRODUCTNAME>
+    <PRODUCT>Tričko Klasik čierna L</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pohodlné tričko na každý deň.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tricko-klasik-cierna-l</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>279</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Tričká</CATEGORYTEXT>
+    <EAN>8590000000435</EAN>
+    <ITEMGROUP_ID>TK</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>čierna</VAL></PARAM>
+    <PARAM><PARAM_NAME>Veľkosť</PARAM_NAME><VAL>L</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ZC-044</ITEM_ID>
+    <PRODUCTNAME>Zimná čiapka sivá</PRODUCTNAME>
+    <PRODUCT>Zimná čiapka sivá</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pletená zimná čiapka.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zimna-ciapka-siva</URL>
+    <IMGURL>http://mocks:4010/images/demo/cap-olive.jpg</IMGURL>
+    <PRICE_VAT>349</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Doplnky</CATEGORYTEXT>
+    <EAN>8590000000442</EAN>
+    <ITEMGROUP_ID>ZC</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>sivá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>akryl</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ZC-045</ITEM_ID>
+    <PRODUCTNAME>Zimná čiapka modrá</PRODUCTNAME>
+    <PRODUCT>Zimná čiapka modrá</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pletená zimná čiapka.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zimna-ciapka-modra</URL>
+    <IMGURL>http://mocks:4010/images/demo/cap-olive.jpg</IMGURL>
+    <PRICE_VAT>349</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Doplnky</CATEGORYTEXT>
+    <EAN>8590000000459</EAN>
+    <ITEMGROUP_ID>ZC</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>akryl</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ZC-046</ITEM_ID>
+    <PRODUCTNAME>Zimná čiapka červená</PRODUCTNAME>
+    <PRODUCT>Zimná čiapka červená</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Pletená zimná čiapka.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zimna-ciapka-cervena</URL>
+    <IMGURL>http://mocks:4010/images/demo/cap-olive.jpg</IMGURL>
+    <PRICE_VAT>349</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečenie | Doplnky</CATEGORYTEXT>
+    <EAN>8590000000466</EAN>
+    <ITEMGROUP_ID>ZC</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Farba</PARAM_NAME><VAL>červená</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>akryl</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-047</ITEM_ID>
+    <PRODUCTNAME>Hrnek Ranní káva</PRODUCTNAME>
+    <PRODUCT>Hrnek Ranní káva</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Ranní káva. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-ranni-kava</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000473</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-048</ITEM_ID>
+    <PRODUCTNAME>Hrnek Dobrá nálada</PRODUCTNAME>
+    <PRODUCT>Hrnek Dobrá nálada</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Dobrá nálada. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-dobra-nalada</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000480</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-049</ITEM_ID>
+    <PRODUCTNAME>Hrnek Pondělí</PRODUCTNAME>
+    <PRODUCT>Hrnek Pondělí</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Pondělí. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-pondeli</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000497</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-050</ITEM_ID>
+    <PRODUCTNAME>Hrnek Čaj o páté</PRODUCTNAME>
+    <PRODUCT>Hrnek Čaj o páté</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Čaj o páté. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-caj-o-pate</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000503</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-051</ITEM_ID>
+    <PRODUCTNAME>Hrnek Kafe s sebou</PRODUCTNAME>
+    <PRODUCT>Hrnek Kafe s sebou</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Kafe s sebou. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-kafe-s-sebou</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000510</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-052</ITEM_ID>
+    <PRODUCTNAME>Hrnek Hory volají</PRODUCTNAME>
+    <PRODUCT>Hrnek Hory volají</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Hory volají. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-hory-volaji</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000527</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-053</ITEM_ID>
+    <PRODUCTNAME>Hrnek Pohoda</PRODUCTNAME>
+    <PRODUCT>Hrnek Pohoda</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Pohoda. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-pohoda</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000534</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-054</ITEM_ID>
+    <PRODUCTNAME>Hrnek Šéf</PRODUCTNAME>
+    <PRODUCT>Hrnek Šéf</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Šéf. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-sef</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000541</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-055</ITEM_ID>
+    <PRODUCTNAME>Hrnek Babička</PRODUCTNAME>
+    <PRODUCT>Hrnek Babička</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Babička. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-babicka</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000558</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-056</ITEM_ID>
+    <PRODUCTNAME>Hrnek Dědeček</PRODUCTNAME>
+    <PRODUCT>Hrnek Dědeček</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Keramický hrnek s motivem Dědeček. Lze mýt v myčce.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/hrnek-dedecek</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>229</PRICE_VAT>
+    <MANUFACTURER>Keramika Pro</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Hrnky</CATEGORYTEXT>
+    <EAN>8590000000565</EAN>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>350 ml</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>keramika</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>30</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-057</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino žlutá 98</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino žlutá 98</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-98</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000572</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>žlutá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>98</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-058</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino žlutá 110</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino žlutá 110</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-110</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000589</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>žlutá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>110</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-059</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino žlutá 122</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino žlutá 122</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-122</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000596</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>žlutá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>122</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-060</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino žlutá 134</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino žlutá 134</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-134</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000602</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>žlutá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>134</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-061</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino modrá 98</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino modrá 98</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-modra-98</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000619</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>98</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-062</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino modrá 110</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino modrá 110</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-modra-110</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000626</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>110</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-063</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino modrá 122</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino modrá 122</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-modra-122</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000633</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>122</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DT-064</ITEM_ID>
+    <PRODUCTNAME>Dětské tričko Dino modrá 134</PRODUCTNAME>
+    <PRODUCT>Dětské tričko Dino modrá 134</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Veselé dětské tričko s dinosaurem.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/detske-tricko-dino-modra-134</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-ink.jpg</IMGURL>
+    <PRICE_VAT>249</PRICE_VAT>
+    <MANUFACTURER>Basic</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Děti</CATEGORYTEXT>
+    <EAN>8590000000640</EAN>
+    <ITEMGROUP_ID>DT</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>134</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-065</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 30/32</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 30/32</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-30-32</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000657</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>30</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>32</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-066</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 30/34</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 30/34</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-30-34</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000664</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>30</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>34</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-067</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 32/32</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 32/32</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-32-32</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000671</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>32</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>32</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-068</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 32/34</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 32/34</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-32-34</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000688</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>32</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>34</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-069</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 34/32</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 34/32</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-34-32</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000695</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>34</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>32</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-070</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 34/34</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 34/34</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-34-34</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000701</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>34</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>34</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-071</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 36/32</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 36/32</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-36-32</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000718</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>36</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>32</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>DZ-072</ITEM_ID>
+    <PRODUCTNAME>Džíny Slim 36/34</PRODUCTNAME>
+    <PRODUCT>Džíny Slim 36/34</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Džíny úzkého střihu s příměsí elastanu.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/dziny-slim-36-34</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-ash.jpg</IMGURL>
+    <PRICE_VAT>1290</PRICE_VAT>
+    <MANUFACTURER>Denim Co</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Kalhoty</CATEGORYTEXT>
+    <EAN>8590000000725</EAN>
+    <ITEMGROUP_ID>DZ</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Pas</PARAM_NAME><VAL>36</VAL></PARAM>
+    <PARAM><PARAM_NAME>Délka</PARAM_NAME><VAL>34</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>denim</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-073</ITEM_ID>
+    <PRODUCTNAME>Zápisník A5 tečkovaný</PRODUCTNAME>
+    <PRODUCT>Zápisník A5 tečkovaný</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A5, tečkovaný, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a5-teckovany</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000732</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A5</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-074</ITEM_ID>
+    <PRODUCTNAME>Zápisník A6 tečkovaný</PRODUCTNAME>
+    <PRODUCT>Zápisník A6 tečkovaný</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A6, tečkovaný, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a6-teckovany</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000749</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A6</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-075</ITEM_ID>
+    <PRODUCTNAME>Zápisník A5 linkovaný</PRODUCTNAME>
+    <PRODUCT>Zápisník A5 linkovaný</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A5, linkovaný, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a5-linkovany</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000756</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A5</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-076</ITEM_ID>
+    <PRODUCTNAME>Zápisník A6 linkovaný</PRODUCTNAME>
+    <PRODUCT>Zápisník A6 linkovaný</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A6, linkovaný, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a6-linkovany</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000763</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A6</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-077</ITEM_ID>
+    <PRODUCTNAME>Zápisník A5 čistý</PRODUCTNAME>
+    <PRODUCT>Zápisník A5 čistý</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A5, čistý, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a5-cisty</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000770</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A5</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-078</ITEM_ID>
+    <PRODUCTNAME>Zápisník A6 čistý</PRODUCTNAME>
+    <PRODUCT>Zápisník A6 čistý</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A6, čistý, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a6-cisty</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000787</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A6</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-079</ITEM_ID>
+    <PRODUCTNAME>Zápisník A5 čtverečkovaný</PRODUCTNAME>
+    <PRODUCT>Zápisník A5 čtverečkovaný</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A5, čtverečkovaný, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a5-ctvereckovany</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000794</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A5</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-080</ITEM_ID>
+    <PRODUCTNAME>Zápisník A6 čtverečkovaný</PRODUCTNAME>
+    <PRODUCT>Zápisník A6 čtverečkovaný</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Zápisník A6, čtverečkovaný, 96 listů.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a6-ctvereckovany</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>189</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000800</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A6</VAL></PARAM>
+    <PARAM><PARAM_NAME>Počet listů</PARAM_NAME><VAL>96</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-081</ITEM_ID>
+    <PRODUCTNAME>Zápisník A4 kroužkový</PRODUCTNAME>
+    <PRODUCT>Zápisník A4 kroužkový</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Kroužková vazba.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/zapisnik-a4-krouzkovy</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>259</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Zápisníky</CATEGORYTEXT>
+    <EAN>8590000000817</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A4</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-082</ITEM_ID>
+    <PRODUCTNAME>Diář 2027</PRODUCTNAME>
+    <PRODUCT>Diář 2027</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Týdenní diář na rok 2027.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/diar-2027</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>349</PRICE_VAT>
+    <MANUFACTURER>Papírna</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Papírnictví | Diáře</CATEGORYTEXT>
+    <EAN>8590000000824</EAN>
+    <PARAM><PARAM_NAME>Formát</PARAM_NAME><VAL>A5</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-083</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 38</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 38</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-38</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000831</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>38</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-084</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 39</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 39</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-39</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000848</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>39</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-085</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 40</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 40</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-40</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000855</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>40</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-086</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 41</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 41</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-41</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000862</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>41</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-087</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 42</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 42</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-42</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000879</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>42</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-088</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 43</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 43</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-43</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000886</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>43</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-089</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 44</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 44</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-44</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000893</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>44</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>TN-090</ITEM_ID>
+    <PRODUCTNAME>Tenisky Urban 45</PRODUCTNAME>
+    <PRODUCT>Tenisky Urban 45</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Lehké městské tenisky.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/tenisky-urban-45</URL>
+    <IMGURL>http://mocks:4010/images/demo/tee-sand.jpg</IMGURL>
+    <PRICE_VAT>1590</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Obuv | Tenisky</CATEGORYTEXT>
+    <EAN>8590000000909</EAN>
+    <ITEMGROUP_ID>TN</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>45</VAL></PARAM>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bílá</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+    <STOCK_QUANTITY>3</STOCK_QUANTITY>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-091</ITEM_ID>
+    <PRODUCTNAME>Svíčka levandule</PRODUCTNAME>
+    <PRODUCT>Svíčka levandule</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní levandule.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-levandule</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000916</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>levandule</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-092</ITEM_ID>
+    <PRODUCTNAME>Svíčka vanilka</PRODUCTNAME>
+    <PRODUCT>Svíčka vanilka</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní vanilka.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-vanilka</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000923</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>vanilka</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-093</ITEM_ID>
+    <PRODUCTNAME>Svíčka cedr</PRODUCTNAME>
+    <PRODUCT>Svíčka cedr</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní cedr.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-cedr</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000930</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>cedr</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-094</ITEM_ID>
+    <PRODUCTNAME>Svíčka citron</PRODUCTNAME>
+    <PRODUCT>Svíčka citron</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní citron.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-citron</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000947</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>citron</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-095</ITEM_ID>
+    <PRODUCTNAME>Svíčka skořice</PRODUCTNAME>
+    <PRODUCT>Svíčka skořice</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní skořice.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-skorice</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000954</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>skořice</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-096</ITEM_ID>
+    <PRODUCTNAME>Svíčka máta</PRODUCTNAME>
+    <PRODUCT>Svíčka máta</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní máta.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-mata</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000961</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>máta</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-097</ITEM_ID>
+    <PRODUCTNAME>Svíčka růže</PRODUCTNAME>
+    <PRODUCT>Svíčka růže</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní růže.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-ruze</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000978</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>růže</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-098</ITEM_ID>
+    <PRODUCTNAME>Svíčka jasmín</PRODUCTNAME>
+    <PRODUCT>Svíčka jasmín</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní jasmín.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-jasmin</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000985</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>jasmín</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-099</ITEM_ID>
+    <PRODUCTNAME>Svíčka santal</PRODUCTNAME>
+    <PRODUCT>Svíčka santal</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní santal.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-santal</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000000992</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>santal</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>ITEM-100</ITEM_ID>
+    <PRODUCTNAME>Svíčka pomeranč</PRODUCTNAME>
+    <PRODUCT>Svíčka pomeranč</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Sójová svíčka s vůní pomeranč.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/svicka-pomeranc</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>299</PRICE_VAT>
+    <MANUFACTURER>Světlo</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Domácnost | Svíčky</CATEGORYTEXT>
+    <EAN>8590000001005</EAN>
+    <PARAM><PARAM_NAME>Vůně</PARAM_NAME><VAL>pomeranč</VAL></PARAM>
+    <PARAM><PARAM_NAME>Doba hoření</PARAM_NAME><VAL>40 h</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>SV-101</ITEM_ID>
+    <PRODUCTNAME>Šála Vlna šedá</PRODUCTNAME>
+    <PRODUCT>Šála Vlna šedá</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivá vlněná šála.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/sala-vlna-seda</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>590</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky</CATEGORYTEXT>
+    <EAN>8590000001012</EAN>
+    <ITEMGROUP_ID>SV</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>šedá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>SV-102</ITEM_ID>
+    <PRODUCTNAME>Šála Vlna hořčicová</PRODUCTNAME>
+    <PRODUCT>Šála Vlna hořčicová</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivá vlněná šála.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/sala-vlna-horcicova</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>590</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky</CATEGORYTEXT>
+    <EAN>8590000001029</EAN>
+    <ITEMGROUP_ID>SV</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>hořčicová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>SV-103</ITEM_ID>
+    <PRODUCTNAME>Šála Vlna tmavě modrá</PRODUCTNAME>
+    <PRODUCT>Šála Vlna tmavě modrá</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivá vlněná šála.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/sala-vlna-tmave-modra</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>590</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky</CATEGORYTEXT>
+    <EAN>8590000001036</EAN>
+    <ITEMGROUP_ID>SV</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>tmavě modrá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>SV-104</ITEM_ID>
+    <PRODUCTNAME>Šála Vlna bordó</PRODUCTNAME>
+    <PRODUCT>Šála Vlna bordó</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Hřejivá vlněná šála.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/sala-vlna-bordo</URL>
+    <IMGURL>http://mocks:4010/images/demo/hoodie-clay.jpg</IMGURL>
+    <PRICE_VAT>590</PRICE_VAT>
+    <MANUFACTURER>Vlnka</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Oblečení | Doplňky</CATEGORYTEXT>
+    <EAN>8590000001043</EAN>
+    <ITEMGROUP_ID>SV</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>bordó</VAL></PARAM>
+    <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>vlna</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>BC-105</ITEM_ID>
+    <PRODUCTNAME>Batoh City černá</PRODUCTNAME>
+    <PRODUCT>Batoh City černá</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Městský batoh s kapsou na notebook.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/sala-vlna-bordo</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <PRICE_VAT>1190</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Batohy</CATEGORYTEXT>
+    <EAN>8590000001050</EAN>
+    <ITEMGROUP_ID>BC</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>18 l</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>BC-106</ITEM_ID>
+    <PRODUCTNAME>Batoh City olivová</PRODUCTNAME>
+    <PRODUCT>Batoh City olivová</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Městský batoh s kapsou na notebook.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/batoh-city-olivova</URL>
+    <PRICE_VAT>1190</PRICE_VAT>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Batohy</CATEGORYTEXT>
+    <EAN>8590000001067</EAN>
+    <ITEMGROUP_ID>BC</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>olivová</VAL></PARAM>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>18 l</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+  <SHOPITEM>
+    <ITEM_ID>BC-107</ITEM_ID>
+    <PRODUCTNAME>Batoh City písková</PRODUCTNAME>
+    <PRODUCT>Batoh City písková</PRODUCT>
+    <DESCRIPTION><![CDATA[<p>Městský batoh s kapsou na notebook.</p>]]></DESCRIPTION>
+    <URL>https://stary-eshop.example/produkt/batoh-city-piskova</URL>
+    <IMGURL>http://mocks:4010/images/demo/bag-natural.jpg</IMGURL>
+    <MANUFACTURER>Urban Step</MANUFACTURER>
+    <CATEGORYTEXT>Heureka.cz | Doplňky | Batohy</CATEGORYTEXT>
+    <EAN>8590000001074</EAN>
+    <ITEMGROUP_ID>BC</ITEMGROUP_ID>
+    <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>písková</VAL></PARAM>
+    <PARAM><PARAM_NAME>Objem</PARAM_NAME><VAL>18 l</VAL></PARAM>
+    <DELIVERY_DATE>0</DELIVERY_DATE>
+  </SHOPITEM>
+</SHOP>

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT from_path FROM redirects WHERE from_path = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "from_path",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "redirects",
+            "name": "from_path"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3b330dff25fd6f1231d9fa48e50f19d19e1e01b32d6fa40a97aa2654562e9de7"
+}

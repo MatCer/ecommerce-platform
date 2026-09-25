@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.product_id, v.variant_id, v.value, p.name_i18n, p.kind, p.unit\n         FROM product_parameter_values v JOIN parameters p ON p.id = v.parameter_id\n         WHERE v.product_id = ANY($1) ORDER BY v.product_id, v.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "name_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "unit",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "unit"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "36c5e3060c7216c11f2edb83384742548753b9ed8eaf4232f9d5e9729841855c"
+}

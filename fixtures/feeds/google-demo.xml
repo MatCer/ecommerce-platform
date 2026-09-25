@@ -1,0 +1,1656 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+<channel>
+<title>Starý e-shop</title>
+<link>https://stary-eshop.example</link>
+<description>Demo feed</description>
+  <item>
+    <g:id>TB-001</g:id>
+    <g:title>Tričko Basic černá S</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-cerna-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:sale_price>269.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000015</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>černá</g:color>
+    <g:size>S</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-002</g:id>
+    <g:title>Tričko Basic černá M</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-cerna-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000022</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>černá</g:color>
+    <g:size>M</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-003</g:id>
+    <g:title>Tričko Basic černá L</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-cerna-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000039</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>černá</g:color>
+    <g:size>L</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-004</g:id>
+    <g:title>Tričko Basic černá XL</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-cerna-xl</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000046</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>černá</g:color>
+    <g:size>XL</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-005</g:id>
+    <g:title>Tričko Basic bílá S</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-bila-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000053</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>bílá</g:color>
+    <g:size>S</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-006</g:id>
+    <g:title>Tričko Basic bílá M</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-bila-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000060</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>bílá</g:color>
+    <g:size>M</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-007</g:id>
+    <g:title>Tričko Basic bílá L</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-bila-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000077</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>bílá</g:color>
+    <g:size>L</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-008</g:id>
+    <g:title>Tričko Basic bílá XL</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-bila-xl</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000084</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>bílá</g:color>
+    <g:size>XL</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-009</g:id>
+    <g:title>Tričko Basic modrá S</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-modra-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000091</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>S</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-010</g:id>
+    <g:title>Tričko Basic modrá M</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-modra-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:sale_price>269.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000107</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>M</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-011</g:id>
+    <g:title>Tričko Basic modrá L</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-modra-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000114</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>L</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-012</g:id>
+    <g:title>Tričko Basic modrá XL</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-modra-xl</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000121</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>XL</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-013</g:id>
+    <g:title>Tričko Basic zelená S</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-zelena-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-forest.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000138</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>zelená</g:color>
+    <g:size>S</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-014</g:id>
+    <g:title>Tričko Basic zelená M</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-zelena-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-forest.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000145</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>zelená</g:color>
+    <g:size>M</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-015</g:id>
+    <g:title>Tričko Basic zelená L</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-zelena-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-forest.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000152</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>zelená</g:color>
+    <g:size>L</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>TB-016</g:id>
+    <g:title>Tričko Basic zelená XL</g:title>
+    <g:description>Klasické tričko ze 100% bavlny. Pratelné na 40 °C.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-basic-zelena-xl</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-forest.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000169</g:gtin>
+    <g:product_type>Oblečení &gt; Trička</g:product_type>
+    <g:item_group_id>TB</g:item_group_id>
+    <g:color>zelená</g:color>
+    <g:size>XL</g:size>
+    <g:material>bavlna</g:material>
+  </item>
+  <item>
+    <g:id>MK-017</g:id>
+    <g:title>Mikina s kapucí šedá S</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000176</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>šedá</g:color>
+    <g:size>S</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-018</g:id>
+    <g:title>Mikina s kapucí šedá M</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000183</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>šedá</g:color>
+    <g:size>M</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-019</g:id>
+    <g:title>Mikina s kapucí šedá L</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:sale_price>809.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000190</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>šedá</g:color>
+    <g:size>L</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-020</g:id>
+    <g:title>Mikina s kapucí šedá XL</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-seda-xl</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000206</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>šedá</g:color>
+    <g:size>XL</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-021</g:id>
+    <g:title>Mikina s kapucí cihlová S</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000213</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>cihlová</g:color>
+    <g:size>S</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-022</g:id>
+    <g:title>Mikina s kapucí cihlová M</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000220</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>cihlová</g:color>
+    <g:size>M</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-023</g:id>
+    <g:title>Mikina s kapucí cihlová L</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000237</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>cihlová</g:color>
+    <g:size>L</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>MK-024</g:id>
+    <g:title>Mikina s kapucí cihlová XL</g:title>
+    <g:description>Teplá mikina s kapucí a klokaní kapsou.</g:description>
+    <g:link>https://stary-eshop.example/produkt/mikina-s-kapuci-cihlova-xl</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>899.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000244</g:gtin>
+    <g:product_type>Oblečení &gt; Mikiny</g:product_type>
+    <g:item_group_id>MK</g:item_group_id>
+    <g:color>cihlová</g:color>
+    <g:size>XL</g:size>
+    <g:material>bavlna s polyesterem</g:material>
+  </item>
+  <item>
+    <g:id>PO-025</g:id>
+    <g:title>Ponožky Merino antracit 39-42</g:title>
+    <g:description>Hřejivé ponožky z merino vlny.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ponozky-merino-antracit-39-42</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000251</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Ponožky</g:product_type>
+    <g:item_group_id>PO</g:item_group_id>
+    <g:color>antracit</g:color>
+    <g:size>39-42</g:size>
+    <g:material>merino vlna</g:material>
+  </item>
+  <item>
+    <g:id>PO-026</g:id>
+    <g:title>Ponožky Merino antracit 43-46</g:title>
+    <g:description>Hřejivé ponožky z merino vlny.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ponozky-merino-antracit-43-46</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000268</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Ponožky</g:product_type>
+    <g:item_group_id>PO</g:item_group_id>
+    <g:color>antracit</g:color>
+    <g:size>43-46</g:size>
+    <g:material>merino vlna</g:material>
+  </item>
+  <item>
+    <g:id>PO-027</g:id>
+    <g:title>Ponožky Merino béžová 39-42</g:title>
+    <g:description>Hřejivé ponožky z merino vlny.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ponozky-merino-bezova-39-42</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000275</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Ponožky</g:product_type>
+    <g:item_group_id>PO</g:item_group_id>
+    <g:color>béžová</g:color>
+    <g:size>39-42</g:size>
+    <g:material>merino vlna</g:material>
+  </item>
+  <item>
+    <g:id>PO-028</g:id>
+    <g:title>Ponožky Merino béžová 43-46</g:title>
+    <g:description>Hřejivé ponožky z merino vlny.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ponozky-merino-bezova-43-46</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:sale_price>224.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000282</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Ponožky</g:product_type>
+    <g:item_group_id>PO</g:item_group_id>
+    <g:color>béžová</g:color>
+    <g:size>43-46</g:size>
+    <g:material>merino vlna</g:material>
+  </item>
+  <item>
+    <g:id>PO-029</g:id>
+    <g:title>Ponožky Merino vínová 39-42</g:title>
+    <g:description>Hřejivé ponožky z merino vlny.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ponozky-merino-vinova-39-42</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000299</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Ponožky</g:product_type>
+    <g:item_group_id>PO</g:item_group_id>
+    <g:color>vínová</g:color>
+    <g:size>39-42</g:size>
+    <g:material>merino vlna</g:material>
+  </item>
+  <item>
+    <g:id>PO-030</g:id>
+    <g:title>Ponožky Merino vínová 43-46</g:title>
+    <g:description>Hřejivé ponožky z merino vlny.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ponozky-merino-vinova-43-46</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000305</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Ponožky</g:product_type>
+    <g:item_group_id>PO</g:item_group_id>
+    <g:color>vínová</g:color>
+    <g:size>43-46</g:size>
+    <g:material>merino vlna</g:material>
+  </item>
+  <item>
+    <g:id>KS-031</g:id>
+    <g:title>Kšiltovka Urban olivová</g:title>
+    <g:description>Nastavitelná kšiltovka.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ksiltovka-urban-olivova</g:link>
+    <g:image_link>http://mocks:4010/images/demo/cap-olive.jpg</g:image_link>
+    <g:price>399.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000312</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Čepice</g:product_type>
+    <g:item_group_id>KS</g:item_group_id>
+    <g:color>olivová</g:color>
+  </item>
+  <item>
+    <g:id>KS-032</g:id>
+    <g:title>Kšiltovka Urban černá</g:title>
+    <g:description>Nastavitelná kšiltovka.</g:description>
+    <g:link>https://stary-eshop.example/produkt/ksiltovka-urban-cerna</g:link>
+    <g:image_link>http://mocks:4010/images/demo/cap-olive.jpg</g:image_link>
+    <g:price>399.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000329</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky &gt; Čepice</g:product_type>
+    <g:item_group_id>KS</g:item_group_id>
+    <g:color>černá</g:color>
+  </item>
+  <item>
+    <g:id>ITEM-033</g:id>
+    <g:title>Plátěná taška Hory</g:title>
+    <g:description>Plátěná taška s potiskem Hory.</g:description>
+    <g:link>https://stary-eshop.example/produkt/platena-taska-hory</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>199.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000336</g:gtin>
+    <g:product_type>Doplňky &gt; Tašky</g:product_type>
+    <g:material>bavlněné plátno</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-034</g:id>
+    <g:title>Plátěná taška Les</g:title>
+    <g:description>Plátěná taška s potiskem Les.</g:description>
+    <g:link>https://stary-eshop.example/produkt/platena-taska-les</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>199.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000343</g:gtin>
+    <g:product_type>Doplňky &gt; Tašky</g:product_type>
+    <g:material>bavlněné plátno</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-035</g:id>
+    <g:title>Plátěná taška Město</g:title>
+    <g:description>Plátěná taška s potiskem Město.</g:description>
+    <g:link>https://stary-eshop.example/produkt/platena-taska-mesto</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>199.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000350</g:gtin>
+    <g:product_type>Doplňky &gt; Tašky</g:product_type>
+    <g:material>bavlněné plátno</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-036</g:id>
+    <g:title>Plátěná taška Moře</g:title>
+    <g:description>Plátěná taška s potiskem Moře.</g:description>
+    <g:link>https://stary-eshop.example/produkt/platena-taska-more</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>199.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:product_type>Doplňky &gt; Tašky</g:product_type>
+    <g:material>bavlněné plátno</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-037</g:id>
+    <g:title>Plátěná taška Minimal</g:title>
+    <g:description>Plátěná taška s potiskem Minimal.</g:description>
+    <g:link>https://stary-eshop.example/produkt/platena-taska-minimal</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>199.00 CZK</g:price>
+    <g:sale_price>179.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000374</g:gtin>
+    <g:product_type>Doplňky &gt; Tašky</g:product_type>
+    <g:material>bavlněné plátno</g:material>
+  </item>
+  <item>
+    <g:id>TK-038</g:id>
+    <g:title>Tričko Klasik biela S</g:title>
+    <g:description>Pohodlné tričko na každý deň.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-klasik-biela-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>279.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000381</g:gtin>
+    <g:product_type>Oblečenie &gt; Tričká</g:product_type>
+    <g:item_group_id>TK</g:item_group_id>
+    <g:color>biela</g:color>
+    <g:size>S</g:size>
+  </item>
+  <item>
+    <g:id>TK-039</g:id>
+    <g:title>Tričko Klasik biela M</g:title>
+    <g:description>Pohodlné tričko na každý deň.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-klasik-biela-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>279.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000398</g:gtin>
+    <g:product_type>Oblečenie &gt; Tričká</g:product_type>
+    <g:item_group_id>TK</g:item_group_id>
+    <g:color>biela</g:color>
+    <g:size>M</g:size>
+  </item>
+  <item>
+    <g:id>TK-040</g:id>
+    <g:title>Tričko Klasik biela L</g:title>
+    <g:description>Pohodlné tričko na každý deň.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-klasik-biela-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>279.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000404</g:gtin>
+    <g:product_type>Oblečenie &gt; Tričká</g:product_type>
+    <g:item_group_id>TK</g:item_group_id>
+    <g:color>biela</g:color>
+    <g:size>L</g:size>
+  </item>
+  <item>
+    <g:id>TK-041</g:id>
+    <g:title>Tričko Klasik čierna S</g:title>
+    <g:description>Pohodlné tričko na každý deň.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-klasik-cierna-s</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>279.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000411</g:gtin>
+    <g:product_type>Oblečenie &gt; Tričká</g:product_type>
+    <g:item_group_id>TK</g:item_group_id>
+    <g:color>čierna</g:color>
+    <g:size>S</g:size>
+  </item>
+  <item>
+    <g:id>TK-042</g:id>
+    <g:title>Tričko Klasik čierna M</g:title>
+    <g:description>Pohodlné tričko na každý deň.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-klasik-cierna-m</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>279.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000428</g:gtin>
+    <g:product_type>Oblečenie &gt; Tričká</g:product_type>
+    <g:item_group_id>TK</g:item_group_id>
+    <g:color>čierna</g:color>
+    <g:size>M</g:size>
+  </item>
+  <item>
+    <g:id>TK-043</g:id>
+    <g:title>Tričko Klasik čierna L</g:title>
+    <g:description>Pohodlné tričko na každý deň.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tricko-klasik-cierna-l</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>279.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000435</g:gtin>
+    <g:product_type>Oblečenie &gt; Tričká</g:product_type>
+    <g:item_group_id>TK</g:item_group_id>
+    <g:color>čierna</g:color>
+    <g:size>L</g:size>
+  </item>
+  <item>
+    <g:id>ZC-044</g:id>
+    <g:title>Zimná čiapka sivá</g:title>
+    <g:description>Pletená zimná čiapka.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zimna-ciapka-siva</g:link>
+    <g:image_link>http://mocks:4010/images/demo/cap-olive.jpg</g:image_link>
+    <g:price>349.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000442</g:gtin>
+    <g:product_type>Oblečenie &gt; Doplnky</g:product_type>
+    <g:item_group_id>ZC</g:item_group_id>
+    <g:color>sivá</g:color>
+    <g:material>akryl</g:material>
+  </item>
+  <item>
+    <g:id>ZC-045</g:id>
+    <g:title>Zimná čiapka modrá</g:title>
+    <g:description>Pletená zimná čiapka.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zimna-ciapka-modra</g:link>
+    <g:image_link>http://mocks:4010/images/demo/cap-olive.jpg</g:image_link>
+    <g:price>349.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000459</g:gtin>
+    <g:product_type>Oblečenie &gt; Doplnky</g:product_type>
+    <g:item_group_id>ZC</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:material>akryl</g:material>
+  </item>
+  <item>
+    <g:id>ZC-046</g:id>
+    <g:title>Zimná čiapka červená</g:title>
+    <g:description>Pletená zimná čiapka.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zimna-ciapka-cervena</g:link>
+    <g:image_link>http://mocks:4010/images/demo/cap-olive.jpg</g:image_link>
+    <g:price>349.00 CZK</g:price>
+    <g:sale_price>314.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000000466</g:gtin>
+    <g:product_type>Oblečenie &gt; Doplnky</g:product_type>
+    <g:item_group_id>ZC</g:item_group_id>
+    <g:color>červená</g:color>
+    <g:material>akryl</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-047</g:id>
+    <g:title>Hrnek Ranní káva</g:title>
+    <g:description>Keramický hrnek s motivem Ranní káva. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-ranni-kava</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000473</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-048</g:id>
+    <g:title>Hrnek Dobrá nálada</g:title>
+    <g:description>Keramický hrnek s motivem Dobrá nálada. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-dobra-nalada</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000480</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-049</g:id>
+    <g:title>Hrnek Pondělí</g:title>
+    <g:description>Keramický hrnek s motivem Pondělí. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-pondeli</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000497</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-050</g:id>
+    <g:title>Hrnek Čaj o páté</g:title>
+    <g:description>Keramický hrnek s motivem Čaj o páté. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-caj-o-pate</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000503</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-051</g:id>
+    <g:title>Hrnek Kafe s sebou</g:title>
+    <g:description>Keramický hrnek s motivem Kafe s sebou. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-kafe-s-sebou</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000510</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-052</g:id>
+    <g:title>Hrnek Hory volají</g:title>
+    <g:description>Keramický hrnek s motivem Hory volají. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-hory-volaji</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000527</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-053</g:id>
+    <g:title>Hrnek Pohoda</g:title>
+    <g:description>Keramický hrnek s motivem Pohoda. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-pohoda</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000534</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-054</g:id>
+    <g:title>Hrnek Šéf</g:title>
+    <g:description>Keramický hrnek s motivem Šéf. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-sef</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000541</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-055</g:id>
+    <g:title>Hrnek Babička</g:title>
+    <g:description>Keramický hrnek s motivem Babička. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-babicka</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:sale_price>206.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000558</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-056</g:id>
+    <g:title>Hrnek Dědeček</g:title>
+    <g:description>Keramický hrnek s motivem Dědeček. Lze mýt v myčce.</g:description>
+    <g:link>https://stary-eshop.example/produkt/hrnek-dedecek</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>229.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Keramika Pro</g:brand>
+    <g:gtin>8590000000565</g:gtin>
+    <g:product_type>Domácnost &gt; Hrnky</g:product_type>
+    <g:material>keramika</g:material>
+  </item>
+  <item>
+    <g:id>DT-057</g:id>
+    <g:title>Dětské tričko Dino žlutá 98</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-98</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000572</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>žlutá</g:color>
+    <g:size>98</g:size>
+  </item>
+  <item>
+    <g:id>DT-058</g:id>
+    <g:title>Dětské tričko Dino žlutá 110</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-110</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000589</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>žlutá</g:color>
+    <g:size>110</g:size>
+  </item>
+  <item>
+    <g:id>DT-059</g:id>
+    <g:title>Dětské tričko Dino žlutá 122</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-122</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000596</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>žlutá</g:color>
+    <g:size>122</g:size>
+  </item>
+  <item>
+    <g:id>DT-060</g:id>
+    <g:title>Dětské tričko Dino žlutá 134</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-zluta-134</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000602</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>žlutá</g:color>
+    <g:size>134</g:size>
+  </item>
+  <item>
+    <g:id>DT-061</g:id>
+    <g:title>Dětské tričko Dino modrá 98</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-modra-98</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000619</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>98</g:size>
+  </item>
+  <item>
+    <g:id>DT-062</g:id>
+    <g:title>Dětské tričko Dino modrá 110</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-modra-110</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000626</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>110</g:size>
+  </item>
+  <item>
+    <g:id>DT-063</g:id>
+    <g:title>Dětské tričko Dino modrá 122</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-modra-122</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000633</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>122</g:size>
+  </item>
+  <item>
+    <g:id>DT-064</g:id>
+    <g:title>Dětské tričko Dino modrá 134</g:title>
+    <g:description>Veselé dětské tričko s dinosaurem.</g:description>
+    <g:link>https://stary-eshop.example/produkt/detske-tricko-dino-modra-134</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-ink.jpg</g:image_link>
+    <g:price>249.00 CZK</g:price>
+    <g:sale_price>224.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Basic</g:brand>
+    <g:gtin>8590000000640</g:gtin>
+    <g:product_type>Oblečení &gt; Děti</g:product_type>
+    <g:item_group_id>DT</g:item_group_id>
+    <g:color>modrá</g:color>
+    <g:size>134</g:size>
+  </item>
+  <item>
+    <g:id>DZ-065</g:id>
+    <g:title>Džíny Slim 30/32</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-30-32</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000657</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-066</g:id>
+    <g:title>Džíny Slim 30/34</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-30-34</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000664</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-067</g:id>
+    <g:title>Džíny Slim 32/32</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-32-32</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000671</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-068</g:id>
+    <g:title>Džíny Slim 32/34</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-32-34</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000688</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-069</g:id>
+    <g:title>Džíny Slim 34/32</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-34-32</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000695</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-070</g:id>
+    <g:title>Džíny Slim 34/34</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-34-34</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000701</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-071</g:id>
+    <g:title>Džíny Slim 36/32</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-36-32</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000718</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>DZ-072</g:id>
+    <g:title>Džíny Slim 36/34</g:title>
+    <g:description>Džíny úzkého střihu s příměsí elastanu.</g:description>
+    <g:link>https://stary-eshop.example/produkt/dziny-slim-36-34</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-ash.jpg</g:image_link>
+    <g:price>1290.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Denim Co</g:brand>
+    <g:gtin>8590000000725</g:gtin>
+    <g:product_type>Oblečení &gt; Kalhoty</g:product_type>
+    <g:item_group_id>DZ</g:item_group_id>
+    <g:material>denim</g:material>
+  </item>
+  <item>
+    <g:id>ITEM-073</g:id>
+    <g:title>Zápisník A5 tečkovaný</g:title>
+    <g:description>Zápisník A5, tečkovaný, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a5-teckovany</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:sale_price>170.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000732</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-074</g:id>
+    <g:title>Zápisník A6 tečkovaný</g:title>
+    <g:description>Zápisník A6, tečkovaný, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a6-teckovany</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000749</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-075</g:id>
+    <g:title>Zápisník A5 linkovaný</g:title>
+    <g:description>Zápisník A5, linkovaný, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a5-linkovany</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000756</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-076</g:id>
+    <g:title>Zápisník A6 linkovaný</g:title>
+    <g:description>Zápisník A6, linkovaný, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a6-linkovany</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000763</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-077</g:id>
+    <g:title>Zápisník A5 čistý</g:title>
+    <g:description>Zápisník A5, čistý, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a5-cisty</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000770</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-078</g:id>
+    <g:title>Zápisník A6 čistý</g:title>
+    <g:description>Zápisník A6, čistý, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a6-cisty</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000787</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-079</g:id>
+    <g:title>Zápisník A5 čtverečkovaný</g:title>
+    <g:description>Zápisník A5, čtverečkovaný, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a5-ctvereckovany</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000794</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-080</g:id>
+    <g:title>Zápisník A6 čtverečkovaný</g:title>
+    <g:description>Zápisník A6, čtverečkovaný, 96 listů.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a6-ctvereckovany</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>189.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000800</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-081</g:id>
+    <g:title>Zápisník A4 kroužkový</g:title>
+    <g:description>Kroužková vazba.</g:description>
+    <g:link>https://stary-eshop.example/produkt/zapisnik-a4-krouzkovy</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>259.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000817</g:gtin>
+    <g:product_type>Papírnictví &gt; Zápisníky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-082</g:id>
+    <g:title>Diář 2027</g:title>
+    <g:description>Týdenní diář na rok 2027.</g:description>
+    <g:link>https://stary-eshop.example/produkt/diar-2027</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>349.00 CZK</g:price>
+    <g:sale_price>314.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Papírna</g:brand>
+    <g:gtin>8590000000824</g:gtin>
+    <g:product_type>Papírnictví &gt; Diáře</g:product_type>
+  </item>
+  <item>
+    <g:id>TN-083</g:id>
+    <g:title>Tenisky Urban 38</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-38</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000831</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>38</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-084</g:id>
+    <g:title>Tenisky Urban 39</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-39</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000848</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>39</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-085</g:id>
+    <g:title>Tenisky Urban 40</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-40</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000855</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>40</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-086</g:id>
+    <g:title>Tenisky Urban 41</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-41</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000862</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>41</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-087</g:id>
+    <g:title>Tenisky Urban 42</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-42</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000879</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>42</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-088</g:id>
+    <g:title>Tenisky Urban 43</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-43</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000886</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>43</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-089</g:id>
+    <g:title>Tenisky Urban 44</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-44</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000893</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>44</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>TN-090</g:id>
+    <g:title>Tenisky Urban 45</g:title>
+    <g:description>Lehké městské tenisky.</g:description>
+    <g:link>https://stary-eshop.example/produkt/tenisky-urban-45</g:link>
+    <g:image_link>http://mocks:4010/images/demo/tee-sand.jpg</g:image_link>
+    <g:price>1590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000000909</g:gtin>
+    <g:product_type>Obuv &gt; Tenisky</g:product_type>
+    <g:item_group_id>TN</g:item_group_id>
+    <g:size>45</g:size>
+    <g:color>bílá</g:color>
+  </item>
+  <item>
+    <g:id>ITEM-091</g:id>
+    <g:title>Svíčka levandule</g:title>
+    <g:description>Sójová svíčka s vůní levandule.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-levandule</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:sale_price>269.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000916</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-092</g:id>
+    <g:title>Svíčka vanilka</g:title>
+    <g:description>Sójová svíčka s vůní vanilka.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-vanilka</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000923</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-093</g:id>
+    <g:title>Svíčka cedr</g:title>
+    <g:description>Sójová svíčka s vůní cedr.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-cedr</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000930</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-094</g:id>
+    <g:title>Svíčka citron</g:title>
+    <g:description>Sójová svíčka s vůní citron.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-citron</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000947</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-095</g:id>
+    <g:title>Svíčka skořice</g:title>
+    <g:description>Sójová svíčka s vůní skořice.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-skorice</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000954</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-096</g:id>
+    <g:title>Svíčka máta</g:title>
+    <g:description>Sójová svíčka s vůní máta.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-mata</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000961</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-097</g:id>
+    <g:title>Svíčka růže</g:title>
+    <g:description>Sójová svíčka s vůní růže.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-ruze</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000978</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-098</g:id>
+    <g:title>Svíčka jasmín</g:title>
+    <g:description>Sójová svíčka s vůní jasmín.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-jasmin</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000985</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-099</g:id>
+    <g:title>Svíčka santal</g:title>
+    <g:description>Sójová svíčka s vůní santal.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-santal</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000000992</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>ITEM-100</g:id>
+    <g:title>Svíčka pomeranč</g:title>
+    <g:description>Sójová svíčka s vůní pomeranč.</g:description>
+    <g:link>https://stary-eshop.example/produkt/svicka-pomeranc</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>299.00 CZK</g:price>
+    <g:sale_price>269.10 CZK</g:sale_price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Světlo</g:brand>
+    <g:gtin>8590000001005</g:gtin>
+    <g:product_type>Domácnost &gt; Svíčky</g:product_type>
+  </item>
+  <item>
+    <g:id>SV-101</g:id>
+    <g:title>Šála Vlna šedá</g:title>
+    <g:description>Hřejivá vlněná šála.</g:description>
+    <g:link>https://stary-eshop.example/produkt/sala-vlna-seda</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000001012</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky</g:product_type>
+    <g:item_group_id>SV</g:item_group_id>
+    <g:color>šedá</g:color>
+    <g:material>vlna</g:material>
+  </item>
+  <item>
+    <g:id>SV-102</g:id>
+    <g:title>Šála Vlna hořčicová</g:title>
+    <g:description>Hřejivá vlněná šála.</g:description>
+    <g:link>https://stary-eshop.example/produkt/sala-vlna-horcicova</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000001029</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky</g:product_type>
+    <g:item_group_id>SV</g:item_group_id>
+    <g:color>hořčicová</g:color>
+    <g:material>vlna</g:material>
+  </item>
+  <item>
+    <g:id>SV-103</g:id>
+    <g:title>Šála Vlna tmavě modrá</g:title>
+    <g:description>Hřejivá vlněná šála.</g:description>
+    <g:link>https://stary-eshop.example/produkt/sala-vlna-tmave-modra</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000001036</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky</g:product_type>
+    <g:item_group_id>SV</g:item_group_id>
+    <g:color>tmavě modrá</g:color>
+    <g:material>vlna</g:material>
+  </item>
+  <item>
+    <g:id>SV-104</g:id>
+    <g:title>Šála Vlna bordó</g:title>
+    <g:description>Hřejivá vlněná šála.</g:description>
+    <g:link>https://stary-eshop.example/produkt/sala-vlna-bordo</g:link>
+    <g:image_link>http://mocks:4010/images/demo/hoodie-clay.jpg</g:image_link>
+    <g:price>590.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Vlnka</g:brand>
+    <g:gtin>8590000001043</g:gtin>
+    <g:product_type>Oblečení &gt; Doplňky</g:product_type>
+    <g:item_group_id>SV</g:item_group_id>
+    <g:color>bordó</g:color>
+    <g:material>vlna</g:material>
+  </item>
+  <item>
+    <g:id>BC-105</g:id>
+    <g:title>Batoh City černá</g:title>
+    <g:description>Městský batoh s kapsou na notebook.</g:description>
+    <g:link>https://stary-eshop.example/produkt/sala-vlna-bordo</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:price>1190.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000001050</g:gtin>
+    <g:product_type>Doplňky &gt; Batohy</g:product_type>
+    <g:item_group_id>BC</g:item_group_id>
+    <g:color>černá</g:color>
+  </item>
+  <item>
+    <g:id>BC-106</g:id>
+    <g:title>Batoh City olivová</g:title>
+    <g:description>Městský batoh s kapsou na notebook.</g:description>
+    <g:link>https://stary-eshop.example/produkt/batoh-city-olivova</g:link>
+    <g:price>1190.00 CZK</g:price>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000001067</g:gtin>
+    <g:product_type>Doplňky &gt; Batohy</g:product_type>
+    <g:item_group_id>BC</g:item_group_id>
+    <g:color>olivová</g:color>
+  </item>
+  <item>
+    <g:id>BC-107</g:id>
+    <g:title>Batoh City písková</g:title>
+    <g:description>Městský batoh s kapsou na notebook.</g:description>
+    <g:link>https://stary-eshop.example/produkt/batoh-city-piskova</g:link>
+    <g:image_link>http://mocks:4010/images/demo/bag-natural.jpg</g:image_link>
+    <g:availability>in_stock</g:availability>
+    <g:condition>new</g:condition>
+    <g:brand>Urban Step</g:brand>
+    <g:gtin>8590000001074</g:gtin>
+    <g:product_type>Doplňky &gt; Batohy</g:product_type>
+    <g:item_group_id>BC</g:item_group_id>
+    <g:color>písková</g:color>
+  </item>
+</channel>
+</rss>

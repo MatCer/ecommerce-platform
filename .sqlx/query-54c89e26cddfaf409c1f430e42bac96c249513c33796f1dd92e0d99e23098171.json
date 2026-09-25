@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO redirects (tenant_id, from_path, to_path, code)\n                 VALUES ($1, $2, $3, 301)\n                 ON CONFLICT (tenant_id, from_path) DO NOTHING RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "redirects",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "54c89e26cddfaf409c1f430e42bac96c249513c33796f1dd92e0d99e23098171"
+}

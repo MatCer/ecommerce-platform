@@ -5,7 +5,7 @@ import { i18n } from "../../lib/i18n";
 import { CARD_SIZES } from "../../lib/images";
 import { storefront } from "../../lib/storefront";
 
-// Blog index. Content arrives with WP13; until then the API answers 404 and so does this route.
+// Blog index: published posts, newest first (WP13).
 const sf = storefront(Astro.request);
 const [shop, blog] = await Promise.all([sf.shop(), sf.blog()]);
 if (!blog) return Astro.rewrite("/404");

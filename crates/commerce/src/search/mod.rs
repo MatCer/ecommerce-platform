@@ -16,6 +16,7 @@ pub mod index;
 pub mod lang;
 pub mod meili;
 pub mod query;
+pub mod synonyms;
 
 use std::time::Duration;
 
@@ -32,6 +33,8 @@ pub const INDEX_PRODUCT_JOB: &str = "search.index_product";
 pub const REINDEX_CATEGORY_JOB: &str = "search.reindex_category";
 /// Rebuilds all indexes of a tenant into new indexes and swaps them in: `{"version"}`.
 pub const REBUILD_JOB: &str = "search.rebuild";
+/// Writes the tenant's synonyms ([`synonyms`]) to all of its indexes: `{}`.
+pub const SYNONYMS_JOB: &str = "search.synonyms";
 
 /// Bumped whenever [`index::settings`] changes; indexes with an older version get the new
 /// settings applied by the next indexing job.

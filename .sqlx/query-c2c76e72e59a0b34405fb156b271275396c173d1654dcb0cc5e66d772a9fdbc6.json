@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO search_synonyms (tenant_id, groups) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET groups = $2, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c2c76e72e59a0b34405fb156b271275396c173d1654dcb0cc5e66d772a9fdbc6"
+}

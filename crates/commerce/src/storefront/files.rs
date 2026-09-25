@@ -122,6 +122,43 @@ async fn entries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Entry>, Error> 
             .insert(r.locale, format!("/p/{}", r.slug));
     }
     out.extend(products.into_values());
+    // Published CMS/legal pages, the blog and its posts.
+    let mut pages: BTreeMap<Uuid, Entry> = BTreeMap::new();
+    let mut blog = false;
+    for r in sqlx::query!(
+        "SELECT pt.page_id, pt.locale, pt.slug, p.kind, p.updated_at FROM page_translations pt
+         JOIN pages p ON p.id = pt.page_id
+         WHERE p.status = 'published' AND p.published_at <= $1
+         ORDER BY pt.page_id",
+        ctx.now
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    {
+        let kind = crate::content::PageKind::parse(&r.kind);
+        blog |= kind == crate::content::PageKind::BlogPost;
+        pages
+            .entry(r.page_id)
+            .or_insert(Entry {
+                paths: BTreeMap::new(),
+                lists: None,
+                lastmod: Some(r.updated_at),
+            })
+            .paths
+            .insert(r.locale, kind.path(&r.slug));
+    }
+    if blog {
+        out.push(Entry {
+            paths: ctx
+                .markets
+                .iter()
+                .flat_map(|m| m.locales.iter().map(|l| (l.clone(), "/blog".to_owned())))
+                .collect(),
+            lists: None,
+            lastmod: None,
+        });
+    }
+    out.extend(pages.into_values());
     Ok(out)
 }
 
@@ -227,6 +264,17 @@ pub async fn llms(tx: &mut TenantTx, ctx: &Context) -> Result<String, Error> {
     }
     out.push_str("\n## Machine-readable\n\n");
     let _ = writeln!(out, "- [Sitemap]({})", ctx.url("/sitemap.xml"));
+    for (label, channel) in [
+        ("Google Merchant feed", "google"),
+        ("Heureka feed", "heureka"),
+        ("Zboží feed", "zbozi"),
+    ] {
+        let _ = writeln!(
+            out,
+            "- [{label}]({})",
+            ctx.url(&format!("/feeds/{}/{channel}.xml", ctx.market.code))
+        );
+    }
     if !other.is_empty() {
         out.push_str("\n## Other markets\n\n");
         let mut other: Vec<_> = other.into_iter().collect();

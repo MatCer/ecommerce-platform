@@ -598,6 +598,7 @@ version = "0.1.0"
 dependencies = [
  "ammonia",
  "argon2",
+ "axum",
  "chrono",
  "hex",
  "hmac",
@@ -607,6 +608,7 @@ dependencies = [
  "object_store",
  "platform",
  "proptest",
+ "quick-xml",
  "rand 0.10.3",
  "ravif",
  "reqwest",

@@ -25,6 +25,16 @@
     bottom: 1rem;
   }
 }
+/* While the banner is open the end of the page stays clear of it, so the footer's last links
+   can be scrolled out from under it (WCAG 2.5.8 target size, 2.4.11 focus not obscured). */
+body:has(.pf-consent) {
+  padding-bottom: 17rem;
+}
+@media (width >= 48rem) {
+  body:has(.pf-consent) {
+    padding-bottom: 14rem;
+  }
+}
 .pf-consent__title {
   margin: 0 0 0.25rem;
   font: 700 1.0625rem / 1.3 var(--font-sans, system-ui, sans-serif);

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE pages SET kind = $2, legal_type = $3, status = $4,\n                published_at = CASE WHEN $4 = 'published' THEN coalesce($5, published_at, now())\n                                    ELSE coalesce($5, published_at) END,\n                image_asset_id = $6, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "88ef00185740ae3c4c02498f516465b6d55c41f737fb2f90cde3dcff072687e1"
+}

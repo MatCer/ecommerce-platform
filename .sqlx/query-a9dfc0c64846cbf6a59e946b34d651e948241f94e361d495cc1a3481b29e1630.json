@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT code, currency, price_list_id, locales, default_locale FROM markets WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "price_list_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "price_list_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "locales",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "locales"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "default_locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "default_locale"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "a9dfc0c64846cbf6a59e946b34d651e948241f94e361d495cc1a3481b29e1630"
+}

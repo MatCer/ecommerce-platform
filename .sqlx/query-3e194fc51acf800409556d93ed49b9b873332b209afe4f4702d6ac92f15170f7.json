@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.legal_type || ':' || l.locale AS \"missing!\"\n           FROM unnest($1::text[]) AS t (legal_type)\n           CROSS JOIN (SELECT DISTINCT default_locale AS locale FROM markets) l\n           WHERE NOT EXISTS (\n               SELECT 1 FROM pages p JOIN page_translations pt ON pt.page_id = p.id\n               WHERE p.legal_type = t.legal_type AND pt.locale = l.locale\n                 AND p.status = 'published' AND p.published_at <= $2)\n           ORDER BY 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "missing!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3e194fc51acf800409556d93ed49b9b873332b209afe4f4702d6ac92f15170f7"
+}

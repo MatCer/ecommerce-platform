@@ -17,6 +17,7 @@ image.workspace = true
 infer.workspace = true
 object_store.workspace = true
 platform.workspace = true
+quick-xml.workspace = true
 rand.workspace = true
 ravif.workspace = true
 reqwest.workspace = true
@@ -32,6 +33,7 @@ uuid.workspace = true
 webp.workspace = true
 
 [dev-dependencies]
+axum.workspace = true
 proptest.workspace = true
 testkit.workspace = true
 

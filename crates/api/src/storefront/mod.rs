@@ -12,6 +12,7 @@
 mod cart;
 mod checkout;
 mod consent;
+mod content;
 pub mod customer;
 mod files;
 mod orders;
@@ -39,6 +40,7 @@ pub const CART_HEADER: &str = "x-cart-token";
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .merge(pages::routes())
+        .merge(content::routes())
         .merge(cart::routes())
         .merge(customer::routes())
         .merge(checkout::routes())

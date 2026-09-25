@@ -1,0 +1,75 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id, p.gpsr -> 'manufacturer' ->> 'name' AS manufacturer, p.heureka_category,\n                  p.google_category,\n                  (SELECT pt.description_html FROM product_translations pt WHERE pt.product_id = p.id\n                   ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1) AS description,\n                  (SELECT pc.category_id FROM product_categories pc WHERE pc.product_id = p.id\n                   ORDER BY pc.category_id LIMIT 1) AS category_id\n           FROM products p WHERE p.id = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "manufacturer",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "heureka_category",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "heureka_category"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "google_category",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "google_category"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "category_id",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      true,
+      true,
+      null,
+      null
+    ]
+  },
+  "hash": "cf3390f6d47520da1cf69d55063d0f444ec05ade9bc5e19af5149161950b3569"
+}

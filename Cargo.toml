@@ -47,6 +47,8 @@ ravif = { version = "0.13.0", default-features = false }
 # Lossy WebP (libwebp); `image` only encodes lossless WebP.
 webp = { version = "0.3.1", default-features = false }
 proptest = "1.11.0"
+# WP13a: streaming feed parser (Heureka, Google Merchant); already in the tree via object_store.
+quick-xml = "0.41.0"
 # WP9: customer passwords (argon2id, OWASP parameters).
 argon2 = "0.6.0"
 # WP9 mail core: SMTP (Mailpit locally), MJML templates, template variables.

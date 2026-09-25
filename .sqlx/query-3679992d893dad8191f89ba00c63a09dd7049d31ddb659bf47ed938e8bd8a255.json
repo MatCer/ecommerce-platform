@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT locale, title, slug, excerpt, blocks, seo_title, seo_description\n         FROM page_translations WHERE page_id = $1 ORDER BY locale",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "excerpt",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "excerpt"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "blocks",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "blocks"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "seo_title",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "seo_title"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "seo_description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "seo_description"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "3679992d893dad8191f89ba00c63a09dd7049d31ddb659bf47ed938e8bd8a255"
+}

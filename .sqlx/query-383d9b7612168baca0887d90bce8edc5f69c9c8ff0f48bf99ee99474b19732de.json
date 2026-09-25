@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT p.id, t.name, t.slug, p.brand\n         FROM products p JOIN product_translations t ON t.product_id = p.id AND t.locale = $2\n         WHERE p.id = ANY($1) AND p.status = 'active'",
+  "query": "SELECT p.id, t.name AS \"name!\", t.slug AS \"slug!\" FROM products p\n           CROSS JOIN LATERAL (\n               SELECT name, slug FROM product_translations pt WHERE pt.product_id = p.id\n               ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1\n           ) t WHERE p.id = ANY($1) AND p.status = 'active'",
   "describe": {
     "columns": [
       {
@@ -16,7 +16,7 @@
       },
       {
         "ordinal": 1,
-        "name": "name",
+        "name": "name!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "slug",
+        "name": "slug!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -35,31 +35,20 @@
             "name": "slug"
           }
         }
-      },
-      {
-        "ordinal": 3,
-        "name": "brand",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "products",
-            "name": "brand"
-          }
-        }
       }
     ],
     "parameters": {
       "Left": [
         "UuidArray",
+        "Text",
         "Text"
       ]
     },
     "nullable": [
       false,
       false,
-      false,
-      true
+      false
     ]
   },
-  "hash": "8abba19653edd0eabef7c0493cb186840398211a4510c4a820bd72ef3a6cb3a0"
+  "hash": "383d9b7612168baca0887d90bce8edc5f69c9c8ff0f48bf99ee99474b19732de"
 }

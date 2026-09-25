@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO legal_entities (tenant_id, data) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET data = $2, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f0ea190ddf980f4cc1fcdcd1ee7fd7b7a216eacbd5fd20c47c5aaa157a430cf1"
+}

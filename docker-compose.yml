@@ -313,6 +313,14 @@ services:
       # Staff invitation links (outbox → mail pipeline).
       AUTH_INTERNAL_URL: http://auth:3000/
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
+      # Export feed URLs and edge purges after catalog/content changes (WP13a, A2).
+      PUBLIC_STOREFRONT_SCHEME: http
+      PUBLIC_STOREFRONT_PORT: ${HTTP_PORT:-8080}
+      EDGE_PURGE_URL: http://edge:8788/_edge/purge
+      EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+      # Dev only: the SSRF-safe fetcher (A21) may reach the mocks service, which serves the
+      # demo feeds and images on the private Docker network. Ignored unless APP_ENV=dev.
+      SAFE_FETCH_ALLOW_HOSTS: mocks
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }

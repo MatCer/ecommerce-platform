@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO import_mappings (tenant_id, source, entity_type, external_id, entity_id)\n         VALUES ($1, $2, $3, $4, $5)\n         ON CONFLICT (tenant_id, source, entity_type, external_id)\n         DO UPDATE SET entity_id = $5, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9ea225da124836a73ffcfa08297d72a1344d2b5e04d28c92d1250172a8e2a79c"
+}
