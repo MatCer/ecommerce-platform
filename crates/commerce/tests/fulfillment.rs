@@ -1066,3 +1066,43 @@ async fn a_returned_parcel_receives_open_withdrawals_and_payout_retries_are_sing
         .unwrap();
     assert_eq!(notes, 1, "no second accounting correction");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_unconfirmed_payout_is_not_documented_as_done(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "wp12-unacked").await;
+    let t = s.shop.tenant;
+    let (order, attempt) = place(&runtime, &s, MethodKind::BankTransfer).await;
+    pay(&runtime, t, attempt).await;
+    invoicing::issue(&runtime, &rates(), t, order, Utc::now())
+        .await
+        .unwrap();
+    let urls = PublicUrls::default();
+    let input = run(&runtime, t, async |tx| refunds::full_input(tx, order).await)
+        .await
+        .unwrap();
+    let out = refunds::refund_order(
+        &runtime,
+        &settings().payments,
+        &urls,
+        t,
+        ACTOR,
+        order,
+        &input,
+    )
+    .await
+    .unwrap();
+    // As if the provider never acknowledged it (a crash before submission).
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    sqlx::query(
+        "UPDATE refunds SET status = 'pending', provider_ref = NULL, finalized_at = NULL
+         WHERE id = $1",
+    )
+    .bind(out.refund.id)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let early = refunds::finalize(&runtime, &urls, t, out.refund.id, ACTOR).await;
+    assert!(matches!(early, Err(Error::Unavailable(_))), "{early:?}");
+}

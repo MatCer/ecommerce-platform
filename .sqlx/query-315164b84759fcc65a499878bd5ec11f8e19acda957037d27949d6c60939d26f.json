@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT r.status, r.finalized_at, r.credit_note_id, r.lines, r.withdrawal_id, r.iban,\n                r.reason, r.amount_minor, a.method\n         FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
+  "query": "SELECT r.status, r.finalized_at, r.credit_note_id, r.lines, r.withdrawal_id, r.iban,\n                r.reason, r.amount_minor, r.provider_ref, a.method\n         FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
   "describe": {
     "columns": [
       {
@@ -93,6 +93,17 @@
       },
       {
         "ordinal": 8,
+        "name": "provider_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "provider_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
         "name": "method",
         "type_info": "Text",
         "origin": {
@@ -117,8 +128,9 @@
       true,
       true,
       false,
+      true,
       false
     ]
   },
-  "hash": "652011bd2b0aeaa9d7b686cc03bf09e71b64c46ac104dd32bbd01accf6568548"
+  "hash": "315164b84759fcc65a499878bd5ec11f8e19acda957037d27949d6c60939d26f"
 }

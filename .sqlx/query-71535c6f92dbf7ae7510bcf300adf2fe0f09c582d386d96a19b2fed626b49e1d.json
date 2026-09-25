@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE refunds SET credit_note_id = $2, retry_of = $3, finalized_at = now() WHERE id = $1",
+  "query": "UPDATE refunds SET credit_note_id = $2, retry_of = $3 WHERE id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -12,5 +12,5 @@
     },
     "nullable": []
   },
-  "hash": "692a001ef3813ffba214565e0d2abcbf74e36cd1b24774295d307910b65e832c"
+  "hash": "71535c6f92dbf7ae7510bcf300adf2fe0f09c582d386d96a19b2fed626b49e1d"
 }

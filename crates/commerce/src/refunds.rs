@@ -381,7 +381,7 @@ pub async fn finalize(
     orders::lock(&mut tx, order_id).await?;
     let r = sqlx::query!(
         "SELECT r.status, r.finalized_at, r.credit_note_id, r.lines, r.withdrawal_id, r.iban,
-                r.reason, r.amount_minor, a.method
+                r.reason, r.amount_minor, r.provider_ref, a.method
          FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
         refund_id
     )
@@ -401,6 +401,16 @@ pub async fn finalize(
         .await?;
         Ok(())
     };
+    // A payout the provider has not acknowledged yet is not documented as done: its credit
+    // note and the withdrawal's completion wait until it is submitted (the backstop job and
+    // "retry" submit it).
+    if r.status == "pending" && r.provider_ref.is_none() {
+        return Err(Error::Unavailable(
+            "the refund is recorded, but the payment provider has not confirmed it yet; it is \
+             retried automatically"
+                .into(),
+        ));
+    }
     let Some(ledger) = r.lines.filter(|_| r.status != "failed") else {
         // A rejected payout (nothing to document) or an amount-only refund.
         finish(&mut tx, None).await?;
@@ -568,7 +578,7 @@ pub async fn retry(
     .await?;
     let (id, manual) = recorded;
     let linked = sqlx::query!(
-        "UPDATE refunds SET credit_note_id = $2, retry_of = $3, finalized_at = now() WHERE id = $1",
+        "UPDATE refunds SET credit_note_id = $2, retry_of = $3 WHERE id = $1",
         id,
         credit_note,
         root
@@ -586,14 +596,23 @@ pub async fn retry(
             other?;
         }
     }
+    // The replacement is submitted below; the backstop resumes it after a crash.
+    let mut job = NewJob::new(FINALIZE_JOB, json!({ "refund_id": id }));
+    job.tenant_id = Some(tenant_id);
+    job.run_at = Some(Utc::now() + Duration::minutes(5));
+    job.idempotency_key = Some(format!("refund_finalize:{id}"));
+    queue::enqueue(&mut *tx, &job).await?;
     tx.commit().await?;
     if manual {
+        finalize(db, urls, tenant_id, id, actor).await?;
         let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
         let out = payments::refund_row(&mut tx, id).await?;
         tx.commit().await?;
         return Ok(out);
     }
-    payments::submit_refund(db, payments_cfg, tenant_id, id).await
+    let out = payments::submit_refund(db, payments_cfg, tenant_id, id).await?;
+    finalize(db, urls, tenant_id, id, actor).await?;
+    Ok(out)
 }
 
 /// The durable backstop of a refund ([`FINALIZE_JOB`]): a Stripe refund left `pending` by a
@@ -856,6 +875,20 @@ pub async fn refund_exception(
         );
     }
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    // The exception stays open while a payout is unconfirmed: refunding it again later returns
+    // whatever failed meanwhile, and closes it once everything went through.
+    let pending = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id
+           WHERE r.order_id = $1 AND r.status = 'pending' AND a.id IS DISTINCT FROM $2"#,
+        order_id,
+        keep
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if pending > 0 {
+        tx.commit().await?;
+        return Ok(refunds);
+    }
     let total: i64 = refunds.iter().map(|r| r.amount_minor).sum();
     orders::resolve_exception(
         &mut tx,

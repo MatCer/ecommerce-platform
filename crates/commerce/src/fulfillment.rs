@@ -668,13 +668,16 @@ pub async fn returned_to_sender(
         });
     }
     apply_fulfillment(tx, order_id, FulfillmentCommand::ReturnToSender, actor).await?;
-    orders::apply_order(
-        tx,
-        &mut o,
-        OrderCommand::MarkReturned(ReturnSummary::Full),
-        actor,
-    )
-    .await?;
+    // Withdrawals may have made the order `returned` already (e.g. refunded on proof).
+    if o.status != OrderStatus::Returned.as_str() {
+        orders::apply_order(
+            tx,
+            &mut o,
+            OrderCommand::MarkReturned(ReturnSummary::Full),
+            actor,
+        )
+        .await?;
+    }
     set_shipment(tx, s.id, ShipmentStatus::Returned).await?;
     // Units a withdrawal already brought back were restocked there (A13: once).
     let lines = sqlx::query!(
