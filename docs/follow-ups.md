@@ -5,16 +5,16 @@
 | WP0 | ~~CI does not smoke-test the auth image~~: CI now boots it against disposable Postgres and checks `/healthz` + clean shutdown in `scripts/smoke-images.sh`. | done (WP15) |
 | WP1 | ~~Manual smoke paths lack browser coverage~~: staff, catalog, search, checkout and cross-tenant checks are in `e2e/`; smoke scripts remain optional diagnostics. | done (WP15) |
 | WP2 | ~~Artifact GC (private bucket `artifacts/` + edge cache volume)~~ done in WP23 (`themes.maintenance`, edge `pruneArtifacts`) | done |
-| WP2 | Moved: size chart, dispatch cutoff/holidays and font library need new merchant data controls and storefront presentation; visual UI work is excluded from WP15. | UI agent / later content model |
+| WP2 | Size chart, dispatch cutoff/holidays on the PDP and a curated font library: not in the M1 spec (§9.2 asks for a delivery estimate, which the PDP shows); each needs a new merchant data model (size tables per product type, a dispatch calendar, self-hosted font assets the builder can subset). Font tokens stay free text but allowlist-validated (A6), so nothing unsafe reaches CSS. | later (content model) |
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
-| WP5 | Moved: the staff table needs an invitation-accepted state and supporting API field; this changes admin UI beyond semantic fixes. | UI agent |
+| WP5 | The staff table has no invitation-accepted state: §5.3 defines no invitation lifecycle, and acceptance happens in the auth service (its own schema and DB role), so the API would need a first-sign-in marker on `staff_members` written from the staff extractor. | later (staff UX) |
 | WP5 | Moved: a deterministic >15 min reauth / tenant-switch-in-flight browser test needs an auth test clock and request barrier; unit freshness and tenant RLS tests exist, but this browser race remains for security acceptance. | WP25 |
 | WP5 | ~~Quick e2e reruns share the auth IP bucket~~: signed per-context local identities separate buckets; the secret is refused outside `APP_ENV=dev`. | done (WP15) |
 | WP6 | ~~Artifact builds are not reproducible~~ done in WP23: fixed `ASTRO_KEY` for the default artifact, per-tenant HMAC-derived key for tenant builds | done |
 | WP6 | Moved: cart creation and handoff still lack `Idempotency-Key` replay after a lost response. One order per cart and idempotent placement prevent duplicate charges; retrying a lost handoff needs a new cart. This is recovery work beyond the local happy-path gate. | later (checkout reliability) |
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
-| WP8 | Payment/carrier marks in `/shop` are generic catalog text (legal/CMS links come from published pages since WP13a; the checkout still links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale) | WP11 / WP12 |
+| WP8 | ~~Payment/carrier marks in `/shop` are generic catalog text~~: `trust.payment_methods`/`trust.carriers` list what checkout offers in the market (text marks, no logos). Still open: the checkout links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale | WP12 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
 | WP9/WP18 | Bounces/complaints arrive at `POST /webhooks/ses` (SNS envelope, HTTP Basic `MAIL_EVENTS_SECRET`); SNS message signature verification (SignatureVersion 2, cert URL pinned to `sns.<region>.amazonaws.com`, TopicArn check) is designed in `commerce::marketing::deliverability` but not built; subscription confirmations are only logged | pre-launch |
 | WP10 | Stripe and bank transfer are configurable but not offered at checkout (no adapter); the order email has a bank-transfer placeholder | WP11 |
@@ -63,7 +63,7 @@
 | WP12 | Moved: carrier-specific COD payout file formats need real carrier sample files; the generic CSV endpoint covers local pilot reconciliation. | pre-launch carrier integration |
 | WP12 | Invoice/credit-note Typst templates and the COD cash-rounding treatment (rounding at collection, after the dispatch invoice, outside the VAT base) need accountant approval before real use | pre-launch |
 | WP12 | Presigned PDF downloads are named by their key (`FV…pdf`); no `Content-Disposition` override (object_store's signer lacks response-header params) | later |
-| WP12 | Moved: payment/carrier marks in the theme footer are generic strings, not verified provider marks; replacement is visual theme work. | UI agent |
+| WP12 | ~~Payment/carrier marks in the theme footer are generic strings~~: the footer and trust row show the market's enabled payment and shipping methods by name; licensed provider logos are not used. | done (WP15) |
 | WP12 | ~~Parallel checkout specs share a storefront IP bucket~~: signed per-context local identities keep the production limiter intact. | done (WP15) |
 | WP18 | No open tracking at all (privacy default); the optional consented tracking pixel of §11.5 is not built | later (only if merchants ask) |
 | WP18 | Marketing message bodies stay in `email_messages` indefinitely (one row per recipient); add a retention rule to `ops.sweep` (e.g. drop bodies of final marketing mail after 30 days) | later (ops) |
@@ -82,7 +82,7 @@
 | WP13b | The export's assets manifest lists public image variants only; merchant-uploaded originals and invoice PDFs (private bucket) are not in the zip | later |
 | WP13b | Any later module holding customer data (WP19 flows, watchdogs) must be added to `privacy::access`/`erase` (a new FK to `customers` without `ON DELETE` would make erasure fail) | WP19 |
 | WP13b | Re-importing an old CSV after an erasure brings the person back; the import cannot know (no tombstones by design) | later (privacy) |
-| WP13b | Moved: customer list needs an admin route, table, search and permission UX; existing export and order views expose data for the pilot. | UI agent |
+| WP13b | ~~No customer list in the admin~~: Orders → Customers (`GET /admin/v1/customers`, search by email/name, cursor pages) links to the customer's orders (`/orders?customer_id=`). No customer detail page/edit yet. | done (WP15) |
 | WP13b | The import UI maps columns only when a run is created; re-checking with a new mapping is API-only (`analyze` takes `mapping`) | later |
 | WP16 | Review invites: after delivery (default 7 days) and only with the `review_invites` consent, call `commerce::reviews::issue_tokens(tx, order_id, now)` and mail one `reviews::review_url(ctx, token)` per product (the e2e writes its token via SQL until then) | WP19 |
 | WP16 | ~~GDPR erasure/export must cover `reviews` and `review_tokens`~~ done in WP13b | done |
