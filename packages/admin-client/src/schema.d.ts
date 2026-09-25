@@ -777,13 +777,13 @@ export interface paths {
             cookie?: never;
         };
         /** Recent full data exports. */
-        get: operations["list_exports"];
+        get: operations["list_data_exports"];
         put?: never;
         /**
          * Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),
          *     prepared in the background. One at a time.
          */
-        post: operations["create_export"];
+        post: operations["create_data_export"];
         delete?: never;
         options?: never;
         head?: never;
@@ -797,7 +797,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["get_export"];
+        get: operations["get_data_export"];
         put?: never;
         post?: never;
         delete?: never;
@@ -816,7 +816,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** A 5-minute download link of a ready export (A21). Needs a recent sign-in (A9); audited. */
-        post: operations["download_export"];
+        post: operations["download_data_export"];
         delete?: never;
         options?: never;
         head?: never;
@@ -831,14 +831,14 @@ export interface paths {
             cookie?: never;
         };
         /** The 50 most recent CSV imports. */
-        get: operations["list_imports"];
+        get: operations["list_data_imports"];
         put?: never;
         /**
          * Starts a CSV import of customers, historical orders (archived, A28) or newsletter
          *     subscribers: PUT the file to `upload`, then call `analyze`. Nothing is written until
          *     `apply`. Honors `Idempotency-Key`.
          */
-        post: operations["create_import"];
+        post: operations["create_data_import"];
         delete?: never;
         options?: never;
         head?: never;
@@ -852,7 +852,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["get_import"];
+        get: operations["get_data_import"];
         put?: never;
         post?: never;
         delete?: never;
@@ -874,7 +874,7 @@ export interface paths {
          * Runs (or re-runs, optionally with a new column mapping) the dry run: row errors, counts
          *     and a preview. Writes nothing.
          */
-        post: operations["analyze_import"];
+        post: operations["analyze_data_import"];
         delete?: never;
         options?: never;
         head?: never;
@@ -894,7 +894,7 @@ export interface paths {
          * Imports the valid rows of an analyzed file in the background. Rows with errors are
          *     skipped; no email, stock movement, payment, invoice or event is ever triggered.
          */
-        post: operations["apply_import"];
+        post: operations["apply_data_import"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5532,19 +5532,78 @@ export interface components {
             error?: string | null;
             /** Format: uuid */
             id: string;
-            kind: components["schemas"]["Kind"];
+            kind: components["schemas"]["DataImportKind"];
             mapping: components["schemas"]["BTreeMap"];
             /** Format: uuid */
             market_id: string;
-            progress: components["schemas"]["Progress"];
-            report?: components["schemas"]["ImportReport"] | null;
-            status: components["schemas"]["RunStatus"];
+            progress: components["schemas"]["DataImportProgress"];
+            report?: components["schemas"]["DataImportReport"] | null;
+            status: components["schemas"]["DataImportStatus"];
             /** Format: date-time */
             updated_at: string;
         };
+        /** @enum {string} */
+        DataImportKind: "customers" | "orders" | "subscribers";
         DataImportList: {
             items: components["schemas"]["DataImport"][];
         };
+        DataImportProgress: {
+            /** Format: int32 */
+            created: number;
+            /** Format: int32 */
+            done: number;
+            /** @description Subscribers: how many were subscribed, left pending, already subscribed or kept. */
+            outcomes: {
+                [key: string]: number;
+            };
+            /** Format: int32 */
+            total: number;
+            /** Format: int32 */
+            updated: number;
+        };
+        /** @description Dry-run report (the apply step adds its outcome to `progress`). */
+        DataImportReport: {
+            /**
+             * @description DataImportKind-specific counts (`with_address`, `lines`, `linked_to_customer`, `subscribed`,
+             *     `pending_not_marketable`, `already_subscribed`, `kept_unsubscribed`).
+             */
+            counts: {
+                [key: string]: number;
+            };
+            errors: components["schemas"]["RowError"][];
+            /** Format: int32 */
+            existing: number;
+            /** @description The file's column headers (for the mapping UI). */
+            headers: string[];
+            /**
+             * Format: int32
+             * @description Rows with at least one error; they are skipped (a bad line drops its whole order).
+             */
+            invalid_rows: number;
+            /**
+             * Format: int32
+             * @description Records that do not exist yet / already exist (by email or order number).
+             */
+            new: number;
+            /** @description The first 10 valid records as they will be imported. */
+            preview: {
+                [key: string]: string;
+            }[];
+            /**
+             * Format: int32
+             * @description Valid records that apply will import (orders: orders, not lines).
+             */
+            records: number;
+            /**
+             * Format: int32
+             * @description Data rows in the file.
+             */
+            rows: number;
+            /** @description More errors than listed (200). */
+            truncated: boolean;
+        };
+        /** @enum {string} */
+        DataImportStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
         DeclareInput: {
             /** @description The explicit confirmation step (A19): must be `true`. */
             confirm: boolean;
@@ -6128,8 +6187,6 @@ export interface components {
             /** Format: int64 */
             next_cursor?: number | null;
         };
-        /** @enum {string} */
-        Kind: "customers" | "orders" | "subscribers";
         LabelFailure: {
             error: string;
             /** Format: uuid */
@@ -6469,7 +6526,7 @@ export interface components {
             translations: components["schemas"]["CategoryTranslation"][];
         };
         NewDataImport: {
-            kind: components["schemas"]["Kind"];
+            kind: components["schemas"]["DataImportKind"];
             mapping?: components["schemas"]["BTreeMap"];
             /**
              * Format: uuid
@@ -10918,7 +10975,7 @@ export interface operations {
             };
         };
     };
-    list_exports: {
+    list_data_exports: {
         parameters: {
             query?: never;
             header: {
@@ -10940,7 +10997,7 @@ export interface operations {
             };
         };
     };
-    create_export: {
+    create_data_export: {
         parameters: {
             query?: never;
             header: {
@@ -10971,7 +11028,7 @@ export interface operations {
             };
         };
     };
-    get_export: {
+    get_data_export: {
         parameters: {
             query?: never;
             header: {
@@ -11003,7 +11060,7 @@ export interface operations {
             };
         };
     };
-    download_export: {
+    download_data_export: {
         parameters: {
             query?: never;
             header: {
@@ -11044,7 +11101,7 @@ export interface operations {
             };
         };
     };
-    list_imports: {
+    list_data_imports: {
         parameters: {
             query?: never;
             header: {
@@ -11066,7 +11123,7 @@ export interface operations {
             };
         };
     };
-    create_import: {
+    create_data_import: {
         parameters: {
             query?: never;
             header: {
@@ -11110,7 +11167,7 @@ export interface operations {
             };
         };
     };
-    get_import: {
+    get_data_import: {
         parameters: {
             query?: never;
             header: {
@@ -11142,7 +11199,7 @@ export interface operations {
             };
         };
     };
-    analyze_import: {
+    analyze_data_import: {
         parameters: {
             query?: never;
             header: {
@@ -11186,7 +11243,7 @@ export interface operations {
             };
         };
     };
-    apply_import: {
+    apply_data_import: {
         parameters: {
             query?: never;
             header: {

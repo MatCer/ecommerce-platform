@@ -43,7 +43,7 @@ const UPLOAD_CONTENT_TYPE: &str = "text/csv";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum Kind {
+pub enum DataImportKind {
     Customers,
     /// Historical orders: archived, never processed (A28).
     Orders,
@@ -51,7 +51,7 @@ pub enum Kind {
     Subscribers,
 }
 
-impl Kind {
+impl DataImportKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Customers => "customers",
@@ -79,7 +79,7 @@ impl Kind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum RunStatus {
+pub enum DataImportStatus {
     /// Waiting for the upload.
     Pending,
     Analyzing,
@@ -90,7 +90,7 @@ pub enum RunStatus {
     Failed,
 }
 
-impl RunStatus {
+impl DataImportStatus {
     fn parse(s: &str) -> Self {
         match s {
             "analyzing" => Self::Analyzing,
@@ -109,7 +109,7 @@ pub type Mapping = BTreeMap<String, String>;
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewDataImport {
-    pub kind: Kind,
+    pub kind: DataImportKind,
     /// Customers without a `locale` get this market's default locale; subscribers join it.
     pub market_id: Uuid,
     /// Bytes of the CSV (at most 20 MB) to upload with the returned presigned PUT.
@@ -138,7 +138,7 @@ pub struct RowError {
 
 /// Dry-run report (the apply step adds its outcome to `progress`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct ImportReport {
+pub struct DataImportReport {
     /// The file's column headers (for the mapping UI).
     pub headers: Vec<String>,
     /// Data rows in the file.
@@ -150,7 +150,7 @@ pub struct ImportReport {
     /// Records that do not exist yet / already exist (by email or order number).
     pub new: u32,
     pub existing: u32,
-    /// Kind-specific counts (`with_address`, `lines`, `linked_to_customer`, `subscribed`,
+    /// DataImportKind-specific counts (`with_address`, `lines`, `linked_to_customer`, `subscribed`,
     /// `pending_not_marketable`, `already_subscribed`, `kept_unsubscribed`).
     pub counts: BTreeMap<String, u32>,
     pub errors: Vec<RowError>,
@@ -160,7 +160,7 @@ pub struct ImportReport {
     pub preview: Vec<BTreeMap<String, String>>,
 }
 
-impl ImportReport {
+impl DataImportReport {
     pub(super) fn error(
         &mut self,
         line: u64,
@@ -186,7 +186,7 @@ impl ImportReport {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Progress {
+pub struct DataImportProgress {
     pub total: u32,
     pub done: u32,
     pub created: u32,
@@ -198,12 +198,12 @@ pub struct Progress {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct DataImport {
     pub id: Uuid,
-    pub kind: Kind,
+    pub kind: DataImportKind,
     pub market_id: Uuid,
     pub mapping: Mapping,
-    pub status: RunStatus,
-    pub report: Option<ImportReport>,
-    pub progress: Progress,
+    pub status: DataImportStatus,
+    pub report: Option<DataImportReport>,
+    pub progress: DataImportProgress,
     pub error: Option<String>,
     pub created_by: String,
     pub created_at: DateTime<Utc>,
@@ -245,12 +245,12 @@ impl Defaults {
 /// Collects a row's problems instead of stopping at the first.
 pub(super) struct Check<'a> {
     row: &'a Row,
-    report: &'a mut ImportReport,
+    report: &'a mut DataImportReport,
     pub ok: bool,
 }
 
 impl<'a> Check<'a> {
-    pub fn new(row: &'a Row, report: &'a mut ImportReport) -> Self {
+    pub fn new(row: &'a Row, report: &'a mut DataImportReport) -> Self {
         Self {
             row,
             report,
@@ -328,21 +328,23 @@ impl Records {
 
 /// Parses and validates a file (pure; runs on a blocking thread).
 fn validate(
-    kind: Kind,
+    kind: DataImportKind,
     bytes: &[u8],
     mapping: &Mapping,
     d: &Defaults,
-) -> Result<(Records, ImportReport), table::FileError> {
+) -> Result<(Records, DataImportReport), table::FileError> {
     let Table { headers, rows } = table::read(bytes, kind.fields(), mapping)?;
-    let mut report = ImportReport {
+    let mut report = DataImportReport {
         headers,
         rows: u32::try_from(rows.len()).unwrap_or(u32::MAX),
-        ..ImportReport::default()
+        ..DataImportReport::default()
     };
     let records = match kind {
-        Kind::Customers => Records::Customers(customers::validate(&rows, d, &mut report)),
-        Kind::Orders => Records::Orders(orders::validate(&rows, d, &mut report)),
-        Kind::Subscribers => Records::Subscribers(subscribers::validate(&rows, d, &mut report)),
+        DataImportKind::Customers => Records::Customers(customers::validate(&rows, d, &mut report)),
+        DataImportKind::Orders => Records::Orders(orders::validate(&rows, d, &mut report)),
+        DataImportKind::Subscribers => {
+            Records::Subscribers(subscribers::validate(&rows, d, &mut report))
+        }
     };
     report.records = u32::try_from(records.len()).unwrap_or(u32::MAX);
     report.preview = records.preview();
@@ -369,7 +371,7 @@ fn job(tenant_id: Uuid, id: Uuid, step: &str) -> NewJob<'static> {
     j
 }
 
-fn check_mapping(kind: Kind, mapping: &Mapping) -> Result<(), Error> {
+fn check_mapping(kind: DataImportKind, mapping: &Mapping) -> Result<(), Error> {
     for (field, header) in mapping {
         if !kind.fields().iter().any(|f| f.name == field) {
             return Err(invalid(
@@ -406,10 +408,10 @@ impl From<RunRow> for DataImport {
     fn from(r: RunRow) -> Self {
         Self {
             id: r.id,
-            kind: Kind::parse(&r.kind),
+            kind: DataImportKind::parse(&r.kind),
             market_id: r.market_id,
             mapping: serde_json::from_value(r.mapping).unwrap_or_default(),
-            status: RunStatus::parse(&r.status),
+            status: DataImportStatus::parse(&r.status),
             report: r.report.and_then(|v| serde_json::from_value(v).ok()),
             progress: serde_json::from_value(r.progress).unwrap_or_default(),
             error: r.error,
@@ -539,8 +541,8 @@ pub async fn analyze(
 ) -> Result<DataImport, Error> {
     let r = row(tx, id).await?;
     if !matches!(
-        RunStatus::parse(&r.status),
-        RunStatus::Pending | RunStatus::Analyzed | RunStatus::Failed
+        DataImportStatus::parse(&r.status),
+        DataImportStatus::Pending | DataImportStatus::Analyzed | DataImportStatus::Failed
     ) {
         return Err(Error::Conflict {
             code: "import_busy",
@@ -548,7 +550,7 @@ pub async fn analyze(
         });
     }
     if let Some(mapping) = &input.mapping {
-        check_mapping(Kind::parse(&r.kind), mapping)?;
+        check_mapping(DataImportKind::parse(&r.kind), mapping)?;
     }
     sqlx::query!(
         "UPDATE data_imports SET status = 'analyzing', error = NULL, updated_at = now(),
@@ -581,7 +583,7 @@ pub async fn analyze(
 /// Applies an analyzed run.
 pub async fn apply(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<DataImport, Error> {
     let r = row(tx, id).await?;
-    if RunStatus::parse(&r.status) != RunStatus::Analyzed {
+    if DataImportStatus::parse(&r.status) != DataImportStatus::Analyzed {
         return Err(Error::Conflict {
             code: "import_not_analyzed",
             detail: "only an analyzed import can be applied; run the dry run first".into(),
@@ -646,9 +648,9 @@ pub async fn run_step(
     let mut tx = tenant_tx(db, tenant_id).await?;
     let r = get(&mut tx, id).await?;
     let expected = if step == "apply" {
-        RunStatus::Applying
+        DataImportStatus::Applying
     } else {
-        RunStatus::Analyzing
+        DataImportStatus::Analyzing
     };
     if r.status != expected {
         return Ok(()); // superseded or already done
@@ -710,9 +712,9 @@ pub async fn run_step(
         return Ok(());
     }
 
-    let mut progress = Progress {
+    let mut progress = DataImportProgress {
         total: report.records,
-        ..Progress::default()
+        ..DataImportProgress::default()
     };
     let n = records.len();
     let mut start = 0;

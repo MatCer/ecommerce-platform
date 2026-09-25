@@ -30,6 +30,9 @@ const ContentMenus = lazy(() => import("./pages/ContentMenus.tsx"));
 const ContentLegal = lazy(() => import("./pages/ContentLegal.tsx"));
 const Redirects = lazy(() => import("./pages/Redirects.tsx"));
 const Imports = lazy(() => import("./pages/Imports.tsx"));
+const DataImports = lazy(() => import("./pages/DataImports.tsx"));
+const ArchivedOrders = lazy(() => import("./pages/ArchivedOrders.tsx"));
+const DataPrivacy = lazy(() => import("./pages/DataPrivacy.tsx"));
 const ExportFeeds = lazy(() => import("./pages/ExportFeeds.tsx"));
 const SearchSynonyms = lazy(() => import("./pages/SearchSynonyms.tsx"));
 const Collections = lazy(() => import("./pages/Collections.tsx"));
@@ -117,6 +120,10 @@ export function App() {
           <Route path="/themes" component={Themes} />
           <Route path="/imports" component={Imports} />
           <Route path="/imports/:id" component={Imports} />
+          <Route path="/data/imports" component={DataImports} />
+          <Route path="/data/imports/:id" component={DataImports} />
+          <Route path="/data/archived-orders" component={ArchivedOrders} />
+          <Route path="/data/privacy" component={DataPrivacy} />
           <Route path="/feeds" component={ExportFeeds} />
           <Route path="/settings/search" component={SearchSynonyms} />
           <Route path="/collections" component={Collections} />

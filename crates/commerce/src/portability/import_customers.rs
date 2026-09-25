@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashSet};
 use platform::Error;
 use platform::db::TenantTx;
 
-use super::imports::{Check, Defaults, ImportReport};
+use super::imports::{Check, DataImportReport, Defaults};
 use super::table::{self, Field, Row, field};
 
 pub const FIELDS: &[Field] = &[
@@ -62,7 +62,7 @@ impl Record {
     }
 }
 
-pub fn validate(rows: &[Row], _d: &Defaults, report: &mut ImportReport) -> Vec<Record> {
+pub fn validate(rows: &[Row], _d: &Defaults, report: &mut DataImportReport) -> Vec<Record> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for row in rows {
@@ -131,7 +131,7 @@ pub fn validate(rows: &[Row], _d: &Defaults, report: &mut ImportReport) -> Vec<R
 pub async fn classify(
     tx: &mut TenantTx,
     records: &[Record],
-    report: &mut ImportReport,
+    report: &mut DataImportReport,
 ) -> Result<(), Error> {
     let emails: Vec<String> = records.iter().map(|r| r.email.clone()).collect();
     let existing = sqlx::query_scalar!(

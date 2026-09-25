@@ -16,7 +16,7 @@ use platform::mail::Stream;
 use serde_json::json;
 use uuid::Uuid;
 
-use super::imports::{Check, Defaults, ImportReport};
+use super::imports::{Check, DataImportReport, Defaults};
 use super::table::{self, Field, Row, field};
 use crate::consent::{self, ConsentPurpose, Subject};
 
@@ -77,7 +77,7 @@ fn text_version(v: &str) -> table::CellResult<String> {
     }
 }
 
-pub fn validate(rows: &[Row], d: &Defaults, report: &mut ImportReport) -> Vec<Record> {
+pub fn validate(rows: &[Row], d: &Defaults, report: &mut DataImportReport) -> Vec<Record> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
     for row in rows {
@@ -157,7 +157,7 @@ impl Outcome {
 pub async fn classify(
     tx: &mut TenantTx,
     records: &[Record],
-    report: &mut ImportReport,
+    report: &mut DataImportReport,
 ) -> Result<(), Error> {
     let emails: Vec<String> = records.iter().map(|r| r.email.clone()).collect();
     let rows = sqlx::query!(
@@ -321,7 +321,7 @@ mod tests {
             ),
             Row::of(7, &[("email", "A@example.com")]),
         ];
-        let mut report = ImportReport::default();
+        let mut report = DataImportReport::default();
         let out = validate(&rows, &Defaults::test(), &mut report);
         assert_eq!(out.len(), 2);
         assert!(out[0].evidence.is_none());

@@ -9,7 +9,7 @@ use commerce::consent::{self, ConsentPurpose, Subject};
 use commerce::marketing::subscribers;
 use commerce::portability::export;
 use commerce::portability::imports::{
-    self, AnalyzeInput, DataImport, Kind, Mapping, NewDataImport, RunStatus,
+    self, AnalyzeInput, DataImport, DataImportKind, DataImportStatus, Mapping, NewDataImport,
 };
 use commerce::privacy::{self, ErasureRequest};
 use object_store::path::Path;
@@ -40,7 +40,7 @@ async fn setup(db: PgPool) -> Ctx {
 
 impl Ctx {
     /// Creates a run, "uploads" `csv` where the presigned PUT would, runs the dry run.
-    async fn analyzed(&self, kind: Kind, csv: &str, mapping: Mapping) -> DataImport {
+    async fn analyzed(&self, kind: DataImportKind, csv: &str, mapping: Mapping) -> DataImport {
         let mut tx = tenant_tx(&self.runtime, self.shop.tenant).await.unwrap();
         let created = imports::create(
             &mut tx,
@@ -83,11 +83,11 @@ impl Ctx {
         imports::get(&mut tx, id).await.unwrap()
     }
 
-    async fn import(&self, kind: Kind, csv: &str) -> DataImport {
+    async fn import(&self, kind: DataImportKind, csv: &str) -> DataImport {
         let run = self.analyzed(kind, csv, Mapping::new()).await;
-        assert_eq!(run.status, RunStatus::Analyzed, "{:?}", run.error);
+        assert_eq!(run.status, DataImportStatus::Analyzed, "{:?}", run.error);
         let run = self.step(run.id, "apply").await;
-        assert_eq!(run.status, RunStatus::Applied, "{:?}", run.error);
+        assert_eq!(run.status, DataImportStatus::Applied, "{:?}", run.error);
         run
     }
 
@@ -139,8 +139,10 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
     let c = setup(db).await;
     let before = c.side_effects().await;
     let m = mapping(&[("email", "E-mail"), ("name", "Jméno"), ("phone", "Telefon")]);
-    let run = c.analyzed(Kind::Customers, CUSTOMERS, m.clone()).await;
-    assert_eq!(run.status, RunStatus::Analyzed, "{:?}", run.error);
+    let run = c
+        .analyzed(DataImportKind::Customers, CUSTOMERS, m.clone())
+        .await;
+    assert_eq!(run.status, DataImportStatus::Analyzed, "{:?}", run.error);
     let r = run.report.unwrap();
     assert_eq!((r.rows, r.records, r.invalid_rows, r.new), (4, 2, 2, 2));
     assert_eq!(r.headers[0], "E-mail");
@@ -154,7 +156,7 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
     );
 
     let run = c.step(run.id, "apply").await;
-    assert_eq!(run.status, RunStatus::Applied, "{:?}", run.error);
+    assert_eq!(run.status, DataImportStatus::Applied, "{:?}", run.error);
     assert_eq!((run.progress.created, run.progress.updated), (2, 0));
     assert_eq!(c.count("SELECT count(*) FROM customers").await, 2);
     assert_eq!(
@@ -171,7 +173,7 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
     assert!(c.storage.private.head(&key).await.is_err());
 
     // Same file again: updates, no duplicates (customers, addresses).
-    let again = c.analyzed(Kind::Customers, CUSTOMERS, m).await;
+    let again = c.analyzed(DataImportKind::Customers, CUSTOMERS, m).await;
     assert_eq!(again.report.as_ref().unwrap().existing, 2);
     let again = c.step(again.id, "apply").await;
     assert_eq!((again.progress.created, again.progress.updated), (0, 2));
@@ -188,9 +190,9 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
 async fn a_bad_file_or_mapping_fails_the_run_and_can_be_reanalyzed(db: PgPool) {
     let c = setup(db).await;
     let run = c
-        .analyzed(Kind::Customers, "Jmeno\nAnna\n", Mapping::new())
+        .analyzed(DataImportKind::Customers, "Jmeno\nAnna\n", Mapping::new())
         .await;
-    assert_eq!(run.status, RunStatus::Failed);
+    assert_eq!(run.status, DataImportStatus::Failed);
     assert!(run.error.unwrap().contains("email"));
     // A new mapping fixes it without a new upload.
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
@@ -210,7 +212,7 @@ async fn a_bad_file_or_mapping_fails_the_run_and_can_be_reanalyzed(db: PgPool) {
         .unwrap();
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     let run = imports::get(&mut tx, run.id).await.unwrap();
-    assert_eq!(run.status, RunStatus::Analyzed, "{:?}", run.error);
+    assert_eq!(run.status, DataImportStatus::Analyzed, "{:?}", run.error);
     assert_eq!(run.report.unwrap().errors[0].code, "invalid_email");
     // Unknown mapping fields and applying before the dry run are refused.
     let err = imports::analyze(
@@ -236,14 +238,19 @@ A-3,2024-04-01,guest@example.com,EUR,12.5,,,,,,,,Kniha,-1,12.5
 #[sqlx::test(migrations = "../../migrations")]
 async fn historical_orders_are_archived_without_side_effects(db: PgPool) {
     let c = setup(db).await;
-    c.import(Kind::Customers, "email,name\nanna@example.com,Anna\n")
-        .await;
+    c.import(
+        DataImportKind::Customers,
+        "email,name\nanna@example.com,Anna\n",
+    )
+    .await;
     let stock_before = c
         .count("SELECT coalesce(sum(on_hand), 0)::bigint FROM inventory_levels")
         .await;
     let before = c.side_effects().await;
 
-    let run = c.analyzed(Kind::Orders, ORDERS, Mapping::new()).await;
+    let run = c
+        .analyzed(DataImportKind::Orders, ORDERS, Mapping::new())
+        .await;
     let r = run.report.clone().unwrap();
     assert_eq!(
         (r.rows, r.records, r.invalid_rows),
@@ -285,7 +292,7 @@ async fn historical_orders_are_archived_without_side_effects(db: PgPool) {
     );
 
     // Re-import replaces instead of duplicating; the archive list pages newest first.
-    let run = c.import(Kind::Orders, ORDERS).await;
+    let run = c.import(DataImportKind::Orders, ORDERS).await;
     assert_eq!((run.progress.created, run.progress.updated), (0, 2));
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     let page = commerce::portability::archived::list(
@@ -342,7 +349,9 @@ gone@example.com,2023-05-01,old shop,,
 bounced@example.com,2023-05-01,old shop,,
 withdrew@example.com,2023-05-01,old shop,,
 ";
-    let run = c.analyzed(Kind::Subscribers, csv, Mapping::new()).await;
+    let run = c
+        .analyzed(DataImportKind::Subscribers, csv, Mapping::new())
+        .await;
     let counts = run.report.clone().unwrap().counts;
     assert_eq!(counts.get("pending_not_marketable"), Some(&2), "{counts:?}");
     assert_eq!(counts.get("kept_unsubscribed"), Some(&1), "{counts:?}");
@@ -415,7 +424,7 @@ withdrew@example.com,2023-05-01,old shop,,
     tx.commit().await.unwrap();
     // Nothing was mailed (no confirmation either); re-import adds no second record.
     assert_eq!(c.side_effects().await, before);
-    c.import(Kind::Subscribers, csv).await;
+    c.import(DataImportKind::Subscribers, csv).await;
     assert_eq!(
         c.count("SELECT count(*) FROM consent_records WHERE source = 'import'")
             .await,
@@ -427,8 +436,11 @@ withdrew@example.com,2023-05-01,old shop,,
 async fn tenant_export_zips_every_table_without_secrets(db: PgPool) {
     let c = setup(db).await;
     let other = testkit::storefront::shop(&c.runtime, "other").await;
-    c.import(Kind::Customers, "email,name\nanna@example.com,Anna\n")
-        .await;
+    c.import(
+        DataImportKind::Customers,
+        "email,name\nanna@example.com,Anna\n",
+    )
+    .await;
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     sqlx::query("UPDATE customers SET password_hash = '$argon2id$v=19$secret'")
         .execute(&mut *tx)
@@ -611,10 +623,10 @@ async fn finished_order(c: &Ctx, email: &str) -> Uuid {
 #[sqlx::test(migrations = "../../migrations")]
 async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     let c = setup(db).await;
-    c.import(Kind::Customers, "email,name,street,city,postal_code,country\nanna@example.com,Anna,Dlouhá 1,Praha,11000,CZ\n").await;
-    c.import(Kind::Orders, "order_number,placed_at,email,currency,total,name\nOLD-1,2022-01-01,anna@example.com,CZK,10,Anna\n").await;
+    c.import(DataImportKind::Customers, "email,name,street,city,postal_code,country\nanna@example.com,Anna,Dlouhá 1,Praha,11000,CZ\n").await;
+    c.import(DataImportKind::Orders, "order_number,placed_at,email,currency,total,name\nOLD-1,2022-01-01,anna@example.com,CZK,10,Anna\n").await;
     c.import(
-        Kind::Subscribers,
+        DataImportKind::Subscribers,
         "email,consent_at,consent_source\nanna@example.com,2022-01-01,old shop\n",
     )
     .await;
@@ -758,7 +770,7 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
 async fn new_tables_are_tenant_isolated(db: PgPool) {
     let c = setup(db).await;
     c.import(
-        Kind::Orders,
+        DataImportKind::Orders,
         "order_number,placed_at,email,currency,total\nA-1,2024-01-01,a@example.com,CZK,1\n",
     )
     .await;

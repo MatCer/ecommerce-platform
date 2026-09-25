@@ -3657,7 +3657,7 @@
           "portability"
         ],
         "summary": "Recent full data exports.",
-        "operationId": "list_exports",
+        "operationId": "list_data_exports",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -3692,7 +3692,7 @@
           "portability"
         ],
         "summary": "Starts a full export of the shop's data (JSON Lines per table + assets manifest, zipped),\nprepared in the background. One at a time.",
-        "operationId": "create_export",
+        "operationId": "create_data_export",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -3738,7 +3738,7 @@
         "tags": [
           "portability"
         ],
-        "operationId": "get_export",
+        "operationId": "get_data_export",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -3793,7 +3793,7 @@
           "portability"
         ],
         "summary": "A 5-minute download link of a ready export (A21). Needs a recent sign-in (A9); audited.",
-        "operationId": "download_export",
+        "operationId": "download_data_export",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -3858,7 +3858,7 @@
           "portability"
         ],
         "summary": "The 50 most recent CSV imports.",
-        "operationId": "list_imports",
+        "operationId": "list_data_imports",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -3893,7 +3893,7 @@
           "portability"
         ],
         "summary": "Starts a CSV import of customers, historical orders (archived, A28) or newsletter\nsubscribers: PUT the file to `upload`, then call `analyze`. Nothing is written until\n`apply`. Honors `Idempotency-Key`.",
-        "operationId": "create_import",
+        "operationId": "create_data_import",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -3969,7 +3969,7 @@
         "tags": [
           "portability"
         ],
-        "operationId": "get_import",
+        "operationId": "get_data_import",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -4024,7 +4024,7 @@
           "portability"
         ],
         "summary": "Runs (or re-runs, optionally with a new column mapping) the dry run: row errors, counts\nand a preview. Writes nothing.",
-        "operationId": "analyze_import",
+        "operationId": "analyze_data_import",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -4098,7 +4098,7 @@
           "portability"
         ],
         "summary": "Imports the valid rows of an analyzed file in the background. Rows with errors are\nskipped; no email, stock movement, payment, invoice or event is ever triggered.",
-        "operationId": "apply_import",
+        "operationId": "apply_data_import",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -24485,7 +24485,7 @@
             "format": "uuid"
           },
           "kind": {
-            "$ref": "#/components/schemas/Kind"
+            "$ref": "#/components/schemas/DataImportKind"
           },
           "mapping": {
             "$ref": "#/components/schemas/BTreeMap"
@@ -24495,12 +24495,12 @@
             "format": "uuid"
           },
           "progress": {
-            "$ref": "#/components/schemas/Progress"
+            "$ref": "#/components/schemas/DataImportProgress"
           },
           "report": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/ImportReport"
+                "$ref": "#/components/schemas/DataImportReport"
               },
               {
                 "type": "null"
@@ -24508,13 +24508,21 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/RunStatus"
+            "$ref": "#/components/schemas/DataImportStatus"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time"
           }
         }
+      },
+      "DataImportKind": {
+        "type": "string",
+        "enum": [
+          "customers",
+          "orders",
+          "subscribers"
+        ]
       },
       "DataImportList": {
         "type": "object",
@@ -24529,6 +24537,150 @@
             }
           }
         }
+      },
+      "DataImportProgress": {
+        "type": "object",
+        "required": [
+          "total",
+          "done",
+          "created",
+          "updated",
+          "outcomes"
+        ],
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "outcomes": {
+            "type": "object",
+            "description": "Subscribers: how many were subscribed, left pending, already subscribed or kept.",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "DataImportReport": {
+        "type": "object",
+        "description": "Dry-run report (the apply step adds its outcome to `progress`).",
+        "required": [
+          "headers",
+          "rows",
+          "records",
+          "invalid_rows",
+          "new",
+          "existing",
+          "counts",
+          "errors",
+          "truncated",
+          "preview"
+        ],
+        "properties": {
+          "counts": {
+            "type": "object",
+            "description": "DataImportKind-specific counts (`with_address`, `lines`, `linked_to_customer`, `subscribed`,\n`pending_not_marketable`, `already_subscribed`, `kept_unsubscribed`).",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RowError"
+            }
+          },
+          "existing": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The file's column headers (for the mapping UI)."
+          },
+          "invalid_rows": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Rows with at least one error; they are skipped (a bad line drops its whole order).",
+            "minimum": 0
+          },
+          "new": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Records that do not exist yet / already exist (by email or order number).",
+            "minimum": 0
+          },
+          "preview": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "description": "The first 10 valid records as they will be imported."
+          },
+          "records": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Valid records that apply will import (orders: orders, not lines).",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Data rows in the file.",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More errors than listed (200)."
+          }
+        }
+      },
+      "DataImportStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "analyzing",
+          "analyzed",
+          "applying",
+          "applied",
+          "failed"
+        ]
       },
       "DeclareInput": {
         "type": "object",
@@ -26419,14 +26571,6 @@
           }
         }
       },
-      "Kind": {
-        "type": "string",
-        "enum": [
-          "customers",
-          "orders",
-          "subscribers"
-        ]
-      },
       "LabelFailure": {
         "type": "object",
         "required": [
@@ -27521,7 +27665,7 @@
         ],
         "properties": {
           "kind": {
-            "$ref": "#/components/schemas/Kind"
+            "$ref": "#/components/schemas/DataImportKind"
           },
           "mapping": {
             "$ref": "#/components/schemas/BTreeMap"

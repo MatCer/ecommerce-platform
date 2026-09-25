@@ -73,6 +73,14 @@ const groups: { label: () => string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: () => t("data.nav"),
+    items: [
+      { href: "/data/imports", label: () => t("data.imports"), min: "admin" },
+      { href: "/data/archived-orders", label: () => t("data.archive"), min: "staff" },
+      { href: "/data/privacy", label: () => t("data.privacy"), min: "admin" },
+    ],
+  },
+  {
     label: () => t("nav.settings"),
     items: [
       { href: "/settings/search", label: () => t("content.search"), min: "staff" },

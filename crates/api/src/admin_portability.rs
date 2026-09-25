@@ -31,14 +31,14 @@ use crate::auth::TenantStaff;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(list_imports, create_import))
-        .routes(routes!(get_import))
-        .routes(routes!(analyze_import))
-        .routes(routes!(apply_import))
+        .routes(routes!(list_data_imports, create_data_import))
+        .routes(routes!(get_data_import))
+        .routes(routes!(analyze_data_import))
+        .routes(routes!(apply_data_import))
         .routes(routes!(list_archived_orders))
-        .routes(routes!(list_exports, create_export))
-        .routes(routes!(get_export))
-        .routes(routes!(download_export))
+        .routes(routes!(list_data_exports, create_data_export))
+        .routes(routes!(get_data_export))
+        .routes(routes!(download_data_export))
         .routes(routes!(privacy_access))
         .routes(routes!(privacy_erasure))
 }
@@ -52,7 +52,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
     params(TenantHeader),
     responses((status = 200, body = DataImportList))
 )]
-async fn list_imports(
+async fn list_data_imports(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<Json<DataImportList>, Error> {
@@ -78,7 +78,7 @@ async fn list_imports(
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn create_import(
+async fn create_data_import(
     staff: TenantStaff,
     State(s): State<AppState>,
     headers: HeaderMap,
@@ -110,7 +110,7 @@ async fn create_import(
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn get_import(
+async fn get_data_import(
     staff: TenantStaff,
     State(s): State<AppState>,
     id: Result<Path<Uuid>, PathRejection>,
@@ -137,7 +137,7 @@ async fn get_import(
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn analyze_import(
+async fn analyze_data_import(
     staff: TenantStaff,
     State(s): State<AppState>,
     id: Result<Path<Uuid>, PathRejection>,
@@ -171,7 +171,7 @@ async fn analyze_import(
         (status = 409, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn apply_import(
+async fn apply_data_import(
     staff: TenantStaff,
     State(s): State<AppState>,
     id: Result<Path<Uuid>, PathRejection>,
@@ -215,7 +215,7 @@ async fn list_archived_orders(
     params(TenantHeader),
     responses((status = 200, body = DataExportList))
 )]
-async fn list_exports(
+async fn list_data_exports(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<Json<DataExportList>, Error> {
@@ -238,7 +238,7 @@ async fn list_exports(
         (status = 409, description = "export_busy", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn create_export(
+async fn create_data_export(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<(StatusCode, Json<DataExport>), Error> {
@@ -262,7 +262,7 @@ async fn create_export(
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn get_export(
+async fn get_data_export(
     staff: TenantStaff,
     State(s): State<AppState>,
     id: Result<Path<Uuid>, PathRejection>,
@@ -287,7 +287,7 @@ async fn get_export(
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn download_export(
+async fn download_data_export(
     staff: TenantStaff,
     State(s): State<AppState>,
     id: Result<Path<Uuid>, PathRejection>,

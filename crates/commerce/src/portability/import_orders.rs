@@ -13,7 +13,7 @@ use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use super::imports::{Check, Defaults, ImportReport};
+use super::imports::{Check, DataImportReport, Defaults};
 use super::table::{self, Field, Row, field};
 
 pub const FIELDS: &[Field] = &[
@@ -152,7 +152,7 @@ fn line(c: &mut Check<'_>) -> Option<Option<Line>> {
     }))
 }
 
-pub fn validate(rows: &[Row], d: &Defaults, report: &mut ImportReport) -> Vec<Record> {
+pub fn validate(rows: &[Row], d: &Defaults, report: &mut DataImportReport) -> Vec<Record> {
     // Orders in first-appearance order; an order with any bad row is left out entirely.
     let mut order: Vec<String> = Vec::new();
     let mut groups: HashMap<String, (Option<Record>, bool)> = HashMap::new();
@@ -228,7 +228,7 @@ pub fn validate(rows: &[Row], d: &Defaults, report: &mut ImportReport) -> Vec<Re
 pub async fn classify(
     tx: &mut TenantTx,
     records: &[Record],
-    report: &mut ImportReport,
+    report: &mut DataImportReport,
 ) -> Result<(), Error> {
     let numbers: Vec<String> = records.iter().map(|r| r.number.clone()).collect();
     let emails: Vec<String> = records.iter().map(|r| r.email.clone()).collect();
@@ -341,7 +341,7 @@ mod tests {
                 ],
             ),
         ];
-        let mut report = ImportReport::default();
+        let mut report = DataImportReport::default();
         let out = validate(&rows, &d(), &mut report);
         assert!(report.errors.is_empty(), "{:?}", report.errors);
         assert_eq!(out.len(), 2);
@@ -402,7 +402,7 @@ mod tests {
                 ],
             ),
         ];
-        let mut report = ImportReport::default();
+        let mut report = DataImportReport::default();
         let out = validate(&rows, &d(), &mut report);
         assert!(out.is_empty());
         let codes: Vec<(u64, &str)> = report
