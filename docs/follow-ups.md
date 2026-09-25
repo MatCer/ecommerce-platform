@@ -30,12 +30,18 @@
 | WP9 | Per-tenant editable email subject/intro text (§11.4) and a tenant logo in emails (no logo in the data model yet; the shop name is the wordmark) | WP13b |
 | WP9 | Marketing stream has no `List-Unsubscribe` headers yet (no marketing mail exists) | M2 (newsletter) |
 | WP9 | No admin view of `email_messages` (states, failures) or of the suppression list | WP14 |
-| WP10 | Stripe and bank transfer are configurable but not offered at checkout (no adapter); the order email has a bank-transfer placeholder | WP11 |
-| WP10 | COD cash rounding is not applied at placement (the tender is unknown until collection, A16) | WP11 |
 | WP10 | The Packeta widget key is a platform setting (`PACKETA_API_KEY`); per-tenant carrier credentials and verifying the chosen point against the Packeta API | WP12 |
 | WP10 | The real Packeta widget (`library.js` + callback) is only exercised against the local mock; validate on the pre-launch checklist | WP15 |
-| WP10 | No cancellation email when an unpaid order expires; late-payment exceptions have no admin action yet (refund task) | WP12 |
+| WP10 | No cancellation email when an unpaid order expires; refunds of late/duplicate payments are done by hand and then marked settled in the exceptions queue (WP11), no refund UI yet | WP12 |
 | WP10 | Payment timeouts are one global scan per minute (orders expire up to ~1.5 min late); per-tenant order numbers serialize placements of one tenant on the counter row | later (perf) |
 | WP13a | Feed import applies product by product and feeds render in memory per market; batch/stream for 100k-item catalogs | later (perf) |
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
 | WP13a | Orders/customers CSV import, tenant data export, customer access/erasure (A29) | WP13b |
+| WP11 | `payments::refund` (Stripe with `refund_application_fee`, bank/COD recorded) has no admin screen yet; WP12 wires it into returns/withdrawals | WP12 |
+| WP11 | COD `delivered` is set by hand (or the carrier CSV stub `POST /admin/v1/cod-reports`); carrier tracking and real COD payout imports (Packeta/PPL) | WP12 |
+| WP11 | The QR code in emails is inline SVG: Gmail and some clients do not render it (the text instructions always are); a CID PNG attachment needs attachments in the mail pipeline | WP14 / pre-launch |
+| WP11 | The real Stripe Payment Element, Stripe-hosted onboarding and Connect webhooks are only exercised against stripe-mock + the simulator; validate with Stripe test keys, plus a manual scan of both QR codes in banking apps (A25) | WP15 (pre-launch checklist) |
+| WP11 | `platform.provider_events` keeps payloads indefinitely (PaymentIntent objects may hold billing details); add retention | WP14 |
+| WP11 | One `PAYMENTS_SECRET_KEY` for stored Fio tokens (ciphertexts carry a version byte for a future rotation); no rotation tooling | later |
+| WP11 | Changing a market's IBAN in place keeps open orders' instructions, but statements of the old IBAN are then refused for that account row; add accounts instead of editing when switching banks | later |
+| WP11 | Payment reminder and email due dates are the UTC date of the deadline | later |
