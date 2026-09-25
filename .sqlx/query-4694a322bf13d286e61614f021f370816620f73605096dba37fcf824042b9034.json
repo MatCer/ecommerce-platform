@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT product_id AS \"product_id!\", variant_id, alt_i18n AS \"alt_i18n!\",\n                  variants AS \"variants!\"\n           FROM (\n               SELECT pm.product_id, pm.variant_id, pm.alt_i18n, a.variants, pm.position,\n                      row_number() OVER (PARTITION BY pm.product_id ORDER BY pm.position) AS n\n               FROM product_media pm JOIN assets a ON a.id = pm.asset_id\n               WHERE pm.product_id = ANY($1) AND a.status = 'ready'\n           ) m\n           WHERE $2::bigint IS NULL OR n <= $2\n           ORDER BY product_id, position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "alt_i18n!",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "alt_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "variants!",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "variants"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "4694a322bf13d286e61614f021f370816620f73605096dba37fcf824042b9034"
+}

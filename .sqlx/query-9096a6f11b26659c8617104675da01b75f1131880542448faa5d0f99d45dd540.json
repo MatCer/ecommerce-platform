@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE checkout_handoffs SET used_at = now()\n         WHERE token_hash = $1 AND market_id = $2 AND used_at IS NULL AND expires_at > now()\n         RETURNING cart_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cart_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "checkout_handoffs",
+            "name": "cart_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9096a6f11b26659c8617104675da01b75f1131880542448faa5d0f99d45dd540"
+}

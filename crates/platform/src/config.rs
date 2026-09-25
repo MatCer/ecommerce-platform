@@ -331,10 +331,84 @@ impl S3Config {
     }
 }
 
+/// Storefront URLs and the edge purge endpoint (spec §9.3). Not `Debug`: holds a secret.
+#[derive(Clone)]
+pub struct StorefrontConfig {
+    /// `PUBLIC_STOREFRONT_SCHEME`: `https` (default) or `http` for local `*.localhost` shops.
+    pub scheme: String,
+    /// `PUBLIC_STOREFRONT_PORT`: a non-default port of the public shop URLs (local dev).
+    pub port: Option<u16>,
+    /// `EDGE_PURGE_URL`, e.g. `http://edge:8788/_edge/purge`; unset = no purges (tests).
+    pub edge_purge_url: Option<Url>,
+    /// `EDGE_PURGE_TOKEN`: the edge's own purge token (distinct service token, A7).
+    pub edge_purge_token: String,
+}
+
+impl StorefrontConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let scheme = get(lookup, "PUBLIC_STOREFRONT_SCHEME").unwrap_or_else(|| "https".into());
+        if scheme != "https" && scheme != "http" {
+            return Err(ConfigError::Invalid {
+                name: "PUBLIC_STOREFRONT_SCHEME",
+                reason: "must be http or https".into(),
+            });
+        }
+        let port = match get(lookup, "PUBLIC_STOREFRONT_PORT") {
+            None => None,
+            Some(_) => Some(parsed(lookup, "PUBLIC_STOREFRONT_PORT", 0u16)?),
+        };
+        let edge_purge_url = match get(lookup, "EDGE_PURGE_URL") {
+            None => None,
+            Some(_) => Some(url(lookup, "EDGE_PURGE_URL")?),
+        };
+        let edge_purge_token = get(lookup, "EDGE_PURGE_TOKEN").unwrap_or_default();
+        if edge_purge_url.is_some() && edge_purge_token.len() < 16 {
+            return Err(ConfigError::Invalid {
+                name: "EDGE_PURGE_TOKEN",
+                reason: "must be at least 16 characters when EDGE_PURGE_URL is set".into(),
+            });
+        }
+        Ok(Self {
+            scheme,
+            port,
+            edge_purge_url,
+            edge_purge_token,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn storefront_defaults_to_https_without_purges() {
+        let cfg = StorefrontConfig::from_lookup(&env(&[])).expect("defaults");
+        assert_eq!((cfg.scheme.as_str(), cfg.port), ("https", None));
+        assert!(cfg.edge_purge_url.is_none());
+        let cfg = StorefrontConfig::from_lookup(&env(&[
+            ("PUBLIC_STOREFRONT_SCHEME", "http"),
+            ("PUBLIC_STOREFRONT_PORT", "8080"),
+        ]))
+        .expect("valid");
+        assert_eq!((cfg.scheme.as_str(), cfg.port), ("http", Some(8080)));
+        assert!(
+            StorefrontConfig::from_lookup(&env(&[("PUBLIC_STOREFRONT_SCHEME", "ftp")])).is_err()
+        );
+        assert!(
+            StorefrontConfig::from_lookup(&env(&[(
+                "EDGE_PURGE_URL",
+                "http://edge:8788/_edge/purge"
+            )]))
+            .is_err(),
+            "purge URL without a token"
+        );
+    }
 
     fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         let map: HashMap<String, String> = pairs

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE platform.storefront_tokens SET expires_at = now() + make_interval(secs => $2)\n         WHERE tenant_id = $1 AND expires_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4630153bc6c936c77a24dd0e26b6d64afe03c7753d7e7c3239e8696bf9e3ad67"
+}

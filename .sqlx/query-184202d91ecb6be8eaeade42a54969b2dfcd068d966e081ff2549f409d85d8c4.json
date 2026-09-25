@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT code, position, name_i18n, \"values\" AS \"values!\" FROM product_options\n           WHERE product_id = ANY($1) ORDER BY position, code",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_options",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "product_options",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_options",
+            "name": "name_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "values!",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_options",
+            "name": "values"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "184202d91ecb6be8eaeade42a54969b2dfcd068d966e081ff2549f409d85d8c4"
+}

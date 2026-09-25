@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pt.product_id, pt.locale, pt.slug, p.updated_at FROM product_translations pt\n         JOIN products p ON p.id = pt.product_id AND p.status = 'active'\n         WHERE EXISTS (\n             SELECT 1 FROM variants v JOIN price_intervals pi\n                 ON pi.variant_id = v.id AND pi.price_list_id = $1\n                AND pi.valid_from <= $2 AND (pi.valid_to IS NULL OR pi.valid_to > $2)\n             WHERE v.product_id = p.id)\n         ORDER BY pt.product_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e20891b660ad01aa3bbd5fc57ff71b1f8088600fde35f81bfba6b8384522b340"
+}

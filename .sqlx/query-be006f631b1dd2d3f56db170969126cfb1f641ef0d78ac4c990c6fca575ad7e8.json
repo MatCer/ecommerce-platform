@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pt.product_id FROM product_translations pt\n         JOIN products p ON p.id = pt.product_id\n         WHERE pt.slug = $1 AND p.status = 'active'\n         ORDER BY (pt.locale = $2) DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "be006f631b1dd2d3f56db170969126cfb1f641ef0d78ac4c990c6fca575ad7e8"
+}

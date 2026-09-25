@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO theme_active (tenant_id, revision_id) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET revision_id = EXCLUDED.revision_id, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b5f2efbeff94bdaa0f0a64a025f4b21381514b03090f2d10efaa462b31f2808d"
+}

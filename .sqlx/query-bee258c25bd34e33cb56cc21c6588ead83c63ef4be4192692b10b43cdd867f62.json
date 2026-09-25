@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO checkout_handoffs (token_hash, tenant_id, cart_id, market_id, expires_at)\n         VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bee258c25bd34e33cb56cc21c6588ead83c63ef4be4192692b10b43cdd867f62"
+}
