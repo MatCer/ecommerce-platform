@@ -93,7 +93,17 @@ async fn events_need_server_side_analytics_consent(db: PgPool) {
             .fetch_all(&mut *tx)
             .await
             .unwrap();
+    let added: serde_json::Value =
+        sqlx::query_scalar("SELECT props FROM events WHERE type = 'add_to_cart'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
     tx.commit().await.unwrap();
+    assert_eq!(
+        added["product_id"],
+        json!(shop.product),
+        "the product comes from the catalog"
+    );
     assert_eq!(rows.len(), 1, "one visitor, one session");
     assert_ne!(rows[0].0, yes, "the consent subject is never stored");
     assert_eq!(rows[0].2, ["analytics"]);

@@ -315,7 +315,7 @@ pub async fn ingest(
     let Some(purposes) = granted(tx, subject).await? else {
         return Ok(0);
     };
-    let events: Vec<CleanEvent> = serde_json::from_slice::<Value>(body)
+    let mut events: Vec<CleanEvent> = serde_json::from_slice::<Value>(body)
         .ok()
         .and_then(|v| v.get("events").and_then(Value::as_array).cloned())
         .unwrap_or_default()
@@ -328,6 +328,22 @@ pub async fn ingest(
     }
     let anon = anon_id(tx.tenant_id(), subject);
     let session = session_for(tx, &anon, now).await?;
+    for e in &mut events {
+        // The cart knows only the variant: the product comes from the catalog (this tenant's
+        // only, via RLS), not from the client.
+        if e.kind == "add_to_cart"
+            && e.props["product_id"].is_null()
+            && let Some(variant) = e.props["variant_id"]
+                .as_str()
+                .and_then(|v| Uuid::parse_str(v).ok())
+        {
+            let product =
+                sqlx::query_scalar!("SELECT product_id FROM variants WHERE id = $1", variant)
+                    .fetch_optional(&mut **tx)
+                    .await?;
+            e.props["product_id"] = json!(product);
+        }
+    }
     for e in &events {
         sqlx::query!(
             "INSERT INTO events (id, tenant_id, at, type, anon_id, session_id, market_id, props,

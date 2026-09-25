@@ -115,13 +115,28 @@ export function createBeacon({
   };
 }
 
+let shared: ReturnType<typeof createBeacon> | undefined;
+
+/**
+ * Queues an analytics event (`page_view`, `view_item`, `add_to_cart`, `begin_checkout`) on
+ * the page's one shared beacon: nothing is queued or sent without `analytics` consent, and the
+ * server checks its own consent records again (A20). Sent when the page is hidden; call
+ * `flushEvents()` before a navigation that must not lose it.
+ */
+export const track = (e: BeaconEvent) => (shared ??= createBeacon()).track(e);
+export const flushEvents = () => shared?.flush();
+
 /**
  * Web Vitals RUM (spec §9.6): only for consented, sampled page views. The reporter
  * (`vitals.ts`, < 1 kB) loads lazily, so unsampled visitors download nothing; its metrics go
  * out in one beacon when the page is hidden. `template` (`home`, `category`, `product`, ...)
  * groups the dashboard's p75 per template.
  */
-export async function startRum(sampleRate: number, template: string, beacon = createBeacon()) {
+export async function startRum(
+  sampleRate: number,
+  template: string,
+  beacon = (shared ??= createBeacon()),
+) {
   if (!hasConsent("analytics") || Math.random() >= sampleRate) return;
   const { observeVitals } = await import("./vitals.ts");
   observeVitals((metrics) => {

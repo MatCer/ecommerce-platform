@@ -20,6 +20,8 @@ interface Props {
   seo: Seo;
   /** Page template for RUM grouping (`home`, `category`, `product`, `search`, `page`). */
   template: string;
+  /** Product pages: the product id for the `view_item` analytics event. */
+  productId?: string;
   /** The LCP image: preloaded AVIF with fetchpriority=high, same `sizes` as its <img> (§9.6). */
   lcp?: { image: Image; sizes: string };
   /** The page shows a fixed bottom bar on phones (product buy bar): keep the footer clear. */
@@ -27,7 +29,7 @@ interface Props {
   /** Current search query, echoed in the header search box. */
   q?: string;
 }
-const { shop, seo, template, lcp, q, bottomBar = false } = Astro.props;
+const { shop, seo, template, productId, lcp, q, bottomBar = false } = Astro.props;
 const { t, pick } = i18n(shop);
 const preload = lcp && lcpImage(lcp.image, lcp.sizes).preload;
 const ogImage = lcp && new URL(lcp.image.src, seo.canonical).href;
@@ -75,6 +77,6 @@ const CONSENT_KEYS = [
     </main>
     <Footer shop={shop} alternates={seo.alternates} />
     <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} textVersion={shop.consent.text_version} labels={pick(CONSENT_KEYS)} />
-    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} template={template} />
+    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} template={template} productId={productId} />
   </body>
 </html>

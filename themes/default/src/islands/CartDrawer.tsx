@@ -1,6 +1,7 @@
 import { imageUrl, type Messages, t, tn } from "@platform/storefront-sdk/format";
 import type { CartLine, Money } from "@platform/storefront-sdk/types";
 import { createEffect, createSignal, For, Show } from "solid-js";
+import { flushEvents, track } from "@platform/storefront-sdk/client";
 import { cart, open, setOpen, updateLine } from "../lib/cart-store";
 import Icon from "../lib/Icon";
 
@@ -207,7 +208,14 @@ export default function CartDrawer(props: {
             </p>
             <p class="mt-1 mb-4 text-xs text-muted-foreground">{l("cart.shipping_note")}</p>
             {/* Edge-owned handoff: mints a one-time token and redirects to checkout.<host>. */}
-            <form method="post" action="/_p/checkout/start">
+            <form
+              method="post"
+              action="/_p/checkout/start"
+              onSubmit={() => {
+                track({ type: "begin_checkout" });
+                flushEvents();
+              }}
+            >
               <button type="submit" class="btn btn-buy h-13 w-full text-lg">
                 {l("cart.checkout")}
               </button>

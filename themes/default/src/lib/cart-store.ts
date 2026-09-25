@@ -1,4 +1,4 @@
-import { cart as api } from "@platform/storefront-sdk/client";
+import { cart as api, track } from "@platform/storefront-sdk/client";
 import type { CartState } from "@platform/storefront-sdk/types";
 import { createSignal } from "solid-js";
 
@@ -36,6 +36,7 @@ export function loadCart() {
 export async function addToCart(variantId: string, quantity = 1, key = crypto.randomUUID()) {
   setCart(await api.add(variantId, quantity, key));
   setAdded(added() + 1);
+  track({ type: "add_to_cart", variant_id: variantId, quantity });
 }
 
 export async function updateLine(lineId: string, quantity: number) {
