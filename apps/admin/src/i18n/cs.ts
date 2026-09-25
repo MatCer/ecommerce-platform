@@ -605,7 +605,7 @@ export const cs: Dictionary = {
     topProducts: "Nejprodávanější produkty",
     product: "Produkt",
     units: "Prodané kusy",
-    topSearches: "Nejčastější vyhledávání",
+    topSearches: "Nejčastější vyhledávání (relace se souhlasem)",
     zeroSearches: "Vyhledávání bez výsledků",
     query: "Hledaný výraz",
     count: "Počet hledání",

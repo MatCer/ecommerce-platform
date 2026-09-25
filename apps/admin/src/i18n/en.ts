@@ -602,7 +602,7 @@ export const en = {
     topProducts: "Top products",
     product: "Product",
     units: "Units sold",
-    topSearches: "Top searches",
+    topSearches: "Top searches (consented sessions)",
     zeroSearches: "Searches with no results",
     query: "Search term",
     count: "Searches",

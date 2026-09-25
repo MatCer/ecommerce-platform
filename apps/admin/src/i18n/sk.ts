@@ -605,7 +605,7 @@ export const sk: Dictionary = {
     topProducts: "Najpredávanejšie produkty",
     product: "Produkt",
     units: "Predané kusy",
-    topSearches: "Najčastejšie vyhľadávania",
+    topSearches: "Najčastejšie vyhľadávania (relácie so súhlasom)",
     zeroSearches: "Vyhľadávania bez výsledkov",
     query: "Hľadaný výraz",
     count: "Počet hľadaní",

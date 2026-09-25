@@ -36,7 +36,8 @@
 | WP14 | A failed local restore leaves database `app` partial (DROP/CREATE DATABASE cannot be transactional); rerun it | accepted (local only) |
 | WP14 | Storefront rate limits are in-process buckets per API replica (N replicas allow N× the rate) | later (scale-out / CDN rate limiting) |
 | WP14 | Dashboard days are UTC, not the merchant's time zone; revenue is placed, non-cancelled order totals (refunds not netted until WP11/WP12 publish them) | later / WP12 |
-| WP14 | Zero-result searches are still logged by the API (edge-cache misses only), top searches by the edge (every request) | later |
+| WP14 | Top searches come from consented sessions only (A20); zero-result searches are still the API-side log of all visitors (edge-cache misses only, per locale, accepted in WP7) | later |
+| WP14 | No `refund` analytics events yet: nothing publishes `order.refunded` before WP11/WP12 (webhooks already offer it) | WP11 / WP12 |
 | WP14 | Every webhook-type outbox event gets a fan-out job even for tenants without subscriptions | later (perf) |
 | WP13a | Feed import applies product by product and feeds render in memory per market; batch/stream for 100k-item catalogs | later (perf) |
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
