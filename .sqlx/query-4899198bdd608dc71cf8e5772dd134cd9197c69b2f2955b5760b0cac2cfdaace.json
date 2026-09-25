@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bestsellers, bought_together, seasonal, recently_viewed, personalized,\n                excluded_product_ids\n         FROM recommendation_settings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bestsellers",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "recommendation_settings",
+            "name": "bestsellers"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "bought_together",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "recommendation_settings",
+            "name": "bought_together"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "seasonal",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "recommendation_settings",
+            "name": "seasonal"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "recently_viewed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "recommendation_settings",
+            "name": "recently_viewed"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "personalized",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "recommendation_settings",
+            "name": "personalized"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "excluded_product_ids",
+        "type_info": "UuidArray",
+        "origin": {
+          "Table": {
+            "table": "recommendation_settings",
+            "name": "excluded_product_ids"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4899198bdd608dc71cf8e5772dd134cd9197c69b2f2955b5760b0cac2cfdaace"
+}

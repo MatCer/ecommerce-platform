@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE collections SET name = $2, title_i18n = $3, kind = $4, starts_at = $5,\n                                ends_at = $6, product_ids = $7, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "91155f99394aea5a8c331aa8b821f115fa4303f9452f8a25fa736e497acaba5f"
+}
