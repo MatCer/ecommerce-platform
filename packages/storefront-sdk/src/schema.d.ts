@@ -608,6 +608,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The "Stripe test simulator" (local mode without a real Stripe key; `404` otherwise): makes
+         *     the API sign a Stripe-shaped `payment_intent.succeeded` / `payment_intent.payment_failed`
+         *     event with the webhook secret and receive it like Stripe's, so verification, storage and
+         *     asynchronous processing run for real. Needs the right to pay. Answers `202` with the
+         *     payment as it is now; the order page polls until the event is processed.
+         */
+        post: operations["simulate_attempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/pages/blog": {
         parameters: {
             query?: never;
@@ -879,6 +902,18 @@ export interface components {
         };
         /** @enum {string} */
         Badge: "sale" | "new";
+        /** @description The payment instructions of a bank-transfer order, as the customer sees them. */
+        BankTransferView: {
+            account_name: string;
+            amount: components["schemas"]["MoneyView"];
+            bic?: string | null;
+            iban: string;
+            message: string;
+            qr_kind?: components["schemas"]["QrKind"] | null;
+            /** @description The QR code as an inline SVG element (server-generated; contains no script). */
+            qr_svg?: string | null;
+            variable_symbol: string;
+        };
         /** @description A block ready to render (images and products resolved, links localized). */
         BlockView: {
             /** Format: int32 */
@@ -1332,6 +1367,15 @@ export interface components {
         } | {
             /** @enum {string} */
             type: "none";
+        } | {
+            account_id: string;
+            client_secret: string;
+            publishable_key: string;
+            /** @enum {string} */
+            type: "stripe";
+        } | {
+            /** @enum {string} */
+            type: "stripe_simulator";
         };
         OptionValueView: {
             code: string;
@@ -1484,6 +1528,7 @@ export interface components {
         PaymentStatus: "unpaid" | "authorized" | "paid" | "partially_refunded" | "refunded" | "failed" | "expired";
         PaymentView: {
             attempt?: components["schemas"]["AttemptView"] | null;
+            bank_transfer?: components["schemas"]["BankTransferView"] | null;
             /**
              * @description Whether this viewer may start or continue payments: the order token alone is read-only
              *     (A4); the browser that placed the order or its signed-in customer may pay.
@@ -1613,6 +1658,8 @@ export interface components {
             personalization?: boolean | null;
             review_invites?: boolean | null;
         };
+        /** @enum {string} */
+        QrKind: "spayd" | "pay_by_square";
         Recommendations: {
             cache: components["schemas"]["CacheHints"];
             products: components["schemas"]["ProductCard"][];
@@ -1734,6 +1781,9 @@ export interface components {
             customer: components["schemas"]["CustomerView"];
             /** @description Relative path on the checkout origin to continue to. */
             redirect: string;
+        };
+        SimulateInput: {
+            outcome: components["schemas"]["Outcome"];
         };
         /** @enum {string} */
         Sort: "recommended" | "price_asc" | "price_desc" | "newest";
@@ -3490,6 +3540,70 @@ export interface operations {
                 };
             };
             /** @description attempt_not_pending | payment_window_closed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    simulate_attempt: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+                attempt: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateInput"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentView"];
+                };
+            };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description attempt_not_initialized */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -122,6 +122,7 @@ async fn put_bank_account(
 #[into_params(parameter_in = Query)]
 pub struct StatementQuery {
     /// `camt053` (ISO 20022 XML), `fio_csv` or `gpc` (ABO).
+    #[param(inline)]
     pub format: Format,
 }
 

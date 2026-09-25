@@ -440,6 +440,11 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     expect(page.headers.get("content-security-policy")).toContain(
       "frame-src https://js.stripe.com",
     );
+    // Stripe.js is allowed only where a payment happens, not on account pages.
+    const account = await get("http://checkout.demo.localhost:8280/account", {
+      cookie: "__Host-cart=checkouttoken_000000000001",
+    });
+    expect(account.headers.get("content-security-policy")).not.toContain("stripe.com");
     expect(api.calls[0]?.headers["x-cart-token"]).toBe("checkouttoken_000000000001");
   });
 

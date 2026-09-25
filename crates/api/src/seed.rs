@@ -1096,9 +1096,36 @@ impl Seeder<'_> {
             )
             .await?;
         }
+        // WP11: a receiving account per market (well-formed demo IBANs, not real accounts).
+        for (market, iban, bic) in [
+            (cz, "CZ6508000000192000145399", "GIBACZPX"),
+            (sk, "SK9611000000002918599669", "TATRSKBX"),
+        ] {
+            if commerce::payments::bank::account(&mut tx, market).await?.is_none() {
+                commerce::payments::bank::configure_account(
+                    &mut tx,
+                    ACTOR,
+                    None,
+                    market,
+                    &commerce::payments::bank::BankAccountInput {
+                        iban: iban.into(),
+                        bic: Some(bic.into()),
+                        account_name: "Demo obchod s.r.o.".into(),
+                        fio_token: None,
+                        clear_fio_token: false,
+                    },
+                )
+                .await?;
+            }
+        }
         let payments = commerce::payments::Payments::default();
         for market in [cz, sk] {
-            for (kind, position) in [(MethodKind::Fake, 0), (MethodKind::Cod, 1)] {
+            for (kind, position) in [
+                (MethodKind::Fake, 0),
+                (MethodKind::Stripe, 1),
+                (MethodKind::BankTransfer, 2),
+                (MethodKind::Cod, 3),
+            ] {
                 let configured = commerce::payments::methods(&mut tx, &payments, market)
                     .await?
                     .iter()
@@ -1122,6 +1149,32 @@ impl Seeder<'_> {
             }
         }
         tx.commit().await?;
+        self.stripe_simulator(tenant_id).await
+    }
+
+    /// Local demo: with the Stripe simulator (no real key), the shop is onboarded right away,
+    /// through the same path as the admin button (a signed `account.updated`, processed by
+    /// the worker). With a real key onboarding stays a person's job in the admin.
+    async fn stripe_simulator(&self, tenant_id: Uuid) -> anyhow::Result<()> {
+        let config = platform::config::PaymentsConfig::from_env(platform::config::AppEnv::Dev)?;
+        let Some(cfg) = config
+            .stripe
+            .filter(|c| c.mode == platform::config::StripeMode::Simulator)
+        else {
+            return Ok(());
+        };
+        let stripe = commerce::payments::stripe::Stripe::new(&cfg, reqwest::Client::new());
+        let mut tx = self.tx(tenant_id).await?;
+        let ready = commerce::payments::stripe::account(&mut tx)
+            .await?
+            .is_some_and(|a| a.ready);
+        tx.commit().await?;
+        if !ready {
+            commerce::payments::stripe::start_onboarding(
+                self.db, &stripe, tenant_id, ACTOR, "", "",
+            )
+            .await?;
+        }
         Ok(())
     }
 

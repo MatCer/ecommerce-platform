@@ -64,3 +64,34 @@ test("demo feeds and images are served by fixed name only", async () => {
   }
   expect((await app.request("/images/demo/missing.jpg")).status).toBe(404);
 });
+
+test("fio API mock: scripted incoming payments in the statement format", async () => {
+  const add = await app.request("/fio/_transactions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      token: "mockToken123",
+      transactions: [{ date: "2026-09-25", amount: 1290.5, vs: "100001", name: "Jan" }],
+    }),
+  });
+  expect(add.status).toBe(200);
+  const res = await app.request(
+    "/fio/v1/rest/periods/mockToken123/2026-09-20/2026-09-30/transactions.json",
+  );
+  const body = (await res.json()) as {
+    accountStatement: { transactionList: { transaction: Record<string, { value: unknown }>[] } };
+  };
+  const [tx] = body.accountStatement.transactionList.transaction;
+  expect(tx?.column1?.value).toBe(1290.5);
+  expect(tx?.column5?.value).toBe("100001");
+  expect(typeof tx?.column22?.value).toBe("number");
+  const outside = await app.request(
+    "/fio/v1/rest/periods/mockToken123/2026-10-01/2026-10-02/transactions.json",
+  );
+  expect(
+    ((await outside.json()) as { accountStatement: { transactionList: { transaction: unknown[] } } })
+      .accountStatement.transactionList.transaction,
+  ).toEqual([]);
+  const bad = await app.request("/fio/v1/rest/periods/x/2026-10-01/2026-10-02/transactions.json");
+  expect(bad.status).toBe(400);
+});
