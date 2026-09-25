@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers s SET status = 'unsubscribed', unsubscribed_at = now(),\n             confirm_token_hash = NULL, confirm_expires_at = NULL, updated_at = now()\n         WHERE s.status IN ('pending', 'subscribed')\n           AND (s.email = $1 OR s.customer_id = $2\n                OR s.email = (SELECT c.email FROM customers c WHERE c.id = $2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "14ed510fa0800b257b5a732e8fe2ddbf88c17450296f0c7371d29c3e98452162"
+}

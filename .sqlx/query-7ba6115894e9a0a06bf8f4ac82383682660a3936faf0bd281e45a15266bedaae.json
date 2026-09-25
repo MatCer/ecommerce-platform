@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO campaign_sends (tenant_id, campaign_id, subscriber_id, status, message_id,\n                                     token_hash, personalized)\n         VALUES ($1, $2, $3, 'sent', $4, $5, $6)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bytea",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7ba6115894e9a0a06bf8f4ac82383682660a3936faf0bd281e45a15266bedaae"
+}

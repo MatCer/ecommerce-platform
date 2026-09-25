@@ -33,7 +33,6 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(start_handoff))
         .routes(routes!(redeem_handoff))
         .routes(routes!(events))
-        .routes(routes!(newsletter))
 }
 
 fn token(headers: &HeaderMap) -> Result<String, Error> {
@@ -451,56 +450,4 @@ async fn events(
     .await?;
     tracing::debug!(stored, forwarded, "events beacon");
     Ok(StatusCode::ACCEPTED)
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct NewsletterSignup {
-    pub email: String,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct NewsletterStatus {
-    /// `accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5).
-    pub status: String,
-}
-
-/// Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail
-/// arrive with the newsletter module (M2).
-#[utoipa::path(
-    post,
-    path = "/storefront/v1/newsletter/subscribe",
-    tag = "storefront",
-    params(StorefrontHeaders),
-    request_body = NewsletterSignup,
-    responses(
-        (status = 202, body = NewsletterStatus),
-        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
-    )
-)]
-async fn newsletter(
-    shopper: Shopper,
-    State(s): State<AppState>,
-    body: Bytes,
-) -> Result<Response, Error> {
-    let input: NewsletterSignup = parse_json(&body)?;
-    let email = input.email.trim();
-    let valid = email.len() <= 254
-        && email
-            .split_once('@')
-            .is_some_and(|(l, d)| !l.is_empty() && d.contains('.') && !d.starts_with('.'))
-        && !email.chars().any(char::is_whitespace);
-    if !valid {
-        return Err(Error::Validation {
-            code: "invalid_email",
-            detail: "not an email address".into(),
-        });
-    }
-    with_ctx(&s, &shopper, async |_, _| Ok(())).await?;
-    Ok((
-        StatusCode::ACCEPTED,
-        Json(NewsletterStatus {
-            status: "accepted".into(),
-        }),
-    )
-        .into_response())
 }

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM subscribers\n           WHERE ($1::text IS NULL OR status = $1) AND ($2::text IS NULL OR email LIKE $2)\n             AND ($3::text IS NULL OR locale = $3) AND ($4::uuid IS NULL OR market_id = $4)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "438193d714349f3423748a1e82d7310b6f941899cbc77c71268e0db3039c92cd"
+}

@@ -134,6 +134,20 @@ fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
     Ok(ai)
 }
 
+/// `MAIL_EVENTS_SECRET` (at least 32 characters): the HTTP Basic password SNS sends with SES
+/// bounce/complaint notifications. Unset: the endpoint is off.
+fn mail_events_secret() -> anyhow::Result<Option<api::auth::ServiceToken>> {
+    match std::env::var("MAIL_EVENTS_SECRET") {
+        Ok(v) if v.trim().is_empty() => Ok(None),
+        Ok(v) if v.len() < 32 => anyhow::bail!("MAIL_EVENTS_SECRET must be at least 32 characters"),
+        Ok(v) => Ok(Some(api::auth::ServiceToken::new(&v))),
+        Err(_) => {
+            tracing::warn!("MAIL_EVENTS_SECRET not set: bounce/complaint ingestion is off");
+            Ok(None)
+        }
+    }
+}
+
 fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
@@ -226,6 +240,7 @@ async fn serve() -> anyhow::Result<()> {
         )?),
         checkout,
         ai: ai_helpers()?,
+        mail_events: mail_events_secret()?,
         themes: theme_cfg
             .secret
             .as_deref()

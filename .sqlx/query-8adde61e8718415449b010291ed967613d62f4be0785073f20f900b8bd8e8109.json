@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET status = 'scheduled', scheduled_at = $2, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8adde61e8718415449b010291ed967613d62f4be0785073f20f900b8bd8e8109"
+}

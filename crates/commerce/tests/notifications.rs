@@ -17,6 +17,7 @@ fn brand() -> Brand {
         shop_name: "Demo".into(),
         shop_url: "http://demo.localhost".into(),
         colors: Colors::default(),
+        ..Brand::default()
     }
 }
 

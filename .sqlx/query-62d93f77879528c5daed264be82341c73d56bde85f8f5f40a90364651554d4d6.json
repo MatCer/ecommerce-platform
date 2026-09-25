@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers s SET customer_id = c.id, updated_at = now()\n         FROM customers c\n         WHERE c.id = $1 AND c.email_verified_at IS NOT NULL AND s.email = c.email\n           AND s.customer_id IS DISTINCT FROM c.id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62d93f77879528c5daed264be82341c73d56bde85f8f5f40a90364651554d4d6"
+}

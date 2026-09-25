@@ -3285,13 +3285,388 @@
         }
       }
     },
+    "/storefront/v1/newsletter/click": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "A tracked campaign link: counts the click and returns the signed target; `404` for anything\nnot signed for this recipient (never an open redirect).",
+        "operationId": "click",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "description": "Recipient token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "u",
+            "in": "query",
+            "description": "Target URL.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "s",
+            "in": "query",
+            "description": "Signature (hex).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClickTarget"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/confirmation": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "What the confirmation page shows (reading changes nothing: link scanners cannot confirm).",
+        "operationId": "confirmation",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "The token from the email link.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Confirmation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, used or expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Confirms a sign-up (the button on the confirmation page): subscribed, consent recorded.",
+        "operationId": "confirm",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsletterStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, used or expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/preferences": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The preference page's view of the subscription behind a campaign email.",
+        "operationId": "preferences",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "description": "The recipient token from a campaign email.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/resubscribe": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Subscribing again from the preference page: a new double opt-in mail to the same address.",
+        "operationId": "resubscribe",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewsletterStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/newsletter/subscribe": {
       "post": {
         "tags": [
           "storefront"
         ],
-        "summary": "Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail\narrive with the newsletter module (M2).",
-        "operationId": "newsletter",
+        "summary": "Newsletter sign-up (double opt-in, §11.5): always `202 accepted` for a valid address.",
+        "operationId": "subscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -3346,6 +3721,88 @@
             }
           },
           "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too_many_signups",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/newsletter/unsubscribe": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Unsubscribes the recipient of a campaign email (RFC 8058 one-click, the preference page).\nIdempotent.",
+        "operationId": "unsubscribe",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewsletterToken"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preferences"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6255,6 +6712,18 @@
           }
         }
       },
+      "ClickTarget": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Where to redirect (exactly what the campaign linked to)."
+          }
+        }
+      },
       "CmsPage": {
         "type": "object",
         "required": [
@@ -6285,6 +6754,19 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "Confirmation": {
+        "type": "object",
+        "description": "What the confirmation page shows before the button is pressed (a read, no change).",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address, partly masked (`j***@example.com`)."
           }
         }
       },
@@ -7273,9 +7755,22 @@
         "properties": {
           "status": {
             "type": "string",
-            "description": "`accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5)."
+            "description": "`accepted` (a confirmation mail is sent when one is due; the answer never tells whether\nthe address is already known) or `subscribed`."
           }
         }
+      },
+      "NewsletterToken": {
+        "type": "object",
+        "description": "A capability token from a newsletter email.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "NextAction": {
         "oneOf": [
@@ -8090,6 +8585,23 @@
           }
         }
       },
+      "Preferences": {
+        "type": "object",
+        "description": "The preference page's view of a subscription.",
+        "required": [
+          "email",
+          "status"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address, partly masked."
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        }
+      },
       "PriceRange": {
         "type": "object",
         "required": [
@@ -8892,6 +9404,16 @@
           "preferences",
           "checkout",
           "linked"
+        ]
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "subscribed",
+          "unsubscribed",
+          "bounced",
+          "complained"
         ]
       },
       "StockState": {

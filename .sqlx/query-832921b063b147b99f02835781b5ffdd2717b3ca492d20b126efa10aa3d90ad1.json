@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO subscribers (tenant_id, email, locale, market_id, confirm_token_hash,\n                                  confirm_expires_at, request_ip_hash, text_version, source)\n         VALUES ($1, $2, $3, $4, $5, now() + make_interval(hours => $6), $7, $8, $9)\n         ON CONFLICT ON CONSTRAINT subscribers_email_unique DO NOTHING\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid",
+        "Bytea",
+        "Int4",
+        "Bytea",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "832921b063b147b99f02835781b5ffdd2717b3ca492d20b126efa10aa3d90ad1"
+}

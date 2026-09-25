@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO campaign_sends (tenant_id, campaign_id, subscriber_id, status,\n                                                 skip_reason)\n                     VALUES ($1, $2, $3, 'skipped', $4)\n                     ON CONFLICT ON CONSTRAINT campaign_sends_once DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "42ac2b63fb45a4ffa5b83f9276fb42c1df315873c0612a5d4dda2c5a6b51c0bb"
+}

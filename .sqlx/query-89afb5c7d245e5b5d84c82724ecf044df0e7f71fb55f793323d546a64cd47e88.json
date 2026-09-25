@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.granted FROM consent_records c\n         JOIN unnest($1::text[], $2::text[]) AS s(kind, id)\n           ON c.subject_type = s.kind AND c.subject_id = s.id\n         WHERE c.purpose = $3\n         ORDER BY c.at DESC, c.id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "granted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "consent_records",
+            "name": "granted"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "89afb5c7d245e5b5d84c82724ecf044df0e7f71fb55f793323d546a64cd47e88"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET status = 'cancelled', finished_at = now(), updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c171362ce46306fd2395e5a7c16795cda24ecb844b733aac9ed12243fcad621"
+}

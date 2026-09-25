@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE campaigns SET name = $2, segment_id = $3, content = $4, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4666c6706b23de2e07f3e7dd5433b6f086a2659fb2d2140185d0e077cf7593a4"
+}

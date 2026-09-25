@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id, c.link_key FROM campaign_sends s JOIN campaigns c ON c.id = s.campaign_id\n         WHERE s.token_hash = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "campaign_sends",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "link_key",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "campaigns",
+            "name": "link_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "0047dcbc75f135c01ddcdee8e4f9e98b03a2eca22d85e3a0bad735ac41f05f1e"
+}

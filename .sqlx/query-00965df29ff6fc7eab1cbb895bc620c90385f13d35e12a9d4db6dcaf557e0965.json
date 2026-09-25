@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO email_settings (tenant_id, logo_asset_id) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET logo_asset_id = EXCLUDED.logo_asset_id,\n             updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "00965df29ff6fc7eab1cbb895bc620c90385f13d35e12a9d4db6dcaf557e0965"
+}

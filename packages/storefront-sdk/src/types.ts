@@ -106,6 +106,10 @@ export type OrderPayment = S["PaymentView"];
 export type BankTransfer = S["BankTransferView"];
 export type OrderSummary = S["OrderSummary"];
 export type OrderPage = S["OrderPage"];
+/** Newsletter (WP18): the pending sign-up behind a confirmation link (address masked). */
+export type NewsletterConfirmation = S["Confirmation"];
+/** Newsletter (WP18): the subscription behind a campaign email's token (preference page). */
+export type NewsletterPreferences = S["Preferences"];
 export type WithdrawalForm = S["WithdrawalForm"];
 export type WithdrawalReceipt = S["WithdrawalReceipt"];
 export type DeclareInput = S["DeclareInput"];

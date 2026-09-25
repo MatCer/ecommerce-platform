@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, subscriber_id FROM campaign_sends WHERE token_hash = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "campaign_sends",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "subscriber_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "campaign_sends",
+            "name": "subscriber_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "15b31733dcce6feeb6ef2f0b07fb9b3e409172d30661282cbb9825386d0277ec"
+}

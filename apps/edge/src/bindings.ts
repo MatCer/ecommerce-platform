@@ -128,6 +128,8 @@ export const CHECKOUT_OPERATIONS: Operation[] = [
   { method: "GET", path: /^\/orders\/[0-9a-f]{64}$/ },
   { method: "GET", path: /^\/customer\/orders$/ },
   { method: "GET", path: /^\/customer\/orders\/[0-9a-f-]{36}$/ },
+  // WP18: the newsletter confirmation and preference pages (token in the query).
+  { method: "GET", path: /^\/newsletter\/(confirmation|preferences)$/ },
 ];
 
 /**

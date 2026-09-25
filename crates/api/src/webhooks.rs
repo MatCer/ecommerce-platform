@@ -1,12 +1,16 @@
-//! Payment provider webhooks (spec §10.4, A10, A11): the fake gateway's (`PAYMENTS_FAKE=1`)
+//! Provider webhooks. Payments (spec §10.4, A10, A11): the fake gateway's (`PAYMENTS_FAKE=1`)
 //! and Stripe Connect's. Both verify the signature over the raw body before parsing. Stripe
 //! events are stored before the 200 and processed by a job (`payments.provider_event`).
+//! Email (WP18): SES bounce/complaint notifications via SNS, HTTP Basic authenticated (see
+//! `commerce::marketing::deliverability` for the production signature-verification design).
 
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
+use base64::Engine;
 use chrono::Utc;
+use commerce::marketing::deliverability::{self, Applied, SnsEnvelope};
 use commerce::payments::{self, FakeEvent, stripe};
 use platform::Error;
 use platform::db::tenant_tx;
@@ -25,6 +29,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(fake_webhook))
         .routes(routes!(stripe_webhook))
+        .routes(routes!(ses_webhook))
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -123,4 +128,77 @@ async fn fake_webhook(
         })?;
     fake_event(&s, signature, &body).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MailEventReceived {
+    /// A suppression was recorded (`false`: ignored, e.g. a transient bounce, or a
+    /// subscription message for the operator).
+    pub applied: bool,
+}
+
+/// The HTTP Basic password, compared as SHA-256 digests.
+fn basic_password(headers: &HeaderMap) -> Option<String> {
+    let v = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    let encoded = v.strip_prefix("Basic ")?;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(encoded.trim())
+        .ok()?;
+    let text = String::from_utf8(decoded).ok()?;
+    Some(text.split_once(':')?.1.to_owned())
+}
+
+/// SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic
+/// credentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). A permanent bounce suppresses
+/// the message's recipient for every stream, a complaint for marketing; subscription messages
+/// are logged for the operator and never followed. `404` when not configured.
+#[utoipa::path(
+    post,
+    path = "/webhooks/ses",
+    tag = "webhooks",
+    request_body(content = String, content_type = "text/plain", description = "An SNS message (JSON) carrying an SES notification"),
+    responses(
+        (status = 200, body = MailEventReceived),
+        (status = 401, description = "invalid_credentials", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, description = "invalid_event", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn ses_webhook(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<MailEventReceived>, Error> {
+    let secret = s.mail_events.as_ref().ok_or(Error::NotFound)?;
+    let ok = basic_password(&headers)
+        .is_some_and(|p| crate::auth::ServiceToken::new(&p).matches(secret));
+    if !ok {
+        return Err(Error::Unauthorized {
+            code: "invalid_credentials",
+        });
+    }
+    let envelope: SnsEnvelope = parse_json(&body)?;
+    match envelope.kind.as_str() {
+        "Notification" => {
+            let event = deliverability::parse_ses(&envelope.message)?;
+            let applied = deliverability::apply(&s.db, &event).await?;
+            tracing::info!(sns = %envelope.message_id, ?applied, "email event");
+            Ok(Json(MailEventReceived {
+                applied: matches!(applied, Applied::Suppressed(n) if n > 0),
+            }))
+        }
+        "SubscriptionConfirmation" | "UnsubscribeConfirmation" => {
+            tracing::warn!(
+                kind = %envelope.kind,
+                topic = %envelope.topic_arn,
+                subscribe_url = envelope.subscribe_url.as_deref().unwrap_or_default(),
+                "SNS subscription message: confirm it manually if the topic is ours"
+            );
+            Ok(Json(MailEventReceived { applied: false }))
+        }
+        _ => Err(Error::Validation {
+            code: "invalid_event",
+            detail: "unknown SNS message type".into(),
+        }),
+    }
 }

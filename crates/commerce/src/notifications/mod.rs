@@ -13,6 +13,7 @@
 //!   Message-ID stays the same); marketing mail is never resent;
 //! - the suppression list is checked right before every send.
 
+pub mod admin;
 pub mod brand;
 
 use std::collections::BTreeMap;
@@ -69,17 +70,43 @@ pub(crate) fn label(locale: &str, key: &str) -> String {
 }
 
 fn text(locale: &str, key: &str, args: &[(&str, String)]) -> String {
-    let mut out = catalog(locale)
-        .get(key)
-        .cloned()
-        .unwrap_or_else(|| key.to_owned());
-    for (name, value) in args {
-        out = out.replace(&format!("{{{name}}}"), value);
+    fill(catalog(locale).get(key).map_or(key, String::as_str), args)
+}
+
+/// `{name}` placeholders in `template` replaced by `args` (single pass: a value that itself
+/// contains `{x}` is never expanded again; unknown placeholders stay as they are).
+pub(crate) fn fill(template: &str, args: &[(&str, String)]) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 1..];
+        let known = after.find('}').and_then(|end| {
+            let name = &after[..end];
+            args.iter().find(|(n, _)| *n == name).map(|(_, v)| (v, end))
+        });
+        match known {
+            Some((value, end)) => {
+                out.push_str(value);
+                rest = &after[end + 1..];
+            }
+            None => {
+                out.push('{');
+                rest = after;
+            }
+        }
     }
+    out.push_str(rest);
     out
 }
 
-/// `{{ t("key", name=value) }}` inside templates, in the render's `locale`.
+/// The platform default of a catalog text (the admin editor shows it).
+pub fn default_text(locale: &str, key: &str) -> String {
+    catalog(locale).get(key).cloned().unwrap_or_default()
+}
+
+/// `{{ t("key", name=value) }}` inside templates, in the render's `locale`; a tenant text
+/// (`overrides`: subject/intro only) replaces the catalog one.
 fn t(state: &State, key: &str, kwargs: Kwargs) -> Result<String, minijinja::Error> {
     let locale = state
         .lookup("locale")
@@ -90,7 +117,14 @@ fn t(state: &State, key: &str, kwargs: Kwargs) -> Result<String, minijinja::Erro
         let v: minijinja::Value = kwargs.get(name)?;
         args.push((name, v.to_string()));
     }
-    Ok(text(&locale, key, &args))
+    let custom = state
+        .lookup("overrides")
+        .and_then(|o| o.get_attr(key).ok())
+        .and_then(|v| v.as_str().map(str::to_owned));
+    Ok(match custom {
+        Some(c) => fill(&c, &args),
+        None => text(&locale, key, &args),
+    })
 }
 
 static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
@@ -175,6 +209,16 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
             include_str!("templates/payment_reminder.txt"),
         ),
         (
+            "newsletter_confirm.mjml",
+            include_str!("templates/newsletter_confirm.mjml"),
+        ),
+        (
+            "newsletter_confirm.txt",
+            include_str!("templates/newsletter_confirm.txt"),
+        ),
+        ("campaign.mjml", include_str!("templates/campaign.mjml")),
+        ("campaign.txt", include_str!("templates/campaign.txt")),
+        (
             "order_shipped.mjml",
             include_str!("templates/order_shipped.mjml"),
         ),
@@ -250,6 +294,8 @@ pub enum Template {
     OrderConfirmation,
     /// A bank transfer is still unpaid (WP11): the instructions and QR code again.
     PaymentReminder,
+    /// Newsletter double opt-in (WP18): the confirmation link.
+    NewsletterConfirm,
     /// WP12: the parcel left (tracking link), arrived, the order was cancelled or refunded.
     OrderShipped,
     OrderDelivered,
@@ -264,6 +310,23 @@ pub enum Template {
 }
 
 impl Template {
+    /// Templates whose subject and intro a tenant may replace (§11.4).
+    pub const EDITABLE: [Self; 13] = [
+        Self::OrderConfirmation,
+        Self::PaymentReminder,
+        Self::OrderShipped,
+        Self::OrderDelivered,
+        Self::OrderRefunded,
+        Self::Invoice,
+        Self::CreditNote,
+        Self::WithdrawalLink,
+        Self::WithdrawalReceipt,
+        Self::MagicLink,
+        Self::PasswordChanged,
+        Self::NewsletterConfirm,
+        Self::StaffInvite,
+    ];
+
     pub fn name(self) -> &'static str {
         match self {
             Self::MagicLink => "magic_link",
@@ -272,6 +335,7 @@ impl Template {
             Self::Order => "order",
             Self::OrderConfirmation => "order_confirmation",
             Self::PaymentReminder => "payment_reminder",
+            Self::NewsletterConfirm => "newsletter_confirm",
             Self::OrderShipped => "order_shipped",
             Self::OrderDelivered => "order_delivered",
             Self::OrderCancelled => "order_cancelled",
@@ -282,7 +346,15 @@ impl Template {
             Self::WithdrawalReceipt => "withdrawal_receipt",
         }
     }
+
+    /// An editable template by name.
+    pub fn editable(name: &str) -> Option<Self> {
+        Self::EDITABLE.into_iter().find(|t| t.name() == name)
+    }
 }
+
+/// Locales the email catalogs cover.
+pub const LOCALES: [&str; 3] = ["cs", "sk", "en"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rendered {
@@ -307,7 +379,16 @@ pub fn render(
     {
         subject_args.push(("number", number.to_owned()));
     }
-    let subject = text(locale, &format!("{name}.subject"), &subject_args);
+    let subject_key = format!("{name}.subject");
+    let subject = match brand.text(locale, &subject_key) {
+        Some(custom) => fill(custom, &subject_args),
+        None => text(locale, &subject_key, &subject_args),
+    };
+    let intro_key = format!("{name}.intro");
+    let mut overrides = serde_json::Map::new();
+    if let Some(intro) = brand.text(locale, &intro_key) {
+        overrides.insert(intro_key, json!(intro));
+    }
     let mut ctx = match vars {
         Value::Object(map) => map.clone(),
         _ => serde_json::Map::new(),
@@ -315,14 +396,24 @@ pub fn render(
     ctx.insert("locale".into(), json!(locale));
     ctx.insert("subject".into(), json!(subject));
     ctx.insert("preview".into(), json!(subject));
+    ctx.insert("overrides".into(), Value::Object(overrides));
     ctx.insert(
         "brand".into(),
         serde_json::to_value(brand).map_err(|e| Error::Internal(e.to_string()))?,
     );
+    render_files(name, &ctx, subject)
+}
+
+/// Renders `<name>.mjml` and `<name>.txt` with `ctx` (which holds `locale`, `brand`, ...).
+pub(crate) fn render_files(
+    name: &str,
+    ctx: &serde_json::Map<String, Value>,
+    subject: String,
+) -> Result<Rendered, Error> {
     let render = |file: String| -> Result<String, Error> {
         TEMPLATES
             .get_template(&file)
-            .and_then(|t| t.render(&ctx))
+            .and_then(|t| t.render(ctx))
             .map_err(|e| Error::Internal(format!("email template {file}: {e}")))
     };
     let mjml = render(format!("{name}.mjml"))?;
@@ -375,23 +466,65 @@ pub async fn enqueue_with_attachments(
     attachments: &[AttachmentRef],
 ) -> Result<Uuid, Error> {
     let r = render(email.template, email.locale, brand, &email.vars)?;
-    let files = serde_json::to_value(attachments).map_err(|e| Error::Internal(e.to_string()))?;
+    store(
+        tx,
+        Stored {
+            stream: email.stream,
+            template: email.template.name(),
+            to: email.to,
+            locale: email.locale,
+            rendered: &r,
+            idempotency_key: &email.idempotency_key,
+            sensitive: email.sensitive,
+            subscriber_id: None,
+            list_unsubscribe: None,
+            attachments,
+        },
+    )
+    .await
+}
+
+/// An already rendered message (campaigns render their own blocks).
+#[derive(Debug, Clone)]
+pub struct Stored<'a> {
+    pub stream: Stream,
+    /// `^[a-z_]{1,64}$`, e.g. `campaign`.
+    pub template: &'a str,
+    pub to: &'a str,
+    pub locale: &'a str,
+    pub rendered: &'a Rendered,
+    pub idempotency_key: &'a str,
+    pub sensitive: bool,
+    /// Marketing: the recipient, whose status and consent are checked again at send time.
+    pub subscriber_id: Option<Uuid>,
+    /// Marketing: the RFC 8058 one-click unsubscribe URL.
+    pub list_unsubscribe: Option<&'a str>,
+    /// Private-bucket files attached at send time (invoices).
+    pub attachments: &'a [AttachmentRef],
+}
+
+/// Stores a rendered message with its `mail.send` job (idempotent per key).
+pub async fn store(tx: &mut TenantTx, m: Stored<'_>) -> Result<Uuid, Error> {
+    let files = serde_json::to_value(m.attachments).map_err(|e| Error::Internal(e.to_string()))?;
     let inserted = sqlx::query_scalar!(
         "INSERT INTO email_messages (tenant_id, stream, template, idempotency_key, to_email, locale,
-                                     subject, html, body_text, sensitive, attachments)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                     subject, html, body_text, sensitive, subscriber_id,
+                                     list_unsubscribe, attachments)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT ON CONSTRAINT email_messages_idempotency DO NOTHING
          RETURNING id",
         tx.tenant_id(),
-        email.stream.as_str(),
-        email.template.name(),
-        email.idempotency_key,
-        email.to,
-        email.locale.split('-').next().unwrap_or("en"),
-        r.subject,
-        r.html,
-        r.text,
-        email.sensitive,
+        m.stream.as_str(),
+        m.template,
+        m.idempotency_key,
+        m.to,
+        m.locale.split('-').next().unwrap_or("en"),
+        m.rendered.subject,
+        m.rendered.html,
+        m.rendered.text,
+        m.sensitive,
+        m.subscriber_id,
+        m.list_unsubscribe,
         files
     )
     .fetch_optional(&mut **tx)
@@ -399,7 +532,7 @@ pub async fn enqueue_with_attachments(
     let Some(id) = inserted else {
         return Ok(sqlx::query_scalar!(
             "SELECT id FROM email_messages WHERE idempotency_key = $1",
-            email.idempotency_key
+            m.idempotency_key
         )
         .fetch_one(&mut **tx)
         .await?);
@@ -493,6 +626,7 @@ pub struct Sending {
     pub subject: String,
     pub html: String,
     pub text: String,
+    pub list_unsubscribe: Option<String>,
     /// SMTP attempts including this one.
     pub attempts: i32,
     pub uncertain_count: i16,
@@ -514,7 +648,7 @@ pub async fn begin_send(
     let mut tx = tenant_tx(db, tenant).await?;
     let Some(m) = sqlx::query!(
         r#"SELECT stream, to_email, subject, html, body_text, status, uncertain_count, attempts,
-                  attachments,
+                  subscriber_id, list_unsubscribe, attachments,
                   updated_at < now() - make_interval(secs => $2) AS "stale!"
            FROM email_messages WHERE id = $1 FOR UPDATE"#,
         id,
@@ -552,10 +686,22 @@ pub async fn begin_send(
     }
     // A14: one retry for transactional mail whose first send ended uncertain, none for
     // marketing, none after a second uncertain send.
+    // A20: a marketing recipient must still be subscribed and consenting right now.
+    let marketing_refusal = match m.subscriber_id {
+        Some(sub) if stream == Stream::Marketing => {
+            match crate::marketing::subscribers::may_receive(&mut tx, sub).await? {
+                Some(reason) => Some(reason),
+                None => crate::marketing::campaigns::delivery_refusal(&mut tx, id).await?,
+            }
+        }
+        _ => None,
+    };
     let refusal = if uncertain > 0 && !(stream == Stream::Transactional && uncertain == 1) {
         Some(("uncertain", None))
     } else if is_suppressed(&mut tx, &m.to_email, stream).await? {
         Some(("failed", Some("suppressed")))
+    } else if let Some(reason) = marketing_refusal {
+        Some(("failed", Some(reason)))
     } else if m.html.is_none() || m.body_text.is_none() {
         Some(("failed", Some("message body is gone")))
     } else {
@@ -586,6 +732,7 @@ pub async fn begin_send(
         subject: m.subject,
         html: m.html.unwrap_or_default(),
         text: m.body_text.unwrap_or_default(),
+        list_unsubscribe: m.list_unsubscribe,
         attempts: m.attempts + 1,
         uncertain_count: uncertain,
         attachments: serde_json::from_value(m.attachments)
@@ -750,6 +897,7 @@ pub async fn deliver(
             html: &s.html,
             text: &s.text,
             id: &id_text,
+            list_unsubscribe: s.list_unsubscribe.as_deref(),
             attachments: &files,
         })
         .await;
@@ -790,7 +938,7 @@ mod tests {
         Brand {
             shop_name: "Kočka & <Pes>".into(),
             shop_url: "http://demo.localhost:8080".into(),
-            colors: brand::Colors::default(),
+            ..Brand::default()
         }
     }
 
@@ -843,6 +991,7 @@ mod tests {
         let vars = json!({
             "url": "http://x/",
             "minutes": 15,
+            "hours": 48,
             "order": {
                 "number": "2026000123",
                 "lines": [{"name": "Tričko", "detail": "M / Zelená", "quantity": 2, "total": "798 Kč"}],
@@ -861,6 +1010,7 @@ mod tests {
                 Template::StaffInvite,
                 Template::Order,
                 Template::OrderConfirmation,
+                Template::NewsletterConfirm,
             ] {
                 let r = render(t, locale, &brand(), &vars).unwrap();
                 assert!(!r.subject.contains('{'), "{locale} {t:?}: {}", r.subject);
@@ -883,6 +1033,91 @@ mod tests {
             assert!(text.contains("152,21 Kč"));
             assert!(text.contains("Zaplatíte při převzetí"));
         }
+    }
+
+    #[test]
+    fn tenant_texts_and_logo_brand_the_mail() {
+        let mut b = brand();
+        b.logo_url = Some("http://demo.localhost:8080/media/t/a/320.png".into());
+        b.texts.insert(
+            "cs:newsletter_confirm.subject".into(),
+            "Ještě krok, {shop} {x}".into(),
+        );
+        b.texts.insert(
+            "cs:newsletter_confirm.intro".into(),
+            "Vítejte v <b>{shop}</b> {shop}".into(),
+        );
+        let vars = json!({"url": "http://checkout.demo.localhost/newsletter/confirm?token=t", "hours": 48});
+        let r = render(Template::NewsletterConfirm, "cs", &b, &vars).unwrap();
+        // Placeholders are filled once; unknown ones stay; tenant text is escaped like any value.
+        assert_eq!(r.subject, "Ještě krok, Kočka & <Pes> {x}");
+        assert!(
+            r.html
+                .contains("Vítejte v &lt;b&gt;Kočka &amp; &lt;Pes&gt;&lt;/b&gt;"),
+            "{}",
+            r.html
+        );
+        assert!(
+            r.text
+                .contains("Vítejte v <b>Kočka & <Pes></b> Kočka & <Pes>")
+        );
+        assert!(
+            r.html
+                .contains("src=\"http://demo.localhost:8080/media/t/a/320.png\"")
+        );
+        assert!(r.html.contains("Odkaz platí 48 hodin"));
+        // Other languages keep the platform text.
+        let en = render(Template::NewsletterConfirm, "en", &b, &vars).unwrap();
+        assert!(en.subject.starts_with("Confirm your"));
+        assert!(!brand().text("cs", "newsletter_confirm.subject").is_some());
+        assert_eq!(
+            fill("{a}{b}{a}", &[("a", "{b}".into()), ("b", "B".into())]),
+            "{b}B{b}"
+        );
+    }
+
+    #[test]
+    fn campaign_layout_renders_blocks_and_footer_links() {
+        let mut ctx = serde_json::Map::new();
+        ctx.insert("locale".into(), json!("cs"));
+        ctx.insert("subject".into(), json!("Novinky"));
+        ctx.insert("preview".into(), json!("Nové zboží"));
+        ctx.insert("overrides".into(), json!({}));
+        ctx.insert("brand".into(), serde_json::to_value(brand()).unwrap());
+        ctx.insert("blocks".into(), json!([
+            {"type": "heading", "text": "Ahoj <b>"},
+            {"type": "text", "html": "<p>Text <a href=\"https://x/\">odkaz</a></p>", "plain": "Text odkaz"},
+            {"type": "button", "label": "Koupit", "href": "https://x/c?a=1&b=2"},
+            {"type": "products", "title": "Pro vás", "rows": [[
+                {"name": "Tričko", "url": "https://x/p/t", "image": null, "price": "399 Kč"}
+            ]]}
+        ]));
+        ctx.insert(
+            "unsubscribe_url".into(),
+            json!("https://checkout.x/newsletter?t=abc"),
+        );
+        ctx.insert(
+            "preferences_url".into(),
+            json!("https://checkout.x/newsletter?t=abc"),
+        );
+        let r = render_files("campaign", &ctx, "Novinky".into()).unwrap();
+        assert!(r.html.contains("Ahoj &lt;b&gt;"));
+        assert!(
+            r.html.contains("<a href=\"https://x/\">odkaz</a>"),
+            "rich text is kept"
+        );
+        assert!(r.html.contains("https://x/c?a=1&amp;b=2"));
+        assert!(r.html.contains("Tričko") && r.html.contains("399 Kč"));
+        assert!(
+            r.html.contains("Odhlásit odběr")
+                && r.html.contains("https://checkout.x/newsletter?t=abc")
+        );
+        assert!(r.text.contains("Koupit: https://x/c?a=1&b=2"));
+        assert!(r.text.contains("- Tričko (399 Kč): https://x/p/t"));
+        assert!(
+            r.text
+                .contains("Odhlásit odběr: https://checkout.x/newsletter?t=abc")
+        );
     }
 
     #[test]

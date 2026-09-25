@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT count(DISTINCT id) FROM assets WHERE id = ANY($1)) = cardinality(\n                      ARRAY(SELECT DISTINCT unnest($1::uuid[])))\n              AND (SELECT count(DISTINCT id) FROM products WHERE id = ANY($2)) = cardinality(\n                      ARRAY(SELECT DISTINCT unnest($2::uuid[]))) AS \"ok!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ok!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2f3a3b5a3eeee859b3c5ea5f3ce68462b42e900dd942712bdf5a8c9edf0a23fd"
+}

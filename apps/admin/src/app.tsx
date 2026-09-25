@@ -47,6 +47,12 @@ const AiSettings = lazy(() => import("./pages/AiSettings.tsx"));
 const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
 const AdTracking = lazy(() => import("./pages/AdTracking.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
+const Subscribers = lazy(() => import("./pages/Subscribers.tsx"));
+const Segments = lazy(() => import("./pages/Segments.tsx"));
+const Campaigns = lazy(() => import("./pages/Campaigns.tsx"));
+const CampaignEditor = lazy(() => import("./pages/CampaignEditor.tsx"));
+const Emails = lazy(() => import("./pages/Emails.tsx"));
+const EmailBranding = lazy(() => import("./pages/EmailBranding.tsx"));
 const Themes = lazy(() => import("./pages/Themes.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -129,6 +135,13 @@ export function App() {
           <Route path="/audit-log" component={AuditLog} />
           <Route path="/settings/webhooks" component={Webhooks} />
           <Route path="/settings/ad-tracking" component={AdTracking} />
+          <Route path="/settings/emails" component={Emails} />
+          <Route path="/settings/email-branding" component={EmailBranding} />
+          <Route path="/marketing/subscribers" component={Subscribers} />
+          <Route path="/marketing/segments" component={Segments} />
+          <Route path="/marketing/campaigns" component={Campaigns} />
+          <Route path="/marketing/campaigns/new" component={CampaignEditor} />
+          <Route path="/marketing/campaigns/:id" component={CampaignEditor} />
           <Route path="/platform/jobs" component={PlatformJobs} />
           <Route path="/account/security" component={Security} />
           <Route path="*" component={NotFound} />

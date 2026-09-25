@@ -315,6 +315,10 @@ impl ServiceToken {
     pub fn new(token: &str) -> Self {
         Self(Sha256::digest(token.as_bytes()).into())
     }
+
+    pub fn matches(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
 }
 
 /// A caller holding the internal service token (edge, checkout, theme builder).

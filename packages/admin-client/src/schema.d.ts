@@ -453,6 +453,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_campaigns"];
+        put?: never;
+        /** Creates a draft campaign. Honors `Idempotency-Key`. */
+        post: operations["create_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A campaign with its delivery numbers. */
+        get: operations["get_campaign"];
+        /** Edits a draft (`409 campaign_not_draft` otherwise). */
+        put: operations["update_campaign"];
+        post?: never;
+        /** Deletes a draft. */
+        delete: operations["delete_campaign"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/campaigns/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stops a scheduled or sending campaign. */
+        post: operations["cancel_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/campaigns/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renders the campaign for a subscriber or a language (links are not tracked). */
+        post: operations["preview_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/campaigns/{id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedules a draft (or moves a scheduled campaign). Sending runs in batches of 500 with the
+         *     tenant's rate limit; everyone in the segment gets it once.
+         */
+        post: operations["schedule_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/campaigns/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sends the campaign now to up to 5 addresses (subject marked `[TEST]`, not tracked, not in
+         *     the stats); audited.
+         */
+        post: operations["test_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/carriers": {
         parameters: {
             query?: never;
@@ -670,6 +780,114 @@ export interface paths {
             cookie?: never;
         };
         get: operations["get_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/email-branding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The logo at the top of every email. */
+        get: operations["get_branding"];
+        /** Sets the email logo (a processed image asset of the shop) or clears it. Owner or admin. */
+        put: operations["put_branding"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/email-suppressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suppressed addresses (bounces, complaints, manual), alphabetically. */
+        get: operations["list_suppressions"];
+        put?: never;
+        /** Suppresses an address for every stream (audited). */
+        post: operations["add_suppression"];
+        /** Removes a suppression (the address gets mail again; audited with what it was). */
+        delete: operations["remove_suppression"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/email-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Editable email texts: every template and language with the platform default. */
+        get: operations["list_texts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/email-templates/{template}/{locale}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Sets the subject/intro of a template in a language (both empty = platform default). Owner
+         *     or admin.
+         */
+        put: operations["put_text"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sent and queued emails, newest first (no bodies in the list). */
+        get: operations["list_messages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/emails/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One email; the body only for non-sensitive mail (never sign-in or order links). */
+        get: operations["get_message"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1924,6 +2142,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/segments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_segments"];
+        put?: never;
+        /** Creates a segment (rules validated against the allowlist). Honors `Idempotency-Key`. */
+        post: operations["create_segment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/segments/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** How many subscribers the rules select right now, with a sample of 10. */
+        post: operations["preview_segment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/segments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_segment"];
+        put: operations["update_segment"];
+        post?: never;
+        /** Deletes a segment (`409 segment_in_use` while campaigns use it). */
+        delete: operations["delete_segment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/shipping-methods": {
         parameters: {
             query?: never;
@@ -2038,6 +2307,60 @@ export interface paths {
          *     token keeps working for 5 minutes while the edge picks up the new one.
          */
         post: operations["rotate_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/subscribers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscribers, newest first, with filters. */
+        get: operations["list_subscribers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/subscribers/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every subscriber matching the filters as CSV (UTF-8). Owner or admin, signed in within the
+         *     last 15 minutes (A9); audited.
+         */
+        get: operations["export_subscribers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/subscribers/{id}/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unsubscribes a subscriber on their request (records the withdrawal, audited). */
+        post: operations["unsubscribe_subscriber"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3161,6 +3484,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/newsletter/click": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A tracked campaign link: counts the click and returns the signed target; `404` for anything
+         *     not signed for this recipient (never an open redirect).
+         */
+        get: operations["click"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/confirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the confirmation page shows (reading changes nothing: link scanners cannot confirm). */
+        get: operations["confirmation"];
+        put?: never;
+        /** Confirms a sign-up (the button on the confirmation page): subscribed, consent recorded. */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The preference page's view of the subscription behind a campaign email. */
+        get: operations["preferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/resubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Subscribing again from the preference page: a new double opt-in mail to the same address. */
+        post: operations["resubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/newsletter/subscribe": {
         parameters: {
             query?: never;
@@ -3170,11 +3565,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /** Newsletter sign-up (double opt-in, §11.5): always `202 accepted` for a valid address. */
+        post: operations["subscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/newsletter/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /**
-         * Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail
-         *     arrive with the newsletter module (M2).
+         * Unsubscribes the recipient of a campaign email (RFC 8058 one-click, the preference page).
+         *     Idempotent.
          */
-        post: operations["newsletter"];
+        post: operations["unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3566,6 +3978,28 @@ export interface paths {
          *     at most 5 minutes old. Repeated events are no-ops.
          */
         post: operations["fake_webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/ses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic
+         *     credentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). A permanent bounce suppresses
+         *     the message's recipient for every stream, a complaint for marketing; subscription messages
+         *     are logged for the operator and never followed. `404` when not configured.
+         */
+        post: operations["ses_webhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4170,6 +4604,94 @@ export interface components {
             /** @description Purge tags (`product:<id>`, `category:<id>`, `shop`, ...). */
             tags: string[];
         };
+        Campaign: {
+            content: {
+                [key: string]: components["schemas"]["LocaleContent"];
+            };
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: date-time */
+            scheduled_at?: string | null;
+            /** Format: uuid */
+            segment_id?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            stats: components["schemas"]["CampaignStats"];
+            status: components["schemas"]["CampaignStatus"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CampaignInput: {
+            /**
+             * @description Content per language (`cs`, `sk`, `en`); a subscriber gets their language, else the
+             *     market's default language, else the first one.
+             */
+            content: {
+                [key: string]: components["schemas"]["LocaleContent"];
+            };
+            name: string;
+            /**
+             * Format: uuid
+             * @description Recipients; `null` = every subscriber.
+             */
+            segment_id?: string | null;
+        };
+        CampaignList: {
+            items: components["schemas"]["Campaign"][];
+        };
+        /** @description Delivery numbers of a campaign. */
+        CampaignStats: {
+            /**
+             * Format: int64
+             * @description Accepted by the mail server (SMTP 250).
+             */
+            accepted: number;
+            /** Format: int64 */
+            bounced: number;
+            /**
+             * Format: int64
+             * @description Recipients who clicked at least once.
+             */
+            clicked: number;
+            /**
+             * Format: int64
+             * @description Clicks in total.
+             */
+            clicks: number;
+            /** Format: int64 */
+            complained: number;
+            /** Format: int64 */
+            failed: number;
+            /**
+             * Format: int64
+             * @description Segment members handled so far (sent + skipped).
+             */
+            recipients: number;
+            /**
+             * Format: int64
+             * @description Messages created.
+             */
+            sent: number;
+            /**
+             * Format: int64
+             * @description Members not mailed (no consent, suppressed, unsubscribed meanwhile).
+             */
+            skipped: number;
+            /**
+             * Format: int64
+             * @description Outcome unknown (never resent, A14).
+             */
+            uncertain: number;
+            /** Format: int64 */
+            unsubscribed: number;
+        };
+        /** @enum {string} */
+        CampaignStatus: "draft" | "scheduled" | "sending" | "sent" | "cancelled";
         CancelInput: {
             /** @description Bank transfer / COD: where the refund of a paid order goes. */
             iban?: string | null;
@@ -4411,6 +4933,10 @@ export interface components {
             meilisearch: components["schemas"]["CheckStatus"];
             storage: components["schemas"]["CheckStatus"];
         };
+        ClickTarget: {
+            /** @description Where to redirect (exactly what the campaign linked to). */
+            url: string;
+        };
         CmsPage: {
             blocks: components["schemas"]["BlockView"][];
             breadcrumbs: components["schemas"]["Link"][];
@@ -4502,6 +5028,68 @@ export interface components {
              */
             kind: string;
             value: string;
+        };
+        /** @description One allowlisted condition; `field` selects it. */
+        Condition: {
+            /** @enum {string} */
+            field: "locale";
+            locales: string[];
+        } | {
+            /** @enum {string} */
+            field: "market";
+            market_ids: string[];
+        } | {
+            /** Format: date-time */
+            after?: string | null;
+            /** Format: date-time */
+            before?: string | null;
+            /** @enum {string} */
+            field: "subscribed";
+        } | {
+            category_ids: string[];
+            /** @enum {string} */
+            field: "purchased_category";
+        } | {
+            brands: string[];
+            /** @enum {string} */
+            field: "purchased_brand";
+        } | {
+            /** @enum {string} */
+            field: "order_count";
+            /** Format: int64 */
+            max?: number | null;
+            /** Format: int64 */
+            min?: number | null;
+        } | {
+            currency: string;
+            /** @enum {string} */
+            field: "total_spent";
+            /** Format: int64 */
+            max_minor?: number | null;
+            /** Format: int64 */
+            min_minor?: number | null;
+        } | {
+            /** Format: date-time */
+            after?: string | null;
+            /** Format: date-time */
+            before?: string | null;
+            /** @enum {string} */
+            field: "last_order";
+        } | {
+            /** Format: int32 */
+            days: number;
+            /** @enum {string} */
+            field: "engaged";
+        } | {
+            dim: components["schemas"]["AffinityDim"];
+            /** @enum {string} */
+            field: "affinity";
+            keys: string[];
+        };
+        /** @description What the confirmation page shows before the button is pressed (a read, no change). */
+        Confirmation: {
+            /** @description The address, partly masked (`j***@example.com`). */
+            email: string;
         };
         /** @description A choice as posted to `/_p/consent` (the contract in `docs/decisions/consent-contract.md`). */
         ConsentChoice: {
@@ -4775,6 +5363,46 @@ export interface components {
         /** @description A 5-minute download link (A21). */
         DownloadLink: {
             url: string;
+        };
+        /** @description One block of a campaign; `type` selects it. */
+        EmailBlock: {
+            text: string;
+            /** @enum {string} */
+            type: "heading";
+        } | {
+            html: string;
+            /** @enum {string} */
+            type: "text";
+        } | {
+            alt?: string;
+            /** Format: uuid */
+            asset_id: string;
+            href?: string;
+            /** @enum {string} */
+            type: "image";
+        } | {
+            href: string;
+            label: string;
+            /** @enum {string} */
+            type: "button";
+        } | {
+            product_ids: string[];
+            title?: string;
+            /** @enum {string} */
+            type: "product_grid";
+        } | {
+            /** Format: int32 */
+            limit?: number;
+            title?: string;
+            /** @enum {string} */
+            type: "personalized_products";
+        };
+        EmailBranding: {
+            /**
+             * Format: uuid
+             * @description An image asset of the tenant shown at the top of every email (`null` = the shop name).
+             */
+            logo_asset_id?: string | null;
         };
         /** @enum {string} */
         EntityType: "product" | "category" | "page" | "menu";
@@ -5334,6 +5962,13 @@ export interface components {
             /** Format: int32 */
             total: number;
         };
+        /** @description The content in one language. */
+        LocaleContent: {
+            blocks: components["schemas"]["EmailBlock"][];
+            /** @description The inbox preview text (defaults to the subject). */
+            preheader?: string;
+            subject: string;
+        };
         MagicLinkRequest: {
             email: string;
             /** @description Relative path on the checkout origin to land on after sign-in (default `/account`). */
@@ -5341,6 +5976,13 @@ export interface components {
         };
         MagicLinkToken: {
             token: string;
+        };
+        MailEventReceived: {
+            /**
+             * @description A suppression was recorded (`false`: ignored, e.g. a transient bounce, or a
+             *     subscription message for the operator).
+             */
+            applied: boolean;
         };
         Market: {
             code: string;
@@ -5369,6 +6011,8 @@ export interface components {
         MarketList: {
             items: components["schemas"]["Market"][];
         };
+        /** @enum {string} */
+        Match: "all" | "any";
         Me: {
             email: string;
             /** @description Platform superadmin (the job queue view, `/admin/v1/platform/*`). */
@@ -5434,6 +6078,36 @@ export interface components {
         Menus: {
             footer: components["schemas"]["MenuItem"][];
             main: components["schemas"]["MenuItem"][];
+        };
+        MessageDetail: components["schemas"]["MessageSummary"] & {
+            /** @description The HTML body (render it sandboxed); `None` for sensitive mail. */
+            html?: string | null;
+            list_unsubscribe?: string | null;
+            /** @description `true` for sign-in/order links: the body is never shown. */
+            sensitive: boolean;
+            text?: string | null;
+        };
+        MessagePage: {
+            items: components["schemas"]["MessageSummary"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
+        MessageSummary: {
+            /** Format: date-time */
+            accepted_at?: string | null;
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            last_error?: string | null;
+            locale: string;
+            status: string;
+            stream: string;
+            subject: string;
+            template: string;
+            to_email: string;
         };
         /** @enum {string} */
         MethodKind: "stripe" | "bank_transfer" | "cod" | "fake";
@@ -5608,8 +6282,15 @@ export interface components {
             email: string;
         };
         NewsletterStatus: {
-            /** @description `accepted`: double opt-in mail arrives with the newsletter module (M2, §11.5). */
+            /**
+             * @description `accepted` (a confirmation mail is sent when one is due; the answer never tells whether
+             *     the address is already known) or `subscribed`.
+             */
             status: string;
+        };
+        /** @description A capability token from a newsletter email. */
+        NewsletterToken: {
+            token: string;
         };
         /** @description What the customer does next. */
         NextAction: {
@@ -6147,6 +6828,30 @@ export interface components {
             /** Format: int32 */
             quantity: number;
         };
+        /** @description The preference page's view of a subscription. */
+        Preferences: {
+            /** @description The address, partly masked. */
+            email: string;
+            status: components["schemas"]["Status"];
+        };
+        Preview: {
+            /**
+             * Format: int64
+             * @description Subscribed members right now.
+             */
+            count: number;
+            /** @description Up to 10 of them. */
+            sample: components["schemas"]["SampleMember"][];
+        };
+        PreviewInput: {
+            /** @description Without a subscriber: the language (default market). */
+            locale?: string | null;
+            /**
+             * Format: uuid
+             * @description Render as this subscriber gets it (language, market, personalized products).
+             */
+            subscriber_id?: string | null;
+        };
         PreviewLink: {
             /** Format: date-time */
             expires_at: string;
@@ -6606,6 +7311,12 @@ export interface components {
             /** @description E.g. the carrier's payout reference, at most 500 characters. */
             note?: string | null;
         };
+        RenderedEmail: {
+            /** @description Full HTML document (show it in a sandboxed iframe). */
+            html: string;
+            subject: string;
+            text: string;
+        };
         /** @enum {string} */
         ResolveAction: "accept" | "assign" | "dismiss";
         ResolveInput: {
@@ -6708,6 +7419,10 @@ export interface components {
         RoleChange: {
             role: components["schemas"]["Role"];
         };
+        Rules: {
+            conditions?: components["schemas"]["Condition"][];
+            match?: components["schemas"]["Match"];
+        };
         /** @enum {string} */
         RunStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
         Sale: {
@@ -6793,11 +7508,24 @@ export interface components {
              */
             what: string;
         };
+        SampleMember: {
+            email: string;
+            /** Format: uuid */
+            id: string;
+            locale: string;
+        };
         SampleRow: {
             changes: components["schemas"]["SampleChange"][];
             name: string;
             /** Format: uuid */
             product_id: string;
+        };
+        ScheduleInput: {
+            /**
+             * Format: date-time
+             * @description When to start; `null` or the past = now.
+             */
+            at?: string | null;
         };
         Screenshot: {
             /** @description `home-mobile`, `product-desktop`, ... */
@@ -6842,6 +7570,23 @@ export interface components {
         SearchStatus: {
             /** @description One index per locale the tenant's markets sell in. */
             indexes: components["schemas"]["IndexStatus"][];
+        };
+        Segment: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            name: string;
+            rules: components["schemas"]["Rules"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SegmentInput: {
+            name: string;
+            rules: components["schemas"]["Rules"];
+        };
+        SegmentList: {
+            items: components["schemas"]["Segment"][];
         };
         /** @description Which products change: every non-empty condition must hold. */
         Selector: {
@@ -7077,6 +7822,8 @@ export interface components {
              */
             matched: number;
         };
+        /** @enum {string} */
+        Status: "pending" | "subscribed" | "unsubscribed" | "bounced" | "complained";
         StatusUpdate: {
             /** @description The gate report (JSON object, at most 256 kB). */
             checks: Record<string, never>;
@@ -7116,6 +7863,44 @@ export interface components {
             account?: components["schemas"]["StripeAccount"] | null;
             mode?: components["schemas"]["StripePlatformMode"] | null;
         };
+        Subscriber: {
+            /** Format: date-time */
+            confirmed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description The customer account with the same (verified) address.
+             */
+            customer_id?: string | null;
+            email: string;
+            /** Format: uuid */
+            id: string;
+            locale: string;
+            /** Format: uuid */
+            market_id: string;
+            /**
+             * Format: date-time
+             * @description Consent evidence: when the sign-up was requested and confirmed, and the consent text
+             *     version shown (the IP hashes are stored but never shown).
+             */
+            requested_at: string;
+            source: string;
+            status: components["schemas"]["Status"];
+            text_version: string;
+            /** Format: date-time */
+            unsubscribed_at?: string | null;
+        };
+        SubscriberPage: {
+            items: components["schemas"]["Subscriber"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+            /**
+             * Format: int64
+             * @description Matching subscribers in total (all pages).
+             */
+            total: number;
+        };
         Subscription: {
             active: boolean;
             /** Format: date-time */
@@ -7149,6 +7934,22 @@ export interface components {
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
             products: components["schemas"]["SearchHit"][];
+        };
+        Suppression: {
+            /** Format: date-time */
+            created_at: string;
+            email: string;
+            note?: string | null;
+            /** @description `bounce`, `complaint` or `manual`. */
+            reason: string;
+        };
+        SuppressionInput: {
+            email: string;
+            note?: string | null;
+        };
+        SuppressionPage: {
+            items: components["schemas"]["Suppression"][];
+            next_after?: string | null;
         };
         Synonyms: {
             /**
@@ -7237,8 +8038,35 @@ export interface components {
             requests: number;
             template: string;
         };
+        /** @description One editable template text set in one language: the platform default and the tenant's. */
+        TemplateText: {
+            default_intro: string;
+            default_subject: string;
+            /** @description The tenant's intro paragraph (`{shop}` is filled in). */
+            intro?: string | null;
+            locale: string;
+            /** @description The tenant's subject (`{shop}` and, for order mail, `{number}` are filled in). */
+            subject?: string | null;
+            template: string;
+        };
+        TemplateTextInput: {
+            intro?: string | null;
+            /** @description Empty or `null` = the platform default. */
+            subject?: string | null;
+        };
+        TemplateTextList: {
+            items: components["schemas"]["TemplateText"][];
+        };
         /** @enum {string} */
         Tender: "cash" | "card" | "unknown";
+        TestSendInput: {
+            /** @description 1-5 addresses. */
+            emails: string[];
+            locale?: string | null;
+        };
+        TestSent: {
+            queued: number;
+        };
         TokensInput: {
             /**
              * Format: uuid
@@ -8626,6 +9454,355 @@ export interface operations {
             };
         };
     };
+    list_campaigns: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignList"];
+                };
+            };
+        };
+    };
+    create_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description campaign_not_draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description campaign_not_draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancel_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description campaign_not_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    preview_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedEmail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    schedule_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Campaign"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description campaign_not_schedulable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    test_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestSendInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestSent"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_carriers: {
         parameters: {
             query?: never;
@@ -9436,6 +10613,302 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GeneratedDocument"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_branding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailBranding"];
+                };
+            };
+        };
+    };
+    put_branding: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailBranding"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailBranding"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_suppressions: {
+        parameters: {
+            query?: {
+                /** @description Part of the address. */
+                q?: string;
+                /** @description `email` of the last row of the previous page. */
+                after?: string;
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuppressionPage"];
+                };
+            };
+        };
+    };
+    add_suppression: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuppressionInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Suppression"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_suppression: {
+        parameters: {
+            query: {
+                email: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_texts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateTextList"];
+                };
+            };
+        };
+    };
+    put_text: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                template: string;
+                locale: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateTextInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateText"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_messages: {
+        parameters: {
+            query?: {
+                /** @description `pending`, `sending`, `accepted`, `uncertain` or `failed`. */
+                status?: string;
+                /** @description `transactional` or `marketing`. */
+                stream?: string;
+                /** @description Part of the recipient address. */
+                to?: string;
+                cursor?: string;
+                /** @description 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagePage"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_message: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageDetail"];
                 };
             };
             404: {
@@ -12947,6 +14420,223 @@ export interface operations {
             };
         };
     };
+    list_segments: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SegmentList"];
+                };
+            };
+        };
+    };
+    create_segment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description name_taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    preview_segment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Rules"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preview"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_segment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_segment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SegmentInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_segment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description segment_in_use */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_shipping: {
         parameters: {
             query?: {
@@ -13481,6 +15171,119 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_subscribers: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["Status"];
+                /** @description Part of the address (case-insensitive). */
+                q?: string;
+                locale?: string;
+                market_id?: string;
+                /** @description `next_cursor` of the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriberPage"];
+                };
+            };
+        };
+    };
+    export_subscribers: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["Status"];
+                /** @description Part of the address (case-insensitive). */
+                q?: string;
+                locale?: string;
+                market_id?: string;
+                /** @description `next_cursor` of the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unsubscribe_subscriber: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscriber"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -16367,7 +18170,200 @@ export interface operations {
             };
         };
     };
-    newsletter: {
+    click: {
+        parameters: {
+            query: {
+                /** @description Recipient token. */
+                t: string;
+                /** @description Target URL. */
+                u: string;
+                /** @description Signature (hex). */
+                s: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClickTarget"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirmation: {
+        parameters: {
+            query: {
+                /** @description The token from the email link. */
+                token: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Confirmation"];
+                };
+            };
+            /** @description Invalid, used or expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterStatus"];
+                };
+            };
+            /** @description Invalid, used or expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    preferences: {
+        parameters: {
+            query: {
+                /** @description The recipient token from a campaign email. */
+                t: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preferences"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    resubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterToken"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsletterStatus"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    subscribe: {
         parameters: {
             query?: never;
             header: {
@@ -16396,6 +18392,53 @@ export interface operations {
                 };
             };
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too_many_signups */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    unsubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsletterToken"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Preferences"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17405,6 +19448,56 @@ export interface operations {
                 };
             };
             /** @description event_mismatch */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ses_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description An SNS message (JSON) carrying an SES notification */
+        requestBody: {
+            content: {
+                "text/plain": string;
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailEventReceived"];
+                };
+            };
+            /** @description invalid_credentials */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_event */
             422: {
                 headers: {
                     [name: string]: unknown;

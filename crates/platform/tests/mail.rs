@@ -29,6 +29,7 @@ fn message(to: &str) -> Outgoing<'_> {
         html: "<p>Ahoj</p>",
         text: "Ahoj",
         id: "0192-test",
+        list_unsubscribe: None,
         attachments: &[],
     }
 }

@@ -1,0 +1,9 @@
+{% extends "layout.txt" %}
+{% block content %}{{ t("newsletter_confirm.heading") }}
+
+{{ t("newsletter_confirm.intro", shop=brand.shop_name) }}
+
+{{ url }}
+
+{{ t("newsletter_confirm.expiry", hours=hours) }}
+{{ t("newsletter_confirm.ignore") }}{% endblock %}

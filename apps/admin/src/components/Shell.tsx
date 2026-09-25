@@ -47,6 +47,14 @@ const groups: { label: () => string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: () => t("nav.marketing"),
+    items: [
+      { href: "/marketing/campaigns", label: () => t("nav.campaigns"), min: "staff" },
+      { href: "/marketing/segments", label: () => t("nav.segments"), min: "staff" },
+      { href: "/marketing/subscribers", label: () => t("nav.subscribers"), min: "staff" },
+    ],
+  },
+  {
     label: () => t("content.content"),
     items: [
       { href: "/content/pages", label: () => t("content.pages"), min: "staff" },
@@ -79,6 +87,8 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/settings/shipping", label: () => t("shipping.title"), min: "staff" },
       { href: "/settings/payments", label: () => t("payments.title"), min: "staff" },
       { href: "/settings/tax", label: () => t("nav.taxProfile"), min: "staff" },
+      { href: "/settings/email-branding", label: () => t("nav.emailBranding"), min: "staff" },
+      { href: "/settings/emails", label: () => t("nav.emails"), min: "admin" },
       { href: "/staff", label: () => t("nav.staff"), min: "admin" },
       { href: "/audit-log", label: () => t("nav.auditLog"), min: "admin" },
       { href: "/settings/webhooks", label: () => t("nav.webhooks"), min: "admin" },

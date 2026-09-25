@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v->>'key' AS \"key!\"\n               FROM email_settings s\n               JOIN assets a ON a.id = s.logo_asset_id AND a.status = 'ready'\n               CROSS JOIN LATERAL jsonb_array_elements(a.variants) v\n               WHERE v->>'format' IN ('png', 'jpeg') AND v->>'key' IS NOT NULL\n               ORDER BY ((v->>'width')::bigint <= $1) DESC,\n                        CASE WHEN (v->>'width')::bigint <= $1 THEN -(v->>'width')::bigint\n                             ELSE (v->>'width')::bigint END\n               LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1496ebfb8d7a6de9969ae62cd60ce3190fb173a36e69ecfcef6eeba6e25c31ac"
+}

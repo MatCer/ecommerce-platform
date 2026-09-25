@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT logo_asset_id FROM email_settings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "logo_asset_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "email_settings",
+            "name": "logo_asset_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "d42179e2c5f4ac1c76cec0f8b1c2b46327100a0de8da57dc2afe8c0403907713"
+}

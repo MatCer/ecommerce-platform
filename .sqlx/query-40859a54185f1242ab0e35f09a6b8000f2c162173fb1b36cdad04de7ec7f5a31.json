@@ -1,0 +1,165 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, email, status, locale, market_id, customer_id, requested_at, confirmed_at,\n                text_version, source, unsubscribed_at, created_at\n         FROM subscribers\n         WHERE ($1::text IS NULL OR status = $1) AND ($2::text IS NULL OR email LIKE $2)\n           AND ($3::text IS NULL OR locale = $3) AND ($4::uuid IS NULL OR market_id = $4)\n           AND ($5::uuid IS NULL OR id < $5)\n         ORDER BY id DESC LIMIT $6",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "requested_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "requested_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "confirmed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "confirmed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "text_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "text_version"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "unsubscribed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "unsubscribed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "40859a54185f1242ab0e35f09a6b8000f2c162173fb1b36cdad04de7ec7f5a31"
+}

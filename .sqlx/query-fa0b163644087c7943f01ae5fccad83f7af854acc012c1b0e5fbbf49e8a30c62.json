@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT to_email FROM email_messages WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "to_email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "email_messages",
+            "name": "to_email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fa0b163644087c7943f01ae5fccad83f7af854acc012c1b0e5fbbf49e8a30c62"
+}

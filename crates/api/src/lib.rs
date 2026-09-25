@@ -8,9 +8,11 @@ pub mod admin_ai;
 pub mod admin_analytics;
 pub mod admin_catalog;
 pub mod admin_content;
+pub mod admin_email;
 pub mod admin_feeds;
 pub mod admin_fulfillment;
 pub mod admin_inventory;
+pub mod admin_marketing;
 pub mod admin_media;
 pub mod admin_orders;
 pub mod admin_payments;
@@ -93,6 +95,9 @@ pub struct AppState {
     pub ads: Option<commerce::adtracking::AdTracking>,
     /// Storefront API rate limits (§8.1).
     pub rate_limit: Arc<rate_limit::StorefrontLimiter>,
+    /// Digest of `MAIL_EVENTS_SECRET` (HTTP Basic password of the SES/SNS bounce endpoint);
+    /// `None` = the endpoint answers 404.
+    pub mail_events: Option<auth::ServiceToken>,
     /// WP23: preview tokens + per-tenant `ASTRO_KEY` (`THEME_SECRET`); `None` = theme builder
     /// features answer 503.
     pub themes: Option<commerce::themes::ThemeKeys>,
@@ -131,7 +136,9 @@ pub struct AppState {
         (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
         (name = "ad-tracking", description = "Admin API: ad-platform forwarders (Meta, GA4, Google Ads, Sklik) and their delivery log"),
         (name = "platform", description = "Admin API for platform superadmins: the job queue"),
-        (name = "webhooks", description = "Payment provider webhooks (signed)"),
+        (name = "marketing", description = "Admin API: newsletter subscribers, segments, campaigns"),
+        (name = "email", description = "Admin API: sent emails, suppressions, email logo and texts"),
+        (name = "webhooks", description = "Provider webhooks: payments (signed), email bounces/complaints"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
         (name = "internal", description = "Internal API for platform services (service token)")
     )
@@ -198,6 +205,8 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_webhooks::routes())
         .merge(admin_ad_tracking::routes())
         .merge(admin_platform::routes())
+        .merge(admin_marketing::routes())
+        .merge(admin_email::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())

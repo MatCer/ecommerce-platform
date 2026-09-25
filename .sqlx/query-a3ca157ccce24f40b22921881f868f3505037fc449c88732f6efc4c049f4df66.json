@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM email_template_texts WHERE template = $1 AND locale = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a3ca157ccce24f40b22921881f868f3505037fc449c88732f6efc4c049f4df66"
+}

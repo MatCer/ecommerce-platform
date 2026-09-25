@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE subscribers SET status = 'pending', confirm_token_hash = $2,\n                 confirm_expires_at = now() + make_interval(hours => $3), requested_at = now(),\n                 request_ip_hash = $4, locale = $5, market_id = $6, text_version = $7,\n                 source = $8, updated_at = now()\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Int4",
+        "Bytea",
+        "Text",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "64f4a329968104ec11f77979622e9b1812d23abfe90282612d77f923e0880ee7"
+}

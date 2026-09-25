@@ -314,6 +314,8 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
       STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
+      # WP18: HTTP Basic password of POST /webhooks/ses (SES bounces/complaints via SNS).
+      MAIL_EVENTS_SECRET: ${MAIL_EVENTS_SECRET:-local-mail-events-secret-0123456789abcdef}
       # WP12: carriers against the local mocks (real endpoints are the defaults).
       PACKETA_API_URL: ${PACKETA_API_URL:-http://mocks:4010/packeta/api/rest}
       PACKETA_VALIDATE_URL: ${PACKETA_VALIDATE_URL:-http://mocks:4010/packeta/pps/api/widget/v1/validate}
