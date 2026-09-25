@@ -265,20 +265,21 @@ fn parse_currency(code: &str) -> Result<Currency, Error> {
     Currency::parse(code).ok_or_else(|| Error::Internal(format!("unknown currency {code}")))
 }
 
-/// Recomputes the timelines of `scope` from `now` and writes the difference. Base segments
-/// starting now get `base_cause`; intervals inserted for pairs without a current interval are
-/// marked `imported` when `imported` is set. Returns the changes of the current price (also
+/// Recomputes the timelines of `scope` from now on and writes the difference. Base segments
+/// starting now get `base_cause`; with `imported`, the interval starting now of a pair without
+/// a current price is marked `imported` (its earlier history is unknown). Returns the changes of the current price (also
 /// published as `price.changed`).
 pub async fn refresh(
     tx: &mut TenantTx,
     scope: &Scope,
-    now: DateTime<Utc>,
     base_cause: Cause,
     imported: bool,
 ) -> Result<Vec<PriceChange>, Error> {
     lock(tx).await?;
+    // "Now" is sampled under the lock: every interval another writer committed starts
+    // before it, so nothing committed can be mistaken for a replaceable future interval.
     // Postgres keeps microseconds: compare like with like, or every run would look changed.
-    let now = now.trunc_subsecs(6);
+    let now = Utc::now().trunc_subsecs(6);
     let tenant_id = tx.tenant_id();
     let (all, variant_ids, list_filter) = match scope {
         Scope::All => (true, vec![], None),
@@ -418,11 +419,12 @@ pub async fn refresh(
         transitions.extend(ops.insert.iter().map(|s| s.from).filter(|t| *t > now));
         ops_all.delete.extend(ops.delete);
         ops_all.set_valid_to.extend(ops.set_valid_to);
-        inserts.extend(
-            ops.insert
-                .into_iter()
-                .map(|s| (p.price_list_id, p.variant_id, s, mark_imported)),
-        );
+        // Only the interval starting now marks where the known history begins; later
+        // (scheduled) intervals are not new imports.
+        inserts.extend(ops.insert.into_iter().map(|s| {
+            let imported = mark_imported && s.from == now;
+            (p.price_list_id, p.variant_id, s, imported)
+        }));
     }
     // Pairs whose price was removed: close their timeline now.
     for (key, existing) in &live {
@@ -571,7 +573,16 @@ async fn publish_change(
 
 /// The `pricing.transition` job: publishes `price.changed` for every interval that starts at
 /// `at` (a scheduled sale start or end). A stale job (the sale was moved) finds nothing.
+/// Replay-safe: a marker in the idempotency store, written in the same transaction as the
+/// events, makes a retried job (crash after commit, before `complete`) publish nothing.
 pub async fn publish_transitions(tx: &mut TenantTx, at: DateTime<Utc>) -> Result<usize, Error> {
+    let key = at.timestamp_micros().to_string();
+    if crate::idempotency::begin(tx, TRANSITION_JOB, &key, &key)
+        .await?
+        .is_some()
+    {
+        return Ok(0);
+    }
     let rows = sqlx::query!(
         "SELECT n.price_list_id, n.variant_id, v.product_id, pl.currency, n.amount_minor, n.cause,
                 n.sale_id, p.amount_minor AS \"before?\"
@@ -598,6 +609,14 @@ pub async fn publish_transitions(tx: &mut TenantTx, at: DateTime<Utc>) -> Result
         };
         publish_change(tx, &change, at).await?;
     }
+    crate::idempotency::finish(
+        tx,
+        TRANSITION_JOB,
+        &key,
+        200,
+        &json!({ "published": rows.len() }),
+    )
+    .await?;
     Ok(rows.len())
 }
 

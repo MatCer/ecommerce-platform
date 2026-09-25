@@ -409,7 +409,13 @@ pub fn price_cart(input: &CartInput) -> Result<PricedCart, Error> {
     // 5. Cash rounding, last.
     let subtotal = goods + charges.iter().map(|c| c.gross_minor).sum::<i64>();
     if let Some(r) = input.cash_rounding {
-        let diff = round_to(subtotal, r.increment_minor) - subtotal;
+        // A positive payment never rounds to zero: it is at least one increment (SK: €0.05
+        // for €0.01-0.02, MF SR guidance on rounding from 2022-07-01).
+        let rounded = match round_to(subtotal, r.increment_minor) {
+            0 if subtotal > 0 => r.increment_minor,
+            rounded => rounded,
+        };
+        let diff = rounded - subtotal;
         if diff != 0 {
             charges.push(charge(
                 ChargeKind::Rounding,
@@ -472,9 +478,8 @@ pub struct Reversal {
 }
 
 /// Reverses `returning` units of `line` after `already_returned` units were reversed (A15).
-/// Cumulative proportional shares: the first k units carry `round(component × k / qty)`, so
-/// partial refunds in any split add up exactly to the original allocation and the rounding
-/// residual lands on the last units returned.
+/// Partial refunds in any split add up exactly to the original allocation, never refund a
+/// negative net, and the rounding residual lands on the last units returned.
 pub fn reverse_line(
     line: &PricedLine,
     already_returned: u32,
@@ -489,11 +494,19 @@ pub fn reverse_line(
                 "cannot return more than was ordered",
             )
         })?;
+    // Each component is spread over the units as evenly as possible, the extra minor units
+    // on the last units: unit i of q carries floor(c/q), plus 1 for the last c mod q units.
+    // Gross and VAT use the same layout, so every unit (and any run of units) has
+    // 0 <= VAT <= gross, and all units together give back exactly the original amounts.
     let qty = i128::from(line.quantity);
-    let share =
-        |component: i64, k: u32| div_round_half_up(i128::from(component) * i128::from(k), qty);
+    let upto_all = |component: i64, k: u32| {
+        let (c, k) = (i128::from(component), i128::from(k));
+        let (base, extra) = (c.div_euclid(qty), c.rem_euclid(qty));
+        k * base + (k - (qty - extra)).max(0)
+    };
     let part = |component: i64| {
-        to_minor(share(component, upto) - share(component, already_returned)).ok_or_else(overflow)
+        to_minor(upto_all(component, upto) - upto_all(component, already_returned))
+            .ok_or_else(overflow)
     };
     let gross = part(line.gross_minor)?;
     let vat = part(line.vat_minor)?;
@@ -595,6 +608,9 @@ mod tests {
             None
         );
         for (total, rounded) in [
+            (1, 5),
+            (2, 5),
+            (0, 0),
             (1291, 1290),
             (1292, 1290),
             (1293, 1295),
@@ -724,6 +740,25 @@ mod tests {
             "invalid_return_quantity"
         );
         assert!(reverse_line(l, 0, 0).is_err());
+        // Review case: 5 units, gross 4, VAT 1 -> no unit refunds VAT without gross.
+        let tiny = PricedLine {
+            id: Uuid::nil(),
+            quantity: 5,
+            unit_price_minor: 1,
+            tax_rate: TaxRate(2100),
+            base_minor: 5,
+            discount_minor: 1,
+            gross_minor: 4,
+            vat_minor: 1,
+            net_minor: 3,
+        };
+        for k in 0..5 {
+            let r = reverse_line(&tiny, k, 1).unwrap();
+            assert!(
+                r.net_minor >= 0 && r.vat_minor <= r.gross_minor,
+                "{k}: {r:?}"
+            );
+        }
     }
 
     fn arb_cart() -> impl Strategy<Value = CartInput> {
@@ -813,7 +848,9 @@ mod tests {
             if let Some(r) = input.cash_rounding {
                 prop_assert_eq!(p.total_minor % r.increment_minor, 0);
                 let diff = p.charges.iter().find(|c| c.kind == ChargeKind::Rounding).map_or(0, |c| c.gross_minor);
-                prop_assert!(diff.abs() * 2 <= r.increment_minor);
+                let subtotal = p.total_minor - diff;
+                prop_assert!(diff.abs() * 2 <= r.increment_minor || (subtotal > 0 && p.total_minor == r.increment_minor));
+                prop_assert_eq!(subtotal > 0, p.total_minor > 0);
             }
             // Deterministic.
             prop_assert_eq!(price_cart(&input).unwrap(), p);
@@ -833,6 +870,7 @@ mod tests {
                     if n == 0 { continue; }
                     let r = reverse_line(l, done, n).unwrap();
                     prop_assert!(r.gross_minor >= 0 && r.vat_minor >= 0 && r.discount_minor >= 0);
+                    prop_assert!(r.vat_minor <= r.gross_minor && r.net_minor >= 0);
                     total.gross_minor += r.gross_minor;
                     total.vat_minor += r.vat_minor;
                     total.net_minor += r.net_minor;

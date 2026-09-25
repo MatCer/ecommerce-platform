@@ -402,6 +402,14 @@ async fn inventory_levels_and_adjustments(db: PgPool) {
         (status, err["code"].as_str()),
         (StatusCode::UNPROCESSABLE_ENTITY, Some("invalid_adjustment"))
     );
+    // i32::MIN must not slip through an abs() overflow.
+    let (status, err) = c
+        .as_clerk(Call::post(&adjust, json!({ "delta": i32::MIN })))
+        .await;
+    assert_eq!(
+        (status, err["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("invalid_quantity"))
+    );
 
     let (status, level) = c
         .as_clerk(Call::put(

@@ -407,6 +407,67 @@ async fn prices_sales_and_intervals(db: PgPool) {
     let scheduled = after.last().unwrap();
     assert_eq!(scheduled["cause"], "sale");
     assert!(scheduled["before_minor"].is_i64());
+    // A retried job (crash after commit) publishes nothing twice.
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let again = intervals::publish_transitions(&mut tx, now + Duration::days(4))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(again, 0);
+    assert_eq!(
+        events(&db, tenant, "price.changed").await.len(),
+        after.len()
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn category_moves_reprice_category_sales(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let parent = testkit::catalog::category(&runtime, tenant, "parent", None).await;
+    let child = testkit::catalog::category(&runtime, tenant, "child", None).await;
+    let mut input = testkit::catalog::product_input("M", 1);
+    input.category_ids = vec![child.id];
+    let product = testkit::catalog::create(&runtime, tenant, &input).await;
+    let v = product.variants[0].id;
+    let list = testkit::pricing::price_list(&runtime, tenant, "cz", Currency::Czk).await;
+    testkit::pricing::set_prices(&runtime, tenant, list.id, &[(v, 10_000)]).await;
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let targets = SaleTargets {
+        category_ids: vec![parent.id],
+        ..SaleTargets::default()
+    };
+    sales::create(&mut tx, "u", &sale("Parent", 1000, None, None, targets))
+        .await
+        .unwrap();
+    assert_eq!(
+        price_now(&mut tx, list.id, v, Utc::now())
+            .await
+            .map(|p| p.0),
+        Some(10_000)
+    );
+    let moved = commerce::catalog::categories::CategoryMove {
+        parent_id: Some(parent.id),
+        position: 0,
+    };
+    commerce::catalog::categories::move_to(&mut tx, "u", child.id, &moved)
+        .await
+        .unwrap();
+    assert_eq!(
+        price_now(&mut tx, list.id, v, Utc::now())
+            .await
+            .map(|p| p.0),
+        Some(9_000)
+    );
+    commerce::catalog::categories::delete(&mut tx, "u", child.id)
+        .await
+        .unwrap();
+    assert_eq!(
+        price_now(&mut tx, list.id, v, Utc::now())
+            .await
+            .map(|p| p.0),
+        Some(10_000)
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -632,6 +693,28 @@ async fn omnibus_reference_from_history(db: PgPool) {
     let fv = future.iter().find(|h| h.variant_id == v).unwrap();
     assert_eq!(fv.omnibus.reference_minor, Some(750));
     assert!(fv.omnibus.claim);
+
+    // Imported today, with the "Later" sale in 40 days: only today's interval is marked
+    // imported, so after 40 days of history the scheduled sale may claim its reduction.
+    let fresh = testkit::catalog::product(&runtime, tenant, "IMP", 1).await;
+    let x = fresh.variants[0].id;
+    let mut import = upsert(&[(x, 2000)]);
+    import.imported = true;
+    pricing::upsert_prices(&mut tx, "u", list.id, &import)
+        .await
+        .unwrap();
+    let later = pricing::price_history(
+        &mut tx,
+        fresh.id,
+        Some(list.id),
+        Utc::now() + Duration::days(41),
+    )
+    .await
+    .unwrap();
+    let flags: Vec<bool> = later[0].intervals.iter().map(|i| i.imported).collect();
+    assert_eq!(flags.first(), Some(&true));
+    assert!(flags[1..].iter().all(|f| !f));
+    assert!(later[0].omnibus.claim);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -742,6 +825,45 @@ async fn coupon_limits_hold_under_concurrency(db: PgPool) {
             .code(),
         "coupon_customer_limit"
     );
+
+    // Omnibus history of coupons: a coupon that already ran cannot be published later, and
+    // an ended published coupon cannot be reopened.
+    let mut private = CouponInput {
+        code: "PRIV".into(),
+        discount: CouponDiscount::Percent { basis_points: 500 },
+        currency: None,
+        min_subtotal_minor: None,
+        starts_at: None,
+        ends_at: None,
+        usage_limit: None,
+        per_customer_limit: None,
+        published: false,
+    };
+    let p = coupons::create(&mut tx, "u", &private).await.unwrap();
+    private.published = true;
+    assert_eq!(
+        coupons::update(&mut tx, "u", p.id, &private)
+            .await
+            .unwrap_err()
+            .code(),
+        "coupon_started"
+    );
+    let mut public = CouponInput {
+        code: "PUB".into(),
+        starts_at: Some(Utc::now() - Duration::days(10)),
+        ends_at: Some(Utc::now() - Duration::days(5)),
+        published: true,
+        ..private
+    };
+    let ended = coupons::create(&mut tx, "u", &public).await.unwrap();
+    public.ends_at = Some(Utc::now() + Duration::days(5));
+    assert_eq!(
+        coupons::update(&mut tx, "u", ended.id, &public)
+            .await
+            .unwrap_err()
+            .code(),
+        "coupon_started"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -796,6 +918,28 @@ async fn stock_movements_and_the_last_unit_race(db: PgPool) {
     assert!(!replay.applied);
     assert_eq!(replay.level.on_hand, 1);
     tx.commit().await.unwrap();
+
+    // Two concurrent absolute counts of 3 end at 3, not 5.
+    let count = |key: &'static str, target: i32| {
+        let runtime = runtime.clone();
+        async move {
+            let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+            let input = Adjustment {
+                delta: None,
+                on_hand: Some(target),
+                note: None,
+            };
+            let m = inventory::adjust(&mut tx, "clerk", v, key, &input)
+                .await
+                .unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tx.commit().await.unwrap();
+            m.level.on_hand
+        }
+    };
+    let (x, y) = tokio::join!(count("count-a", 3), count("count-b", 3));
+    assert_eq!((x, y), (3, 3));
+    assert_eq!(count("count-c", 1).await, 1);
 
     // Two orders race for the last unit: exactly one wins.
     let reserve = |order: &'static str| {
@@ -935,7 +1079,7 @@ async fn stock_movements_and_the_last_unit_race(db: PgPool) {
     assert_eq!(first["after"]["on_hand"], 1);
     let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
     let page = inventory::movements(&mut tx, v, None, 10).await.unwrap();
-    assert_eq!(page.items.len(), 2);
+    assert_eq!(page.items.len(), 4);
     let listed = inventory::list(&mut tx, Some(product.id), None, 10)
         .await
         .unwrap();

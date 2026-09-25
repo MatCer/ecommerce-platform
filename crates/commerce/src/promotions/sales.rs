@@ -250,15 +250,17 @@ fn schedule(
     Ok((starts_at, input.ends_at))
 }
 
-async fn rematerialize(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<(), Error> {
+async fn rematerialize(tx: &mut TenantTx) -> Result<(), Error> {
     // ponytail: recomputes every priced variant and writes only real differences; narrow the
     // scope to the sale's targets if tenants reach hundreds of thousands of prices.
-    intervals::refresh(tx, &Scope::All, now, Cause::Base, false).await?;
+    intervals::refresh(tx, &Scope::All, Cause::Base, false).await?;
     Ok(())
 }
 
 pub async fn create(tx: &mut TenantTx, actor: &str, input: &SaleInput) -> Result<Sale, Error> {
     input.validate()?;
+    // Lock before sampling the time (see intervals::refresh).
+    intervals::lock(tx).await?;
     let now = Utc::now();
     let (starts_at, ends_at) = schedule(input, None, now)?;
     let (kind, value, currency) = columns(&input.discount);
@@ -280,7 +282,7 @@ pub async fn create(tx: &mut TenantTx, actor: &str, input: &SaleInput) -> Result
     )
     .execute(&mut **tx)
     .await?;
-    rematerialize(tx, now).await?;
+    rematerialize(tx).await?;
     let sale = get(tx, id).await?;
     audit::record(
         tx,
@@ -330,7 +332,7 @@ pub async fn update(
     )
     .execute(&mut **tx)
     .await?;
-    rematerialize(tx, now).await?;
+    rematerialize(tx).await?;
     let after = get(tx, id).await?;
     audit::record(
         tx,
@@ -352,7 +354,7 @@ pub async fn delete(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Erro
     sqlx::query!("DELETE FROM sales WHERE id = $1", id)
         .execute(&mut **tx)
         .await?;
-    rematerialize(tx, Utc::now()).await?;
+    rematerialize(tx).await?;
     audit::record(
         tx,
         actor,

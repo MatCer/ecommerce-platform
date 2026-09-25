@@ -3,7 +3,8 @@
 //! A price reduction is announced only while a sale sets the price. Its reference is the
 //! lowest price in the 30 days before the reduction started:
 //! - a chained (progressive) reduction keeps the reference from before its first step: the
-//!   chain is the run of back-to-back sale intervals ending with the current one;
+//!   chain is the run of back-to-back, non-increasing sale intervals ending with the current
+//!   one;
 //! - a product younger than 30 days uses the lowest price since launch;
 //! - a price history that starts with an import less than 30 days before the reduction is
 //!   incomplete: no reduction claim until 30 days of history exist;
@@ -102,9 +103,12 @@ pub fn reference(history: &[Interval], coupons: &[CouponWindow], at: DateTime<Ut
         return out;
     }
     let mut first = idx;
+    // A progressive reduction: back-to-back sale steps, each one lower (or equal). A step up
+    // (e.g. a deeper overlapping sale expired) starts a new reduction.
     while first > 0
         && history[first - 1].cause == Cause::Sale
         && history[first - 1].valid_to == Some(history[first].valid_from)
+        && history[first - 1].amount_minor >= history[first].amount_minor
     {
         first -= 1;
     }
@@ -226,6 +230,17 @@ mod tests {
         assert_eq!(o.reduction_started_at, Some(t(111)));
         assert_eq!(o.reference_minor, Some(900));
         assert_eq!(o.discount_percent, Some(22));
+        // A step up inside a run of sales (the deeper sale ended) is a new reduction whose
+        // window contains the earlier 700: no claim.
+        let h = [
+            iv(0, Some(100), 1000, Cause::Base),
+            iv(100, Some(110), 700, Cause::Sale),
+            iv(110, None, 900, Cause::Sale),
+        ];
+        let o = reference(&h, &[], t(115));
+        assert_eq!(o.reduction_started_at, Some(t(110)));
+        assert_eq!(o.reference_minor, Some(700));
+        assert!(!o.claim);
     }
 
     #[test]

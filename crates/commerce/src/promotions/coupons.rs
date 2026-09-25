@@ -364,8 +364,21 @@ pub async fn update(
     input: &CouponInput,
 ) -> Result<Coupon, Error> {
     input.validate()?;
+    // Lock the row: the rules below must see the version being replaced.
+    sqlx::query!("SELECT id FROM coupons WHERE id = $1 FOR UPDATE", id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)?;
     let before = get(tx, id).await?;
     let now = Utc::now();
+    // Its public availability window [start, end) is Omnibus history: publishing a coupon
+    // that already ran would make its past public retroactively.
+    if !before.published && input.published && started(&before, now) {
+        return Err(Error::Conflict {
+            code: "coupon_started",
+            detail: "a coupon that already started cannot be published; create a new one".into(),
+        });
+    }
     if before.published && started(&before, now) {
         let same_terms = normalize_code(&input.code) == before.code
             && input.discount == before.discount
@@ -373,7 +386,12 @@ pub async fn update(
             && input.min_subtotal_minor == before.min_subtotal_minor
             && input.starts_at == before.starts_at
             && input.published;
-        let end_ok = input.ends_at == before.ends_at || input.ends_at.is_some_and(|e| e >= now);
+        // An ended coupon stays ended (re-opening it would erase the gap); a running one may
+        // end at any future time.
+        let end_ok = match before.ends_at {
+            Some(e) if e <= now => input.ends_at == before.ends_at,
+            _ => input.ends_at == before.ends_at || input.ends_at.is_some_and(|e| e >= now),
+        };
         if !same_terms || !end_ok {
             return Err(Error::Conflict {
                 code: "coupon_started",

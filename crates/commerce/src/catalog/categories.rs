@@ -344,6 +344,8 @@ pub async fn move_to(
     renumber(tx, &new).await?;
     if before.parent_id != m.parent_id {
         renumber(tx, &old).await?;
+        // Sales targeting a category include its subcategories (A18 intervals).
+        crate::pricing::refresh_category_sales(tx).await?;
     }
     let after = get(tx, id).await?;
     record(
@@ -379,6 +381,7 @@ pub async fn delete(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Erro
         .await?;
     let rest = siblings(tx, before.parent_id, id).await?;
     renumber(tx, &rest).await?;
+    crate::pricing::refresh_category_sales(tx).await?;
     record(
         tx,
         actor,

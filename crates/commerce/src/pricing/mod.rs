@@ -440,7 +440,6 @@ pub async fn upsert_prices(
             variant_ids: ids,
             price_list_id: Some(price_list_id),
         },
-        Utc::now(),
         cause,
         input.imported,
     )
@@ -492,7 +491,6 @@ pub async fn delete_price(
             variant_ids: vec![variant_id],
             price_list_id: Some(price_list_id),
         },
-        Utc::now(),
         Cause::Base,
         false,
     )
@@ -513,6 +511,7 @@ pub async fn delete_price(
 /// Recomputes the timelines of a product's variants after a catalog change (variants or
 /// category membership affect which sales apply).
 pub async fn refresh_product(tx: &mut TenantTx, product_id: Uuid) -> Result<(), Error> {
+    intervals::lock(tx).await?;
     let variant_ids =
         sqlx::query_scalar!("SELECT id FROM variants WHERE product_id = $1", product_id)
             .fetch_all(&mut **tx)
@@ -523,11 +522,26 @@ pub async fn refresh_product(tx: &mut TenantTx, product_id: Uuid) -> Result<(), 
             variant_ids,
             price_list_id: None,
         },
-        Utc::now(),
         Cause::Base,
         false,
     )
     .await?;
+    Ok(())
+}
+
+/// Recomputes all timelines when a live sale targets categories: a category move or delete
+/// changes which products those sales reach.
+pub async fn refresh_category_sales(tx: &mut TenantTx) -> Result<(), Error> {
+    intervals::lock(tx).await?;
+    let affected = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM sales WHERE (ends_at IS NULL OR ends_at > now())
+                  AND jsonb_array_length(coalesce(targets->'category_ids', '[]')) > 0) AS "x!""#
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if affected {
+        intervals::refresh(tx, &Scope::All, Cause::Base, false).await?;
+    }
     Ok(())
 }
 

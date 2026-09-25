@@ -148,6 +148,28 @@ pub async fn get(tx: &mut TenantTx, variant_id: Uuid) -> Result<Level, Error> {
     level(tx, variant_id).await
 }
 
+/// Creates the variant's level row if needed and locks it. All stock changes of a variant are
+/// serialized here, so replay, availability and absolute-count checks see settled data.
+async fn lock_level(tx: &mut TenantTx, variant_id: Uuid) -> Result<(), Error> {
+    let tenant_id = tx.tenant_id();
+    sqlx::query!(
+        "INSERT INTO inventory_levels (tenant_id, variant_id) SELECT $1, id FROM variants WHERE id = $2
+         ON CONFLICT DO NOTHING",
+        tenant_id,
+        variant_id
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query!(
+        "SELECT variant_id FROM inventory_levels WHERE variant_id = $1 FOR UPDATE",
+        variant_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    Ok(())
+}
+
 fn insufficient(kind: MovementKind) -> Error {
     match kind {
         MovementKind::Release | MovementKind::Commit => Error::Conflict {
@@ -174,7 +196,7 @@ pub async fn apply(
 ) -> Result<Moved, Error> {
     check_ref(r)?;
     let qty_ok = match kind {
-        MovementKind::Adjust => quantity != 0 && quantity.abs() <= MAX_QUANTITY,
+        MovementKind::Adjust => quantity != 0 && (-MAX_QUANTITY..=MAX_QUANTITY).contains(&quantity),
         _ => (1..=MAX_QUANTITY).contains(&quantity),
     };
     if !qty_ok {
@@ -187,23 +209,7 @@ pub async fn apply(
         ));
     }
     let tenant_id = tx.tenant_id();
-    // The level row exists and is locked before anything else: all movements of a variant
-    // are serialized here, so the replay check and the availability check see settled data.
-    sqlx::query!(
-        "INSERT INTO inventory_levels (tenant_id, variant_id) SELECT $1, id FROM variants WHERE id = $2
-         ON CONFLICT DO NOTHING",
-        tenant_id,
-        variant_id
-    )
-    .execute(&mut **tx)
-    .await?;
-    sqlx::query!(
-        "SELECT variant_id FROM inventory_levels WHERE variant_id = $1 FOR UPDATE",
-        variant_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    .ok_or(Error::NotFound)?;
+    lock_level(tx, variant_id).await?;
     let replay = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM stock_movements WHERE kind = $1 AND ref_type = $2
                           AND ref_id = $3 AND variant_id = $4) AS "x!""#,
@@ -353,10 +359,14 @@ pub async fn adjust(
     ref_id: &str,
     input: &Adjustment,
 ) -> Result<Moved, Error> {
+    // Lock first: an absolute count computes its delta from the settled level.
+    lock_level(tx, variant_id).await?;
     let current = level(tx, variant_id).await?;
     let delta = match (input.delta, input.on_hand) {
         (Some(d), None) => d,
-        (None, Some(target)) if (0..=MAX_QUANTITY).contains(&target) => target - current.on_hand,
+        (None, Some(target)) if (0..=MAX_QUANTITY).contains(&target) => target
+            .checked_sub(current.on_hand)
+            .ok_or_else(|| invalid("invalid_quantity", "adjustment out of range"))?,
         (None, Some(_)) => return Err(invalid("invalid_quantity", "on_hand out of range")),
         _ => {
             return Err(invalid(
