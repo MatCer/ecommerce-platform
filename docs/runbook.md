@@ -110,6 +110,15 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 | Credentials | Sealed with `SECRETS_KEY` (same key as webhooks); without it the admin answers 503 and deliveries wait. |
 | Local | `AD_PLATFORMS_BASE_URL=http://mocks:4010/ads` (dev only) sends every vendor call to `apps/mocks`; `GET http://mocks.localhost:<port>/ads/<meta|ga4|google|sklik>/requests` shows what arrived, `PUT .../config {status, fail_times}` injects failures. |
 
+## 6b. Email marketing (WP18)
+
+| Topic | Operations |
+|---|---|
+| Sending | `marketing.campaign_batch` jobs: 500 recipients per batch, at most 500 marketing messages per tenant and minute (`email_settings` window). A stuck campaign shows as `sending` with a dead batch job in the superadmin job view; retrying the job is safe (one send per campaign and subscriber). |
+| Re-checks | Status, `email_marketing` consent (address or linked customer, latest wins) and suppression are checked when a batch runs and again right before SMTP; a withdrawal between the two marks the message `failed` (`not_subscribed` / `no_consent`). Marketing mail with an uncertain SMTP outcome is never resent (A14). |
+| Bounces | `POST /webhooks/ses` (HTTP Basic, `MAIL_EVENTS_SECRET`, unset = off). Permanent bounce: suppressed for every stream, subscriber `bounced`; complaint: suppressed for marketing, subscriber `complained` + consent withdrawal. Only the recipient of the referenced message is ever suppressed. Staff can remove a suppression in Admin → Emails (audited). |
+| Links | Unsubscribe/preference/click links carry a per-recipient token (hashed at rest); click targets are HMAC-signed per campaign, so the redirect is never open. |
+
 ## 7. Backups and restore
 
 ### Local (A29)
@@ -178,9 +187,13 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
 - [ ] **Packeta + PPL**: sandbox labels and tracking; the real Packeta widget (`library.js` +
       callback) in the checkout CSP; the chosen pickup point verified against the API. Verify:
       test order end to end, label PDF, tracking status.
-- [ ] **SES**: domain verified with DKIM, SPF, DMARC; production access granted; bounce and
-      complaint notifications feed the suppression list (today manual:
-      `api admin suppress-email`). Verify: mail-tester score, a bounce to the simulator lands.
+- [ ] **SES**: domain verified with DKIM, SPF, DMARC; production access granted; a
+      configuration set per stream publishes Bounce + Complaint to an SNS topic with an HTTPS
+      subscription `https://ses:<MAIL_EVENTS_SECRET>@api.<domain>/webhooks/ses` (confirm the
+      subscription by hand: its `SubscribeURL` is logged, never followed). Build the SNS
+      signature check first (design in `commerce::marketing::deliverability`). Verify:
+      mail-tester score, a bounce to `bounce@simulator.amazonses.com` shows in Admin → Emails →
+      Suppressions; a campaign to Gmail shows the one-click "Unsubscribe" (RFC 8058).
 - [ ] **QR payments**: SPAYD and PAY by square codes scanned with several CZ/SK banking apps
       (amount, IBAN, VS, message). Verify: screenshots per bank.
 - [ ] **ČNB rates**: the daily fixing URL, weekends/holidays (last fixing used). Verify: a

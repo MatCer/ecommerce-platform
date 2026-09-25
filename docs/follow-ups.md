@@ -10,17 +10,12 @@
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
 | WP5 | No invitation-accepted status in the staff list | WP15 |
 | WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
-| WP6 | `/newsletter/subscribe` validates and drops (no storage); `/events` is stored since WP14 | M2 (WP18) |
 | WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
 | WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart); place-order is keyed since WP10 | WP15 |
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | Payment/carrier marks in `/shop` are generic catalog text (legal/CMS links come from published pages since WP13a; the checkout still links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale) | WP11 / WP12 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
-| WP9 | Email suppressions are added manually (`api admin suppress-email`); no bounce/complaint ingestion from the provider (SES notifications; on the runbook pre-launch checklist) | pre-launch |
-| WP9 | Per-tenant editable email subject/intro text (§11.4) and a tenant logo in emails (no logo in the data model yet; the shop name is the wordmark) | WP13b |
-| WP9 | Marketing stream has no `List-Unsubscribe` headers yet (no marketing mail exists) | M2 (newsletter) |
-| WP9 | No admin view of `email_messages` (states, failures) or of the suppression list | WP14 |
-| WP9 | No admin view of `email_messages` (states, failures) or of the suppression list (not done in WP14; dead mail jobs show in the superadmin job view) | WP15 |
+| WP9/WP18 | Bounces/complaints arrive at `POST /webhooks/ses` (SNS envelope, HTTP Basic `MAIL_EVENTS_SECRET`); SNS message signature verification (SignatureVersion 2, cert URL pinned to `sns.<region>.amazonaws.com`, TopicArn check) is designed in `commerce::marketing::deliverability` but not built; subscription confirmations are only logged | pre-launch |
 | WP10 | Stripe and bank transfer are configurable but not offered at checkout (no adapter); the order email has a bank-transfer placeholder | WP11 |
 | WP10 | COD cash rounding is not applied at placement (the tender is unknown until collection, A16) | WP11 |
 | WP10 | The Packeta widget key is a platform setting (`PACKETA_API_KEY`); per-tenant carrier credentials and verifying the chosen point against the Packeta API | WP12 |
@@ -42,7 +37,6 @@
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
 | WP13a | Orders/customers CSV import, tenant data export, customer access/erasure (A29) | WP13b |
 | WP17 | The hourly rollup recomputes the tenant's co-purchases, scores and customer affinity in full (stats for the last 2 days; the nightly run recomputes all 400 retained days so late cancellations leave every result); fine for demo-sized shops, narrow it to changed orders for large catalogs/order books | later (perf) |
-| WP17 | `customer_affinity` is rolled up (consent-filtered) but only the staff "why recommended" view reads it; the shop origin never knows the customer | WP18 (personalized product blocks) |
 | WP11 | `payments::refund(attempt)` (Stripe with `refund_application_fee` and the refund id as idempotency key, bank/COD recorded) and `payments::retry_refund` have no admin screen yet; a Stripe refund whose outcome is unknown stays `pending` until retried or reconciled by `refund.*` webhooks; WP12 wires them into returns/withdrawals and a pending-refund list | WP12 |
 | WP11 | COD `delivered` is set by hand (or the carrier CSV stub `POST /admin/v1/cod-reports`); carrier tracking and real COD payout imports (Packeta/PPL) | WP12 |
 | WP11 | The QR code in emails is inline SVG: Gmail and some clients do not render it (the text instructions always are); a CID PNG attachment needs attachments in the mail pipeline | WP14 / pre-launch |
@@ -59,3 +53,8 @@
 | WP22 | The AI quota is a soft limit (concurrent calls may overshoot by one call); no superadmin UI for quotas (CLI `set-ai-quota`) | later (only if it matters) |
 | WP22 | Old `ai_proposals` / `ai_bulk_plans` rows are never purged | later (ops) |
 | WP20/WP22 | Full e2e with 4 workers: checkout handoff `/start` timeouts in 2 specs + shared demo-owner sign-ins hit the auth rate limit; make the suite reliable (per-spec users, IP-aware auth limits from WP12) | WP15 |
+| WP18 | No open tracking at all (privacy default); the optional consented tracking pixel of §11.5 is not built | later (only if merchants ask) |
+| WP18 | Marketing message bodies stay in `email_messages` indefinitely (one row per recipient); add a retention rule to `ops.sweep` (e.g. drop bodies of final marketing mail after 30 days) | later (ops) |
+| WP18 | The marketing rate is one platform constant (500 messages per tenant and minute); per-tenant sending quotas | later |
+| WP18 | Subscriber import (CSV) and the AI copy assist per segment (§11.5) | WP13b / M3 |
+| WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
