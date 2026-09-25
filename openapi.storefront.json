@@ -2898,6 +2898,30 @@
             }
           },
           {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "token",
             "in": "path",
             "description": "Order capability token",
@@ -2969,6 +2993,30 @@
             }
           },
           {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "token",
             "in": "path",
             "description": "Order capability token",
@@ -3005,7 +3053,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "A new payment attempt after a failed one, within the order's payment window (A10).",
+        "summary": "A new payment attempt after a failed one, within the order's payment window (A10). Needs\nthe right to pay (`403 payment_not_allowed`).",
         "operationId": "new_attempt",
         "parameters": [
           {
@@ -3040,6 +3088,30 @@
             }
           },
           {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "token",
             "in": "path",
             "description": "Order capability token",
@@ -3055,6 +3127,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaymentStart"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -3086,7 +3168,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Initializes (again) a pending attempt at its provider (A10): idempotent, for when the\nautomatic init after placement failed.",
+        "summary": "Initializes (again) a pending attempt at its provider (A10): idempotent, for when the\nautomatic init after placement failed or the customer comes back to pay. Needs the right\nto pay; `409 payment_window_closed` after the order's payment deadline.",
         "operationId": "init_attempt",
         "parameters": [
           {
@@ -3112,6 +3194,30 @@
             "name": "X-Locale",
             "in": "header",
             "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
             "required": false,
             "schema": {
               "type": [
@@ -3149,6 +3255,16 @@
               }
             }
           },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
             "content": {
               "application/problem+json": {
@@ -3159,7 +3275,7 @@
             }
           },
           "409": {
-            "description": "attempt_not_pending",
+            "description": "attempt_not_pending | payment_window_closed",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6112,7 +6228,8 @@
         "required": [
           "method",
           "status",
-          "can_retry"
+          "can_retry",
+          "can_pay"
         ],
         "properties": {
           "attempt": {
@@ -6126,9 +6243,13 @@
               }
             ]
           },
+          "can_pay": {
+            "type": "boolean",
+            "description": "Whether this viewer may start or continue payments: the order token alone is read-only\n(A4); the browser that placed the order or its signed-in customer may pay."
+          },
           "can_retry": {
             "type": "boolean",
-            "description": "Whether the customer can start a new attempt now (A10)."
+            "description": "Whether a new attempt can be started now (A10); only for a viewer who may pay."
           },
           "expires_at": {
             "type": [

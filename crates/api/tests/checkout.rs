@@ -285,35 +285,52 @@ async fn guest_checkout_pays_after_a_failed_attempt(db: PgPool) {
     let (status, page) = c.fake_pay(&attempt, "failed").await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert_eq!(page["status"], "failed");
+    // The order token alone is read-only (A4): paying needs the placing browser's cart
+    // capability (or the customer's session).
     let (status, payment, _) = c
         .call(Call::get(&format!("/storefront/v1/orders/{token}/payment")))
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(payment["status"], "failed");
-    assert_eq!(payment["can_retry"], true);
-    let (status, retry, _) = c
-        .call(Call::post(
-            &format!("/storefront/v1/orders/{token}/payment-attempts"),
-            json!({}),
-        ))
+    assert_eq!(
+        (payment["can_retry"].clone(), payment["can_pay"].clone()),
+        (json!(false), json!(false))
+    );
+    let retry_path = format!("/storefront/v1/orders/{token}/payment-attempts");
+    let (status, problem, _) = c.call(Call::post(&retry_path, json!({}))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(problem["code"], "payment_not_allowed");
+    let (_, payment, _) = c
+        .checkout(
+            &cart,
+            Call::get(&format!("/storefront/v1/orders/{token}/payment")),
+        )
         .await;
+    assert_eq!(payment["can_retry"], true);
+    let (status, retry, _) = c.checkout(&cart, Call::post(&retry_path, json!({}))).await;
     assert_eq!(status, StatusCode::CREATED, "{retry}");
     let second = retry["attempt_id"].as_str().unwrap().to_owned();
     assert_ne!(second, attempt);
     // Init is idempotent and bound to the order.
     let (status, init, _) = c
-        .call(Call::post(
-            &format!("/storefront/v1/orders/{token}/payment-attempts/{second}/init"),
-            json!({}),
-        ))
+        .checkout(
+            &cart,
+            Call::post(
+                &format!("/storefront/v1/orders/{token}/payment-attempts/{second}/init"),
+                json!({}),
+            ),
+        )
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(init["action"], retry["action"]);
     let (status, _, _) = c
-        .call(Call::post(
-            &format!("/storefront/v1/orders/{token}/payment-attempts/{attempt}/init"),
-            json!({}),
-        ))
+        .checkout(
+            &cart,
+            Call::post(
+                &format!("/storefront/v1/orders/{token}/payment-attempts/{attempt}/init"),
+                json!({}),
+            ),
+        )
         .await;
     assert_eq!(
         status,

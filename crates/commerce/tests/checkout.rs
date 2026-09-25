@@ -813,6 +813,95 @@ async fn failed_payment_retry_then_success(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn the_payment_deadline_holds_before_the_expiry_job_runs(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "deadline").await;
+    let m = methods(&runtime, &shop).await;
+    let token = ready_cart(&runtime, &shop, &m, 2, "a@example.test").await;
+    let input = summary(&runtime, &shop, &token).await;
+    let placed = place(&runtime, &shop, &token, "k", &input).await.unwrap();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("UPDATE orders SET payment_expires_at = now() - interval '1 second' WHERE id = $1")
+        .bind(placed.order_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let e = payments::init(
+        &runtime,
+        shop.tenant,
+        &settings().payments,
+        placed.attempt_id,
+        "/o/x",
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(code(&e), "payment_window_closed");
+    // The provider confirms anyway: the order expires first, so it is a late payment.
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    payments::apply_outcome(&mut tx, placed.attempt_id, Outcome::Succeeded, "fake")
+        .await
+        .unwrap();
+    let o = orders::view(&mut tx, placed.order_id).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(o.status, orders::status::OrderStatus::Cancelled);
+    assert_eq!(o.payment.status, orders::status::PaymentStatus::Paid);
+    assert_eq!(o.exception.as_deref(), Some("late_payment"));
+    assert_eq!(level(&runtime, &shop, shop.variants[0]).await.reserved, 0);
+    let page = {
+        let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+        orders::list(
+            &mut tx,
+            &orders::OrderFilter {
+                exception: true,
+                ..Default::default()
+            },
+            None,
+            10,
+        )
+        .await
+        .unwrap()
+    };
+    assert_eq!(page.items.len(), 1, "the refund work list");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn money_from_a_second_attempt_is_flagged_not_refused(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "dup").await;
+    let m = methods(&runtime, &shop).await;
+    let token = ready_cart(&runtime, &shop, &m, 1, "a@example.test").await;
+    let input = summary(&runtime, &shop, &token).await;
+    let placed = place(&runtime, &shop, &token, "k", &input).await.unwrap();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    payments::apply_outcome(&mut tx, placed.attempt_id, Outcome::Failed, "fake")
+        .await
+        .unwrap();
+    let second = payments::retry(&mut tx, &settings().payments, placed.order_id)
+        .await
+        .unwrap();
+    // The first attempt's money arrives after all: paid, and the open second attempt closes.
+    payments::apply_outcome(&mut tx, placed.attempt_id, Outcome::Succeeded, "fake")
+        .await
+        .unwrap();
+    assert_eq!(
+        payments::attempt(&mut tx, second).await.unwrap().status,
+        payments::AttemptStatus::Expired
+    );
+    let o = orders::view(&mut tx, placed.order_id).await.unwrap();
+    assert_eq!(o.payment.status, orders::status::PaymentStatus::Paid);
+    assert_eq!(o.exception, None);
+    // A provider still reporting the second attempt paid: recorded and flagged for a refund.
+    payments::apply_outcome(&mut tx, second, Outcome::Succeeded, "fake")
+        .await
+        .unwrap();
+    let o = orders::view(&mut tx, placed.order_id).await.unwrap();
+    assert_eq!(o.exception.as_deref(), Some("duplicate_payment"));
+    assert_eq!(o.status, orders::status::OrderStatus::Confirmed);
+    tx.commit().await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn expiry_releases_stock_and_a_late_success_is_an_exception(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "expire").await;
@@ -955,9 +1044,17 @@ async fn consents_customers_and_guest_linking(db: PgPool) {
             .unwrap(),
         1
     );
-    let page = orders::list(&mut tx, Some(unverified), None, None, 10)
-        .await
-        .unwrap();
+    let page = orders::list(
+        &mut tx,
+        &orders::OrderFilter {
+            customer_id: Some(unverified),
+            ..Default::default()
+        },
+        None,
+        10,
+    )
+    .await
+    .unwrap();
     assert_eq!(page.items.len(), 1);
     assert_eq!(page.items[0].id, placed.order_id);
     tx.commit().await.unwrap();

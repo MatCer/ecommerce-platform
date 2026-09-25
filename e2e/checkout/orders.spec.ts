@@ -100,6 +100,9 @@ async function fillContactAndAddress(page: Page, email: string | null, city = "P
 async function choosePickupPoint(page: Page, point: RegExp) {
   await page.getByRole("radio", { name: /Zásilkovna – výdejní místo/ }).check();
   const widget = page.frameLocator('iframe[title="Packeta"]');
+  await expect(widget.getByRole("button", { name: point })).toBeVisible();
+  // A modal: the checkout behind it is inert (out of the tab order) while it is open.
+  await expect(page.locator("main")).toHaveJSProperty("inert", true);
   // The widget removes its frame right after the choice; a plain click would wait on it.
   await widget.getByRole("button", { name: point }).dispatchEvent("click");
   await expect(page.getByTestId("pickup-point")).toContainText(point);
@@ -236,6 +239,33 @@ test("SK checkout with home delivery", async ({ browser }) => {
   const o = await order(page, SK, token);
   expect(o.total.formatted).toContain("€");
   expect(o.payment.status).toBe("paid");
+  await page.context().close();
+});
+
+test("a lost placement response is replayed with the same key: one order (A12)", async ({
+  browser,
+}) => {
+  const page = await newPage(browser);
+  await toCheckout(page, CZ, "tricko-henley");
+  await fillContactAndAddress(page, `ztraceno-${run}@example.test`);
+  await choosePickupPoint(page, /Z-BOX Praha 1/);
+  await page.getByRole("radio", { name: /Testovací platba/ }).check();
+  // The first response is lost after the server committed the order.
+  let first: { number?: string } | null = null;
+  const keys: string[] = [];
+  await page.route("**/_p/checkout/place-order", async (route) => {
+    keys.push(route.request().headers()["idempotency-key"] ?? "");
+    if (first) return route.continue();
+    first = (await (await route.fetch()).json()) as { number?: string };
+    await route.abort("failed");
+  });
+  await acceptAndPlace(page);
+  await expect(page.getByRole("alert")).toContainText("nepodařilo");
+  await page.getByRole("button", { name: "Objednat s povinností platby" }).click();
+  const token = await fakePay(page, "Pay");
+  expect(keys).toHaveLength(2);
+  expect(keys[1]).toBe(keys[0]);
+  expect((await order(page, CZ, token)).number).toBe(first?.number);
   await page.context().close();
 });
 

@@ -87,8 +87,9 @@ CREATE TABLE orders (
                                              'partially_refunded', 'refunded', 'failed', 'expired')),
     fulfillment_status text NOT NULL CHECK (fulfillment_status IN ('unfulfilled', 'label_created',
                                              'shipped', 'delivered', 'returned')),
-    -- A10: money arrived for an expired or cancelled order; needs a refund, never a restock.
-    exception          text CHECK (exception IN ('late_payment')),
+    -- A10: money the order cannot keep (after expiry/cancellation, or a second successful
+    -- attempt); needs a refund, never a restock.
+    exception          text CHECK (exception IN ('late_payment', 'duplicate_payment')),
     ship_to_country    text NOT NULL CHECK (ship_to_country ~ '^[A-Z]{2}$'),
     vat_payer          boolean NOT NULL,
     subtotal_minor     bigint NOT NULL,

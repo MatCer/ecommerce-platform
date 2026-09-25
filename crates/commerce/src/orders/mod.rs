@@ -198,27 +198,40 @@ pub(crate) async fn payment_succeeded(
 ) -> Result<(), Error> {
     let events = apply_payment(tx, o, PaymentCommand::Succeed, actor).await?;
     if events.contains(&PaymentEvent::LatePayment) {
-        sqlx::query!(
-            "UPDATE orders SET exception = 'late_payment', updated_at = now() WHERE id = $1",
-            o.id
-        )
-        .execute(&mut **tx)
-        .await?;
-        event(
-            tx,
-            o.id,
-            "exception",
-            &json!({ "exception": "late_payment", "action": "refund_required" }),
-            actor,
-        )
-        .await?;
-        platform::queue::publish(&mut **tx, EXCEPTION_EVENT, &publish_payload(o)).await?;
-        return Ok(());
+        return flag_exception(tx, o, "late_payment", actor).await;
     }
     if o.status == OrderStatus::Pending.as_str() {
         apply_order(tx, o, OrderCommand::Confirm, actor).await?;
     }
     platform::queue::publish(&mut **tx, PAID_EVENT, &publish_payload(o)).await?;
+    Ok(())
+}
+
+/// Money the order cannot keep (A10): `late_payment` (after expiry or cancellation) or
+/// `duplicate_payment` (a second attempt succeeded). Recorded with a refund task event; stock
+/// is never touched.
+pub(crate) async fn flag_exception(
+    tx: &mut TenantTx,
+    o: &OrderRow,
+    exception: &str,
+    actor: &str,
+) -> Result<(), Error> {
+    sqlx::query!(
+        "UPDATE orders SET exception = $2, updated_at = now() WHERE id = $1",
+        o.id,
+        exception
+    )
+    .execute(&mut **tx)
+    .await?;
+    event(
+        tx,
+        o.id,
+        "exception",
+        &json!({ "exception": exception, "action": "refund_required" }),
+        actor,
+    )
+    .await?;
+    platform::queue::publish(&mut **tx, EXCEPTION_EVENT, &publish_payload(o)).await?;
     Ok(())
 }
 
@@ -278,6 +291,31 @@ pub async fn link_guest_orders(tx: &mut TenantTx, customer_id: Uuid) -> Result<u
     .execute(&mut **tx)
     .await?
     .rows_affected())
+}
+
+/// Whether the requester may pay the order (new attempts, provider init). The order token is
+/// a read-only capability (A4), so paying needs more: the checkout cart capability of the cart
+/// the order was placed from (the same browser), or the session of the order's customer.
+pub async fn may_pay(
+    tx: &mut TenantTx,
+    order_id: Uuid,
+    cart_token: Option<&str>,
+    customer_id: Option<Uuid>,
+) -> Result<bool, Error> {
+    let r = sqlx::query!(
+        "SELECT o.customer_id, c.checkout_token_hash FROM orders o JOIN carts c ON c.id = o.cart_id
+         WHERE o.id = $1",
+        order_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    let by_customer = customer_id.is_some() && r.customer_id == customer_id;
+    let by_cart = cart_token.is_some_and(|t| {
+        capability::well_formed(t)
+            && r.checkout_token_hash.as_deref() == Some(&capability::hash(t)[..])
+    });
+    Ok(by_customer || by_cart)
 }
 
 /// The customer an order belongs to (`None` for a guest order), `404` for unknown orders.
@@ -359,8 +397,11 @@ pub struct PaymentView {
     pub status: PaymentStatus,
     /// The latest attempt.
     pub attempt: Option<AttemptView>,
-    /// Whether the customer can start a new attempt now (A10).
+    /// Whether a new attempt can be started now (A10); only for a viewer who may pay.
     pub can_retry: bool,
+    /// Whether this viewer may start or continue payments: the order token alone is read-only
+    /// (A4); the browser that placed the order or its signed-in customer may pay.
+    pub can_pay: bool,
     /// Unpaid orders are cancelled after this.
     pub expires_at: Option<DateTime<Utc>>,
 }
@@ -560,6 +601,7 @@ pub async fn view(tx: &mut TenantTx, id: Uuid) -> Result<OrderView, Error> {
                 created_at: a.created_at,
             }),
             can_retry,
+            can_pay: true,
             expires_at: o.payment_expires_at,
         },
         notes: o.notes,
@@ -588,12 +630,19 @@ pub struct OrderPage {
     pub next_cursor: Option<Uuid>,
 }
 
-/// Orders newest first, optionally only one customer's or one status; keyset-paginated by id
-/// (UUIDv7, so id order is placement order).
+/// Which orders to list.
+#[derive(Debug, Clone, Default)]
+pub struct OrderFilter {
+    pub customer_id: Option<Uuid>,
+    pub status: Option<OrderStatus>,
+    /// Only orders with an exception (`late_payment`, `duplicate_payment`): the refund work list.
+    pub exception: bool,
+}
+
+/// Orders newest first; keyset-paginated by id (UUIDv7, so id order is placement order).
 pub async fn list(
     tx: &mut TenantTx,
-    customer_id: Option<Uuid>,
-    status: Option<OrderStatus>,
+    filter: &OrderFilter,
     cursor: Option<Uuid>,
     limit: i64,
 ) -> Result<OrderPage, Error> {
@@ -605,12 +654,14 @@ pub async fn list(
          WHERE ($1::uuid IS NULL OR customer_id = $1)
            AND ($2::text IS NULL OR status = $2)
            AND ($3::uuid IS NULL OR id < $3)
+           AND (NOT $5 OR exception IS NOT NULL)
          ORDER BY id DESC
          LIMIT $4",
-        customer_id,
-        status.map(OrderStatus::as_str),
+        filter.customer_id,
+        filter.status.map(OrderStatus::as_str),
         cursor,
-        limit + 1
+        limit + 1,
+        filter.exception
     )
     .fetch_all(&mut **tx)
     .await?;

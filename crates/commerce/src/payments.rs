@@ -498,11 +498,26 @@ pub async fn init(
 ) -> Result<NextAction, Error> {
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
     let a = attempt(&mut tx, attempt_id).await?;
+    let window = sqlx::query!(
+        "SELECT status, payment_expires_at FROM orders WHERE id = $1",
+        a.order_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
     tx.commit().await?;
     if a.status != AttemptStatus::Pending {
         return Err(Error::Conflict {
             code: "attempt_not_pending",
             detail: "this payment attempt is already finished".into(),
+        });
+    }
+    // The deadline holds whether or not the expiry job ran yet (A10).
+    if (window.status != "pending" && window.status != "confirmed")
+        || window.payment_expires_at.is_some_and(|e| e <= Utc::now())
+    {
+        return Err(Error::Conflict {
+            code: "payment_window_closed",
+            detail: "the time to pay this order ran out".into(),
         });
     }
     let req = AttemptInit {
@@ -597,6 +612,19 @@ pub async fn apply_outcome(
     let order_id = attempt(tx, attempt_id).await?.order_id;
     // Attempts change only under the order's lock (placement, retries, expiry, outcomes).
     let mut order = orders::lock(tx, order_id).await?;
+    // A deadline that passed counts even before the expiry job ran: the order expires first,
+    // so a success now is a late payment and a failure changes nothing (A10).
+    if order.status == "pending" && order.payment_expires_at.is_some_and(|e| e <= Utc::now()) {
+        orders::event(
+            tx,
+            order.id,
+            "payment_window_closed",
+            &json!({ "expired_at": order.payment_expires_at }),
+            "system",
+        )
+        .await?;
+        orders::expire_unpaid(tx, &mut order, "system").await?;
+    }
     let a = attempt(tx, attempt_id).await?;
     let target = match outcome {
         Outcome::Succeeded => AttemptStatus::Succeeded,
@@ -643,7 +671,28 @@ pub async fn apply_outcome(
     )
     .await?;
     match outcome {
-        Outcome::Succeeded => orders::payment_succeeded(tx, &mut order, actor).await?,
+        // Another attempt already paid the order: the money is recorded, never refused, and the
+        // order is flagged for a refund (A10).
+        Outcome::Succeeded
+            if matches!(
+                order.payment_status.as_str(),
+                "paid" | "partially_refunded" | "refunded"
+            ) =>
+        {
+            orders::flag_exception(tx, &order, "duplicate_payment", actor).await?;
+        }
+        Outcome::Succeeded => {
+            // The order is paid: attempts still open elsewhere must not take money too.
+            sqlx::query!(
+                "UPDATE payment_attempts SET status = 'expired', completed_at = now(), updated_at = now()
+                 WHERE order_id = $1 AND status = 'pending' AND id <> $2",
+                order.id,
+                attempt_id
+            )
+            .execute(&mut **tx)
+            .await?;
+            orders::payment_succeeded(tx, &mut order, actor).await?;
+        }
         // A late failure (after the payment already moved on) changes nothing else.
         Outcome::Failed if matches!(order.payment_status.as_str(), "unpaid" | "authorized") => {
             orders::apply_payment(tx, &mut order, PaymentCommand::Fail, actor).await?;

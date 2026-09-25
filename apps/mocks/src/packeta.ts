@@ -92,10 +92,11 @@ const LIBRARY = `(() => {
   let open = null;
   function close(point) {
     if (!open) return;
-    const { overlay, callback, onMessage, before } = open;
+    const { overlay, callback, onMessage, before, inerted } = open;
     open = null;
     window.removeEventListener("message", onMessage);
     overlay.remove();
+    for (const el of inerted) el.inert = false;
     if (before && typeof before.focus === "function") before.focus();
     callback(point);
   }
@@ -126,7 +127,10 @@ const LIBRARY = `(() => {
       if (data.type === "packeta.point") close(data.point || null);
       else if (data.type === "packeta.close") close(null);
     };
-    open = { overlay, callback, onMessage, before: document.activeElement };
+    // A modal: the page behind it leaves the tab order and the accessibility tree.
+    const inerted = Array.from(document.body.children).filter((el) => !el.inert);
+    for (const el of inerted) el.inert = true;
+    open = { overlay, callback, onMessage, before: document.activeElement, inerted };
     window.addEventListener("message", onMessage);
     overlay.addEventListener("keydown", (e) => { if (e.key === "Escape") close(null); });
     document.body.append(overlay);

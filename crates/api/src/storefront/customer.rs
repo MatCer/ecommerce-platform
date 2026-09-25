@@ -438,7 +438,16 @@ async fn my_orders(
     headers: HeaderMap,
 ) -> Result<Response, Error> {
     let page = as_customer(&s, &shopper, &headers, async |tx, c| {
-        orders::list(tx, Some(c), None, None, 50).await
+        orders::list(
+            tx,
+            &orders::OrderFilter {
+                customer_id: Some(c),
+                ..Default::default()
+            },
+            None,
+            50,
+        )
+        .await
     })
     .await?;
     Ok(no_store(Json(page).into_response()))

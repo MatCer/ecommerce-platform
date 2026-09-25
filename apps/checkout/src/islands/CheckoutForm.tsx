@@ -6,6 +6,7 @@ import type {
   PaymentMethodKind,
   PickupPoint,
   PlacedOrder,
+  PlaceOrderInput,
   ShippingOption,
 } from "@platform/storefront-sdk/types";
 import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
@@ -72,7 +73,7 @@ export function checkoutProblem(m: M, code: string | null): string {
   }
 }
 
-/** A fresh key per placement attempt; a retry after a lost response reuses it (A12). */
+/** A fresh key per placement; a replay after an unknown outcome reuses it (A12). */
 const newKey = () =>
   typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
@@ -116,7 +117,8 @@ export default function CheckoutForm(props: {
   const [error, setError] = createSignal("");
   const [notice, setNotice] = createSignal("");
   const [touched, setTouched] = createSignal(false);
-  let key = newKey();
+  /** A placement whose outcome is unknown, replayed as is on the next click. */
+  let pending: { key: string; body: PlaceOrderInput } | null = null;
 
   const regions = (() => {
     try {
@@ -183,11 +185,37 @@ export default function CheckoutForm(props: {
   const emailValid = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email().trim());
   const addressesValid = () => complete(billing()) && (!elsewhere() || complete(delivery()));
 
+  /** Sends a placement; an unknown outcome keeps it for an exact replay (A12). */
+  async function submit(p: { key: string; body: PlaceOrderInput }) {
+    const r = await call<PlacedOrder>("POST", "/_p/checkout/place-order", p.body, {
+      "idempotency-key": p.key,
+    });
+    if (r.ok && r.data) {
+      const action = r.data.payment.action;
+      location.assign(action?.type === "redirect" ? action.url : r.data.confirmation_url);
+      return;
+    }
+    setPlacing(false);
+    // Lost response, gateway error or still running: the order may exist. The next click
+    // replays the same key and body (no step is saved before it, so nothing can change).
+    const unknown = r.code === "network" || r.status >= 500 || r.code === "idempotency_in_progress";
+    pending = unknown ? p : null;
+    setError(checkoutProblem(m, r.code));
+    if (r.code === "cart_changed" || r.code === "price_changed") {
+      const fresh = await call<CheckoutView>("GET", "/_p/checkout");
+      if (fresh.ok && fresh.data) setView(fresh.data);
+    }
+  }
+
   async function place(e: SubmitEvent) {
     e.preventDefault();
     setTouched(true);
     setError("");
     setNotice("");
+    if (pending) {
+      setPlacing(true);
+      return submit(pending);
+    }
     const v = view();
     if (!emailValid() || !addressesValid()) return setError(t(m, "checkout.incomplete"));
     if (!v.shipping_method_id || !v.payment_method) return setError(t(m, "checkout.incomplete"));
@@ -209,10 +237,9 @@ export default function CheckoutForm(props: {
       setPlacing(false);
       return setNotice(t(m, "checkout.price_updated"));
     }
-    const r = await call<PlacedOrder>(
-      "POST",
-      "/_p/checkout/place-order",
-      {
+    await submit({
+      key: newKey(),
+      body: {
         version: now.cart.version,
         total_minor: now.totals.total.amount_minor,
         accept_terms: true,
@@ -221,21 +248,7 @@ export default function CheckoutForm(props: {
         review_invites: reviews(),
         notes: note().trim() || null,
       },
-      { "idempotency-key": key },
-    );
-    if (r.ok && r.data) {
-      const action = r.data.payment.action;
-      location.assign(action?.type === "redirect" ? action.url : r.data.confirmation_url);
-      return;
-    }
-    setPlacing(false);
-    // A network error keeps the key: the retry must not place a second order.
-    if (r.code !== "network") key = newKey();
-    setError(checkoutProblem(m, r.code));
-    if (r.code === "cart_changed" || r.code === "price_changed") {
-      const fresh = await call<CheckoutView>("GET", "/_p/checkout");
-      if (fresh.ok && fresh.data) setView(fresh.data);
-    }
+    });
   }
 
   const section = "rounded-lg border border-border bg-card p-4 sm:p-5";

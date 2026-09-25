@@ -1435,7 +1435,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** A new payment attempt after a failed one, within the order's payment window (A10). */
+        /**
+         * A new payment attempt after a failed one, within the order's payment window (A10). Needs
+         *     the right to pay (`403 payment_not_allowed`).
+         */
         post: operations["new_attempt"];
         delete?: never;
         options?: never;
@@ -1454,7 +1457,8 @@ export interface paths {
         put?: never;
         /**
          * Initializes (again) a pending attempt at its provider (A10): idempotent, for when the
-         *     automatic init after placement failed.
+         *     automatic init after placement failed or the customer comes back to pay. Needs the right
+         *     to pay; `409 payment_window_closed` after the order's payment deadline.
          */
         post: operations["init_attempt"];
         delete?: never;
@@ -2822,7 +2826,12 @@ export interface components {
         PaymentStatus: "unpaid" | "authorized" | "paid" | "partially_refunded" | "refunded" | "failed" | "expired";
         PaymentView: {
             attempt?: components["schemas"]["AttemptView"] | null;
-            /** @description Whether the customer can start a new attempt now (A10). */
+            /**
+             * @description Whether this viewer may start or continue payments: the order token alone is read-only
+             *     (A4); the browser that placed the order or its signed-in customer may pay.
+             */
+            can_pay: boolean;
+            /** @description Whether a new attempt can be started now (A10); only for a viewer who may pay. */
             can_retry: boolean;
             /**
              * Format: date-time
@@ -4716,6 +4725,8 @@ export interface operations {
             query?: {
                 status?: components["schemas"]["OrderStatus"];
                 customer_id?: string;
+                /** @description Only orders with an exception (money to refund, A10). */
+                exception?: boolean;
                 /** @description `next_cursor` from the previous page. */
                 cursor?: string;
                 /** @description Page size, 1-100 (default 50). */
@@ -8102,6 +8113,10 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
             };
             path: {
                 /** @description Order capability token */
@@ -8139,6 +8154,10 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
             };
             path: {
                 /** @description Order capability token */
@@ -8176,6 +8195,10 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
             };
             path: {
                 /** @description Order capability token */
@@ -8191,6 +8214,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentStart"];
+                };
+            };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             404: {
@@ -8222,6 +8254,10 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description The checkout cart capability the order was placed with (`__Host-cart`). */
+                "X-Cart-Token"?: string | null;
+                /** @description The session of the order's customer (`__Host-sid`). */
+                "X-Customer-Session"?: string | null;
             };
             path: {
                 /** @description Order capability token */
@@ -8240,6 +8276,15 @@ export interface operations {
                     "application/json": components["schemas"]["PaymentStart"];
                 };
             };
+            /** @description payment_not_allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8248,7 +8293,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description attempt_not_pending */
+            /** @description attempt_not_pending | payment_window_closed */
             409: {
                 headers: {
                     [name: string]: unknown;

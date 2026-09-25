@@ -264,6 +264,8 @@ async fn configure_payment_method(
 pub struct OrderQuery {
     pub status: Option<OrderStatus>,
     pub customer_id: Option<Uuid>,
+    /// Only orders with an exception (money to refund, A10).
+    pub exception: Option<bool>,
     /// `next_cursor` from the previous page.
     pub cursor: Option<Uuid>,
     /// Page size, 1-100 (default 50).
@@ -287,7 +289,12 @@ async fn list_orders(
     let q = query_params(query)?;
     Ok(Json(
         in_tx(&s, staff.tenant_id, async |tx| {
-            orders::list(tx, q.customer_id, q.status, q.cursor, q.limit.unwrap_or(50)).await
+            let filter = orders::OrderFilter {
+                customer_id: q.customer_id,
+                status: q.status,
+                exception: q.exception.unwrap_or(false),
+            };
+            orders::list(tx, &filter, q.cursor, q.limit.unwrap_or(50)).await
         })
         .await?,
     ))
