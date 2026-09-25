@@ -5190,7 +5190,7 @@
         "tags": [
           "fulfillment"
         ],
-        "summary": "Returns a late or duplicate payment (A10) and resolves the order's exception. Admin.",
+        "summary": "Returns late or duplicate payments (A10); the exception is resolved once they are all\nrefunded (repeat to resubmit pending payouts). Admin.",
         "operationId": "refund_exception",
         "parameters": [
           {

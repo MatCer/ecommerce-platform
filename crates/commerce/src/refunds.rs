@@ -817,15 +817,20 @@ pub async fn cancel(
 // A10 exceptions: money the order cannot keep
 
 /// Returns late or duplicate payments of an order (amount-only refunds, no credit note: none of
-/// that money was invoiced) and resolves its exception. `409 no_open_exception` otherwise.
+/// that money was invoiced) and resolves its exception once every such payment is fully
+/// refunded (succeeded refunds only). Each payout is recorded with its backstop job in one
+/// transaction; a repeated call resubmits payouts still pending and returns what failed.
+/// `409 no_open_exception` otherwise.
 pub async fn refund_exception(
     db: &sqlx::PgPool,
     payments_cfg: &Payments,
+    urls: &PublicUrls,
     tenant_id: Uuid,
     actor: &str,
     order_id: Uuid,
 ) -> Result<Vec<Refund>, Error> {
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let mut order = orders::lock(&mut tx, order_id).await?;
     let o = sqlx::query!(
         "SELECT exception, status, paid_attempt_id FROM orders WHERE id = $1
              AND exception IS NOT NULL AND exception_resolved_at IS NULL",
@@ -844,6 +849,7 @@ pub async fn refund_exception(
     } else {
         o.paid_attempt_id
     };
+    let reason = format!("{} refund", o.exception.as_deref().unwrap_or("exception"));
     let due = sqlx::query!(
         r#"SELECT a.id, a.amount_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r
                     WHERE r.attempt_id = a.id AND r.status <> 'failed'), 0)::bigint AS "left!"
@@ -855,50 +861,95 @@ pub async fn refund_exception(
     )
     .fetch_all(&mut *tx)
     .await?;
-    tx.commit().await?;
-    let mut refunds = Vec::new();
+    let mut submit = Vec::new();
     for a in due.into_iter().filter(|a| a.left > 0) {
-        refunds.push(
-            payments::refund(
-                db,
-                payments_cfg,
-                tenant_id,
-                a.id,
-                a.left,
-                Some(&format!(
-                    "{} refund",
-                    o.exception.as_deref().unwrap_or("exception")
-                )),
-                actor,
-            )
-            .await?,
-        );
+        let (id, manual) = payments::record_refund(
+            &mut tx,
+            &mut order,
+            a.id,
+            a.left,
+            Some(&reason),
+            actor,
+            &RefundDetails::default(),
+        )
+        .await?;
+        let mut job = NewJob::new(FINALIZE_JOB, json!({ "refund_id": id }));
+        job.tenant_id = Some(tenant_id);
+        job.run_at = Some(Utc::now() + Duration::minutes(5));
+        job.idempotency_key = Some(format!("refund_finalize:{id}"));
+        queue::enqueue(&mut *tx, &job).await?;
+        if !manual {
+            submit.push(id);
+        }
     }
-    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    // The exception stays open while a payout is unconfirmed: refunding it again later returns
-    // whatever failed meanwhile, and closes it once everything went through.
+    // Payouts of earlier calls still waiting for the provider are resubmitted too.
     let pending = sqlx::query_scalar!(
-        r#"SELECT count(*) AS "n!" FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id
-           WHERE r.order_id = $1 AND r.status = 'pending' AND a.id IS DISTINCT FROM $2"#,
+        "SELECT r.id FROM refunds r
+         WHERE r.order_id = $1 AND r.status = 'pending' AND r.attempt_id IS DISTINCT FROM $2",
+        order_id,
+        keep
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    for id in pending {
+        if !submit.contains(&id) {
+            submit.push(id);
+        }
+    }
+    for id in &submit {
+        // An unknown outcome stays pending (webhooks, the backstop); a rejection is `failed`.
+        match payments::retry_refund(db, payments_cfg, tenant_id, *id).await {
+            Ok(_) | Err(Error::Unavailable(_) | Error::Conflict { .. }) => {}
+            Err(e) => return Err(e),
+        }
+        if let Err(e) = resume(db, payments_cfg, urls, tenant_id, *id).await {
+            tracing::info!(refund = %id, error = %e, "exception refund not final yet");
+        }
+    }
+
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    orders::lock(&mut tx, order_id).await?;
+    let refunds = sqlx::query_scalar!(
+        "SELECT id FROM refunds WHERE order_id = $1 AND attempt_id IS DISTINCT FROM $2
+         ORDER BY created_at, id",
+        order_id,
+        keep
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    let mut out = Vec::with_capacity(refunds.len());
+    for id in refunds {
+        out.push(payments::refund_row(&mut tx, id).await?);
+    }
+    // Settled only when every payment to return is covered by succeeded refunds.
+    let owed = sqlx::query_scalar!(
+        r#"SELECT coalesce(sum(greatest(a.amount_minor - coalesce((SELECT sum(r.amount_minor)
+                    FROM refunds r WHERE r.attempt_id = a.id AND r.status = 'succeeded'), 0), 0)),
+                  0)::bigint AS "owed!"
+           FROM payment_attempts a
+           WHERE a.order_id = $1 AND a.status = 'succeeded' AND a.id IS DISTINCT FROM $2"#,
         order_id,
         keep
     )
     .fetch_one(&mut *tx)
     .await?;
-    if pending > 0 {
-        tx.commit().await?;
-        return Ok(refunds);
+    if owed == 0 {
+        let total: i64 = out
+            .iter()
+            .filter(|r| r.status == RefundStatus::Succeeded)
+            .map(|r| r.amount_minor)
+            .sum();
+        orders::resolve_exception(
+            &mut tx,
+            actor,
+            order_id,
+            &format!("refunded {total} (minor units) to the customer"),
+        )
+        .await?;
     }
-    let total: i64 = refunds.iter().map(|r| r.amount_minor).sum();
-    orders::resolve_exception(
-        &mut tx,
-        actor,
-        order_id,
-        &format!("refunded {} (minor units) to the customer", total),
-    )
-    .await?;
     tx.commit().await?;
-    Ok(refunds)
+    Ok(out)
 }
 
 /// The order's refunds, newest last.

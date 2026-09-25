@@ -1206,7 +1206,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Returns a late or duplicate payment (A10) and resolves the order's exception. Admin. */
+        /**
+         * Returns late or duplicate payments (A10); the exception is resolved once they are all
+         *     refunded (repeat to resubmit pending payouts). Admin.
+         */
         post: operations["refund_exception"];
         delete?: never;
         options?: never;

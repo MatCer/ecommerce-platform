@@ -2029,4 +2029,22 @@ async fn refund_events_are_order_independent(db: PgPool) {
             .await
             .unwrap();
     assert_eq!(status, "succeeded");
+    drop(tx);
+    // WP12: the bank returns the refund later (`refund.updated` failed): the money is owed
+    // again, so the payment state goes back to paid (the order can be refunded anew).
+    deliver(
+        &runtime,
+        &event(
+            "evt_re_failed",
+            "refund.updated",
+            acct,
+            false,
+            refund("failed"),
+        ),
+    )
+    .await;
+    assert_eq!(
+        view(&runtime, t, a.order_id).await.payment.status,
+        orders::status::PaymentStatus::Paid
+    );
 }

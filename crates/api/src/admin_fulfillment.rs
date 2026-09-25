@@ -573,7 +573,8 @@ async fn retry_refund(
     ))
 }
 
-/// Returns a late or duplicate payment (A10) and resolves the order's exception. Admin.
+/// Returns late or duplicate payments (A10); the exception is resolved once they are all
+/// refunded (repeat to resubmit pending payouts). Admin.
 #[utoipa::path(
     post,
     path = "/admin/v1/orders/{id}/exception/refund",
@@ -596,6 +597,7 @@ async fn refund_exception(
         refunds::refund_exception(
             &s.db,
             &s.checkout.payments,
+            &s.public_urls,
             staff.tenant_id,
             &staff.user.user_id,
             id,

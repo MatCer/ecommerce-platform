@@ -209,6 +209,11 @@ pub enum PaymentCommand {
     Refund {
         full: bool,
     },
+    /// A refund that counted turned out failed (a provider's late `refund.failed`): the state
+    /// goes back to what the remaining successful refunds say (`none_left` → `paid`).
+    RefundReversed {
+        none_left: bool,
+    },
 }
 
 impl PaymentCommand {
@@ -221,6 +226,8 @@ impl PaymentCommand {
             Self::Retry => "retry",
             Self::Refund { full: true } => "refund_full",
             Self::Refund { full: false } => "refund_partial",
+            Self::RefundReversed { none_left: true } => "refund_reversed_all",
+            Self::RefundReversed { none_left: false } => "refund_reversed_partial",
         }
     }
 }
@@ -235,6 +242,8 @@ pub enum PaymentEvent {
     RetryStarted,
     PartiallyRefunded,
     Refunded,
+    /// A refund failed after it had counted; the money is owed to the customer again.
+    RefundReversed,
     /// Money arrived for an expired or cancelled order: flag the order as an exception and
     /// open a refund task; never restore stock silently (A10).
     LatePayment,
@@ -269,6 +278,12 @@ pub fn payment_transition(
         }
         (S::Paid | S::PartiallyRefunded, C::Refund { full: false }) => {
             (S::PartiallyRefunded, vec![E::PartiallyRefunded])
+        }
+        (S::PartiallyRefunded | S::Refunded, C::RefundReversed { none_left: true }) => {
+            (S::Paid, vec![E::RefundReversed])
+        }
+        (S::Refunded, C::RefundReversed { none_left: false }) => {
+            (S::PartiallyRefunded, vec![E::RefundReversed])
         }
         _ => {
             return Err(TransitionError {
@@ -633,6 +648,8 @@ mod tests {
         PaymentCommand::Retry,
         PaymentCommand::Refund { full: true },
         PaymentCommand::Refund { full: false },
+        PaymentCommand::RefundReversed { none_left: true },
+        PaymentCommand::RefundReversed { none_left: false },
     ];
 
     #[test]
@@ -654,6 +671,9 @@ mod tests {
             ("paid", "refund_partial", "partially_refunded"),
             ("partially_refunded", "refund_full", "refunded"),
             ("partially_refunded", "refund_partial", "partially_refunded"),
+            ("partially_refunded", "refund_reversed_all", "paid"),
+            ("refunded", "refund_reversed_all", "paid"),
+            ("refunded", "refund_reversed_partial", "partially_refunded"),
         ]
         .into();
         let mut seen = BTreeSet::new();

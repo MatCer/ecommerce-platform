@@ -1106,3 +1106,52 @@ async fn an_unconfirmed_payout_is_not_documented_as_done(db: PgPool) {
     let early = refunds::finalize(&runtime, &urls, t, out.refund.id, ACTOR).await;
     assert!(matches!(early, Err(Error::Unavailable(_))), "{early:?}");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_duplicate_payment_is_returned_and_the_exception_closes_when_settled(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "wp12-dup").await;
+    let t = s.shop.tenant;
+    let (order, attempt) = place(&runtime, &s, MethodKind::BankTransfer).await;
+    pay(&runtime, t, attempt).await;
+    // A second (duplicate) successful payment of the same order.
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let dup: Uuid = sqlx::query_scalar(
+        "INSERT INTO payment_attempts (tenant_id, order_id, method, status, amount_minor,
+             currency, completed_at, cod_status, tender, collector)
+         SELECT tenant_id, order_id, 'cod', 'succeeded', amount_minor, currency, now(),
+                'collected', 'cash', 'merchant'
+         FROM payment_attempts WHERE id = $1 RETURNING id",
+    )
+    .bind(attempt)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE orders SET exception = 'duplicate_payment' WHERE id = $1")
+        .bind(order)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let urls = PublicUrls::default();
+    let out = refunds::refund_exception(&runtime, &settings().payments, &urls, t, ACTOR, order)
+        .await
+        .unwrap();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].attempt_id, dup);
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let resolved: bool =
+        sqlx::query_scalar("SELECT exception_resolved_at IS NOT NULL FROM orders WHERE id = $1")
+            .bind(order)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert!(resolved);
+    // The retained payment is untouched.
+    let status: String = sqlx::query_scalar("SELECT payment_status FROM orders WHERE id = $1")
+        .bind(order)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(status, "paid");
+}

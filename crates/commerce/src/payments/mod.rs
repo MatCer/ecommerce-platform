@@ -1179,6 +1179,20 @@ pub(crate) async fn settle_refunds(
     )
     .fetch_one(&mut **tx)
     .await?;
+    // Both directions: a refund that failed after it counted puts the state back.
+    let reversed = match (order.payment_status.as_str(), refunded) {
+        ("refunded" | "partially_refunded", r) if r <= 0 => {
+            Some(PaymentCommand::RefundReversed { none_left: true })
+        }
+        ("refunded", r) if r < retained.amount_minor => {
+            Some(PaymentCommand::RefundReversed { none_left: false })
+        }
+        _ => None,
+    };
+    if let Some(command) = reversed {
+        orders::apply_payment(tx, order, command, actor).await?;
+        return Ok(());
+    }
     if refunded <= 0 {
         return Ok(());
     }
