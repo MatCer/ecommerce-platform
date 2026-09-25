@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { packetaRoutes } from "./packeta.ts";
 
 /**
  * Local stand-ins for third-party APIs (Packeta, PPL, ČNB, bank, ad platforms, DNS).
@@ -7,6 +8,8 @@ import { Hono } from "hono";
 export const app = new Hono();
 
 app.get("/healthz", (c) => c.json({ status: "ok" }));
+
+packetaRoutes(app);
 
 /**
  * DNS TXT stub for custom-domain verification (spec A29). Tests and operators publish records
