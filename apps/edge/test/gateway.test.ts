@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { Counters } from "../src/counters.ts";
 import { createGateway, type Gateway } from "../src/gateway.ts";
 import { StaticResolver } from "../src/sites.ts";
 import { buildArtifact, checkoutWorker, fakeApi, hostileTheme, site } from "./fixtures.ts";
@@ -925,5 +926,65 @@ describe("platform routes backed by the real API (WP6)", () => {
     const res = await get("http://checkout.sk.localhost/");
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Pokladna");
+  });
+});
+
+describe("analytics (A20) and client addresses (§8.1)", () => {
+  test("pages and searches are counted without identifiers; the beacon carries the consent subject", async () => {
+    const counters = new Counters();
+    const counted = createGateway({
+      artifactRoot: root,
+      resolver,
+      checkoutArtifact: checkoutId,
+      apiOrigin: "http://api.test",
+      mediaOrigin: "http://media.test",
+      scheme: "http",
+      purgeToken: PURGE_TOKEN,
+      upstream: api.fn,
+      renderTimeoutMs: 1500,
+      log: () => {},
+      counters,
+    });
+    const hit = (url: string, headers: Record<string, string> = {}, init: RequestInit = {}) =>
+      counted.fetch(
+        new Request(url, { ...init, headers: { host: new URL(url).host, ...headers } }),
+      );
+    try {
+      api.calls.length = 0;
+      const ip = { "x-forwarded-for": "10.0.0.1, 198.51.100.4" };
+      await hit("http://demo.localhost:8280/", ip);
+      await hit("http://demo.localhost:8280/", ip); // edge cache hit: still a request
+      await hit("http://demo.localhost:8280/search?q=Modr%C3%A9%20triko", ip);
+      await hit("http://demo.localhost:8280/_astro/app.v1.js");
+      const batch = counters.drain();
+      expect(batch.counters.map((c) => [c.template, c.requests])).toEqual([
+        ["home", 2],
+        ["search", 1],
+      ]);
+      expect(batch.searches.map((s) => [s.query, s.count])).toEqual([["modré triko", 1]]);
+      expect(JSON.stringify(batch)).not.toContain("198.51.100.4");
+      // SSR binding calls carry the client address (rate limits per token + IP).
+      const ssr = api.calls.find((c) => c.url.includes("/storefront/v1/"));
+      expect(ssr?.headers["x-client-ip"]).toBe("198.51.100.4");
+
+      api.calls.length = 0;
+      const res = await hit(
+        "http://demo.localhost:8280/_p/e",
+        {
+          ...ip,
+          origin: "http://demo.localhost:8280",
+          "content-type": "text/plain",
+          cookie: `__Secure-consent_id=${"c".repeat(32)}`,
+          "x-consent-subject": "d".repeat(32),
+        },
+        { method: "POST", body: JSON.stringify({ events: [{ type: "page_view" }] }) },
+      );
+      expect(res.status).toBe(204);
+      const sent = api.calls.find((c) => c.url.endsWith("/storefront/v1/events"));
+      expect(sent?.headers["x-consent-subject"]).toBe("c".repeat(32)); // the cookie, not a header
+      expect(sent?.headers["x-client-ip"]).toBe("198.51.100.4");
+    } finally {
+      await counted.dispose();
+    }
   });
 });

@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { ArtifactFetcher } from "./artifacts.ts";
+import { Counters } from "./counters.ts";
 import { createGateway } from "./gateway.ts";
 import { ApiResolver } from "./sites.ts";
 
@@ -12,6 +13,7 @@ function required(name: string): string {
 const artifactRoot = required("ARTIFACT_ROOT");
 const apiOrigin = required("API_ORIGIN");
 const serviceToken = required("INTERNAL_API_TOKEN");
+const counters = new Counters();
 const gateway = createGateway({
   artifactRoot,
   // Sites (tenant, market, token, active artifacts) come from the API (spec §8.4).
@@ -23,6 +25,7 @@ const gateway = createGateway({
   scheme: process.env.PUBLIC_SCHEME === "http" ? "http" : "https",
   purgeToken: required("EDGE_PURGE_TOKEN"),
   packetaWidgetUrl: process.env.PACKETA_WIDGET_URL || undefined,
+  counters,
 });
 
 const port = Number(process.env.PORT ?? 8787);
@@ -36,10 +39,20 @@ console.log(JSON.stringify({ level: "info", msg: "edge listening", port, adminPo
 // A30: one instance per artifact; idle ones are disposed and recreated on demand.
 const idle = setInterval(() => void gateway.pool.evictIdle(10 * 60_000), 60_000);
 
+// A20: cookieless counters go to the API every 30 s (kept for the next flush on failure).
+const flushCounters = () =>
+  counters.flush(apiOrigin, serviceToken).catch((err) =>
+    console.log(JSON.stringify({ level: "warn", msg: "counter flush failed", err: String(err) })),
+  );
+const flushing = setInterval(() => void flushCounters(), 30_000);
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     clearInterval(idle);
+    clearInterval(flushing);
     for (const s of servers) s.close();
-    void gateway.dispose().finally(() => process.exit(0));
+    void flushCounters()
+      .then(() => gateway.dispose())
+      .finally(() => process.exit(0));
   });
 }
