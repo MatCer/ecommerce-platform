@@ -2,7 +2,7 @@
 
 use platform::Error;
 use platform::db::tenant_tx;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::ToSchema;
@@ -12,7 +12,7 @@ use crate::{audit, id, unique_violation};
 
 /// Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
 /// management or exports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Staff,

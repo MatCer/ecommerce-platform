@@ -36,6 +36,9 @@ pub struct Jwks {
     pub url: String,
     pub keys: Arc<RwLock<Value>>,
     pub hits: Arc<AtomicUsize>,
+    pub auth_requests: Arc<RwLock<Vec<(String, String, Value)>>>,
+    /// 0 succeeds, 1 fails ensure-user, 2 fails invite.
+    pub auth_failure: Arc<AtomicUsize>,
 }
 
 pub async fn jwks_server(keys: Value) -> Jwks {
@@ -57,15 +60,60 @@ pub async fn jwks_server(keys: Value) -> Jwks {
             }
         }),
     );
+    let auth_requests = Arc::new(RwLock::new(Vec::new()));
+    let auth_failure = Arc::new(AtomicUsize::new(0));
+    let mut router = router;
+    for (path, stage) in [("/internal/users", 1), ("/internal/users/invite", 2)] {
+        let requests = auth_requests.clone();
+        let failure = auth_failure.clone();
+        router = router.route(
+            path,
+            axum::routing::post(
+                move |headers: axum::http::HeaderMap, axum::Json(body): axum::Json<Value>| {
+                    let requests = requests.clone();
+                    let failure = failure.clone();
+                    async move {
+                        let token = headers
+                            .get("authorization")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or("")
+                            .to_owned();
+                        requests
+                            .write()
+                            .await
+                            .push((path.to_owned(), token, body.clone()));
+                        if failure.load(Ordering::SeqCst) == stage {
+                            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                        }
+                        axum::Json(
+                            json!({"id": format!("auth:{}", body["email"].as_str().unwrap())}),
+                        )
+                        .into_response()
+                    }
+                },
+            ),
+        );
+    }
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}/jwks", listener.local_addr().unwrap());
     tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
-    Jwks { url, keys, hits }
+    Jwks {
+        url,
+        keys,
+        hits,
+        auth_requests,
+        auth_failure,
+    }
 }
 
 pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
     AppState {
         db,
+        auth_service: api::auth_service::AuthService::new(
+            jwks.url.parse().unwrap(),
+            SERVICE_TOKEN.into(),
+        )
+        .unwrap(),
         http: reqwest::Client::new(),
         meili_url: "http://127.0.0.1:1".parse().unwrap(),
         storage: testkit::memory_storage(),
@@ -132,6 +180,14 @@ impl<'a> Call<'a> {
     pub fn post(uri: &'a str, body: Value) -> Self {
         Self {
             method: "POST",
+            body: Some(body),
+            ..Self::get(uri)
+        }
+    }
+
+    pub fn patch(uri: &'a str, body: Value) -> Self {
+        Self {
+            method: "PATCH",
             body: Some(body),
             ..Self::get(uri)
         }

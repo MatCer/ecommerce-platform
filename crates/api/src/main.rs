@@ -67,7 +67,12 @@ async fn serve() -> anyhow::Result<()> {
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()?;
+    let auth_service = platform::config::AuthServiceConfig::from_env()?;
     let state = api::AppState {
+        auth_service: api::auth_service::AuthService::new(
+            auth_service.base_url,
+            auth_service.token,
+        )?,
         db: db.clone(),
         http: http.clone(),
         meili_url: MeiliConfig::from_env()?.url,

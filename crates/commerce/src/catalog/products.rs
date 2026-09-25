@@ -1036,8 +1036,8 @@ pub struct ProductFilter {
 pub const MAX_PAGE: i64 = 100;
 
 /// Newest first; UUIDv7 ids make the last id the cursor.
-/// ponytail: `q` is an unindexed ILIKE scan per tenant; add a pg_trgm index (or use the WP7
-/// search index) when admin lists of large catalogs get slow.
+/// `q` matches a name (any locale) or SKU substring through `platform.search_product_ids`,
+/// which can use the pg_trgm indexes (RLS would block them for non-leakproof `ILIKE`).
 pub async fn list(
     tx: &mut TenantTx,
     filter: &ProductFilter,
@@ -1068,11 +1068,7 @@ pub async fn list(
              AND ($2::text IS NULL OR p.status = $2)
              AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM product_categories c
                                               WHERE c.product_id = p.id AND c.category_id = $3))
-             AND ($4::text IS NULL
-                  OR EXISTS (SELECT 1 FROM product_translations t
-                             WHERE t.product_id = p.id AND t.name ILIKE $4)
-                  OR EXISTS (SELECT 1 FROM variants v
-                             WHERE v.product_id = p.id AND v.sku ILIKE $4))
+             AND ($4::text IS NULL OR p.id IN (SELECT platform.search_product_ids($4)))
            ORDER BY p.id DESC
            LIMIT $5"#,
         cursor,

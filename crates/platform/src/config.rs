@@ -149,6 +149,32 @@ impl WorkerConfig {
     }
 }
 
+/// Not Debug: contains the internal auth service secret.
+#[derive(Clone)]
+pub struct AuthServiceConfig {
+    pub base_url: Url,
+    pub token: String,
+}
+impl AuthServiceConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let token = required(lookup, "AUTH_INTERNAL_TOKEN")?;
+        if token.chars().count() < 32 {
+            return Err(ConfigError::Invalid {
+                name: "AUTH_INTERNAL_TOKEN",
+                reason: "must be at least 32 characters".into(),
+            });
+        }
+        let mut base_url = url(lookup, "AUTH_INTERNAL_URL")?;
+        if !base_url.path().ends_with('/') {
+            base_url.set_path(&format!("{}/", base_url.path()));
+        }
+        Ok(Self { base_url, token })
+    }
+}
+
 /// Staff authentication (spec A9): JWTs issued by the Better Auth service.
 #[derive(Debug, Clone)]
 pub struct StaffAuthConfig {
@@ -403,5 +429,43 @@ mod tests {
             cfg.media_base_url.as_str(),
             "http://s3.localhost:8080/public/"
         );
+    }
+}
+
+#[cfg(test)]
+mod auth_service_config_tests {
+    use super::*;
+    #[test]
+    fn internal_auth_configuration_is_required_and_secret_is_validated() {
+        assert!(matches!(
+            AuthServiceConfig::from_lookup(&|_| None),
+            Err(ConfigError::Missing("AUTH_INTERNAL_TOKEN"))
+        ));
+        let lookup = |key: &str| match key {
+            "AUTH_INTERNAL_URL" => Some("http://auth:3000/base".into()),
+            "AUTH_INTERNAL_TOKEN" => Some("x".repeat(32)),
+            _ => None,
+        };
+        let cfg = AuthServiceConfig::from_lookup(&lookup).expect("valid configuration");
+        assert_eq!(cfg.base_url.as_str(), "http://auth:3000/base/");
+        assert!(matches!(
+            AuthServiceConfig::from_lookup(&|key| if key == "AUTH_INTERNAL_TOKEN" {
+                Some("short".into())
+            } else {
+                lookup(key)
+            }),
+            Err(ConfigError::Invalid {
+                name: "AUTH_INTERNAL_TOKEN",
+                ..
+            })
+        ));
+        assert!(matches!(
+            AuthServiceConfig::from_lookup(&|key| if key == "AUTH_INTERNAL_URL" {
+                None
+            } else {
+                lookup(key)
+            }),
+            Err(ConfigError::Missing("AUTH_INTERNAL_URL"))
+        ));
     }
 }
