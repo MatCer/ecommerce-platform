@@ -337,7 +337,11 @@ async fn default_source(tx: &mut TenantTx, storage: &Storage) -> Result<Source, 
 
 /// The source a revision was built from: its own archive, or (for revisions following the
 /// default) the default artifact's source, falling back to the current default.
-async fn revision_source(tx: &mut TenantTx, storage: &Storage, id: Uuid) -> Result<Source, Error> {
+pub(crate) async fn revision_source(
+    tx: &mut TenantTx,
+    storage: &Storage,
+    id: Uuid,
+) -> Result<Source, Error> {
     let r = sqlx::query!(
         "SELECT r.source_key, t.source_key AS artifact_source FROM theme_revisions r
          LEFT JOIN platform.theme_artifacts t ON t.id = r.artifact_id WHERE r.id = $1",
@@ -352,21 +356,22 @@ async fn revision_source(tx: &mut TenantTx, storage: &Storage, id: Uuid) -> Resu
     }
 }
 
-async fn active_id(tx: &mut TenantTx) -> Result<Option<Uuid>, Error> {
+pub(crate) async fn active_id(tx: &mut TenantTx) -> Result<Option<Uuid>, Error> {
     Ok(sqlx::query_scalar!("SELECT revision_id FROM theme_active")
         .fetch_optional(&mut **tx)
         .await?)
 }
 
-/// Stores the source and creates a draft revision whose build is queued.
-async fn create(
+/// Stores the source and creates a draft revision whose build is queued. `ai_run`: the AI run
+/// (and its prompt) a `Change::Ai` revision checks.
+pub(crate) async fn create(
     tx: &mut TenantTx,
     storage: &Storage,
     actor: &str,
     change: Change,
     parent: Option<Uuid>,
     source: &Source,
-    prompt: Option<&str>,
+    ai_run: Option<(Uuid, &str)>,
 ) -> Result<RevisionSummary, Error> {
     lock_numbering(tx).await?;
     let pending = sqlx::query_scalar!(
@@ -391,8 +396,8 @@ async fn create(
         .await?;
     sqlx::query!(
         "INSERT INTO theme_revisions (id, tenant_id, number, parent_id, origin, change, status,
-                                      source_key, created_by, prompt)
-         SELECT $1, $2, coalesce(max(number), 0) + 1, $3, 'custom', $4, 'draft', $5, $6, $7
+                                      source_key, created_by, prompt, ai_run_id)
+         SELECT $1, $2, coalesce(max(number), 0) + 1, $3, 'custom', $4, 'draft', $5, $6, $7, $8
          FROM theme_revisions",
         id,
         tx.tenant_id(),
@@ -400,7 +405,8 @@ async fn create(
         change.as_str(),
         key.as_ref(),
         actor,
-        prompt
+        ai_run.map(|(_, p)| p),
+        ai_run.map(|(r, _)| r)
     )
     .execute(&mut **tx)
     .await?;
@@ -480,21 +486,9 @@ pub async fn edit_tokens(
         Some(id) => Some(id),
         None => active_id(tx).await?,
     };
-    // The fast path skips the code gates, so the code must already have passed them: only a
-    // revision that is ready or was published (or follows the platform's default) is a base.
+    // The fast path skips the code gates, so the code must already have passed them.
     if let Some(id) = base {
-        let b = fetch(tx, id, false).await?;
-        if !(matches!(b.status.as_str(), "ready" | "published" | "superseded")
-            || b.origin == "default")
-        {
-            return Err(Error::Conflict {
-                code: "base_not_validated",
-                detail: format!(
-                    "revision #{} is {}; edit the tokens of a revision that passed the checks",
-                    b.number, b.status
-                ),
-            });
-        }
+        ensure_validated_base(tx, id).await?;
     }
     let mut source = match base {
         Some(id) => revision_source(tx, storage, id).await?,
@@ -504,6 +498,49 @@ pub async fn edit_tokens(
         .files
         .insert(TOKENS_FILE.to_owned(), archive::tokens_file(&tokens));
     create(tx, storage, actor, Change::Tokens, base, &source, None).await
+}
+
+/// A base for a token edit or an AI run must have passed the gates (ready or published, or
+/// follow the platform's default), and an AI revision must have been accepted by the staff.
+pub(crate) async fn ensure_validated_base(tx: &mut TenantTx, id: Uuid) -> Result<(), Error> {
+    let b = fetch(tx, id, false).await?;
+    if !(matches!(b.status.as_str(), "ready" | "published" | "superseded") || b.origin == "default")
+    {
+        return Err(Error::Conflict {
+            code: "base_not_validated",
+            detail: format!(
+                "revision #{} is {}; start from a revision that passed the checks",
+                b.number, b.status
+            ),
+        });
+    }
+    ensure_ai_accepted(tx, &b).await
+}
+
+/// An AI revision that was never published is usable only once its run was accepted, and only
+/// the run's final revision (the one the staff reviewed).
+async fn ensure_ai_accepted(tx: &mut TenantTx, r: &Row) -> Result<(), Error> {
+    if r.change != Change::Ai.as_str() || r.published_at.is_some() {
+        return Ok(());
+    }
+    let accepted = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM ai_theme_runs
+                          WHERE revision_id = $1 AND status = 'accepted') AS "ok!""#,
+        r.id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if accepted {
+        Ok(())
+    } else {
+        Err(Error::Conflict {
+            code: "ai_run_not_accepted",
+            detail: format!(
+                "revision #{} comes from an AI edit that was not accepted; review and accept it first",
+                r.number
+            ),
+        })
+    }
 }
 
 /// A power user's source archive (validated per A6; contract violations fail the gates).
@@ -558,6 +595,7 @@ pub async fn publish(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Revisio
             ),
         });
     }
+    ensure_ai_accepted(tx, &r).await?;
     if let Some(p) = previous {
         sqlx::query!(
             "UPDATE theme_revisions SET status = 'superseded', superseded_at = now(),
@@ -897,7 +935,7 @@ pub async fn attach_artifact(
 
 /// Home, the category with the most active products (a real listing page) and its first
 /// product, in the primary market's default locale.
-async fn check_pages(tx: &mut TenantTx) -> Result<Vec<String>, Error> {
+pub(crate) async fn check_pages(tx: &mut TenantTx) -> Result<Vec<String>, Error> {
     let r = sqlx::query!(
         r#"WITH m AS (SELECT default_locale FROM markets ORDER BY created_at LIMIT 1),
            cat AS (

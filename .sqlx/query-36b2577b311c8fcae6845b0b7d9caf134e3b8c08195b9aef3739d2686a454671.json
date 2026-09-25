@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_theme_runs SET status = $2, summary = $3, error = $4, diff = $5, report = $6,\n                    finished_at = now(), updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "36b2577b311c8fcae6845b0b7d9caf134e3b8c08195b9aef3739d2686a454671"
+}

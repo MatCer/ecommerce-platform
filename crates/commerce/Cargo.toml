@@ -15,6 +15,7 @@ minijinja.workspace = true
 chrono.workspace = true
 crc32fast.workspace = true
 flate2.workspace = true
+similar.workspace = true
 hex.workspace = true
 hmac.workspace = true
 image.workspace = true

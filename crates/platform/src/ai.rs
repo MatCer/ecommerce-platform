@@ -792,24 +792,24 @@ mod tests {
             AiError::Refused
         ));
         assert!(matches!(
-            parse_turn(&json!({"stop_reason": "end_turn"})).unwrap_err().error,
+            parse_turn(&json!({"stop_reason": "end_turn"}))
+                .unwrap_err()
+                .error,
             AiError::InvalidOutput(_)
         ));
     }
 
     #[tokio::test]
     async fn fake_agents_answer_from_the_history() {
-        let fake = Fake::new([])
-            .unwrap()
-            .with_agent(
-                "echo",
-                Arc::new(|messages: &[Value]| {
-                    json!({
-                        "stop_reason": "end_turn",
-                        "content": [{"type": "text", "text": format!("{} messages", messages.len())}]
-                    })
-                }),
-            );
+        let fake = Fake::new([]).unwrap().with_agent(
+            "echo",
+            Arc::new(|messages: &[Value]| {
+                json!({
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": format!("{} messages", messages.len())}]
+                })
+            }),
+        );
         let client = Client::Fake(Arc::new(fake));
         let messages = [json!({"role": "user", "content": "hi"})];
         let c = Conversation {

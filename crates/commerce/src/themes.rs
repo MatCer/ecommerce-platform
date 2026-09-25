@@ -10,6 +10,7 @@
 //! The builder turns a source into an artifact in a sandbox and reports gate results; the
 //! staff previews (A21) and publishes or rolls back. See `docs/decisions/theme-builder-sandbox.md`.
 
+pub mod ai_edit;
 pub mod archive;
 pub mod keys;
 mod revisions;

@@ -61,7 +61,7 @@ static SEGMENT: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Why `path` (as written in the archive) is not an acceptable theme file path, if it is not.
-fn path_problem(path: &str) -> Option<String> {
+pub(crate) fn path_problem(path: &str) -> Option<String> {
     if path.is_empty() || path.len() > MAX_PATH_LEN {
         return Some(format!(
             "{path:?}: path is empty or longer than {MAX_PATH_LEN} characters"
