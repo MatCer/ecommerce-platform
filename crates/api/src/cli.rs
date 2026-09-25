@@ -284,6 +284,32 @@ async fn publish_artifacts(
             .ok_or_else(|| anyhow!("artifact {id} is not a {} artifact", expected.as_str()))?;
         let mut files = Vec::new();
         read_tree(&dir, "", &mut files)?;
+        // Exactly the files the manifest lists (the edge verifies the bytes against the content
+        // address; `make theme-build` runs `theme-kit verify` before this).
+        let mut expected: std::collections::BTreeSet<String> = ["manifest.json".to_owned()].into();
+        if manifest["runtime"]["main"] != "entry.mjs" {
+            bail!("artifact {id}: the entry module must be entry.mjs");
+        }
+        for m in manifest["runtime"]["modules"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            expected.insert(format!("server/{}", m.as_str().unwrap_or_default()));
+        }
+        for p in manifest["assets"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .map(|(p, _)| p)
+        {
+            expected.insert(format!("client{p}"));
+        }
+        let present: std::collections::BTreeSet<String> =
+            files.iter().map(|(p, _)| p.clone()).collect();
+        if present != expected {
+            bail!("artifact {id}: the files do not match the manifest");
+        }
         let tokens = manifest.get("tokens").filter(|t| !t.is_null());
         themes::register_artifact(db, &storage, id, kind, tokens, files).await?;
         match kind {

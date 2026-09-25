@@ -235,6 +235,42 @@ export function validateManifest(m: ArtifactManifest, id: string): ArtifactManif
   return m;
 }
 
+/**
+ * Verifies an unpacked artifact directory before it is published: the manifest is valid,
+ * every listed module and asset is present with the listed bytes, nothing else is there, and
+ * the content address recomputed from the files equals the id.
+ */
+export async function verifyArtifact(root: string, id: string): Promise<ArtifactManifest> {
+  const m = await readManifest(root, id);
+  const dir = path.join(root, id);
+  const present = new Set(await listFiles(dir));
+  const expected = new Set(["manifest.json"]);
+  const server: [string, string][] = [];
+  for (const mod of m.runtime.modules) {
+    expected.add(`server/${mod}`);
+    server.push([mod, sha256(await readFile(path.join(dir, "server", mod)))]);
+  }
+  for (const [p, entry] of Object.entries(m.assets)) {
+    expected.add(`client${p}`);
+    const body = await readFile(path.join(dir, "client", p));
+    if (sha256(body) !== entry.sha256 || body.byteLength !== entry.size)
+      throw new Error(`artifact ${id}: ${p} does not match the manifest`);
+  }
+  const extra = [...present].filter((f) => !expected.has(f));
+  const missing = [...expected].filter((f) => !present.has(f));
+  if (extra.length || missing.length)
+    throw new Error(`artifact ${id}: extra ${extra.join(", ")} / missing ${missing.join(", ")}`);
+  const computed = artifactId({
+    kind: m.kind,
+    server,
+    assets: m.assets,
+    tokens: m.tokens,
+    csp: m.csp,
+  });
+  if (computed !== id) throw new Error(`artifact ${id}: content address mismatch (${computed})`);
+  return m;
+}
+
 /** Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. */
 export async function readManifest(root: string, id: string): Promise<ArtifactManifest> {
   if (!ID_RE.test(id)) throw new Error(`artifact: invalid id ${JSON.stringify(id)}`);

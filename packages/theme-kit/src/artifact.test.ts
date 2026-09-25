@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
-import { packArtifact, readManifest } from "./artifact.ts";
+import { packArtifact, readManifest, verifyArtifact } from "./artifact.ts";
 
 const PROJECT = fileURLToPath(new URL("../../../themes/default", import.meta.url));
 
@@ -46,4 +46,29 @@ test("refuses symlinked roots and entries", async () => {
   await expect(
     packArtifact({ dist: e, outRoot: out, kind: "theme", projectDir: PROJECT }),
   ).rejects.toThrow(/symlink/);
+});
+
+test("verify recomputes the content address and refuses tampered, missing or extra files", async () => {
+  const d = await dist({ "server/entry.mjs": "export default {}", "client/_astro/a.js": "1" });
+  const pack = async () => {
+    const out = await mkdtemp(path.join(tmpdir(), "wp6-verify-"));
+    return {
+      out,
+      m: await packArtifact({ dist: d, outRoot: out, kind: "theme", projectDir: PROJECT }),
+    };
+  };
+  const ok = await pack();
+  expect((await verifyArtifact(ok.out, ok.m.id)).id).toBe(ok.m.id);
+
+  const tampered = await pack();
+  await writeFile(path.join(tampered.out, tampered.m.id, "server/entry.mjs"), "export default 1");
+  await expect(verifyArtifact(tampered.out, tampered.m.id)).rejects.toThrow(/content address/);
+
+  const extra = await pack();
+  await writeFile(path.join(extra.out, extra.m.id, "server/evil.mjs"), "1");
+  await expect(verifyArtifact(extra.out, extra.m.id)).rejects.toThrow(/extra server\/evil.mjs/);
+
+  const asset = await pack();
+  await writeFile(path.join(asset.out, asset.m.id, "client/_astro/a.js"), "2");
+  await expect(verifyArtifact(asset.out, asset.m.id)).rejects.toThrow(/does not match/);
 });

@@ -556,17 +556,14 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect(res.headers.get("set-cookie")).toMatch(
       /^cart=carttoken_00000000000000000001; .*Max-Age=2592000/,
     );
-    await get(
+    const calls = api.calls.length;
+    const bad = await get(
       `${shop}/_p/cart/lines`,
-      {
-        origin: shop,
-        cookie,
-        "content-type": "application/json",
-        "idempotency-key": "bad key\u0001",
-      },
+      { origin: shop, cookie, "content-type": "application/json", "idempotency-key": "bad key" },
       { method: "POST", body: JSON.stringify({ variant_id: "v1" }) },
     );
-    expect(api.calls.at(-1)?.headers["idempotency-key"]).toBeUndefined();
+    expect(bad.status).toBe(400);
+    expect(api.calls.length).toBe(calls); // refused before any cart call
   });
 
   test("the checkout artifact comes from the resolved site", async () => {

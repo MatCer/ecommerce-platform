@@ -113,8 +113,9 @@ export class ArtifactFetcher {
     }
 
     const bodies = new Map<string, Uint8Array>();
-    // One budget for every file: the limit holds while the downloads are in flight.
-    const budget = { left: MAX_ARTIFACT_BYTES };
+    // One budget for every file, the manifest included: the limit holds while the downloads
+    // are in flight.
+    const budget = { left: MAX_ARTIFACT_BYTES - manifestBytes.byteLength };
     for (let i = 0; i < files.length; i += CONCURRENCY) {
       const batch = files.slice(i, i + CONCURRENCY);
       const got = await Promise.all(batch.map((f) => this.#get(id, f, budget, signal)));

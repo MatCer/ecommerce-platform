@@ -89,6 +89,8 @@ ps: ## Show stack status
 
 theme-build: ## Build + pack the default theme and checkout (A22), upload + publish them for every tenant (A30)
 	scripts/build-artifacts.sh
+	node packages/theme-kit/src/cli.ts verify --root .artifacts \
+		"$$(cat .artifacts/channels/default-theme)" "$$(cat .artifacts/channels/checkout)"
 	$(COMPOSE_FULL) run --rm --no-deps -v "$(CURDIR)/.artifacts:/artifacts:ro" api \
 		/usr/local/bin/api admin publish-artifacts --root /artifacts \
 		--theme "$$(cat .artifacts/channels/default-theme)" --checkout "$$(cat .artifacts/channels/checkout)"

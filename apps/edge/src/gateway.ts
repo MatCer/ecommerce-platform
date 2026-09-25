@@ -434,6 +434,11 @@ export function createGateway(opts: GatewayOptions) {
     if (req.method !== "GET" && !sameOrigin(req, host, port))
       return problem(403, "cross_origin", "cross-origin request");
 
+    // Idempotency-Key (§8.1): the API runs a keyed cart mutation once and replays it after. A
+    // malformed key is refused, never silently dropped (a retry would then apply twice).
+    const key = req.headers.get("idempotency-key");
+    if (key !== null && !IDEMPOTENCY_KEY_RE.test(key))
+      return problem(400, "invalid_idempotency_key", "1-255 visible ASCII characters");
     let body: ArrayBuffer | undefined;
     if (req.method === "POST" || req.method === "PATCH") {
       const b = await readJsonBody(req, MAX_JSON_BODY);
@@ -461,15 +466,13 @@ export function createGateway(opts: GatewayOptions) {
       setCookie = cartCookie(token);
     }
 
-    // Idempotency-Key (§8.1): the API runs a keyed cart mutation once and replays it after.
-    const key = req.headers.get("idempotency-key");
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/cart${rest}`, {
         method: req.method,
         headers: apiHeaders(site, {
           "x-cart-token": token,
           ...(body ? { "content-type": "application/json" } : {}),
-          ...(key && IDEMPOTENCY_KEY_RE.test(key) ? { "idempotency-key": key } : {}),
+          ...(key ? { "idempotency-key": key } : {}),
         }),
         body,
       }),

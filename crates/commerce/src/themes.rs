@@ -22,6 +22,8 @@ use crate::audit;
 use crate::markets::invalid;
 
 pub const DEFAULT_THEME: &str = "default-theme";
+/// A6: an artifact (all files) is at most 50 MB.
+pub const MAX_ARTIFACT_BYTES: usize = 50 * 1024 * 1024;
 pub const CHECKOUT: &str = "checkout";
 
 /// Earlier artifacts stay reachable for `/_astro/*` (A22): the previous 3 revisions or those
@@ -103,9 +105,28 @@ pub async fn register_artifact(
             format!("unexpected artifact file {path:?}"),
         ));
     }
+    let total: usize = files.iter().map(|(_, b)| b.len()).sum();
+    if total > MAX_ARTIFACT_BYTES {
+        return Err(invalid("invalid_artifact", "artifact is larger than 50 MB"));
+    }
+    // One publisher per artifact id at a time: the existence check, the uploads and the
+    // registration happen under a transaction-scoped advisory lock.
+    let mut lock = db.begin().await?;
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('theme_artifact:' || $1, 0))",
+        id
+    )
+    .execute(&mut *lock)
+    .await?;
     // Registered artifacts are immutable (edges may run them): publishing the same id again
     // must bring exactly the stored bytes, and nothing is written.
-    if artifact_exists(db, id).await? {
+    let exists = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM platform.theme_artifacts WHERE id = $1) AS "x!""#,
+        id
+    )
+    .fetch_one(&mut *lock)
+    .await?;
+    if exists {
         for (path, bytes) in &files {
             let stored = match storage.private.get(&object_key(id, path)).await {
                 Ok(r) => Some(r.bytes().await?),
@@ -129,14 +150,14 @@ pub async fn register_artifact(
     }
     // Registered only after every file is stored, so a registered artifact is complete.
     sqlx::query!(
-        "INSERT INTO platform.theme_artifacts (id, kind, tokens) VALUES ($1, $2, $3)
-         ON CONFLICT (id) DO NOTHING",
+        "INSERT INTO platform.theme_artifacts (id, kind, tokens) VALUES ($1, $2, $3)",
         id,
         kind.as_str(),
         tokens
     )
-    .execute(db)
+    .execute(&mut *lock)
     .await?;
+    lock.commit().await?;
     Ok(())
 }
 

@@ -26,6 +26,7 @@ step "astro build"
 step "pack + publish"
 id=$(node "$kit/cli.ts" pack --dist "$theme/dist" --kind theme --tokens "$theme/theme.tokens.json" \
   --out "$ARTIFACT_ROOT" | tail -1)
+node "$kit/cli.ts" verify --root "$ARTIFACT_ROOT" "$id"
 root_abs="$(cd "$ARTIFACT_ROOT" && pwd)"
 ${PUBLISH:-docker compose run --rm --no-deps -v "$root_abs:/artifacts:ro" api \
   /usr/local/bin/api admin publish-artifacts --root /artifacts --theme} "$id"

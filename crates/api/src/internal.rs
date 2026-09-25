@@ -75,12 +75,18 @@ async fn artifact_file(
     {
         return Err(Error::NotFound);
     }
-    let bytes = match s.storage.private.get(&themes::object_key(&id, &file)).await {
-        Ok(r) => r.bytes().await?,
+    let object = match s.storage.private.get(&themes::object_key(&id, &file)).await {
+        Ok(r) => r,
         Err(object_store::Error::NotFound { .. }) => return Err(Error::NotFound),
         Err(e) => return Err(e.into()),
     };
-    let mut res = bytes.into_response();
+    // Registration caps artifacts; a larger object is not ours to serve. Streamed, not buffered.
+    if object.meta.size > themes::MAX_ARTIFACT_BYTES as u64 {
+        return Err(Error::Internal(format!(
+            "artifact object {id}/{file} is too large"
+        )));
+    }
+    let mut res = axum::body::Body::from_stream(object.into_stream()).into_response();
     res.headers_mut().insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/octet-stream"),
