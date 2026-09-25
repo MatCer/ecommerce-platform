@@ -118,12 +118,7 @@ export default function Subscribers() {
         }
       />
       <div class="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <TextField
-          type="search"
-          label={t("marketing.searchEmail")}
-          value={q()}
-          onChange={setQ}
-        />
+        <TextField type="search" label={t("marketing.searchEmail")} value={q()} onChange={setQ} />
         <SelectField
           label={t("marketing.status")}
           value={status()}

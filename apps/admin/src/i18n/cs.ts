@@ -1601,7 +1601,8 @@ export const cs: Dictionary = {
   },
   marketing: {
     subscribers: "Odběratelé",
-    subscribersDesc: "Lidé, kteří potvrdili (nebo si vyžádali) newsletter, včetně záznamu o souhlasu.",
+    subscribersDesc:
+      "Lidé, kteří potvrdili (nebo si vyžádali) newsletter, včetně záznamu o souhlasu.",
     export: "Exportovat CSV",
     searchEmail: "Hledat podle e-mailu",
     status: "Stav",
@@ -1671,7 +1672,8 @@ export const cs: Dictionary = {
     matching: "Odpovídajících odběratelů: {{n}}",
     sample: "Ukázka odpovídajících odběratelů",
     deleteSegment: "Smazat segment {{name}}?",
-    deleteSegmentDesc: "Odeslané kampaně si ponechají svá čísla. Segment, který kampaň používá, smazat nelze.",
+    deleteSegmentDesc:
+      "Odeslané kampaně si ponechají svá čísla. Segment, který kampaň používá, smazat nelze.",
     block_heading: "Nadpis",
     block_text: "Text",
     block_image: "Obrázek",
@@ -1722,7 +1724,8 @@ export const cs: Dictionary = {
     problemSubject: "{{locale}}: zadejte předmět o délce 1–200 znaků.",
     problemBlocks: "{{locale}}: přidejte 1–50 bloků.",
     problemBlock: "{{locale}}: blok {{n}} není úplný.",
-    unsavedHint: "Neuložené změny: uložte je, abyste je mohli zobrazit v náhledu, otestovat nebo naplánovat.",
+    unsavedHint:
+      "Neuložené změny: uložte je, abyste je mohli zobrazit v náhledu, otestovat nebo naplánovat.",
     notEditable: "Upravovat lze jen koncepty.",
     scheduledAt: "Naplánováno na",
     startedAt: "Zahájeno",
@@ -1740,7 +1743,8 @@ export const cs: Dictionary = {
     send: "Odeslat",
     testSent: "Test odeslán (počet adres: {{n}})",
     schedule: "Naplánovat",
-    scheduleDesc: "Uložená verze půjde příjemcům: {{segment}}. Odběratelé bez souhlasu budou přeskočeni.",
+    scheduleDesc:
+      "Uložená verze půjde příjemcům: {{segment}}. Odběratelé bez souhlasu budou přeskočeni.",
     sendNow: "Odeslat hned",
     sendLater: "V určený čas",
     sendAt: "Odeslat v",

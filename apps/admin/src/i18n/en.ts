@@ -1595,7 +1595,8 @@ export const en = {
   },
   marketing: {
     subscribers: "Subscribers",
-    subscribersDesc: "People who confirmed (or requested) the newsletter, with their consent record.",
+    subscribersDesc:
+      "People who confirmed (or requested) the newsletter, with their consent record.",
     export: "Export CSV",
     searchEmail: "Search by email",
     status: "Status",
@@ -1665,7 +1666,8 @@ export const en = {
     matching: "{{n}} subscribers match",
     sample: "Sample of matching subscribers",
     deleteSegment: "Delete segment {{name}}?",
-    deleteSegmentDesc: "Campaigns sent to it keep their numbers. A segment used by a campaign cannot be deleted.",
+    deleteSegmentDesc:
+      "Campaigns sent to it keep their numbers. A segment used by a campaign cannot be deleted.",
     block_heading: "Heading",
     block_text: "Text",
     block_image: "Image",
@@ -1676,7 +1678,8 @@ export const en = {
     imageLink: "Link (optional)",
     gridLimit: "Select 1–{{max}} products.",
     productCount: "Number of products",
-    personalizedHint: "Each recipient gets products matching their interests, otherwise best sellers.",
+    personalizedHint:
+      "Each recipient gets products matching their interests, otherwise best sellers.",
     campaigns: "Campaigns",
     campaign: "Campaign",
     campaignsDesc: "Newsletters to a segment or to every subscriber.",
@@ -1734,7 +1737,8 @@ export const en = {
     send: "Send",
     testSent: "Test emails queued: {{n}}",
     schedule: "Schedule",
-    scheduleDesc: "The saved version goes to: {{segment}}. Subscribers without consent are skipped.",
+    scheduleDesc:
+      "The saved version goes to: {{segment}}. Subscribers without consent are skipped.",
     sendNow: "Send now",
     sendLater: "At a set time",
     sendAt: "Send at",

@@ -285,7 +285,9 @@ function Suppressions() {
 
   const add = createMutation(() => ({
     mutationFn: (body: Schemas["SuppressionInput"]) =>
-      unwrap(api.POST("/admin/v1/email-suppressions", { params: { header: tenantHeader() }, body })),
+      unwrap(
+        api.POST("/admin/v1/email-suppressions", { params: { header: tenantHeader() }, body }),
+      ),
     onSuccess: async () => {
       setAdding(false);
       await refresh();
@@ -361,7 +363,9 @@ function Suppressions() {
                       <tr>
                         <td class={`${tdClass} font-medium`}>{s.email}</td>
                         <td class={`${tdClass} text-xs`}>
-                          {s.reason === "bounce" || s.reason === "complaint" || s.reason === "manual"
+                          {s.reason === "bounce" ||
+                          s.reason === "complaint" ||
+                          s.reason === "manual"
                             ? t(`emails.reason_${s.reason}`)
                             : s.reason}
                         </td>
@@ -416,12 +420,7 @@ function Suppressions() {
             required
             maxLength={254}
           />
-          <TextField
-            label={t("emails.note")}
-            value={note()}
-            onChange={setNote}
-            maxLength={500}
-          />
+          <TextField label={t("emails.note")} value={note()} onChange={setNote} maxLength={500} />
           <Show when={error()}>
             <p role="alert" class="text-xs font-medium text-error-700">
               {error()}

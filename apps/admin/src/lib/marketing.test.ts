@@ -4,8 +4,8 @@ import {
   blankContent,
   blankEmailBlock,
   blockValid,
-  campaignInput,
   type Condition,
+  campaignInput,
   contentProblem,
   EMAIL_BLOCK_TYPES,
   fromCondition,
@@ -29,8 +29,14 @@ describe("segment rules", () => {
       { field: "affinity", dim: "brand", keys: ["Nike"] },
     ];
     for (const c of conditions) expect(toCondition(fromCondition(c))).toEqual(c);
-    const dated = toCondition(fromCondition({ field: "subscribed", after: "2026-01-01T10:00:00Z" }));
-    expect(dated).toEqual({ field: "subscribed", after: "2026-01-01T10:00:00.000Z", before: undefined });
+    const dated = toCondition(
+      fromCondition({ field: "subscribed", after: "2026-01-01T10:00:00Z" }),
+    );
+    expect(dated).toEqual({
+      field: "subscribed",
+      after: "2026-01-01T10:00:00.000Z",
+      before: undefined,
+    });
   });
 
   it("converts amounts in major units to minor units", () => {

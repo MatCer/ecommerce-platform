@@ -66,7 +66,10 @@ function problemText(p: ContentProblem): string {
     case "blocks":
       return t("marketing.problemBlocks", { locale: p.locale.toUpperCase() });
     case "block":
-      return t("marketing.problemBlock", { locale: p.locale.toUpperCase(), n: String(p.index + 1) });
+      return t("marketing.problemBlock", {
+        locale: p.locale.toUpperCase(),
+        n: String(p.index + 1),
+      });
   }
 }
 
@@ -216,7 +219,11 @@ export default function CampaignEditor() {
   const body = () => campaignInput(name(), segmentId(), content());
   const dirty = () => {
     const c = campaign.data;
-    return !c || JSON.stringify(body()) !== JSON.stringify(campaignInput(c.name, c.segment_id ?? "", c.content));
+    return (
+      !c ||
+      JSON.stringify(body()) !==
+        JSON.stringify(campaignInput(c.name, c.segment_id ?? "", c.content))
+    );
   };
   const setLocaleContent = (l: string, patch: Partial<LocaleContent>) =>
     setContent({ ...content(), [l]: { ...(content()[l] ?? blankContent()), ...patch } });
@@ -237,7 +244,10 @@ export default function CampaignEditor() {
             }),
           )
         : unwrap(
-            api.POST("/admin/v1/campaigns", { params: { header: create.header(input) }, body: input }),
+            api.POST("/admin/v1/campaigns", {
+              params: { header: create.header(input) },
+              body: input,
+            }),
           ),
     onSuccess: async (result) => {
       const created = !params.id;
@@ -409,12 +419,7 @@ export default function CampaignEditor() {
         </p>
       </Show>
       <div>
-        <Button
-          type="submit"
-          variant="primary"
-          loading={save.isPending}
-          disabled={!name().trim()}
-        >
+        <Button type="submit" variant="primary" loading={save.isPending} disabled={!name().trim()}>
           {t("common.save")}
         </Button>
       </div>
@@ -522,7 +527,9 @@ export default function CampaignEditor() {
   return (
     <>
       <PageHeader
-        title={params.id ? (campaign.data?.name ?? t("marketing.campaign")) : t("marketing.newCampaign")}
+        title={
+          params.id ? (campaign.data?.name ?? t("marketing.campaign")) : t("marketing.newCampaign")
+        }
         back={{ href: "/marketing/campaigns", label: t("marketing.campaigns") }}
         actions={params.id ? actions() : undefined}
       />

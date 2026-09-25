@@ -535,7 +535,7 @@ async fn campaigns_send_once_per_subscriber_with_rechecks_and_tracking(db: PgPoo
     let _ = product(&runtime, &s, "LIN", "Len").await;
     let a = subscribed(&runtime, &s, "anna@example.com").await;
     let b = subscribed(&runtime, &s, "bert@example.com").await;
-    let _pending = {
+    {
         let c = ctx(&runtime, &s, "cs").await;
         let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
         subscribers::subscribe(&mut tx, &c, "pending@example.com", None, "form")

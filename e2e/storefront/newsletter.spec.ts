@@ -38,7 +38,20 @@ function env(name: string, fallback: string): string {
 function sql(query: string): string {
   return execFileSync(
     "docker",
-    ["compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "app", "-At", "-c", query],
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "app",
+      "-At",
+      "-c",
+      query,
+    ],
     { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
   ).trim();
 }
@@ -109,7 +122,9 @@ async function subscribe(page: Page, email: string) {
   expect(link, "confirmation link").toBeTruthy();
   await page.goto(link ?? "");
   await expect(page.getByRole("heading", { name: "Potvrzení odběru" })).toBeVisible();
-  await expect(page.getByText(/Potvrďte, že chcete dostávat novinky na adresu .\*\*\*@example\.com/)).toBeVisible();
+  await expect(
+    page.getByText(/Potvrďte, že chcete dostávat novinky na adresu .\*\*\*@example\.com/),
+  ).toBeVisible();
   await expectAccessible(page, "newsletter confirmation");
   await page.getByRole("button", { name: "Potvrdit odběr" }).click();
   await expect(page.getByText("Děkujeme, odběr je potvrzený.")).toBeVisible();
@@ -192,7 +207,7 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
       preheader: "Podzimní výběr",
       blocks: [
         { type: "heading", text: "Novinky na podzim" },
-        { type: "text", html: "<p>Mrkněte na <a href=\"/\">celý obchod</a>.</p>" },
+        { type: "text", html: '<p>Mrkněte na <a href="/">celý obchod</a>.</p>' },
         { type: "personalized_products", title: "Vybrali jsme pro vás", limit: 2 },
         { type: "button", label: "Do obchodu", href: "/" },
       ],
@@ -263,7 +278,10 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
   const slugsB = productSlugs(mailB?.HTML ?? "");
   expect(slugsA.length).toBeGreaterThan(0);
   expect(slugsB.length).toBeGreaterThan(0);
-  expect(slugsB.every((s) => inCategory.includes(s)), `${slugsB} in ${category}`).toBe(true);
+  expect(
+    slugsB.every((s) => inCategory.includes(s)),
+    `${slugsB} in ${category}`,
+  ).toBe(true);
   expect(slugsA).not.toEqual(slugsB);
   expect(mailA?.HTML).toContain("/_p/newsletter/click?t=");
   for (const m of [mailA, mailB]) {

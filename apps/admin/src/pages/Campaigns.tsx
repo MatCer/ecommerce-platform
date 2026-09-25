@@ -43,7 +43,9 @@ export default function Campaigns() {
   const remove = createMutation(() => ({
     mutationFn: (id: string) =>
       unwrap(
-        api.DELETE("/admin/v1/campaigns/{id}", { params: { header: tenantHeader(), path: { id } } }),
+        api.DELETE("/admin/v1/campaigns/{id}", {
+          params: { header: tenantHeader(), path: { id } },
+        }),
       ),
     onSuccess: async () => {
       setDeleting(null);

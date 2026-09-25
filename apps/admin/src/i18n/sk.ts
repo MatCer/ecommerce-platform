@@ -1601,7 +1601,8 @@ export const sk: Dictionary = {
   },
   marketing: {
     subscribers: "Odberatelia",
-    subscribersDesc: "Ľudia, ktorí potvrdili (alebo si vyžiadali) newsletter, vrátane záznamu o súhlase.",
+    subscribersDesc:
+      "Ľudia, ktorí potvrdili (alebo si vyžiadali) newsletter, vrátane záznamu o súhlase.",
     export: "Exportovať CSV",
     searchEmail: "Hľadať podľa e-mailu",
     status: "Stav",
@@ -1671,7 +1672,8 @@ export const sk: Dictionary = {
     matching: "Zodpovedajúcich odberateľov: {{n}}",
     sample: "Ukážka zodpovedajúcich odberateľov",
     deleteSegment: "Zmazať segment {{name}}?",
-    deleteSegmentDesc: "Odoslané kampane si ponechajú svoje čísla. Segment, ktorý kampaň používa, sa zmazať nedá.",
+    deleteSegmentDesc:
+      "Odoslané kampane si ponechajú svoje čísla. Segment, ktorý kampaň používa, sa zmazať nedá.",
     block_heading: "Nadpis",
     block_text: "Text",
     block_image: "Obrázok",
@@ -1682,7 +1684,8 @@ export const sk: Dictionary = {
     imageLink: "Odkaz (nepovinný)",
     gridLimit: "Vyberte 1–{{max}} produktov.",
     productCount: "Počet produktov",
-    personalizedHint: "Každý príjemca dostane produkty podľa svojich záujmov, inak najpredávanejšie.",
+    personalizedHint:
+      "Každý príjemca dostane produkty podľa svojich záujmov, inak najpredávanejšie.",
     campaigns: "Kampane",
     campaign: "Kampaň",
     campaignsDesc: "Newslettre pre segment alebo pre všetkých odberateľov.",
@@ -1722,7 +1725,8 @@ export const sk: Dictionary = {
     problemSubject: "{{locale}}: zadajte predmet s dĺžkou 1–200 znakov.",
     problemBlocks: "{{locale}}: pridajte 1–50 blokov.",
     problemBlock: "{{locale}}: blok {{n}} nie je úplný.",
-    unsavedHint: "Neuložené zmeny: uložte ich, aby ste ich mohli zobraziť v náhľade, otestovať alebo naplánovať.",
+    unsavedHint:
+      "Neuložené zmeny: uložte ich, aby ste ich mohli zobraziť v náhľade, otestovať alebo naplánovať.",
     notEditable: "Upravovať sa dajú len koncepty.",
     scheduledAt: "Naplánované na",
     startedAt: "Začaté",
@@ -1740,7 +1744,8 @@ export const sk: Dictionary = {
     send: "Odoslať",
     testSent: "Test odoslaný (počet adries: {{n}})",
     schedule: "Naplánovať",
-    scheduleDesc: "Uložená verzia pôjde príjemcom: {{segment}}. Odberatelia bez súhlasu budú preskočení.",
+    scheduleDesc:
+      "Uložená verzia pôjde príjemcom: {{segment}}. Odberatelia bez súhlasu budú preskočení.",
     sendNow: "Odoslať hneď",
     sendLater: "V určený čas",
     sendAt: "Odoslať o",

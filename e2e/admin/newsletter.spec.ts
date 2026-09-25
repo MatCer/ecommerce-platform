@@ -21,7 +21,9 @@ async function signIn(page: Page, email: string): Promise<void> {
 }
 
 const nav = (page: Page, name: string) =>
-  page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name, exact: true });
+  page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("link", { name, exact: true });
 
 async function addBlock(page: Page, name: string): Promise<void> {
   await page.getByRole("button", { name: "Add block", exact: true }).click();
@@ -93,7 +95,9 @@ test("staff segment subscribers, build a campaign, preview it and send a test", 
   const frame = page.locator('iframe[title="Email preview"]');
   await expect(frame).toBeVisible();
   await expect(frame).toHaveAttribute("sandbox", "");
-  await expect(page.frameLocator('iframe[title="Email preview"]').getByText("Podzim je tu").first()).toBeVisible();
+  await expect(
+    page.frameLocator('iframe[title="Email preview"]').getByText("Podzim je tu").first(),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Send test", exact: true }).click();
   const test_ = page.getByRole("dialog", { name: "Send test" });
@@ -112,7 +116,10 @@ test("staff segment subscribers, build a campaign, preview it and send a test", 
   const log = page.getByRole("table", { name: "Sent emails" });
   await expect(log.getByRole("cell", { name: tester })).toBeVisible();
   await expectAccessible(page, "email log");
-  await log.getByRole("button", { name: /^Details/ }).first().click();
+  await log
+    .getByRole("button", { name: /^Details/ })
+    .first()
+    .click();
   const detail = page.getByRole("dialog");
   await expect(detail.getByText(tester)).toBeVisible();
   await page.keyboard.press("Escape");

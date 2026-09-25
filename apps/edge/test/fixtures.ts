@@ -242,7 +242,9 @@ export function fakeApi() {
         ? Response.json({ url: q.get("u") })
         : Response.json({ code: "not_found" }, { status: 404 });
     }
-    if (["/newsletter/unsubscribe", "/newsletter/confirmation", "/newsletter/resubscribe"].includes(p)) {
+    if (
+      ["/newsletter/unsubscribe", "/newsletter/confirmation", "/newsletter/resubscribe"].includes(p)
+    ) {
       const token = (JSON.parse(calls.at(-1)?.body || "{}") as { token?: string }).token;
       return token === "a".repeat(64)
         ? Response.json({ status: "ok" }, { status: p.endsWith("resubscribe") ? 202 : 200 })

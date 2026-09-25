@@ -174,7 +174,11 @@ export function fromCondition(c: Condition): ConditionForm {
     case "last_order":
       return { ...f, after: toLocalInput(c.after), before: toLocalInput(c.before) };
     case "order_count":
-      return { ...f, min: c.min == null ? "" : String(c.min), max: c.max == null ? "" : String(c.max) };
+      return {
+        ...f,
+        min: c.min == null ? "" : String(c.min),
+        max: c.max == null ? "" : String(c.max),
+      };
     case "total_spent":
       return {
         ...f,
@@ -267,9 +271,7 @@ export function blockValid(b: EmailBlock): boolean {
     case "button":
       return len(b.label) >= 1 && len(b.label) <= 100 && validContentHref(b.href);
     case "product_grid":
-      return (
-        b.product_ids.length >= 1 && b.product_ids.length <= MAX_GRID && len(b.title) <= 200
-      );
+      return b.product_ids.length >= 1 && b.product_ids.length <= MAX_GRID && len(b.title) <= 200;
     case "personalized_products": {
       const limit = b.limit ?? 4;
       return Number.isInteger(limit) && limit >= 2 && limit <= 8 && len(b.title) <= 200;
