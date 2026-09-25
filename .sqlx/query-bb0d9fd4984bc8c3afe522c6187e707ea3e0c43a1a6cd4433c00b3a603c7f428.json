@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT version, email, phone, billing_address, shipping_address, shipping_method_id,\n                pickup_point, payment_method\n         FROM carts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "phone",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "phone"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "billing_address",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "billing_address"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "shipping_address",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "shipping_address"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "shipping_method_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "shipping_method_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "pickup_point",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "pickup_point"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "payment_method",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "payment_method"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "bb0d9fd4984bc8c3afe522c6187e707ea3e0c43a1a6cd4433c00b3a603c7f428"
+}

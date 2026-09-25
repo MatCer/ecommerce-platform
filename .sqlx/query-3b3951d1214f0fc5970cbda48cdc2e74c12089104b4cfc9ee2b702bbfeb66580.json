@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT cl.id, cl.variant_id, cl.quantity, v.product_id, v.sku, v.option_values\n         FROM cart_lines cl JOIN variants v ON v.id = cl.variant_id\n         WHERE cl.cart_id = $1 ORDER BY cl.created_at, cl.id",
+  "query": "SELECT cl.id, cl.variant_id, cl.quantity, v.product_id, v.sku, v.option_values, v.weight_g\n         FROM cart_lines cl JOIN variants v ON v.id = cl.variant_id\n         WHERE cl.cart_id = $1 ORDER BY cl.created_at, cl.id",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,17 @@
             "name": "option_values"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "weight_g",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "weight_g"
+          }
+        }
       }
     ],
     "parameters": {
@@ -81,8 +92,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "7ed3da236e4897eeaec47caf9ec60530f78d2e7bb57d0c2fb3375418be339a46"
+  "hash": "3b3951d1214f0fc5970cbda48cdc2e74c12089104b4cfc9ee2b702bbfeb66580"
 }

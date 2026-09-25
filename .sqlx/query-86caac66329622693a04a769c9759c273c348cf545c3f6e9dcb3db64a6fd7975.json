@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shipping_methods SET carrier = $2, name_i18n = $3, description_i18n = $4,\n             price_minor = $5, free_over_minor = $6, weight_tiers = $7, cod_allowed = $8,\n             cod_fee_minor = $9, active = $10, position = $11, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Jsonb",
+        "Bool",
+        "Int8",
+        "Bool",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "86caac66329622693a04a769c9759c273c348cf545c3f6e9dcb3db64a6fd7975"
+}

@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO shipping_methods (id, tenant_id, market_id, carrier, name_i18n, description_i18n,\n             price_minor, free_over_minor, weight_tiers, cod_allowed, cod_fee_minor, active, position)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Jsonb",
+        "Bool",
+        "Int8",
+        "Bool",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8c6d981d6a326a5777c7ae20c32c63e7aa5468d80f67b34ffb89f56427411231"
+}

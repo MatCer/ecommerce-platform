@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET shipping_method_id = $2, pickup_point = $3,\n             payment_method = CASE WHEN payment_method = 'cod' AND NOT $4 THEN NULL\n                                   ELSE payment_method END,\n             updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Jsonb",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f52985bded0b7ca8b0dad96127e26cdfe74069f774056218750f370470cd35d3"
+}
