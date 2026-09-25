@@ -689,17 +689,17 @@ pub struct AddressInput {
     pub is_default: bool,
 }
 
-struct CleanAddress {
-    name: String,
-    company: Option<String>,
-    street: String,
-    city: String,
-    postal_code: String,
-    country: String,
-    phone: Option<String>,
+pub(crate) struct CleanAddress {
+    pub(crate) name: String,
+    pub(crate) company: Option<String>,
+    pub(crate) street: String,
+    pub(crate) city: String,
+    pub(crate) postal_code: String,
+    pub(crate) country: String,
+    pub(crate) phone: Option<String>,
 }
 
-fn clean(a: &AddressInput) -> Result<CleanAddress, Error> {
+pub(crate) fn clean(a: &AddressInput) -> Result<CleanAddress, Error> {
     let field = |v: &str, name: &'static str, max: usize| -> Result<String, Error> {
         let v = v.trim();
         if v.is_empty() || v.chars().count() > max || v.chars().any(char::is_control) {
