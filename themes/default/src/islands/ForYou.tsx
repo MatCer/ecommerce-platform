@@ -6,8 +6,8 @@ import type { Props } from "./ForYouList";
 /**
  * Home "for you" gate: loads the list (`ForYouList`) only while the visitor grants
  * `personalization` (A20), so everyone else downloads almost nothing and the cached home page
- * stays the same for all; a withdrawal unmounts it. Renders nothing on the server: hydrate
- * with client:idle.
+ * stays the same for all; a withdrawal (here, or in another tab once this one is shown again)
+ * unmounts it. Renders nothing on the server: hydrate with client:idle.
  */
 export default function ForYou(props: Props) {
   const [List, setList] = createSignal<Component<Props>>();
@@ -18,8 +18,16 @@ export default function ForYou(props: Props) {
       if (granted() && !List()) void import("./ForYouList").then((m) => setList(() => m.default));
     };
     sync();
+    // A choice made in another tab reaches this one when it is shown again.
+    const shown = () => document.visibilityState === "visible" && sync();
     addEventListener(CONSENT_CHANGED, sync);
-    onCleanup(() => removeEventListener(CONSENT_CHANGED, sync));
+    addEventListener("pageshow", sync);
+    document.addEventListener("visibilitychange", shown);
+    onCleanup(() => {
+      removeEventListener(CONSENT_CHANGED, sync);
+      removeEventListener("pageshow", sync);
+      document.removeEventListener("visibilitychange", shown);
+    });
   });
   return (
     <Show when={granted() && List()}>

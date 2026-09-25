@@ -22,9 +22,11 @@ use super::{HALF_LIFE_DAYS, MIN_SUPPORT, WINDOW_DAYS};
 /// A first run (or an explicit backfill) reads this many days: enough for last year's month
 /// (seasonal) and the 90-day window.
 pub const BACKFILL_DAYS: u32 = 400;
-/// The nightly run recomputes the whole scoring window, so late changes to older orders
-/// (a cancellation weeks later) leave the scores.
-pub const NIGHTLY_DAYS: u32 = 91;
+/// The nightly run recomputes everything retained (scores and last year's month), so a late
+/// change to an older order (a cancellation weeks or months later) leaves every result.
+/// ponytail: a full recompute per tenant and night; recompute only the days of changed orders
+/// if it gets heavy for large tenants.
+pub const NIGHTLY_DAYS: u32 = BACKFILL_DAYS;
 /// Stats older than this are pruned.
 pub const KEEP_DAYS: i64 = 400;
 /// Customer affinity looks back one year, with a slower decay than the scores.
@@ -230,6 +232,14 @@ pub async fn customer_affinity(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<
 /// everything derived from them. Returns how many products' search popularity changed (they
 /// are marked for [`take_reindex`]).
 pub async fn run(tx: &mut TenantTx, now: DateTime<Utc>, days: u32) -> Result<u64, Error> {
+    // One rollup per tenant at a time (the hourly job and a seed backfill may overlap): the
+    // second waits instead of failing on the first one's rows.
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        format!("recommendations-rollup:{}", tx.tenant_id())
+    )
+    .execute(&mut **tx)
+    .await?;
     let today = now.date_naive();
     let from = today - chrono::Days::new(u64::from(days.max(1) - 1));
     stats(tx, from, today).await?;

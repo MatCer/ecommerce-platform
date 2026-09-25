@@ -517,8 +517,8 @@ async fn analytics_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
 /// Above this many changed products one index rebuild replaces the per-product jobs.
 const REINDEX_REBUILD_OVER: usize = 1000;
 
-/// Hourly (WP17): product stats of today and yesterday (the whole 91-day scoring window at the
-/// 03:00 UTC slot, 400 days on a tenant's first run or a `backfill` request), co-purchases,
+/// Hourly (WP17): product stats of today and yesterday (everything retained, 400 days, at the
+/// 03:00 UTC slot, on a tenant's first run or on a `backfill` request), co-purchases,
 /// scores, customer affinity; then reindexes the products whose search popularity moved. The
 /// rollup marks them; a second transaction takes the marks and enqueues the jobs, so their
 /// version is drawn after the change committed (A27) and a crash in between only delays them.

@@ -862,7 +862,7 @@ async fn nightly_window_corrects_late_cancellations(db: PgPool) {
         &runtime,
         &shop,
         &[(shop.product, shop.variants[0])],
-        now - Duration::days(20),
+        now - Duration::days(120),
         "confirmed",
     )
     .await;
@@ -878,7 +878,8 @@ async fn nightly_window_corrects_late_cancellations(db: PgPool) {
         n.unwrap_or(0)
     };
     assert_eq!(units().await, 1);
-    // Cancelled three weeks after placement: the hourly run (2 days) does not see it...
+    // Cancelled four months after placement (it still counts for last year's month next
+    // year): the hourly run (2 days) does not see it...
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query("UPDATE orders SET status = 'cancelled'")
         .execute(&mut *tx)
@@ -887,7 +888,7 @@ async fn nightly_window_corrects_late_cancellations(db: PgPool) {
     rollup::run(&mut tx, now, 2).await.unwrap();
     tx.commit().await.unwrap();
     assert_eq!(units().await, 1);
-    // ...the nightly run recomputes the whole scoring window.
+    // ...the nightly run recomputes everything retained.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     rollup::run(&mut tx, now, rollup::NIGHTLY_DAYS)
         .await

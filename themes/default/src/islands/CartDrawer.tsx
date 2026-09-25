@@ -1,7 +1,8 @@
+import { CONSENT_CHANGED } from "@platform/storefront-sdk/consent";
 import { imageUrl, type Messages, t, tn } from "@platform/storefront-sdk/format";
 import { recommendations } from "@platform/storefront-sdk/recommendations";
 import type { CartLine, Money, ProductCard } from "@platform/storefront-sdk/types";
-import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onCleanup, Show } from "solid-js";
 import { cart, open, setOpen, updateLine } from "../lib/cart-store";
 import Icon from "../lib/Icon";
 import MiniCard from "../lib/MiniCard";
@@ -43,11 +44,22 @@ export default function CartDrawer(props: {
   // cart's content changes while the drawer is open; a late answer for an older cart is dropped.
   const [crossSell, setCrossSell] = createSignal<ProductCard[]>([]);
   let asked = 0;
+  // A consent change (the answer may have been personal) drops the list and asks again.
+  const [consent, setConsent] = createSignal(0);
+  const consentChanged = () => {
+    asked++;
+    setCrossSell([]);
+    setConsent(consent() + 1);
+  };
+  addEventListener(CONSENT_CHANGED, consentChanged);
+  onCleanup(() => removeEventListener(CONSENT_CHANGED, consentChanged));
   createEffect(
     on(
       () => {
         const c = cart();
-        return open() && c && "version" in c && c.lines.length > 0 ? `${c.id}:${c.version}` : null;
+        return open() && c && "version" in c && c.lines.length > 0
+          ? `${c.id}:${c.version}:${consent()}`
+          : null;
       },
       (key) => {
         if (!key) return;

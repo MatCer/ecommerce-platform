@@ -19,8 +19,16 @@ export default function RecentlyViewed(props: Props) {
         void import("./RecentlyViewedList").then((m) => setList(() => m.default));
     };
     sync();
+    // A choice made in another tab reaches this one when it is shown again.
+    const shown = () => document.visibilityState === "visible" && sync();
     addEventListener(CONSENT_CHANGED, sync);
-    onCleanup(() => removeEventListener(CONSENT_CHANGED, sync));
+    addEventListener("pageshow", sync);
+    document.addEventListener("visibilitychange", shown);
+    onCleanup(() => {
+      removeEventListener(CONSENT_CHANGED, sync);
+      removeEventListener("pageshow", sync);
+      document.removeEventListener("visibilitychange", shown);
+    });
   });
   return (
     <Show when={granted() && List()}>
