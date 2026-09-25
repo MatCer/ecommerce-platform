@@ -133,7 +133,17 @@ jobs:
           tags: ecommerce-admin:ci
           cache-from: type=gha,scope=admin
           cache-to: type=gha,scope=admin,mode=max
-      - run: scripts/smoke-images.sh ecommerce-rust:ci ecommerce-mocks:ci
+      # WP23: the theme builder / sandbox image (locked theme deps + Chromium).
+      - name: Build theme-builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/theme-builder/Dockerfile
+          tags: ecommerce-theme-builder:ci
+          load: true
+          cache-from: type=gha,scope=theme-builder
+          cache-to: type=gha,scope=theme-builder,mode=max
+      - run: scripts/smoke-images.sh ecommerce-rust:ci ecommerce-mocks:ci ecommerce-theme-builder:ci
 
   ts:
     name: TypeScript (Biome, typecheck, vitest)

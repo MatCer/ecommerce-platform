@@ -4,7 +4,7 @@
 |---|---|---|
 | WP0 | CI doesn't smoke-test the auth image (needs Postgres) | WP15 |
 | WP1 | The smoke scripts are manual; move them into the e2e suite | WP15 |
-| WP2 | Artifact GC (private bucket `artifacts/` + edge cache volume); WP6 keeps everything | WP23 |
+| WP2 | ~~Artifact GC (private bucket `artifacts/` + edge cache volume)~~ done in WP23 (`themes.maintenance`, edge `pruneArtifacts`) | done |
 | WP2 | Page-model gaps left after WP8: size chart, dispatch cutoff + holidays, batch card lookup by ids (recently viewed shows no prices until then); font library | WP15 |
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
@@ -12,7 +12,7 @@
 | WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
 | WP7 | Real popularity signal is a placeholder (tenant synonyms done in WP13a) | WP17 |
 | WP6 | `/newsletter/subscribe` validates and drops (no storage); `/events` is stored since WP14 | M2 (WP18) |
-| WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
+| WP6 | ~~Artifact builds are not reproducible~~ done in WP23: fixed `ASTRO_KEY` for the default artifact, per-tenant HMAC-derived key for tenant builds | done |
 | WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart); place-order is keyed since WP10 | WP15 |
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | Payment/carrier marks in `/shop` are generic catalog text (legal/CMS links come from published pages since WP13a; the checkout still links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale) | WP11 / WP12 |
@@ -54,3 +54,8 @@
 | WP22 | One entity per proposal: no "translate every product missing sk" batch job (bulk plans cover non-text fields) | later |
 | WP22 | The AI quota is a soft limit (concurrent calls may overshoot by one call); no superadmin UI for quotas (CLI `set-ai-quota`) | later (only if it matters) |
 | WP22 | Old `ai_proposals` / `ai_bulk_plans` rows are never purged | later (ops) |
+| WP23 | Sandboxes run under runc on the app host; prod should use gVisor/Firecracker on dedicated build hosts (the proxy would pin `Runtime`) | pre-launch |
+| WP23 | Builder queue is in memory (concurrency 1): a builder restart drops queued builds; they fail after 30 min and must be re-created (no retry button yet) | later |
+| WP23 | Theme source archives and screenshots of old revisions are never deleted (small; artifacts are GC'd) | later (ops) |
+| WP23 | The WP2 lint ideas not built: `client:visible` on an island whose server render can be empty, stale preloads; no image-bytes budget or desktop CLS run in the gates | WP24 |
+| WP23 | No diff view between revisions and no "rebuild" action (a new token edit/upload/reset creates a new revision) | WP24 |

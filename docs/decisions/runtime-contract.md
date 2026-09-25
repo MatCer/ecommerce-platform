@@ -192,7 +192,7 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
 | `checkout.<shop>/_p/tokens.css` | tenant tokens as CSS (A6) |
 | `checkout.<shop>/_p/account/*` | customer accounts → `/storefront/v1/customer/*` (WP9, §12) |
 | `checkout.<shop>` assets / everything else | checkout artifact / checkout worker (always `no-store`) |
-| `preview-*` | 404 until WP23 |
+| `preview-<n>--<shop>` | the previewed revision (WP23, §14): token → cookie, `no-store`, `noindex` |
 | internal port 8788: `/_edge/purge`, `/_edge/healthz` | bearer `EDGE_PURGE_TOKEN` (constant-time compare, ≥ 16 chars); not routed by Caddy |
 
 State-changing `/_p/*` requests must be same-origin (`Origin` equal to the shop origin, else
@@ -438,3 +438,26 @@ separate cache namespace, never cached (already bypassed by the policy).
   binding context (`GET /customer/me`, `/customer/addresses`, `/consent`), never the cookies.
 - Pages with a `token` query parameter (`/account/verify?token=`) are served with
   `Referrer-Policy: no-referrer`.
+
+## 14. WP23: tenant themes, the builder and previews
+
+- **Tenant artifacts** come from the sandboxed builder (`docs/decisions/theme-builder-sandbox.md`):
+  same artifact contract (§2), registered through `PUT /internal/v1/themes/revisions/{id}/artifact`
+  (builder token, A7) after the builder recomputed the content address; the edge verifies it
+  again on download. Builds are reproducible: the default artifact uses a fixed `ASTRO_KEY`,
+  tenant builds a per-tenant key derived from `THEME_SECRET`.
+- **Previews** (`preview-<n>--<shop>`, A21): `?preview_token=` → `GET /internal/v1/previews/resolve`
+  (edge token; the API checks the HMAC, tenant, revision number and expiry) → 303 to the clean
+  URL with `__Host-preview` (`HttpOnly; Secure; SameSite=None; Partitioned`, max 1 h). The site
+  is the shop's with the revision's artifact and no retained artifacts. Every response is
+  `no-store` + `x-robots-tag: noindex, nofollow`; the theme CSP's `frame-ancestors` is the admin
+  origin (`ADMIN_ORIGIN`) instead of `'none'`; `/_p/checkout/start` answers a "Checkout is
+  disabled in preview" page; `/_p/e`, `/_p/newsletter` are no-ops; no page counters. Resolutions
+  are cached per (host, token) for ≤ 60 s and never past the token's expiry.
+- **Caddy** serves `https://*.localhost` with `tls internal` too, so the builder's browser checks
+  measure previews over h2 from the internal `theme-check` network (Chromium maps `*.localhost`
+  to `caddy`).
+- **Artifact GC:** API/worker `themes.maintenance` (hourly) and the edge's `pruneArtifacts`
+  (hourly, local copies unused for 7 days and not running).
+- **Custom revisions and A30:** a tenant whose active revision is custom no longer follows new
+  default artifacts; rolling back to a default revision (or never forking) keeps following.
