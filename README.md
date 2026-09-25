@@ -106,7 +106,8 @@ cargo run -p api
 ```
 
 `AUTH_INTERNAL_URL` is the auth service's `/internal` API (staff invitations). It is not proxied
-by Caddy, so natively it only works with the auth service also running natively.
+by Caddy, so natively it only works with the auth service also running natively. Without both
+`AUTH_INTERNAL_*` variables the API still starts and staff invitations answer `503`.
 
 ## Tenants and staff sign-in
 

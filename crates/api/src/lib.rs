@@ -51,7 +51,8 @@ const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
-    pub auth_service: auth_service::AuthService,
+    /// The auth service's internal API (staff invitations); `None` when not configured.
+    pub auth_service: Option<auth_service::AuthService>,
     pub http: reqwest::Client,
     pub meili_url: Url,
     pub storage: Storage,

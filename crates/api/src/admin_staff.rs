@@ -64,14 +64,17 @@ async fn invite(
     let input: Invitation = parse_json(&body)?;
     staff::authorize(caller.role, None, Some(input.role))?;
     let email = staff::normalize_email(&input.email)?;
-    let user = s.auth_service.ensure_user(&email, &email).await?;
+    let auth = s.auth_service.as_ref().ok_or_else(|| {
+        Error::Unavailable("staff invitations need the auth service (AUTH_INTERNAL_URL)".into())
+    })?;
+    let user = auth.ensure_user(&email, &email).await?;
     let mut tx = tenant_tx(&s.db, caller.tenant_id).await?;
     let member = staff::invite(&mut tx, &caller.user.user_id, &user, &email, input.role).await?;
     let callback = s
         .admin_origin
         .to_str()
         .map_err(|_| Error::Internal("invalid admin origin".into()))?;
-    s.auth_service.invite(&email, callback).await?;
+    auth.invite(&email, callback).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(member)))
 }

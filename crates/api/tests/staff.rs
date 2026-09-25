@@ -169,6 +169,18 @@ async fn invitation_validation_freshness_and_auth_failures(db: PgPool) {
                 .is_empty()
         );
     }
+
+    // Without the auth service configured the API still runs; invitations answer 503.
+    let unconfigured = api::AppState {
+        auth_service: None,
+        ..s.clone()
+    };
+    let (status, _, _) = Call::post("/admin/v1/staff/invitations", input.clone())
+        .tenant(tenant)
+        .token(&token)
+        .send(&unconfigured)
+        .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
 }
 #[sqlx::test(migrations = "../../migrations")]
 async fn role_changes_last_owner_and_removal(db: PgPool) {

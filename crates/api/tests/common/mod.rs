@@ -109,11 +109,10 @@ pub async fn jwks_server(keys: Value) -> Jwks {
 pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
     AppState {
         db,
-        auth_service: api::auth_service::AuthService::new(
-            jwks.url.parse().unwrap(),
-            SERVICE_TOKEN.into(),
-        )
-        .unwrap(),
+        auth_service: Some(
+            api::auth_service::AuthService::new(jwks.url.parse().unwrap(), SERVICE_TOKEN.into())
+                .unwrap(),
+        ),
         http: reqwest::Client::new(),
         meili_url: "http://127.0.0.1:1".parse().unwrap(),
         storage: testkit::memory_storage(),

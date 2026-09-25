@@ -67,12 +67,16 @@ async fn serve() -> anyhow::Result<()> {
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()?;
-    let auth_service = platform::config::AuthServiceConfig::from_env()?;
+    let auth_service = platform::config::AuthServiceConfig::optional_from_env()?
+        .map(|c| api::auth_service::AuthService::new(c.base_url, c.token))
+        .transpose()?;
+    if auth_service.is_none() {
+        tracing::warn!(
+            "AUTH_INTERNAL_URL/AUTH_INTERNAL_TOKEN not set: staff invitations answer 503"
+        );
+    }
     let state = api::AppState {
-        auth_service: api::auth_service::AuthService::new(
-            auth_service.base_url,
-            auth_service.token,
-        )?,
+        auth_service,
         db: db.clone(),
         http: http.clone(),
         meili_url: MeiliConfig::from_env()?.url,

@@ -19,11 +19,7 @@ const DEAD_MEILI: &str = "http://127.0.0.1:1";
 fn state(db: PgPool) -> AppState {
     AppState {
         db,
-        auth_service: api::auth_service::AuthService::new(
-            "http://127.0.0.1:1/".parse().unwrap(),
-            "unused-in-these-tests".into(),
-        )
-        .unwrap(),
+        auth_service: None,
         http: reqwest::Client::new(),
         meili_url: DEAD_MEILI.parse().unwrap(),
         storage: testkit::memory_storage(),
