@@ -1,11 +1,13 @@
 use std::time::Duration;
 
 use anyhow::anyhow;
-use platform::config::{AuthServiceConfig, DbConfig, MeiliConfig, S3Config, WorkerConfig};
+use platform::config::{
+    AppEnv, AuthServiceConfig, DbConfig, MeiliConfig, OpsConfig, S3Config, WorkerConfig,
+};
 use platform::mail::{MailConfig, Mailer};
 use platform::storage::Storage;
 use worker::runner::RunnerConfig;
-use worker::{cron, handlers, outbox, runner};
+use worker::{cron, handlers, metrics, outbox, runner};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -32,7 +34,40 @@ async fn main() -> anyhow::Result<()> {
         .map(|c| platform::auth_service::AuthService::new(c.base_url, c.token))
         .transpose()?;
 
+    // Webhook deliveries need the secrets key; without it they wait (retry) until it is set.
+    let ops = OpsConfig::from_env()?;
+    let env: AppEnv = std::env::var("APP_ENV")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(AppEnv::Prod);
+    let webhooks = ops.secrets_key.map(|key| commerce::webhooks::Webhooks {
+        secrets: platform::crypto::SecretBox::new(&key),
+        http: platform::http::SafeClient::new(ops.safe_http_allow_hosts.clone()),
+        require_https: env == AppEnv::Prod,
+    });
+    if webhooks.is_none() {
+        tracing::warn!("SECRETS_KEY is not configured: webhook deliveries stay queued until it is");
+    }
+    // Event partitions exist before the first event of a new month even if the nightly job
+    // has not run yet (e.g. after downtime).
+    if let Err(e) = sqlx::query("SELECT platform.ensure_event_partitions(2)")
+        .execute(&db)
+        .await
+    {
+        tracing::warn!(error = %e, "ensuring event partitions failed");
+    }
+
     let (stop, shutdown) = tokio::sync::watch::channel(false);
+    if let Some(bind) = ops.metrics_bind {
+        let handle = platform::metrics::install().map_err(|e| anyhow!(e))?;
+        tokio::spawn(metrics::refresh(db.clone(), shutdown.clone()));
+        let shutdown = shutdown.clone();
+        tokio::spawn(async move {
+            if let Err(e) = platform::metrics::serve(bind, handle, shutdown).await {
+                tracing::error!(error = %e, "metrics listener failed");
+            }
+        });
+    }
     tokio::spawn(async move {
         platform::shutdown::signal().await;
         let _ = stop.send(true);
@@ -45,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::join!(
         runner::run(
             db.clone(),
-            handlers::all(storage, meili, mailer, auth),
+            handlers::all(storage, meili, mailer, auth, webhooks),
             RunnerConfig::new(owner, cfg.concurrency),
             shutdown.clone(),
         ),

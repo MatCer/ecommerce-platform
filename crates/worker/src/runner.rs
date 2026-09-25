@@ -133,6 +133,7 @@ async fn job_loop(
 
 async fn process(ctx: &Ctx, handlers: &Handlers, cfg: &RunnerConfig, job: Job) {
     let span = tracing::info_span!("job", id = job.id, kind = %job.kind, attempt = job.attempts);
+    let started = std::time::Instant::now();
 
     // Spawned so a panicking handler fails the job instead of killing the loop.
     let mut task = match handlers.0.get(job.kind.as_str()) {
@@ -188,6 +189,12 @@ async fn process(ctx: &Ctx, handlers: &Handlers, cfg: &RunnerConfig, job: Job) {
                 })
         }
     };
+    metrics::histogram!(
+        "job_duration_seconds",
+        "kind" => job.kind.clone(),
+        "outcome" => if outcome.is_ok() { "ok" } else { "error" },
+    )
+    .record(started.elapsed().as_secs_f64());
     match (recorded, outcome) {
         (Ok(state), Ok(())) => tracing::info!(parent: &span, state, "job finished"),
         (Ok(state), Err(e)) => tracing::warn!(parent: &span, state, error = %e, "job failed"),
