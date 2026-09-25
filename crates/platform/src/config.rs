@@ -440,10 +440,105 @@ impl CheckoutConfig {
     }
 }
 
+/// Operations and integrations shared by api and worker (WP14). Not `Debug`: holds the
+/// secrets key.
+#[derive(Clone)]
+pub struct OpsConfig {
+    /// `METRICS_BIND`: the internal Prometheus listener (`/metrics`), e.g. `0.0.0.0:9100`. It
+    /// is a separate port that the public proxy never routes; unset = no metrics endpoint.
+    pub metrics_bind: Option<SocketAddr>,
+    /// `SECRETS_KEY`: 64 hex characters (AES-256 key) encrypting stored integration secrets
+    /// (webhook signing secrets). Unset = webhook subscriptions are unavailable.
+    pub secrets_key: Option<[u8; 32]>,
+    /// `SAFE_HTTP_ALLOW_HOSTS`: comma-separated host names the SSRF-safe client may reach
+    /// even on private addresses (local mocks). Refused with `APP_ENV=prod`.
+    pub safe_http_allow_hosts: Vec<String>,
+    /// `STOREFRONT_RATE_PER_SECOND` (default 20) and `STOREFRONT_RATE_BURST` (default 120):
+    /// Storefront API requests per storefront token + client IP (spec §8.1).
+    pub storefront_rate_per_second: u32,
+    pub storefront_rate_burst: u32,
+}
+
+impl OpsConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let env = parsed(lookup, "APP_ENV", AppEnv::Prod)?;
+        let metrics_bind = match get(lookup, "METRICS_BIND") {
+            None => None,
+            Some(_) => Some(parsed(
+                lookup,
+                "METRICS_BIND",
+                SocketAddr::from(([0, 0, 0, 0], 0)),
+            )?),
+        };
+        let secrets_key = match get(lookup, "SECRETS_KEY") {
+            None => None,
+            Some(raw) => {
+                let bytes = hex::decode(raw.trim())
+                    .ok()
+                    .and_then(|b| <[u8; 32]>::try_from(b).ok());
+                Some(bytes.ok_or(ConfigError::Invalid {
+                    name: "SECRETS_KEY",
+                    reason: "must be 64 hex characters (32 random bytes)".into(),
+                })?)
+            }
+        };
+        let safe_http_allow_hosts: Vec<String> = get(lookup, "SAFE_HTTP_ALLOW_HOSTS")
+            .unwrap_or_default()
+            .split(',')
+            .map(|h| h.trim().to_ascii_lowercase())
+            .filter(|h| !h.is_empty())
+            .collect();
+        if env == AppEnv::Prod && !safe_http_allow_hosts.is_empty() {
+            return Err(ConfigError::Invalid {
+                name: "SAFE_HTTP_ALLOW_HOSTS",
+                reason: "private-address exceptions are refused with APP_ENV=prod".into(),
+            });
+        }
+        let storefront_rate_per_second = parsed(lookup, "STOREFRONT_RATE_PER_SECOND", 20u32)?;
+        let storefront_rate_burst = parsed(lookup, "STOREFRONT_RATE_BURST", 120u32)?;
+        if storefront_rate_per_second == 0 || storefront_rate_burst == 0 {
+            return Err(ConfigError::Invalid {
+                name: "STOREFRONT_RATE_PER_SECOND",
+                reason: "rate and burst must be positive".into(),
+            });
+        }
+        Ok(Self {
+            metrics_bind,
+            secrets_key,
+            safe_http_allow_hosts,
+            storefront_rate_per_second,
+            storefront_rate_burst,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn ops_config_refuses_private_exceptions_in_prod_and_bad_keys() {
+        let dev = env(&[("APP_ENV", "dev"), ("SAFE_HTTP_ALLOW_HOSTS", "Mocks, ,x")]);
+        assert_eq!(
+            OpsConfig::from_lookup(&dev).unwrap().safe_http_allow_hosts,
+            ["mocks", "x"]
+        );
+        assert!(OpsConfig::from_lookup(&env(&[("SAFE_HTTP_ALLOW_HOSTS", "mocks")])).is_err());
+        assert!(OpsConfig::from_lookup(&env(&[("SECRETS_KEY", "abcd")])).is_err());
+        let key = "11".repeat(32);
+        let c = OpsConfig::from_lookup(&env(&[("SECRETS_KEY", &key)])).unwrap();
+        assert_eq!(c.secrets_key, Some([0x11; 32]));
+        assert!(c.metrics_bind.is_none());
+        assert_eq!(
+            (c.storefront_rate_per_second, c.storefront_rate_burst),
+            (20, 120)
+        );
+    }
 
     #[test]
     fn checkout_config_refuses_the_fake_gateway_in_prod() {

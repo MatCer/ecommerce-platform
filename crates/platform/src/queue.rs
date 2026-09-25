@@ -213,6 +213,81 @@ pub async fn purge<'c>(db: impl PgExecutor<'c>, older_than: Duration) -> Result<
     .await
 }
 
+/// Depth and lag of unfinished jobs per kind and status (`/metrics`).
+#[derive(Debug, Clone)]
+pub struct KindStats {
+    pub kind: String,
+    pub status: String,
+    pub jobs: i64,
+    /// Age of the oldest due job still waiting (queued only).
+    pub oldest_due_seconds: Option<f64>,
+}
+
+pub async fn stats<'c>(db: impl PgExecutor<'c>) -> Result<Vec<KindStats>, sqlx::Error> {
+    sqlx::query_as!(
+        KindStats,
+        r#"SELECT kind AS "kind!", status AS "status!", jobs AS "jobs!", oldest_due_seconds
+           FROM queue.stats()"#
+    )
+    .fetch_all(db)
+    .await
+}
+
+/// Age in seconds of the oldest undispatched outbox event (0 when none).
+pub async fn outbox_lag<'c>(db: impl PgExecutor<'c>) -> Result<f64, sqlx::Error> {
+    sqlx::query_scalar!(r#"SELECT queue.outbox_lag_seconds() AS "s!""#)
+        .fetch_one(db)
+        .await
+}
+
+/// A job as the superadmin sees it (spec §13: dead-letter status visible in the admin).
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+pub struct JobInfo {
+    pub id: i64,
+    pub tenant_id: Option<Uuid>,
+    pub queue: String,
+    pub kind: String,
+    pub payload: Value,
+    pub status: String,
+    pub attempts: i32,
+    pub max_attempts: i32,
+    pub run_at: DateTime<Utc>,
+    pub last_error: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+}
+
+/// Newest first; `before` = the last id of the previous page.
+pub async fn list<'c>(
+    db: impl PgExecutor<'c>,
+    status: Option<&str>,
+    kind: Option<&str>,
+    before: Option<i64>,
+    limit: i32,
+) -> Result<Vec<JobInfo>, sqlx::Error> {
+    sqlx::query_as!(
+        JobInfo,
+        r#"SELECT id AS "id!", tenant_id, queue AS "queue!", kind AS "kind!",
+                  payload AS "payload!", status AS "status!", attempts AS "attempts!",
+                  max_attempts AS "max_attempts!", run_at AS "run_at!", last_error,
+                  created_at AS "created_at!", finished_at
+           FROM queue.list_jobs($1, $2, $3, $4)"#,
+        status,
+        kind,
+        before,
+        limit
+    )
+    .fetch_all(db)
+    .await
+}
+
+/// Puts a dead job back in the queue with fresh attempts; `false` when it is not dead.
+pub async fn requeue<'c>(db: impl PgExecutor<'c>, id: i64) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar!(r#"SELECT queue.requeue($1) AS "ok!""#, id)
+        .fetch_one(db)
+        .await
+}
+
 fn lease_secs(lease: Duration) -> i32 {
     i32::try_from(lease.as_secs().max(1)).unwrap_or(i32::MAX)
 }

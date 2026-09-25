@@ -52,6 +52,12 @@ argon2 = "0.6.0"
 # WP9 mail core: SMTP (Mailpit locally), MJML templates, template variables.
 lettre = { version = "0.11.23", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1", "tokio1-rustls", "aws-lc-rs", "webpki-roots"] }
 minijinja = "2.24.0"
+# WP14: webhook/ad-platform secrets at rest (AES-256-GCM), Storefront API rate limits (GCRA),
+# Prometheus metrics (facade + text exporter, no built-in HTTP listener).
+aes-gcm = "0.11.1"
+governor = "0.10.4"
+metrics = "0.24.6"
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
 mrml = { version = "6.0.1", default-features = false, features = ["parse", "render"] }
 
 [workspace.lints.rust]
