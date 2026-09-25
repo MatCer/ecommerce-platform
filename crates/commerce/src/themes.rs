@@ -5,6 +5,17 @@
 //! (`default-theme`, `checkout`). Each tenant has revisions pointing at artifacts and one active
 //! revision. M1 ships one shared default artifact: publishing a new default appends a revision
 //! to every tenant that follows the default (`origin = 'default'`) and activates it.
+//!
+//! M3 (WP23): tenants own theme sources (`custom` revisions: fork, token edit, upload, reset).
+//! The builder turns a source into an artifact in a sandbox and reports gate results; the
+//! staff previews (A21) and publishes or rolls back. See `docs/decisions/theme-builder-sandbox.md`.
+
+pub mod archive;
+pub mod keys;
+mod revisions;
+
+pub use keys::{PREVIEW_TTL_SECS, ThemeKeys};
+pub use revisions::*;
 
 use chrono::{DateTime, Utc};
 use object_store::path::Path;
@@ -78,6 +89,69 @@ impl ArtifactKind {
             _ => None,
         }
     }
+}
+
+/// Checks an unpacked artifact against its own manifest: the manifest names `id` and `kind`,
+/// the entry module is `entry.mjs`, and the files are exactly the manifest's modules + assets.
+/// Returns the manifest's design tokens. The content address itself is verified by the edge
+/// (and `theme-kit verify`) from the bytes before anything runs.
+pub fn check_artifact(
+    id: &str,
+    kind: ArtifactKind,
+    files: &[(String, Vec<u8>)],
+) -> Result<Option<Value>, Error> {
+    let bad = |detail: String| invalid("invalid_artifact", detail);
+    if !artifact_id_valid(id) {
+        return Err(bad("artifact id must be 32 hex characters".into()));
+    }
+    let manifest = files
+        .iter()
+        .find(|(p, _)| p == "manifest.json")
+        .ok_or_else(|| bad("manifest.json is missing".into()))?;
+    let manifest: Value = serde_json::from_slice(&manifest.1)
+        .map_err(|e| bad(format!("manifest.json is not JSON: {e}")))?;
+    if manifest["id"] != id {
+        return Err(bad(format!("the manifest does not describe artifact {id}")));
+    }
+    if manifest["kind"].as_str().and_then(ArtifactKind::parse) != Some(kind) {
+        return Err(bad(format!(
+            "artifact {id} is not a {} artifact",
+            kind.as_str()
+        )));
+    }
+    if manifest["runtime"]["main"] != "entry.mjs" {
+        return Err(bad(format!(
+            "artifact {id}: the entry module must be entry.mjs"
+        )));
+    }
+    let mut expected: std::collections::BTreeSet<String> = ["manifest.json".to_owned()].into();
+    for m in manifest["runtime"]["modules"]
+        .as_array()
+        .into_iter()
+        .flatten()
+    {
+        expected.insert(format!("server/{}", m.as_str().unwrap_or_default()));
+    }
+    for p in manifest["assets"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(p, _)| p)
+    {
+        expected.insert(format!("client{p}"));
+    }
+    let present: std::collections::BTreeSet<String> =
+        files.iter().map(|(p, _)| p.clone()).collect();
+    if present != expected || present.len() != files.len() {
+        return Err(bad(format!(
+            "artifact {id}: the files do not match the manifest"
+        )));
+    }
+    let tokens = manifest.get("tokens").filter(|t| !t.is_null()).cloned();
+    if let Some(t) = &tokens {
+        archive::validate_tokens(t).map_err(|e| bad(format!("manifest tokens: {e}")))?;
+    }
+    Ok(tokens)
 }
 
 /// Uploads an unpacked artifact (`(relative path, bytes)` pairs, incl. `manifest.json`) to the
@@ -208,9 +282,9 @@ pub async fn activate_default(
     artifact_id: &str,
 ) -> Result<Option<Revision>, Error> {
     let current = sqlx::query!(
-        "SELECT r.id, r.artifact_id, r.origin FROM theme_active a
+        r#"SELECT r.id, r.artifact_id AS "artifact_id!", r.origin FROM theme_active a
          JOIN theme_revisions r ON r.id = a.revision_id
-         FOR UPDATE OF a",
+         FOR UPDATE OF a"#,
     )
     .fetch_optional(&mut **tx)
     .await?;
@@ -220,13 +294,14 @@ pub async fn activate_default(
         return Ok(None);
     }
     let parent = current.as_ref().map(|c| c.id);
+    lock_numbering(tx).await?;
     let rev = sqlx::query_as!(
         Revision,
-        "INSERT INTO theme_revisions (tenant_id, number, parent_id, artifact_id, origin, status,
+        r#"INSERT INTO theme_revisions (tenant_id, number, parent_id, artifact_id, origin, status,
                                       created_by, published_at)
          SELECT $1, coalesce(max(number), 0) + 1, $2, $3, 'default', 'published', $4, now()
          FROM theme_revisions
-         RETURNING id, number, artifact_id, status, published_at",
+         RETURNING id, number, artifact_id AS "artifact_id!", status, published_at"#,
         tx.tenant_id(),
         parent,
         artifact_id,
@@ -236,7 +311,8 @@ pub async fn activate_default(
     .await?;
     if let Some(p) = parent {
         sqlx::query!(
-            "UPDATE theme_revisions SET status = 'superseded', superseded_at = now() WHERE id = $1",
+            "UPDATE theme_revisions SET status = 'superseded', superseded_at = now(),
+                status_changed_at = now() WHERE id = $1",
             p
         )
         .execute(&mut **tx)
@@ -322,8 +398,8 @@ pub struct ActiveTheme {
 
 pub async fn active(tx: &mut TenantTx) -> Result<ActiveTheme, Error> {
     let Some(current) = sqlx::query!(
-        "SELECT r.artifact_id, r.number FROM theme_active a
-         JOIN theme_revisions r ON r.id = a.revision_id"
+        r#"SELECT r.artifact_id AS "artifact_id!", r.number FROM theme_active a
+         JOIN theme_revisions r ON r.id = a.revision_id"#
     )
     .fetch_optional(&mut **tx)
     .await?
@@ -331,11 +407,11 @@ pub async fn active(tx: &mut TenantTx) -> Result<ActiveTheme, Error> {
         return Ok(ActiveTheme::default());
     };
     let retained = sqlx::query_scalar!(
-        "SELECT artifact_id FROM theme_revisions
+        r#"SELECT artifact_id AS "artifact_id!" FROM theme_revisions
          WHERE artifact_id <> $1 AND status = 'superseded'
            AND (number >= $2::int - $3::int
                 OR superseded_at > now() - make_interval(days => $4::int))
-         GROUP BY artifact_id ORDER BY max(number) DESC",
+         GROUP BY artifact_id ORDER BY max(number) DESC"#,
         current.artifact_id,
         current.number,
         i32::try_from(RETAIN_REVISIONS).unwrap_or(3),

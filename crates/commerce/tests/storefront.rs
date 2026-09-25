@@ -282,7 +282,7 @@ async fn publishing_keeps_recent_artifacts_retained(db: PgPool) {
 
     // A custom revision (M3) is left alone by default publishes.
     let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
-    sqlx::query("UPDATE theme_revisions SET origin = 'custom'")
+    sqlx::query("UPDATE theme_revisions SET origin = 'custom', change = 'fork', source_key = 'x'")
         .execute(&mut *tx)
         .await
         .unwrap();
