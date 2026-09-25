@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM ad_deliveries WHERE customer_id = $1 OR order_id = ANY($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "920108a16a11a98f2c02c8cc680b4c393e46676225a1defe10cba160e3b74110"
+}

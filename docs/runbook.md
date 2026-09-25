@@ -119,6 +119,15 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 | Bounces | `POST /webhooks/ses` (HTTP Basic, `MAIL_EVENTS_SECRET`, unset = off). Permanent bounce: suppressed for every stream, subscriber `bounced`; complaint: suppressed for marketing, subscriber `complained` + consent withdrawal. Only the recipient of the referenced message is ever suppressed. Staff can remove a suppression in Admin → Emails (audited). |
 | Links | Unsubscribe/preference/click links carry a per-recipient token (hashed at rest); click targets are HMAC-signed per campaign, so the redirect is never open. |
 
+## 6c. Data import, export and GDPR requests (WP13b)
+
+| Topic | Operations |
+|---|---|
+| CSV imports | Admin → Data → CSV import. `data.import` jobs (`analyze`, then `apply`); a run stuck in `analyzing`/`applying` has a dead job in the job view, and retrying it is safe (natural-key upserts; `apply` resumes after the last committed batch of 200). Files: 20 MB, 50 000 rows; deleted once applied. Historical orders go to `archived_orders` only and never trigger payments, stock, invoices, mail or events. |
+| Subscriber evidence | Rows with `consent_at` + `consent_source` record an `email_marketing` grant at that time (source `import`) and subscribe the address only if it is the latest decision of the address and of a customer account with it, and the address is not suppressed. Rows without evidence stay `pending` (never marketable, never mailed). |
+| Exports | `data.export` job writes `exports/<tenant>/<id>.zip` (private bucket): every RLS-forced tenant table as JSONL without `bytea` columns, password hashes, mail bodies or unsubscribe URLs. Download = 5-minute presigned URL, owner/admin with a login under 15 minutes, audited. |
+| Access / erasure | Admin → Data → Export and privacy (owner/admin, fresh login, audited). Erasure is refused while an order of the person is unfinished, a withdrawal is open, a refund pending, or an import/export is running. It deletes the account, subscriber, analytics/ad rows; anonymizes orders, addresses, carts, withdrawals, archived orders and the mail log; pseudonymizes consent records; keeps invoices, credit notes and bank transactions. Files (labels, document sheets, all earlier exports, unapplied import CSVs) are removed by a retried `privacy.delete_objects` job. Backups keep the data until they rotate. |
+
 ## 7. Backups and restore
 
 ### Local (A29)

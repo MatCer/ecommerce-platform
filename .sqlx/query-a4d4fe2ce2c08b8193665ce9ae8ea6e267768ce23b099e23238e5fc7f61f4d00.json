@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE archived_orders SET email = $3, name = NULL, phone = NULL, address = NULL,\n                 customer_id = NULL, updated_at = now()\n             WHERE email = $1 OR customer_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a4d4fe2ce2c08b8193665ce9ae8ea6e267768ce23b099e23238e5fc7f61f4d00"
+}

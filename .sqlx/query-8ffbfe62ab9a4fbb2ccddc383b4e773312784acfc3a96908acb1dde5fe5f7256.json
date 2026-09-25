@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.number FROM orders o WHERE o.id = ANY($1) AND (\n             o.status NOT IN ('delivered', 'cancelled', 'returned')\n             OR EXISTS (SELECT 1 FROM withdrawals w WHERE w.order_id = o.id AND w.status = 'open')\n             OR EXISTS (SELECT 1 FROM refunds r WHERE r.order_id = o.id AND r.status = 'pending'))\n         ORDER BY o.number LIMIT 10",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8ffbfe62ab9a4fbb2ccddc383b4e773312784acfc3a96908acb1dde5fe5f7256"
+}

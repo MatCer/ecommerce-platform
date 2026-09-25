@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_imports SET report = report || '{\"preview\": [], \"errors\": []}'\n           WHERE status = 'applied' AND strpos(lower(report::text), $1) > 0",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62d531b1fe70286139680ca32551c7bafaade2c56a4ead713f59679ff7de8576"
+}

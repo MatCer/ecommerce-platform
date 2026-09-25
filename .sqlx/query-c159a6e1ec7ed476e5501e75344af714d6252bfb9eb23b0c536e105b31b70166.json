@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(a) ORDER BY a.placed_at), '[]') AS \"v!\"\n           FROM archived_orders a WHERE a.email = $1 OR a.customer_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c159a6e1ec7ed476e5501e75344af714d6252bfb9eb23b0c536e105b31b70166"
+}

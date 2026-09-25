@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(jsonb_build_object(\n                   'template', m.template, 'stream', m.stream, 'subject', m.subject,\n                   'status', m.status, 'created_at', m.created_at) ORDER BY m.created_at), '[]')\n                  AS \"v!\"\n           FROM email_messages m WHERE lower(m.to_email) = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e82eb256dbbb78aab94528072e55b9d0f5285972ba4f2288782c035c90876e62"
+}

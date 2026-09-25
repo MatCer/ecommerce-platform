@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO archived_orders (tenant_id, number, placed_at, email, customer_id, name,\n                                        phone, currency, total_minor, status_label, address,\n                                        lines, import_id)\n           VALUES ($1, $2, $3, $4, (SELECT id FROM customers WHERE email = $4), $5, $6, $7, $8,\n                   $9, $10, $11, $12)\n           ON CONFLICT ON CONSTRAINT archived_orders_number_unique DO UPDATE SET\n               placed_at = EXCLUDED.placed_at, email = EXCLUDED.email,\n               customer_id = EXCLUDED.customer_id, name = EXCLUDED.name, phone = EXCLUDED.phone,\n               currency = EXCLUDED.currency, total_minor = EXCLUDED.total_minor,\n               status_label = EXCLUDED.status_label, address = EXCLUDED.address,\n               lines = EXCLUDED.lines, import_id = EXCLUDED.import_id, updated_at = now()\n           RETURNING (xmax = 0) AS \"created!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4baf30e78aac6a23bf2add7d426f8b907eb3e0eb5921ff36f53a89d65b566ae3"
+}

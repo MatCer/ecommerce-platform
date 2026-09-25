@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_imports SET status = 'applying', progress = '{}', updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "86fbcce7a7e34263399bdc5b7a1e089cdabef57d8f55e3fd7ca7b0443d12c715"
+}

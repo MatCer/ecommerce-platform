@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO subscribers (tenant_id, email, status, locale, market_id, requested_at,\n                                  text_version, source, consent_evidence)\n         VALUES ($1, $2, 'pending', coalesce($3, $4), $5, coalesce($6, now()), $7, 'import', $8)\n         ON CONFLICT ON CONSTRAINT subscribers_email_unique DO NOTHING\n         RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "subscribers",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Timestamptz",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7a6dddd7636ef7017a9555cb469e736fcf9644089baf6e9f14802df8c5b5620d"
+}

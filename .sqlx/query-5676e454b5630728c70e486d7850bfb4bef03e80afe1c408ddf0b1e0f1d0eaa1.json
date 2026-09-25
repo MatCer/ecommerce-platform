@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY b.booked_on), '[]') AS \"v!\"\n           FROM bank_transactions b\n           WHERE b.attempt_id IN (SELECT p.id FROM payment_attempts p WHERE p.order_id = ANY($1))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "v!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5676e454b5630728c70e486d7850bfb4bef03e80afe1c408ddf0b1e0f1d0eaa1"
+}

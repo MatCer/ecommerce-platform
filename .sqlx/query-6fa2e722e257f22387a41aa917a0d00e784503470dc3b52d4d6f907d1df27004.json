@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose, granted,\n                                      text_version, source, at)\n         SELECT $1, $2, $3, $4, true, $5, 'import', $6\n         WHERE NOT EXISTS (SELECT 1 FROM consent_records\n                           WHERE subject_type = $2 AND subject_id = $3 AND purpose = $4\n                             AND source = 'import' AND at = $6)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6fa2e722e257f22387a41aa917a0d00e784503470dc3b52d4d6f907d1df27004"
+}

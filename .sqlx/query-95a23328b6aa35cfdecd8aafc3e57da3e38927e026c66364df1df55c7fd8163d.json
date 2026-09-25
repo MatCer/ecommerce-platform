@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO customer_addresses (tenant_id, customer_id, name, company, street, city,\n                                             postal_code, country, is_default)\n             SELECT $1, $2, $3, $4, $5, $6, $7, $8,\n                    NOT EXISTS (SELECT 1 FROM customer_addresses\n                                WHERE customer_id = $2 AND is_default)\n             WHERE NOT EXISTS (SELECT 1 FROM customer_addresses\n                               WHERE customer_id = $2 AND street = $5 AND city = $6\n                                 AND postal_code = $7 AND country = $8)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "95a23328b6aa35cfdecd8aafc3e57da3e38927e026c66364df1df55c7fd8163d"
+}

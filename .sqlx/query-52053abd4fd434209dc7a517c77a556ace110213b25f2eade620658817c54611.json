@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE data_imports SET status = 'applied', applied_at = now(), updated_at = now(),\n                    progress = $2\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "52053abd4fd434209dc7a517c77a556ace110213b25f2eade620658817c54611"
+}

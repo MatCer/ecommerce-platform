@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE email_messages SET to_email = $2, subject = $3, html = NULL,\n                 body_text = NULL, list_unsubscribe = NULL, send_token = NULL,\n                 status = CASE WHEN status IN ('pending', 'sending') THEN 'failed'\n                               ELSE status END,\n                 last_error = CASE WHEN status IN ('pending', 'sending') THEN 'recipient erased'\n                                   ELSE last_error END,\n                 updated_at = now()\n             WHERE lower(to_email) = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a3469c480f29268ba89734fe6d212c71b01b25eefde601ae60724b51e3145441"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM webhook_deliveries d\n         WHERE d.status IN ('succeeded', 'dead')\n           AND (strpos(d.payload::text, $1) > 0\n                OR EXISTS (SELECT 1 FROM unnest($2::uuid[]) i\n                           WHERE strpos(d.payload::text, i::text) > 0))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d3da46560ecb61f19819b5d30ed14720e983b96248d4580e34db23be78c2ff87"
+}
