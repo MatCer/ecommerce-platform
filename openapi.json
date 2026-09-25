@@ -18880,7 +18880,8 @@
         "type": "object",
         "required": [
           "personalization",
-          "result"
+          "result",
+          "names"
         ],
         "properties": {
           "affinity": {
@@ -18893,6 +18894,17 @@
                 "type": "null"
               }
             ]
+          },
+          "names": {
+            "type": "object",
+            "description": "Names of the skipped products (recommended ones carry theirs in the card).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           "personalization": {
             "type": "boolean",

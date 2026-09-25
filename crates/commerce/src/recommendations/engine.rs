@@ -250,6 +250,26 @@ pub struct Explained {
     pub skipped: Vec<Skipped>,
 }
 
+/// Display names of products (any status), preferring `locale`, for staff explanations of
+/// skipped candidates.
+pub async fn product_names(
+    tx: &mut TenantTx,
+    ids: &[Uuid],
+    locale: &str,
+) -> Result<std::collections::BTreeMap<Uuid, String>, Error> {
+    Ok(sqlx::query!(
+        "SELECT DISTINCT ON (product_id) product_id, name FROM product_translations
+         WHERE product_id = ANY($1) ORDER BY product_id, (locale = $2) DESC, locale",
+        ids,
+        locale
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|r| (r.product_id, r.name))
+    .collect())
+}
+
 // ---------------------------------------------------------------------------------------
 // Chain
 

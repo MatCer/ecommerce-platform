@@ -4394,6 +4394,10 @@ export interface components {
         };
         RecommendationExplain: {
             affinity?: components["schemas"]["Affinity"] | null;
+            /** @description Names of the skipped products (recommended ones carry theirs in the card). */
+            names: {
+                [key: string]: string;
+            };
             /** @description The customer's `personalization` consent is granted (always false without one). */
             personalization: boolean;
             result: components["schemas"]["Explained"];

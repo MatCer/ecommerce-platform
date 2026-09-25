@@ -1,6 +1,8 @@
 //! Recommendations Admin API (spec §8.3, §11.2): collections (staff), strategy settings and
 //! exclusions (admin), and the "why recommended" explanation for staff.
 
+use std::collections::BTreeMap;
+
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::rejection::{PathRejection, QueryRejection};
@@ -250,6 +252,8 @@ pub struct RecommendationExplain {
     /// The customer's interests, when personalization is allowed.
     pub affinity: Option<Affinity>,
     pub result: Explained,
+    /// Names of the skipped products (recommended ones carry theirs in the card).
+    pub names: BTreeMap<Uuid, String>,
 }
 
 fn ids(raw: Option<&str>) -> Vec<Uuid> {
@@ -306,10 +310,13 @@ async fn explain(
         }
         let settings = settings::get(tx).await?;
         let result = engine::recommend(tx, &ctx, &settings, &target, &visitor, limit).await?;
+        let skipped: Vec<Uuid> = result.skipped.iter().map(|s| s.product_id).collect();
+        let names = engine::product_names(tx, &skipped, &ctx.locale).await?;
         Ok(RecommendationExplain {
             personalization: visitor.personalization,
             affinity,
             result,
+            names,
         })
     })
     .await?;

@@ -258,6 +258,10 @@ async fn admin_collections_settings_and_explain(db: PgPool) {
     );
     assert_eq!(why["result"]["items"], json!([]));
     assert_eq!(why["result"]["skipped"][0]["reason"], json!("excluded"));
+    assert_eq!(
+        why["names"][c.shop.product.to_string()],
+        json!("Product TEE")
+    );
     assert_eq!(why["personalization"], json!(false));
 
     let (status, _, _) = Call::delete(&format!("/admin/v1/collections/{id}"))
