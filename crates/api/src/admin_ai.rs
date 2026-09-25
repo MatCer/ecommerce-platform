@@ -325,10 +325,7 @@ async fn apply_plan(
     headers: HeaderMap,
 ) -> Result<Response, Error> {
     let id = path_id(id)?;
-    let current = in_tx(&s, staff.tenant_id, async |tx| plan::get(tx, id).await).await?;
-    if current.needs_fresh_auth {
-        staff.require_fresh_auth()?;
-    }
+    let fresh = staff.require_fresh_auth().is_ok();
     let actor = staff.user.user_id.clone();
     idempotent(
         &s,
@@ -337,7 +334,7 @@ async fn apply_plan(
         APPLY_PLAN,
         &id,
         StatusCode::ACCEPTED,
-        async |tx| plan::confirm(tx, &actor, id).await,
+        async |tx| plan::confirm(tx, &actor, id, fresh).await,
     )
     .await
 }

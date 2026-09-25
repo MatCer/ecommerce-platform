@@ -228,7 +228,7 @@ async fn price_plans_need_fresh_auth_and_apply_once(db: PgPool) {
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(body["code"], "plan_not_ready");
 
-    plan::run_apply(&c.runtime, c.shop.tenant, id)
+    plan::run_apply(&c.runtime, c.shop.tenant, id, false)
         .await
         .unwrap();
     let (_, body) = c.staff(Call::get(&uri)).await;

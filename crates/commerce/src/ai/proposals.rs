@@ -350,6 +350,7 @@ pub async fn accept(
     if input.fields.is_empty() || input.fields.len() > proposal.changes.len() {
         return Err(invalid("no_fields", "choose at least one proposed field"));
     }
+    Doc::lock(tx, proposal.entity_type, &proposal.entity_id).await?;
     let mut doc = Doc::load(tx, proposal.entity_type, &proposal.entity_id).await?;
     let find = |locale: &str, field: &str| {
         proposal
@@ -971,11 +972,7 @@ impl Gen<'_> {
             tx.commit().await?;
             g
         };
-        let all_source: String = units
-            .iter()
-            .map(Unit::plain)
-            .collect::<Vec<_>>()
-            .join("\n");
+        let all_source: String = units.iter().map(Unit::plain).collect::<Vec<_>>().join("\n");
         let mut changes = vec![];
         let mut warnings = vec![];
         let mut model = String::new();

@@ -154,7 +154,8 @@ async fn ai_plan(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
 /// Applies a confirmed bulk plan, one product per transaction (resumable).
 async fn ai_apply(ctx: Ctx, job: Job) -> Result<(), JobError> {
     let (tenant, id) = tenant_and(&job, "plan_id")?;
-    ai_outcome(plan::run_apply(&ctx.db, tenant, id).await)
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(plan::run_apply(&ctx.db, tenant, id, last).await)
 }
 
 /// Delivers one email (A14). A message that could not be handed over is retried with backoff

@@ -428,10 +428,26 @@ pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<BulkPlan, Error> {
     })
 }
 
-/// Confirms a previewed plan and queues its application. The caller checks fresh auth when
-/// [`BulkPlan::needs_fresh_auth`]. `409 plan_not_ready` unless the plan is `ready`.
-pub async fn confirm(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<BulkPlan, Error> {
+/// Confirms a previewed plan and queues its application. `fresh_auth`: the caller signed in at
+/// most 15 minutes ago; plans that change prices need it (`401 reauth_required`, A9). Decided
+/// on the locked plan, so a plan cannot turn into a price plan between check and apply.
+/// `409 plan_not_ready` unless the plan is `ready`.
+pub async fn confirm(
+    tx: &mut TenantTx,
+    actor: &str,
+    id: Uuid,
+    fresh_auth: bool,
+) -> Result<BulkPlan, Error> {
+    sqlx::query_scalar!("SELECT id FROM ai_bulk_plans WHERE id = $1 FOR UPDATE", id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)?;
     let plan = get(tx, id).await?;
+    if plan.status == PlanStatus::Ready && plan.needs_fresh_auth && !fresh_auth {
+        return Err(Error::Unauthorized {
+            code: "reauth_required",
+        });
+    }
     let updated = sqlx::query!(
         "UPDATE ai_bulk_plans SET status = 'applying', applied_by = $2,
                 progress = jsonb_build_object('done', 0, 'skipped', 0, 'total', target_count),
@@ -465,6 +481,10 @@ pub async fn confirm(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<BulkPla
 // ---------------------------------------------------------------------------------------
 // References (catalog data the plan may name)
 
+/// What the plan's codes, slugs and keys resolve to. Stored with the preview, so the apply
+/// changes exactly the resources the staff saw (a slug reused or a market moved to another
+/// price list afterwards cannot redirect an approved plan).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct Refs {
     /// Slug (any locale) -> category id.
     categories: HashMap<String, Uuid>,
@@ -475,7 +495,60 @@ struct Refs {
     /// Every market locale (text parameters without a locale).
     locales: Vec<String>,
     /// For the model: categories, markets, price lists, parameters, brands.
+    #[serde(skip)]
     context: Value,
+}
+
+impl Refs {
+    /// Only the references `plan` uses.
+    fn used_by(&self, plan: &Plan) -> Self {
+        let mut out = Self {
+            locales: self.locales.clone(),
+            ..Self::default()
+        };
+        let mut category = |c: &String| {
+            if let Some(id) = self.categories.get(c) {
+                out.categories.insert(c.clone(), *id);
+            }
+        };
+        for c in &plan.selector.categories {
+            category(c);
+        }
+        for op in &plan.operations {
+            if let Operation::AddCategory { category: c }
+            | Operation::RemoveCategory { category: c } = op
+            {
+                category(c);
+            }
+        }
+        let markets = plan
+            .operations
+            .iter()
+            .filter_map(|o| match o {
+                Operation::AdjustPrice { market, .. } => Some(market),
+                _ => None,
+            })
+            .chain(plan.selector.price.as_ref().map(|p| &p.market));
+        for m in markets {
+            if let Some(l) = self.lists.get(m) {
+                out.lists.insert(m.clone(), *l);
+            }
+        }
+        let params = plan
+            .operations
+            .iter()
+            .filter_map(|o| match o {
+                Operation::SetParameter { parameter, .. } => Some(parameter),
+                _ => None,
+            })
+            .chain(plan.selector.parameters.iter().map(|f| &f.parameter));
+        for p in params {
+            if let Some(v) = self.parameters.get(p) {
+                out.parameters.insert(p.clone(), v.clone());
+            }
+        }
+        out
+    }
 }
 
 async fn refs(tx: &mut TenantTx) -> Result<Refs, Error> {
@@ -591,6 +664,15 @@ fn check_refs(plan: &Plan, r: &Refs) -> Vec<String> {
     }
     if let Some(p) = &plan.selector.price {
         market(&p.market, &mut errors);
+    }
+    let mut lists = BTreeSet::new();
+    for op in &plan.operations {
+        if let Operation::AdjustPrice { market: m, .. } = op
+            && let Some((list, _)) = r.lists.get(m)
+            && !lists.insert(*list)
+        {
+            errors.push(format!("{m:?}: one price change per price list"));
+        }
     }
     for op in &plan.operations {
         match op {
@@ -1043,13 +1125,14 @@ pub async fn run_plan(
     .await?;
     sqlx::query!(
         "UPDATE ai_bulk_plans SET status = 'ready', plan = $2, target_count = $3, sample = $4,
-                model = $5, updated_at = now()
+                model = $5, refs = $6, updated_at = now()
          WHERE id = $1 AND status = 'pending'",
         id,
         serde_json::to_value(&plan).map_err(internal)?,
         i32::try_from(ids.len()).unwrap_or(i32::MAX),
         serde_json::to_value(&sample).map_err(internal)?,
-        model
+        model,
+        serde_json::to_value(r.used_by(&plan)).map_err(internal)?
     )
     .execute(&mut *tx)
     .await?;
@@ -1088,17 +1171,41 @@ async fn finish(
 // ---------------------------------------------------------------------------------------
 // Applying (the job): one product per transaction, marked done in the same transaction.
 
-pub async fn run_apply(db: &PgPool, tenant: Uuid, id: Uuid) -> Result<Outcome, Error> {
-    let r = {
-        let mut tx = tenant_tx(db, tenant).await?;
-        let r = refs(&mut tx).await?;
-        tx.commit().await?;
-        r
-    };
+/// Applies a confirmed plan. On the job's last attempt a failure marks the plan `failed`
+/// (products already changed stay changed, each audited).
+pub async fn run_apply(
+    db: &PgPool,
+    tenant: Uuid,
+    id: Uuid,
+    last_attempt: bool,
+) -> Result<Outcome, Error> {
+    match apply_items(db, tenant, id).await {
+        Err(e) if last_attempt && !matches!(e, Error::NotFound) => {
+            tracing::error!(plan = %id, error = %e, "bulk plan apply gave up");
+            let mut tx = tenant_tx(db, tenant).await?;
+            let progress = progress(&mut tx, id).await?;
+            sqlx::query!(
+                "UPDATE ai_bulk_plans SET status = 'failed', errors = $2, progress = $3,
+                        updated_at = now()
+                 WHERE id = $1 AND status = 'applying'",
+                id,
+                json!(["the plan could not be applied completely; the products already changed stay changed"]),
+                serde_json::to_value(&progress).map_err(internal)?
+            )
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok(Outcome::Done)
+        }
+        other => other,
+    }
+}
+
+async fn apply_items(db: &PgPool, tenant: Uuid, id: Uuid) -> Result<Outcome, Error> {
     loop {
         let mut tx = tenant_tx(db, tenant).await?;
         let row = sqlx::query!(
-            "SELECT status, plan, applied_by FROM ai_bulk_plans WHERE id = $1",
+            "SELECT status, plan, refs, model, applied_by FROM ai_bulk_plans WHERE id = $1",
             id
         )
         .fetch_optional(&mut *tx)
@@ -1113,7 +1220,13 @@ pub async fn run_apply(db: &PgPool, tenant: Uuid, id: Uuid) -> Result<Outcome, E
             .transpose()
             .map_err(internal)?
             .ok_or_else(|| Error::Internal("applying plan without a plan".into()))?;
+        let r: Refs = serde_json::from_value(row.refs).map_err(internal)?;
         let actor = row.applied_by.unwrap_or_default();
+        let source = Source {
+            plan_id: id,
+            model: row.model.unwrap_or_default(),
+            actor: &actor,
+        };
         let next = sqlx::query_scalar!(
             "SELECT product_id FROM ai_bulk_items WHERE plan_id = $1 AND status = 'pending'
              ORDER BY product_id LIMIT 1 FOR UPDATE SKIP LOCKED",
@@ -1122,6 +1235,16 @@ pub async fn run_apply(db: &PgPool, tenant: Uuid, id: Uuid) -> Result<Outcome, E
         .fetch_optional(&mut *tx)
         .await?;
         let Some(product_id) = next else {
+            // Nothing unlocked; items another run still holds keep the plan open.
+            let pending = sqlx::query_scalar!(
+                r#"SELECT count(*) AS "n!" FROM ai_bulk_items WHERE plan_id = $1 AND status = 'pending'"#,
+                id
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            if pending > 0 {
+                return Ok(Outcome::Retry("another run is applying this plan".into()));
+            }
             let progress = progress(&mut tx, id).await?;
             sqlx::query!(
                 "UPDATE ai_bulk_plans SET status = 'applied', applied_at = now(), progress = $2,
@@ -1144,7 +1267,7 @@ pub async fn run_apply(db: &PgPool, tenant: Uuid, id: Uuid) -> Result<Outcome, E
             tx.commit().await?;
             return Ok(Outcome::Done);
         };
-        let status = match apply_one(&mut tx, &actor, &plan, &r, product_id).await {
+        let status = match apply_one(&mut tx, &source, &plan, &r, product_id).await {
             Ok(done) => {
                 if done {
                     "done"
@@ -1199,20 +1322,33 @@ async fn progress(tx: &mut TenantTx, id: Uuid) -> Result<ApplyProgress, Error> {
     })
 }
 
+/// Who applies the plan (audit actor) and where its AI text came from (markers).
+struct Source<'a> {
+    plan_id: Uuid,
+    model: String,
+    actor: &'a str,
+}
+
 /// Applies the plan to one product through the services. `false`: skipped (deleted, or a
 /// price moved outside the band since the preview).
 async fn apply_one(
     tx: &mut TenantTx,
-    actor: &str,
+    source: &Source<'_>,
     plan: &Plan,
     r: &Refs,
     product_id: Uuid,
 ) -> Result<bool, Error> {
+    let actor = source.actor;
     let product = match products::get(tx, product_id).await {
         Ok(p) => p,
         Err(Error::NotFound) => return Ok(false),
         Err(e) => return Err(e),
     };
+    // Prices are read, checked and written under the tenant's pricing lock, so a concurrent
+    // price change cannot slip in between.
+    if plan.has_price_changes() {
+        crate::pricing::intervals::lock(tx).await?;
+    }
     let moves = match price_changes(tx, plan, r, &[product_id]).await? {
         Ok(m) => m,
         Err(_) => return Ok(false),
@@ -1221,7 +1357,35 @@ async fn apply_one(
     let mut input = before.clone();
     apply_to_input(&plan.operations, r, &mut input);
     if input != before {
-        products::replace(tx, actor, product_id, &input).await?;
+        let saved = super::fields::Doc::Product(Box::new(
+            products::replace(tx, actor, product_id, &input).await?,
+        ));
+        // Text written by the model is labelled like accepted proposals (AI Act).
+        for op in &plan.operations {
+            if let Operation::SetField {
+                field,
+                locale: Some(locale),
+                ..
+            } = op
+                && let Some(value) = saved.get(locale, field.as_str())
+            {
+                super::marks::record(
+                    tx,
+                    super::fields::EntityType::Product,
+                    &product_id.to_string(),
+                    &super::marks::NewMark {
+                        locale,
+                        field: field.as_str(),
+                        value: &value,
+                        feature: super::BULK_PLAN,
+                        model: &source.model,
+                        proposal_id: source.plan_id,
+                        accepted_by: actor,
+                    },
+                )
+                .await?;
+            }
+        }
     }
     let mut by_list: BTreeMap<Uuid, Vec<PriceItem>> = BTreeMap::new();
     for m in moves {
@@ -1347,6 +1511,33 @@ mod tests {
             None,
             "free items stay untouched"
         );
+    }
+
+    #[test]
+    fn one_price_change_per_price_list() {
+        let list = Uuid::now_v7();
+        let r = Refs {
+            lists: HashMap::from([
+                ("sk".to_owned(), (list, Currency::Eur)),
+                ("eur".to_owned(), (list, Currency::Eur)),
+            ]),
+            ..Refs::default()
+        };
+        let p = plan(json!([
+            {"op": "adjust_price", "market": "sk", "percent": 5, "amount_minor": null},
+            {"op": "adjust_price", "market": "eur", "percent": 3, "amount_minor": null}
+        ]))
+        .unwrap();
+        let errors = check_refs(&p, &r);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("one price change per price list")),
+            "{errors:?}"
+        );
+        // Unused references are not frozen with the preview.
+        let used = r.used_by(&plan(json!([{"op": "set_status", "status": "draft"}])).unwrap());
+        assert!(used.lists.is_empty());
     }
 
     #[test]

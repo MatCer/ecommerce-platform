@@ -128,6 +128,38 @@ impl Doc {
         })
     }
 
+    /// Row-locks the entity until the transaction ends, so a concurrent edit cannot commit
+    /// between reading and writing it (`404` when it does not exist).
+    pub async fn lock(tx: &mut TenantTx, t: EntityType, id: &str) -> Result<(), Error> {
+        let uuid = || Uuid::parse_str(id).map_err(|_| Error::NotFound);
+        let found = match t {
+            EntityType::Product => {
+                sqlx::query_scalar!("SELECT id FROM products WHERE id = $1 FOR UPDATE", uuid()?)
+                    .fetch_optional(&mut **tx)
+                    .await?
+            }
+            EntityType::Category => {
+                sqlx::query_scalar!(
+                    "SELECT id FROM categories WHERE id = $1 FOR UPDATE",
+                    uuid()?
+                )
+                .fetch_optional(&mut **tx)
+                .await?
+            }
+            EntityType::Page => {
+                sqlx::query_scalar!("SELECT id FROM pages WHERE id = $1 FOR UPDATE", uuid()?)
+                    .fetch_optional(&mut **tx)
+                    .await?
+            }
+            EntityType::Menu => {
+                sqlx::query_scalar!("SELECT id FROM menus WHERE handle = $1 FOR UPDATE", id)
+                    .fetch_optional(&mut **tx)
+                    .await?
+            }
+        };
+        found.map(|_| ()).ok_or(Error::NotFound)
+    }
+
     pub fn entity_type(&self) -> EntityType {
         match self {
             Self::Product(_) => EntityType::Product,

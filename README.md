@@ -63,6 +63,10 @@ make down
 Local checkout (WP10) pays through the fake gateway (`PAYMENTS_FAKE=1`, refused with
 `APP_ENV=prod`): its page `/_p/fake-pay/<attempt>` has Pay / Fail buttons. Unpaid orders expire
 after the method's payment window (fake: 60 min) and release their stock.
+
+AI helpers (WP22) use the Anthropic API when `ANTHROPIC_API_KEY` is set in `.env`; without it
+the admin runs them against a deterministic fake provider ("Demo AI"). Quotas, the threat model
+and a manual smoke test with a real key: [`docs/decisions/ai-helpers.md`](docs/decisions/ai-helpers.md).
 | https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
 First run of the demo shop: `make up && make seed && make theme-build`. The seed owner

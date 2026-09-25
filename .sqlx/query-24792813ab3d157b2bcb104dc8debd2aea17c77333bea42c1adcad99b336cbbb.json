@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT status, plan, applied_by FROM ai_bulk_plans WHERE id = $1",
+  "query": "SELECT status, plan, refs, model, applied_by FROM ai_bulk_plans WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,28 @@
       },
       {
         "ordinal": 2,
+        "name": "refs",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "refs"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "model",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "model"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "applied_by",
         "type_info": "Text",
         "origin": {
@@ -45,8 +67,10 @@
     "nullable": [
       false,
       true,
+      false,
+      true,
       true
     ]
   },
-  "hash": "a9719c5d7a711be50e4b0161dc0d1db90be55c1cbd09f07cb2697658578214ff"
+  "hash": "24792813ab3d157b2bcb104dc8debd2aea17c77333bea42c1adcad99b336cbbb"
 }

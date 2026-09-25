@@ -327,16 +327,20 @@ async fn bulk_price_plan_previews_then_applies_through_pricing(db: PgPool) {
     assert_eq!(price(shop.variants[0]).await, 520);
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-    let confirmed = plan::confirm(&mut tx, "boss", p.id).await.unwrap();
+    let confirmed = plan::confirm(&mut tx, "boss", p.id, true).await.unwrap();
     assert_eq!(confirmed.status, PlanStatus::Applying);
     tx.commit().await.unwrap();
     assert_eq!(
-        plan::run_apply(&runtime, shop.tenant, p.id).await.unwrap(),
+        plan::run_apply(&runtime, shop.tenant, p.id, false)
+            .await
+            .unwrap(),
         Outcome::Done
     );
     // A retried job finds nothing left to do (exactly once per product).
     assert_eq!(
-        plan::run_apply(&runtime, shop.tenant, p.id).await.unwrap(),
+        plan::run_apply(&runtime, shop.tenant, p.id, false)
+            .await
+            .unwrap(),
         Outcome::Done
     );
     assert_eq!(price(shop.variants[0]).await, 546);
@@ -386,7 +390,7 @@ async fn bulk_price_plan_previews_then_applies_through_pricing(db: PgPool) {
     // Applied plans cannot be confirmed again.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     assert_eq!(
-        plan::confirm(&mut tx, "boss", p.id)
+        plan::confirm(&mut tx, "boss", p.id, true)
             .await
             .unwrap_err()
             .code(),
@@ -472,6 +476,39 @@ async fn tenants_cannot_see_each_others_ai_data(db: PgPool) {
         "Raise prices of T-shirts by 5 % in SK",
     )
     .await;
+    // Rows in every AI table of the shop: a marker (accepted field) and a glossary.
+    accept(&runtime, shop.tenant, id, &[("cs", "seo_title")])
+        .await
+        .unwrap();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    glossary::put(
+        &mut tx,
+        STAFF,
+        &Glossary {
+            entries: vec![GlossaryEntry {
+                term: "Testkit".into(),
+                translations: BTreeMap::new(),
+            }],
+        },
+    )
+    .await
+    .unwrap();
+    for table in [
+        "ai_usage",
+        "ai_proposals",
+        "ai_bulk_plans",
+        "ai_bulk_items",
+        "ai_marks",
+        "ai_glossaries",
+    ] {
+        let n: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert!(n > 0, "{table} has rows for its own tenant");
+    }
+    tx.commit().await.unwrap();
     let mut tx = tenant_tx(&runtime, other.tenant).await.unwrap();
     assert_eq!(
         proposals::get(&mut tx, id).await.unwrap_err().code(),
@@ -587,4 +624,72 @@ async fn pages_and_menus_translate_as_whole_units(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(labelled.items[0].field, "labels");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn bulk_text_is_labelled_and_apply_waits_for_held_items(db: PgPool) {
+    let (runtime, shop, _ai) = setup(&db).await;
+    let plan_id = Uuid::now_v7();
+    let plan = json!({
+        "explanation": "SEO titles",
+        "selector": {"categories": ["trika"], "brands": [], "statuses": [], "parameters": [], "price": null},
+        "operations": [{"op": "set_field", "field": "seo_title", "locale": "cs", "value": "Trička od Testkit"}],
+    });
+    let refs = json!({"categories": {}, "lists": {}, "parameters": {}, "locales": ["cs", "sk"]});
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO ai_bulk_plans (id, tenant_id, prompt, status, plan, refs, target_count, model,
+                                    created_by, applied_by)
+         VALUES ($1, $2, 'SEO', 'applying', $3, $4, 1, 'fake', 'clerk', 'boss')",
+    )
+    .bind(plan_id)
+    .bind(shop.tenant)
+    .bind(&plan)
+    .bind(&refs)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO ai_bulk_items (tenant_id, plan_id, product_id) VALUES ($1, $2, $3)")
+        .bind(shop.tenant)
+        .bind(plan_id)
+        .bind(shop.product)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    // Another run holds the only item: this run must not declare the plan applied.
+    let mut holder = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("SELECT 1 FROM ai_bulk_items WHERE plan_id = $1 FOR UPDATE")
+        .bind(plan_id)
+        .execute(&mut *holder)
+        .await
+        .unwrap();
+    let outcome = plan::run_apply(&runtime, shop.tenant, plan_id, false)
+        .await
+        .unwrap();
+    assert!(matches!(outcome, Outcome::Retry(_)), "{outcome:?}");
+    holder.rollback().await.unwrap();
+
+    assert_eq!(
+        plan::run_apply(&runtime, shop.tenant, plan_id, false)
+            .await
+            .unwrap(),
+        Outcome::Done
+    );
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let applied = plan::get(&mut tx, plan_id).await.unwrap();
+    assert_eq!(applied.status, PlanStatus::Applied);
+    let stored = products::get(&mut tx, shop.product).await.unwrap();
+    let cs = stored
+        .translations
+        .iter()
+        .find(|t| t.locale == "cs")
+        .unwrap();
+    assert_eq!(cs.seo_title.as_deref(), Some("Trička od Testkit"));
+    let labels = marks::list(&mut tx, EntityType::Product, &shop.product.to_string())
+        .await
+        .unwrap();
+    assert_eq!(labels.items.len(), 1);
+    assert_eq!(labels.items[0].feature, "bulk_plan");
 }

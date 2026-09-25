@@ -70,6 +70,7 @@ CREATE TABLE ai_marks (
     value_sha256    text NOT NULL CHECK (value_sha256 ~ '^[0-9a-f]{64}$'),
     feature         text NOT NULL,
     model           text NOT NULL,
+    -- The proposal or bulk plan the text came from.
     proposal_id     uuid,
     accepted_by     text NOT NULL,
     ai_generated_at timestamptz NOT NULL DEFAULT now(),
@@ -90,6 +91,8 @@ CREATE TABLE ai_bulk_plans (
     target_count integer NOT NULL DEFAULT 0 CHECK (target_count >= 0),
     sample       jsonb NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(sample) = 'array'),
     progress     jsonb NOT NULL DEFAULT '{}',
+    -- What the plan's codes/slugs/keys resolved to at preview time (applied as previewed).
+    refs         jsonb NOT NULL DEFAULT '{}',
     model        text,
     created_by   text NOT NULL,
     applied_by   text,

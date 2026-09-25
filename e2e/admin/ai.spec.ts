@@ -104,10 +104,16 @@ test("generates a description, previews it and accepts it with an AI label", asy
   await ai.getByLabel("Language", { exact: true }).selectOption("cs");
   await ai.getByLabel("Tone").selectOption("premium");
   await ai.getByLabel("Length").selectOption("short");
+  // Generating must not submit the surrounding product form.
+  const saves: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "PUT" && r.url().includes("/admin/v1/products/")) saves.push(r.url());
+  });
   await ai.getByRole("button", { name: "Generate proposal" }).click();
   const changes = ai.getByRole("list", { name: "Proposed changes" });
   await expect(changes).toBeVisible({ timeout: 30_000 });
   await expect(changes.getByText(/ukázkový popis od demo AI \(premium, short\)/)).toBeVisible();
+  expect(saves).toEqual([]);
   await expectAccessible(page, "ai-proposal");
   // Accept the description only.
   await ai.getByRole("checkbox", { name: "Short description (CS)" }).uncheck();

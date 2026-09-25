@@ -182,6 +182,16 @@ export default function AiBulkEdit() {
           </div>
         </Show>
 
+        <Show when={plan.isError}>
+          <div
+            role="alert"
+            class="flex flex-wrap items-center gap-2 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700"
+          >
+            {errorMessage(plan.error)}
+            <Button onClick={() => void plan.refetch()}>{t("common.retry")}</Button>
+          </div>
+        </Show>
+
         <Show when={plan.data && plan.data.status !== "pending" ? plan.data : undefined}>
           {(p) => (
             <section aria-labelledby="plan-h" class="flex flex-col gap-4">

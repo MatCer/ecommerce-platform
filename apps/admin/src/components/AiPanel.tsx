@@ -175,7 +175,9 @@ export function AiPanel(props: {
           params: { header: tenantHeader(), path: { id: proposalId() ?? "" } },
         }),
       ),
-    onSettled: () => setProposalId(null),
+    onMutate: () => setError(undefined),
+    onSuccess: () => setProposalId(null),
+    onError: (e: unknown) => setError(e),
   }));
 
   const quotaExceeded = () =>
@@ -224,13 +226,7 @@ export function AiPanel(props: {
         </div>
       </Show>
 
-      <form
-        class="flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!busy()) generate.mutate();
-        }}
-      >
+      <div class="flex flex-col gap-3">
         <div class="grid gap-3 sm:grid-cols-2">
           <SelectField
             label={t("ai.task")}
@@ -279,15 +275,17 @@ export function AiPanel(props: {
         </Show>
         <div>
           <Button
-            type="submit"
             variant="primary"
             loading={busy()}
             disabled={kind() === "translate" && targets().length === 0}
+            onClick={() => {
+              if (!busy()) generate.mutate();
+            }}
           >
             {t("ai.generate")}
           </Button>
         </div>
-      </form>
+      </div>
 
       <div aria-live="polite">
         <Show when={busy()}>
@@ -311,6 +309,16 @@ export function AiPanel(props: {
               {t("ai.seeUsage")}
             </A>
           </Show>
+        </div>
+      </Show>
+
+      <Show when={proposal.isError}>
+        <div
+          role="alert"
+          class="flex flex-wrap items-center gap-2 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700"
+        >
+          {errorMessage(proposal.error)}
+          <Button onClick={() => void proposal.refetch()}>{t("common.retry")}</Button>
         </div>
       </Show>
 

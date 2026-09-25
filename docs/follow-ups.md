@@ -39,3 +39,7 @@
 | WP13a | Feed import applies product by product and feeds render in memory per market; batch/stream for 100k-item catalogs | later (perf) |
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
 | WP13a | Orders/customers CSV import, tenant data export, customer access/erasure (A29) | WP13b |
+| WP22 | Translations cover names, descriptions, SEO, page blocks and menu labels; option/value names, parameter texts and image alt texts are not translated by AI yet | later |
+| WP22 | One entity per proposal: no "translate every product missing sk" batch job (bulk plans cover non-text fields) | later |
+| WP22 | The AI quota is a soft limit (concurrent calls may overshoot by one call); no superadmin UI for quotas (CLI `set-ai-quota`) | WP14 (only if it matters) |
+| WP22 | Old `ai_proposals` / `ai_bulk_plans` rows are never purged | WP14 |
