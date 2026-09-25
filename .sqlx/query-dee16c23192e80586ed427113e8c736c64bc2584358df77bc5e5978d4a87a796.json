@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ad_platforms (tenant_id, platform, enabled, paused, test_mode, market_ids,\n                                   settings, credentials_ciphertext, credentials_hint)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n         ON CONFLICT (tenant_id, platform) DO UPDATE\n         SET enabled = $3, paused = $4, test_mode = $5, market_ids = $6, settings = $7,\n             credentials_ciphertext = $8, credentials_hint = $9, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Bool",
+        "Bool",
+        "UuidArray",
+        "Jsonb",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dee16c23192e80586ed427113e8c736c64bc2584358df77bc5e5978d4a87a796"
+}

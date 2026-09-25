@@ -301,6 +301,10 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
       STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
+      # Dev only (WP20): ad-platform connection tests go to the vendor mocks, reached through
+      # the SSRF-safe client's dev allowlist. Both are ignored unless APP_ENV=dev.
+      AD_PLATFORMS_BASE_URL: http://mocks:4010/ads
+      SAFE_FETCH_ALLOW_HOSTS: mocks
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
@@ -346,6 +350,9 @@ services:
       SAFE_FETCH_ALLOW_HOSTS: mocks
       # WP11: Fio API polling (the local mock); tokens are encrypted with SECRETS_KEY.
       FIO_API_URL: ${FIO_API_URL:-http://mocks:4010/fio}
+      # Dev only (WP20): every ad-platform call goes to the vendor mocks (ignored unless
+      # APP_ENV=dev).
+      AD_PLATFORMS_BASE_URL: http://mocks:4010/ads
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }

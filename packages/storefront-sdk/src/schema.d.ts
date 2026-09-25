@@ -471,7 +471,8 @@ export interface paths {
          *     `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
          *     records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
          *     `analytics` right now; purposes the client claims are ignored and unknown props dropped.
-         *     Always `202`, so the answer does not reveal the consent state.
+         *     Page views and shopping steps also go to the enabled ad platforms while the subject grants
+         *     `ads` (WP20). Always `202`, so the answer does not reveal the consent state.
          */
         post: operations["events"];
         delete?: never;
@@ -2593,6 +2594,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2625,6 +2628,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3227,6 +3232,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
