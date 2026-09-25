@@ -1,10 +1,40 @@
 ---
+import { t } from "@platform/storefront-sdk/format";
+import WithdrawalHistory from "../components/WithdrawalHistory.astro";
+import WithdrawalForm from "../islands/WithdrawalForm";
+import WithdrawalRequest from "../islands/WithdrawalRequest";
 import Checkout from "../layouts/Checkout.astro";
+import { checkoutApi, messages, shopUrl } from "../lib/api";
 
-const shopUrl = `${Astro.url.protocol}//${Astro.url.host.replace(/^checkout\./, "")}/`;
+const api = checkoutApi(Astro.request);
+const token = Astro.url.searchParams.get("t");
+const [shop, form] = await Promise.all([
+  api.shop(),
+  token !== null ? api.withdrawalForm(token) : null,
+]);
+const m = shop?.messages ?? {};
+const locale = shop?.locale ?? "cs";
+Astro.response.headers.set("Cache-Control", "no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+if (token !== null && !form) Astro.response.status = 404;
+// Legal links have no page-kind discriminator; expose the published policies without
+// guessing translated slugs, including the withdrawal policy when available.
+const legalPages = shop?.legal_pages ?? [];
 ---
 
-<Checkout title="Odstoupení od smlouvy" shopName="Obchod" shopUrl={shopUrl}>
-  <h1 class="font-display text-2xl font-bold">Odstoupení od smlouvy</h1>
-  <p class="mt-2 text-muted-foreground">Formulář pro odstoupení (spec A19) přibude ve WP12.</p>
+<Checkout title={t(m, "withdraw.title")} shopName={shop?.name ?? ""} shopUrl={shopUrl(Astro.url)} lang={locale} accountLabel={t(m, "account.nav")} withdrawalLabel={t(m, "withdraw.title")}>
+  <div class="grid gap-5">
+    <h1 class="font-display text-2xl font-bold">{t(m, "withdraw.title")}</h1>
+    <p class="text-sm text-muted-foreground">{t(m, "withdraw.rights")}</p>
+    {legalPages.length > 0 && <nav aria-label={t(m, "withdraw.legal")} class="flex flex-wrap gap-3 text-sm">
+      {legalPages.map(link => <a class="text-identity-ink underline" href={new URL(link.href, shopUrl(Astro.url)).href}>{link.label}</a>)}
+    </nav>}
+    {form && token !== null ? <>
+      <WithdrawalForm client:load form={form} target={{ mode: "token", id: token }} m={messages(m, "withdraw.")} locale={locale} />
+      <WithdrawalHistory receipts={form.withdrawals} m={m} locale={locale} />
+    </> : <>
+      {token !== null && <p role="alert">{t(m, "withdraw.link_invalid")}</p>}
+      <WithdrawalRequest client:load m={messages(m, "withdraw.")} />
+    </>}
+  </div>
 </Checkout>

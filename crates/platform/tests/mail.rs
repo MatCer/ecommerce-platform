@@ -1,7 +1,7 @@
 //! `Mailer::send` outcome classification against a scripted SMTP server (spec A14).
 #![allow(clippy::unwrap_used)]
 
-use platform::mail::{Delivery, MailConfig, Mailer, Outgoing, Stream};
+use platform::mail::{Attachment, Delivery, MailConfig, Mailer, Outgoing, Stream};
 use testkit::smtp::{FakeSmtp, Mode};
 
 fn mailer(url: &str) -> Mailer {
@@ -29,6 +29,7 @@ fn message(to: &str) -> Outgoing<'_> {
         html: "<p>Ahoj</p>",
         text: "Ahoj",
         id: "0192-test",
+        attachments: &[],
     }
 }
 
@@ -53,6 +54,26 @@ async fn accepted_only_after_250() {
         raw[0]
     );
     assert!(raw[0].contains("multipart/alternative"));
+}
+
+#[tokio::test]
+async fn attachments_make_a_mixed_message() {
+    let smtp = FakeSmtp::start(Mode::Accept).await;
+    let files = [Attachment {
+        filename: "FV202600001.pdf".into(),
+        content_type: "application/pdf".into(),
+        body: b"%PDF-1.4 test".to_vec(),
+    }];
+    let msg = Outgoing {
+        attachments: &files,
+        ..message("jana@example.test")
+    };
+    assert_eq!(mailer(&smtp.url()).send(&msg).await, Delivery::Accepted);
+    let raw = smtp.received().remove(0);
+    assert!(raw.contains("multipart/mixed"), "{raw}");
+    assert!(raw.contains("multipart/alternative"), "{raw}");
+    assert!(raw.contains("Content-Type: application/pdf"), "{raw}");
+    assert!(raw.contains("filename=\"FV202600001.pdf\""), "{raw}");
 }
 
 #[tokio::test]

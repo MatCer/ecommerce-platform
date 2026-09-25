@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT carrier, public_key, sender_label, updated_at FROM carrier_accounts",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "carrier",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "carrier"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "public_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "public_key"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "sender_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "sender_label"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "5712e6c4882f2a3d468ee6a820a83046b8791cf95f3c9b0bf612f256034efe0b"
+}

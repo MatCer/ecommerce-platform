@@ -315,28 +315,47 @@ impl Stripe {
         {
             return Err(Error::Internal("stored PaymentIntent id".into()));
         }
-        let list = self
-            .call(
-                reqwest::Method::GET,
-                &format!("/v1/refunds?payment_intent={payment_intent}&limit=100"),
-                Some(account),
-                None,
-                &[],
-            )
-            .await?;
         let ours = refund_id.to_string();
-        Ok(list
-            .get("data")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .find(|r| r.pointer("/metadata/refund_id").and_then(Value::as_str) == Some(&ours))
-            .and_then(|r| {
-                Some((
-                    r.get("id")?.as_str()?.to_owned(),
-                    r.get("status")?.as_str()?.to_owned(),
-                ))
-            }))
+        // Every page (Stripe lists newest first, 100 per page): absence must be certain before
+        // the caller creates the refund again.
+        let mut after: Option<String> = None;
+        for _ in 0..100 {
+            let cursor = after
+                .as_deref()
+                .map(|a| format!("&starting_after={a}"))
+                .unwrap_or_default();
+            let list = self
+                .call(
+                    reqwest::Method::GET,
+                    &format!("/v1/refunds?payment_intent={payment_intent}&limit=100{cursor}"),
+                    Some(account),
+                    None,
+                    &[],
+                )
+                .await?;
+            let data = list.get("data").and_then(Value::as_array);
+            let found = data
+                .into_iter()
+                .flatten()
+                .find(|r| r.pointer("/metadata/refund_id").and_then(Value::as_str) == Some(&ours));
+            if let Some(r) = found {
+                return Ok(Some((
+                    Self::str_field(r, "id")?,
+                    Self::str_field(r, "status")?,
+                )));
+            }
+            let more = list.get("has_more").and_then(Value::as_bool) == Some(true);
+            let last = data
+                .and_then(|d| d.last())
+                .and_then(|r| r.get("id"))
+                .and_then(Value::as_str)
+                .filter(|id| id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'));
+            match (more, last) {
+                (true, Some(id)) => after = Some(id.to_owned()),
+                _ => return Ok(None),
+            }
+        }
+        Err(Error::Unavailable("too many refunds to search".into()))
     }
 
     // -----------------------------------------------------------------------------------

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO carrier_accounts (tenant_id, carrier, credentials, public_key, sender_label,\n             updated_by)\n         VALUES ($1, $2, $3, $4, $5, $6)\n         ON CONFLICT (tenant_id, carrier) DO UPDATE SET credentials = EXCLUDED.credentials,\n             public_key = EXCLUDED.public_key, sender_label = EXCLUDED.sender_label,\n             updated_by = EXCLUDED.updated_by, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bytea",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4196cbe64664945edadb0f5a94d6946275c2bde3a4774ca8b0c99b287daa4def"
+}

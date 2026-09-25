@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE invoices SET pdf_key = $2, pdf_rendered_at = now()\n         WHERE id = $1 AND pdf_key IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d9318103d04fe534dccbe04d7cae5a9d1c563faa0dccc6f16edcf3d716bcbbb7"
+}

@@ -1,0 +1,8 @@
+{% extends "order.mjml" %}
+{% block heading %}{{ t("order_delivered.heading", number=order.number) }}{% endblock %}
+{% block intro %}
+        <mj-text>{{ t("order_delivered.intro", shop=brand.shop_name) }}</mj-text>
+{% endblock %}
+{% block after_summary %}
+        <mj-text font-size="13px" color="{{ brand.colors.muted }}">{{ t("order_delivered.withdrawal") }} <a href="{{ withdraw_url }}">{{ t("order_delivered.withdrawal_link") }}</a></mj-text>
+{% endblock %}

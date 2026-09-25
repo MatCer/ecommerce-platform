@@ -206,6 +206,9 @@ services:
       ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
       SMTP_URL: smtp://mailpit:1025
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
+      # Sign-ins per client IP and minute (default 10). Locally every e2e browser shares one
+      # IP (the Docker gateway), so the stack allows more.
+      AUTH_SIGNIN_RATE_MAX: ${AUTH_SIGNIN_RATE_MAX:-120}
     depends_on:
       postgres: { condition: service_healthy }
       mailpit: { condition: service_started }
@@ -301,6 +304,10 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
       STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
+      # WP12: carriers against the local mocks (real endpoints are the defaults).
+      PACKETA_API_URL: ${PACKETA_API_URL:-http://mocks:4010/packeta/api/rest}
+      PACKETA_VALIDATE_URL: ${PACKETA_VALIDATE_URL:-http://mocks:4010/packeta/pps/api/widget/v1/validate}
+      PPL_API_URL: ${PPL_API_URL:-http://mocks:4010/ppl}
       # Dev only (WP20): ad-platform connection tests go to the vendor mocks, reached through
       # the SSRF-safe client's dev allowlist. Both are ignored unless APP_ENV=dev.
       AD_PLATFORMS_BASE_URL: http://mocks:4010/ads
@@ -350,6 +357,16 @@ services:
       SAFE_FETCH_ALLOW_HOSTS: mocks
       # WP11: Fio API polling (the local mock); tokens are encrypted with SECRETS_KEY.
       FIO_API_URL: ${FIO_API_URL:-http://mocks:4010/fio}
+      # WP12: Stripe for refunds a crash left unsubmitted (same settings as the api).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
+      STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
+      # WP12: carrier tracking, ČNB rates (local mocks) and PDF rendering (Typst in the image).
+      PACKETA_API_URL: ${PACKETA_API_URL:-http://mocks:4010/packeta/api/rest}
+      PACKETA_VALIDATE_URL: ${PACKETA_VALIDATE_URL:-http://mocks:4010/packeta/pps/api/widget/v1/validate}
+      PPL_API_URL: ${PPL_API_URL:-http://mocks:4010/ppl}
+      CNB_RATES_URL: ${CNB_RATES_URL:-http://mocks:4010/cnb/denni_kurz.txt}
       # Dev only (WP20): every ad-platform call goes to the vendor mocks (ignored unless
       # APP_ENV=dev).
       AD_PLATFORMS_BASE_URL: http://mocks:4010/ads

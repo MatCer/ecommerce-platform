@@ -172,6 +172,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
             commerce::storefront::PublicUrls::default(),
         )),
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
+        carriers: None,
     }
 }
 

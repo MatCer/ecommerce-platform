@@ -440,6 +440,53 @@ impl CheckoutConfig {
     }
 }
 
+/// Carrier and document integrations (WP12). Defaults are the real services; the local stack
+/// points them at `apps/mocks`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FulfillmentConfig {
+    /// `PACKETA_API_URL`: Packeta's REST/XML endpoint.
+    pub packeta_api_url: Url,
+    /// `PACKETA_VALIDATE_URL`: the pickup-point validation endpoint of the widget API.
+    pub packeta_validate_url: Url,
+    /// `PPL_API_URL`: the PPL CPL API base (OAuth + shipments).
+    pub ppl_api_url: Url,
+    /// `CNB_RATES_URL`: the ČNB daily fixing (`denni_kurz.txt`).
+    pub cnb_rates_url: Url,
+    /// `TYPST_BIN`: the Typst CLI rendering PDFs (worker).
+    pub typst_bin: String,
+}
+
+impl FulfillmentConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let or = |name: &'static str, default: &str| -> Result<Url, ConfigError> {
+            match get(lookup, name) {
+                Some(_) => url(lookup, name),
+                None => Url::parse(default).map_err(|e| ConfigError::Invalid {
+                    name,
+                    reason: e.to_string(),
+                }),
+            }
+        };
+        Ok(Self {
+            packeta_api_url: or("PACKETA_API_URL", "https://www.zasilkovna.cz/api/rest")?,
+            packeta_validate_url: or(
+                "PACKETA_VALIDATE_URL",
+                "https://widget.packeta.com/v6/pps/api/widget/v1/validate",
+            )?,
+            ppl_api_url: or("PPL_API_URL", "https://api.dhl.com/ecs/ppl/myapi2")?,
+            cnb_rates_url: or(
+                "CNB_RATES_URL",
+                "https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt",
+            )?,
+            typst_bin: get(lookup, "TYPST_BIN").unwrap_or_else(|| "typst".into()),
+        })
+    }
+}
+
 /// How the platform talks to Stripe (WP11).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StripeMode {

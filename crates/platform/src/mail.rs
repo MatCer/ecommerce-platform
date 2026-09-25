@@ -140,6 +140,16 @@ pub struct Outgoing<'a> {
     /// Stable per message: the Message-ID becomes `<id@from-domain>`, so a duplicate after an
     /// uncertain send can be recognised by the receiver (spec §13).
     pub id: &'a str,
+    /// Files attached to the message (invoices, WP12).
+    pub attachments: &'a [Attachment],
+}
+
+/// A file attached to an email.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attachment {
+    pub filename: String,
+    pub content_type: String,
+    pub body: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,16 +226,28 @@ fn build(t: &Transport, msg: &Outgoing<'_>) -> Result<Message, String> {
         Some(msg.from_name.chars().filter(|c| !c.is_control()).collect()),
         t.from.email.clone(),
     );
-    Message::builder()
+    let builder = Message::builder()
         .from(from)
         .to(to)
         .subject(msg.subject)
         .message_id(Some(format!("<{}@{}>", msg.id, t.from.email.domain())))
-        .header(header::MIME_VERSION_1_0)
-        .multipart(MultiPart::alternative_plain_html(
-            msg.text.to_owned(),
-            msg.html.to_owned(),
-        ))
+        .header(header::MIME_VERSION_1_0);
+    let body = MultiPart::alternative_plain_html(msg.text.to_owned(), msg.html.to_owned());
+    if msg.attachments.is_empty() {
+        return builder
+            .multipart(body)
+            .map_err(|e| format!("invalid message: {e}"));
+    }
+    let mut mixed = MultiPart::mixed().multipart(body);
+    for a in msg.attachments {
+        let content_type = header::ContentType::parse(&a.content_type)
+            .map_err(|e| format!("invalid attachment type: {e}"))?;
+        let name: String = a.filename.chars().filter(|c| !c.is_control()).collect();
+        mixed = mixed
+            .singlepart(lettre::message::Attachment::new(name).body(a.body.clone(), content_type));
+    }
+    builder
+        .multipart(mixed)
         .map_err(|e| format!("invalid message: {e}"))
 }
 

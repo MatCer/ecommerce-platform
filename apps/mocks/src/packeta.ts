@@ -19,7 +19,7 @@ interface Point {
   country: string;
 }
 
-const POINTS: Record<string, Point[]> = {
+export const POINTS: Record<string, Point[]> = {
   cz: [
     {
       id: "4101",

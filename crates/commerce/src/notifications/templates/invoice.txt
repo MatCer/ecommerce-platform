@@ -1,0 +1,8 @@
+{% extends "layout.txt" %}
+{% block content %}{{ t(kind ~ ".heading", doc=document.number) }}
+
+{{ t(kind ~ ".intro", shop=brand.shop_name, number=order.number) }}
+{{ t("invoice.total") }}: {{ document.total }}
+{{ t("invoice.issued_on") }}: {{ document.issued_on }}
+
+{{ t("order.button") }}: {{ order.url }}{% endblock %}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE refunds SET finalized_at = now(), credit_note_id = coalesce(credit_note_id, $2)\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "36366d05474d28f21941cb11ae53ea9923ae588b361bda65fc95428f9db86dc4"
+}

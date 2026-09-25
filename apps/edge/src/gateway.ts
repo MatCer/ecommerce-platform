@@ -87,6 +87,7 @@ const CART_OPS: { method: string; path: RegExp }[] = [
 
 /** Customer account operations on the checkout origin (`/_p/account/*`, WP9, A4, A5). */
 const ACCOUNT_OPS: { method: string; path: RegExp }[] = [
+  { method: "POST", path: /^\/orders\/[0-9a-f-]{36}\/withdrawal$/ },
   { method: "POST", path: /^\/magic-link$/ },
   { method: "POST", path: /^\/magic-link\/consume$/ },
   { method: "POST", path: /^\/login$/ },
@@ -107,6 +108,11 @@ const CHECKOUT_OPS: { method: string; path: RegExp }[] = [
 ];
 
 /** The order page's operations (`/_p/orders/<order token>/*`, A4, A10). */
+const WITHDRAW_OPS: { method: string; path: RegExp }[] = [
+  { method: "POST", path: /^$/ },
+  { method: "POST", path: /^\/[0-9a-f]{64}$/ },
+];
+
 const ORDER_OPS: { method: string; path: RegExp }[] = [
   { method: "GET", path: /^\/[0-9a-f]{64}$/ },
   { method: "GET", path: /^\/[0-9a-f]{64}\/payment$/ },
@@ -1134,6 +1140,10 @@ ${
     const p = url.pathname;
     if (p.startsWith("/_p/account/"))
       return accountProxy(site, req, p.slice("/_p/account".length), host, port, clientIp);
+    if (p === "/_p/withdraw" || p.startsWith("/_p/withdraw/")) {
+      const rest = p.slice("/_p/withdraw".length);
+      return checkoutProxy(site, req, "/withdrawals", rest, WITHDRAW_OPS, host, port, clientIp);
+    }
     if (p === "/_p/checkout" || p.startsWith("/_p/checkout/")) {
       const rest = p.slice("/_p/checkout".length);
       return checkoutProxy(site, req, "/checkout", rest, CHECKOUT_OPS, host, port, clientIp);
@@ -1234,7 +1244,12 @@ ${
     headers.set("cache-control", "no-store");
     // A sign-in link (`/account/verify?token=`) or an order page (`/o/<token>`, A4) must not
     // leak its capability through Referer.
-    if (url.searchParams.has("token") || url.pathname.startsWith("/o/"))
+    if (
+      url.searchParams.has("token") ||
+      url.searchParams.has("t") ||
+      url.pathname === "/withdraw" ||
+      url.pathname.startsWith("/o/")
+    )
       headers.set("referrer-policy", "no-referrer");
     return new Response(req.method === "HEAD" ? null : r.body, { status: r.status, headers });
   }
@@ -1265,12 +1280,20 @@ ${
   }
 
   async function fetchHandler(request: Request): Promise<Response> {
+    let response: Response;
     try {
-      return await handle(request);
+      response = await handle(request);
     } catch (err) {
       log({ level: "error", msg: "request failed", path: safePath(request.url), err: String(err) });
-      return text(err instanceof TimeoutError ? 504 : 502, "Shop temporarily unavailable");
+      response = text(err instanceof TimeoutError ? 504 : 502, "Shop temporarily unavailable");
     }
+    // Even rejected requests and render failures must not leak a withdrawal capability.
+    const path = new URL(request.url).pathname;
+    if (path === "/withdraw" || path === "/_p/withdraw" || path.startsWith("/_p/withdraw/")) {
+      response.headers.set("referrer-policy", "no-referrer");
+      response.headers.set("cache-control", "no-store");
+    }
+    return response;
   }
 
   /** Internal admin surface (separate port, never routed by Caddy). */
@@ -1410,7 +1433,7 @@ function safeHost(url: string) {
 
 function safePath(url: string) {
   try {
-    return new URL(url).pathname;
+    return new URL(url).pathname.replace(/^\/_p\/withdraw\/[^/]+/, "/_p/withdraw/[redacted]");
   } catch {
     return "invalid";
   }

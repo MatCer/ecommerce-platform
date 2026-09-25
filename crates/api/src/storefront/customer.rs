@@ -307,7 +307,7 @@ pub struct AddressList {
 }
 
 /// Runs `f` for the signed-in customer.
-async fn as_customer<T>(
+pub(super) async fn as_customer<T>(
     s: &AppState,
     shopper: &Shopper,
     headers: &HeaderMap,

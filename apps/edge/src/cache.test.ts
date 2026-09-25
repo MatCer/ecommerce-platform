@@ -51,6 +51,7 @@ describe("A2 request allowlist", () => {
       "authorization",
     ],
     ["?token=", req({ path: "/p/x?token=1" }), "capability token in URL"],
+    ["?t=", req({ path: "/p/x?t=1" }), "capability token in URL"],
     ["?h=", req({ path: "/p/x?h=1" }), "capability token in URL"],
     ["?sig=", req({ path: "/p/x?sig=1" }), "capability token in URL"],
     ["account path", req({ path: "/account" }), "not allowlisted"],

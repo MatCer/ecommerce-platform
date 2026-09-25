@@ -1,0 +1,22 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import type { DocumentLinks } from "@platform/storefront-sdk/types";
+
+interface Props {
+  documents: DocumentLinks | null;
+  m: Record<string, string>;
+  locale: string;
+}
+const { documents, m, locale } = Astro.props;
+const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
+---
+{documents && documents.items.length > 0 && <section aria-labelledby="order-documents" class="rounded-lg border border-border bg-card p-4">
+  <h2 id="order-documents" class="font-display text-lg font-bold">{t(m, "order.documents")}</h2>
+  <p class="mt-1 text-sm text-muted-foreground">{t(m, "order.documents.hint")}</p>
+  <ul class="mt-3 grid gap-3 text-sm">
+    {documents.items.map(d => <li class="flex flex-wrap items-center justify-between gap-2">
+      <span>{t(m, `order.documents.${d.kind}`)} {d.number} · <time datetime={d.issued_on}>{date.format(new Date(d.issued_on))}</time> · {d.total.formatted}</span>
+      <a href={d.url} referrerpolicy="no-referrer" class="text-identity-ink underline">{t(m, "order.documents.download")}<span class="sr-only"> {d.number}</span></a>
+    </li>)}
+  </ul>
+</section>}

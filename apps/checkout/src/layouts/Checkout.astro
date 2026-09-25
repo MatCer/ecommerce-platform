@@ -8,6 +8,7 @@ interface Props {
   lang?: string;
   /** Localized "My account" (from the shop's messages). */
   accountLabel?: string;
+  withdrawalLabel?: string;
   /** The two-column checkout needs more room than the account pages. */
   wide?: boolean;
 }
@@ -17,6 +18,7 @@ const {
   shopUrl,
   lang = "cs",
   accountLabel = "Můj účet",
+  withdrawalLabel = "Odstoupení od smlouvy",
   wide = false,
 } = Astro.props;
 const width = wide ? "max-w-5xl" : "max-w-3xl";
@@ -45,7 +47,7 @@ const width = wide ? "max-w-5xl" : "max-w-3xl";
       <slot />
     </main>
     <footer class:list={["mx-auto px-4 py-6 text-sm text-muted-foreground", width]}>
-      <a href="/withdraw" class="underline">Odstoupení od smlouvy</a>
+      <a href="/withdraw" class="underline">{withdrawalLabel}</a>
     </footer>
   </body>
 </html>

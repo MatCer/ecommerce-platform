@@ -1,0 +1,8 @@
+{% extends "order.mjml" %}
+{% block heading %}{{ t("order_cancelled.heading", number=order.number) }}{% endblock %}
+{% block intro %}
+        <mj-text>{{ t("order_cancelled.intro_" ~ reason, shop=brand.shop_name) }}</mj-text>
+{%- if refund %}
+        <mj-text>{{ t("order_cancelled.refund") }}</mj-text>
+{%- endif %}
+{% endblock %}

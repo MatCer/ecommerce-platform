@@ -5,8 +5,8 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, OpsConfig, PaymentsConfig, S3Config,
-    ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, FulfillmentConfig, MeiliConfig, OpsConfig,
+    PaymentsConfig, S3Config, ServiceTokenConfig, StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
@@ -169,6 +169,12 @@ async fn serve() -> anyhow::Result<()> {
             "AUTH_INTERNAL_URL/AUTH_INTERNAL_TOKEN not set: staff invitations answer 503"
         );
     }
+    let checkout = Arc::new(checkout_settings(
+        &CheckoutConfig::from_env(cfg.env)?,
+        &PaymentsConfig::from_env(cfg.env)?,
+        &ops,
+    )?);
+    let fulfillment = FulfillmentConfig::from_env()?;
     let state = api::AppState {
         auth_service,
         db: db.clone(),
@@ -189,11 +195,6 @@ async fn serve() -> anyhow::Result<()> {
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
-        checkout: Arc::new(checkout_settings(
-            &CheckoutConfig::from_env(cfg.env)?,
-            &PaymentsConfig::from_env(cfg.env)?,
-            &ops,
-        )?),
         webhooks: webhooks(&ops, cfg.env)?,
         ads: match ops.secrets_key {
             Some(key) => Some(commerce::adtracking::AdTracking::new(
@@ -211,6 +212,13 @@ async fn serve() -> anyhow::Result<()> {
             ops.storefront_rate_per_second,
             ops.storefront_rate_burst,
         )),
+        carriers: Some(commerce::carriers::Carriers::new(
+            fulfillment.packeta_api_url.to_string(),
+            fulfillment.packeta_validate_url.to_string(),
+            fulfillment.ppl_api_url.to_string(),
+            checkout.payments.secrets.clone(),
+        )?),
+        checkout,
         ai: ai_helpers()?,
     };
     let limiter = state.rate_limit.clone();
