@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Counters } from "../src/counters.ts";
-import { createGateway, type Gateway } from "../src/gateway.ts";
+import { createGateway, type Gateway, type GatewayOptions } from "../src/gateway.ts";
 import { ApiPreviewResolver, StaticResolver } from "../src/sites.ts";
 import { buildArtifact, fakeApi, hostileTheme, site } from "./fixtures.ts";
 
@@ -183,4 +183,50 @@ test("local artifact GC removes long-unused artifacts only", async () => {
   // Recently used ones stay (the draft and live artifacts rendered above).
   await stat(path.join(root, draft, "manifest.json"));
   await stat(path.join(root, live, "manifest.json"));
+});
+
+test("pruning never removes an artifact a request is using, and drops its cached manifest", async () => {
+  const old = Date.now() / 1000 - 30 * 86_400;
+  const id = (
+    await buildArtifact(root, "theme", hostileTheme("racy"), { "_astro/app.racy.js": "4" })
+  ).id;
+  await utimes(path.join(root, id), old, old);
+  const downloads: string[] = [];
+  const racy = createGateway({
+    artifactRoot: root,
+    resolver: new StaticResolver({
+      "racy.localhost": site({ theme_artifact: id, shop_host: "racy.localhost" }),
+    }),
+    apiOrigin: "http://api.test",
+    mediaOrigin: "http://media.test",
+    scheme: "http",
+    purgeToken: "purge-token-0123456789abcdef",
+    upstream,
+    artifacts: {
+      ensure: async (a: string) => {
+        downloads.push(a);
+      },
+    } as unknown as GatewayOptions["artifacts"],
+    log: () => {},
+  });
+  const asset = () =>
+    racy.fetch(
+      new Request("http://racy.localhost:8080/_astro/app.racy.js", {
+        headers: { host: "racy.localhost:8080" },
+      }),
+    );
+  try {
+    // A request racing the prune marks the artifact as used before the (synchronous)
+    // eligibility check: it is kept and served.
+    const [pruned, res] = await Promise.all([racy.pruneArtifacts(7 * 86_400_000), asset()]);
+    expect(pruned).toEqual([]);
+    expect(res.status).toBe(200);
+    // Idle long enough: removed, and the next request loads it afresh (download + verify).
+    const later = Date.now() + 30 * 86_400_000;
+    expect(await racy.pruneArtifacts(7 * 86_400_000, later)).toContain(id);
+    expect((await asset()).status).toBe(404);
+    expect(downloads).toEqual([id, id]);
+  } finally {
+    await racy.dispose();
+  }
 });

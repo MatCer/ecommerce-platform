@@ -723,6 +723,7 @@ export const sk: Dictionary = {
     requiredHint: "Polia označené * sú povinné.",
   },
   errors: {
+    base_not_validated: "Základom zmeny tokenov môže byť len revízia, ktorá prešla kontrolami.",
     builds_in_progress: "Ešte bežia tri zostavenia vzhľadu. Počkajte, kým jedno dobehne.",
     default_source_missing: "Predvolený vzhľad zatiaľ nie je k dispozícii.",
     not_publishable: "Zverejniť možno len revízie, ktoré prešli všetkými kontrolami.",

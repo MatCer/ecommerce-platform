@@ -721,6 +721,7 @@ export const en = {
     requiredHint: "Fields marked * are required.",
   },
   errors: {
+    base_not_validated: "Only a revision that passed the checks can be the base of a token change.",
     builds_in_progress: "Three theme builds are still running. Wait until one finishes.",
     default_source_missing: "The default theme is not available yet.",
     not_publishable: "Only revisions that passed every check can be published.",

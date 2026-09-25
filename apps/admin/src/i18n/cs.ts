@@ -721,6 +721,7 @@ export const cs: Dictionary = {
     requiredHint: "Pole označená * jsou povinná.",
   },
   errors: {
+    base_not_validated: "Základem změny tokenů může být jen revize, která prošla kontrolami.",
     builds_in_progress: "Ještě běží tři sestavení vzhledu. Počkejte, až jedno doběhne.",
     default_source_missing: "Výchozí vzhled zatím není k dispozici.",
     not_publishable: "Zveřejnit lze jen revize, které prošly všemi kontrolami.",

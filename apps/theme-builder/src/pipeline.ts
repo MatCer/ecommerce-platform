@@ -8,7 +8,7 @@
  * (`verifyArtifact`). Step outputs are read without following symlinks.
  */
 import { spawn } from "node:child_process";
-import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { verifyArtifact } from "@platform/theme-kit";
 import { judge, type PageResult } from "@platform/theme-kit/budget";
@@ -128,6 +128,31 @@ export async function safeRead(root: string, rel: string, max: number): Promise<
     if (last ? !st.isFile() || st.size > max : !st.isDirectory()) return null;
   }
   return readFile(p);
+}
+
+/**
+ * Walks an output tree without following anything: only directories and regular files, at
+ * most `maxFiles` files and `maxBytes` in total. Run before any file of it is opened (a FIFO
+ * would block a read, a huge file would exhaust memory).
+ */
+export async function checkTree(root: string, maxBytes: number, maxFiles: number): Promise<void> {
+  let bytes = 0;
+  let files = 0;
+  const walk = async (dir: string) => {
+    for (const name of await readdir(dir)) {
+      const p = path.join(dir, name);
+      const st = await lstat(p);
+      if (st.isDirectory()) await walk(p);
+      else if (st.isFile()) {
+        bytes += st.size;
+        files += 1;
+        if (bytes > maxBytes || files > maxFiles)
+          throw new Error("the build output is larger than allowed");
+      } else throw new Error(`the build output contains a special file or link: ${name}`);
+    }
+  };
+  if (!(await realDir(root))) throw new Error("the build output is not a plain directory");
+  await walk(root);
 }
 
 async function realDir(p: string): Promise<boolean> {
@@ -261,6 +286,7 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
       !(await realDir(path.join(root, id)))
     )
       throw new Error("the build output is not a plain directory");
+    await checkTree(path.join(root, id), 52 * 1024 * 1024, 20_000);
     const manifest = await verifyArtifact(root, id);
     report.steps.push({
       name: "build",
@@ -296,6 +322,9 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
       timeoutMs: 600_000,
     });
     const out = path.join(dir, "out/check");
+    // Only a check step that completed counts; each page must have been measured.
+    if (c.exitCode !== 0 || c.timedOut)
+      fail(`checks did not complete: ${c.timedOut ? "timed out" : errorSummary(tail(c, 20_000))}`);
     const measured = await safeRead(out, "report.json", 8 * 1024 * 1024);
     const results = measured
       ? ((JSON.parse(measured.toString("utf8")) as { results?: PageResult[] }).results ?? [])
@@ -318,22 +347,36 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
         failures,
       };
     });
-    if (!results.length)
-      fail(`budget: nothing was measured (${c.timedOut ? "timed out" : tail(c, 800)})`);
+    const measuredPaths = new Set(results.map((r) => r.path));
+    for (const p of check.pages) if (!measuredPaths.has(p)) fail(`budget: ${p} was not measured`);
     report.steps.push({
       name: "budget",
-      status: results.length && pages.every((p) => p.failures.length === 0) ? "passed" : "failed",
+      status:
+        results.length &&
+        check.pages.every((p) => measuredPaths.has(p)) &&
+        pages.every((p) => p.failures.length === 0)
+          ? "passed"
+          : "failed",
       ms: c.ms,
       lighthouse: !tokensOnly,
       pages,
     });
     const summary = await safeRead(out, "result.json", 64 * 1024);
-    const smoke = summary
-      ? ((JSON.parse(summary.toString("utf8")) as { smoke?: { ok: boolean; log: string } }).smoke ??
-        null)
-      : null;
-    if (tokensOnly) report.steps.push({ name: "smoke", status: "skipped" });
-    else {
+    const parsed = summary
+      ? (JSON.parse(summary.toString("utf8")) as {
+          measure?: { ok: boolean; log: string };
+          smoke?: { ok: boolean; log: string };
+        })
+      : {};
+    const smoke = parsed.smoke ?? null;
+    if (!parsed.measure?.ok)
+      fail(
+        `budget: the measurement did not finish (${parsed.measure?.log.slice(-400) ?? "no report"})`,
+      );
+    if (tokensOnly) {
+      report.steps.push({ name: "smoke", status: "skipped" });
+      if (!smoke?.ok) fail(`screenshots: ${smoke?.log.slice(-400) ?? "did not run"}`);
+    } else {
       report.steps.push({
         name: "smoke",
         status: smoke?.ok ? "passed" : "failed",
@@ -343,12 +386,15 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
         fail(`smoke (browse → cart → checkout): ${smoke?.log.slice(-600) ?? "did not run"}`);
     }
     report.screenshots = [];
+    const expected = SCREENSHOTS.slice(0, Math.min(check.pages.length, 3) * 2);
     for (const name of SCREENSHOTS) {
       const png = await safeRead(out, `shots/${name}.png`, 5 * 1024 * 1024);
       if (!png) continue;
       await cfg.api.screenshot(tenant, revision, name, png);
       report.screenshots.push(name);
     }
+    const missing = expected.filter((n) => !report.screenshots?.includes(n));
+    if (missing.length) fail(`screenshots missing: ${missing.join(", ")}`);
 
     // 4. The revision's own functional checks (untrusted code: exit code only).
     if (functional.length) {

@@ -48,13 +48,25 @@ export async function addCookie(ctx: BrowserContext, base: URL, cookie: Cookie |
 
 /**
  * Page-model calls of a fresh render of `url` (`x-edge-subrequests`). `Authorization` makes the
- * edge bypass its HTML cache (A2); previews are never cached anyway. Fetched from the page, so
- * cookies and host mapping apply.
+ * edge bypass its HTML cache (A2); previews are never cached anyway. Read from a separate
+ * navigation's response (through the browser, so cookies and host mapping apply) before any
+ * theme script runs: page JavaScript cannot fake the number.
  */
 export async function freshSubrequests(page: Page, url: string): Promise<number> {
-  const n = await page.evaluate(async (u) => {
-    const res = await fetch(u, { headers: { authorization: "Bearer gate" } });
-    return res.headers.get("x-edge-subrequests");
-  }, url);
-  return n === null ? Number.NaN : Number(n);
+  const probe = await page.context().newPage();
+  try {
+    await probe.setExtraHTTPHeaders({ authorization: "Bearer gate" });
+    // Only the document: no theme script, style or image is loaded or run.
+    await probe.route("**/*", (r) =>
+      r.request().isNavigationRequest() ? r.continue() : r.abort(),
+    );
+    await probe.addInitScript(() => {
+      window.stop();
+    });
+    const res = await probe.goto(url, { waitUntil: "commit" });
+    const n = res?.headers()["x-edge-subrequests"];
+    return n === undefined ? Number.NaN : Number(n);
+  } finally {
+    await probe.close();
+  }
 }

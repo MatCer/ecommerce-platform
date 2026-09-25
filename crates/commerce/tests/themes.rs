@@ -471,6 +471,21 @@ async fn token_edits_uploads_and_limits(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(f.failures, vec!["lint: foreign fetch".to_owned()]);
+    // The token fast path never builds on code that did not pass the gates.
+    for base in [up.id, edit.id] {
+        let err = themes::edit_tokens(
+            &mut tx,
+            &storage,
+            "o",
+            &TokensInput {
+                base_revision_id: Some(base),
+                tokens: tokens("#010203"),
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.code(), "base_not_validated");
+    }
     assert_eq!(
         themes::publish(&mut tx, "o", up.id)
             .await
@@ -521,6 +536,27 @@ async fn maintenance_expires_builds_and_collects_artifacts(db: PgPool) {
         .execute(&db)
         .await
         .unwrap();
+    // More than one GC batch of even older, still referenced artifacts must not starve the
+    // orphan (they are excluded up front, not retried against the foreign key).
+    sqlx::query(
+        "INSERT INTO platform.theme_artifacts (id, kind, created_at)
+         SELECT lpad(to_hex(g), 32, 'e'), 'theme', now() - interval '60 days'
+         FROM generate_series(1, 205) g",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO theme_revisions (tenant_id, number, artifact_id, origin, status, created_by)
+         SELECT $1, 1000 + g, lpad(to_hex(g), 32, 'e'), 'default', 'superseded', 't'
+         FROM generate_series(1, 205) g",
+    )
+    .bind(a.tenant)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
 
     let report = themes::maintenance(&runtime, &storage).await.unwrap();
     assert_eq!(report.expired_builds, 1);
@@ -544,11 +580,17 @@ async fn maintenance_expires_builds_and_collects_artifacts(db: PgPool) {
             .is_err()
     );
     let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
-    let list = themes::list(&mut tx).await.unwrap();
-    let st = |id: Uuid| list.iter().find(|r| r.id == id).unwrap().clone();
-    assert_eq!(st(stuck.id).status, "failed");
-    assert!(st(stuck.id).failures[0].contains("did not finish"));
-    assert_eq!(st(dropped.id).artifact_id, None);
+    let stuck = themes::detail(&mut tx, &storage, stuck.id)
+        .await
+        .unwrap()
+        .revision;
+    assert_eq!(stuck.status, "failed");
+    assert!(stuck.failures[0].contains("did not finish"));
+    let dropped = themes::detail(&mut tx, &storage, dropped.id)
+        .await
+        .unwrap()
+        .revision;
+    assert_eq!(dropped.artifact_id, None);
     // Idempotent.
     tx.commit().await.unwrap();
     assert_eq!(

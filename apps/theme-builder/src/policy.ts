@@ -60,6 +60,7 @@ const HOST_CONFIG = new Set([
   "Init",
   "AutoRemove",
   "Privileged",
+  "LogConfig",
 ]);
 const TMPFS_PATHS = new Set(["/work", "/tmp"]);
 const TMPFS_OPTS =
@@ -123,6 +124,11 @@ export function checkCreate(body: unknown, p: Policy, name: string | null): stri
   if (h.ReadonlyRootfs !== true) fail("ReadonlyRootfs must be true");
   if (h.Privileged !== undefined && h.Privileged !== false) fail("Privileged must be false");
   if (JSON.stringify(h.CapDrop) !== '["ALL"]') fail('CapDrop must be ["ALL"]');
+  // Bounded log storage on the host (a sandbox may print without end).
+  if (
+    JSON.stringify(h.LogConfig) !== '{"Type":"json-file","Config":{"max-size":"8m","max-file":"1"}}'
+  )
+    fail("LogConfig must be json-file with max-size 8m, max-file 1");
   if (JSON.stringify(h.SecurityOpt) !== '["no-new-privileges"]')
     fail('SecurityOpt must be ["no-new-privileges"]');
   if (!isInt(h.Memory, 64 * 1024 * 1024, p.maxMemory)) fail("Memory out of range");

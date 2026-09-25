@@ -480,6 +480,22 @@ pub async fn edit_tokens(
         Some(id) => Some(id),
         None => active_id(tx).await?,
     };
+    // The fast path skips the code gates, so the code must already have passed them: only a
+    // revision that is ready or was published (or follows the platform's default) is a base.
+    if let Some(id) = base {
+        let b = fetch(tx, id, false).await?;
+        if !(matches!(b.status.as_str(), "ready" | "published" | "superseded")
+            || b.origin == "default")
+        {
+            return Err(Error::Conflict {
+                code: "base_not_validated",
+                detail: format!(
+                    "revision #{} is {}; edit the tokens of a revision that passed the checks",
+                    b.number, b.status
+                ),
+            });
+        }
+    }
     let mut source = match base {
         Some(id) => revision_source(tx, storage, id).await?,
         None => default_source(tx, storage).await?,
@@ -970,6 +986,7 @@ pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, 
     let expired = json!([format!(
         "the build was removed after {GC_AFTER_DAYS} days; create a new revision to publish it"
     )]);
+    let mut referenced: Vec<String> = Vec::new();
     for tenant in tenants {
         let mut tx = tenant_tx(db, tenant).await?;
         out.expired_builds += sqlx::query!(
@@ -1002,14 +1019,25 @@ pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, 
         .execute(&mut *tx)
         .await?
         .rows_affected();
+        // Artifacts this tenant still references (RLS: collected tenant by tenant).
+        referenced.extend(
+            sqlx::query_scalar!(
+                r#"SELECT DISTINCT artifact_id AS "id!" FROM theme_revisions
+                   WHERE artifact_id IS NOT NULL"#
+            )
+            .fetch_all(&mut *tx)
+            .await?,
+        );
         tx.commit().await?;
     }
     let candidates = sqlx::query_scalar!(
         "SELECT id FROM platform.theme_artifacts a
          WHERE kind = 'theme' AND created_at < now() - make_interval(days => $1)
            AND NOT EXISTS (SELECT 1 FROM platform.artifact_channels c WHERE c.artifact_id = a.id)
+           AND id <> ALL($2)
          ORDER BY created_at LIMIT 200",
-        GC_AFTER_DAYS
+        GC_AFTER_DAYS,
+        &referenced
     )
     .fetch_all(db)
     .await?;

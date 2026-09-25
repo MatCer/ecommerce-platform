@@ -113,6 +113,14 @@ describe("sandbox create policy (A6)", () => {
     ["secret env", (b) => b.Env.push("THEME_BUILDER_TOKEN=x")],
     ["api key env", (b) => b.Env.push("S3_SECRET_ACCESS_KEY=x")],
     ["tty", (b) => Object.assign(b, { Tty: true })],
+    [
+      "unbounded logs",
+      (b) => Object.assign(b.HostConfig, { LogConfig: { Type: "json-file", Config: {} } }),
+    ],
+    [
+      "syslog driver",
+      (b) => Object.assign(b.HostConfig, { LogConfig: { Type: "syslog", Config: {} } }),
+    ],
     ["networking config", (b) => Object.assign(b, { NetworkingConfig: {} })],
     ["missing label", (b) => Object.assign(b, { Labels: {} })],
     ["foreign label", (b) => Object.assign(b.Labels, { "com.docker.compose.project": "wp20" })],

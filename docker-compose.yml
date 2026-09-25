@@ -415,8 +415,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
+  # Memory-backed and size-capped: sandbox outputs (written by theme code during builds)
+  # cannot fill the host's disk; build jobs are transient anyway.
   theme-work:
     name: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-work
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=1g,nr_inodes=200000,uid=1000,gid=1000,mode=0700
   edge-artifacts:
   pg-data:
   meili-data:

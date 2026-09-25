@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import type http from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -302,56 +303,67 @@ describe("pipeline", () => {
     expect(h.uploads).toEqual([]);
   });
 
-  test("happy path: verified artifact, budgets, smoke, screenshots → ready", async () => {
-    const h = await harness({
-      static: async () => ({
-        stdout:
-          '@@result {"violations":[],"typecheck":{"ok":true,"ms":5,"log":""},"checks":["checks/buy.spec.ts"]}',
-      }),
-      build: async (s, work) => {
-        // A real (tiny) Astro-shaped build, packed like the sandbox does.
-        const dist = path.join(work, "dist");
-        await mkdir(path.join(dist, "server"), { recursive: true });
-        await mkdir(path.join(dist, "client/_astro"), { recursive: true });
-        await writeFile(path.join(dist, "server/entry.mjs"), "export default {}");
-        await writeFile(path.join(dist, "client/_astro/a.js"), "1");
-        const m = await packArtifact({
-          dist,
-          outRoot: path.join(work, s.job, "out/build/artifacts"),
-          kind: "theme",
-          tokensFile: path.join(THEME, "theme.tokens.json"),
-          projectDir: THEME,
-        });
-        return { stdout: `@@result {"ok":true,"artifact_id":"${m.id}"}` };
-      },
-      check: async (s, work) => {
-        const out = path.join(work, s.job, "out/check");
-        const page = {
-          path: "/",
-          kind: "home",
-          lcpMs: 1100,
-          tbtMs: 0,
-          cls: 0,
-          jsGzip: 20_000,
-          jsTransfer: 20_000,
-          jsGzipWithRum: 21_000,
-          thirdPartyOrigins: [],
-          axe: [],
-          cspViolations: [],
-          subrequests: 2,
-        };
-        await writeFile(path.join(out, "report.json"), JSON.stringify({ results: [page] }));
-        await writeFile(
-          path.join(out, "result.json"),
-          JSON.stringify({ smoke: { ok: true, log: "" } }),
-        );
-        await mkdir(path.join(out, "shots"));
-        await writeFile(path.join(out, "shots/home-mobile.png"), "png");
-        expect(s.env.PREVIEW_COOKIE).toBe("__Host-preview=tok");
-        expect(s.env.THEME_KIT_CHROMIUM_ARGS).toContain("MAP *.localhost caddy");
-        return {};
-      },
+  const passedStatic = async () => ({
+    stdout:
+      '@@result {"violations":[],"typecheck":{"ok":true,"ms":5,"log":""},"checks":["checks/buy.spec.ts"]}',
+  });
+
+  /** A real (tiny) Astro-shaped build, packed like the sandbox does. */
+  const tinyBuild = async (s: SandboxSpec, work: string) => {
+    const dist = path.join(work, `dist-${s.job}`);
+    await mkdir(path.join(dist, "server"), { recursive: true });
+    await mkdir(path.join(dist, "client/_astro"), { recursive: true });
+    await writeFile(path.join(dist, "server/entry.mjs"), "export default {}");
+    await writeFile(path.join(dist, "client/_astro/a.js"), "1");
+    const m = await packArtifact({
+      dist,
+      outRoot: path.join(work, s.job, "out/build/artifacts"),
+      kind: "theme",
+      tokensFile: path.join(THEME, "theme.tokens.json"),
+      projectDir: THEME,
     });
+    return { stdout: `@@result {"ok":true,"artifact_id":"${m.id}"}` };
+  };
+
+  const page = (over: Record<string, unknown> = {}) => ({
+    path: "/",
+    kind: "home",
+    lcpMs: 1100,
+    tbtMs: 0,
+    cls: 0,
+    jsGzip: 20_000,
+    jsTransfer: 20_000,
+    jsGzipWithRum: 21_000,
+    thirdPartyOrigins: [],
+    axe: [],
+    cspViolations: [],
+    subrequests: 2,
+    ...over,
+  });
+
+  /** What a completed check step leaves: report, summary, both screenshots of the page. */
+  const checkOutput =
+    (opts: { page?: Record<string, unknown>; shots?: string[]; exitCode?: number } = {}) =>
+    async (s: SandboxSpec, work: string) => {
+      const out = path.join(work, s.job, "out/check");
+      await writeFile(
+        path.join(out, "report.json"),
+        JSON.stringify({ results: [page(opts.page)] }),
+      );
+      await writeFile(
+        path.join(out, "result.json"),
+        JSON.stringify({ measure: { ok: true, log: "" }, smoke: { ok: true, log: "" } }),
+      );
+      await mkdir(path.join(out, "shots"));
+      for (const n of opts.shots ?? ["home-mobile", "home-desktop"])
+        await writeFile(path.join(out, `shots/${n}.png`), "png");
+      expect(s.env.PREVIEW_COOKIE).toBe("__Host-preview=tok");
+      expect(s.env.THEME_KIT_CHROMIUM_ARGS).toContain("MAP *.localhost caddy");
+      return { exitCode: opts.exitCode ?? 0 };
+    };
+
+  test("happy path: verified artifact, budgets, smoke, screenshots → ready", async () => {
+    const h = await harness({ static: passedStatic, build: tinyBuild, check: checkOutput() });
     await h.run();
     const [status, report] = h.statuses.at(-1) ?? [];
     expect(report?.failures).toEqual([]);
@@ -364,7 +376,7 @@ describe("pipeline", () => {
       "smoke:passed",
       "functional:passed",
     ]);
-    expect(h.uploads).toEqual(["artifact true", "shot home-mobile"]);
+    expect(h.uploads).toEqual(["artifact true", "shot home-mobile", "shot home-desktop"]);
     expect(h.specs.map((s) => [s.step, s.network])).toEqual([
       ["static", "none"],
       ["build", "none"],
@@ -377,47 +389,48 @@ describe("pipeline", () => {
 
   test("a budget failure fails the revision with the numbers", async () => {
     const h = await harness({
-      static: async () => ({ stdout: '@@result {"violations":[],"typecheck":null,"checks":[]}' }),
-      build: async (s, work) => {
-        const dist = path.join(work, "dist2");
-        await mkdir(path.join(dist, "server"), { recursive: true });
-        await mkdir(path.join(dist, "client"), { recursive: true });
-        await writeFile(path.join(dist, "server/entry.mjs"), "export default {}");
-        const m = await packArtifact({
-          dist,
-          outRoot: path.join(work, s.job, "out/build/artifacts"),
-          kind: "theme",
-          projectDir: THEME,
-        });
-        return { stdout: `@@result {"ok":true,"artifact_id":"${m.id}"}` };
-      },
-      check: async (s, work) => {
-        const out = path.join(work, s.job, "out/check");
-        const page = {
-          path: "/p/x",
-          kind: "product",
-          lcpMs: 1200,
-          tbtMs: 0,
-          cls: 0,
-          jsGzip: 60_000,
-          jsTransfer: 1,
-          jsGzipWithRum: 61_000,
-          thirdPartyOrigins: [],
-          axe: [],
-          cspViolations: [],
-          subrequests: 2,
-        };
-        await writeFile(path.join(out, "report.json"), JSON.stringify({ results: [page] }));
-        await writeFile(
-          path.join(out, "result.json"),
-          JSON.stringify({ smoke: { ok: true, log: "" } }),
-        );
-        return {};
-      },
+      static: passedStatic,
+      build: tinyBuild,
+      check: checkOutput({ page: { jsGzip: 60_000, jsGzipWithRum: 61_000 } }),
     });
     await h.run();
     const [status, report] = h.statuses.at(-1) ?? [];
     expect(status).toBe("failed");
-    expect(report?.failures).toContain("budget /p/x: JS 58.6 kB gz > 30");
+    expect(report?.failures).toContain("budget /: JS 58.6 kB gz > 35");
+  });
+
+  test("an incomplete check step never yields ready", async () => {
+    for (const [name, check, reason] of [
+      ["crashed after the report", checkOutput({ exitCode: 1 }), "checks did not complete"],
+      [
+        "missing screenshot",
+        checkOutput({ shots: ["home-mobile"] }),
+        "screenshots missing: home-desktop",
+      ],
+      ["other page measured", checkOutput({ page: { path: "/x" } }), "budget: / was not measured"],
+    ] as const) {
+      const h = await harness({ static: passedStatic, build: tinyBuild, check });
+      await h.run();
+      const [status, report] = h.statuses.at(-1) ?? [];
+      expect(status, name).toBe("failed");
+      expect(report?.failures.join("\n"), name).toContain(reason);
+    }
+  });
+
+  test("special files in the build output are refused before anything is read", async () => {
+    const h = await harness({
+      static: passedStatic,
+      build: async (s, work) => {
+        const r = await tinyBuild(s, work);
+        const id = /"artifact_id":"([0-9a-f]+)"/.exec(r.stdout)?.[1] ?? "";
+        const manifest = path.join(work, s.job, "out/build/artifacts", id, "manifest.json");
+        await rm(manifest);
+        execFileSync("mkfifo", [manifest]);
+        return r;
+      },
+    });
+    await h.run();
+    expect(h.statuses.at(-1)?.[1].failures[0]).toContain("special file or link: manifest.json");
+    expect(h.uploads).toEqual([]);
   });
 });

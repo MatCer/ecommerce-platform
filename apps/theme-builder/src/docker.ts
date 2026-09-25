@@ -40,7 +40,33 @@ export interface DockerOptions {
   user: string;
 }
 
+/** What the builder keeps of a step's output (the end, where `@@result` is). */
 const MAX_LOG = 1024 * 1024;
+/**
+ * Docker keeps at most this much log per sandbox (json-file rotation, one file), and the
+ * builder never reads more: a theme printing without end cannot exhaust either.
+ */
+export const LOG_MAX_SIZE = "8m";
+const MAX_LOG_READ = 12 * 1024 * 1024;
+
+/** Reads a response body up to `max` bytes (then cancels the stream). */
+async function readCapped(res: Response, max: number): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = res.body?.getReader();
+  if (!reader) return new Uint8Array();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
 
 /** Splits Docker's multiplexed log stream (8-byte frame headers) into stdout and stderr. */
 export function demux(buf: Uint8Array): { stdout: string; stderr: string } {
@@ -111,6 +137,7 @@ export class Docker {
         PidsLimit: s.pids,
         ShmSize: 256 * 1024 * 1024,
         Init: true,
+        LogConfig: { Type: "json-file", Config: { "max-size": LOG_MAX_SIZE, "max-file": "1" } },
         Tmpfs: {
           "/work": `rw,noexec,nosuid,nodev,size=1024m,uid=${this.#uid()},gid=${this.#uid()},mode=0700`,
           "/tmp": `rw,noexec,nosuid,nodev,size=1024m,uid=${this.#uid()},gid=${this.#uid()},mode=0700`,
@@ -154,13 +181,18 @@ export class Docker {
       } finally {
         clearTimeout(timer);
       }
-      const logs = new Uint8Array(
-        await (
-          await this.#call("GET", `/containers/${id}/logs?stdout=1&stderr=1&tail=5000`)
-        ).arrayBuffer(),
+      const logs = await readCapped(
+        await this.#call("GET", `/containers/${id}/logs?stdout=1&stderr=1`),
+        MAX_LOG_READ,
       );
-      const { stdout, stderr } = demux(logs.subarray(0, MAX_LOG * 2));
-      return { exitCode, timedOut, stdout, stderr, ms: Date.now() - started };
+      const { stdout, stderr } = demux(logs);
+      return {
+        exitCode,
+        timedOut,
+        stdout: stdout.slice(-MAX_LOG),
+        stderr: stderr.slice(-MAX_LOG),
+        ms: Date.now() - started,
+      };
     } finally {
       await this.#call("DELETE", `/containers/${id}?force=1&v=1`).catch(() => {});
     }

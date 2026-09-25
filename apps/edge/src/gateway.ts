@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { readdir, rm, stat } from "node:fs/promises";
+import { readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
 import type { ArtifactFetcher } from "./artifacts.ts";
@@ -219,6 +219,8 @@ export function createGateway(opts: GatewayOptions) {
   const manifests = new Map<string, Promise<ArtifactManifest>>();
   /** When each local artifact was last needed (artifact GC of the cache volume). */
   const used = new Map<string, number>();
+  /** Artifacts being deleted: loads wait for the deletion, then download afresh. */
+  const pruning = new Map<string, Promise<void>>();
   const revalidating = new Set<string>();
   let outboundDenied = 0;
 
@@ -227,6 +229,7 @@ export function createGateway(opts: GatewayOptions) {
     let m = manifests.get(id);
     if (!m) {
       m = (async () => {
+        await pruning.get(id);
         await opts.artifacts?.ensure(id);
         return readManifest(opts.artifactRoot, id);
       })();
@@ -1351,17 +1354,29 @@ ${
    * for `maxAgeMs` and that no worker runs. They are downloaded (and verified) again on demand.
    */
   async function pruneArtifacts(maxAgeMs: number, now = Date.now()): Promise<string[]> {
-    const running = pool.ids();
     const removed: string[] = [];
     for (const e of await readdir(opts.artifactRoot, { withFileTypes: true }).catch(() => [])) {
-      if (!e.isDirectory() || !/^[0-9a-f]{32}$/.test(e.name) || running.has(e.name)) continue;
-      const dir = path.join(opts.artifactRoot, e.name);
-      const last = used.get(e.name) ?? (await stat(dir).catch(() => null))?.mtimeMs ?? now;
-      if (now - last < maxAgeMs) continue;
-      manifests.delete(e.name);
-      used.delete(e.name);
-      await rm(dir, { recursive: true, force: true });
-      removed.push(e.name);
+      if (!e.isDirectory() || !/^[0-9a-f]{32}$/.test(e.name)) continue;
+      const id = e.name;
+      const dir = path.join(opts.artifactRoot, id);
+      const mtime = (await stat(dir).catch(() => null))?.mtimeMs ?? now;
+      // Decided synchronously, after the last await: no request can start using the
+      // artifact between this check and marking it as being pruned.
+      if (pool.ids().has(id) || now - (used.get(id) ?? mtime) < maxAgeMs) continue;
+      let done: () => void = () => {};
+      pruning.set(id, new Promise<void>((r) => (done = r)));
+      manifests.delete(id);
+      used.delete(id);
+      try {
+        // Renamed away first: a concurrent download starts from a clean slate.
+        const trash = path.join(opts.artifactRoot, `.prune-${id}-${Date.now()}`);
+        await rename(dir, trash);
+        await rm(trash, { recursive: true, force: true });
+        removed.push(id);
+      } finally {
+        pruning.delete(id);
+        done();
+      }
     }
     return removed;
   }
