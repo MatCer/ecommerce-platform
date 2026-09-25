@@ -60,7 +60,21 @@ test("nothing is stored before a choice; storage follows the personalization pur
   expect(recent.get("recent")).toBeNull();
 });
 
-test("the choice is reported to the platform and survives a missing endpoint", async () => {
+test("the choice goes out as a JSON beacon when the browser has sendBeacon", async () => {
+  const beacons: [string, Blob][] = [];
+  vi.stubGlobal("navigator", {
+    sendBeacon: (url: string, data: Blob) => beacons.push([url, data]) > 0,
+  });
+  const post = vi.fn();
+  await saveConsent(["analytics"], post);
+  expect(post).not.toHaveBeenCalled();
+  expect(beacons[0]?.[0]).toBe("/_p/consent");
+  expect(beacons[0]?.[1].type).toBe("application/json");
+  expect(await beacons[0]?.[1].text()).toBe('{"purposes":["analytics"]}');
+});
+
+test("without sendBeacon the choice is posted and survives a missing endpoint", async () => {
+  vi.stubGlobal("navigator", {});
   const post = vi.fn(async (_url: string, _init?: RequestInit) => {
     throw new TypeError("offline");
   });

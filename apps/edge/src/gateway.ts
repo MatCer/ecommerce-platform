@@ -573,6 +573,36 @@ export function createGateway(opts: GatewayOptions) {
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   }
 
+  /**
+   * Consent record from the platform banner (A20): same-origin JSON, forwarded to the API.
+   * Until the API records consent (WP9) an unknown route is answered 202 "not recorded", so
+   * the banner stays quiet; the browser keeps its own copy of the choice either way.
+   */
+  async function consent(site: Site, req: Request, host: string, port: string): Promise<Response> {
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    const body = await readJsonBody(req, MAX_JSON_BODY);
+    if (body instanceof Response) return body;
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/consent`, {
+        method: "POST",
+        headers: apiHeaders(site, { "content-type": "application/json" }),
+        body,
+      }),
+    );
+    if (res.status === 404 || res.status === 405) {
+      await res.body?.cancel();
+      return Response.json({ recorded: false }, { status: 202, headers: { "cache-control": "no-store" } });
+    }
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   /** Newsletter sign-up: same-origin JSON only; double opt-in is the API's job (§11.5). */
   async function newsletter(
     site: Site,
@@ -657,6 +687,7 @@ export function createGateway(opts: GatewayOptions) {
       return publicProxy(site, req, url, p.slice("/_p/public".length));
     if (p === "/_p/e") return events(site, req, host, port);
     if (p === "/_p/newsletter") return newsletter(site, req, host, port);
+    if (p === "/_p/consent") return consent(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {
       return new Response(SPECULATION_RULES, {
         headers: {

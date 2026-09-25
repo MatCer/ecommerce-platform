@@ -59,7 +59,8 @@ try {
   await page.screenshot({ path: `${values.shots}/product.png` });
   await budget(page);
 
-  await page.getByRole("button", { name: /do košíku|do košíka|to cart/i }).click();
+  // .first(): a theme may repeat the buy button in a sticky bar on phones.
+  await page.getByRole("button", { name: /do košíku|do košíka|to cart/i }).first().click();
   await expect(page.getByRole("dialog", { name: /Košík|Cart/ })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/cart.png` });
 

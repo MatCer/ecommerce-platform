@@ -56,11 +56,16 @@ export async function saveConsent(
   document.cookie = `${COOKIE}=${encodeURIComponent(granted.join(","))}; Path=/; Max-Age=15552000; SameSite=Lax; Secure`;
   if (!granted.includes("personalization")) clearStorage();
   dispatchEvent(new CustomEvent(CONSENT_CHANGED, { detail: granted }));
+  // A beacon survives navigation and its answer is not ours to handle (a 404 before the
+  // endpoint exists stays silent); fetch only where beacons are unavailable.
+  const body = JSON.stringify({ purposes: granted });
+  if (globalThis.navigator?.sendBeacon?.("/_p/consent", new Blob([body], { type: "application/json" })))
+    return;
   try {
     await post("/_p/consent", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ purposes: granted }),
+      body,
       credentials: "same-origin",
       keepalive: true,
     });

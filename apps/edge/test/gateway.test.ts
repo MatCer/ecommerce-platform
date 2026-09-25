@@ -477,6 +477,30 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     ).toBe(415);
   });
 
+  test("consent is same-origin JSON, forwarded with the tenant; quiet until the API records it", async () => {
+    api.calls.length = 0;
+    const body = JSON.stringify({ purposes: ["analytics"] });
+    const res = await get(
+      `${shop}/_p/consent`,
+      { ...origin, "content-type": "application/json" },
+      { method: "POST", body },
+    );
+    // The fake API has no consent route yet (WP9): answered, not an error.
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ recorded: false });
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/consent",
+      body,
+      headers: { "x-tenant": "t-demo" },
+    });
+    const cross = await get(
+      `${shop}/_p/consent`,
+      { "content-type": "application/json" },
+      { method: "POST", body },
+    );
+    expect(cross.status).toBe(403);
+  });
+
   test("newsletter as a plain HTML form: subscribes, then 303 back to the same page", async () => {
     api.calls.length = 0;
     const form = { ...origin, "content-type": "application/x-www-form-urlencoded" };
