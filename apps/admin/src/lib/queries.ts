@@ -61,6 +61,14 @@ export function useMarkets() {
   }));
 }
 
+/** Campaign recipient segments (WP18). */
+export function useSegments() {
+  return createQuery(() => ({
+    queryKey: tenantKey("segments"),
+    queryFn: () => unwrap(api.GET("/admin/v1/segments", { params: { header: tenantHeader() } })),
+  }));
+}
+
 /** Indented options for selecting a category ("Clothing / T-shirts" depth shown with dashes). */
 export function categoryOptions(
   tree: readonly CategoryNode[],
