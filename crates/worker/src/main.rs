@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::anyhow;
+use commerce::themes::ai_edit as themes_ai;
 use platform::config::{
     AppEnv, AuthServiceConfig, DbConfig, MeiliConfig, OpsConfig, S3Config, StorefrontConfig,
     WorkerConfig,
@@ -112,13 +113,19 @@ async fn main() -> anyhow::Result<()> {
     let owner = format!("{host}:{}", std::process::id());
     tracing::info!(%owner, concurrency = cfg.concurrency, "worker started");
 
+    let handlers = handlers::all(storage, meili, mailer, auth, extra);
+    // WP24: AI theme runs wait minutes for builds of the default queue; their own loops keep
+    // them from ever holding the slots those builds need.
+    let mut ai_runner = RunnerConfig::new(format!("{owner}/ai"), themes_ai::WORKER_LOOPS);
+    ai_runner.queues = vec![themes_ai::QUEUE.into()];
     tokio::join!(
         runner::run(
             db.clone(),
-            handlers::all(storage, meili, mailer, auth, extra),
+            handlers.clone(),
             RunnerConfig::new(owner, cfg.concurrency),
             shutdown.clone(),
         ),
+        runner::run(db.clone(), handlers, ai_runner, shutdown.clone()),
         outbox::run(db.clone(), Duration::from_millis(500), shutdown.clone()),
         cron::run(db.clone(), Duration::from_secs(30), shutdown),
     );

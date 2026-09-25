@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ai_theme_runs (id, tenant_id, base_revision_id, prompt, created_by)\n         VALUES ($1, $2, $3, $4, $5)\n         ON CONFLICT (tenant_id) WHERE status IN ('queued', 'running') DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "716fef904e3266df7981f4f871fb8ced6004b58de381bc3ed0274b45bcc01f7e"
+}

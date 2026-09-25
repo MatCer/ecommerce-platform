@@ -404,3 +404,112 @@ async fn uploads_and_token_edits_are_validated(db: PgPool) {
         (StatusCode::UNPROCESSABLE_ENTITY, Some("invalid_body"))
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn ai_runs_are_admin_only_and_tenant_scoped(db: PgPool) {
+    let c = setup(db).await;
+    let t = c.shop.tenant;
+    fn start(token: &str, t: uuid::Uuid) -> Call<'_> {
+        Call::post(
+            "/admin/v1/themes/ai-runs",
+            json!({ "prompt": "Add a free-shipping bar" }),
+        )
+        .token(token)
+        .tenant(t)
+    }
+    let (st, _, _) = start(&c.clerk, t).send(&c.s).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    let (st, run, _) = start(&c.owner, t).send(&c.s).await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{run}");
+    assert_eq!(run["status"], "queued");
+    let id = run["id"].as_str().unwrap().to_owned();
+    let (st, body, _) = start(&c.owner, t).send(&c.s).await;
+    assert_eq!(
+        (st, body["code"].as_str()),
+        (StatusCode::CONFLICT, Some("ai_run_in_progress"))
+    );
+    let (st, body, _) = Call::post(
+        "/admin/v1/themes/ai-runs",
+        json!({ "prompt": "x", "model": "claude-opus-5-5" }),
+    )
+    .token(&c.owner)
+    .tenant(t)
+    .send(&c.s)
+    .await;
+    assert_eq!(
+        (st, body["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("invalid_body"))
+    );
+
+    // Staff may follow the run; the list names the provider.
+    let (st, list, _) = Call::get("/admin/v1/themes/ai-runs")
+        .token(&c.clerk)
+        .tenant(t)
+        .send(&c.s)
+        .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(list["provider"], "fake");
+    assert_eq!(list["items"][0]["id"], id.as_str());
+    let (st, detail, _) = Call::get(&format!("/admin/v1/themes/ai-runs/{id}"))
+        .token(&c.clerk)
+        .tenant(t)
+        .send(&c.s)
+        .await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(detail["limits"]["max_turns"], 25);
+
+    // Another tenant sees nothing, even with its own owner.
+    let (st, _, _) = Call::get(&format!("/admin/v1/themes/ai-runs/{id}"))
+        .token(&c.stranger)
+        .tenant(c.other.tenant)
+        .send(&c.s)
+        .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+    let (st, _, _) = Call::post(&format!("/admin/v1/themes/ai-runs/{id}/cancel"), json!({}))
+        .token(&c.stranger)
+        .tenant(c.other.tenant)
+        .send(&c.s)
+        .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+
+    // Only succeeded runs are accepted; staff cannot cancel; owners can.
+    let (st, body, _) = Call::post(&format!("/admin/v1/themes/ai-runs/{id}/accept"), json!({}))
+        .token(&c.owner)
+        .tenant(t)
+        .send(&c.s)
+        .await;
+    assert_eq!(
+        (st, body["code"].as_str()),
+        (StatusCode::CONFLICT, Some("invalid_transition"))
+    );
+    let (st, _, _) = Call::post(&format!("/admin/v1/themes/ai-runs/{id}/cancel"), json!({}))
+        .token(&c.clerk)
+        .tenant(t)
+        .send(&c.s)
+        .await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+    let (st, body, _) = Call::post(&format!("/admin/v1/themes/ai-runs/{id}/cancel"), json!({}))
+        .token(&c.owner)
+        .tenant(t)
+        .send(&c.s)
+        .await;
+    assert_eq!(
+        (st, body["status"].as_str()),
+        (StatusCode::OK, Some("cancelled"))
+    );
+
+    // The revision diff view: the default revision has no parent (empty diff).
+    let base = run["base_revision_id"].as_str().unwrap();
+    let (st, diff, _) = Call::get(&format!("/admin/v1/themes/revisions/{base}/diff"))
+        .token(&c.clerk)
+        .tenant(t)
+        .send(&c.s)
+        .await;
+    assert_eq!((st, diff["diff"].as_str()), (StatusCode::OK, Some("")));
+    let (st, _, _) = Call::get(&format!("/admin/v1/themes/revisions/{base}/diff"))
+        .token(&c.stranger)
+        .tenant(c.other.tenant)
+        .send(&c.s)
+        .await;
+    assert_eq!(st, StatusCode::NOT_FOUND);
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_theme_runs\n             SET status = 'failed', finished_at = now(), updated_at = now(),\n                 error = 'interrupted: the run stopped making progress; start it again'\n             WHERE status = 'running'\n               AND updated_at < now() - make_interval(mins => $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "570c8edcef50834fc5aec9f3fe5ce5057c568ddfd6917f1a0724906aa1ab18f3"
+}

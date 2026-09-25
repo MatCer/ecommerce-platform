@@ -1,5 +1,13 @@
 import { expect, test } from "vitest";
-import { hexOf, parseReport, statusTone, tokenErrors, tokenGroups } from "./themes.ts";
+import {
+  diffLines,
+  hexOf,
+  parseReport,
+  runTone,
+  statusTone,
+  tokenErrors,
+  tokenGroups,
+} from "./themes.ts";
 
 test("parses the builder report defensively", () => {
   const r = parseReport({
@@ -50,4 +58,22 @@ test("token editor validation mirrors the A6 allowlist", () => {
   expect(hexOf("oklch(1 0 0)")).toBeUndefined();
   expect(statusTone("failed")).toBe("error");
   expect(statusTone("building")).toBe("warning");
+});
+
+test("tags unified diff lines and run statuses", () => {
+  const d =
+    "--- a/src/x.astro\n+++ b/src/x.astro\n@@ -1,2 +1,2 @@\n <h1>x</h1>\n-<p>a</p>\n+<p>b</p>\nBinary file public/a.png: 1 → 2 bytes\n";
+  expect(diffLines(d).map((l) => l.kind)).toEqual([
+    "file",
+    "file",
+    "hunk",
+    "ctx",
+    "del",
+    "add",
+    "file",
+  ]);
+  expect(diffLines("")).toEqual([]);
+  expect(runTone("running")).toBe("warning");
+  expect(runTone("succeeded")).toBe("success");
+  expect(runTone("discarded")).toBe("neutral");
 });

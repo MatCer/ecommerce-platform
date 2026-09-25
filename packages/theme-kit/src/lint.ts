@@ -19,7 +19,7 @@ export const REQUIRED_ROUTES = [
   "src/pages/404.astro",
 ];
 
-const RULES: { id: string; re: RegExp; message: string }[] = [
+const RULES: { id: string; re: RegExp; message: string; files?: RegExp }[] = [
   {
     id: "foreign-fetch",
     re: /\bfetch\(\s*[`'"](https?:)?\/\//,
@@ -54,6 +54,15 @@ const RULES: { id: string; re: RegExp; message: string }[] = [
     id: "cloudflare-env",
     re: /from\s+["']cloudflare:(?!workers["'])/,
     message: "only cloudflare:workers (env.STOREFRONT) is available",
+  },
+  // WP2 prompt 8: a client:visible island whose server render is empty has no box to observe
+  // and never hydrates. ponytail: flags every client:visible (the default theme uses none);
+  // analyse the island's server render if a theme ever needs the directive.
+  {
+    id: "client-visible",
+    re: /\bclient:visible\b/,
+    files: /\.astro$/,
+    message: "use client:idle; a client:visible island with an empty server render never hydrates",
   },
   {
     id: "cookie-access",
@@ -123,7 +132,8 @@ export async function lintTheme(
     const lines = (await readFile(path.join(themeDir, f), "utf8")).split("\n");
     lines.forEach((text, i) => {
       for (const r of RULES)
-        if (r.re.test(text)) v.push({ file: f, line: i + 1, rule: r.id, message: r.message });
+        if ((!r.files || r.files.test(f)) && r.re.test(text))
+          v.push({ file: f, line: i + 1, rule: r.id, message: r.message });
       for (const m of text.matchAll(SET_HTML)) {
         if (!SET_HTML_OK.test(m[1] ?? "")) {
           v.push({

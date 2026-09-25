@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_theme_runs SET status = 'cancelled', cancel_requested = true,\n                        finished_at = now(), updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f437d7cfc2966a2985c2f4088c8ac752d8de501065078f212cd4c34354177876"
+}
