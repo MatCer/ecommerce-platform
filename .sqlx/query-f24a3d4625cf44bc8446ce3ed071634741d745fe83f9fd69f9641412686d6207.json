@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kind, order_ids, locale, status FROM documents WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "documents",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "order_ids",
+        "type_info": "UuidArray",
+        "origin": {
+          "Table": {
+            "table": "documents",
+            "name": "order_ids"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "documents",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "documents",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f24a3d4625cf44bc8446ce3ed071634741d745fe83f9fd69f9641412686d6207"
+}

@@ -1,0 +1,137 @@
+{
+  "kind": "invoice",
+  "number": "FV202600003",
+  "locale": "sk",
+  "order_number": "100001",
+  "issued_on": "2026-09-25",
+  "taxable_supply_date": "2026-09-24",
+  "due_on": "2026-09-25",
+  "currency": "EUR",
+  "vat_payer": true,
+  "supplier": {
+    "name": "Demo obchod s.r.o.",
+    "street": "Dlouhá 12",
+    "city": "Praha 1",
+    "postal_code": "110 00",
+    "country": "CZ",
+    "company_id": "12345678",
+    "vat_id": "CZ12345678",
+    "sk_ic_dph": null,
+    "registry": "C 12345 vedená u Městského soudu v Praze",
+    "email": "obchod@example.cz",
+    "phone": null
+  },
+  "customer": {
+    "name": "Jana Nováková",
+    "company": null,
+    "street": "Krátká 8",
+    "city": "Brno",
+    "postal_code": "602 00",
+    "country": "SK",
+    "email": "jana@example.test"
+  },
+  "payment": {
+    "method": "stripe",
+    "variable_symbol": "100001",
+    "paid": true,
+    "bank_account": {
+      "iban": "CZ6508000000192000145399",
+      "bic": "GIBACZPX",
+      "name": "Demo obchod s.r.o."
+    }
+  },
+  "lines": [
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Bavlněné tričko (modrá, M)",
+      "sku": "TEE-BLU-M",
+      "quantity": 2,
+      "unit_gross_minor": 516,
+      "gross_minor": 952,
+      "vat_rate": "21",
+      "vat_minor": 165,
+      "net_minor": 787
+    },
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000002",
+      "name": "Keramický hrnek",
+      "sku": "MUG-01",
+      "quantity": 1,
+      "unit_gross_minor": 996,
+      "gross_minor": 996,
+      "vat_rate": "12",
+      "vat_minor": 106,
+      "net_minor": 890
+    },
+    {
+      "kind": "shipping",
+      "order_line_id": null,
+      "name": "Packeta – výdajné miesto",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 142,
+      "gross_minor": 142,
+      "vat_rate": "21",
+      "vat_minor": 25,
+      "net_minor": 117
+    },
+    {
+      "kind": "shipping",
+      "order_line_id": null,
+      "name": "Packeta – výdajné miesto",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 148,
+      "gross_minor": 148,
+      "vat_rate": "12",
+      "vat_minor": 16,
+      "net_minor": 132
+    }
+  ],
+  "vat_recap": [
+    {
+      "rate": "21",
+      "net_minor": 904,
+      "vat_minor": 190,
+      "gross_minor": 1094
+    },
+    {
+      "rate": "12",
+      "net_minor": 1022,
+      "vat_minor": 122,
+      "gross_minor": 1144
+    }
+  ],
+  "czk_recap": {
+    "rate": {
+      "currency": "EUR",
+      "fixing_date": "2026-09-24",
+      "amount": 1,
+      "rate_milli": 24305
+    },
+    "rows": [
+      {
+        "rate": "21",
+        "net_minor": 21972,
+        "vat_minor": 4618,
+        "gross_minor": 26590
+      },
+      {
+        "rate": "12",
+        "net_minor": 24840,
+        "vat_minor": 2965,
+        "gross_minor": 27805
+      }
+    ],
+    "vat_minor": 7583
+  },
+  "totals": {
+    "net_minor": 1926,
+    "vat_minor": 312,
+    "gross_minor": 2238
+  },
+  "original": null,
+  "reason": null
+}

@@ -3,6 +3,7 @@ import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { ApiProblem } from "../components/CheckoutSettings.tsx";
+import { RefundException } from "../components/order/RefundException.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { formatDateTime, t } from "../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
@@ -84,7 +85,10 @@ export default function PaymentExceptions() {
                                 <OrderException exception={o.exception} />
                               </td>
                               <td class={tdClass}>
-                                <ResolveOrderException orderId={o.id} />
+                                <div class="flex flex-wrap gap-2">
+                                  <ResolveOrderException orderId={o.id} />
+                                  <RefundException orderId={o.id} />
+                                </div>
                               </td>
                             </tr>
                           )}

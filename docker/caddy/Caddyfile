@@ -15,9 +15,13 @@ http://api.localhost {
 	reverse_proxy api:8000
 }
 
+# Better Auth rate-limits per client IP (WP12): Caddy overwrites X-Real-IP with the peer
+# address, the only IP header the auth service trusts (AUTH_CLIENT_IP_HEADER).
 http://auth.localhost {
 	respond /internal/* "not found" 404
-	reverse_proxy auth:3000
+	reverse_proxy auth:3000 {
+		header_up X-Real-IP {remote_host}
+	}
 }
 
 http://mail.localhost {
@@ -30,12 +34,17 @@ http://s3.localhost {
 
 # Third-party stand-ins the browser loads (WP10: the Packeta pickup-point widget) and the
 # local webhook receiver and ad-platform stand-ins that e2e tests read back and configure
-# (WP14, WP20). The other mock endpoints (DNS stub, ...) stay on the compose network.
+# (WP14, WP20), and the carrier mocks' test controls (WP12). The other mock endpoints
+# (DNS stub, ...) stay on the compose network.
 http://mocks.localhost {
 	handle /packeta/* {
 		reverse_proxy mocks:4010
 	}
 	handle /webhooks/* {
+		reverse_proxy mocks:4010
+	}
+	# WP12 e2e: advance a PPL shipment's tracking phase (Packeta's control is under /packeta).
+	handle /ppl/_shipments/* {
 		reverse_proxy mocks:4010
 	}
 	handle /ads/* {
@@ -49,7 +58,9 @@ http://mocks.localhost {
 # from the SPA. On the admin origin the cookie is first-party (auth.localhost keeps JWKS).
 http://admin.localhost {
 	handle /api/auth/* {
-		reverse_proxy auth:3000
+		reverse_proxy auth:3000 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	handle {
 		reverse_proxy admin:80

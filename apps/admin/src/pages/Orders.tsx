@@ -1,7 +1,8 @@
-import { Badge, Button, EmptyState, SelectField } from "@platform/ui";
+import { Badge, Button, Checkbox, EmptyState, SelectField } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createInfiniteQuery } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { BulkDocuments } from "../components/order/BulkDocuments.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { formatDateTime, t } from "../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
@@ -28,15 +29,22 @@ export function OrderException(props: { exception?: string | null }) {
 }
 
 export default function Orders() {
+  const [exception, setException] = createSignal(false);
+  const [selected, setSelected] = createSignal<Set<string>>(new Set());
   const [status, setStatus] = createSignal<Schemas["OrderStatus"]>();
   const orders = createInfiniteQuery(() => ({
-    queryKey: tenantKey("orders", status() ?? ""),
+    queryKey: tenantKey("orders", status() ?? "", exception()),
     queryFn: ({ pageParam }) =>
       unwrap(
         api.GET("/admin/v1/orders", {
           params: {
             header: tenantHeader(),
-            query: { status: status(), cursor: pageParam, limit: 50 },
+            query: {
+              status: status(),
+              exception: exception() || undefined,
+              cursor: pageParam,
+              limit: 50,
+            },
           },
         }),
       ),
@@ -44,6 +52,19 @@ export default function Orders() {
     getNextPageParam: (last) => last.next_cursor ?? undefined,
   }));
   const rows = () => orders.data?.pages.flatMap((page) => page.items) ?? [];
+  createEffect(() => {
+    tenantKey("orders");
+    status();
+    exception();
+    setSelected(new Set<string>());
+  });
+  const select = (id: string, checked: boolean) =>
+    setSelected((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   return (
     <>
       <PageHeader title={t("orders.title")} />
@@ -58,6 +79,15 @@ export default function Orders() {
           onChange={(value) => setStatus(statuses.find((s) => s === value))}
         />
       </div>
+      <Checkbox
+        class="mb-4"
+        label={t("fulfillment.exceptionOnly")}
+        checked={exception()}
+        onChange={setException}
+      />
+      <Show keyed when={JSON.stringify(tenantKey("bulk-documents"))}>
+        {(_key) => <BulkDocuments orders={rows().filter((row) => selected().has(row.id))} />}
+      </Show>
       <QueryState query={orders}>
         {() => (
           <Show
@@ -68,6 +98,15 @@ export default function Orders() {
               <table class={tableClass}>
                 <thead>
                   <tr>
+                    <Th>
+                      <Checkbox
+                        label={t("fulfillment.selectAll")}
+                        checked={rows().length > 0 && rows().every((row) => selected().has(row.id))}
+                        onChange={(checked) =>
+                          setSelected(new Set(checked ? rows().map((row) => row.id) : []))
+                        }
+                      />
+                    </Th>
                     <For
                       each={[
                         t("orders.number"),
@@ -87,6 +126,17 @@ export default function Orders() {
                   <For each={rows()}>
                     {(order) => (
                       <tr>
+                        <td class={tdClass}>
+                          <Checkbox
+                            label={
+                              <span class="sr-only">
+                                {t("fulfillment.selectOrder", { number: order.number })}
+                              </span>
+                            }
+                            checked={selected().has(order.id)}
+                            onChange={(checked) => select(order.id, checked)}
+                          />
+                        </td>
                         <td class={tdClass}>
                           <A
                             class="font-medium text-accent-700 hover:underline"

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM order_events\n                          WHERE order_id = $1 AND kind = 'invoice_delayed') AS \"x!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "x!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "998f77f5a3b25cf8a6bf58bc66858c4162821fe7858ffc01589b618c9833b9b4"
+}

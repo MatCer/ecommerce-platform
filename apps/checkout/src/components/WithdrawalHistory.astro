@@ -1,0 +1,21 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import type { WithdrawalReceipt } from "@platform/storefront-sdk/types";
+
+interface Props {
+  receipts: WithdrawalReceipt[];
+  m: Record<string, string>;
+  locale: string;
+}
+const { receipts, m, locale } = Astro.props;
+const date = (v: string) =>
+  new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(v));
+---
+{receipts.length > 0 && <section aria-labelledby="withdrawal-history" class="grid gap-3">
+  <h2 id="withdrawal-history" class="font-display text-lg font-bold">{t(m, "withdraw.history")}</h2>
+  {receipts.map(r => <details class="rounded-lg border border-border bg-card p-4">
+    <summary class="cursor-pointer">{t(m, "withdraw.declared_at")}: {date(r.declared_at)}</summary>
+    <p class="my-3 text-sm">{t(m, "withdraw.refund_due_at")}: {date(r.refund_due_at)}</p>
+    <pre class="whitespace-pre-wrap break-words font-sans text-sm">{r.declaration}</pre>
+  </details>)}
+</section>}

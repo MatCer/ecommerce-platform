@@ -39,6 +39,8 @@ const PaymentMethods = lazy(() => import("./pages/PaymentMethods.tsx"));
 const PaymentExceptions = lazy(() => import("./pages/PaymentExceptions.tsx"));
 const BankTransactions = lazy(() => import("./pages/BankTransactions.tsx"));
 const Orders = lazy(() => import("./pages/Orders.tsx"));
+const Withdrawals = lazy(() => import("./pages/Withdrawals.tsx"));
+const Carriers = lazy(() => import("./pages/Carriers.tsx"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
 const AiBulkEdit = lazy(() => import("./pages/AiBulkEdit.tsx"));
 const AiSettings = lazy(() => import("./pages/AiSettings.tsx"));
@@ -115,6 +117,8 @@ export function App() {
           <Route path="/settings/recommendations" component={Recommendations} />
           <Route path="/settings/ai" component={AiSettings} />
           <Route path="/orders" component={Orders} />
+          <Route path="/withdrawals" component={Withdrawals} />
+          <Route path="/settings/carriers" component={Carriers} />
           <Route path="/orders/:id" component={OrderDetail} />
           <Route path="/payments/exceptions" component={PaymentExceptions} />
           <Route path="/payments/bank" component={BankTransactions} />

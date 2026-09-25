@@ -64,3 +64,9 @@
 | WP23 | The WP2 lint ideas not built: `client:visible` on an island whose server render can be empty, stale preloads; no image-bytes budget or desktop CLS run in the gates | WP24 |
 | WP23 | No diff view between revisions and no "rebuild" action (a new token edit/upload/reset creates a new revision) | WP24 |
 | WP20/WP22 | Full e2e with 4 workers: checkout handoff `/start` timeouts in 2 specs + shared demo-owner sign-ins hit the auth rate limit; make the suite reliable (per-spec users, IP-aware auth limits from WP12) | WP15 |
+| WP12 | Packeta/PPL are built from public docs and exercised only against `apps/mocks` (request shapes, home-delivery carrier ids, COD rounding rules); carrier-side cancellation of a voided label and an unanswered shipment announcement (`label_in_progress`) are reconciled by hand in the carrier portal | pre-launch checklist |
+| WP12 | Carrier-specific COD payout imports (Packeta/PPL report formats) are not built; payouts go through the generic CSV (`POST /admin/v1/cod-reports`) | WP15 |
+| WP12 | Invoice/credit-note Typst templates and the COD cash-rounding treatment (rounding at collection, after the dispatch invoice, outside the VAT base) need accountant approval before real use | pre-launch |
+| WP12 | Presigned PDF downloads are named by their key (`FV…pdf`); no `Content-Disposition` override (object_store's signer lacks response-header params) | later |
+| WP12 | Payment/carrier marks in the theme's `/shop` are still generic text | WP15 |
+| WP12 | Full e2e with 4 workers from one IP still hits the storefront rate limit (`429` on `/_p/cart/lines`) in 1-2 checkout specs; they pass alone | WP15 |

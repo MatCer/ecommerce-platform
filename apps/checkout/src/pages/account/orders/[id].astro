@@ -1,8 +1,11 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
 import OrderDetails from "../../../components/OrderDetails.astro";
+import OrderDocuments from "../../../components/OrderDocuments.astro";
+import WithdrawalHistory from "../../../components/WithdrawalHistory.astro";
+import WithdrawalForm from "../../../islands/WithdrawalForm";
 import Checkout from "../../../layouts/Checkout.astro";
-import { checkoutApi, shopUrl } from "../../../lib/api";
+import { checkoutApi, messages, shopUrl } from "../../../lib/api";
 
 // One of the signed-in customer's orders (placed signed in, or linked after verification, A5).
 const api = checkoutApi(Astro.request);
@@ -12,6 +15,10 @@ if (!me) return Astro.redirect(`/account?next=/account/orders/${encodeURICompone
 const order = await api.customerOrder(id);
 if (!order) Astro.response.status = 404;
 const m = shop?.messages ?? {};
+const [documents, withdrawal] = order
+  ? await Promise.all([api.myDocuments(id), api.myWithdrawalForm(id)])
+  : [null, null];
+Astro.response.headers.set("Cache-Control", "no-store");
 ---
 
 <Checkout
@@ -20,6 +27,7 @@ const m = shop?.messages ?? {};
   shopUrl={shopUrl(Astro.url)}
   lang={shop?.locale ?? "cs"}
   accountLabel={t(m, "account.nav")}
+  withdrawalLabel={t(m, "withdraw.title")}
   wide
 >
   <div class="grid gap-4">
@@ -33,6 +41,11 @@ const m = shop?.messages ?? {};
             {t(m, "order.payment")}: <strong>{t(m, `order.payment_status.${order.payment.status}`)}</strong>
           </p>
           <OrderDetails order={order} m={m} />
+          <OrderDocuments documents={documents} m={m} locale={shop?.locale ?? "cs"} />
+          {withdrawal && <>
+            {withdrawal.eligible && <WithdrawalForm client:load form={withdrawal} target={{ mode: "account", id }} m={messages(m, "withdraw.")} locale={shop?.locale ?? "cs"} />}
+            <WithdrawalHistory receipts={withdrawal.withdrawals} m={m} locale={shop?.locale ?? "cs"} />
+          </>}
         </>
       ) : (
         <p>{t(m, "account.orders_empty")}</p>

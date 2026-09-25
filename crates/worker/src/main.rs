@@ -87,6 +87,7 @@ async fn main() -> anyhow::Result<()> {
         webhooks,
         fio: fio_poller(env, &ops)?,
         theme_builder: theme_builder()?,
+        fulfillment: Some(fulfillment(env, &ops)?),
         ads,
     };
     tracing::info!(provider = extra.ai.provider(), "AI helpers");
@@ -125,6 +126,40 @@ async fn main() -> anyhow::Result<()> {
     db.close().await;
     tracing::info!("worker stopped");
     Ok(())
+}
+
+/// Carriers (tracking), the ČNB client and the Typst renderer (WP12).
+fn fulfillment(
+    env: platform::config::AppEnv,
+    ops: &platform::config::OpsConfig,
+) -> anyhow::Result<handlers::Fulfillment> {
+    let c = platform::config::FulfillmentConfig::from_env()?;
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()?;
+    Ok(handlers::Fulfillment {
+        carriers: commerce::carriers::Carriers::new(
+            c.packeta_api_url.to_string(),
+            c.packeta_validate_url.to_string(),
+            c.ppl_api_url.to_string(),
+            ops.secrets_key
+                .map(|k| std::sync::Arc::new(platform::crypto::SecretBox::new(&k))),
+        )?,
+        payments: commerce::payments::Payments {
+            fake: None,
+            stripe: platform::config::PaymentsConfig::from_env(env)?
+                .stripe
+                .map(|cfg| commerce::payments::stripe::Stripe::new(&cfg, http.clone())),
+            secrets: None,
+        },
+        rates: commerce::invoicing::Rates {
+            http,
+            url: c.cnb_rates_url.to_string(),
+        },
+        typst: commerce::documents::Typst {
+            bin: c.typst_bin.into(),
+        },
+    })
 }
 
 /// The Fio API poller when `SECRETS_KEY` is set (stored tokens are encrypted with it).

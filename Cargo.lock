@@ -649,6 +649,7 @@ dependencies = [
  "ammonia",
  "argon2",
  "axum",
+ "base64 0.23.1",
  "chrono",
  "crc32fast",
  "flate2",

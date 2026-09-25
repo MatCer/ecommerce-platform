@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status, carrier_status FROM shipments WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "carrier_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "carrier_status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "3d5f27c1041611c76aaea62cec81a66fc309b02659176ef3263225ec9c7f76c5"
+}

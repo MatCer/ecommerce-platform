@@ -106,3 +106,7 @@ export type OrderPayment = S["PaymentView"];
 export type BankTransfer = S["BankTransferView"];
 export type OrderSummary = S["OrderSummary"];
 export type OrderPage = S["OrderPage"];
+export type WithdrawalForm = S["WithdrawalForm"];
+export type WithdrawalReceipt = S["WithdrawalReceipt"];
+export type DeclareInput = S["DeclareInput"];
+export type DocumentLinks = S["DocumentLinks"];

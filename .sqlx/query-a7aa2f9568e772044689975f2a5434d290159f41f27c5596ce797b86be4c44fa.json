@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO invoices (id, tenant_id, series_id, kind, number, order_id, original_id,\n             issued_on, taxable_supply_date, due_on, currency, vat_payer, document, total_minor,\n             created_by)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Date",
+        "Date",
+        "Text",
+        "Bool",
+        "Jsonb",
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7aa2f9568e772044689975f2a5434d290159f41f27c5596ce797b86be4c44fa"
+}

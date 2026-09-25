@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM carrier_accounts WHERE carrier = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c5143a4d05b61ebb0dfa758131fe2d766af349724baa7aa3c1cce54d78ff84c9"
+}

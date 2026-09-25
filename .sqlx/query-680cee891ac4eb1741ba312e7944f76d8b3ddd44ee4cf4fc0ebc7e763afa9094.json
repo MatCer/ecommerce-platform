@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, options_label, sku, quantity, unit_gross_minor, total_minor, tax_rate,\n                tax_minor\n         FROM order_lines WHERE order_id = $1 ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "options_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "options_label"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "sku",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "sku"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "quantity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "unit_gross_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "unit_gross_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "total_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "total_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "tax_rate",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "tax_rate"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "tax_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "tax_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "680cee891ac4eb1741ba312e7944f76d8b3ddd44ee4cf4fc0ebc7e763afa9094"
+}

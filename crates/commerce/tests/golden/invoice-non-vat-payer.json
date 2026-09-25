@@ -1,0 +1,90 @@
+{
+  "kind": "invoice",
+  "number": "FV202600004",
+  "locale": "cs",
+  "order_number": "100001",
+  "issued_on": "2026-09-25",
+  "taxable_supply_date": "2026-09-24",
+  "due_on": "2026-09-25",
+  "currency": "CZK",
+  "vat_payer": false,
+  "supplier": {
+    "name": "Demo obchod s.r.o.",
+    "street": "Dlouhá 12",
+    "city": "Praha 1",
+    "postal_code": "110 00",
+    "country": "CZ",
+    "company_id": "12345678",
+    "vat_id": "CZ12345678",
+    "sk_ic_dph": null,
+    "registry": "C 12345 vedená u Městského soudu v Praze",
+    "email": "obchod@example.cz",
+    "phone": null
+  },
+  "customer": {
+    "name": "Jana Nováková",
+    "company": null,
+    "street": "Krátká 8",
+    "city": "Brno",
+    "postal_code": "602 00",
+    "country": "CZ",
+    "email": "jana@example.test"
+  },
+  "payment": {
+    "method": "bank_transfer",
+    "variable_symbol": "100001",
+    "paid": true,
+    "bank_account": {
+      "iban": "CZ6508000000192000145399",
+      "bic": "GIBACZPX",
+      "name": "Demo obchod s.r.o."
+    }
+  },
+  "lines": [
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000001",
+      "name": "Bavlněné tričko (modrá, M)",
+      "sku": "TEE-BLU-M",
+      "quantity": 2,
+      "unit_gross_minor": 12900,
+      "gross_minor": 23800,
+      "vat_rate": null,
+      "vat_minor": 0,
+      "net_minor": 23800
+    },
+    {
+      "kind": "goods",
+      "order_line_id": "00000000-0000-0000-0000-000000000002",
+      "name": "Keramický hrnek",
+      "sku": "MUG-01",
+      "quantity": 1,
+      "unit_gross_minor": 24900,
+      "gross_minor": 24900,
+      "vat_rate": null,
+      "vat_minor": 0,
+      "net_minor": 24900
+    },
+    {
+      "kind": "shipping",
+      "order_line_id": null,
+      "name": "Zásilkovna – výdejní místo",
+      "sku": null,
+      "quantity": 1,
+      "unit_gross_minor": 7900,
+      "gross_minor": 7900,
+      "vat_rate": null,
+      "vat_minor": 0,
+      "net_minor": 7900
+    }
+  ],
+  "vat_recap": [],
+  "czk_recap": null,
+  "totals": {
+    "net_minor": 56600,
+    "vat_minor": 0,
+    "gross_minor": 56600
+  },
+  "original": null,
+  "reason": null
+}

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(sum(greatest(a.amount_minor - coalesce((SELECT sum(r.amount_minor)\n                    FROM refunds r WHERE r.attempt_id = a.id AND r.status = 'succeeded'), 0), 0)),\n                  0)::bigint AS \"owed!\"\n           FROM payment_attempts a\n           WHERE a.order_id = $1 AND a.status = 'succeeded' AND a.id IS DISTINCT FROM $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "owed!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "079480219db4e1a185fe3b06242bb2e4cabc0766accbcbdb6036b987134789b3"
+}

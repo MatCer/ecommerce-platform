@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT credentials, sender_label FROM carrier_accounts WHERE carrier = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "credentials",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "credentials"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sender_label",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "sender_label"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "53903de088469307f2fb851be186120cd576475ca37a660efe6a21fba9c9e4f7"
+}

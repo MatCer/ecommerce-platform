@@ -146,7 +146,7 @@ pub struct PlaceOrderInput {
     pub notes: Option<String>,
 }
 
-fn clean_address(a: &CheckoutAddress) -> Result<CheckoutAddress, Error> {
+pub(crate) fn clean_address(a: &CheckoutAddress) -> Result<CheckoutAddress, Error> {
     let c = customers::clean(&AddressInput {
         name: a.name.clone(),
         company: a.company.clone(),
@@ -182,7 +182,7 @@ fn clean_phone(phone: Option<&str>) -> Result<Option<String>, Error> {
     Ok(Some(p.to_owned()))
 }
 
-fn clean_pickup(p: &PickupPoint) -> Result<PickupPoint, Error> {
+pub(crate) fn clean_pickup(p: &PickupPoint) -> Result<PickupPoint, Error> {
     let bad = || invalid("invalid_pickup_point", "the pickup point is incomplete");
     let text = |v: &str, max: usize| -> Result<String, Error> {
         let v = v.trim();
@@ -622,6 +622,14 @@ pub async fn view(
         missing.push("cart_unavailable");
     }
     let full = &c.full;
+    // WP12: the tenant's own Packeta key replaces the platform's widget key.
+    let tenant_key = crate::carriers::packeta_public_key(tx).await?;
+    let packeta = settings.packeta.clone().map(|mut w| {
+        if let Some(k) = tenant_key {
+            w.api_key = k;
+        }
+        w
+    });
     Ok(CheckoutView {
         cart: c.priced.view.clone(),
         email: st.email,
@@ -632,7 +640,7 @@ pub async fn view(
         shipping_methods,
         shipping_method_id: c.method.as_ref().map(|m| m.id),
         pickup_point: st.pickup_point,
-        packeta: settings.packeta.clone(),
+        packeta,
         payment_methods,
         payment_method: st.payment_method,
         totals: Totals {
@@ -1127,12 +1135,12 @@ async fn record_consents(
     Ok(())
 }
 
-fn mail_text(locale: &str, key: &str) -> String {
+pub(crate) fn mail_text(locale: &str, key: &str) -> String {
     notifications::label(locale, key)
 }
 
 /// The order summary every order email shows (`order.mjml`).
-fn order_vars(o: &OrderView, url: String) -> Value {
+pub(crate) fn order_vars(o: &OrderView, url: String) -> Value {
     let l = o.locale.as_str();
     let mut totals = vec![
         json!({ "label": mail_text(l, "order_confirmation.subtotal"), "amount": o.subtotal.formatted }),
@@ -1291,7 +1299,11 @@ pub async fn order_by_token(tx: &mut TenantTx, token: &str) -> Result<OrderView,
 
 /// A10 payment timeouts: cancels unpaid orders whose payment window closed, releasing their
 /// stock and coupon. Each order runs in its own tenant transaction. Returns how many expired.
-pub async fn expire_due(db: &sqlx::PgPool, max: i32) -> Result<usize, Error> {
+pub async fn expire_due(
+    db: &sqlx::PgPool,
+    urls: &crate::storefront::PublicUrls,
+    max: i32,
+) -> Result<usize, Error> {
     let due = sqlx::query!(
         r#"SELECT tenant_id AS "tenant_id!", order_id AS "order_id!"
            FROM platform.due_payment_expiries($1)"#,
@@ -1316,6 +1328,17 @@ pub async fn expire_due(db: &sqlx::PgPool, max: i32) -> Result<usize, Error> {
         )
         .await?;
         orders::expire_unpaid(&mut tx, &mut o, "system").await?;
+        // WP12: the customer learns why the order is gone.
+        orders::mail::send(
+            &mut tx,
+            urls,
+            o.id,
+            Template::OrderCancelled,
+            json!({ "reason": "expired", "refund": false }),
+            format!("order_cancelled:{}", o.id),
+            &[],
+        )
+        .await?;
         tx.commit().await?;
         expired += 1;
     }

@@ -176,6 +176,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
         themes: Some(commerce::themes::ThemeKeys::new(THEME_SECRET.as_bytes())),
         builder_token: Some(api::auth::ServiceToken::new(BUILDER_TOKEN)),
+        carriers: None,
     }
 }
 

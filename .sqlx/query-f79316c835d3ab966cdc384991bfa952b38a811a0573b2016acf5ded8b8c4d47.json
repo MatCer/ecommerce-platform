@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, amount_minor, currency, status, reason, iban, credit_note_id, withdrawal_id,\n                created_by, created_at\n         FROM refunds WHERE order_id = $1 ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "iban",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "iban"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "credit_note_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "credit_note_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "withdrawal_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "withdrawal_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "created_by",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "created_by"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f79316c835d3ab966cdc384991bfa952b38a811a0573b2016acf5ded8b8c4d47"
+}

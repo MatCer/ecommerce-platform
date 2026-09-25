@@ -5,9 +5,11 @@ import type {
   CheckoutView,
   ConsentState,
   Customer,
+  DocumentLinks,
   Order,
   OrderPage,
   ShopModel,
+  WithdrawalForm,
 } from "@platform/storefront-sdk/types";
 
 /**
@@ -39,6 +41,22 @@ export function checkoutApi(request: Request) {
     orders: async () => (await get<OrderPage>("/customer/orders"))?.items ?? [],
     customerOrder: (id: string) =>
       /^[0-9a-f-]{36}$/.test(id) ? get<Order>(`/customer/orders/${id}`) : Promise.resolve(null),
+    withdrawalForm: (token: string) =>
+      /^[0-9a-f]{64}$/.test(token)
+        ? get<WithdrawalForm>(`/withdrawals/${token}`)
+        : Promise.resolve(null),
+    myWithdrawalForm: (id: string) =>
+      /^[0-9a-f-]{36}$/.test(id)
+        ? get<WithdrawalForm>(`/customer/orders/${id}/withdrawal`)
+        : Promise.resolve(null),
+    orderDocuments: (token: string) =>
+      /^[0-9a-f]{64}$/.test(token)
+        ? get<DocumentLinks>(`/orders/${token}/documents`)
+        : Promise.resolve(null),
+    myDocuments: (id: string) =>
+      /^[0-9a-f-]{36}$/.test(id)
+        ? get<DocumentLinks>(`/customer/orders/${id}/documents`)
+        : Promise.resolve(null),
   };
 }
 

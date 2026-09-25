@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id FROM withdrawals WHERE (NOT $1 OR status = 'open')\n         ORDER BY status = 'open' DESC, refund_due_at, id LIMIT 200",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "34815d2721e2b2d2e386b990cf5fec103be084ca4cbbd7e0cadf54bb40ab3603"
+}

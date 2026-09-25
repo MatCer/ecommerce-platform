@@ -17,6 +17,7 @@ pub mod customer;
 mod files;
 mod orders;
 mod pages;
+mod withdrawals;
 
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -47,6 +48,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .merge(orders::routes())
         .merge(consent::routes())
         .merge(files::routes())
+        .merge(withdrawals::routes())
 }
 
 fn header<'a>(parts: &'a Parts, name: &str) -> Option<&'a str> {

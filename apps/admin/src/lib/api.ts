@@ -23,15 +23,17 @@ export function setTenantId(id: string): void {
   setTenantSignal(id);
 }
 
+export const authedFetch = createAuthedFetch({
+  token: accessToken,
+  refresh: refreshToken,
+  reauth: requestReauth,
+  tenant: tenantId,
+  fetch: (req) => fetch(req),
+});
+
 export const api = createAdminClient({
   baseUrl: API_ORIGIN,
-  fetch: createAuthedFetch({
-    token: accessToken,
-    refresh: refreshToken,
-    reauth: requestReauth,
-    tenant: tenantId,
-    fetch: (req) => fetch(req),
-  }),
+  fetch: authedFetch,
 });
 
 /**

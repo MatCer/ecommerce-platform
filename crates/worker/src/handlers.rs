@@ -60,6 +60,8 @@ pub struct Extra {
     pub fio: Option<Fio>,
     /// WP23: the theme builder (`THEME_BUILDER_URL` + `THEME_BUILDER_TOKEN`).
     pub theme_builder: Option<ThemeBuilder>,
+    /// WP12: carriers (tracking), the ČNB client and the Typst renderer.
+    pub fulfillment: Option<Fulfillment>,
 }
 
 /// Hands revisions to the theme builder (WP23). Not `Debug`: it holds the service token.
@@ -68,6 +70,16 @@ pub struct ThemeBuilder {
     pub url: reqwest::Url,
     pub token: String,
     pub http: reqwest::Client,
+}
+
+/// Carrier tracking, ČNB rates, PDF rendering and refund payouts (WP12).
+#[derive(Clone)]
+pub struct Fulfillment {
+    pub carriers: commerce::carriers::Carriers,
+    /// Stripe (resumes refunds a crash left unsubmitted).
+    pub payments: commerce::payments::Payments,
+    pub rates: commerce::invoicing::Rates,
+    pub typst: commerce::documents::Typst,
 }
 
 /// Fio API polling (WP11). Not `Debug`: it holds the key for stored tokens.
@@ -90,6 +102,7 @@ impl Extra {
             webhooks: None,
             fio: None,
             theme_builder: None,
+            fulfillment: None,
             ads: None,
         })
     }
@@ -103,6 +116,8 @@ pub const PAYMENTS_EXPIRE: &str = "payments.expire";
 pub const PAYMENTS_REMIND: &str = "payments.remind";
 /// Downloads new transactions of accounts with a Fio API token and matches them (A25).
 pub const PAYMENTS_FIO_POLL: &str = "payments.fio_poll";
+/// WP12: polls carriers for dispatched parcels (shipped, delivered).
+pub const SHIPPING_TRACK: &str = "shipping.track";
 pub use commerce::adtracking::{DELIVER_JOB as AD_DELIVER_JOB, REFUND_JOB as AD_REFUND_JOB};
 pub use commerce::analytics::{PARTITIONS_JOB, ROLLUP_JOB};
 pub use commerce::ops::SWEEP_JOB;
@@ -122,12 +137,18 @@ pub fn all(
     let sweep_storage = storage.clone();
     let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
     let webhooks = extra.webhooks.clone();
+    let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
     let (ai1, ai2) = (extra.ai.clone(), extra.ai.clone());
     let theme_builder = extra.theme_builder.clone();
     let theme_storage = storage.clone();
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
+    let (urls2, urls3, urls4, urls5) = (urls.clone(), urls.clone(), urls.clone(), urls.clone());
+    let (f1, f2, f3, f4) = (wp12.clone(), wp12.clone(), wp12.clone(), wp12.clone());
+    let f5 = wp12.clone();
+    let wp12_track = wp12;
+    let (s1, s2, s3) = (storage.clone(), storage.clone(), storage.clone());
     Handlers::default()
         .register(EDGE_PURGE, move |_ctx, job| {
             edge_purge(job, e1.edge.clone())
@@ -143,7 +164,25 @@ pub fn all(
             search_synonyms(ctx, job, m4.clone())
         })
         .register(notifications::SEND_JOB, move |ctx, job| {
-            mail_send(ctx, job, mailer.clone())
+            mail_send(ctx, job, mailer.clone(), s1.clone())
+        })
+        .register(commerce::invoicing::ISSUE_JOB, move |ctx, job| {
+            invoice_issue(ctx, job, f1.clone())
+        })
+        .register(commerce::invoicing::RENDER_JOB, move |ctx, job| {
+            invoice_render(ctx, job, f2.clone(), s2.clone(), urls2.clone())
+        })
+        .register(commerce::invoicing::RATES_JOB, move |ctx, job| {
+            invoice_rates(ctx, job, f3.clone())
+        })
+        .register(commerce::documents::RENDER_JOB, move |ctx, job| {
+            document_render(ctx, job, f4.clone(), s3.clone())
+        })
+        .register(commerce::refunds::FINALIZE_JOB, move |ctx, job| {
+            refund_finalize(ctx, job, f5.clone(), urls5.clone())
+        })
+        .register(SHIPPING_TRACK, move |ctx, job| {
+            shipping_track(ctx, job, wp12_track.clone(), urls3.clone())
         })
         .register(STAFF_INVITE_MAIL, move |ctx, job| {
             staff_invite_mail(ctx, job, auth.clone())
@@ -165,7 +204,9 @@ pub fn all(
         })
         .register(intervals::TRANSITION_JOB, price_transition)
         .register(LINK_GUEST_ORDERS, link_guest_orders)
-        .register(PAYMENTS_EXPIRE, payments_expire)
+        .register(PAYMENTS_EXPIRE, move |ctx, job| {
+            payments_expire(ctx, job, urls4.clone())
+        })
         .register(stripe::EVENT_JOB, provider_event)
         .register(PAYMENTS_REMIND, move |ctx, job| {
             payments_remind(ctx, job, urls.clone())
@@ -344,14 +385,19 @@ async fn payments_fio_poll(ctx: Ctx, _job: Job, fio: Option<Fio>) -> Result<(), 
 
 /// Delivers one email (A14). A message that could not be handed over is retried with backoff
 /// until the message itself gives up (`failed`, see `notifications::deliver`).
-async fn mail_send(ctx: Ctx, job: Job, mailer: Option<Mailer>) -> Result<(), JobError> {
+async fn mail_send(
+    ctx: Ctx,
+    job: Job,
+    mailer: Option<Mailer>,
+    storage: Storage,
+) -> Result<(), JobError> {
     let (tenant, message) = tenant_and(&job, "message_id")?;
     // Retried with backoff (the message stays `pending`); the hourly reconciliation requeues
     // it if the job gives up before mail is configured.
     let mailer = mailer.ok_or_else(|| {
         JobError::Retry("mail is not configured (MAIL_TRANSACTIONAL_SMTP_URL, ...)".into())
     })?;
-    match notifications::deliver(&ctx.db, &mailer, tenant, message).await {
+    match notifications::deliver(&ctx.db, &mailer, Some(&storage), tenant, message).await {
         Ok(Step::Done) => Ok(()),
         Ok(Step::Retry(reason)) => Err(JobError::Retry(reason)),
         Err(e) => Err(JobError::Retry(e.to_string())),
@@ -687,9 +733,10 @@ async fn link_guest_orders(ctx: Ctx, job: Job) -> Result<(), JobError> {
     Ok(())
 }
 
-/// A10: cancels unpaid orders whose payment window closed and releases their stock.
-async fn payments_expire(ctx: Ctx, _job: Job) -> Result<(), JobError> {
-    let expired = commerce::checkout::expire_due(&ctx.db, 500)
+/// A10: cancels unpaid orders whose payment window closed and releases their stock; the
+/// customer gets the cancellation email (WP12).
+async fn payments_expire(ctx: Ctx, _job: Job, urls: PublicUrls) -> Result<(), JobError> {
+    let expired = commerce::checkout::expire_due(&ctx.db, &urls, 500)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
     if expired > 0 {
@@ -909,4 +956,120 @@ async fn ops_sweep(ctx: Ctx, _job: Job, storage: Storage, meili: Meili) -> Resul
         .map_err(|e| JobError::Retry(e.to_string()))?;
     tracing::info!(?report, "sweep done");
     Ok(())
+}
+
+// ---------------------------------------------------------------------------------------
+// WP12: invoices, documents, rates, tracking
+
+fn wp12(f: Option<Fulfillment>) -> Result<Fulfillment, JobError> {
+    f.ok_or_else(|| JobError::Retry("fulfillment integrations are not configured".into()))
+}
+
+fn payload_id(job: &Job, pointer: &str) -> Result<(Uuid, Uuid), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("job without tenant".into()))?;
+    let id = job
+        .payload
+        .pointer(pointer)
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| JobError::Permanent(format!("payload has no {pointer}")))?;
+    Ok((tenant, id))
+}
+
+/// `order.paid` / `order.shipped` → the order's invoice when its A17 scenario is due. A ČNB
+/// rate that is not published yet retries (the order shows `invoice_delayed`).
+async fn invoice_issue(ctx: Ctx, job: Job, f: Option<Fulfillment>) -> Result<(), JobError> {
+    let (tenant, order) = payload_id(&job, "/payload/order_id")?;
+    let f = wp12(f)?;
+    match commerce::invoicing::issue(&ctx.db, &f.rates, tenant, order, chrono::Utc::now()).await {
+        Ok(commerce::invoicing::Issued::RateUnavailable) => {
+            // Waiting for ČNB is not a failure: a fresh job later, the order shows the delay.
+            let now = chrono::Utc::now();
+            queue::enqueue(
+                &ctx.db,
+                &commerce::invoicing::delayed_issue_job(tenant, order, now),
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            tracing::info!(%tenant, %order, "invoice waits for the ČNB fixing");
+            Ok(())
+        }
+        Ok(outcome) => {
+            tracing::info!(%tenant, %order, ?outcome, "invoice issue");
+            Ok(())
+        }
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+async fn invoice_render(
+    ctx: Ctx,
+    job: Job,
+    f: Option<Fulfillment>,
+    storage: Storage,
+    urls: PublicUrls,
+) -> Result<(), JobError> {
+    let (tenant, id) = payload_id(&job, "/invoice_id")?;
+    let f = wp12(f)?;
+    commerce::invoicing::render(&ctx.db, &storage, &f.typst, &urls, tenant, id)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
+}
+
+/// Today's ČNB fixing (hourly; issuing fetches older dates on demand).
+async fn invoice_rates(ctx: Ctx, _job: Job, f: Option<Fulfillment>) -> Result<(), JobError> {
+    let f = wp12(f)?;
+    let today = commerce::invoicing::prague::date(chrono::Utc::now());
+    let fixing = commerce::invoicing::cnb::fetch(&f.rates.http, &f.rates.url, today)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    commerce::invoicing::cnb::store(&ctx.db, &fixing)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
+}
+
+async fn document_render(
+    ctx: Ctx,
+    job: Job,
+    f: Option<Fulfillment>,
+    storage: Storage,
+) -> Result<(), JobError> {
+    let (tenant, id) = payload_id(&job, "/document_id")?;
+    let f = wp12(f)?;
+    commerce::documents::render(&ctx.db, &storage, &f.typst, tenant, id)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
+}
+
+async fn shipping_track(
+    ctx: Ctx,
+    _job: Job,
+    f: Option<Fulfillment>,
+    urls: PublicUrls,
+) -> Result<(), JobError> {
+    let Some(f) = f else { return Ok(()) };
+    let polled = commerce::fulfillment::track_due(&ctx.db, &f.carriers, &urls, 200)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    if polled > 0 {
+        tracing::info!(polled, "shipments tracked");
+    }
+    Ok(())
+}
+
+/// Backstop for a refund whose payout submission or finalization (credit note, email,
+/// withdrawal completion) did not run inline.
+async fn refund_finalize(
+    ctx: Ctx,
+    job: Job,
+    f: Option<Fulfillment>,
+    urls: PublicUrls,
+) -> Result<(), JobError> {
+    let (tenant, id) = payload_id(&job, "/refund_id")?;
+    let f = wp12(f)?;
+    commerce::refunds::resume(&ctx.db, &f.payments, &urls, tenant, id)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
 }

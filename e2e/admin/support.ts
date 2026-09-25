@@ -1,12 +1,13 @@
 /** Helpers for the admin e2e suite: stack env, superadmin CLI, Mailpit, axe, screenshots. */
 import { execFileSync } from "node:child_process";
-import { createHmac } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
+import { createHash, createHmac } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page } from "@playwright/test";
+import { type Browser, expect, type Page } from "@playwright/test";
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -60,14 +61,28 @@ interface MailSummary {
   Created: string;
 }
 
-/** The newest sign-in link mailed to `to` after `since` (polls Mailpit for up to 15 s). */
+/**
+ * A sign-in link mailed to `to` after `since` (polls Mailpit for up to 15 s). Parallel test
+ * files sign in the same owner at the same time; each claims a different link (a claim file
+ * per link, created exclusively), so no two workers consume the same single-use link.
+ */
 export function magicLink(to: string, since: Date): Promise<string> {
   return mailedLink(to, since, /https?:\/\/[^\s"'<>]+magic-link\/verify[^\s"'<>]*/);
 }
 
-/** The newest password-reset link mailed to `to` after `since`. */
+/** A password-reset link mailed to `to` after `since` (claimed like `magicLink`). */
 export function resetLink(to: string, since: Date): Promise<string> {
   return mailedLink(to, since, /https?:\/\/[^\s"'<>]+\/reset-password\/[^\s"'<>]*/);
+}
+
+function claim(link: string): boolean {
+  const file = join(tmpdir(), `e2e-link-${createHash("sha256").update(link).digest("hex")}`);
+  try {
+    writeFileSync(file, "", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function mailedLink(to: string, since: Date, pattern: RegExp): Promise<string> {
@@ -77,14 +92,14 @@ async function mailedLink(to: string, since: Date, pattern: RegExp): Promise<str
     const body = (await res.json()) as { messages: MailSummary[] };
     const fresh = body.messages
       .filter((m) => new Date(m.Created) >= since)
-      .sort((a, b) => b.Created.localeCompare(a.Created))[0];
-    if (fresh) {
-      const msg = (await (await fetch(`${mailpit}/api/v1/message/${fresh.ID}`)).json()) as {
+      .sort((a, b) => a.Created.localeCompare(b.Created));
+    for (const m of fresh) {
+      const msg = (await (await fetch(`${mailpit}/api/v1/message/${m.ID}`)).json()) as {
         Text: string;
         HTML: string;
       };
-      const link = `${msg.Text}\n${msg.HTML}`.match(pattern);
-      if (link) return link[0].replace(/&amp;/g, "&");
+      const link = `${msg.Text}\n${msg.HTML}`.match(pattern)?.[0].replace(/&amp;/g, "&");
+      if (link && claim(link)) return link;
     }
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -174,4 +189,81 @@ export async function totp(secret: string): Promise<string> {
   const offset = (hmac[hmac.length - 1] ?? 0) & 0xf;
   const value = hmac.readUInt32BE(offset) & 0x7fffffff;
   return String(value % 1_000_000).padStart(6, "0");
+}
+
+/**
+ * A read (or a job enqueue) as the database superuser in the postgres container, for
+ * assertions the UI does not show (WP12: invoice dates, stock). Returns psql's unaligned output.
+ */
+export function sql(query: string): string {
+  return execFileSync(
+    "docker",
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "app",
+      "-At",
+      "-c",
+      query,
+    ],
+    { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
+  ).trim();
+}
+
+/** Runs a worker job now instead of waiting for its cron slot (e.g. `shipping.track`). */
+export function enqueueJob(kind: string): void {
+  if (!/^[a-z_.]+$/.test(kind)) throw new Error("bad job kind");
+  sql(
+    `SELECT queue.enqueue('${kind}', '{}'::jsonb, NULL, 'default', NULL, 3, 'e2e:${kind}:${Date.now()}')`,
+  );
+}
+
+/** The seeded demo owner, signed in once per file (the auth service rate-limits sign-ins). */
+export async function signInOwner(browser: Browser): Promise<Page> {
+  const owner = "owner@lnen.example";
+  const page = await (await browser.newContext()).newPage();
+  await useEnglish(page);
+  await page.goto("/login");
+  const since = new Date(Date.now() - 1000);
+  await page.getByLabel("Email").fill(owner);
+  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.goto(await magicLink(owner, since));
+  return page;
+}
+
+/** Polls `probe` until it returns a truthy value (or fails after `ms`). */
+export async function eventually<T>(
+  probe: () => T | Promise<T>,
+  ms = 30_000,
+): Promise<NonNullable<T>> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const v = await probe();
+    if (v) return v as NonNullable<T>;
+    if (Date.now() > deadline) throw new Error("condition not met in time");
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+/** A Mailpit message with its attachments (newest to `to` whose subject contains `subject`). */
+export async function mailWithAttachments(
+  to: string,
+  subject: string,
+): Promise<{ Text: string; Attachments: { FileName: string; ContentType: string }[] }> {
+  return eventually(async () => {
+    const res = await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
+    const body = (await res.json()) as { messages: { ID: string; Subject: string }[] };
+    const hit = body.messages.find((m) => m.Subject.includes(subject));
+    if (!hit) return null;
+    return (await (await fetch(`${mailpit}/api/v1/message/${hit.ID}`)).json()) as {
+      Text: string;
+      Attachments: { FileName: string; ContentType: string }[];
+    };
+  });
 }

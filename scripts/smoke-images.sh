@@ -53,6 +53,8 @@ status=$(curl -s -o /dev/null -w '%{http_code}' "$api_url/readyz")
 curl -fsS --retry 30 --retry-delay 1 --retry-all-errors "$mocks_url/healthz" >/dev/null || fail "mocks /healthz"
 
 [[ $(docker inspect -f '{{.State.Running}}' "$worker") == true ]] || fail "worker is not running"
+# WP12: the worker renders PDFs with the bundled Typst CLI.
+docker exec "$worker" /usr/local/bin/typst --version >/dev/null || fail "typst missing in the image"
 docker stop -t 10 "$worker" >/dev/null
 [[ $(docker inspect -f '{{.State.ExitCode}}' "$worker") == 0 ]] || fail "worker did not exit cleanly"
 docker stop -t 10 "$api" >/dev/null
@@ -83,4 +85,4 @@ if [[ -n $builder_image ]]; then
   echo "theme-builder image OK: builder healthz/readyz, sandbox proxy policy"
 fi
 
-echo "images OK: api healthz/healthcheck/readyz, worker lifecycle, mocks healthz"
+echo "images OK: api healthz/healthcheck/readyz, worker lifecycle + typst, mocks healthz"

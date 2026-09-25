@@ -953,7 +953,12 @@ async fn expiry_releases_stock_and_a_late_success_is_an_exception(db: PgPool) {
     assert_eq!(level(&runtime, &shop, shop.variants[0]).await.reserved, 3);
 
     // Nothing is due yet.
-    assert_eq!(checkout::expire_due(&runtime, 100).await.unwrap(), 0);
+    assert_eq!(
+        checkout::expire_due(&runtime, &PublicUrls::default(), 100)
+            .await
+            .unwrap(),
+        0
+    );
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query("UPDATE orders SET payment_expires_at = now() - interval '1 minute' WHERE id = $1")
         .bind(placed.order_id)
@@ -961,9 +966,16 @@ async fn expiry_releases_stock_and_a_late_success_is_an_exception(db: PgPool) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert_eq!(checkout::expire_due(&runtime, 100).await.unwrap(), 1);
     assert_eq!(
-        checkout::expire_due(&runtime, 100).await.unwrap(),
+        checkout::expire_due(&runtime, &PublicUrls::default(), 100)
+            .await
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        checkout::expire_due(&runtime, &PublicUrls::default(), 100)
+            .await
+            .unwrap(),
         0,
         "once"
     );

@@ -15,10 +15,12 @@ const cfg: Config = {
   smtpUrl: "unused",
   mailFrom: "test@example.test",
   internalToken: "internal-token-internal-token-0123456789",
+  clientIpHeader: "x-real-ip",
+  signInRateMax: 100,
   port: 3000,
 };
 
-function setup() {
+function setup(config: Config = cfg) {
   const outbox: Mail[] = [];
   const db: Record<string, Record<string, unknown>[]> = {
     user: [],
@@ -28,10 +30,10 @@ function setup() {
     twoFactor: [],
     jwks: [],
   };
-  const auth = createAuth(cfg, memoryAdapter(db), async (mail) => {
+  const auth = createAuth(config, memoryAdapter(db), async (mail) => {
     outbox.push(mail);
   });
-  return { app: createApp(auth, cfg), outbox, db, auth };
+  return { app: createApp(auth, config), outbox, db, auth };
 }
 
 /** RFC 6238 TOTP (SHA-1, 6 digits, 30 s) for a base32 secret, as an authenticator app. */
@@ -260,6 +262,27 @@ describe("staff sign-in", () => {
     expect(ok.headers.get("access-control-allow-credentials")).toBe("true");
     const evil = await preflight("http://evil.localhost");
     expect(evil.headers.get("access-control-allow-origin")).not.toBe("http://evil.localhost");
+  });
+});
+
+describe("rate limits", () => {
+  const signIn = (app: ReturnType<typeof setup>["app"], headers: Record<string, string>) =>
+    app.request("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: cfg.adminOrigin, ...headers },
+      body: JSON.stringify({ email: "nobody@example.test", password: "wrong-password-123" }),
+    });
+
+  test("are per client IP from the proxy's header; client X-Forwarded-For is ignored", async () => {
+    const { app } = setup({ ...cfg, signInRateMax: 3 });
+    const a = { "x-real-ip": "203.0.113.7" };
+    for (let i = 0; i < 3; i++) expect((await signIn(app, a)).status).toBe(401);
+    expect((await signIn(app, a)).status).toBe(429);
+    // A spoofed forwarded chain does not open a new bucket...
+    const spoof = { ...a, "x-forwarded-for": `198.51.100.${Date.now() % 250}` };
+    expect((await signIn(app, spoof)).status).toBe(429);
+    // ...but another client (another proxy-set IP) has its own.
+    expect((await signIn(app, { "x-real-ip": "203.0.113.8" })).status).toBe(401);
   });
 });
 

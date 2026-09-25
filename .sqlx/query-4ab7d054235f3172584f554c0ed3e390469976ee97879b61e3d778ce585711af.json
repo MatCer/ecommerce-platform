@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT shipping_method_snapshot FROM orders WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shipping_method_snapshot",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "shipping_method_snapshot"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4ab7d054235f3172584f554c0ed3e390469976ee97879b61e3d778ce585711af"
+}

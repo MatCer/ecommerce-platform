@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT number, placed_at, status, payment_method FROM orders WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "placed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "payment_method",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "payment_method"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ea4ff3358e1239db9ce9fe9607baaac1d83667f2970397c40b0d7d94853f9410"
+}

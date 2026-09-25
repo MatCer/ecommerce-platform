@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO shipments (id, tenant_id, order_id, carrier, status, created_by)\n                 VALUES ($1, $2, $3, $4, 'creating', $5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a50b5e205164e2a0d31f574f156eba3e5cc510fac08d5c9bbe8fba2e42d50730"
+}

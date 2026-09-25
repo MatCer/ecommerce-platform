@@ -515,7 +515,8 @@ pub struct DashboardQuery {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SalesTotals {
     pub currency: String,
-    /// Sum of order totals (placed, not cancelled), minor units.
+    /// Sum of order totals (placed, not cancelled) less what was refunded of them (WP12,
+    /// netted on the order's day), minor units.
     pub revenue_minor: i64,
     pub orders: i64,
     /// Average order value, minor units (0 without orders).
@@ -629,9 +630,13 @@ pub async fn dashboard(tx: &mut TenantTx, q: &DashboardQuery) -> Result<Dashboar
 
     let sales = sqlx::query_as!(
         SalesTotals,
-        r#"SELECT currency AS "currency!", sum(total_minor)::bigint AS "revenue_minor!",
-                  count(*) AS "orders!", (sum(total_minor) / count(*))::bigint AS "aov_minor!"
-           FROM orders
+        r#"SELECT currency AS "currency!", sum(net)::bigint AS "revenue_minor!",
+                  count(*) AS "orders!", (sum(net) / count(*))::bigint AS "aov_minor!"
+           FROM (SELECT o.currency, o.market_id, o.placed_at, o.status,
+                        o.total_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r
+                            WHERE r.order_id = o.id AND r.attempt_id = o.paid_attempt_id
+                              AND r.status = 'succeeded'), 0) AS net
+                 FROM orders o) orders
            WHERE placed_at >= $1 AND placed_at < $2 AND status <> 'cancelled'
              AND ($3::uuid IS NULL OR market_id = $3)
            GROUP BY currency ORDER BY currency"#,
@@ -644,8 +649,12 @@ pub async fn dashboard(tx: &mut TenantTx, q: &DashboardQuery) -> Result<Dashboar
     let daily_sales = sqlx::query_as!(
         DailySales,
         r#"SELECT (placed_at AT TIME ZONE 'UTC')::date AS "date!", currency AS "currency!",
-                  sum(total_minor)::bigint AS "revenue_minor!", count(*) AS "orders!"
-           FROM orders
+                  sum(net)::bigint AS "revenue_minor!", count(*) AS "orders!"
+           FROM (SELECT o.currency, o.market_id, o.placed_at, o.status,
+                        o.total_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r
+                            WHERE r.order_id = o.id AND r.attempt_id = o.paid_attempt_id
+                              AND r.status = 'succeeded'), 0) AS net
+                 FROM orders o) orders
            WHERE placed_at >= $1 AND placed_at < $2 AND status <> 'cancelled'
              AND ($3::uuid IS NULL OR market_id = $3)
            GROUP BY 1, 2 ORDER BY 1, 2"#,

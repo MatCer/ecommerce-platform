@@ -947,6 +947,51 @@ pub async fn refund(
     reason: Option<&str>,
     actor: &str,
 ) -> Result<Refund, Error> {
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let order_id = attempt(&mut tx, attempt_id).await?.order_id;
+    let mut order = orders::lock(&mut tx, order_id).await?;
+    let (id, manual) = record_refund(
+        &mut tx,
+        &mut order,
+        attempt_id,
+        amount_minor,
+        reason,
+        actor,
+        &RefundDetails::default(),
+    )
+    .await?;
+    tx.commit().await?;
+    if manual {
+        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+        let r = refund_row(&mut tx, id).await?;
+        tx.commit().await?;
+        return Ok(r);
+    }
+    submit_refund(db, payments, tenant_id, id).await
+}
+
+/// What a refund covered (WP12): the reversed allocations, the credit note, the withdrawal and
+/// the account a bank refund goes to.
+#[derive(Debug, Clone, Default)]
+pub struct RefundDetails {
+    pub lines: Option<serde_json::Value>,
+    pub withdrawal_id: Option<Uuid>,
+    pub iban: Option<String>,
+}
+
+/// Records a refund of `amount_minor` of a successful attempt under the (locked) order: the
+/// balance is reserved (pending refunds count), bank/COD refunds are recorded as done and
+/// settled. Returns the refund id and whether it was manual (a Stripe refund still has to be
+/// submitted with [`submit_refund`] after the commit).
+pub(crate) async fn record_refund(
+    tx: &mut TenantTx,
+    order: &mut orders::OrderRow,
+    attempt_id: Uuid,
+    amount_minor: i64,
+    reason: Option<&str>,
+    actor: &str,
+    details: &RefundDetails,
+) -> Result<(Uuid, bool), Error> {
     let reason = reason.map(str::trim).filter(|r| !r.is_empty());
     if reason.is_some_and(|r| r.chars().count() > 500) {
         return Err(invalid(
@@ -954,10 +999,12 @@ pub async fn refund(
             "the reason is at most 500 characters",
         ));
     }
-    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    let order_id = attempt(&mut tx, attempt_id).await?.order_id;
-    let mut order = orders::lock(&mut tx, order_id).await?;
-    let paid = attempt(&mut tx, attempt_id).await?;
+    let order_id = order.id;
+    let tenant_id = tx.tenant_id();
+    let paid = attempt(tx, attempt_id).await?;
+    if paid.order_id != order_id {
+        return Err(Error::NotFound);
+    }
     if paid.status != AttemptStatus::Succeeded {
         return Err(Error::Conflict {
             code: "nothing_to_refund",
@@ -969,7 +1016,7 @@ pub async fn refund(
            WHERE attempt_id = $1 AND status <> 'failed'"#,
         attempt_id
     )
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut **tx)
     .await?;
     let left = paid.amount_minor - reserved;
     if amount_minor <= 0 || amount_minor > left {
@@ -987,8 +1034,8 @@ pub async fn refund(
     };
     sqlx::query!(
         "INSERT INTO refunds (id, tenant_id, order_id, attempt_id, amount_minor, currency, reason,
-             status, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+             status, created_by, lines, withdrawal_id, iban)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
         id,
         tenant_id,
         order_id,
@@ -997,12 +1044,15 @@ pub async fn refund(
         paid.currency,
         reason,
         status.as_str(),
-        actor
+        actor,
+        details.lines,
+        details.withdrawal_id,
+        details.iban
     )
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
     audit::record(
-        &mut tx,
+        tx,
         actor,
         "refund.created",
         "order",
@@ -1012,16 +1062,9 @@ pub async fn refund(
     )
     .await?;
     if manual {
-        settle_refunds(&mut tx, &mut order, actor).await?;
+        settle_refunds(tx, order, actor).await?;
     }
-    tx.commit().await?;
-    if manual {
-        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-        let r = refund_row(&mut tx, id).await?;
-        tx.commit().await?;
-        return Ok(r);
-    }
-    submit_refund(db, payments, tenant_id, id).await
+    Ok((id, manual))
 }
 
 /// Repeats a `pending` Stripe refund with the same idempotency key (after an ambiguous failure
@@ -1041,7 +1084,7 @@ pub async fn retry_refund(
     submit_refund(db, payments, tenant_id, refund_id).await
 }
 
-async fn submit_refund(
+pub(crate) async fn submit_refund(
     db: &sqlx::PgPool,
     payments: &Payments,
     tenant_id: Uuid,
@@ -1136,6 +1179,20 @@ pub(crate) async fn settle_refunds(
     )
     .fetch_one(&mut **tx)
     .await?;
+    // Both directions: a refund that failed after it counted puts the state back.
+    let reversed = match (order.payment_status.as_str(), refunded) {
+        ("refunded" | "partially_refunded", r) if r <= 0 => {
+            Some(PaymentCommand::RefundReversed { none_left: true })
+        }
+        ("refunded", r) if r < retained.amount_minor => {
+            Some(PaymentCommand::RefundReversed { none_left: false })
+        }
+        _ => None,
+    };
+    if let Some(command) = reversed {
+        orders::apply_payment(tx, order, command, actor).await?;
+        return Ok(());
+    }
     if refunded <= 0 {
         return Ok(());
     }

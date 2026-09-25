@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT variant_id FROM order_lines WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "variant_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "cc5046482a096f3c875d2ff923942c358952cfbf922c8abc192b7eb166932b51"
+}

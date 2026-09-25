@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.status, r.finalized_at, r.credit_note_id, r.lines, r.withdrawal_id, r.iban,\n                r.reason, r.amount_minor, r.provider_ref, a.method\n         FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "finalized_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "finalized_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "credit_note_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "credit_note_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "lines",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "lines"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "withdrawal_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "withdrawal_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "iban",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "iban"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "provider_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "provider_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "method",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "method"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "315164b84759fcc65a499878bd5ec11f8e19acda957037d27949d6c60939d26f"
+}

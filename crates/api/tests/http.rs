@@ -46,6 +46,7 @@ fn state(db: PgPool) -> AppState {
         builder_token: Some(api::auth::ServiceToken::new(
             "builder-token-for-http-tests-0123456789",
         )),
+        carriers: None,
     }
 }
 

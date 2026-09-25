@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.status, r.finalized_at, a.method FROM refunds r\n         JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "finalized_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "refunds",
+            "name": "finalized_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "method",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "method"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "bd3ea88d326b3617ace84fbd108b2219134992f31e307d3d4e80cf778b00338b"
+}

@@ -113,6 +113,10 @@ export const STOREFRONT_OPERATIONS: Operation[] = [
 
 /** The checkout app's capabilities (A7: a separate binding). Grows with WP9/WP10. */
 export const CHECKOUT_OPERATIONS: Operation[] = [
+  { method: "GET", path: /^\/withdrawals\/[0-9a-f]{64}$/ },
+  { method: "GET", path: /^\/customer\/orders\/[0-9a-f-]{36}\/withdrawal$/ },
+  { method: "GET", path: /^\/orders\/[0-9a-f]{64}\/documents$/ },
+  { method: "GET", path: /^\/customer\/orders\/[0-9a-f-]{36}\/documents$/ },
   { method: "GET", path: /^\/shop$/ },
   { method: "GET", path: /^\/cart$/ },
   // WP9: the signed-in customer (session from the context) and their consent.
