@@ -4,6 +4,27 @@
  */
 
 export interface paths {
+    "/admin/v1/analytics/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sales (from orders: placed, not cancelled), traffic (edge page counters without
+         *     identifiers; sessions, funnel and conversion over consented sessions only, A20), top
+         *     products, top and zero-result searches, and Web Vitals p75 per template. Days are UTC.
+         */
+        get: operations["dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/assets": {
         parameters: {
             query?: never;
@@ -409,6 +430,40 @@ export interface paths {
         post?: never;
         /** Deletes the parameter and its values on all products. */
         delete: operations["delete_parameter"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/platform/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jobs of every tenant, newest first; dead ones by default. */
+        get: operations["jobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/platform/jobs/{id}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Puts a dead job back in the queue with fresh attempts (`409 not_dead` otherwise). */
+        post: operations["requeue"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -829,6 +884,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscriptions (never their secrets) and the event types on offer. */
+        get: operations["list"];
+        put?: never;
+        /** Creates a subscription. The signing secret is in this response only. */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/webhooks/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The delivery log, newest first. */
+        get: operations["deliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/webhooks/deliveries/{id}/redeliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sends a finished (succeeded or dead) delivery again, with a new 24 h retry window. */
+        post: operations["redeliver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/webhooks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deletes a subscription and its delivery log. */
+        delete: operations["remove"];
+        options?: never;
+        head?: never;
+        /** Changes the URL, event types, description or active flag. */
+        patch: operations["update"];
+        trace?: never;
+    };
+    "/admin/v1/webhooks/{id}/rotate-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replaces the signing secret (the old one stops working at once); the new secret is in
+         *     this response only.
+         */
+        post: operations["rotate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -840,6 +985,23 @@ export interface paths {
         get: operations["healthz"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/analytics/counters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Page request and search counters flushed by the edge (A20: no identifiers). */
+        post: operations["counters"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1346,8 +1508,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events
-         *     and server counters (A20).
+         * Events beacon (`/_p/e`, A20): `{"events": [...]}` with `page_view`, `view_item`,
+         *     `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
+         *     records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
+         *     `analytics` right now; purposes the client claims are ignored and unknown props dropped.
+         *     Always `202`, so the answer does not reveal the consent state.
          */
         post: operations["events"];
         delete?: never;
@@ -2033,6 +2198,15 @@ export interface components {
             email: string;
             phone?: string | null;
         };
+        /** @description What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`). */
+        CounterBatch: {
+            counters?: components["schemas"]["PageCounter"][];
+            searches?: components["schemas"]["SearchCounter"][];
+        };
+        CountersRecorded: {
+            counters: number;
+            searches: number;
+        };
         Coupon: {
             /** @example PODZIM10 */
             code: string;
@@ -2125,11 +2299,84 @@ export interface components {
              */
             recently_verified: boolean;
         };
+        DailySales: {
+            currency: string;
+            /** Format: date */
+            date: string;
+            /** Format: int64 */
+            orders: number;
+            /** Format: int64 */
+            revenue_minor: number;
+        };
+        DailyTraffic: {
+            /**
+             * Format: int64
+             * @description Sessions of visitors who consented to analytics.
+             */
+            consented_sessions: number;
+            /** Format: date */
+            date: string;
+            /**
+             * Format: int64
+             * @description All page requests counted by the edge (no consent needed, no identifiers).
+             */
+            page_requests: number;
+        };
+        Dashboard: {
+            daily_sales: components["schemas"]["DailySales"][];
+            daily_traffic: components["schemas"]["DailyTraffic"][];
+            /** Format: date */
+            from: string;
+            /** Format: uuid */
+            market_id?: string | null;
+            sales: components["schemas"]["SalesTotals"][];
+            /** Format: date */
+            to: string;
+            top_products: components["schemas"]["TopProduct"][];
+            top_searches: components["schemas"]["QueryCount"][];
+            traffic: components["schemas"]["Traffic"];
+            web_vitals: components["schemas"]["VitalP75"][];
+            zero_result_searches: components["schemas"]["QueryCount"][];
+        };
+        Delivery: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            delivered_at?: string | null;
+            /**
+             * Format: int64
+             * @description Outbox event id (the payload's `id` is `evt_<event_id>`).
+             */
+            event_id: number;
+            event_type: string;
+            /** Format: uuid */
+            id: string;
+            last_error?: string | null;
+            /** Format: date-time */
+            next_at?: string | null;
+            payload: unknown;
+            /** Format: int32 */
+            response_code?: number | null;
+            /** @description `pending`, `retrying`, `succeeded` or `dead`. */
+            status: string;
+            /** Format: uuid */
+            subscription_id: string;
+        };
         DeliveryEstimate: {
             /** Format: date */
             from: string;
             /** Format: date */
             to: string;
+        };
+        DeliveryPage: {
+            items: components["schemas"]["Delivery"][];
+            /**
+             * Format: uuid
+             * @description Pass as `cursor` for the next (older) page; absent on the last page.
+             */
+            next_cursor?: string | null;
         };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
@@ -2192,6 +2439,15 @@ export interface components {
         };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
+        FunnelStep: {
+            /**
+             * Format: int64
+             * @description Consented sessions that reached the step.
+             */
+            sessions: number;
+            /** @description `sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`. */
+            step: string;
+        };
         /** @description EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19). */
         Gpsr: {
             eu_responsible_person?: components["schemas"]["GpsrParty"] | null;
@@ -2301,6 +2557,33 @@ export interface components {
             email: string;
             role: components["schemas"]["Role"];
         };
+        /** @description A job as the superadmin sees it (spec §13: dead-letter status visible in the admin). */
+        JobInfo: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            last_error?: string | null;
+            /** Format: int32 */
+            max_attempts: number;
+            payload: unknown;
+            queue: string;
+            /** Format: date-time */
+            run_at: string;
+            status: string;
+            /** Format: uuid */
+            tenant_id?: string | null;
+        };
+        JobPage: {
+            items: components["schemas"]["JobInfo"][];
+            /** Format: int64 */
+            next_cursor?: number | null;
+        };
         Legal: {
             privacy_url: string;
             terms_url: string;
@@ -2406,6 +2689,8 @@ export interface components {
         };
         Me: {
             email: string;
+            /** @description Platform superadmin (the job queue view, `/admin/v1/platform/*`). */
+            is_superadmin: boolean;
             /** @description Tenants the user can act in (send one as `X-Tenant-Id`). */
             memberships: components["schemas"]["Membership"][];
             user_id: string;
@@ -2529,6 +2814,12 @@ export interface components {
             market_ids?: string[];
             /** @example Česko – maloobchod */
             name: string;
+        };
+        NewSubscription: {
+            active?: boolean;
+            description?: string;
+            events: string[];
+            url: string;
         };
         NewUpload: {
             /**
@@ -2709,6 +3000,17 @@ export interface components {
             api_key: string;
             /** @description `library.js` of the widget (Packeta's, or the local mock). */
             script_url: string;
+        };
+        PageCounter: {
+            /** Format: date */
+            day: string;
+            /** Format: uuid */
+            market_id: string;
+            /** Format: int64 */
+            requests: number;
+            template: string;
+            /** Format: uuid */
+            tenant_id: string;
         };
         Pagination: {
             next?: string | null;
@@ -3104,6 +3406,11 @@ export interface components {
             personalization?: boolean | null;
             review_invites?: boolean | null;
         };
+        QueryCount: {
+            /** Format: int64 */
+            count: number;
+            query: string;
+        };
         Readiness: {
             checks: components["schemas"]["Checks"];
             /**
@@ -3249,6 +3556,32 @@ export interface components {
             /** @description Products in these categories or any of their subcategories. */
             category_ids?: string[];
             product_ids?: string[];
+        };
+        SalesTotals: {
+            /**
+             * Format: int64
+             * @description Average order value, minor units (0 without orders).
+             */
+            aov_minor: number;
+            currency: string;
+            /** Format: int64 */
+            orders: number;
+            /**
+             * Format: int64
+             * @description Sum of order totals (placed, not cancelled), minor units.
+             */
+            revenue_minor: number;
+        };
+        SearchCounter: {
+            /** Format: int64 */
+            count: number;
+            /** Format: date */
+            day: string;
+            locale: string;
+            /** @description Raw query text; minimized before storage like the zero-result log (A20). */
+            query: string;
+            /** Format: uuid */
+            tenant_id: string;
         };
         SearchHit: {
             brand?: string | null;
@@ -3452,6 +3785,36 @@ export interface components {
              */
             token: string;
         };
+        Subscription: {
+            active: boolean;
+            /** Format: date-time */
+            created_at: string;
+            description: string;
+            events: string[];
+            /** Format: uuid */
+            id: string;
+            /** @description The secret's last characters, to tell secrets apart. */
+            secret_hint: string;
+            /** Format: date-time */
+            updated_at: string;
+            url: string;
+        };
+        SubscriptionList: {
+            /** @description Event types a subscription can ask for. */
+            event_types: string[];
+            items: components["schemas"]["Subscription"][];
+        };
+        SubscriptionUpdate: {
+            active?: boolean | null;
+            description?: string | null;
+            events?: string[] | null;
+            url?: string | null;
+        };
+        /** @description Returned by create and rotate only: the signing secret is never shown again. */
+        SubscriptionWithSecret: {
+            secret: string;
+            subscription: components["schemas"]["Subscription"];
+        };
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
             products: components["schemas"]["SearchHit"][];
@@ -3516,6 +3879,21 @@ export interface components {
             vat_id?: string | null;
             vat_payer: boolean;
         };
+        TemplateRequests: {
+            /** Format: int64 */
+            requests: number;
+            template: string;
+        };
+        TopProduct: {
+            currency: string;
+            name: string;
+            /** Format: uuid */
+            product_id?: string | null;
+            /** Format: int64 */
+            revenue_minor: number;
+            /** Format: int64 */
+            units: number;
+        };
         Totals: {
             discount: components["schemas"]["MoneyView"];
             payment_fee: components["schemas"]["MoneyView"];
@@ -3531,6 +3909,22 @@ export interface components {
              * @description Share of consented page views that report Web Vitals (spec §9.6).
              */
             rum_sample_rate: number;
+        };
+        Traffic: {
+            by_template: components["schemas"]["TemplateRequests"][];
+            /** Format: int64 */
+            consented_page_views: number;
+            /** Format: int64 */
+            consented_sessions: number;
+            /**
+             * Format: double
+             * @description Consented sessions with a purchase / consented sessions; `None` without sessions.
+             */
+            conversion_rate?: number | null;
+            /** @description Labelled "consented sessions" (A20): visitors without consent are not in it. */
+            funnel: components["schemas"]["FunnelStep"][];
+            /** Format: int64 */
+            page_requests: number;
         };
         Trust: {
             delivery: string;
@@ -3662,6 +4056,15 @@ export interface components {
             rate: string;
             vat: components["schemas"]["MoneyView"];
         };
+        VitalP75: {
+            /** @description `LCP`, `INP` (ms) or `CLS` (unitless). */
+            metric: string;
+            /** Format: double */
+            p75: number;
+            /** Format: int64 */
+            samples: number;
+            template: string;
+        };
         WeightTier: {
             /** Format: int64 */
             price_minor: number;
@@ -3680,6 +4083,59 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    dashboard: {
+        parameters: {
+            query: {
+                /** @description First day (UTC, inclusive). */
+                from: string;
+                /** @description Last day (UTC, inclusive); at most 366 days after `from`. */
+                to: string;
+                /** @description Only this market; all markets when omitted. */
+                market_id?: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_assets: {
         parameters: {
             query?: {
@@ -4968,6 +5424,79 @@ export interface operations {
                 content?: never;
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    jobs: {
+        parameters: {
+            query?: {
+                /** @description `queued`, `running`, `done` or `dead` (default `dead`). */
+                status?: string;
+                /** @description Only this job kind (e.g. `media.process`). */
+                kind?: string;
+                /** @description `next_cursor` from the previous page. */
+                cursor?: number;
+                /** @description Page size, 1-200 (default 50). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobPage"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    requeue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Job id */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requeued */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6587,6 +7116,294 @@ export interface operations {
             };
         };
     };
+    list: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionList"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewSubscription"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionWithSecret"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deliveries: {
+        parameters: {
+            query?: {
+                /** @description Only this subscription's deliveries. */
+                subscription_id?: string;
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryPage"];
+                };
+            };
+        };
+    };
+    redeliver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Delivery"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subscription"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    rotate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionWithSecret"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     healthz: {
         parameters: {
             query?: never;
@@ -6603,6 +7420,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    counters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CounterBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountersRecorded"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -8029,6 +8885,12 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description Anonymous subject id from the consent cookie (32 hex characters). */
+                "X-Consent-Subject"?: string | null;
+                /** @description Checkout origin only: the signed-in customer's session. */
+                "X-Customer-Session"?: string | null;
+                /** @description The client's IP (stored as a salted hash with the record). */
+                "X-Client-Ip"?: string | null;
             };
             path?: never;
             cookie?: never;

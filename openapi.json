@@ -10,6 +10,100 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/analytics/dashboard": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Sales (from orders: placed, not cancelled), traffic (edge page counters without\nidentifiers; sessions, funnel and conversion over consented sessions only, A20), top\nproducts, top and zero-result searches, and Web Vitals p75 per template. Days are UTC.",
+        "operationId": "dashboard",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day (UTC, inclusive).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day (UTC, inclusive); at most 366 days after `from`.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "market_id",
+            "in": "query",
+            "description": "Only this market; all markets when omitted.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/assets": {
       "get": {
         "tags": [
@@ -2197,6 +2291,129 @@
             "description": "Deleted"
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/jobs": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Jobs of every tenant, newest first; dead ones by default.",
+        "operationId": "jobs",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`queued`, `running`, `done` or `dead` (default `dead`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Only this job kind (e.g. `media.process`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-200 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobPage"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/platform/jobs/{id}/requeue": {
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Puts a dead job back in the queue with fresh attempts (`409 not_dead` otherwise).",
+        "operationId": "requeue",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Job id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Requeued"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4801,6 +5018,467 @@
         ]
       }
     },
+    "/admin/v1/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "Subscriptions (never their secrets) and the event types on offer.",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionList"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "Creates a subscription. The signing secret is in this response only.",
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSubscription"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionWithSecret"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/webhooks/deliveries": {
+      "get": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "The delivery log, newest first.",
+        "operationId": "deliveries",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "subscription_id",
+            "in": "query",
+            "description": "Only this subscription's deliveries.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/webhooks/deliveries/{id}/redeliver": {
+      "post": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "Sends a finished (succeeded or dead) delivery again, with a new 24 h retry window.",
+        "operationId": "redeliver",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/webhooks/{id}": {
+      "delete": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "Deletes a subscription and its delivery log.",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "Changes the URL, event types, description or active flag.",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Subscription"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/webhooks/{id}/rotate-secret": {
+      "post": {
+        "tags": [
+          "webhooks-admin"
+        ],
+        "summary": "Replaces the signing secret (the old one stops working at once); the new secret is in\nthis response only.",
+        "operationId": "rotate",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionWithSecret"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -4820,6 +5498,59 @@
             }
           }
         }
+      }
+    },
+    "/internal/v1/analytics/counters": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Page request and search counters flushed by the edge (A20: no identifiers).",
+        "operationId": "counters",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CounterBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CountersRecorded"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "service_token": []
+          }
+        ]
       }
     },
     "/internal/v1/resolve": {
@@ -7632,7 +8363,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events\nand server counters (A20).",
+        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nAlways `202`, so the answer does not reveal the consent state.",
         "operationId": "events",
         "parameters": [
           {
@@ -7658,6 +8389,42 @@
             "name": "X-Locale",
             "in": "header",
             "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous subject id from the consent cookie (32 hex characters).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Checkout origin only: the signed-in customer's session.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-Ip",
+            "in": "header",
+            "description": "The client's IP (stored as a salted hash with the record).",
             "required": false,
             "schema": {
               "type": [
@@ -10424,6 +11191,42 @@
         },
         "additionalProperties": false
       },
+      "CounterBatch": {
+        "type": "object",
+        "description": "What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`).",
+        "properties": {
+          "counters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageCounter"
+            }
+          },
+          "searches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchCounter"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CountersRecorded": {
+        "type": "object",
+        "required": [
+          "counters",
+          "searches"
+        ],
+        "properties": {
+          "counters": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "searches": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
       "Coupon": {
         "type": "object",
         "required": [
@@ -10731,6 +11534,204 @@
           }
         }
       },
+      "DailySales": {
+        "type": "object",
+        "required": [
+          "date",
+          "currency",
+          "revenue_minor",
+          "orders"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "orders": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revenue_minor": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DailyTraffic": {
+        "type": "object",
+        "required": [
+          "date",
+          "page_requests",
+          "consented_sessions"
+        ],
+        "properties": {
+          "consented_sessions": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sessions of visitors who consented to analytics."
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "page_requests": {
+            "type": "integer",
+            "format": "int64",
+            "description": "All page requests counted by the edge (no consent needed, no identifiers)."
+          }
+        }
+      },
+      "Dashboard": {
+        "type": "object",
+        "required": [
+          "from",
+          "to",
+          "sales",
+          "daily_sales",
+          "daily_traffic",
+          "traffic",
+          "top_products",
+          "top_searches",
+          "zero_result_searches",
+          "web_vitals"
+        ],
+        "properties": {
+          "daily_sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailySales"
+            }
+          },
+          "daily_traffic": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyTraffic"
+            }
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "market_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "sales": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTotals"
+            }
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "top_products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TopProduct"
+            }
+          },
+          "top_searches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCount"
+            }
+          },
+          "traffic": {
+            "$ref": "#/components/schemas/Traffic"
+          },
+          "web_vitals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VitalP75"
+            }
+          },
+          "zero_result_searches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryCount"
+            }
+          }
+        }
+      },
+      "Delivery": {
+        "type": "object",
+        "required": [
+          "id",
+          "subscription_id",
+          "event_id",
+          "event_type",
+          "status",
+          "attempts",
+          "created_at",
+          "payload"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "event_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Outbox event id (the payload's `id` is `evt_<event_id>`)."
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "next_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "payload": {},
+          "response_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `retrying`, `succeeded` or `dead`."
+          },
+          "subscription_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "DeliveryEstimate": {
         "type": "object",
         "required": [
@@ -10745,6 +11746,28 @@
           "to": {
             "type": "string",
             "format": "date"
+          }
+        }
+      },
+      "DeliveryPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Delivery"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next (older) page; absent on the last page."
           }
         }
       },
@@ -10948,6 +11971,24 @@
           "delivered",
           "returned"
         ]
+      },
+      "FunnelStep": {
+        "type": "object",
+        "required": [
+          "step",
+          "sessions"
+        ],
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Consented sessions that reached the step."
+          },
+          "step": {
+            "type": "string",
+            "description": "`sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`."
+          }
+        }
       },
       "Gpsr": {
         "type": "object",
@@ -11324,6 +12365,94 @@
           }
         },
         "additionalProperties": false
+      },
+      "JobInfo": {
+        "type": "object",
+        "description": "A job as the superadmin sees it (spec §13: dead-letter status visible in the admin).",
+        "required": [
+          "id",
+          "queue",
+          "kind",
+          "payload",
+          "status",
+          "attempts",
+          "max_attempts",
+          "run_at",
+          "created_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payload": {},
+          "queue": {
+            "type": "string"
+          },
+          "run_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "JobPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobInfo"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
       },
       "Legal": {
         "type": "object",
@@ -11704,11 +12833,16 @@
         "required": [
           "user_id",
           "email",
-          "memberships"
+          "memberships",
+          "is_superadmin"
         ],
         "properties": {
           "email": {
             "type": "string"
+          },
+          "is_superadmin": {
+            "type": "boolean",
+            "description": "Platform superadmin (the job queue view, `/admin/v1/platform/*`)."
           },
           "memberships": {
             "type": "array",
@@ -12046,6 +13180,31 @@
           "name": {
             "type": "string",
             "example": "Česko – maloobchod"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewSubscription": {
+        "type": "object",
+        "required": [
+          "url",
+          "events"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -12634,6 +13793,38 @@
             "description": "`library.js` of the widget (Packeta's, or the local mock)."
           }
         }
+      },
+      "PageCounter": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "market_id",
+          "day",
+          "template",
+          "requests"
+        ],
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "template": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
       },
       "Pagination": {
         "type": "object",
@@ -13958,6 +15149,22 @@
         },
         "additionalProperties": false
       },
+      "QueryCount": {
+        "type": "object",
+        "required": [
+          "query",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "query": {
+            "type": "string"
+          }
+        }
+      },
       "Readiness": {
         "type": "object",
         "required": [
@@ -14380,6 +15587,66 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalesTotals": {
+        "type": "object",
+        "required": [
+          "currency",
+          "revenue_minor",
+          "orders",
+          "aov_minor"
+        ],
+        "properties": {
+          "aov_minor": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Average order value, minor units (0 without orders)."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "orders": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revenue_minor": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sum of order totals (placed, not cancelled), minor units."
+          }
+        }
+      },
+      "SearchCounter": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "day",
+          "locale",
+          "query",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string",
+            "description": "Raw query text; minimized before storage like the zero-result log (A20)."
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "additionalProperties": false
@@ -15027,6 +16294,123 @@
           }
         }
       },
+      "Subscription": {
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "events",
+          "description",
+          "active",
+          "secret_hint",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "secret_hint": {
+            "type": "string",
+            "description": "The secret's last characters, to tell secrets apart."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "SubscriptionList": {
+        "type": "object",
+        "required": [
+          "items",
+          "event_types"
+        ],
+        "properties": {
+          "event_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event types a subscription can ask for."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subscription"
+            }
+          }
+        }
+      },
+      "SubscriptionUpdate": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "events": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SubscriptionWithSecret": {
+        "type": "object",
+        "description": "Returned by create and rotate only: the signing secret is never shown again.",
+        "required": [
+          "subscription",
+          "secret"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "subscription": {
+            "$ref": "#/components/schemas/Subscription"
+          }
+        }
+      },
       "Suggestions": {
         "type": "object",
         "required": [
@@ -15191,6 +16575,54 @@
         },
         "additionalProperties": false
       },
+      "TemplateRequests": {
+        "type": "object",
+        "required": [
+          "template",
+          "requests"
+        ],
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      },
+      "TopProduct": {
+        "type": "object",
+        "required": [
+          "name",
+          "currency",
+          "units",
+          "revenue_minor"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "revenue_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "units": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Totals": {
         "type": "object",
         "required": [
@@ -15239,6 +16671,51 @@
             "type": "number",
             "format": "double",
             "description": "Share of consented page views that report Web Vitals (spec §9.6)."
+          }
+        }
+      },
+      "Traffic": {
+        "type": "object",
+        "required": [
+          "page_requests",
+          "consented_sessions",
+          "consented_page_views",
+          "funnel",
+          "by_template"
+        ],
+        "properties": {
+          "by_template": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TemplateRequests"
+            }
+          },
+          "consented_page_views": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "consented_sessions": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversion_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Consented sessions with a purchase / consented sessions; `None` without sessions."
+          },
+          "funnel": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunnelStep"
+            },
+            "description": "Labelled \"consented sessions\" (A20): visitors without consent are not in it."
+          },
+          "page_requests": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15628,6 +17105,32 @@
           }
         }
       },
+      "VitalP75": {
+        "type": "object",
+        "required": [
+          "template",
+          "metric",
+          "p75",
+          "samples"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "description": "`LCP`, `INP` (ms) or `CLS` (unitless)."
+          },
+          "p75": {
+            "type": "number",
+            "format": "double"
+          },
+          "samples": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "template": {
+            "type": "string"
+          }
+        }
+      },
       "WeightTier": {
         "type": "object",
         "required": [
@@ -15705,6 +17208,18 @@
     {
       "name": "checkout",
       "description": "Admin API: shipping and payment methods, orders"
+    },
+    {
+      "name": "analytics",
+      "description": "Admin API: the analytics dashboard"
+    },
+    {
+      "name": "webhooks-admin",
+      "description": "Admin API: outbound webhook subscriptions and deliveries"
+    },
+    {
+      "name": "platform",
+      "description": "Admin API for platform superadmins: the job queue"
     },
     {
       "name": "webhooks",
