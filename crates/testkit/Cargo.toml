@@ -9,6 +9,8 @@ publish.workspace = true
 [dependencies]
 object_store.workspace = true
 platform.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

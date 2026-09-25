@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/src/schema.d.ts", "!openapi.json"]
+    "includes": ["**", "!**/src/schema.d.ts", "!openapi.json", "!.sqlx"]
   },
   "formatter": {
     "indentStyle": "space",

@@ -21,6 +21,8 @@ RUN cargo chef cook --release --locked --recipe-path recipe.json
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 COPY migrations migrations
+COPY .sqlx .sqlx
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --locked --bin api --bin worker
 
 # Distroless: glibc + CA certs, no shell or package manager, runs as uid 65532.

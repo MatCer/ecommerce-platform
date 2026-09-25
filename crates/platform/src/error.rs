@@ -18,6 +18,18 @@ pub enum Error {
     MethodNotAllowed,
     #[error("request body too large")]
     PayloadTooLarge,
+    /// Malformed request outside the body (headers, query). `code` is stable snake_case.
+    #[error("{detail}")]
+    BadRequest { code: &'static str, detail: String },
+    /// Missing or invalid credentials (`invalid_token`, `reauth_required`, ...).
+    #[error("unauthorized: {code}")]
+    Unauthorized { code: &'static str },
+    /// Authenticated but not allowed (`not_a_member`, `insufficient_role`, ...).
+    #[error("forbidden: {code}")]
+    Forbidden { code: &'static str },
+    /// State conflict (`idempotency_conflict`, `already_exists`, ...).
+    #[error("{detail}")]
+    Conflict { code: &'static str, detail: String },
     /// Input failed validation. `code` is a stable snake_case identifier.
     #[error("{detail}")]
     Validation { code: &'static str, detail: String },
@@ -37,6 +49,10 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::BadRequest { .. } => StatusCode::BAD_REQUEST,
+            Self::Unauthorized { .. } => StatusCode::UNAUTHORIZED,
+            Self::Forbidden { .. } => StatusCode::FORBIDDEN,
+            Self::Conflict { .. } => StatusCode::CONFLICT,
             Self::Validation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Database(_) | Self::Storage(_) | Self::Internal(_) => {
@@ -50,7 +66,11 @@ impl Error {
             Self::NotFound => "not_found",
             Self::MethodNotAllowed => "method_not_allowed",
             Self::PayloadTooLarge => "payload_too_large",
-            Self::Validation { code, .. } => code,
+            Self::BadRequest { code, .. }
+            | Self::Unauthorized { code }
+            | Self::Forbidden { code }
+            | Self::Conflict { code, .. }
+            | Self::Validation { code, .. } => code,
             Self::Unavailable(_) => "service_unavailable",
             Self::Database(_) | Self::Storage(_) | Self::Internal(_) => "internal_error",
         }
@@ -59,8 +79,14 @@ impl Error {
     /// Detail safe to show to clients. Server-side failures expose nothing.
     fn public_detail(&self) -> Option<String> {
         match self {
-            Self::NotFound | Self::MethodNotAllowed | Self::PayloadTooLarge => None,
-            Self::Validation { detail, .. } => Some(detail.clone()),
+            Self::NotFound
+            | Self::MethodNotAllowed
+            | Self::PayloadTooLarge
+            | Self::Unauthorized { .. }
+            | Self::Forbidden { .. } => None,
+            Self::BadRequest { detail, .. }
+            | Self::Conflict { detail, .. }
+            | Self::Validation { detail, .. } => Some(detail.clone()),
             Self::Unavailable(_) | Self::Database(_) | Self::Storage(_) | Self::Internal(_) => None,
         }
     }
@@ -110,7 +136,13 @@ impl IntoResponse for Error {
         if status.is_server_error() {
             tracing::error!(error = %self, code = self.code(), "request failed");
         }
-        Problem::new(status, self.code(), self.public_detail()).into_response()
+        let mut res = Problem::new(status, self.code(), self.public_detail()).into_response();
+        if status == StatusCode::UNAUTHORIZED {
+            // RFC 6750 §3: name the expected scheme.
+            res.headers_mut()
+                .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+        }
+        res
     }
 }
 
@@ -153,6 +185,21 @@ mod tests {
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(body["code"], "invalid_slug");
         assert_eq!(body["detail"], "slug must be lowercase");
+    }
+
+    #[tokio::test]
+    async fn unauthorized_names_bearer_scheme() {
+        let (status, _, body) = render(Error::Unauthorized {
+            code: "reauth_required",
+        })
+        .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["code"], "reauth_required");
+        let res = Error::Unauthorized {
+            code: "invalid_token",
+        }
+        .into_response();
+        assert_eq!(res.headers()[header::WWW_AUTHENTICATE], "Bearer");
     }
 
     #[tokio::test]

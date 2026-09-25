@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT request_hash, status, response FROM idempotency_keys\n             WHERE tenant_id = $1 AND operation = $2 AND key = $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "idempotency_keys",
+            "name": "request_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "idempotency_keys",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "response",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "idempotency_keys",
+            "name": "response"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "a4185348638103f1e925aadb2b355ff24a40d4128ca5483e73b2a6bfd9de938d"
+}

@@ -1,0 +1,4 @@
+[env]
+# sqlx::query! macros check SQL against the committed .sqlx/ data, so builds need no database.
+# `make sqlx-prepare` refreshes it after SQL changes (needs a migrated database).
+SQLX_OFFLINE = "true"

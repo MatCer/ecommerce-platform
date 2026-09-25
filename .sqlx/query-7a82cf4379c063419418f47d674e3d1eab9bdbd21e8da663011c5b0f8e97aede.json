@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.tenant_id, d.market_id, t.slug\n         FROM platform.domains d JOIN platform.tenants t ON t.id = d.tenant_id\n         WHERE d.hostname = $1 AND d.verified_at IS NOT NULL AND t.status = 'active'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tenant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "platform.domains",
+            "name": "tenant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "platform.domains",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.tenants",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7a82cf4379c063419418f47d674e3d1eab9bdbd21e8da663011c5b0f8e97aede"
+}

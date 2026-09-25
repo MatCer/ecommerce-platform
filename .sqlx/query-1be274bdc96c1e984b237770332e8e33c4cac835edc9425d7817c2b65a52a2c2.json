@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE platform.domains SET is_primary = false WHERE market_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1be274bdc96c1e984b237770332e8e33c4cac835edc9425d7817c2b65a52a2c2"
+}

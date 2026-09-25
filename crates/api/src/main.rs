@@ -1,24 +1,57 @@
+use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{Context, anyhow, bail};
-use platform::config::{ApiConfig, AppEnv, DbConfig, MeiliConfig, S3Config};
+use anyhow::{Context, anyhow};
+use axum::http::HeaderValue;
+use clap::{Parser, Subcommand};
+use platform::config::{
+    ApiConfig, AppEnv, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig, StaffAuthConfig,
+};
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
 
-const USAGE: &str = "usage: api [serve | openapi | migrate | healthcheck]";
+#[derive(Parser)]
+#[command(
+    name = "api",
+    about = "Commerce platform API server and operator commands"
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Serve HTTP (default).
+    Serve,
+    /// Print the OpenAPI document (used by `make openapi`).
+    Openapi,
+    /// Apply migrations; run with the owner role's DATABASE_URL.
+    Migrate,
+    /// Container health probe.
+    Healthcheck,
+    /// Superadmin operations.
+    #[command(subcommand)]
+    Admin(api::cli::AdminCommand),
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    match std::env::args().nth(1).as_deref() {
-        None | Some("serve") => serve().await,
-        // Prints the OpenAPI document to stdout; used by `make openapi`. No logging here.
-        Some("openapi") => {
+    match Cli::parse().command.unwrap_or(Command::Serve) {
+        Command::Serve => serve().await,
+        // No logging here: stdout is the document.
+        Command::Openapi => {
             println!("{}", api::openapi().to_pretty_json()?);
             Ok(())
         }
-        Some("migrate") => migrate().await,
-        Some("healthcheck") => healthcheck().await,
-        Some(other) => bail!("unknown command {other:?}\n{USAGE}"),
+        Command::Migrate => migrate().await,
+        Command::Healthcheck => healthcheck().await,
+        Command::Admin(cmd) => {
+            let db = platform::db::pool(&DbConfig::from_env()?)?;
+            let result = api::cli::run(&db, cmd).await;
+            db.close().await;
+            result
+        }
     }
 }
 
@@ -29,14 +62,21 @@ fn init_tracing() -> anyhow::Result<()> {
 async fn serve() -> anyhow::Result<()> {
     init_tracing()?;
     let cfg = ApiConfig::from_env()?;
+    let auth = StaffAuthConfig::from_env()?;
     let db = platform::db::pool(&DbConfig::from_env()?)?;
+    let http = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()?;
     let state = api::AppState {
         db: db.clone(),
-        http: reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()?,
+        http: http.clone(),
         meili_url: MeiliConfig::from_env()?.url,
         storage: Storage::s3(&S3Config::from_env()?)?,
+        staff_auth: Arc::new(api::auth::StaffAuth::new(http, auth.jwks_url, &auth.issuer)),
+        internal_token: api::auth::ServiceToken::new(
+            &ServiceTokenConfig::from_env()?.internal_api_token,
+        ),
+        admin_origin: HeaderValue::from_str(&auth.admin_origin).context("ADMIN_ORIGIN")?,
     };
     let app = api::app(state, cfg.env == AppEnv::Dev);
 

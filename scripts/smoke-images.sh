@@ -21,6 +21,8 @@ dead_deps=(
   -e S3_ENDPOINT=http://127.0.0.1:1
   -e S3_ACCESS_KEY_ID=smoke -e S3_SECRET_ACCESS_KEY=smoke
   -e S3_BUCKET_PUBLIC=public -e S3_BUCKET_PRIVATE=private
+  -e AUTH_JWKS_URL=http://127.0.0.1:1/jwks -e ADMIN_ORIGIN=http://admin.localhost:8080
+  -e INTERNAL_API_TOKEN=smoke-internal-api-token-0123456789abcdef
 )
 
 docker run -d --name "$api" -p 127.0.0.1::8000 "${dead_deps[@]}" "$rust_image" /usr/local/bin/api >/dev/null

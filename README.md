@@ -11,12 +11,13 @@ Design: [`docs/superpowers/specs/2026-09-24-platform-design.md`](docs/superpower
 ```text
 crates/commerce   business modules (no HTTP, no framework types)
 crates/platform   config, problem+json errors, tracing, db pool, S3 storage, health checks
-crates/api        axum binary: /healthz, /readyz, /openapi.json, /docs (dev)
-crates/worker     background worker binary
+crates/api        axum binary: health, OpenAPI, Admin API (/admin/v1), Internal API, superadmin CLI
+crates/worker     job runner, outbox dispatcher, cron leader
 crates/testkit    shared test helpers
 migrations/       sqlx migrations (run as app_owner)
 packages/         shared TS config, generated API clients, storefront SDK, theme-kit (artifacts + gates)
-apps/mocks        Hono service standing in for third-party APIs + the stub Storefront API (until WP6)
+apps/auth         Better Auth (Hono): staff sign-in, magic links, TOTP, EdDSA JWTs + JWKS
+apps/mocks        third-party API stand-ins (incl. a DNS TXT stub) + the stub Storefront API (until WP6)
 apps/edge         storefront edge: Node + Miniflare gateway (tenancy, cache, headers, checkout handoff)
 apps/checkout     platform checkout app (Astro + Solid) served on checkout.<shop>
 themes/default    default Astro + Solid theme (the template merchants fork)
@@ -46,7 +47,8 @@ make down
 
 | URL | What |
 |---|---|
-| http://api.localhost:8080 | Rust API (`/healthz`, `/readyz`, `/openapi.json`, `/docs` Swagger UI) |
+| http://api.localhost:8080 | Rust API (`/healthz`, `/readyz`, `/openapi.json`, `/docs` Swagger UI, `/admin/v1`) |
+| http://auth.localhost:8080 | Better Auth (`/api/auth/*`, JWKS at `/api/auth/jwks`) |
 | http://mail.localhost:8080 | Mailpit UI (also http://localhost:58025) |
 | http://s3.localhost:8080 | MinIO S3 API (`public` bucket is anonymously readable) |
 | http://localhost:59001 | MinIO console (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`) |
@@ -57,8 +59,9 @@ make down
 | http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "Pokračovat k pokladně") |
 | https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
-`admin.localhost` and `auth.localhost` answer 502 until their work packages land. The storefront
-runtime contract (artifacts, bindings, cache policy, handoff, budget numbers) is documented in
+`admin.localhost` answers 502 until its work package lands. `/internal/*` on `api` and `auth` is
+never proxied by Caddy; it is for services on the compose network only. The storefront runtime
+contract (artifacts, bindings, cache policy, handoff, budget numbers) is documented in
 [`docs/decisions/runtime-contract.md`](docs/decisions/runtime-contract.md). Every host port is configurable in `.env`
 (see `.env.example`).
 
@@ -79,6 +82,8 @@ trusted network.
 | `make fmt` | Format Rust and TS |
 | `make openapi` | Regenerate `openapi.json` and the TS clients; commit the result |
 | `make openapi-check` | Fail if the generated clients are stale (runs in CI) |
+| `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
+| `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
 | `make theme-build` | Build + pack the theme and checkout artifacts into `.artifacts` |
 | `make perf` | Lab budget gate (Lighthouse mobile, A26 JS, axe) over HTTPS/h2 |
@@ -92,13 +97,39 @@ DATABASE_URL=postgres://app_runtime:app-runtime-local@localhost:55432/app \
 MEILI_URL=http://localhost:57700 S3_ENDPOINT=http://localhost:59000 \
 S3_ACCESS_KEY_ID=app-local S3_SECRET_ACCESS_KEY=app-local-secret-key \
 S3_BUCKET_PUBLIC=public S3_BUCKET_PRIVATE=private \
+AUTH_JWKS_URL=http://auth.localhost:8080/api/auth/jwks ADMIN_ORIGIN=http://admin.localhost:8080 \
+INTERNAL_API_TOKEN=local-internal-api-token-0123456789abcdef \
 cargo run -p api
 ```
 
-## Database roles
+## Tenants and staff sign-in
 
-`app_owner` owns the databases and runs migrations. `app_runtime` is what the API and worker
-connect as: not an owner and without `BYPASSRLS`, so row-level security applies to it.
+Staff accounts are invite-only (no public sign-up). A superadmin creates a tenant with its
+default CZ market, the `<slug>.localhost` domain and an owner, who gets a magic link by email:
+
+```bash
+make admin args="create-tenant --slug demo --name 'Demo shop' --owner-email owner@example.com"
+# open the link from http://mail.localhost:8080; it signs in and verifies the address
+make admin args="add-domain --tenant demo --host shop.example.cz"      # prints the TXT record
+make admin args="verify-domain --host shop.example.cz"                 # checks it (DNS stub)
+```
+
+The admin SPA (and anything else) then gets a 5-minute JWT from
+`GET http://auth.localhost:8080/api/auth/token` (session cookie) and calls the Admin API with
+`Authorization: Bearer <jwt>` and `X-Tenant-Id: <tenant uuid>`. Mutations accept an
+`Idempotency-Key` header. `scripts/smoke-staff-flow.sh` runs the whole flow against the stack,
+including the cross-tenant 403.
+
+## Database roles and tenancy
+
+`app_owner` owns the databases, every table and function, and runs migrations. `app_runtime` is
+what the API, worker and CLI connect as: it owns nothing and has no `BYPASSRLS`. `auth_service`
+(Better Auth) owns only the `auth` schema.
+
+Tenant tables live in `public` with `tenant_id`, a `tenant_isolation` policy and forced RLS (a
+test enforces this for every table). Code reaches them only through `platform::db::tenant_tx`,
+which sets the transaction-local `app.tenant_id`; without it, queries fail. The `queue` schema
+(outbox, jobs) is reachable only through `SECURITY DEFINER` functions.
 
 ## Conventions
 

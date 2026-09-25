@@ -29,6 +29,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
       APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:-app-owner-local}
       APP_RUNTIME_PASSWORD: ${APP_RUNTIME_PASSWORD:-app-runtime-local}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth-service-local}
     ports: ["${HOST_BIND:-127.0.0.1}:${PG_PORT:-55432}:5432"]
     volumes:
       - pg-data:/var/lib/postgresql/data
@@ -142,6 +143,30 @@ services:
       timeout: 3s
       retries: 30
 
+  # Staff identity (Better Auth, spec D11/A9). Its own DB role and `auth` schema.
+  auth:
+    <<: *infra
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-ecommerce}-auth:local
+    environment:
+      DATABASE_URL: postgres://auth_service:${AUTH_DB_PASSWORD:-auth-service-local}@postgres:5432/app
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-better-auth-secret-0123456789abcdef}
+      BETTER_AUTH_URL: http://auth.localhost:${HTTP_PORT:-8080}
+      AUTH_ISSUER: http://auth.localhost
+      ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
+      SMTP_URL: smtp://mailpit:1025
+      AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
+    depends_on:
+      postgres: { condition: service_healthy }
+      mailpit: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   caddy:
     <<: *infra
     image: caddy:2.11.4-alpine
@@ -177,10 +202,19 @@ services:
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
       S3_BUCKET_PUBLIC: public
       S3_BUCKET_PRIVATE: private
+      AUTH_JWKS_URL: http://auth:3000/api/auth/jwks
+      AUTH_ISSUER: http://auth.localhost
+      ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-api-token-0123456789abcdef}
+      # Superadmin CLI (`make admin args=...`) only.
+      AUTH_INTERNAL_URL: http://auth:3000/
+      AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
+      DNS_TXT_URL: http://mocks:4010/dns/txt
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
       meilisearch: { condition: service_started }
+      auth: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "/usr/local/bin/api", "healthcheck"]
       interval: 5s
@@ -192,6 +226,7 @@ services:
     command: ["/usr/local/bin/worker"]
     environment:
       <<: *runtime-db
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
     depends_on:
       migrate: { condition: service_completed_successfully }
 

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT queue.mark_dispatched($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mark_dispatched",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "14548d9efe49a20baf64366447b8ab731a96cbe976ec74d8fb6b80b4b51eec10"
+}
