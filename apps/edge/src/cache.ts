@@ -11,7 +11,7 @@ const CACHEABLE_PATH =
   /^(\/[a-z]{2})?(\/|\/c\/.+|\/p\/[^/]+|\/pages\/[^/]+|\/blog(\/[^/]+)?|\/search)$/;
 
 /** Query parameters carrying capabilities (A2): never cache such URLs. */
-const CAPABILITY_PARAMS = ["token", "h", "sig"];
+const CAPABILITY_PARAMS = ["token", "h", "sig", "t"];
 
 /** Tracking parameters dropped from the cache key and from the URL the theme sees. */
 const TRACKING_PARAM = /^(utm_[a-z]+|gclid|gbraid|wbraid|fbclid|msclkid|sklik_[a-z]+|_gl)$/;

@@ -1523,6 +1523,11 @@ export interface components {
         OrderLineView: {
             /** @description This line's share of the coupon (A15). */
             discount: components["schemas"]["MoneyView"];
+            /**
+             * Format: uuid
+             * @description The order line (refunds and withdrawals name lines by it).
+             */
+            id: string;
             name: string;
             options_label: string;
             /** Format: int32 */

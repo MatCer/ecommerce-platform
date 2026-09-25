@@ -16,7 +16,7 @@ let resolver: StaticResolver;
 let api: ReturnType<typeof fakeApi>;
 let gw: Gateway;
 
-const newGateway = () =>
+const newGateway = (upstream = api.fn, log: (entry: unknown) => void = () => {}) =>
   createGateway({
     artifactRoot: root,
     resolver,
@@ -25,9 +25,9 @@ const newGateway = () =>
     mediaOrigin: "http://media.test",
     scheme: "http",
     purgeToken: PURGE_TOKEN,
-    upstream: api.fn,
+    upstream,
     renderTimeoutMs: 1500,
-    log: () => {},
+    log,
   });
 
 const get = (url: string, headers: Record<string, string> = {}, init: RequestInit = {}) => {
@@ -69,6 +69,147 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await gw?.dispose();
+});
+
+describe("WP12 withdrawal routes", () => {
+  const checkout = "http://checkout.demo.localhost:8280";
+  const token = "a".repeat(64);
+  const id = "12345678-1234-1234-1234-123456789abc";
+  const json = { origin: checkout, "content-type": "application/json" };
+  const post = (route: string, headers: Record<string, string> = json, body = "{}") =>
+    get(`${checkout}${route}`, headers, { method: "POST", body });
+
+  test("upstream failures retain capability protections and redact the logged path", async () => {
+    const entries: unknown[] = [];
+    const proxy = newGateway(
+      async () => {
+        throw new Error("upstream offline");
+      },
+      (entry) => entries.push(entry),
+    );
+    try {
+      const response = await proxy.fetch(
+        new Request(`${checkout}/_p/withdraw/${token}`, {
+          method: "POST",
+          headers: json,
+          body: "{}",
+        }),
+      );
+      expect(response.status).toBe(502);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(entries).toHaveLength(1);
+      expect(JSON.stringify(entries)).toContain("/_p/withdraw/[redacted]");
+      expect(JSON.stringify(entries)).not.toContain(token);
+    } finally {
+      await proxy.dispose();
+    }
+  });
+
+  test.each([202, 201, 404, 409, 422, 429])(
+    "preserves upstream status %s and JSON without cookies",
+    async (status) => {
+      const body = status < 400 ? { id: "receipt" } : { code: "invalid_withdrawal" };
+      const proxy = newGateway(async () =>
+        Response.json(body, {
+          status,
+          headers: { "set-cookie": "unexpected=1", "retry-after": "60" },
+        }),
+      );
+      try {
+        const response = await proxy.fetch(
+          new Request(`${checkout}/_p/withdraw/${token}`, {
+            method: "POST",
+            headers: json,
+            body: JSON.stringify({ confirm: true }),
+          }),
+        );
+        expect(response.status).toBe(status);
+        expect(await response.json()).toEqual(body);
+        expect(response.headers.get("set-cookie")).toBeNull();
+        expect(response.headers.get("cache-control")).toBe("no-store");
+        expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+        if (status === 429) expect(response.headers.get("retry-after")).toBe("60");
+      } finally {
+        await proxy.dispose();
+      }
+    },
+  );
+
+  test.each([
+    ["/_p/withdraw", "/withdrawals", { order_number: "100001", email: "buyer@example.test" }],
+    [
+      `/_p/withdraw/${token}`,
+      `/withdrawals/${token}`,
+      { lines: [{ order_line_id: id, quantity: 1 }], confirm: true },
+    ],
+    [
+      `/_p/account/orders/${id}/withdrawal`,
+      `/customer/orders/${id}/withdrawal`,
+      { lines: [{ order_line_id: id, quantity: 1 }], confirm: true },
+    ],
+  ])("forwards %s with tenant, session and rate-limit IP", async (route, upstreamPath, body) => {
+    const response = await post(
+      route,
+      {
+        ...json,
+        cookie: "__Host-sid=sessiontoken_000000000001",
+        "x-forwarded-for": "198.51.100.1, 203.0.113.9",
+        "x-client-ip": "forged",
+      },
+      JSON.stringify(body),
+    );
+    expect(api.calls.at(-1)).toMatchObject({
+      url: `http://api.test/storefront/v1${upstreamPath}`,
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: {
+        "x-tenant": "t-demo",
+        "x-customer-session": "sessiontoken_000000000001",
+        "x-client-ip": "203.0.113.9",
+      },
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    if (route.startsWith("/_p/withdraw"))
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+  });
+
+  test.each(["/_p/withdraw", `/_p/withdraw/${token}`, `/_p/account/orders/${id}/withdrawal`])(
+    "protects %s from CSRF and shop-origin calls",
+    async (route) => {
+      const count = api.calls.length;
+      expect((await post(route, { ...json, origin: "https://evil.example" })).status).toBe(403);
+      expect((await post(route, { "content-type": "application/json" })).status).toBe(403);
+      expect((await post(route, { ...json, "content-type": "text/plain" })).status).toBe(415);
+      expect((await get(`${checkout}${route}`)).status).toBe(404);
+      expect(
+        (await get(`http://demo.localhost:8280${route}`, json, { method: "POST", body: "{}" }))
+          .status,
+      ).toBe(404);
+      expect(api.calls.length).toBe(count);
+    },
+  );
+
+  test.each([
+    "/_p/withdraw/short",
+    `/_p/withdraw/${token}/extra`,
+    `/_p/withdraw/${"A".repeat(64)}`,
+    "/_p/account/orders/short/withdrawal",
+  ])("rejects invalid route %s", async (route) => {
+    const count = api.calls.length;
+    expect((await post(route)).status).toBe(404);
+    expect(api.calls.length).toBe(count);
+  });
+
+  test.each(["/withdraw", `/withdraw?t=${token}`])(
+    "never caches or leaks a referrer from %s",
+    async (route) => {
+      const response = await get(`${checkout}${route}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    },
+  );
 });
 
 describe("restricted theme binding (A7)", () => {
