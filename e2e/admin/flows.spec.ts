@@ -11,11 +11,22 @@ test.describe.configure({ mode: "serial" });
 
 let page: Page;
 
+/** The defaults the parallel cart and review suites rely on. */
+function resetDefaults(): void {
+  sql(`UPDATE flow_definitions d SET enabled=true, config=CASE d.kind
+      WHEN 'abandoned_cart' THEN '{"delays_hours":[1,24,72],"coupon_percent":null}'::jsonb
+      ELSE '{"delays_hours":[168],"coupon_percent":null}'::jsonb END
+    FROM platform.tenants t WHERE t.id=d.tenant_id AND t.slug='demo'
+      AND d.kind IN ('abandoned_cart','review_invite')`);
+}
+
 test.beforeAll(async ({ browser }) => {
+  resetDefaults();
   page = await signInOwner(browser);
 });
 
 test.afterAll(async () => {
+  resetDefaults();
   await page.context().close();
 });
 
@@ -40,7 +51,9 @@ test("flow settings validate, save and persist", async () => {
   await expect(cart.getByRole("alert")).toContainText("increasing hours");
   await cart.getByLabel("Email 2 after (hours)").fill("24");
   // The coupon only touches the last reminder; the first stays at 1 h for the checkout suite.
-  await cart.getByRole("checkbox", { name: /one-use discount/ }).check();
+  // Kobalte checkboxes: the visually hidden input is toggled through its label.
+  await cart.locator("label").filter({ hasText: "one-use discount" }).click();
+  await expect(cart.getByRole("checkbox", { name: /one-use discount/ })).toBeChecked();
   await cart.getByLabel("Discount (%)").fill("15");
   await cart.getByRole("button", { name: /^Save/ }).click();
   await expect(page.getByText("Abandoned cart: settings saved")).toBeVisible();
@@ -57,9 +70,8 @@ test("flow settings validate, save and persist", async () => {
   );
 
   // Restore the defaults the other suites rely on.
-  await card("Abandoned cart")
-    .getByRole("checkbox", { name: /one-use discount/ })
-    .uncheck();
+  await card("Abandoned cart").locator("label").filter({ hasText: "one-use discount" }).click();
+  await expect(card("Abandoned cart").getByLabel("Discount (%)")).toBeHidden();
   await card("Abandoned cart").getByRole("button", { name: /^Save/ }).click();
   await expect(page.getByText("Abandoned cart: settings saved")).toBeVisible();
   await card("Review invitation").getByLabel("Send after delivery (hours)").fill("168");

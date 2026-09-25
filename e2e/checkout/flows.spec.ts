@@ -118,7 +118,6 @@ test("price-drop watch form works without JavaScript and asks for confirmation",
   const watch = shopper.locator("#watch");
   await watch.getByText("Hlídat produkt").click();
   await expect(watch.getByText(/Nejdřív vám pošleme e-mail s potvrzovacím odkazem/)).toBeVisible();
-  await expectAccessible(shopper, "product watch form");
 
   // A malformed price comes back as an error on the same page.
   await watch.getByLabel("klesne cena").check();
@@ -129,6 +128,9 @@ test("price-drop watch form works without JavaScript and asks for confirmation",
   await expect(shopper.getByRole("alert")).toContainText("Zkontrolujte e-mail a cenu");
 
   const email = `watch-form-${run}@example.test`;
+  // Headless Chromium without JS keeps a stale hit-test map after the hash jump; a reload of the
+  // same GET (what a shopper's scroll would do) settles it.
+  await shopper.reload();
   await watch.getByLabel("klesne cena").check();
   await watch.getByLabel(/Cena klesne na/).fill("1,50");
   await watch.getByLabel("E-mail").fill(email);
@@ -147,9 +149,17 @@ test("price-drop watch form works without JavaScript and asks for confirmation",
   if (!link) throw new Error("watch confirmation link missing");
   await shopper.goto(link);
   await expect(shopper.getByRole("heading", { name: "Potvrďte hlídání" })).toBeVisible();
-  await expectAccessible(shopper, "watch confirmation");
   await shopper.getByRole("button", { name: "Potvrdit hlídání" }).click();
   await expect(shopper.getByRole("status")).toContainText("Hlídání je potvrzené");
   expect(sql(`SELECT status FROM flow_watches WHERE email='${email}'`)).toBe("confirmed");
   await context.close();
+
+  // axe needs JavaScript: check the open form and an outcome message in a normal browser.
+  const scripted = await newPage(browser);
+  await scripted.goto(`${CZ}/p/tricko-henley?watch=invalid#watch`);
+  await expect(scripted.locator("#watch").getByRole("alert")).toBeVisible();
+  await expectAccessible(scripted, "product watch form");
+  await scripted.goto(link);
+  await expectAccessible(scripted, "watch confirmation");
+  await scripted.context().close();
 });

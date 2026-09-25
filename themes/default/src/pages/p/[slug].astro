@@ -54,7 +54,8 @@ const BUY_KEYS = [
     <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
     <div class="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10 lg:gap-14">
       <Gallery client:idle images={p.images} labels={pick(["product.gallery", "product.image", "product.prev_image", "product.next_image"])} />
-      <div class="flex flex-col gap-6 md:sticky md:top-36 md:self-start">
+      <!-- Not sticky while the watch form is open: the column would outgrow the viewport. -->
+      <div class="flex flex-col gap-6 md:sticky md:top-36 md:self-start md:has-[#watch[open]]:static">
         <div>
           {p.brand && <p class="eyebrow mb-2 text-identity-ink">{p.brand}</p>}
           <h1 class="text-3xl leading-tight font-extrabold md:text-4xl">{p.name}</h1>
