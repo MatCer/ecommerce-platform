@@ -223,6 +223,12 @@ fn internal(e: impl std::fmt::Display) -> Error {
     Error::Internal(e.to_string())
 }
 
+/// Where the merchant uploads (presigned PUT). The analysis copies it to [`object_key`], a key
+/// only the server writes, so what gets applied is exactly what was analyzed.
+fn upload_key(tenant_id: Uuid, id: Uuid) -> Path {
+    Path::from(format!("import-uploads/{tenant_id}/{id}.xml"))
+}
+
 fn object_key(tenant_id: Uuid, id: Uuid) -> Path {
     Path::from(format!("imports/{tenant_id}/{id}.xml"))
 }
@@ -396,7 +402,12 @@ pub async fn create(
         );
         let url = storage
             .private_signer
-            .signed_url_opts(Method::PUT, &key, media::UPLOAD_URL_TTL, &options)
+            .signed_url_opts(
+                Method::PUT,
+                &upload_key(tenant_id, id),
+                media::UPLOAD_URL_TTL,
+                &options,
+            )
             .await?;
         Some(UploadTarget {
             method: "PUT".into(),
@@ -569,16 +580,38 @@ pub async fn run_step(
     let source = Source::parse(&r.source);
     let key = Path::from(r.object_key.clone());
 
-    // URL runs download once; the stored copy is what gets applied.
-    if let Some(url) = &r.url
-        && step == "analyze"
-    {
-        match fetch.get(url, FEED_LIMITS).await {
-            Ok(f) => {
-                storage.private.put(&key, PutPayload::from(f.bytes)).await?;
+    // The analysis snapshots the feed (download, or the uploaded file) to the server-only key;
+    // apply reads that snapshot, so a later upload cannot change what gets applied.
+    if step == "analyze" {
+        let snapshot = match &r.url {
+            Some(url) => match fetch.get(url, FEED_LIMITS).await {
+                Ok(f) => f.bytes,
+                Err(e) => {
+                    return fail(db, tenant_id, id, &format!("download failed: {e}")).await;
+                }
+            },
+            None => {
+                let upload = upload_key(tenant_id, id);
+                match storage.private.head(&upload).await {
+                    Ok(meta) if meta.size > MAX_FEED_BYTES => {
+                        return fail(db, tenant_id, id, "the feed is larger than 100 MB").await;
+                    }
+                    Ok(meta) => storage
+                        .private
+                        .get_range(&upload, 0..meta.size)
+                        .await?
+                        .to_vec(),
+                    Err(object_store::Error::NotFound { .. }) => {
+                        return fail(db, tenant_id, id, "no feed file was uploaded").await;
+                    }
+                    Err(e) => return Err(e.into()),
+                }
             }
-            Err(e) => return fail(db, tenant_id, id, &format!("download failed: {e}")).await,
-        }
+        };
+        storage
+            .private
+            .put(&key, PutPayload::from(snapshot))
+            .await?;
     }
     let bytes = match storage.private.head(&key).await {
         Ok(meta) if meta.size > MAX_FEED_BYTES => {
@@ -600,7 +633,7 @@ pub async fn run_step(
     };
 
     let mut tx = tenant_tx(db, tenant_id).await?;
-    let (plan, mut report) = plan(&mut tx, source, &t, items).await?;
+    let (plan, redirects, mut report) = plan(&mut tx, source, &t, items).await?;
     tx.commit().await?;
     if step == "analyze" {
         let mut tx = tenant_tx(db, tenant_id).await?;
@@ -633,9 +666,21 @@ pub async fn run_step(
         activate: r.activate,
     };
     for (i, group) in plan.iter().enumerate() {
-        if let Err(e) = ctx.apply_group(group, &mut progress, &mut report).await {
-            progress.failed += 1;
-            report.problem(&group.items[0].item_id, "product_failed", e.to_string());
+        match ctx
+            .apply_group(group, &redirects, &mut progress, &mut report)
+            .await
+        {
+            Ok(()) => {}
+            // Rejected data (validation, conflicts): reported, the import goes on.
+            Err(e @ (Error::Validation { .. } | Error::Conflict { .. } | Error::NotFound)) => {
+                progress.failed += 1;
+                report.problem(&group.items[0].item_id, "product_failed", e.to_string());
+            }
+            // Infrastructure failures: the job retries; mappings make the rerun resume.
+            Err(e) => {
+                save_progress(db, tenant_id, id, &progress, None).await?;
+                return Err(e);
+            }
         }
         progress.done += 1;
         if i % 10 == 9 {
@@ -675,6 +720,9 @@ async fn save_progress(
 // ---------------------------------------------------------------------------------------
 // Planning (dry run)
 
+/// Old URL path -> the item (feed order) whose product it redirects to.
+type Redirects = HashMap<String, String>;
+
 /// A product to import: its items (variants) and how it maps to existing data.
 #[derive(Debug, Clone)]
 struct Group {
@@ -694,12 +742,13 @@ async fn plan(
     source: Source,
     t: &Target,
     items: Vec<FeedItem>,
-) -> Result<(Vec<Group>, ImportReport), Error> {
+) -> Result<(Vec<Group>, Redirects, ImportReport), Error> {
     let mut report = ImportReport {
         items: u32::try_from(items.len()).unwrap_or(u32::MAX),
         ..ImportReport::default()
     };
     let mut seen = HashSet::new();
+    let mut feed_order: Vec<String> = Vec::new();
     let mut groups: Vec<Group> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
     for mut item in items {
@@ -763,10 +812,13 @@ async fn plan(
             }
             Some(_) => {}
         }
-        let key = item
-            .group_id
-            .clone()
-            .unwrap_or_else(|| item.item_id.clone());
+        // Group ids and item ids are separate namespaces: a standalone item never joins a
+        // group whose id happens to equal its item id (also in the persisted mappings).
+        let key = match &item.group_id {
+            Some(g) => format!("g:{g}"),
+            None => format!("i:{}", item.item_id),
+        };
+        feed_order.push(item.item_id.clone());
         match index.get(&key) {
             Some(&i) => groups[i].items.push(item),
             None => {
@@ -808,6 +860,7 @@ async fn plan(
     .map(|r| (r.sku, r.product_id))
     .collect();
     let mut kept = Vec::with_capacity(groups.len());
+    let mut claimed = HashSet::new();
     for mut g in groups {
         let owners: BTreeSet<Uuid> = g
             .items
@@ -829,6 +882,19 @@ async fn plan(
             continue;
         }
         g.existing = g.existing.or_else(|| owners.first().copied());
+        // Two groups of one feed must not rewrite the same product (each would drop the
+        // other's variants): the first keeps it, later ones are reported.
+        if let Some(p) = g.existing
+            && !claimed.insert(p)
+        {
+            report.skipped_items += u32::try_from(g.items.len()).unwrap_or(0);
+            report.problem(
+                &g.items[0].item_id,
+                "product_in_several_groups",
+                "another group of this feed already updates the product of these SKUs",
+            );
+            continue;
+        }
         kept.push(g);
     }
     let groups = kept;
@@ -880,17 +946,26 @@ async fn plan(
     report.new_images =
         report.images - n(usize::try_from(count_mapped(tx, "asset", &images).await?).unwrap_or(0));
 
-    // Redirects: old paths already redirected (existing rows, or earlier in this feed).
-    let mut from_paths = HashSet::new();
+    // Redirects in feed order (not group order): the first item with an old path owns it;
+    // paths that already redirect (existing rows) are reported and left alone.
+    let mut owners: Redirects = HashMap::new();
     let mut candidates: Vec<(String, String)> = Vec::new();
-    for g in &groups {
-        for i in &g.items {
-            if let Some(p) = i.url.as_deref().and_then(old_path) {
-                if from_paths.insert(p.clone()) {
-                    candidates.push((i.item_id.clone(), p));
-                } else {
-                    report.collision("redirect", &i.item_id, &p);
-                }
+    let urls: HashMap<&str, Option<&str>> = groups
+        .iter()
+        .flat_map(|g| g.items.iter())
+        .map(|x| (x.item_id.as_str(), x.url.as_deref()))
+        .collect();
+    for i in &feed_order {
+        // Items of skipped groups are absent.
+        let Some(url) = urls.get(i.as_str()) else {
+            continue;
+        };
+        if let Some(p) = url.and_then(old_path) {
+            if owners.contains_key(&p) {
+                report.collision("redirect", i, &p);
+            } else {
+                owners.insert(p.clone(), i.clone());
+                candidates.push((i.clone(), p));
             }
         }
     }
@@ -906,11 +981,12 @@ async fn plan(
     for (item, p) in &candidates {
         if existing.contains(p) {
             report.collision("redirect", item, p);
+            owners.remove(p);
         } else {
             report.redirects += 1;
         }
     }
-    Ok((groups, report))
+    Ok((groups, owners, report))
 }
 
 /// The redirect source for an old product URL: its path (query kept out), normalized.
@@ -1306,6 +1382,7 @@ impl ApplyCtx<'_> {
     async fn apply_group(
         &self,
         group: &Group,
+        redirects: &Redirects,
         progress: &mut Progress,
         report: &mut ImportReport,
     ) -> Result<(), Error> {
@@ -1313,7 +1390,19 @@ impl ApplyCtx<'_> {
         let mut tx = tenant_tx(self.db, self.tenant_id).await?;
         let locale = self.target.locale.clone();
         let first = &group.items[0];
-        let name = common_name(&group.items);
+        let existing = match group.existing {
+            Some(id) => products::get(&mut tx, id).await.ok(),
+            None => None,
+        };
+        // A partial feed (fewer items than the product has variants) cannot tell the product
+        // name from a variant name: keep the current one.
+        let current_name = existing.as_ref().and_then(|p| {
+            (p.variants.len() > group.items.len())
+                .then(|| p.translations.iter().find(|t| t.locale == locale))
+                .flatten()
+                .map(|t| t.name.clone())
+        });
+        let name = current_name.unwrap_or_else(|| common_name(&group.items));
         let category = self.category(&mut tx, &first.category).await?;
 
         let (opts, per_item) = options(&group.items, &locale);
@@ -1383,10 +1472,6 @@ impl ApplyCtx<'_> {
             }
         }
 
-        let existing = match group.existing {
-            Some(id) => products::get(&mut tx, id).await.ok(),
-            None => None,
-        };
         let variant_ids: HashMap<String, Uuid> = existing
             .as_ref()
             .map(|p| p.variants.iter().map(|v| (v.sku.clone(), v.id)).collect())
@@ -1475,20 +1560,59 @@ impl ApplyCtx<'_> {
                 parameters.extend(
                     p.parameters
                         .iter()
-                        .filter(|v| {
-                            !imported_params.contains(&v.parameter_id)
-                                && v.variant_sku.as_deref().is_none_or(|s| skus.contains(s))
-                        })
+                        .filter(|v| !imported_params.contains(&v.parameter_id))
                         .cloned(),
                 );
                 let mut all_media = media;
                 for m in &p.media {
-                    if !all_media.iter().any(|x| x.asset_id == m.asset_id)
-                        && m.variant_sku.as_deref().is_none_or(|s| skus.contains(s))
-                    {
+                    if !all_media.iter().any(|x| x.asset_id == m.asset_id) {
                         all_media.push(m.clone());
                     }
                 }
+                // Variants: the feed's are merged in by SKU; variants the feed does not list
+                // stay (a partial feed must not delete prices, stock or order history).
+                let mut merged_options = p.options.clone();
+                for o in opts {
+                    match merged_options.iter_mut().find(|x| x.code == o.code) {
+                        Some(x) => {
+                            for v in o.values {
+                                if !x.values.iter().any(|y| y.code == v.code) {
+                                    x.values.push(v);
+                                }
+                            }
+                        }
+                        None => merged_options.push(o),
+                    }
+                }
+                let before: HashMap<&str, &products::Variant> =
+                    p.variants.iter().map(|v| (v.sku.as_str(), v)).collect();
+                let mut merged_variants: Vec<VariantInput> = variants
+                    .into_iter()
+                    .map(|mut v| {
+                        if let Some(old) = before.get(v.sku.as_str()) {
+                            // A group reduced to one item keeps the variant's option values.
+                            if v.option_values.is_empty() {
+                                v.option_values = old.option_values.clone();
+                            }
+                            v.is_default = old.is_default;
+                            v.weight_g = old.weight_g;
+                        }
+                        v
+                    })
+                    .collect();
+                merged_variants.extend(
+                    p.variants
+                        .iter()
+                        .filter(|v| !skus.contains(v.sku.as_str()))
+                        .map(|v| VariantInput {
+                            id: Some(v.id),
+                            sku: v.sku.clone(),
+                            ean: v.ean.clone(),
+                            option_values: v.option_values.clone(),
+                            weight_g: v.weight_g,
+                            is_default: v.is_default,
+                        }),
+                );
                 ProductInput {
                     status: p.status,
                     brand: first.brand.clone().or(p.brand.clone()),
@@ -1501,8 +1625,8 @@ impl ApplyCtx<'_> {
                         .or(p.heureka_category.clone()),
                     google_category: first.google_category.clone().or(p.google_category.clone()),
                     translations,
-                    options: opts,
-                    variants,
+                    options: merged_options,
+                    variants: merged_variants,
                     category_ids,
                     media: all_media,
                     parameters,
@@ -1584,7 +1708,11 @@ impl ApplyCtx<'_> {
             let Some(from) = i.url.as_deref().and_then(old_path) else {
                 continue;
             };
-            if from == to_path || !paths.insert(from.clone()) {
+            // Only the item that owns the path in feed order (dry run) creates it.
+            if from == to_path
+                || redirects.get(&from) != Some(&i.item_id)
+                || !paths.insert(from.clone())
+            {
                 continue;
             }
             let created = sqlx::query_scalar!(

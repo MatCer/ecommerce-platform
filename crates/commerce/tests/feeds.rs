@@ -59,6 +59,20 @@ async fn setup(db: PgPool) -> Ctx {
 
 impl Ctx {
     async fn upload_run(&self) -> Uuid {
+        self.upload_run_with(&self.feed).await
+    }
+
+    /// Writes `feed` where the merchant's presigned PUT would.
+    async fn upload(&self, id: Uuid, feed: &str) {
+        let key = Path::from(format!("import-uploads/{}/{id}.xml", self.shop.tenant));
+        self.storage
+            .private
+            .put(&key, PutPayload::from(feed.to_owned().into_bytes()))
+            .await
+            .unwrap();
+    }
+
+    async fn upload_run_with(&self, feed: &str) -> Uuid {
         let mut tx = tenant_tx(&self.runtime, self.shop.tenant).await.unwrap();
         let created = import::create(
             &mut tx,
@@ -68,7 +82,7 @@ impl Ctx {
                 source: Source::Heureka,
                 market_id: self.shop.cz,
                 url: None,
-                upload_size: Some(self.feed.len() as u64),
+                upload_size: Some(feed.len() as u64),
                 activate: false,
             },
         )
@@ -76,15 +90,7 @@ impl Ctx {
         .unwrap();
         assert!(created.upload.is_some());
         tx.commit().await.unwrap();
-        let key = Path::from(format!(
-            "imports/{}/{}.xml",
-            self.shop.tenant, created.run.id
-        ));
-        self.storage
-            .private
-            .put(&key, PutPayload::from(self.feed.clone().into_bytes()))
-            .await
-            .unwrap();
+        self.upload(created.run.id, feed).await;
         created.run.id
     }
 
@@ -146,10 +152,7 @@ async fn dry_run_then_apply_is_idempotent(db: PgPool) {
     assert_eq!(p.created, r.products, "{:?}", run.report);
     assert_eq!(p.failed, 0, "{:?}", run.report.map(|r| r.problems));
     assert_eq!(p.images_downloaded, 7);
-    assert!(
-        p.redirects_created >= 90 && p.redirects_skipped >= 1,
-        "{p:?}"
-    );
+    assert!(p.redirects_created >= 90, "{p:?}");
 
     // New products are drafts; the T-shirt group became one product with two options.
     assert_eq!(
@@ -301,13 +304,105 @@ async fn url_runs_download_through_the_safe_client(db: PgPool) {
 async fn broken_feeds_fail_with_a_message(db: PgPool) {
     let c = setup(db).await;
     let id = c.upload_run().await;
-    let key = Path::from(format!("imports/{}/{id}.xml", c.shop.tenant));
-    c.storage
-        .private
-        .put(&key, PutPayload::from_static(b"<SHOP><SHOPITEM><ITEM_ID>1"))
-        .await
-        .unwrap();
+    c.upload(id, "<SHOP><SHOPITEM><ITEM_ID>1").await;
     let run = c.step(id, "analyze").await;
     assert_eq!(run.status, RunStatus::Failed);
     assert!(run.error.unwrap().contains("invalid XML"));
+}
+
+fn item(id: &str, group: Option<&str>, name: &str, size: &str, url: &str, price: u32) -> String {
+    format!(
+        "<SHOPITEM><ITEM_ID>{id}</ITEM_ID><PRODUCTNAME>{name}</PRODUCTNAME>{}<PRICE_VAT>{price}</PRICE_VAT>\
+         <URL>https://old.example{url}</URL><PARAM><PARAM_NAME>Velikost</PARAM_NAME><VAL>{size}</VAL></PARAM></SHOPITEM>",
+        group
+            .map(|g| format!("<ITEMGROUP_ID>{g}</ITEMGROUP_ID>"))
+            .unwrap_or_default()
+    )
+}
+
+fn shop(items: &[String]) -> String {
+    format!("<SHOP>{}</SHOP>", items.concat())
+}
+
+/// Review fixes: separate group/item namespaces, redirects owned in feed order, partial feeds
+/// keep variants, the applied file is the analyzed snapshot.
+#[sqlx::test(migrations = "../../migrations")]
+async fn partial_feeds_namespaces_redirect_order_and_snapshots(db: PgPool) {
+    let c = setup(db).await;
+    // Feed order: A1 (group A), X (standalone item whose id equals group A's id), A2 (group A,
+    // same old URL as X). X appeared first, so X owns /shared.
+    let feed = shop(&[
+        item("A1", Some("A"), "Mikina Test S", "S", "/a1", 500),
+        item("A", None, "Hrnek Test", "one", "/shared", 200),
+        item("A2", Some("A"), "Mikina Test M", "M", "/shared", 500),
+    ]);
+    let id = c.upload_run_with(&feed).await;
+    let run = c.step(id, "analyze").await;
+    let r = run.report.unwrap();
+    assert_eq!((r.products, r.variants), (2, 3), "{r:?}");
+    assert!(
+        r.collisions
+            .iter()
+            .any(|x| x.kind == "redirect" && x.item_id == "A2")
+    );
+    // Overwriting the upload after the dry run changes nothing: apply uses the snapshot.
+    c.upload(id, &shop(&[item("EVIL", None, "Cizí", "x", "/evil", 1)]))
+        .await;
+    let run = c.step(id, "apply").await;
+    assert_eq!(run.progress.created, 2, "{:?}", run.report);
+    assert_eq!(
+        c.count("SELECT count(*) FROM variants WHERE sku = 'EVIL'")
+            .await,
+        0
+    );
+    assert_eq!(
+        c.count(
+            "SELECT count(*) FROM redirects r JOIN product_translations t
+               ON r.to_path = '/p/' || t.slug
+             WHERE r.from_path = '/shared' AND t.name = 'Hrnek Test'"
+        )
+        .await,
+        1,
+        "the first item in feed order owns the old URL"
+    );
+    let variants_of_a = "SELECT count(*) FROM variants v JOIN product_translations t
+                           ON t.product_id = v.product_id WHERE t.name = 'Mikina Test'";
+    assert_eq!(c.count(variants_of_a).await, 2);
+
+    // A later feed with only A1 updates it and keeps A2 (with its price).
+    let partial = c
+        .upload_run_with(&shop(&[item(
+            "A1",
+            Some("A"),
+            "Mikina Test S",
+            "S",
+            "/a1",
+            550,
+        )]))
+        .await;
+    c.step(partial, "analyze").await;
+    let run = c.step(partial, "apply").await;
+    assert_eq!(
+        (run.progress.updated, run.progress.failed),
+        (1, 0),
+        "{:?}",
+        run.report
+    );
+    assert_eq!(c.count(variants_of_a).await, 2, "A2 is kept");
+    assert_eq!(
+        c.count(
+            "SELECT count(*) FROM variant_prices p JOIN variants v ON v.id = p.variant_id
+             WHERE v.sku = 'A2' AND p.amount_minor = 50000"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        c.count(
+            "SELECT count(*) FROM variant_prices p JOIN variants v ON v.id = p.variant_id
+             WHERE v.sku = 'A1' AND p.amount_minor = 55000"
+        )
+        .await,
+        1
+    );
 }

@@ -80,7 +80,11 @@ async fn export_feeds_are_generated_and_served_per_market(db: PgPool) {
     assert_eq!(status, StatusCode::OK);
     assert!(google.contains("xmlns:g=\"http://base.google.com/ns/1.0\""));
     assert!(google.contains("<g:price>129.00 CZK</g:price>"), "{google}");
-    assert!(google.contains("http://shop.localhost:8080/p/tee-cs"));
+    // Each variant links to its own offer (the product page preselects it).
+    assert!(
+        google.contains("http://shop.localhost:8080/p/tee-cs?variant=TEE-"),
+        "{google}"
+    );
     let (_, heureka) = c
         .feed("/storefront/v1/files/feeds/sk/heureka.xml", c.shop.cz)
         .await;
@@ -178,6 +182,12 @@ async fn imports_start_with_an_upload_or_a_url(db: PgPool) {
     let (_, list) = c.admin(Call::get("/admin/v1/imports")).await;
     assert_eq!(list["items"].as_array().unwrap().len(), 2);
 
+    let (status, _, _) = Call::post("/admin/v1/feeds/regenerate", json!({}))
+        .token(&c.clerk)
+        .tenant(c.shop.tenant)
+        .send(&c.s)
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "regeneration is owner/admin");
     // Imports change the catalog wholesale: owner/admin only.
     let (status, _, _) = Call::get("/admin/v1/imports")
         .token(&c.clerk)

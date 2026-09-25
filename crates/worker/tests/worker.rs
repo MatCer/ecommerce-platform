@@ -711,7 +711,7 @@ async fn catalog_events_purge_the_edge_and_debounce_feed_exports(db: PgPool) {
     let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
     queue::publish(
         &mut *tx,
-        "product.updated",
+        "price.changed",
         &json!({ "product_id": product.id }),
     )
     .await
@@ -732,7 +732,7 @@ async fn catalog_events_purge_the_edge_and_debounce_feed_exports(db: PgPool) {
     .fetch_all(&db)
     .await
     .unwrap();
-    // product.created (from the fixture) + product.updated + page.changed purge; both product
+    // product.created (from the fixture) + price.changed + page.changed purge; both product
     // events share one export job.
     assert_eq!(
         kinds,

@@ -382,6 +382,8 @@ async fn go_live_flags_gaps_until_legal_content_is_complete(db: PgPool) {
         ))
         .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    // Templates installed before the legal entity is complete keep "fill in" markers: once
+    // published they are flagged as unfinished (checked below after re-installing).
     let (status, entity) = c
         .admin(Call::put(
             "/admin/v1/legal-entity",
@@ -449,6 +451,35 @@ async fn go_live_flags_gaps_until_legal_content_is_complete(db: PgPool) {
     tx.commit().await.unwrap();
     let (_, report) = c.admin(Call::get("/admin/v1/go-live")).await;
     assert_eq!(report["ready"], true, "{report}");
+
+    // An unfinished published legal page (a leftover marker) blocks go-live again.
+    let terms_id: Uuid = sqlx::query_scalar("SELECT id FROM pages WHERE legal_type = 'terms'")
+        .fetch_one(
+            &mut *platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+                .await
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let uri = format!("/admin/v1/pages/{terms_id}");
+    let (_, mut terms) = c.admin(Call::get(&uri)).await;
+    terms["translations"][0]["blocks"] =
+        json!([{ "type": "rich_text", "html": "<p>[DOPLŇTE: company_id]</p>" }]);
+    for k in ["id", "created_at", "updated_at"] {
+        terms.as_object_mut().unwrap().remove(k);
+    }
+    assert_eq!(c.admin(Call::put(&uri, terms)).await.0, StatusCode::OK);
+    let (_, report) = c.admin(Call::get("/admin/v1/go-live")).await;
+    assert_eq!(report["ready"], false);
+    assert!(
+        check(&report, "legal_pages")["missing"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("terms:cs (unfinished)")),
+        "{report}"
+    );
+    let (_, restored) = c.admin(Call::get(&uri)).await;
+    assert_eq!(restored["status"], "published");
 
     // The footer lists the published legal pages; the cookies page is the consent policy.
     let (_, shop) = c.sf("/storefront/v1/shop").await;

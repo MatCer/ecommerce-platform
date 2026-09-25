@@ -260,6 +260,21 @@ fn description(found: &Found, blocks: &[BlockView]) -> String {
     plain_excerpt(&html, 160)
 }
 
+/// Purge tags of a page: itself, the blog (posts), and every product shown in its grids (so
+/// price and stock changes reach the page too).
+fn tags(id: Uuid, blocks: &[BlockView], blog: bool) -> Vec<String> {
+    let mut out = vec![format!("page:{id}")];
+    if blog {
+        out.push("blog".into());
+    }
+    for b in blocks {
+        if let BlockView::ProductGrid { products, .. } = b {
+            out.extend(products.iter().map(|p| format!("product:{}", p.id)));
+        }
+    }
+    out
+}
+
 /// `/pages/<slug>`: a CMS or legal page.
 pub async fn cms_page(
     tx: &mut TenantTx,
@@ -270,6 +285,7 @@ pub async fn cms_page(
         return Ok(None);
     };
     let blocks = views(tx, ctx, &found.blocks).await?;
+    let cache = CacheHints::public(300, tags(found.id, &blocks, false));
     let kind = PageKind::parse(&found.kind);
     let path = kind.path(&found.slug);
     let breadcrumbs = vec![
@@ -303,7 +319,7 @@ pub async fn cms_page(
         blocks,
         breadcrumbs,
         seo,
-        cache: CacheHints::public(300, vec![format!("page:{}", found.id)]),
+        cache,
     }))
 }
 
@@ -376,6 +392,7 @@ pub async fn blog_post(
         return Ok(None);
     };
     let blocks = views(tx, ctx, &found.blocks).await?;
+    let cache = CacheHints::public(300, tags(found.id, &blocks, true));
     let kind = PageKind::parse(&found.kind);
     let path = kind.path(&found.slug);
     let breadcrumbs = vec![
@@ -419,7 +436,7 @@ pub async fn blog_post(
         image,
         breadcrumbs,
         seo,
-        cache: CacheHints::public(300, vec![format!("page:{}", found.id), "blog".into()]),
+        cache,
     }))
 }
 

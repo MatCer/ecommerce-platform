@@ -5,7 +5,7 @@ import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/P
 import { formatDateTime, t } from "../i18n/index.ts";
 import { api, tenantHeader, unwrap } from "../lib/api.ts";
 import { contentError } from "../lib/content-api.ts";
-import { tenantKey } from "../lib/me.ts";
+import { tenantKey, useMembership } from "../lib/me.ts";
 
 const CHANNELS = { google: "Google Merchant", heureka: "Heureka", zbozi: "Zboží" };
 export default function ExportFeeds() {
@@ -14,6 +14,7 @@ export default function ExportFeeds() {
     queryFn: () => unwrap(api.GET("/admin/v1/feeds", { params: { header: tenantHeader() } })),
   }));
   const [error, setError] = createSignal<string>();
+  const { can } = useMembership();
   const regenerate = createMutation(() => ({
     mutationFn: () =>
       unwrap(api.POST("/admin/v1/feeds/regenerate", { params: { header: tenantHeader() } })),
@@ -37,9 +38,11 @@ export default function ExportFeeds() {
       <PageHeader
         title={t("content.feeds")}
         actions={
-          <Button loading={regenerate.isPending} onClick={() => regenerate.mutate()}>
-            {t("content.regenerate")}
-          </Button>
+          <Show when={can("admin")}>
+            <Button loading={regenerate.isPending} onClick={() => regenerate.mutate()}>
+              {t("content.regenerate")}
+            </Button>
+          </Show>
         }
       />
       <Show when={error()}>

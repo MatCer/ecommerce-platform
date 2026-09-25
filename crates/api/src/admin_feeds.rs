@@ -190,7 +190,8 @@ async fn list_feeds(
     ))
 }
 
-/// Regenerates the export feeds now (they also refresh hourly and after catalog changes).
+/// Regenerates the export feeds now (owner/admin; they also refresh hourly and after catalog
+/// changes).
 #[utoipa::path(
     post,
     path = "/admin/v1/feeds/regenerate",
@@ -203,6 +204,8 @@ async fn regenerate_feeds(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<StatusCode, Error> {
+    // A full catalog regeneration is an owner/admin action (the files themselves are public).
+    staff.require(Role::Admin)?;
     let tenant = staff.tenant_id;
     in_tx(&s, tenant, async |tx| {
         platform::queue::enqueue(&mut **tx, &export::job(tenant, Utc::now(), false)).await?;

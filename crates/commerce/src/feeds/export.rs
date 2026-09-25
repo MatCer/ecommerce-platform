@@ -516,10 +516,21 @@ async fn items_of(
         imgs.dedup();
         let o = &v.price.omnibus;
         let claim = o.claim && o.reference_minor.is_some();
+        let grouped = counts.get(&v.product_id).copied().unwrap_or(0) > 1;
+        // Each variant lands on its own offer: the product page preselects `?variant=<sku>`.
+        let link = {
+            let page = ctx.page_url(&format!("/p/{}", p.slug));
+            match reqwest::Url::parse(&page) {
+                Ok(mut u) if grouped => {
+                    u.query_pairs_mut().append_pair("variant", &v.sku);
+                    u.to_string()
+                }
+                _ => page,
+            }
+        };
         out.push(ExportItem {
             id: v.sku.clone(),
-            group_id: (counts.get(&v.product_id).copied().unwrap_or(0) > 1)
-                .then(|| v.product_id.to_string()),
+            group_id: grouped.then(|| v.product_id.to_string()),
             title: if labels.is_empty() {
                 p.name.clone()
             } else {
@@ -530,7 +541,7 @@ async fn items_of(
                 .and_then(|x| x.description.as_deref())
                 .map(|d| plain_excerpt(d, DESCRIPTION_CHARS))
                 .unwrap_or_default(),
-            link: ctx.page_url(&format!("/p/{}", p.slug)),
+            link,
             images: imgs,
             price_minor: v.price.amount_minor,
             reference_minor: o.reference_minor.filter(|_| claim),
@@ -619,6 +630,15 @@ pub async fn generate(
     urls: &PublicUrls,
     tenant_id: Uuid,
 ) -> Result<usize, Error> {
+    // One generation per tenant at a time (hourly, debounced and manual jobs may overlap):
+    // a slower, older run must not overwrite a newer file. Held until this function returns.
+    let mut guard = db.begin().await?;
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('feeds:' || $1::text, 0))",
+        tenant_id.to_string()
+    )
+    .fetch_one(&mut *guard)
+    .await?;
     let mut tx = tenant_tx(db, tenant_id).await?;
     let markets: Vec<Uuid> =
         sqlx::query_scalar!("SELECT id FROM markets WHERE price_list_id IS NOT NULL ORDER BY code")
@@ -649,7 +669,15 @@ pub async fn generate(
                 .private
                 .put(&path, PutPayload::from(xml.into_bytes()))
                 .await?;
-            let count = i32::try_from(items.len()).unwrap_or(i32::MAX);
+            // Comparison sites list only orderable items.
+            let listed = match channel {
+                Channel::Google => items.len(),
+                Channel::Heureka | Channel::Zbozi => items
+                    .iter()
+                    .filter(|i| i.availability != Availability::OutOfStock)
+                    .count(),
+            };
+            let count = i32::try_from(listed).unwrap_or(i32::MAX);
             let mut tx = tenant_tx(db, tenant_id).await?;
             sqlx::query!(
                 "INSERT INTO feed_exports (tenant_id, market_id, channel, object_key, items, bytes,
@@ -670,6 +698,7 @@ pub async fn generate(
             written += 1;
         }
     }
+    guard.commit().await?;
     Ok(written)
 }
 

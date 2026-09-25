@@ -294,6 +294,16 @@ fn values(
             escape(v)
         }
     };
+    // Optional facts (a non-VAT-payer has no VAT id, not every trader is in a register) read
+    // as a dash; only required ones leave a "fill in" marker (which go-live flags).
+    let optional = |v: &str| {
+        let v = v.trim();
+        if v.is_empty() {
+            "—".to_owned()
+        } else {
+            escape(v)
+        }
+    };
     let returns = if e.returns_address.trim().is_empty() {
         e.address()
     } else {
@@ -303,11 +313,11 @@ fn values(
         ("shop_name", pick("shop_name", shop_name)),
         ("company_name", pick("company_name", &e.company_name)),
         ("company_id", pick("company_id", &e.company_id)),
-        ("vat_id", pick("vat_id", vat_id.unwrap_or_default())),
+        ("vat_id", optional(vat_id.unwrap_or_default())),
         ("address", pick("address", &e.address())),
         ("email", pick("email", &e.email)),
-        ("phone", pick("phone", &e.phone)),
-        ("registry", pick("registry", &e.registry)),
+        ("phone", optional(&e.phone)),
+        ("registry", optional(&e.registry)),
         ("returns_address", pick("returns_address", &returns)),
     ]
 }
@@ -603,6 +613,21 @@ pub async fn go_live(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<GoLiveRepo
     )
     .fetch_all(&mut **tx)
     .await?;
+    // Published but unfinished: empty, or still carrying a template "fill in" marker (e.g.
+    // installed before the legal entity was complete), in any locale.
+    let unfinished: Vec<String> = sqlx::query_scalar!(
+        r#"SELECT p.legal_type || ':' || t.locale || ' (unfinished)' AS "missing!"
+           FROM pages p JOIN page_translations t ON t.page_id = p.id
+           WHERE p.legal_type = ANY($1::text[]) AND p.status = 'published'
+             AND (t.blocks = '[]'::jsonb OR t.blocks::text LIKE '%[DOPLŇTE:%'
+                  OR t.blocks::text LIKE '%[FILL IN:%')
+           ORDER BY 1"#,
+        &required as &[&str]
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut pages_missing = pages_missing;
+    pages_missing.extend(unfinished);
     let n = i64::try_from(pages_missing.len()).unwrap_or(i64::MAX);
     checks.push(check(CheckCode::LegalPages, pages_missing, n));
 

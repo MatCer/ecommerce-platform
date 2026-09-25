@@ -144,10 +144,12 @@ pub async fn ensure_indexes(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Resu
 /// job reads the latest groups, so a burst of edits ends in the last state.
 pub async fn apply_synonyms(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Result<(), Error> {
     ensure_indexes(db, meili, tenant_id).await?;
+    // Exclusive tenant lock for the whole write: synonym jobs run one after the other (each
+    // reads the latest groups) and never between a rebuild's final synonym refresh and swap.
     let mut tx = tenant_tx(db, tenant_id).await?;
+    lock_tenant(&mut tx, true).await?;
     let groups = super::synonyms::get(&mut tx).await?.groups;
     let targets = targets(&mut tx).await?;
-    tx.commit().await?;
     for (locale, uids) in targets {
         let body = json!({ "synonyms": super::synonyms::for_locale(&groups, &locale) });
         for uid in uids {
@@ -161,6 +163,7 @@ pub async fn apply_synonyms(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Resu
                 .map_err(|e| Error::Unavailable(e.to_string()))?;
         }
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -506,6 +509,14 @@ async fn rebuild_locked(
     // 3. Swap all locales at once, under the exclusive tenant lock.
     let mut tx = tenant_tx(db, tenant_id).await?;
     lock_tenant(&mut tx, true).await?;
+    // Synonyms may have changed since the build started: the new indexes go live with the
+    // current ones (synonym jobs take the same lock, so none runs in between).
+    let groups = super::synonyms::get(&mut tx).await?.groups;
+    for (locale, uid) in &building {
+        let body = json!({ "synonyms": super::synonyms::for_locale(&groups, locale) });
+        let task = meili.update_settings(uid, &body).await?;
+        meili.wait(task, SETTINGS_WAIT).await?;
+    }
     let pairs: Vec<(String, String)> = building
         .iter()
         .map(|(locale, uid)| (index_uid(tenant_id, locale), uid.clone()))
