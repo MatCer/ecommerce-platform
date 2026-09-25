@@ -89,9 +89,15 @@ export function createStorefront({
     product: (slug: string) => get<ProductPage>(`/pages/product/${segment(slug)}`),
     search: (query: Query) => required<ListingPage>(`/pages/search${qs(query)}`),
     suggest: (q: string) => required<SearchSuggest>(`/search/suggest${qs({ q })}`),
-    /** Product recommendations; `context` is `product:<id>`, `cart` or `home` (spec §8.2). */
-    recommendations: (context: string) =>
-      required<Recommendations>(`/recommendations${qs({ context })}`),
+    /**
+     * Public recommendations (spec §11.2): `context` is `product:<id>`, `category:<id>`,
+     * `collection:<id>` or `home`; `limit` 1-24 (default 8). Never personal: personal picks,
+     * the cart cross-sell and recently viewed are island reads (`recommendations` in `./client`).
+     */
+    recommendations: (context: string, opts: { limit?: number } = {}) =>
+      required<Recommendations>(
+        `/recommendations${qs({ context, limit: opts.limit === undefined ? undefined : String(opts.limit) })}`,
+      ),
     /** A published CMS or legal page (`/pages/<slug>`); `null` if there is none. */
     cms: (slug: string) => get<CmsPage>(`/pages/cms/${segment(slug)}`),
     /** Blog index (newest first) and articles (`/blog/<slug>`). */

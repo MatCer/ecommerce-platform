@@ -3,6 +3,7 @@ import type {
   Cart,
   CartState,
   ConsentPurpose,
+  Recommendations,
   SearchHit,
   SearchResult,
   SearchSuggest,
@@ -66,6 +67,26 @@ export const search = (
   fetch(`${opts.base ?? ""}/_p/public/search?${params}`, { signal: opts.signal }).then((r) =>
     json<SearchResult>(r),
   );
+
+/**
+ * Private recommendations for islands (WP17): `context` is `cart` (cross-sell for the cart),
+ * `home` (personal picks with the `personalization` consent, else the public ones) or `recent`
+ * with `ids` (recently viewed from the device, rehydrated with live prices; empty without
+ * consent). The edge adds the cart and consent cookies; the answer is never cached (A2). The
+ * cart has no locale-prefixed route, so leave `base` out for `cart`.
+ */
+export const recommendations = (
+  query: { context: string; limit?: number; ids?: string[] },
+  opts: { base?: string; signal?: AbortSignal } = {},
+) => {
+  const p = new URLSearchParams({ context: query.context });
+  if (query.limit !== undefined) p.set("limit", String(query.limit));
+  if (query.ids?.length) p.set("ids", query.ids.join(","));
+  return fetch(`${opts.base ?? ""}/_p/recommendations?${p}`, {
+    credentials: "same-origin",
+    signal: opts.signal,
+  }).then((r) => json<Recommendations>(r));
+};
 
 /** The smallest AVIF (else any) thumbnail of a search hit at least `width` px wide. */
 export function hitThumb(hit: SearchHit, width: number): string | undefined {
