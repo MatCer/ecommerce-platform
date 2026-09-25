@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE assets SET status = 'processing', key = $6, mime = $2, width = $3, height = $4,\n                sha256 = $5, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4",
+        "Int4",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3703c6e4bbf07c0a8be9ce76f76a4287cff4cb1fc481b4002e8cbd6daca1b8da"
+}

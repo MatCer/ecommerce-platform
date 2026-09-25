@@ -281,9 +281,151 @@ async fn cleanup_job_runs_end_to_end(db: PgPool) {
     let id = queue::enqueue(&runtime, &NewJob::new("maintenance.cleanup", json!({})))
         .await
         .unwrap();
-    let (stop, task) = start(&runtime, worker::handlers::all(), fast_config());
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(testkit::memory_storage()),
+        fast_config(),
+    );
     let (attempts, _) = wait_for_status(&db, id, "done").await;
     stop.send(true).unwrap();
     task.await.unwrap();
     assert_eq!(attempts, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn media_jobs_process_and_purge_assets(db: PgPool) {
+    use commerce::media::{self, AssetStatus, NewUpload};
+    use image::ImageEncoder;
+    use object_store::{ObjectStoreExt, PutPayload, path::Path};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let storage = testkit::memory_storage();
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png)
+        .write_image(
+            &[200u8; 3 * 50 * 40],
+            50,
+            40,
+            image::ExtendedColorType::Rgb8,
+        )
+        .unwrap();
+
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let input = NewUpload {
+        filename: None,
+        content_type: "image/png".into(),
+        size: png.len() as u64,
+    };
+    let up = media::create_upload(&mut tx, &storage, "u1", &input)
+        .await
+        .unwrap();
+    let key = Path::from(format!("uploads/{tenant}/{}", up.asset.id));
+    storage
+        .private
+        .put(&key, PutPayload::from(png))
+        .await
+        .unwrap();
+    media::complete(&mut tx, &storage, "u1", up.asset.id)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let job_id = |kind: &'static str| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>("SELECT max(id) FROM queue.jobs WHERE kind = $1")
+                .bind(kind)
+                .fetch_one(&db)
+                .await
+                .unwrap()
+        }
+    };
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(storage.clone()),
+        fast_config(),
+    );
+    wait_for_status(&db, job_id(media::PROCESS_JOB).await, "done").await;
+
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let asset = media::get(&mut tx, &storage, up.asset.id).await.unwrap();
+    assert_eq!(asset.status, AssetStatus::Ready);
+    assert_eq!(asset.variants.len(), 3);
+    media::delete(&mut tx, &storage, "u1", up.asset.id)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    wait_for_status(&db, job_id(media::PURGE_JOB).await, "done").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert!(storage.private.head(&key).await.is_err());
+    let original = Path::from(format!("originals/{tenant}/{}", up.asset.id));
+    assert!(storage.private.head(&original).await.is_err());
+    for v in &asset.variants {
+        assert!(
+            storage
+                .public
+                .head(&Path::from(v.key.as_str()))
+                .await
+                .is_err()
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn media_job_failing_every_attempt_marks_the_asset_failed(db: PgPool) {
+    use commerce::media::{self, AssetStatus, NewUpload};
+    use image::ImageEncoder;
+    use object_store::{ObjectStoreExt, PutPayload, path::Path};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let storage = testkit::memory_storage();
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let mut png = Vec::new();
+    image::codecs::png::PngEncoder::new(&mut png)
+        .write_image(&[10u8; 3 * 8 * 8], 8, 8, image::ExtendedColorType::Rgb8)
+        .unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let input = NewUpload {
+        filename: None,
+        content_type: "image/png".into(),
+        size: png.len() as u64,
+    };
+    let up = media::create_upload(&mut tx, &storage, "u1", &input)
+        .await
+        .unwrap();
+    let key = Path::from(format!("uploads/{tenant}/{}", up.asset.id));
+    storage
+        .private
+        .put(&key, PutPayload::from(png))
+        .await
+        .unwrap();
+    media::complete(&mut tx, &storage, "u1", up.asset.id)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    // The original vanishes: every attempt fails with a storage error.
+    let original = Path::from(format!("originals/{tenant}/{}", up.asset.id));
+    storage.private.delete(&original).await.unwrap();
+
+    let id: i64 = sqlx::query_scalar("SELECT id FROM queue.jobs WHERE kind = $1")
+        .bind(media::PROCESS_JOB)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(storage.clone()),
+        fast_config(),
+    );
+    let (attempts, _) = wait_for_status(&db, id, "dead").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert_eq!(attempts, 5);
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let asset = media::get(&mut tx, &storage, up.asset.id).await.unwrap();
+    assert_eq!(asset.status, AssetStatus::Failed);
+    assert!(asset.error.unwrap().contains("upload the image again"));
 }

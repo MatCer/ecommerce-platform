@@ -5,9 +5,11 @@
 //! tenant transaction (spec A8).
 
 pub mod audit;
+pub mod catalog;
 pub mod id;
 pub mod idempotency;
 pub mod markets;
+pub mod media;
 pub mod tenancy;
 
 /// Postgres `unique_violation` (23505).

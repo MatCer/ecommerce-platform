@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e4d867a8e26e7020b92447b93669a72d8a4ad241747eca792f8281caa73e60ab"
+}

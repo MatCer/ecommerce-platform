@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO categories (id, tenant_id, parent_id, position, image_asset_id)\n         SELECT $1, $2, $3, coalesce(max(position) + 1, 0), $4\n         FROM categories WHERE parent_id IS NOT DISTINCT FROM $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a5a033934b3e05d658e32b4114eddb7b3fd550bba8b8db3efdb34c58b4caf760"
+}

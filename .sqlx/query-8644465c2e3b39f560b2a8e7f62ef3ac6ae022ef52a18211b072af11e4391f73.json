@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE categories c SET position = o.ord - 1\n         FROM unnest($1::uuid[]) WITH ORDINALITY AS o(id, ord)\n         WHERE c.id = o.id AND c.position <> o.ord - 1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8644465c2e3b39f560b2a8e7f62ef3ac6ae022ef52a18211b072af11e4391f73"
+}

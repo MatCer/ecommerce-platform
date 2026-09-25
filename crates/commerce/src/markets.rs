@@ -71,18 +71,22 @@ pub struct NewMarket {
     pub is_default: bool,
 }
 
-fn invalid(code: &'static str, detail: impl Into<String>) -> Error {
+pub(crate) fn invalid(code: &'static str, detail: impl Into<String>) -> Error {
     Error::Validation {
         code,
         detail: detail.into(),
     }
 }
 
-fn all_bytes(s: &str, len: std::ops::RangeInclusive<usize>, ok: impl Fn(u8) -> bool) -> bool {
+pub(crate) fn all_bytes(
+    s: &str,
+    len: std::ops::RangeInclusive<usize>,
+    ok: impl Fn(u8) -> bool,
+) -> bool {
     len.contains(&s.len()) && s.bytes().all(ok)
 }
 
-fn is_locale(s: &str) -> bool {
+pub(crate) fn is_locale(s: &str) -> bool {
     match s.split_once('-') {
         None => all_bytes(s, 2..=2, |b| b.is_ascii_lowercase()),
         Some((lang, region)) => {

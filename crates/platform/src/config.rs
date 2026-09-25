@@ -235,6 +235,12 @@ pub struct S3Config {
     pub bucket_public: String,
     /// `S3_BUCKET_PRIVATE`
     pub bucket_private: String,
+    /// `S3_PUBLIC_ENDPOINT`: the endpoint as clients reach it, used for presigned URLs
+    /// (e.g. `http://s3.localhost:8080` through Caddy). Defaults to `S3_ENDPOINT`.
+    pub public_endpoint: Url,
+    /// `MEDIA_BASE_URL`: base URL of public-bucket objects (a CDN domain in prod). Defaults to
+    /// `<S3_PUBLIC_ENDPOINT>/<S3_BUCKET_PUBLIC>/`.
+    pub media_base_url: Url,
 }
 
 impl S3Config {
@@ -243,13 +249,30 @@ impl S3Config {
     }
 
     pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let endpoint = url(lookup, "S3_ENDPOINT")?;
+        let public_endpoint = match get(lookup, "S3_PUBLIC_ENDPOINT") {
+            Some(_) => url(lookup, "S3_PUBLIC_ENDPOINT")?,
+            None => endpoint.clone(),
+        };
+        let bucket_public = required(lookup, "S3_BUCKET_PUBLIC")?;
+        let media_base_url = match get(lookup, "MEDIA_BASE_URL") {
+            Some(_) => url(lookup, "MEDIA_BASE_URL")?,
+            None => public_endpoint
+                .join(&format!("{bucket_public}/"))
+                .map_err(|e| ConfigError::Invalid {
+                    name: "S3_BUCKET_PUBLIC",
+                    reason: e.to_string(),
+                })?,
+        };
         Ok(Self {
-            endpoint: url(lookup, "S3_ENDPOINT")?,
+            endpoint,
             region: get(lookup, "S3_REGION").unwrap_or_else(|| "us-east-1".into()),
             access_key_id: required(lookup, "S3_ACCESS_KEY_ID")?,
             secret_access_key: required(lookup, "S3_SECRET_ACCESS_KEY")?,
-            bucket_public: required(lookup, "S3_BUCKET_PUBLIC")?,
+            bucket_public,
             bucket_private: required(lookup, "S3_BUCKET_PRIVATE")?,
+            public_endpoint,
+            media_base_url,
         })
     }
 }
@@ -361,5 +384,24 @@ mod tests {
         ]))
         .expect("valid");
         assert_eq!(cfg.region, "us-east-1");
+        assert_eq!(cfg.public_endpoint.as_str(), "http://minio:9000/");
+        assert_eq!(cfg.media_base_url.as_str(), "http://minio:9000/public/");
+    }
+
+    #[test]
+    fn s3_public_endpoint_and_media_url() {
+        let cfg = S3Config::from_lookup(&env(&[
+            ("S3_ENDPOINT", "http://minio:9000"),
+            ("S3_PUBLIC_ENDPOINT", "http://s3.localhost:8080"),
+            ("S3_ACCESS_KEY_ID", "k"),
+            ("S3_SECRET_ACCESS_KEY", "s"),
+            ("S3_BUCKET_PUBLIC", "public"),
+            ("S3_BUCKET_PRIVATE", "private"),
+        ]))
+        .expect("valid");
+        assert_eq!(
+            cfg.media_base_url.as_str(),
+            "http://s3.localhost:8080/public/"
+        );
     }
 }

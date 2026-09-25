@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id, p.status, p.brand, p.created_at, p.updated_at,\n                  coalesce((SELECT jsonb_object_agg(t.locale, t.name) FROM product_translations t\n                            WHERE t.product_id = p.id), '{}') AS \"name!\",\n                  (SELECT v.sku FROM variants v WHERE v.product_id = p.id AND v.is_default) AS default_sku,\n                  (SELECT count(*) FROM variants v WHERE v.product_id = p.id) AS \"variant_count!\"\n           FROM products p\n           WHERE ($1::uuid IS NULL OR p.id < $1)\n             AND ($2::text IS NULL OR p.status = $2)\n             AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM product_categories c\n                                              WHERE c.product_id = p.id AND c.category_id = $3))\n             AND ($4::text IS NULL\n                  OR EXISTS (SELECT 1 FROM product_translations t\n                             WHERE t.product_id = p.id AND t.name ILIKE $4)\n                  OR EXISTS (SELECT 1 FROM variants v\n                             WHERE v.product_id = p.id AND v.sku ILIKE $4))\n           ORDER BY p.id DESC\n           LIMIT $5",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "brand",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "brand"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "default_sku",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "variant_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "4158b320214370485e228b93527f459d02918a69d8944f52f9052b726d78a016"
+}

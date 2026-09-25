@@ -1,8 +1,13 @@
 //! Job handlers. Every handler is idempotent (spec §13).
 
+use std::sync::Arc;
 use std::time::Duration;
 
+use commerce::media::{self, Processed};
 use platform::queue::{self, Job};
+use platform::storage::Storage;
+use tokio::sync::Semaphore;
+use uuid::Uuid;
 
 use crate::runner::{Ctx, Handlers, JobError};
 
@@ -13,10 +18,23 @@ pub const MAINTENANCE_CLEANUP: &str = "maintenance.cleanup";
 
 const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
 
-pub fn all() -> Handlers {
+/// Image encoding is CPU-heavy (each encode is single-threaded): one at a time per worker
+/// process keeps the other job loops responsive. ponytail: fixed at 1; make it configurable
+/// when a dedicated media worker gets more cores.
+const MEDIA_CONCURRENCY: usize = 1;
+
+pub fn all(storage: Storage) -> Handlers {
+    let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
+    let purge_storage = storage.clone();
     Handlers::default()
         .register(EVENTS_LOG, events_log)
         .register(MAINTENANCE_CLEANUP, maintenance_cleanup)
+        .register(media::PROCESS_JOB, move |ctx, job| {
+            media_process(ctx, job, storage.clone(), encode_slots.clone())
+        })
+        .register(media::PURGE_JOB, move |_ctx, job| {
+            media_purge(job, purge_storage.clone())
+        })
 }
 
 async fn events_log(_ctx: Ctx, job: Job) -> Result<(), JobError> {
@@ -45,4 +63,62 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         .await?;
     tracing::info!(queue_rows, idempotency_keys = keys, "cleanup done");
     Ok(())
+}
+
+fn tenant_and_asset(job: &Job) -> Result<(Uuid, Uuid), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("media job without tenant".into()))?;
+    let asset = job
+        .payload
+        .get("asset_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no asset_id".into()))?;
+    Ok((tenant, asset))
+}
+
+async fn media_process(
+    ctx: Ctx,
+    job: Job,
+    storage: Storage,
+    slots: Arc<Semaphore>,
+) -> Result<(), JobError> {
+    let (tenant, asset) = tenant_and_asset(&job)?;
+    let _slot = slots
+        .acquire()
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    let outcome = match media::process(&ctx.db, &storage, tenant, asset).await {
+        Ok(outcome) => outcome,
+        // Last attempt: record the failure on the asset instead of leaving it `processing`.
+        Err(e) if job.attempts >= job.max_attempts => {
+            tracing::error!(%asset, error = %e, "media processing gave up");
+            media::mark_failed(
+                &ctx.db,
+                tenant,
+                asset,
+                "processing failed repeatedly; upload the image again",
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            return Err(JobError::Permanent(e.to_string()));
+        }
+        Err(e) => return Err(JobError::Retry(e.to_string())),
+    };
+    tracing::info!(%asset, ?outcome, "media processed");
+    if outcome == Processed::Failed {
+        tracing::warn!(%asset, "image could not be decoded; asset marked failed");
+    }
+    Ok(())
+}
+
+async fn media_purge(job: Job, storage: Storage) -> Result<(), JobError> {
+    let keys = |field: &str| -> Result<Vec<String>, JobError> {
+        serde_json::from_value(job.payload.get(field).cloned().unwrap_or_default())
+            .map_err(|e| JobError::Permanent(format!("{field}: {e}")))
+    };
+    media::purge(&storage, &keys("private")?, &keys("public")?)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))
 }

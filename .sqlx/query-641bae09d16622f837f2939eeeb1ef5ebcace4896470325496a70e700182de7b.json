@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SET CONSTRAINTS variants_sku_unique, variants_options_unique IMMEDIATE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "641bae09d16622f837f2939eeeb1ef5ebcace4896470325496a70e700182de7b"
+}

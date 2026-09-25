@@ -7,6 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+commerce.workspace = true
 object_store.workspace = true
 platform.workspace = true
 sqlx.workspace = true

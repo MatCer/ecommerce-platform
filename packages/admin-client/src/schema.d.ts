@@ -4,6 +4,84 @@
  */
 
 export interface paths {
+    "/admin/v1/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assets, newest first. */
+        get: operations["list_assets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/assets/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts an image upload: returns a pending asset and a presigned `PUT` URL (15 minutes)
+         *     into private storage. Upload the file there with the returned headers, then call
+         *     `complete`. Honors `Idempotency-Key`.
+         */
+        post: operations["create_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/assets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An asset with its public variant URLs once `ready`. */
+        get: operations["get_asset"];
+        put?: never;
+        post?: never;
+        /** Deletes an asset no product uses (`409 asset_in_use`); its files are removed afterwards. */
+        delete: operations["delete_asset"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/assets/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.
+         *     A rejected file is deleted and the asset stays `pending` (upload again, then retry).
+         *     Calling it again on a processing or ready asset returns it unchanged; on a failed asset
+         *     it runs processing again from the kept original.
+         */
+        post: operations["complete_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/audit-log": {
         parameters: {
             query?: never;
@@ -15,6 +93,58 @@ export interface paths {
         get: operations["audit_log"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["category_tree"];
+        put?: never;
+        /** Creates a category at the end of its siblings. Honors `Idempotency-Key`. */
+        post: operations["create_category"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/categories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_category"];
+        /** Updates translations and image; use `/move` to change the parent or position. */
+        put: operations["update_category"];
+        post?: never;
+        /** Deletes a category without subcategories (`409 has_children` otherwise). */
+        delete: operations["delete_category"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/categories/{id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Moves a category with its subtree. Into its own subtree: `422 category_cycle`. */
+        post: operations["move_category"];
         delete?: never;
         options?: never;
         head?: never;
@@ -52,6 +182,103 @@ export interface paths {
         };
         /** The signed-in staff user and their tenants. Needs no `X-Tenant-Id`. */
         get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/parameters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Parameters ordered by key. */
+        get: operations["list_parameters"];
+        put?: never;
+        /** Honors `Idempotency-Key`. */
+        post: operations["create_parameter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/parameters/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_parameter"];
+        /** The kind cannot change while products have values (`409 parameter_in_use`). */
+        put: operations["update_parameter"];
+        post?: never;
+        /** Deletes the parameter and its values on all products. */
+        delete: operations["delete_parameter"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products, newest first, with filters and cursor pagination. */
+        get: operations["list_products"];
+        put?: never;
+        /**
+         * Creates a product document (attributes, translations, options, variants, categories,
+         *     media, parameter values, tax categories). Honors `Idempotency-Key`.
+         */
+        post: operations["create_product"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_product"];
+        /**
+         * Replaces the whole product document. Variants listed with an `id` are updated in place
+         *     (their ids stay stable), variants without one are created, unlisted ones are deleted.
+         */
+        put: operations["replace_product"];
+        post?: never;
+        delete: operations["delete_product"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/tax-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tax categories and rates in force on a date. Products map to one per country
+         *     (`tax_categories` in the product document) and default to `standard`.
+         */
+        get: operations["list_tax_categories"];
         put?: never;
         post?: never;
         delete?: never;
@@ -115,6 +342,47 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Asset: {
+            /** Format: int64 */
+            bytes?: number | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Why processing failed. */
+            error?: string | null;
+            filename?: string | null;
+            /** Format: int32 */
+            height?: number | null;
+            /** Format: uuid */
+            id: string;
+            /** @description Sniffed type of the original (after `complete`). */
+            mime?: string | null;
+            sha256?: string | null;
+            status: components["schemas"]["AssetStatus"];
+            /** Format: date-time */
+            updated_at: string;
+            variants: components["schemas"]["AssetVariant"][];
+            /** Format: int32 */
+            width?: number | null;
+        };
+        AssetPage: {
+            items: components["schemas"]["Asset"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
+        /** @enum {string} */
+        AssetStatus: "pending" | "processing" | "ready" | "failed";
+        AssetVariant: {
+            /** Format: int64 */
+            bytes: number;
+            /** @description `avif`, `webp`, `jpeg` or `png`. */
+            format: string;
+            /** Format: int32 */
+            height: number;
+            /** @description Public-bucket key. */
+            key: string;
+            /** Format: int32 */
+            width: number;
+        };
         AuditEntry: {
             action: string;
             /** @description Better Auth user id, or `platform` for superadmin operations. */
@@ -135,12 +403,84 @@ export interface components {
              */
             next_cursor?: string | null;
         };
+        BTreeMap: {
+            [key: string]: string;
+        };
+        Category: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            image_asset_id?: string | null;
+            /** Format: uuid */
+            parent_id?: string | null;
+            /** Format: int32 */
+            position: number;
+            translations: components["schemas"]["CategoryTranslation"][];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CategoryMove: {
+            /**
+             * Format: uuid
+             * @description New parent, `null` for the root level.
+             */
+            parent_id?: string | null;
+            /**
+             * Format: int32
+             * @description 0-based index among the new siblings; larger values append.
+             */
+            position: number;
+        };
+        /** @description A category with its subtree. */
+        CategoryNode: components["schemas"]["Category"] & {
+            children: components["schemas"]["CategoryNode"][];
+        };
+        CategoryTranslation: {
+            /** @description Sanitized on write. */
+            description_html?: string;
+            /** @example cs */
+            locale: string;
+            /** @example Trička */
+            name: string;
+            seo_description?: string | null;
+            seo_title?: string | null;
+            /** @example tricka */
+            slug: string;
+        };
+        CategoryTree: {
+            /** @description Root categories with nested `children`, siblings in position order. */
+            items: components["schemas"]["CategoryNode"][];
+        };
+        CategoryUpdate: {
+            /** Format: uuid */
+            image_asset_id?: string | null;
+            translations: components["schemas"]["CategoryTranslation"][];
+        };
         /** @enum {string} */
         CheckStatus: "ok" | "fail";
         Checks: {
             database: components["schemas"]["CheckStatus"];
             meilisearch: components["schemas"]["CheckStatus"];
             storage: components["schemas"]["CheckStatus"];
+        };
+        /** @description EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19). */
+        Gpsr: {
+            eu_responsible_person?: components["schemas"]["GpsrParty"] | null;
+            manufacturer?: components["schemas"]["GpsrParty"] | null;
+            /** @description Safety information per locale. */
+            safety_info?: components["schemas"]["BTreeMap"];
+            /** @description Warnings per locale. */
+            warnings?: components["schemas"]["BTreeMap"];
+        };
+        /** @description Name, postal address and an electronic contact (email or URL). */
+        GpsrParty: {
+            address: string;
+            email?: string | null;
+            name: string;
+            phone?: string | null;
+            url?: string | null;
         };
         Health: {
             status: components["schemas"]["CheckStatus"];
@@ -175,6 +515,16 @@ export interface components {
             /** Format: uuid */
             tenant_id: string;
         };
+        NewCategory: {
+            /** Format: uuid */
+            image_asset_id?: string | null;
+            /**
+             * Format: uuid
+             * @description `null` for a root category. The new category is appended to its siblings.
+             */
+            parent_id?: string | null;
+            translations: components["schemas"]["CategoryTranslation"][];
+        };
         NewMarket: {
             /**
              * @description Lowercase identifier, unique per tenant, e.g. `sk`.
@@ -208,6 +558,70 @@ export interface components {
             name: string;
             tax_mode?: components["schemas"]["TaxMode"];
         };
+        NewUpload: {
+            /**
+             * @description `image/jpeg`, `image/png`, `image/webp` or `image/gif`. Must be sent with the PUT.
+             * @example image/jpeg
+             */
+            content_type: string;
+            /**
+             * @description Original file name, for display only.
+             * @example tricko.jpg
+             */
+            filename?: string | null;
+            /**
+             * Format: int64
+             * @description Exact size in bytes (at most 20 MB); `complete` checks the uploaded file against it.
+             * @example 184320
+             */
+            size: number;
+        };
+        OptionValue: {
+            /** @example red */
+            code: string;
+            name_i18n: components["schemas"]["BTreeMap"];
+        };
+        Parameter: {
+            /** Format: date-time */
+            created_at: string;
+            filterable: boolean;
+            /** Format: uuid */
+            id: string;
+            key: string;
+            kind: components["schemas"]["ParameterKind"];
+            name_i18n: components["schemas"]["BTreeMap"];
+            unit?: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ParameterInput: {
+            filterable?: boolean;
+            /**
+             * @description Unique per tenant, e.g. `material`.
+             * @example material
+             */
+            key: string;
+            /** @description Cannot change while values exist. */
+            kind: components["schemas"]["ParameterKind"];
+            name_i18n: components["schemas"]["BTreeMap"];
+            /** @description Display unit for numbers, e.g. `cm`. */
+            unit?: string | null;
+        };
+        /** @enum {string} */
+        ParameterKind: "text" | "number" | "bool";
+        ParameterPage: {
+            items: components["schemas"]["Parameter"][];
+            /** @description Pass as `cursor` for the next page (the last key); absent on the last page. */
+            next_cursor?: string | null;
+        };
+        ParameterValue: {
+            /** Format: uuid */
+            parameter_id: string;
+            /** @description `{"cs": "bavlna"}` for text parameters, a number or a boolean otherwise. */
+            value: unknown;
+            /** @description Variant-level value (by SKU); omit for a product-level value. */
+            variant_sku?: string | null;
+        };
         /** @description RFC 9457 problem details body. */
         Problem: {
             /** @description Stable machine-readable error code, e.g. `not_found`. */
@@ -218,6 +632,114 @@ export interface components {
             title: string;
             /** @description Always `about:blank`; `code` carries the specific error kind. */
             type: string;
+        };
+        Product: {
+            brand?: string | null;
+            category_ids: string[];
+            /** Format: date-time */
+            created_at: string;
+            google_category?: string | null;
+            gpsr: components["schemas"]["Gpsr"];
+            heureka_category?: string | null;
+            /** Format: uuid */
+            id: string;
+            media: components["schemas"]["ProductMedia"][];
+            options: components["schemas"]["ProductOption"][];
+            parameters: components["schemas"]["ParameterValue"][];
+            status: components["schemas"]["ProductStatus"];
+            tax_categories: {
+                [key: string]: string;
+            };
+            translations: components["schemas"]["ProductTranslation"][];
+            unit_measure?: components["schemas"]["UnitMeasure"] | null;
+            /** Format: double */
+            unit_quantity?: number | null;
+            /** Format: date-time */
+            updated_at: string;
+            variants: components["schemas"]["Variant"][];
+        };
+        /** @description A product document, as written by `POST /products` and `PUT /products/{id}`. */
+        ProductInput: {
+            brand?: string | null;
+            category_ids?: string[];
+            google_category?: string | null;
+            gpsr?: components["schemas"]["Gpsr"];
+            heureka_category?: string | null;
+            /** @description In display order. */
+            media?: components["schemas"]["ProductMedia"][];
+            options?: components["schemas"]["ProductOption"][];
+            parameters?: components["schemas"]["ParameterValue"][];
+            status?: components["schemas"]["ProductStatus"];
+            /** @description Country -> tax category code (`reduced`, ...); countries not listed use `standard` (A3). */
+            tax_categories?: {
+                [key: string]: string;
+            };
+            translations: components["schemas"]["ProductTranslation"][];
+            unit_measure?: components["schemas"]["UnitMeasure"] | null;
+            /**
+             * Format: double
+             * @description Content in `unit_measure` units (0.75 for 750 ml with `l`); set together with it.
+             */
+            unit_quantity?: number | null;
+            variants?: components["schemas"]["VariantInput"][];
+        };
+        ProductMedia: {
+            alt_i18n?: components["schemas"]["BTreeMap"];
+            /** Format: uuid */
+            asset_id: string;
+            /** @description Shows the image for one variant only (by SKU). */
+            variant_sku?: string | null;
+        };
+        ProductOption: {
+            /**
+             * @description Referenced by `variants[].option_values`, e.g. `color`.
+             * @example color
+             */
+            code: string;
+            name_i18n: components["schemas"]["BTreeMap"];
+            values: components["schemas"]["OptionValue"][];
+        };
+        ProductPage: {
+            items: components["schemas"]["ProductSummary"][];
+            /**
+             * Format: uuid
+             * @description Pass as `cursor` for the next page; absent on the last page.
+             */
+            next_cursor?: string | null;
+        };
+        /** @enum {string} */
+        ProductStatus: "draft" | "active" | "archived";
+        /** @description A row of the product list. */
+        ProductSummary: {
+            brand?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            default_sku?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description Locale -> name. */
+            name: components["schemas"]["BTreeMap"];
+            status: components["schemas"]["ProductStatus"];
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: int64 */
+            variant_count: number;
+        };
+        ProductTranslation: {
+            /** @description Sanitized on write: unsafe markup is removed. */
+            description_html?: string;
+            /** @example cs */
+            locale: string;
+            /** @example Tričko Basic */
+            name: string;
+            seo_description?: string | null;
+            seo_title?: string | null;
+            short_description?: string;
+            /**
+             * @description Unique per tenant and locale.
+             * @example tricko-basic
+             */
+            slug: string;
         };
         Readiness: {
             checks: components["schemas"]["Checks"];
@@ -247,11 +769,82 @@ export interface components {
          * @enum {string}
          */
         Role: "staff" | "admin" | "owner";
+        TaxCategory: {
+            /** @example reduced */
+            code: string;
+            /** @example CZ */
+            country: string;
+            /**
+             * @description Percent as a decimal string, e.g. `"12"` or `"13.5"`.
+             * @example 12
+             */
+            rate: string;
+            /** Format: date */
+            valid_from: string;
+        };
+        TaxCategoryList: {
+            items: components["schemas"]["TaxCategory"][];
+        };
         /**
          * @description Whether prices are entered gross (B2C, default) or net.
          * @enum {string}
          */
         TaxMode: "gross" | "net";
+        /**
+         * @description Basis of the unit price shown next to the price (per kg, per l, ...).
+         * @enum {string}
+         */
+        UnitMeasure: "kg" | "l" | "m" | "m2" | "pcs";
+        Upload: {
+            asset: components["schemas"]["Asset"];
+            upload: components["schemas"]["UploadTarget"];
+        };
+        /** @description Where and how to upload the file. */
+        UploadTarget: {
+            /** Format: date-time */
+            expires_at: string;
+            /** @description Headers the upload must send exactly as given (they are part of the signature). */
+            headers: {
+                [key: string]: string;
+            };
+            /** @example PUT */
+            method: string;
+            url: string;
+        };
+        Variant: {
+            ean?: string | null;
+            /** Format: uuid */
+            id: string;
+            is_default: boolean;
+            option_values: {
+                [key: string]: string;
+            };
+            sku: string;
+            /** Format: int32 */
+            weight_g?: number | null;
+        };
+        VariantInput: {
+            /** @description GTIN-8/12/13/14 with a valid check digit. */
+            ean?: string | null;
+            /**
+             * Format: uuid
+             * @description Existing variant to update; omit for a new variant.
+             */
+            id?: string | null;
+            /** @description At most one; defaults to the first variant. */
+            is_default?: boolean;
+            /** @description One value code per product option: `{"color": "red", "size": "m"}`. */
+            option_values?: {
+                [key: string]: string;
+            };
+            /**
+             * @description Unique per tenant.
+             * @example TS-RED-M
+             */
+            sku: string;
+            /** Format: int32 */
+            weight_g?: number | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -261,6 +854,199 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_assets: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+                status?: components["schemas"]["AssetStatus"];
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_upload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewUpload"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Upload"];
+                };
+            };
+            /** @description `unsupported_type`, `file_too_large` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_asset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_asset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    complete_upload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `upload_missing` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `unsupported_type`, `file_too_large`, `image_too_large`, `corrupt_image`, `size_mismatch` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     audit_log: {
         parameters: {
             query?: {
@@ -295,6 +1081,239 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    category_tree: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryTree"];
+                };
+            };
+        };
+    };
+    create_category: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewCategory"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_category: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_category: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_category: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    move_category: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryMove"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -420,6 +1439,475 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_parameters: {
+        parameters: {
+            query?: {
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 100). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParameterPage"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_parameter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParameterInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parameter"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_parameter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parameter"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_parameter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParameterInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Parameter"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_parameter: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_products: {
+        parameters: {
+            query?: {
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+                status?: components["schemas"]["ProductStatus"];
+                /** @description Only products in this category (not its subcategories). */
+                category_id?: string;
+                /** @description Case-insensitive substring of a product name (any locale) or a SKU. */
+                q?: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_product: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `sku_taken`, `slug_taken`, `idempotency_conflict` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_product: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    replace_product: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Product"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_product: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_tax_categories: {
+        parameters: {
+            query?: {
+                /** @description ISO 3166-1 alpha-2, e.g. `CZ`; all EU countries when omitted. */
+                country?: string;
+                /** @description Rates in force on this date (default today). */
+                at?: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxCategoryList"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

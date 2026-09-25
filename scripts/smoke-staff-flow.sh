@@ -4,37 +4,8 @@
 # Admin API through Caddy (me, markets, idempotency, audit log, cross-tenant 403) ->
 # internal host resolution -> custom domain verification via the DNS stub.
 # Needs curl and jq. Reads ports from .env.
-set -euo pipefail
-cd "$(dirname "$0")/.."
-set -a
-# shellcheck disable=SC1091
-source .env
-set +a
-
-http="http://%s.localhost:${HTTP_PORT:-8080}"
-api=$(printf "$http" api)
-auth=$(printf "$http" auth)
-mailpit="http://127.0.0.1:${MAILPIT_UI_PORT:-58025}"
-compose=(docker compose)
-run=$RANDOM$RANDOM
-jar=$(mktemp)
-trap 'rm -f "$jar"' EXIT
-
-step() { printf '\n== %s\n' "$*"; }
-fail() {
-  echo "FAIL: $*" >&2
-  exit 1
-}
-expect_status() { # expect_status <want> <curl args...>
-  local want=$1
-  shift
-  local got
-  got=$(curl -s -o /tmp/smoke-body.$$ -w '%{http_code}' "$@")
-  [[ $got == "$want" ]] || fail "expected $want, got $got: $(cat /tmp/smoke-body.$$)"
-  cat /tmp/smoke-body.$$
-  rm -f /tmp/smoke-body.$$
-}
-admin() { "${compose[@]}" exec -T api /usr/local/bin/api admin "$@"; }
+# shellcheck source=lib/smoke.sh
+source "$(dirname "$0")/lib/smoke.sh"
 
 step "create two tenants with the superadmin CLI"
 a=$(admin create-tenant --slug "acme-$run" --name "Acme $run" --owner-email "owner-$run@example.test")
@@ -43,23 +14,8 @@ tenant_a=$(jq -r .tenant_id <<<"$a")
 tenant_b=$(jq -r .tenant_id <<<"$b")
 echo "tenant A $tenant_a, tenant B $tenant_b"
 
-step "magic link from Mailpit"
-link=""
-for _ in $(seq 1 30); do
-  id=$(curl -s "$mailpit/api/v1/search?query=to:owner-$run@example.test" | jq -r '.messages[0].ID // empty')
-  if [[ -n $id ]]; then
-    link=$(curl -s "$mailpit/api/v1/message/$id" | jq -r .Text | grep -o 'http://auth\.localhost[^[:space:]]*' | head -1)
-    break
-  fi
-  sleep 1
-done
-[[ -n $link ]] || fail "no magic link email"
-echo "${link%%token=*}token=<redacted>"
-
-step "sign in: verify the link (session cookie), then get a JWT"
-status=$(curl -s -o /dev/null -w '%{http_code}' -c "$jar" "$link")
-[[ $status == 302 ]] || fail "magic link verify returned $status"
-jwt=$(expect_status 200 -b "$jar" "$auth/api/auth/token" | jq -r .token)
+step "sign in: magic link from Mailpit -> session cookie -> JWT"
+jwt=$(login "owner-$run@example.test")
 jq -R 'split(".")[1] | @base64d | fromjson | {iss, aud, email, email_verified, lifetime: (.exp - .iat)}' <<<"$jwt"
 
 step "GET /admin/v1/me"

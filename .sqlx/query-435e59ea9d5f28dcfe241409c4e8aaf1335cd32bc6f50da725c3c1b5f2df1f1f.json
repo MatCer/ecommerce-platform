@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.asset_id, v.sku AS \"variant_sku?\", m.alt_i18n\n         FROM product_media m LEFT JOIN variants v ON v.id = m.variant_id\n         WHERE m.product_id = $1 ORDER BY m.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "asset_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "asset_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_sku?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "sku"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "alt_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "alt_i18n"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "435e59ea9d5f28dcfe241409c4e8aaf1335cd32bc6f50da725c3c1b5f2df1f1f"
+}

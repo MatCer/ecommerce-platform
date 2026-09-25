@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_categories WHERE product_id = $1 AND NOT (category_id = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "98388a301c0171e26664a5fecedea5590e1219f223317c165ea3131b1b5d6c27"
+}
