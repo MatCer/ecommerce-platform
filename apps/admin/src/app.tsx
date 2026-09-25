@@ -42,6 +42,7 @@ const AiBulkEdit = lazy(() => import("./pages/AiBulkEdit.tsx"));
 const AiSettings = lazy(() => import("./pages/AiSettings.tsx"));
 const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
+const Themes = lazy(() => import("./pages/Themes.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -102,6 +103,7 @@ export function App() {
           <Route path="/content/menus" component={ContentMenus} />
           <Route path="/content/legal" component={ContentLegal} />
           <Route path="/content/redirects" component={Redirects} />
+          <Route path="/themes" component={Themes} />
           <Route path="/imports" component={Imports} />
           <Route path="/imports/:id" component={Imports} />
           <Route path="/feeds" component={ExportFeeds} />

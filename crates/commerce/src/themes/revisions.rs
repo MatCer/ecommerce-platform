@@ -126,7 +126,7 @@ pub struct RevisionDetail {
     #[schema(value_type = Object)]
     pub checks: Value,
     /// Design tokens of the built artifact (`colors`, `fonts`, `radius`), if built.
-    #[schema(value_type = Option<Object>)]
+    #[schema(value_type = Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>)]
     pub tokens: Option<Value>,
     pub screenshots: Vec<Screenshot>,
 }
@@ -463,7 +463,7 @@ pub struct TokensInput {
     /// The revision whose source is edited; default: the active revision.
     pub base_revision_id: Option<Uuid>,
     /// `{colors, fonts, radius}`: allowlisted keys and values (A6).
-    #[schema(value_type = Object)]
+    #[schema(value_type = std::collections::HashMap<String, std::collections::HashMap<String, String>>)]
     pub tokens: Value,
 }
 

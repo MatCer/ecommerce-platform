@@ -22640,7 +22640,19 @@
               "object",
               "null"
             ],
-            "description": "Design tokens of the built artifact (`colors`, `fonts`, `radius`), if built."
+            "description": "Design tokens of the built artifact (`colors`, `fonts`, `radius`), if built.",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         }
       },
@@ -24264,7 +24276,19 @@
           },
           "tokens": {
             "type": "object",
-            "description": "`{colors, fonts, radius}`: allowlisted keys and values (A6)."
+            "description": "`{colors, fonts, radius}`: allowlisted keys and values (A6).",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

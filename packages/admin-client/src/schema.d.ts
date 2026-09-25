@@ -5535,7 +5535,11 @@ export interface components {
             revision: components["schemas"]["RevisionSummary"];
             screenshots: components["schemas"]["Screenshot"][];
             /** @description Design tokens of the built artifact (`colors`, `fonts`, `radius`), if built. */
-            tokens?: Record<string, never> | null;
+            tokens?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            } | null;
         };
         RevisionList: {
             items: components["schemas"]["RevisionSummary"][];
@@ -6080,7 +6084,11 @@ export interface components {
              */
             base_revision_id?: string | null;
             /** @description `{colors, fonts, radius}`: allowlisted keys and values (A6). */
-            tokens: Record<string, never>;
+            tokens: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
         };
         /**
          * @description Voice of generated descriptions.
