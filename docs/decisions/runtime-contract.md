@@ -352,3 +352,18 @@ separate cache namespace, never cached (already bypassed by the policy).
 - **Storefront API authorization:** token → tenant (401), market loaded under that tenant's RLS
   (403 `market_mismatch`), a disagreeing `X-Tenant` is 403. Caddy no longer proxies
   `api.localhost/storefront/*`.
+- **Publishing safety:** `make theme-build` runs `theme-kit verify` (content address recomputed
+  from the files, exact file set) before `publish-artifacts`; registration is serialized per id
+  (advisory lock) and a registered id is immutable (different bytes → `409 artifact_mismatch`).
+  The edge additionally refuses a manifest whose runtime section (entry point, compatibility
+  date/flags) differs from the platform's, and an artifact of the wrong kind for theme/checkout.
+- **Measured on the seeded demo shop** (`make perf`, 3-run medians, compose stack over h2):
+
+  | Page | LCP | TBT | CLS | JS gz | calls |
+  |---|---|---|---|---|---|
+  | `/` | 1053 ms | 0 | 0.017 | 21.3 kB | 2 |
+  | `/c/trika` | 1053 ms | 0 | 0.007 | 22.4 kB | 2 |
+  | `/p/tricko-basic` | 1352 ms | 0 | 0.000 | 24.6 kB | 2 |
+
+  The PDP needed a 720 px image variant: with only 640/960 the 412 px @1.75 viewport loaded the
+  960 px file and LCP was 1.8 s. The media pipeline now also emits 480 and 720.
