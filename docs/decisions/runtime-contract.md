@@ -181,6 +181,7 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
 | `<shop>/_p/checkout/start` (POST) | handoff (§7) |
 | `<shop>/_p/public/<storefront op>` (GET) | public page-model reads for islands |
 | `<shop>/_p/e`, `/_p/newsletter` (POST) | events beacon, newsletter |
+| `<shop>/_p/consent`, `checkout.<shop>/_p/consent` (GET, POST) | consent (A20, `consent-contract.md`) |
 | `<shop>/_p/speculation-rules.json` | rules |
 | other `/_p/*`, `/_edge/*` | 404 |
 | `<shop>/media/*` | media origin (image variants) |
@@ -189,6 +190,7 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
 | `<shop>` anything else (GET/HEAD only, else 405) | theme worker |
 | `checkout.<shop>/start?h=` | handoff exchange |
 | `checkout.<shop>/_p/tokens.css` | tenant tokens as CSS (A6) |
+| `checkout.<shop>/_p/account/*` | customer accounts → `/storefront/v1/customer/*` (WP9, §12) |
 | `checkout.<shop>` assets / everything else | checkout artifact / checkout worker (always `no-store`) |
 | `preview-*` | 404 until WP23 |
 | internal port 8788: `/_edge/purge`, `/_edge/healthz` | bearer `EDGE_PURGE_TOKEN` (constant-time compare, ≥ 16 chars); not routed by Caddy |
@@ -374,3 +376,22 @@ separate cache namespace, never cached (already bypassed by the policy).
   engine's `f.<facet key>` parameters in both paths. `/storefront/v1/search` and
   `/search/suggest` use the storefront-token model like every storefront call; islands reach
   them as `/_p/public/search*`. `make seed` queues a full index rebuild.
+
+## 12. WP9: customer accounts and consent on the edge
+
+- `checkout.<shop>/_p/account/{magic-link, magic-link/consume, login, logout, me, password,
+  addresses[/<id>]}` proxy to `/storefront/v1/customer/*`. State-changing calls need a
+  same-origin `Origin` (else `Sec-Fetch-Site: same-origin`) and a JSON body (CSRF, §14).
+- The session is `__Host-sid` (HttpOnly, Secure, SameSite=Lax, host-only on the checkout
+  origin, 30 days, renewed on every successful account call). The API returns a new session
+  in `X-Session-Token` and asks for deletion with `X-Session-Clear: 1` (or a `401`); the edge
+  turns both into `Set-Cookie` and never forwards them. The shop origin never sees the session.
+- The edge forwards the session (`X-Customer-Session`), the checkout cart (`X-Cart-Token`,
+  merged into the customer's cart on sign-in, A4), the consent subject (`X-Consent-Subject`)
+  and the client IP (`X-Client-Ip`, the last `X-Forwarded-For` hop appended by Caddy; used
+  for rate limits and stored only as a salted hash). All of these are stripped from client
+  requests and refused from workers.
+- SSR pages of the checkout app get the session and consent subject through the `CHECKOUT`
+  binding context (`GET /customer/me`, `/customer/addresses`, `/consent`), never the cookies.
+- Pages with a `token` query parameter (`/account/verify?token=`) are served with
+  `Referrer-Policy: no-referrer`.

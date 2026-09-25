@@ -28,3 +28,9 @@
 | WP6 | The probe theme does not render the second card image (it would compete with the LCP) | WP8 |
 | WP6 | Artifact builds are not reproducible: Astro embeds a random per-build `key` (server islands), so ids change on every build; set `ASTRO_KEY` per publish from a platform secret | WP23 |
 | WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart) | WP10 |
+| WP9 | `customer.email_verified` is published but nothing links guest orders yet (A5 hook) | WP10 |
+| WP9 | Email suppressions are added manually (`api admin suppress-email`); no bounce/complaint ingestion from the provider (SES notifications) | WP14 / pre-launch |
+| WP9 | Per-tenant editable email subject/intro text (§11.4) and a tenant logo in emails (no logo in the data model yet; the shop name is the wordmark) | WP13 |
+| WP9 | Marketing stream has no `List-Unsubscribe` headers yet (no marketing mail exists) | M2 (newsletter) |
+| WP9 | No admin view of `email_messages` (states, failures) or of the suppression list | WP14 |
+| WP9 | The default theme's banner must post the consent contract (`docs/decisions/consent-contract.md`) and read the `consent` cookie | WP8 |
