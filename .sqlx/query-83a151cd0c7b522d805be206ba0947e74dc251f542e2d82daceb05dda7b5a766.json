@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE documents SET status = 'ready', object_key = $2, updated_at = now()\n                 WHERE id = $1 AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "83a151cd0c7b522d805be206ba0947e74dc251f542e2d82daceb05dda7b5a766"
+}

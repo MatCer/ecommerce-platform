@@ -540,6 +540,7 @@ pub async fn analyze(
     id: Uuid,
     input: &AnalyzeInput,
 ) -> Result<DataImport, Error> {
+    lock_tenant(tx).await?;
     let r = row(tx, id).await?;
     if !matches!(
         DataImportStatus::parse(&r.status),
@@ -581,8 +582,21 @@ pub async fn analyze(
     get(tx, id).await
 }
 
+/// Serializes starting imports and exports with personal-data erasures of the tenant
+/// (transaction-scoped advisory lock).
+pub async fn lock_tenant(tx: &mut TenantTx) -> Result<(), Error> {
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('data_portability:' || $1::text, 0))",
+        tx.tenant_id().to_string()
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 /// Applies an analyzed run.
 pub async fn apply(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<DataImport, Error> {
+    lock_tenant(tx).await?;
     let r = row(tx, id).await?;
     if DataImportStatus::parse(&r.status) != DataImportStatus::Analyzed {
         return Err(Error::Conflict {
@@ -664,10 +678,12 @@ pub async fn run_step(
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;
+    // A fixed clock for "not in the future" (nothing in the file can be newer than the run),
+    // so the dry run, the apply and every retry derive exactly the same records.
     let d = Defaults {
         market_id: r.market_id,
         locale,
-        now: Utc::now(),
+        now: r.created_at,
     };
     let key = object_key(tenant_id, id);
     if step == "analyze" {
@@ -763,6 +779,9 @@ pub async fn run_step(
         )
         .execute(&mut *tx)
         .await?;
+        if last {
+            delete_files(&mut tx, id).await?;
+        }
         tx.commit().await?;
         start = end;
     }
@@ -777,14 +796,21 @@ pub async fn run_step(
         )
         .execute(&mut *tx)
         .await?;
+        delete_files(&mut tx, id).await?;
         tx.commit().await?;
     }
-    // The file holds personal data: once applied it is not kept.
-    for k in [upload_key(tenant_id, id), key] {
-        match storage.private.delete(&k).await {
-            Ok(()) | Err(object_store::Error::NotFound { .. }) => {}
-            Err(e) => tracing::warn!(import = %id, error = %e, "import file not deleted"),
-        }
-    }
+    Ok(())
+}
+
+/// The CSV holds personal data: once the run is applied, both copies are deleted by a queued
+/// (retried) job, enqueued in the transaction that marks the run applied.
+async fn delete_files(tx: &mut TenantTx, id: Uuid) -> Result<(), Error> {
+    let tenant_id = tx.tenant_id();
+    let keys = [upload_key(tenant_id, id), object_key(tenant_id, id)].map(|k| k.to_string());
+    let mut job = NewJob::new(crate::privacy::DELETE_OBJECTS_JOB, json!({ "keys": keys }));
+    job.tenant_id = Some(tenant_id);
+    job.max_attempts = 10;
+    job.idempotency_key = Some(format!("{JOB}:{id}:files"));
+    queue::enqueue(&mut **tx, &job).await?;
     Ok(())
 }

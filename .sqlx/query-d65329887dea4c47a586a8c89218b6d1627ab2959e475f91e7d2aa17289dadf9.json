@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT pg_advisory_xact_lock(hashtextextended('data_export:' || $1::text, 0))",
+  "query": "SELECT pg_advisory_xact_lock(hashtextextended('data_portability:' || $1::text, 0))",
   "describe": {
     "columns": [
       {
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "f7cce77d773dd3227990014ccf949bd8a97a3a21591b5b4fb6ba08831c769898"
+  "hash": "d65329887dea4c47a586a8c89218b6d1627ab2959e475f91e7d2aa17289dadf9"
 }

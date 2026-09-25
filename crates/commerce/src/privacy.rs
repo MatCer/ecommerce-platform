@@ -219,6 +219,14 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
     )
     .fetch_one(&mut **tx)
     .await?;
+    let bank_transactions = sqlx::query_scalar!(
+        r#"SELECT coalesce(jsonb_agg(to_jsonb(b) ORDER BY b.booked_on), '[]') AS "v!"
+           FROM bank_transactions b
+           WHERE b.attempt_id IN (SELECT p.id FROM payment_attempts p WHERE p.order_id = ANY($1))"#,
+        &ids
+    )
+    .fetch_one(&mut **tx)
+    .await?;
     let payments = sqlx::query_scalar!(
         r#"SELECT coalesce(jsonb_agg(to_jsonb(p) ORDER BY p.created_at), '[]') AS "v!"
            FROM payment_attempts p WHERE p.order_id = ANY($1)"#,
@@ -275,6 +283,7 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
         "shipments": shipments,
         "payments": payments,
         "refunds": refunds,
+        "bank_transactions": bank_transactions,
         "campaign_sends": campaign_sends,
         "recommendation_affinity": affinity,
     }))
@@ -311,14 +320,11 @@ pub async fn erase(
             detail: "confirm_email must repeat the address".into(),
         });
     }
+    // Imports and exports take this lock before they start, so none can begin between the
+    // busy check below and the commit.
+    crate::portability::imports::lock_tenant(tx).await?;
     // The same row locks as refunds and withdrawals take (orders::lock), in a fixed order,
     // so nothing can start on these orders between the checks and the anonymization.
-    sqlx::query!(
-        "SELECT id FROM customers WHERE id = $1 FOR UPDATE",
-        s.customer_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
     let ids = sqlx::query_scalar!(
         "SELECT id FROM orders WHERE email = $1 OR customer_id = $2 ORDER BY id FOR UPDATE",
         s.email,
@@ -412,12 +418,15 @@ pub async fn erase(
             r#"UPDATE documents d SET status = 'failed', object_key = NULL,
                    error = 'removed by a personal-data erasure', updated_at = now()
                FROM documents old
-               WHERE old.id = d.id AND d.order_ids && $1 AND d.object_key IS NOT NULL
-               RETURNING old.object_key AS "k!""#,
+               WHERE old.id = d.id AND d.order_ids && $1
+                 AND (d.object_key IS NOT NULL OR d.status = 'pending')
+               RETURNING old.object_key"#,
             &ids
         )
         .fetch_all(&mut **tx)
-        .await?,
+        .await?
+        .into_iter()
+        .flatten(),
     );
     objects.extend(
         sqlx::query_scalar!("DELETE FROM data_exports RETURNING object_key")
@@ -425,15 +434,19 @@ pub async fn erase(
             .await?,
     );
     let tenant = tx.tenant_id();
-    for id in sqlx::query_scalar!(
-        "UPDATE data_imports SET status = 'failed', report = NULL, updated_at = now(),
-             error = 'discarded by a personal-data erasure; upload the file again'
-         WHERE status IN ('pending', 'analyzed', 'failed')
-         RETURNING id"
+    // Runs not applied yet are dropped (their files may hold the person); applied runs keep
+    // their counts. Every run's CSV objects are deleted (applied ones normally are already).
+    let mut import_ids = sqlx::query_scalar!(
+        "DELETE FROM data_imports WHERE status IN ('pending', 'analyzed', 'failed') RETURNING id"
     )
     .fetch_all(&mut **tx)
-    .await?
-    {
+    .await?;
+    import_ids.extend(
+        sqlx::query_scalar!("SELECT id FROM data_imports")
+            .fetch_all(&mut **tx)
+            .await?,
+    );
+    for id in import_ids {
         objects.push(format!("data-import-uploads/{tenant}/{id}.csv"));
         objects.push(format!("data-imports/{tenant}/{id}.csv"));
     }
@@ -574,8 +587,9 @@ pub async fn erase(
     Ok(report)
 }
 
-/// The job deleting the private objects of an erasure (payload `{"keys": [...]}`); a missing
-/// object counts as deleted, any other failure retries the job.
+/// The job deleting private objects holding personal data (an erasure's files, applied import
+/// CSVs), payload `{"keys": [...]}`; a missing object counts as deleted, any other failure
+/// retries the job.
 pub const DELETE_OBJECTS_JOB: &str = "privacy.delete_objects";
 
 pub async fn delete_objects(

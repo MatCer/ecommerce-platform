@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE data_imports SET status = 'failed', report = NULL, updated_at = now(),\n             error = 'discarded by a personal-data erasure; upload the file again'\n         WHERE status IN ('pending', 'analyzed', 'failed')\n         RETURNING id",
+  "query": "DELETE FROM data_imports WHERE status IN ('pending', 'analyzed', 'failed') RETURNING id",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "189bcafcf6826b09d163b33849209d300593f0597c9ac7fbfe827d3d1e89dbe8"
+  "hash": "01084adcb51319b5fe153e78a86363b6e83fdb73bd8797c984aee1007791b4ce"
 }

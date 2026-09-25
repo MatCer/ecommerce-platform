@@ -111,7 +111,7 @@ impl Ctx {
         [
             self.count("SELECT count(*) FROM email_messages").await,
             q("SELECT count(*) FROM queue.outbox").await,
-            q("SELECT count(*) FROM queue.jobs WHERE kind <> 'data.import'").await,
+            q("SELECT count(*) FROM queue.jobs WHERE kind NOT IN ('data.import', 'privacy.delete_objects')").await,
             self.count("SELECT count(*) FROM orders").await,
             self.count("SELECT count(*) FROM stock_movements").await,
             self.count("SELECT count(*) FROM invoices").await,
@@ -168,9 +168,20 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
             .await,
         1
     );
-    // The CSV (personal data) is gone once applied.
-    let key = Path::from(format!("data-imports/{}/{}.csv", c.shop.tenant, run.id));
-    assert!(c.storage.private.head(&key).await.is_err());
+    // The CSV (personal data) is deleted by a queued job once applied.
+    let key = format!("data-imports/{}/{}.csv", c.shop.tenant, run.id);
+    let keys: serde_json::Value = sqlx::query_scalar(
+        "SELECT payload->'keys' FROM queue.jobs WHERE kind = 'privacy.delete_objects'",
+    )
+    .fetch_one(&c.owner)
+    .await
+    .unwrap();
+    let keys: Vec<String> = serde_json::from_value(keys).unwrap();
+    assert!(keys.contains(&key), "{keys:?}");
+    privacy::delete_objects(&c.storage, c.shop.tenant, &keys)
+        .await
+        .unwrap();
+    assert!(c.storage.private.head(&Path::from(key)).await.is_err());
 
     // Same file again: updates, no duplicates (customers, addresses).
     let again = c.analyzed(DataImportKind::Customers, CUSTOMERS, m).await;
@@ -781,10 +792,11 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
         (1, 1)
     );
     assert_eq!(report.consent_records_pseudonymized, 2);
-    // Label, export zip, and both CSV keys of the discarded import.
-    assert_eq!(report.files_deleted, 4);
+    // Label, export zip, and both CSV keys of the three applied and the discarded import.
+    assert_eq!(report.files_deleted, 10);
     let keys: serde_json::Value = sqlx::query_scalar(
-        "SELECT payload->'keys' FROM queue.jobs WHERE kind = 'privacy.delete_objects'",
+        "SELECT payload->'keys' FROM queue.jobs WHERE kind = 'privacy.delete_objects'
+         ORDER BY id DESC LIMIT 1",
     )
     .fetch_one(&c.owner)
     .await
@@ -803,10 +815,12 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
             .is_err()
     );
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    let discarded = imports::get(&mut tx, pending_import.id).await.unwrap();
+    let discarded = imports::get(&mut tx, pending_import.id).await;
     tx.commit().await.unwrap();
-    assert_eq!(discarded.status, DataImportStatus::Failed);
-    assert!(discarded.report.is_none());
+    assert!(
+        matches!(discarded, Err(platform::Error::NotFound)),
+        "an unapplied import is dropped"
+    );
 
     let n = |sql: &'static str| c.count(sql);
     assert_eq!(n("SELECT count(*) FROM customers").await, 0);

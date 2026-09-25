@@ -154,12 +154,8 @@ pub async fn list(tx: &mut TenantTx) -> Result<DataExportList, Error> {
 
 /// Starts an export; one at a time per tenant.
 pub async fn create(tx: &mut TenantTx, actor: &str) -> Result<DataExport, Error> {
-    sqlx::query!(
-        "SELECT pg_advisory_xact_lock(hashtextextended('data_export:' || $1::text, 0))",
-        tx.tenant_id().to_string()
-    )
-    .fetch_one(&mut **tx)
-    .await?;
+    // Also serializes with erasures, which refuse to run while an export is pending.
+    super::imports::lock_tenant(tx).await?;
     let busy = sqlx::query_scalar!(
         r#"SELECT count(*) AS "n!" FROM data_exports WHERE status IN ('pending', 'running')"#
     )

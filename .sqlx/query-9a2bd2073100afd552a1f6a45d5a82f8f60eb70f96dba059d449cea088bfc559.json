@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE documents d SET status = 'failed', object_key = NULL,\n                   error = 'removed by a personal-data erasure', updated_at = now()\n               FROM documents old\n               WHERE old.id = d.id AND d.order_ids && $1\n                 AND (d.object_key IS NOT NULL OR d.status = 'pending')\n               RETURNING old.object_key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "object_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "documents",
+            "name": "object_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "9a2bd2073100afd552a1f6a45d5a82f8f60eb70f96dba059d449cea088bfc559"
+}
