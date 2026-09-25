@@ -269,3 +269,24 @@ test("lists export channels and saves synonyms", async () => {
   await page.reload();
   await expect(page.getByLabel("Synonym groups", { exact: true })).toHaveValue("boty, obuv");
 });
+
+test("creates and deletes a redirect", async () => {
+  await nav("Redirects").click();
+  await expect(page.getByRole("heading", { name: "Redirects", exact: true })).toBeVisible();
+  const form = page.getByRole("form", { name: "New redirect" });
+  await form.getByLabel("From path").fill("/stara-akce");
+  await form.getByLabel("To path").fill("/pages/doprava");
+  await form.getByRole("button", { name: "Create", exact: true }).click();
+  const row = page.getByRole("row").filter({ hasText: "/stara-akce" });
+  await expect(row).toContainText("/pages/doprava");
+  await expect(row).toContainText("301");
+  await expectAccessible(page, "redirects");
+  // Invalid targets are refused with the API's explanation.
+  await form.getByLabel("From path").fill("/x");
+  await form.getByLabel("To path").fill("https://evil.example");
+  await form.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("same shop");
+  await row.getByRole("button", { name: "Delete: /stara-akce" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(row).toHaveCount(0);
+});

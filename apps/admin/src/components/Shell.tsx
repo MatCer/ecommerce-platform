@@ -44,6 +44,7 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/content/blog", label: () => t("content.blog"), min: "staff" },
       { href: "/content/menus", label: () => t("content.menus"), min: "staff" },
       { href: "/content/legal", label: () => t("content.legal"), min: "staff" },
+      { href: "/content/redirects", label: () => t("redirects.title"), min: "staff" },
     ],
   },
   {

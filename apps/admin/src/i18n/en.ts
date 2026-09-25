@@ -1,5 +1,21 @@
 /** English UI strings; the source of the dictionary shape (cs and sk must match it). */
 export const en = {
+  redirects: {
+    title: "Redirects",
+    description:
+      "Old shop paths sent to new ones (301 permanent, 302 temporary). Imports add them from old product URLs.",
+    new: "New redirect",
+    from: "From path",
+    to: "To path",
+    code: "Type",
+    permanent: "301 permanent",
+    temporary: "302 temporary",
+    empty: "No redirects yet",
+    emptyDesc: "Add one above, or import a feed to redirect old product URLs.",
+    more: "Load more",
+    deleteTitle: "Delete the redirect from {{path}}?",
+    deleteDesc: "Visitors of the old path will see “not found”.",
+  },
   content: {
     content: "Content",
     pages: "Pages",
@@ -166,6 +182,7 @@ export const en = {
     synonymError:
       "Use at most 500 groups, each with 2–20 distinct terms of 1–50 printable characters. Check line {{line}}.",
     noEntries: "No entries yet",
+  },
   checkout: {
     market: "Market",
     name: "Name",

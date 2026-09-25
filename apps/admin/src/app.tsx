@@ -28,6 +28,7 @@ const ContentPages = lazy(() => import("./pages/ContentPages.tsx"));
 const ContentEditor = lazy(() => import("./pages/ContentEditor.tsx"));
 const ContentMenus = lazy(() => import("./pages/ContentMenus.tsx"));
 const ContentLegal = lazy(() => import("./pages/ContentLegal.tsx"));
+const Redirects = lazy(() => import("./pages/Redirects.tsx"));
 const Imports = lazy(() => import("./pages/Imports.tsx"));
 const ExportFeeds = lazy(() => import("./pages/ExportFeeds.tsx"));
 const SearchSynonyms = lazy(() => import("./pages/SearchSynonyms.tsx"));
@@ -93,6 +94,7 @@ export function App() {
           <Route path="/content/blog/:id" component={ContentEditor} />
           <Route path="/content/menus" component={ContentMenus} />
           <Route path="/content/legal" component={ContentLegal} />
+          <Route path="/content/redirects" component={Redirects} />
           <Route path="/imports" component={Imports} />
           <Route path="/imports/:id" component={Imports} />
           <Route path="/feeds" component={ExportFeeds} />

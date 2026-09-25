@@ -1,6 +1,22 @@
 import type { Dictionary } from "./en.ts";
 
 export const cs: Dictionary = {
+  redirects: {
+    title: "Přesměrování",
+    description:
+      "Staré adresy obchodu vedené na nové (301 trvalé, 302 dočasné). Importy je zakládají ze starých URL produktů.",
+    new: "Nové přesměrování",
+    from: "Z cesty",
+    to: "Na cestu",
+    code: "Typ",
+    permanent: "301 trvalé",
+    temporary: "302 dočasné",
+    empty: "Zatím žádná přesměrování",
+    emptyDesc: "Přidejte je výše, nebo importujte feed a přesměrujte staré URL produktů.",
+    more: "Načíst další",
+    deleteTitle: "Smazat přesměrování z {{path}}?",
+    deleteDesc: "Návštěvníci staré adresy uvidí „nenalezeno“.",
+  },
   content: {
     content: "Obsah",
     pages: "Stránky",
@@ -167,6 +183,7 @@ export const cs: Dictionary = {
     synonymError:
       "Použijte nejvýše 500 skupin, každou s 2–20 různými výrazy o 1–50 tisknutelných znacích. Zkontrolujte řádek {{line}}.",
     noEntries: "Zatím žádné položky",
+  },
   checkout: {
     market: "Trh",
     name: "Název",
