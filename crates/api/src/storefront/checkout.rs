@@ -28,7 +28,9 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
-use super::customer::{CONSENT_SUBJECT_HEADER, SESSION_HEADER, header_str, ip_hash, no_store};
+use super::customer::{
+    CLIENT_UA_HEADER, CONSENT_SUBJECT_HEADER, SESSION_HEADER, header_str, ip_hash, no_store,
+};
 use super::{CART_HEADER, CartHeader, Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
 use crate::admin::{IdempotencyHeader, REPLAYED, idempotency_key, parse_json};
@@ -268,7 +270,7 @@ async fn place_order(
             None => None,
         };
         let ip = ip_hash(tx, &headers).await?;
-        checkout::place_order(
+        let placed = checkout::place_order(
             tx,
             ctx,
             &s.checkout,
@@ -281,7 +283,14 @@ async fn place_order(
                 ip_hash: ip.as_deref(),
             },
         )
-        .await
+        .await?;
+        // WP20: the purchase for the ad platforms, in the placement transaction, only while
+        // the visitor's consent subject grants `ads` (checked again when sending).
+        if let Some(subject) = header_str(&headers, CONSENT_SUBJECT_HEADER) {
+            let ua = header_str(&headers, CLIENT_UA_HEADER);
+            commerce::adtracking::capture_purchase(tx, placed.order_id, subject, ua).await?;
+        }
+        Ok(placed)
     })
     .await?;
     if let Some(subject) = header_str(&headers, CONSENT_SUBJECT_HEADER) {

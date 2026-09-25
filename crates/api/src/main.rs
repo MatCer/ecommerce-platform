@@ -174,7 +174,7 @@ async fn serve() -> anyhow::Result<()> {
         ),
         admin_origin: HeaderValue::from_str(&auth.admin_origin).context("ADMIN_ORIGIN")?,
         public_urls: commerce::storefront::PublicUrls {
-            scheme: sf.scheme,
+            scheme: sf.scheme.clone(),
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
@@ -184,6 +184,18 @@ async fn serve() -> anyhow::Result<()> {
             &ops,
         )?),
         webhooks: webhooks(&ops, cfg.env)?,
+        ads: match ops.secrets_key {
+            Some(key) => Some(commerce::adtracking::AdTracking::new(
+                platform::crypto::SecretBox::new(&key),
+                platform::http::SafeClient::from_env()?,
+                commerce::adtracking::AdTracking::endpoints_from_env(),
+                commerce::storefront::PublicUrls {
+                    scheme: sf.scheme,
+                    port: sf.port,
+                },
+            )),
+            None => None,
+        },
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
             ops.storefront_rate_per_second,
             ops.storefront_rate_burst,

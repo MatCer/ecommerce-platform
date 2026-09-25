@@ -37,6 +37,9 @@ pub const SESSION_TOKEN_HEADER: &str = "x-session-token";
 pub const SESSION_CLEAR_HEADER: &str = "x-session-clear";
 pub const CONSENT_SUBJECT_HEADER: &str = "x-consent-subject";
 pub const CLIENT_IP_HEADER: &str = "x-client-ip";
+/// The shopper's browser user agent, forwarded by the edge for ad platforms that require it
+/// on website events (Meta, WP20). Kept only while an ad delivery is open.
+pub const CLIENT_UA_HEADER: &str = "x-client-user-agent";
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()

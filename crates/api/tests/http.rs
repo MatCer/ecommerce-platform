@@ -39,6 +39,7 @@ fn state(db: PgPool) -> AppState {
         edge: api::edge::EdgePurge::disabled(),
         checkout: Default::default(),
         webhooks: None,
+        ads: None,
         rate_limit: std::sync::Arc::new(api::rate_limit::StorefrontLimiter::new(1, 1)),
     }
 }

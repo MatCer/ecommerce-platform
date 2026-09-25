@@ -41,6 +41,9 @@ pub(crate) struct ConsentHeaders {
     /// The client's IP (stored as a salted hash with the record).
     #[param(rename = "X-Client-Ip")]
     x_client_ip: Option<String>,
+    /// The browser's user agent (ad platforms that require it, WP20).
+    #[param(rename = "X-Client-User-Agent")]
+    x_client_user_agent: Option<String>,
 }
 
 fn anon(headers: &HeaderMap) -> Option<String> {
