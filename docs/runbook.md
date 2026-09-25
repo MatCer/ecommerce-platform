@@ -166,17 +166,28 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
       test payments + webhook delivery log.
 - [ ] **Packeta + PPL**: sandbox labels and tracking; the real Packeta widget (`library.js` +
       callback) in the checkout CSP; the chosen pickup point verified against the API. Verify:
-      test order end to end, label PDF, tracking status.
+      test order end to end, label PDF, tracking status. WP12 specifics: the request shapes of
+      `createPacket` / `packetLabelPdf` / `packetStatus`, the widget validation endpoint
+      (`PACKETA_VALIDATE_URL`), the home-delivery carrier ids (CZ 106, SK 131), COD amounts
+      (Packeta may require whole CZK) and the PPL CPL batch/label/tracking fields
+      (`PPL_API_URL`, OAuth scope `myapi2`) were built from public docs and are only exercised
+      against `apps/mocks`; carrier-side cancellation of a voided label is manual (portal).
+      Real COD payout files (Packeta/PPL) still go through the generic CSV import.
 - [ ] **SES**: domain verified with DKIM, SPF, DMARC; production access granted; bounce and
       complaint notifications feed the suppression list (today manual:
       `api admin suppress-email`). Verify: mail-tester score, a bounce to the simulator lands.
 - [ ] **QR payments**: SPAYD and PAY by square codes scanned with several CZ/SK banking apps
       (amount, IBAN, VS, message). Verify: screenshots per bank.
-- [ ] **ČNB rates**: the daily fixing URL, weekends/holidays (last fixing used). Verify: a
-      holiday date against the ČNB site.
+- [ ] **ČNB rates**: the daily fixing URL (`CNB_RATES_URL`), weekends/holidays (last fixing
+      used), a supply dated today before ~14:30 waits for that day's fixing (the order shows
+      `invoice_delayed`). Verify: a holiday date against the ČNB site.
 - [ ] **Legal review** of the templates: terms, privacy, cookies, withdrawal form, complaints.
 - [ ] **Accountant review**: VAT setup (OSS / distance-sales mode, tax categories) and the
-      invoice templates (A17). Verify: sample invoices and credit notes signed off.
+      invoice templates (A17): **the Typst templates require accountant approval before real
+      use** (`crates/commerce/src/documents/templates`, samples in `samples/`). Open points to
+      confirm: COD cash rounding happens at collection after the dispatch invoice (outside the
+      VAT base by default), credit notes use the original invoice's ČNB rate, prefixes `FV` /
+      `DB`. Verify: sample invoices and credit notes signed off.
 - [ ] **Regulatory status**: EET 2.0 (CZ) and SK e-invoicing (from Jan 2027) checked for the
       launch date.
 - [ ] **Domain + TLS**: real domain on Cloudflare for SaaS, certificates issued, HSTS.
