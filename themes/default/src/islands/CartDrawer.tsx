@@ -145,12 +145,12 @@ export default function CartDrawer(props: {
               <For each={lines()}>
                 {(line) => (
                   <li class="flex gap-4 py-4">
-                    {/* The photo repeats the name link next to it: hidden from assistive tech. */}
+                    {/* The photo repeats the name link next to it: out of the tab order, named. */}
                     <a
                       href={`${props.base}/p/${line.slug}`}
                       class="shrink-0"
                       tabIndex={-1}
-                      aria-hidden="true"
+                      aria-label={line.product_name}
                     >
                       <img
                         src={line.image ? imageUrl(line.image, 160) : undefined}
