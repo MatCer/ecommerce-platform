@@ -27,7 +27,7 @@
   --card: oklch(1 0 0); /* sidebar, panels, inputs */
   --muted: oklch(0.967 0.003 260); /* header rows, hover */
   --muted-foreground: oklch(0.5 0.012 260); /* labels, 5.8:1 */
-  --faint-foreground: oklch(0.56 0.012 260); /* timestamps, 4.6:1 */
+  --faint-foreground: oklch(0.52 0.012 260); /* timestamps, hints; 5.3:1 */
   --border: oklch(0.905 0.004 260);
   --border-strong: oklch(0.82 0.006 260);
   --input: oklch(0.72 0.008 260); /* control outline, 3.1:1 (SC 1.4.11) */

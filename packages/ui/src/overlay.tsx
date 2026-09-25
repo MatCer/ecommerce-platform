@@ -99,7 +99,10 @@ export function ToastRegion(props: { label?: string }) {
   return (
     <Portal>
       <Toast.Region aria-label={props.label}>
-        <Toast.List class="fixed right-4 bottom-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 outline-none" />
+        <Toast.List
+          as="div"
+          class="fixed right-4 bottom-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 outline-none"
+        />
       </Toast.Region>
     </Portal>
   );
@@ -115,6 +118,7 @@ export function showToast(opts: {
   const tone = opts.tone ?? "success";
   return toaster.show((p) => (
     <Toast
+      as="div"
       toastId={p.toastId}
       priority={tone === "error" ? "high" : "low"}
       persistent={tone === "error"}

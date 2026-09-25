@@ -47,8 +47,9 @@ make down
 
 | URL | What |
 |---|---|
+| http://admin.localhost:8080 | Admin SPA; Better Auth is also served here under `/api/auth/*` (first-party session cookie) |
 | http://api.localhost:8080 | Rust API (`/healthz`, `/readyz`, `/openapi.json`, `/docs` Swagger UI, `/admin/v1`) |
-| http://auth.localhost:8080 | Better Auth (`/api/auth/*`, JWKS at `/api/auth/jwks`) |
+| http://auth.localhost:8080 | Better Auth directly (JWKS at `/api/auth/jwks`) |
 | http://mail.localhost:8080 | Mailpit UI (also http://localhost:58025) |
 | http://s3.localhost:8080 | MinIO S3 API (`public` bucket is anonymously readable) |
 | http://localhost:59001 | MinIO console (`MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` from `.env`) |
@@ -59,7 +60,7 @@ make down
 | http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "Pokračovat k pokladně") |
 | https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
-`admin.localhost` answers 502 until its work package lands. `/internal/*` on `api` and `auth` is
+`/internal/*` on `api` and `auth` is
 never proxied by Caddy; it is for services on the compose network only. The storefront runtime
 contract (artifacts, bindings, cache policy, handoff, budget numbers) is documented in
 [`docs/decisions/runtime-contract.md`](docs/decisions/runtime-contract.md). Every host port is configurable in `.env`
@@ -86,6 +87,7 @@ trusted network.
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
 | `make theme-build` | Build + pack the theme and checkout artifacts into `.artifacts` |
+| `make e2e` | Playwright suites (`e2e/`) against the running stack; `WP5_SCREENSHOTS=1` also writes `docs/screenshots/wp5/` |
 | `make perf` | Lab budget gate (Lighthouse mobile, A26 JS, axe) over HTTPS/h2 |
 
 Running the API natively against `make dev-infra` (values from `.env.example`):
@@ -99,8 +101,12 @@ S3_ACCESS_KEY_ID=app-local S3_SECRET_ACCESS_KEY=app-local-secret-key \
 S3_BUCKET_PUBLIC=public S3_BUCKET_PRIVATE=private \
 AUTH_JWKS_URL=http://auth.localhost:8080/api/auth/jwks ADMIN_ORIGIN=http://admin.localhost:8080 \
 INTERNAL_API_TOKEN=local-internal-api-token-0123456789abcdef \
+AUTH_INTERNAL_URL=http://localhost:3000/ AUTH_INTERNAL_TOKEN=local-auth-internal-token-0123456789abcdef \
 cargo run -p api
 ```
+
+`AUTH_INTERNAL_URL` is the auth service's `/internal` API (staff invitations). It is not proxied
+by Caddy, so natively it only works with the auth service also running natively.
 
 ## Tenants and staff sign-in
 
@@ -114,8 +120,11 @@ make admin args="add-domain --tenant demo --host shop.example.cz"      # prints 
 make admin args="verify-domain --host shop.example.cz"                 # checks it (DNS stub)
 ```
 
-The admin SPA (and anything else) then gets a 5-minute JWT from
-`GET http://auth.localhost:8080/api/auth/token` (session cookie) and calls the Admin API with
+Owners and admins invite more staff from the admin SPA (Staff screen) or with
+`POST /admin/v1/staff/invitations`; a shop always keeps at least one owner.
+
+The admin SPA at http://admin.localhost:8080 (and anything else) gets a 5-minute JWT from
+`GET http://admin.localhost:8080/api/auth/token` (session cookie) and calls the Admin API with
 `Authorization: Bearer <jwt>` and `X-Tenant-Id: <tenant uuid>`. Mutations accept an
 `Idempotency-Key` header. `scripts/smoke-staff-flow.sh` runs the whole flow against the stack,
 including the cross-tenant 403.

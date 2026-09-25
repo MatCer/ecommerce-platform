@@ -37,7 +37,7 @@ magic_link() {
   for _ in $(seq 1 30); do
     id=$(curl -s "$mailpit/api/v1/search?query=to:$1" | jq -r '.messages[0].ID // empty')
     if [[ -n $id ]]; then
-      curl -s "$mailpit/api/v1/message/$id" | jq -r .Text | grep -o 'http://auth\.localhost[^[:space:]]*' | head -1
+      curl -s "$mailpit/api/v1/message/$id" | jq -r .Text | grep -o 'http://admin\.localhost[^[:space:]]*/api/auth/magic-link/verify[^[:space:]]*' | head -1
       return
     fi
     sleep 1

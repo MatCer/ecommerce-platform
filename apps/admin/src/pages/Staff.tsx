@@ -137,7 +137,7 @@ export default function Staff() {
                   {(m) => (
                     <tr>
                       <td class={`${tdClass} font-medium`}>
-                        {m.email}
+                        {m.email}{" "}
                         <Show when={m.user_id === claims()?.sub}>
                           <span class="ml-1 text-xs font-normal text-muted-foreground">
                             ({t("staff.you")})

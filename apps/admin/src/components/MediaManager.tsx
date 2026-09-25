@@ -198,6 +198,8 @@ export function MediaManager(props: {
           id="media-upload"
           type="file"
           multiple
+          tabIndex={-1}
+          aria-label={t("editor.upload")}
           accept={ACCEPTED_TYPES.join(",")}
           class="sr-only"
           onChange={(e) => void onFiles(e.currentTarget.files)}

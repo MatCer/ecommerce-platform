@@ -94,12 +94,12 @@ export async function expectAccessible(page: Page, name: string): Promise<void> 
   expect(bad, `axe on ${name}`).toEqual([]);
 }
 
-/** Full-page screenshots for the PR, only when WP5_SCREENSHOTS is set. */
+/** Viewport screenshots for the PR, only when WP5_SCREENSHOTS is set. */
 export async function screenshot(page: Page, name: string): Promise<void> {
   if (!process.env.WP5_SCREENSHOTS) return;
   const dir = join(root, "docs/screenshots/wp5");
   mkdirSync(dir, { recursive: true });
-  await page.screenshot({ path: join(dir, `${name}.png`), fullPage: true });
+  await page.screenshot({ path: join(dir, `${name}.png`) });
 }
 
 /** A small valid RGB PNG (gradient) for the upload flow. */

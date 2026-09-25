@@ -23,6 +23,9 @@ const productName = `Tričko E2E ${run}`;
 let context: BrowserContext;
 let page: Page;
 
+const nav = (p: Page, name: string) =>
+  p.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name, exact: true });
+
 async function signInWithLink(p: Page, email: string): Promise<void> {
   await p.goto("/login");
   await expect(p.getByRole("heading", { name: "Sign in" })).toBeVisible();
@@ -52,15 +55,15 @@ test("owner signs in with a magic link from Mailpit", async () => {
   await signInWithLink(page, owner);
   await expect(page.getByText(`You are working in ${shop} as Owner.`)).toBeVisible();
   // Owners see the settings group, including staff and the audit log.
-  const nav = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(nav.getByRole("link", { name: "Staff" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Audit log" })).toBeVisible();
+  const menu = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(menu.getByRole("link", { name: "Staff" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Audit log" })).toBeVisible();
   await expectAccessible(page, "dashboard");
   await screenshot(page, "02-dashboard");
 });
 
 test("creates a category", async () => {
-  await page.getByRole("link", { name: "Categories" }).click();
+  await nav(page, "Categories").click();
   await expect(page.getByText("No categories yet")).toBeVisible();
   await page.getByRole("button", { name: "New category" }).first().click();
   const dialog = page.getByRole("dialog");
@@ -85,10 +88,7 @@ test("creates a category", async () => {
 });
 
 test("creates a product with variants and an uploaded image", async () => {
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: "Products" })
-    .click();
+  await nav(page, "Products").click();
   await expect(page.getByText("No products yet")).toBeVisible();
   await expectAccessible(page, "products-empty");
   await page.getByRole("link", { name: "New product" }).first().click();
@@ -115,7 +115,8 @@ test("creates a product with variants and an uploaded image", async () => {
   await variants.getByLabel("EAN: S").fill("4006381333931");
   await variants.getByLabel("Weight (g): M").fill("180");
 
-  await page.getByRole("checkbox", { name: "T-shirts" }).check();
+  await page.getByRole("region", { name: "Categories" }).getByText("T-shirts").click();
+  await expect(page.getByRole("checkbox", { name: "T-shirts" })).toBeChecked();
 
   // Presigned upload -> worker -> ready.
   await page.locator("#media-upload").setInputFiles({
@@ -149,11 +150,18 @@ test("creates a product with variants and an uploaded image", async () => {
   await expect(row).toBeVisible();
   await expectAccessible(page, "products");
   await screenshot(page, "05-products");
+
+  // Tablet width: the layout keeps the navigation and the table usable.
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(nav(page, "Products")).toBeVisible();
+  await expect(row).toBeVisible();
+  await screenshot(page, "05b-products-tablet");
+  await page.setViewportSize({ width: 1280, height: 860 });
 });
 
 test("invites a staff member by email", async () => {
-  await page.getByRole("link", { name: "Staff" }).click();
-  await expect(page.getByRole("cell", { name: new RegExp(owner) })).toBeVisible();
+  await nav(page, "Staff").click();
+  await expect(page.getByRole("cell", { name: `${owner} (you)`, exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Invite member" }).click();
   const dialog = page.getByRole("dialog");
   const since = new Date(Date.now() - 1000);
@@ -161,13 +169,13 @@ test("invites a staff member by email", async () => {
   await dialog.getByLabel("Role").selectOption("staff");
   await dialog.getByRole("button", { name: "Invite member" }).click();
   await expect(page.getByText(`Invitation sent to ${clerk}`)).toBeVisible();
-  await expect(page.getByRole("cell", { name: clerk })).toBeVisible();
+  await expect(page.getByRole("cell", { name: clerk, exact: true })).toBeVisible();
   // The invitation is a sign-in link in Mailpit.
   expect(await magicLink(clerk, since)).toContain("/api/auth/magic-link/verify");
   await expectAccessible(page, "staff");
   await screenshot(page, "06-staff");
 
-  await page.getByRole("link", { name: "Audit log" }).click();
+  await nav(page, "Audit log").click();
   await expect(page.getByRole("cell", { name: "staff.invited" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "product.created" }).first()).toBeVisible();
   await expectAccessible(page, "audit-log");
@@ -180,10 +188,10 @@ test("a staff member sees only what their role allows", async ({ browser }) => {
   await useEnglish(p);
   await signInWithLink(p, clerk);
   await expect(p.getByText(`You are working in ${shop} as Staff.`)).toBeVisible();
-  const nav = p.getByRole("navigation", { name: "Main navigation" });
-  await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Staff" })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Audit log" })).toHaveCount(0);
+  const menu = p.getByRole("navigation", { name: "Main navigation" });
+  await expect(menu.getByRole("link", { name: "Products" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Staff" })).toHaveCount(0);
+  await expect(menu.getByRole("link", { name: "Audit log" })).toHaveCount(0);
 
   await p.goto("/staff");
   await expect(p.getByText("You don't have access")).toBeVisible();
