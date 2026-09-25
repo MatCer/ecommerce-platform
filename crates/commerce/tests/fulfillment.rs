@@ -480,6 +480,25 @@ async fn prepaid_invoice_dispatch_and_partial_refund_with_credit_note(db: PgPool
         .unwrap();
     assert_eq!(o.payment.status.as_str(), "partially_refunded");
     assert_eq!(emails(&runtime, t, "order_refunded").await.len(), 2);
+    // The dashboard nets refunds against the order's revenue (WP14 follow-up).
+    let today = Utc::now().date_naive();
+    let d = run(&runtime, t, async |tx| {
+        commerce::analytics::dashboard(
+            tx,
+            &commerce::analytics::DashboardQuery {
+                from: today - chrono::Days::new(1),
+                to: today + chrono::Days::new(1),
+                market_id: None,
+            },
+        )
+        .await
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        d.sales[0].revenue_minor,
+        o.total.amount_minor - line.total.amount_minor
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

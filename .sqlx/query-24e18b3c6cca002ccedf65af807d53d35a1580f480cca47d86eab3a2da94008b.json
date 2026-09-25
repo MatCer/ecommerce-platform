@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT (placed_at AT TIME ZONE 'UTC')::date AS \"date!\", currency AS \"currency!\",\n                  sum(total_minor)::bigint AS \"revenue_minor!\", count(*) AS \"orders!\"\n           FROM orders\n           WHERE placed_at >= $1 AND placed_at < $2 AND status <> 'cancelled'\n             AND ($3::uuid IS NULL OR market_id = $3)\n           GROUP BY 1, 2 ORDER BY 1, 2",
+  "query": "SELECT (placed_at AT TIME ZONE 'UTC')::date AS \"date!\", currency AS \"currency!\",\n                  sum(net)::bigint AS \"revenue_minor!\", count(*) AS \"orders!\"\n           FROM (SELECT o.currency, o.market_id, o.placed_at, o.status,\n                        o.total_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r\n                            WHERE r.order_id = o.id AND r.attempt_id = o.paid_attempt_id\n                              AND r.status = 'succeeded'), 0) AS net\n                 FROM orders o) orders\n           WHERE placed_at >= $1 AND placed_at < $2 AND status <> 'cancelled'\n             AND ($3::uuid IS NULL OR market_id = $3)\n           GROUP BY 1, 2 ORDER BY 1, 2",
   "describe": {
     "columns": [
       {
@@ -47,5 +47,5 @@
       null
     ]
   },
-  "hash": "ebdca4407e26a516ae5d00b2ad387e01044f76cdd2b18375f1ea24342c65a2dd"
+  "hash": "24e18b3c6cca002ccedf65af807d53d35a1580f480cca47d86eab3a2da94008b"
 }
