@@ -1,0 +1,47 @@
+---
+import type { DeliveryEstimate, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * Delivery, returns and payment facts as designed rows (family rule: trust sits in the buy
+ * decision's field of view, not in small print). `list` beside the buy box, `band` on the home
+ * page. A product's delivery estimate replaces the shop's generic delivery promise.
+ */
+interface Props {
+  shop: ShopModel;
+  layout: "list" | "band";
+  delivery?: DeliveryEstimate | null;
+}
+const { shop, layout, delivery } = Astro.props;
+const { t } = i18n(shop);
+const day = (d: string) =>
+  new Date(`${d}T12:00:00Z`).toLocaleDateString(shop.locale, { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" });
+const rows = [
+  { icon: "truck", text: delivery ? t("product.delivery", { from: day(delivery.from), to: day(delivery.to) }) : shop.trust.delivery },
+  { icon: "returns", text: shop.trust.returns },
+  { icon: "card", text: shop.trust.payments.join(" · ") },
+] as const;
+---
+
+{
+  layout === "list" ? (
+    <ul class="grid gap-3 text-sm">
+      {rows.map((r) => (
+        <li class="flex items-center gap-3">
+          <span class="grid size-9 shrink-0 place-items-center rounded-full bg-identity-wash text-identity-ink"><Icon name={r.icon} class="size-5" /></span>
+          {r.text}
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <ul class="grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-3">
+      {rows.map((r) => (
+        <li class="flex items-center gap-4 bg-card px-5 py-5 md:px-6 md:py-6">
+          <span class="grid size-11 shrink-0 place-items-center rounded-full bg-identity-wash text-identity-ink"><Icon name={r.icon} class="size-6" /></span>
+          <span class="font-semibold">{r.text}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}

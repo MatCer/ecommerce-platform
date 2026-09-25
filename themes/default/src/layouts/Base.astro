@@ -1,27 +1,36 @@
 ---
-import { lcpImage, pick, t } from "@platform/storefront-sdk/format";
+import ConsentBanner from "@platform/storefront-sdk/consent-banner";
+import { lcpImage } from "@platform/storefront-sdk/format";
 import type { Image, Seo, ShopModel } from "@platform/storefront-sdk/types";
 import "virtual:theme-tokens.css";
 import "../styles/global.css";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
 import archivo from "../fonts/archivo-latin-ext.woff2?url";
-import ConsentBanner from "../islands/ConsentBanner";
-import MiniCart from "../islands/MiniCart";
-import Newsletter from "../islands/Newsletter";
 import Rum from "../islands/Rum";
-import SearchBox from "../islands/SearchBox";
+import { i18n } from "../lib/i18n";
 import { jsonLd } from "../lib/storefront";
 
-const MINI_CART_KEYS = [
-  "cart.title",
-  "cart.empty",
-  "cart.subtotal",
-  "cart.discount",
-  "cart.total",
-  "cart.vat_included",
-  "cart.checkout",
-  "cart.increase",
-  "cart.decrease",
-] as const;
+/**
+ * Page shell: SEO head from the page model, header, main landmark, footer, consent, RUM.
+ * Every page renders inside it.
+ */
+interface Props {
+  shop: ShopModel;
+  seo: Seo;
+  /** Page template for RUM grouping (`home`, `category`, `product`, `search`, `page`). */
+  template: string;
+  /** The LCP image: preloaded AVIF with fetchpriority=high, same `sizes` as its <img> (§9.6). */
+  lcp?: { image: Image; sizes: string };
+  /** The page shows a fixed bottom bar on phones (product buy bar): keep the footer clear. */
+  bottomBar?: boolean;
+  /** Current search query, echoed in the header search box. */
+  q?: string;
+}
+const { shop, seo, template, lcp, q, bottomBar = false } = Astro.props;
+const { t, pick } = i18n(shop);
+const preload = lcp && lcpImage(lcp.image, lcp.sizes).preload;
+const ogImage = lcp && new URL(lcp.image.src, seo.canonical).href;
 const CONSENT_KEYS = [
   "legal.cookies",
   "consent.title",
@@ -30,23 +39,9 @@ const CONSENT_KEYS = [
   "consent.reject",
   "consent.settings",
   "consent.save",
-  "consent.analytics",
-  "consent.ads",
-  "consent.personalization",
-  "consent.email_marketing",
-  "consent.review_invites",
-] as const;
-
-interface Props {
-  shop: ShopModel;
-  seo: Seo;
-  /** LCP image: preloaded AVIF with fetchpriority=high (spec §9.6). */
-  lcp?: { image: Image; sizes: string };
-  q?: string;
-}
-const { shop, seo, lcp, q } = Astro.props;
-const m = shop.messages;
-const preload = lcp && lcpImage(lcp.image, lcp.sizes).preload;
+  "consent.necessary",
+  ...shop.consent.purposes.map((p) => `consent.${p}`),
+];
 ---
 
 <!doctype html>
@@ -55,59 +50,31 @@ const preload = lcp && lcpImage(lcp.image, lcp.sizes).preload;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{seo.title}</title>
-    <meta name="description" content={seo.description} />
+    {seo.description && <meta name="description" content={seo.description} />}
     <link rel="canonical" href={seo.canonical} />
     {seo.robots && <meta name="robots" content={seo.robots} />}
     {seo.alternates.map((a) => <link rel="alternate" hreflang={a.locale} href={a.href} />)}
+    <meta property="og:type" content={template === "product" ? "product" : "website"} />
+    <meta property="og:site_name" content={shop.name} />
     <meta property="og:title" content={seo.title} />
-    <meta property="og:description" content={seo.description} />
+    {seo.description && <meta property="og:description" content={seo.description} />}
     <meta property="og:url" content={seo.canonical} />
+    {ogImage && <meta property="og:image" content={ogImage} />}
     {preload && <link {...preload} />}
     <link rel="preload" href={archivo} as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     {seo.json_ld.map((d) => <script type="application/ld+json" set:html={jsonLd(d)} />)}
   </head>
-  <body class="min-h-dvh">
-    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:p-3">
-      {t(m, "nav.skip")}
+  <body class:list={["flex min-h-dvh flex-col antialiased", bottomBar && "pb-20 md:pb-0"]}>
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-card focus:px-4 focus:py-3 focus:font-semibold focus:shadow-lg">
+      {t("nav.skip")}
     </a>
-    <header class="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur">
-      <div class="container-shop flex h-16 items-center gap-3 md:gap-6">
-        <a href="/" class="font-display text-lg font-extrabold tracking-tight whitespace-nowrap">{shop.name}</a>
-        <div class="flex-1"><SearchBox client:idle q={q} labels={pick(m, ["search.label", "search.placeholder"])} /></div>
-        <MiniCart client:idle labels={pick(m, MINI_CART_KEYS)} />
-      </div>
-      <nav aria-label={t(m, "nav.categories")} class="container-shop -mt-1 flex gap-5 overflow-x-auto pb-2 text-sm font-semibold">
-        {shop.menus.main.map((m) => <a href={m.href} class="py-1 whitespace-nowrap hover:text-identity-ink">{m.label}</a>)}
-      </nav>
-    </header>
-
-    <main id="main" class="container-shop py-4 md:py-8">
+    <Header shop={shop} q={q} />
+    <main id="main" tabindex="-1" class="flex-1 focus:outline-none">
       <slot />
     </main>
-
-    <footer class="mt-12 bg-panel text-card">
-      <div class="container-shop grid gap-8 py-10 md:grid-cols-3">
-        <section aria-labelledby="nl">
-          <h2 id="nl" class="mb-3 font-display text-lg font-bold">{t(m, "newsletter.title")}</h2>
-          <Newsletter client:visible labels={pick(m, ["newsletter.email", "newsletter.submit", "newsletter.done", "newsletter.invalid"])} />
-        </section>
-        <nav aria-label={t(m, "footer.customer_service")}>
-          <ul class="grid gap-2 text-sm">
-            {shop.menus.footer.map((m) => <li><a href={m.href} class="underline-offset-4 hover:underline">{m.label}</a></li>)}
-          </ul>
-        </nav>
-        <div class="text-sm text-card/80">
-          <p>{shop.trust.delivery}</p>
-          <p>{shop.trust.returns}</p>
-          <p class="mt-2">{shop.trust.payments.join(" · ")}</p>
-          <ul class="mt-4 grid gap-1">
-            {shop.legal_pages.map((m) => <li><a href={m.href} class="underline">{m.label}</a></li>)}
-          </ul>
-        </div>
-      </div>
-    </footer>
-    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} labels={pick(m, CONSENT_KEYS)} />
-    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} />
+    <Footer shop={shop} alternates={seo.alternates} />
+    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} labels={pick(CONSENT_KEYS)} />
+    <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} template={template} />
   </body>
 </html>

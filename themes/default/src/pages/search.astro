@@ -1,15 +1,17 @@
 ---
 import Listing from "../components/Listing.astro";
 import Base from "../layouts/Base.astro";
-import { storefront } from "../lib/storefront";
+import { i18n } from "../lib/i18n";
+import { CARD_SIZES } from "../lib/images";
+import { listingQuery, storefront } from "../lib/storefront";
 
 const sf = storefront(Astro.request);
-const query = Object.fromEntries(
-  [...new Set(Astro.url.searchParams.keys())].map((k) => [k, Astro.url.searchParams.getAll(k)]),
-);
-const [shop, page] = await Promise.all([sf.shop(), sf.search(query)]);
+const [shop, page] = await Promise.all([sf.shop(), sf.search(listingQuery(Astro.url))]);
+const first = page.products[0]?.images[0];
+// An empty query still lists the catalog; its heading must not read "Results for “”".
+const title = page.query?.trim() ? page.title : i18n(shop).t("search.title");
 ---
 
-<Base shop={shop} seo={page.seo} q={Astro.url.searchParams.get("q") ?? ""}>
-  <Listing page={page} action="/search" messages={shop.messages} />
+<Base shop={shop} seo={page.seo} template="search" q={page.query ?? ""} lcp={first && { image: first, sizes: CARD_SIZES }}>
+  <Listing page={{ ...page, title }} shop={shop} action={`${shop.base_path}/search`} />
 </Base>

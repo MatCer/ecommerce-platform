@@ -53,14 +53,16 @@ export default function ConsentBanner(props: ConsentBannerProps) {
     }
   };
 
+  // Browser-only setup and teardown both live in onMount: a top-level onCleanup also runs when
+  // the server render is disposed, where `document` does not exist (it hangs the SSR stream).
   onMount(() => {
     setOpen(readConsent() === null);
     addEventListener(CONSENT_OPEN, reopen);
     document.addEventListener("click", onClick);
-  });
-  onCleanup(() => {
-    removeEventListener(CONSENT_OPEN, reopen);
-    document.removeEventListener("click", onClick);
+    onCleanup(() => {
+      removeEventListener(CONSENT_OPEN, reopen);
+      document.removeEventListener("click", onClick);
+    });
   });
 
   return (

@@ -1,130 +1,247 @@
-import { imageUrl, type Messages, t } from "@platform/storefront-sdk/format";
-import { createEffect, For, onMount, Show } from "solid-js";
-import { cart, loadCart, open, setOpen, updateLine } from "../lib/cart-store";
+import { imageUrl, type Messages, t, tn } from "@platform/storefront-sdk/format";
+import type { CartLine, Money } from "@platform/storefront-sdk/types";
+import { createEffect, createSignal, For, on, onMount, Show } from "solid-js";
+import { added, cart, loadCart, open, setOpen, updateLine } from "../lib/cart-store";
+import Icon from "../lib/Icon";
+import { bag, close, minus, plus, trash, truck } from "../lib/icons";
 
-/** Header cart button + drawer with free-shipping progress and the checkout handoff form (A1). */
-export default function MiniCart(props: { labels: Messages }) {
-  const l = (key: string) => t(props.labels, key);
+/**
+ * Header cart button + cart drawer (native modal <dialog>: focus trap, Escape, focus return).
+ * Free-delivery progress only when the shop has a threshold; checkout is a POST to the
+ * edge-owned handoff, which moves the cart to the checkout origin (A1).
+ */
+export default function MiniCart(props: {
+  labels: Messages;
+  locale: string;
+  base: string;
+  threshold?: Money;
+}) {
+  const l = (key: string, args?: Record<string, string | number>) => t(props.labels, key, args);
+  const [busy, setBusy] = createSignal(false);
+  const [failed, setFailed] = createSignal(false);
+  const [bump, setBump] = createSignal(false);
   let dialog: HTMLDialogElement | undefined;
+
   onMount(() => void loadCart());
   createEffect(() => {
     if (!dialog) return;
     if (open() && !dialog.open) dialog.showModal();
     if (!open() && dialog.open) dialog.close();
   });
+  createEffect(
+    on(added, () => {
+      setBump(false);
+      requestAnimationFrame(() => setBump(true));
+    }, { defer: true }),
+  );
+
   const count = () => cart()?.item_count ?? 0;
+  const lines = () => cart()?.lines ?? [];
+  const remaining = () => {
+    const c = cart();
+    return c && "version" in c ? c.free_shipping_remaining : null;
+  };
+  const progress = () => {
+    const r = remaining();
+    const total = props.threshold?.amount_minor;
+    return r && total ? Math.min(100, Math.round(((total - r.amount_minor) / total) * 100)) : 100;
+  };
+
+  async function change(line: CartLine, quantity: number) {
+    setBusy(true);
+    setFailed(false);
+    try {
+      await updateLine(line.id, quantity);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <>
       <button
         type="button"
-        class="relative inline-flex h-10 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-semibold"
+        class="relative grid size-11 place-items-center rounded-md hover:bg-muted lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       >
-        <svg
+        <Icon d={bag} class="size-6 lg:size-5" />
+        <span class="hidden lg:inline" aria-hidden="true">
+          {l("cart.title")}
+        </span>
+        <span class="sr-only">{l("cart.open", { count: count() })}</span>
+        <span
           aria-hidden="true"
-          viewBox="0 0 24 24"
-          class="size-5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
+          class="absolute top-1 right-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-identity-ink px-1 text-[0.6875rem] font-bold text-card tabular-nums lg:static"
+          classList={{ "animate-bump": bump(), invisible: count() === 0 }}
         >
-          <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6" />
-          <circle cx="10" cy="20" r="1.3" />
-          <circle cx="17" cy="20" r="1.3" />
-        </svg>
-        <span class="sr-only md:not-sr-only">{l("cart.title")}</span>
-        <span class="grid min-w-5 place-items-center rounded-full bg-identity px-1 text-xs text-card tabular-nums">
           {count()}
-          <span class="sr-only"> položek</span>
         </span>
       </button>
 
       <dialog
         ref={dialog}
         onClose={() => setOpen(false)}
-        class="ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground backdrop:bg-foreground/40"
-        aria-label={l("cart.title")}
+        onClick={(e) => e.target === dialog && setOpen(false)}
+        aria-labelledby="cart-title"
+        class="m-0 ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground shadow-sheet backdrop:bg-foreground/45"
       >
         <div class="flex h-full flex-col">
-          <header class="flex items-center justify-between border-b border-border p-4">
-            <h2 class="font-display text-lg font-bold">{l("cart.title")}</h2>
+          <header class="flex h-16 items-center justify-between border-b border-border px-5">
+            <h2 id="cart-title" class="text-lg font-bold">
+              {l("cart.title")}
+              <Show when={count() > 0}>
+                <span class="ml-2 text-sm font-normal text-muted-foreground">
+                  {tn(props.labels, props.locale, "cart.items", count())}
+                </span>
+              </Show>
+            </h2>
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-sm underline"
+              class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-muted"
               onClick={() => setOpen(false)}
             >
-              ✕
+              <Icon d={close} class="size-6" />
+              <span class="sr-only">{l("cart.close")}</span>
             </button>
           </header>
+
+          <Show when={props.threshold && remaining() != null && lines().length > 0}>
+            <div class="border-b border-border bg-identity-wash px-5 py-3 text-sm">
+              <p class="mb-2 flex items-center gap-2 font-medium text-identity-ink">
+                <Icon d={truck} class="size-4" />
+                {remaining()?.amount_minor
+                  ? l("cart.free_shipping_remaining", { amount: remaining()?.formatted ?? "" })
+                  : l("cart.free_shipping_reached")}
+              </p>
+              <div class="h-1.5 overflow-hidden rounded-full bg-card" aria-hidden="true">
+                <div
+                  class="h-full rounded-full bg-identity transition-[width] duration-300"
+                  style={{ width: `${progress()}%` }}
+                />
+              </div>
+            </div>
+          </Show>
+
           <Show
-            when={cart()?.lines.length}
-            fallback={<p class="p-4 text-muted-foreground">{l("cart.empty")}</p>}
+            when={lines().length > 0}
+            fallback={
+              <div class="grid flex-1 place-content-center gap-4 p-8 text-center">
+                <p class="text-muted-foreground">{l("cart.empty")}</p>
+                <button type="button" class="btn btn-secondary" onClick={() => setOpen(false)}>
+                  {l("cart.continue")}
+                </button>
+              </div>
+            }
           >
-            <ul class="flex-1 divide-y divide-border overflow-y-auto px-4">
-              <For each={cart()?.lines}>
+            <ul class="flex-1 divide-y divide-border overflow-y-auto px-5" aria-busy={busy()}>
+              <For each={lines()}>
                 {(line) => (
-                  <li class="flex gap-3 py-3">
-                    <img
-                      src={line.image ? imageUrl(line.image, 120) : undefined}
-                      alt=""
-                      width="60"
-                      height="75"
-                      loading="lazy"
-                      class="rounded-sm bg-muted"
-                    />
-                    <div class="flex-1 text-sm">
-                      <p class="font-semibold">{line.product_name}</p>
+                  <li class="flex gap-4 py-4">
+                    <a href={`${props.base}/p/${line.slug}`} class="shrink-0" tabIndex={-1}>
+                      <img
+                        src={line.image ? imageUrl(line.image, 160) : undefined}
+                        alt=""
+                        width="64"
+                        height="80"
+                        loading="lazy"
+                        class="h-20 w-16 rounded-md bg-muted object-cover"
+                      />
+                    </a>
+                    <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                      <a
+                        href={`${props.base}/p/${line.slug}`}
+                        class="font-semibold hover:underline"
+                      >
+                        {line.product_name}
+                      </a>
                       <p class="text-muted-foreground">{line.variant_label}</p>
-                      <div class="mt-1 flex items-center gap-2">
+                      <Show when={!line.available}>
+                        <p class="font-semibold text-sale">{l("cart.unavailable")}</p>
+                      </Show>
+                      <div class="mt-auto flex items-center justify-between gap-2 pt-1">
+                        <div
+                          class="flex items-center rounded-md border border-border"
+                          role="group"
+                          aria-label={`${l("cart.quantity")}: ${line.product_name}`}
+                        >
+                          <button
+                            type="button"
+                            class="grid size-9 place-items-center disabled:text-subtle"
+                            disabled={busy() || line.quantity <= 1}
+                            onClick={() => change(line, line.quantity - 1)}
+                          >
+                            <Icon d={minus} class="size-4" />
+                            <span class="sr-only">{l("cart.decrease")}</span>
+                          </button>
+                          <span class="w-7 text-center tabular-nums" aria-live="polite">
+                            {line.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            class="grid size-9 place-items-center disabled:text-subtle"
+                            disabled={busy() || !line.available}
+                            onClick={() => change(line, line.quantity + 1)}
+                          >
+                            <Icon d={plus} class="size-4" />
+                            <span class="sr-only">{l("cart.increase")}</span>
+                          </button>
+                        </div>
                         <button
                           type="button"
-                          class="size-7 rounded-sm border border-border"
-                          aria-label={l("cart.decrease")}
-                          onClick={() => updateLine(line.id, line.quantity - 1)}
+                          class="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-sale"
+                          disabled={busy()}
+                          onClick={() => change(line, 0)}
                         >
-                          −
+                          <Icon d={trash} class="size-4" />
+                          <span class="sr-only">
+                            {l("cart.remove")}: {line.product_name}
+                          </span>
                         </button>
-                        <span class="tabular-nums">{line.quantity}</span>
-                        <button
-                          type="button"
-                          class="size-7 rounded-sm border border-border"
-                          aria-label={l("cart.increase")}
-                          onClick={() => updateLine(line.id, line.quantity + 1)}
-                        >
-                          +
-                        </button>
+                        <p class="price ml-auto text-base">{line.total.formatted}</p>
                       </div>
                     </div>
-                    <p class="price text-sm">{line.total.formatted}</p>
                   </li>
                 )}
               </For>
             </ul>
-            <footer class="border-t border-border p-4">
+            <footer class="border-t border-border bg-background px-5 py-4">
+              <Show when={failed()}>
+                <p role="alert" class="mb-3 text-sm font-medium text-sale">
+                  {l("cart.update_failed")}
+                </p>
+              </Show>
               <Show when={cart()?.discount?.amount_minor}>
                 <p class="mb-1 flex justify-between text-sm text-sale">
                   <span>{l("cart.discount")}</span>
                   <span class="price">−{cart()?.discount?.formatted}</span>
                 </p>
               </Show>
-              <p class="mb-3 flex justify-between text-sm">
-                <span>
+              <p class="flex items-baseline justify-between">
+                <span class="font-semibold">
                   {l("cart.total")}{" "}
-                  <span class="text-muted-foreground">({l("cart.vat_included")})</span>
+                  <span class="text-sm font-normal text-muted-foreground">
+                    ({l("cart.vat_included")})
+                  </span>
                 </span>
-                <span class="price text-lg">{cart()?.total?.formatted}</span>
+                <span class="price text-2xl">{cart()?.total?.formatted}</span>
               </p>
+              <p class="mt-1 mb-4 text-xs text-muted-foreground">{l("cart.shipping_note")}</p>
               {/* Edge-owned handoff: mints a one-time token and redirects to checkout.<host>. */}
               <form method="post" action="/_p/checkout/start">
-                <button
-                  type="submit"
-                  class="h-12 w-full rounded-md bg-buy font-display font-bold text-foreground hover:bg-buy-hover"
-                >
+                <button type="submit" class="btn btn-buy h-13 w-full text-lg">
                   {l("cart.checkout")}
                 </button>
               </form>
+              <button
+                type="button"
+                class="mt-2 min-h-11 w-full text-sm font-semibold text-identity-ink underline underline-offset-4"
+                onClick={() => setOpen(false)}
+              >
+                {l("cart.continue")}
+              </button>
             </footer>
           </Show>
         </div>

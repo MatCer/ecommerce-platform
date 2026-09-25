@@ -156,6 +156,7 @@
   "sort.recommended": "Odporúčané",
   "trust.carriers": "Výdajné miesta · Kuriér",
   "trust.delivery": "Doručenie do 2 pracovných dní",
+  "trust.free_shipping_from": "Doprava zadarmo od {amount}",
   "trust.payments": "Karta · Prevodom · Dobierka",
   "trust.returns": "Vrátenie do 30 dní zadarmo"
 }

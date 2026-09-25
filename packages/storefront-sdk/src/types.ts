@@ -14,6 +14,14 @@ export type Seo = S["Seo"];
 /** Cache hints the edge reads from every page model (spec §8.2, A2). */
 export type CacheHints = S["CacheHints"];
 export type Link = S["Link"];
+/** hreflang alternate (`cs-CZ` → URL of the same page there). */
+export type Alternate = S["Alternate"];
+export type MarketLink = S["MarketLink"];
+export type DeliveryEstimate = S["DeliveryEstimate"];
+/** General Product Safety Regulation information (EU 2023/988, art. 19). */
+export type Gpsr = S["GpsrView"];
+export type Parameter = S["ParameterView"];
+export type ProductDetail = S["ProductDetail"];
 export type MenuItem = S["MenuItem"];
 export type ConsentPurpose = S["ConsentPurpose"];
 export type ShopModel = S["ShopModel"];
@@ -36,6 +44,44 @@ export type SearchResult = S["SearchResult"];
 export type SearchHit = S["SearchHit"];
 export type CartLine = S["CartLineView"];
 export type Cart = S["CartView"];
+
+// --- CMS pages and blog: provisional shapes until WP13 ships these page models. Until then the
+// API answers 404 and themes render their 404 page. ---------------------------------------
+
+export interface CmsPage {
+  title: string;
+  /** Sanitized server-side, like `description_html`. */
+  content_html: string;
+  breadcrumbs: Link[];
+  seo: Seo;
+  cache: CacheHints;
+}
+
+export interface BlogPostSummary {
+  title: string;
+  href: string;
+  excerpt: string;
+  /** ISO date. */
+  published_at: string;
+  image?: Image | null;
+}
+
+export interface BlogIndex {
+  title: string;
+  posts: BlogPostSummary[];
+  seo: Seo;
+  cache: CacheHints;
+}
+
+export interface BlogPost {
+  title: string;
+  content_html: string;
+  published_at: string;
+  image?: Image | null;
+  breadcrumbs: Link[];
+  seo: Seo;
+  cache: CacheHints;
+}
 
 /** `GET /_p/cart` before anything was added: the edge answers without creating a cart. */
 export interface EmptyCart {

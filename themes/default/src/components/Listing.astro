@@ -1,54 +1,84 @@
 ---
-import { type Messages, pick, t } from "@platform/storefront-sdk/format";
-import type { ListingPage } from "@platform/storefront-sdk/types";
-import FacetFilters from "../islands/FacetFilters";
+import type { ListingPage, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
 import Breadcrumbs from "./Breadcrumbs.astro";
-import ProductCard from "./ProductCard.astro";
+import Facets from "./Facets.astro";
+import Icon from "./Icon.astro";
+import ProductGrid from "./ProductGrid.astro";
 
+/** A category page or search results: header, filters + sort, grid, pagination, empty state. */
 interface Props {
   page: ListingPage;
+  shop: ShopModel;
+  /** The form action (the listing's own path, locale prefix included). */
   action: string;
-  messages: Messages;
 }
-const { page, action, messages: m } = Astro.props;
+const { page, shop, action } = Astro.props;
+const { t, tn } = i18n(shop);
+const { pagination: pg } = page;
 ---
 
-<Breadcrumbs items={page.breadcrumbs} label={t(m, "nav.breadcrumbs")} />
-<header class="mb-4 flex flex-wrap items-baseline gap-x-3">
-  <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{page.title}</h1>
-  <p class="text-sm text-muted-foreground">{t(m, "listing.count", { count: page.total })}</p>
-</header>
-{
-  page.subcategories.length > 0 && (
-    <nav aria-label={t(m, "nav.categories")} class="mb-4 flex flex-wrap gap-2 text-sm">
-      {page.subcategories.map((c) => <a href={c.href} class="rounded-full border border-border bg-card px-3 py-1 hover:border-identity">{c.label}</a>)}
-    </nav>
-  )
-}
-<div class="mb-6 rounded-lg border border-border bg-card p-3">
-  <FacetFilters client:visible facets={page.facets} sort={page.sort} action={action} labels={pick(m, ["listing.sort", "listing.apply"])} />
+<div class="container-shop">
+  <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
+  <header class="mb-5 max-w-3xl">
+    <h1 class="text-3xl font-extrabold md:text-4xl">{page.title}</h1>
+    <p class="mt-1 text-sm text-muted-foreground">{tn("listing.count", page.total)}</p>
+    {
+      page.category?.description_html && (
+        // description_html is sanitized by the platform (contract: the only unescaped HTML).
+        <div class="mt-3 leading-relaxed text-muted-foreground" set:html={page.category.description_html} />
+      )
+    }
+  </header>
+  {
+    page.subcategories.length > 0 && (
+      <nav aria-label={t("nav.categories")} class="mb-5">
+        <ul class="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          {page.subcategories.map((c) => (
+            <li class="shrink-0">
+              <a href={c.href} class="chip font-semibold">{c.label}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    )
+  }
+  {(page.facets.length > 0 || page.products.length > 0) && <Facets page={page} shop={shop} action={action} />}
+  {
+    page.products.length === 0 ? (
+      <div class="surface mx-auto my-8 grid max-w-xl justify-items-center gap-3 px-6 py-12 text-center">
+        <Icon name="search" class="size-8 text-subtle" />
+        <p class="text-lg font-semibold">{t(page.query !== undefined && page.query !== null ? "search.no_results" : "listing.empty")}</p>
+        {page.query !== undefined && page.query !== null && <p class="text-muted-foreground">{t("search.hint")}</p>}
+        <ul class="mt-2 flex flex-wrap justify-center gap-2">
+          {shop.menus.main.map((m) => <li><a href={m.href} class="chip font-semibold">{m.label}</a></li>)}
+        </ul>
+      </div>
+    ) : (
+      <ProductGrid products={page.products} shop={shop} lcp label={t("search.products")} />
+    )
+  }
+  {
+    pg.pages > 1 && (
+      <nav aria-label={t("listing.pagination")} class="mt-10 flex items-center justify-center gap-3">
+        {pg.prev ? (
+          <a rel="prev" href={pg.prev} class="btn btn-secondary">
+            <Icon name="chevronLeft" class="size-4" />
+            {t("listing.prev")}
+          </a>
+        ) : (
+          <span class="btn btn-secondary pointer-events-none opacity-40" aria-hidden="true"><Icon name="chevronLeft" class="size-4" />{t("listing.prev")}</span>
+        )}
+        <p class="px-2 text-sm font-medium text-muted-foreground">{t("listing.page", { page: pg.page, pages: pg.pages })}</p>
+        {pg.next ? (
+          <a rel="next" href={pg.next} class="btn btn-secondary">
+            {t("listing.next")}
+            <Icon name="chevronRight" class="size-4" />
+          </a>
+        ) : (
+          <span class="btn btn-secondary pointer-events-none opacity-40" aria-hidden="true">{t("listing.next")}<Icon name="chevronRight" class="size-4" /></span>
+        )}
+      </nav>
+    )
+  }
 </div>
-{
-  page.products.length === 0 ? (
-    <p class="py-10 text-center text-muted-foreground">{t(m, page.query ? "search.no_results" : "listing.empty")}</p>
-  ) : (
-    <ul class="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] md:gap-4">
-      {page.products.map((p, i) => (
-        <li class="flex">
-          <ProductCard product={p} messages={m} eager={i < 2} priority={i === 0} />
-        </li>
-      ))}
-    </ul>
-  )
-}
-{
-  page.pagination.pages > 1 && (
-    <nav aria-label={t(m, "listing.pagination")} class="mt-8 flex justify-center gap-4">
-      {page.pagination.prev && <a rel="prev" href={page.pagination.prev} class="rounded-md border border-border bg-card px-4 py-2">{t(m, "listing.prev")}</a>}
-      <span class="px-2 py-2 text-sm text-muted-foreground">
-        {page.pagination.page} / {page.pagination.pages}
-      </span>
-      {page.pagination.next && <a rel="next" href={page.pagination.next} class="rounded-md border border-border bg-card px-4 py-2">{t(m, "listing.next")}</a>}
-    </nav>
-  )
-}

@@ -1,50 +1,58 @@
 ---
-import { imageAttrs, type Messages, t } from "@platform/storefront-sdk/format";
-import type { ProductCard } from "@platform/storefront-sdk/types";
+import { imageAttrs } from "@platform/storefront-sdk/format";
+import type { ProductCard, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n, productHref } from "../lib/i18n";
+import { CARD_SIZES } from "../lib/images";
+import StockLine from "./StockLine.astro";
 
+/**
+ * The one card stanza every grid repeats: photo → name → price (+ Omnibus reference) → unit
+ * price → stock. The whole card is the link. The second photo appears on hover/focus, and only
+ * pointer devices with hover download it (`<source media>`, a data: placeholder otherwise).
+ */
 interface Props {
   product: ProductCard;
-  messages: Messages;
-  /** Above-the-fold cards load eagerly; only the first one gets fetchpriority=high. */
+  shop: ShopModel;
+  /** Above-the-fold cards load eagerly; only the LCP card gets fetchpriority=high. */
   eager?: boolean;
   priority?: boolean;
 }
-const { product: p, messages: m, eager = false, priority = false } = Astro.props;
-// sizes must match the real slot: a 50vw guess at DPR 1.75 rounds up to the next (4× heavier) variant.
-const SIZES = "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)";
-// `p.images[1]` is the hover image; WP8 decides how to load it without competing with the LCP.
-const main = p.images[0];
-const img = main && imageAttrs(main, { sizes: SIZES, priority, width: 360 });
-const stockClass = {
-  in_stock: "text-stock-in",
-  low_stock: "text-stock-low",
-  backorder: "text-stock-low",
-  out_of_stock: "text-subtle",
-}[p.stock];
+const { product: p, shop, eager = false, priority = false } = Astro.props;
+const { t } = i18n(shop);
+const [main, hover] = p.images;
+const img = main && imageAttrs(main, { sizes: CARD_SIZES, priority, width: 360 });
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+// A18: a reduction (badge, strikethrough, %) only with the page model's reference price.
+const reduced = p.reference_price && p.discount_percent ? p.discount_percent : null;
 ---
 
-<article class="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-shadow hover:shadow-md">
-  <div class="relative bg-muted">
-    {img ? <img {...img} loading={eager ? "eager" : img.loading} class="aspect-[4/5] w-full object-cover" /> : <div class="aspect-[4/5] w-full" />}
+<article class="group relative flex w-full flex-col overflow-hidden surface transition-[box-shadow,translate] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lift focus-within:shadow-lift">
+  <div class="relative aspect-[4/5] overflow-hidden bg-muted">
+    {img && <img {...img} loading={eager ? "eager" : img.loading} class="size-full object-cover" />}
     {
-      p.badges.length > 0 && (
-        <ul class="absolute top-2 left-2 flex gap-1">
-          {p.badges.map((b) => <li class={`rounded-sm px-1.5 py-0.5 text-xs font-bold ${b === "sale" ? "bg-sale text-card" : "bg-card text-identity-ink"}`}>{t(m, `badge.${b}`)}</li>)}
-        </ul>
+      hover && (
+        <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100">
+          <source media="(hover: hover) and (pointer: fine)" type="image/avif" srcset={hover.srcset} sizes={CARD_SIZES} />
+          <img src={BLANK} alt="" width={360} height={Math.round((hover.height / hover.width) * 360)} loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover" />
+        </picture>
       )
     }
+    <ul class="absolute top-2 left-2 flex flex-col items-start gap-1">
+      {reduced && <li class="rounded-sm bg-sale px-1.5 py-0.5 text-xs font-bold text-card"><span aria-hidden="true">−{reduced} %</span><span class="sr-only">{t("price.discount", { percent: reduced })}</span></li>}
+      {p.badges.includes("new") && <li class="rounded-sm bg-card px-1.5 py-0.5 text-xs font-bold text-identity-ink shadow-sm">{t("badge.new")}</li>}
+    </ul>
   </div>
-  <div class="flex flex-1 flex-col gap-1 p-3">
-    <h3 class="text-sm font-medium">
-      <a href={`/p/${p.slug}`} class="after:absolute after:inset-0">{p.name}</a>
+  <div class="flex flex-1 flex-col gap-1 p-3 md:p-4">
+    {p.brand && <p class="text-xs text-muted-foreground">{p.brand}</p>}
+    <h3 class="text-sm leading-snug font-medium text-pretty md:text-[0.9375rem]">
+      <a href={productHref(shop, p.slug)} class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">{p.name}</a>
     </h3>
-    <p class="mt-auto flex flex-wrap items-baseline gap-x-2">
-      <span class={`price text-lg ${p.reference_price ? "text-sale" : ""}`}>{p.price_varies ? t(m, "product.price_from", { price: p.price.formatted }) : p.price.formatted}</span>
-      {p.reference_price && <s class="price text-xs font-semibold text-subtle"><span class="sr-only">{t(m, "price.original")} </span>{p.reference_price.formatted}</s>}
+    <p class="mt-auto flex flex-wrap items-baseline gap-x-2 pt-2">
+      {reduced && <span class="sr-only">{t("price.current")}:</span>}
+      <span class:list={["price text-lg md:text-xl", reduced && "text-sale"]}>{p.price_varies ? t("product.price_from", { price: p.price.formatted }) : p.price.formatted}</span>
+      {reduced && p.reference_price && <s class="price text-sm font-semibold text-subtle"><span class="sr-only">{t("price.original")}: </span>{p.reference_price.formatted}</s>}
     </p>
-    {p.unit_price && <p class="text-xs text-muted-foreground">{t(m, "price.unit", { price: p.unit_price.price.formatted, unit: p.unit_price.unit })}</p>}
-    <p class={`flex items-center gap-1.5 text-xs font-semibold ${stockClass}`}>
-      <span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>{t(m, `product.${p.stock}`)}
-    </p>
+    {p.unit_price && <p class="text-xs text-muted-foreground">{t("price.unit", { price: p.unit_price.price.formatted, unit: p.unit_price.unit })}</p>}
+    <StockLine state={p.stock} label={t(`product.${p.stock}`)} />
   </div>
 </article>

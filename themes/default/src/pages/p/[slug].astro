@@ -1,29 +1,38 @@
 ---
-import { pick, t } from "@platform/storefront-sdk/format";
+import { imageUrl } from "@platform/storefront-sdk/format";
 import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import ProductDetails from "../../components/ProductDetails.astro";
+import RecommendationSlot from "../../components/RecommendationSlot.astro";
+import TrustRow from "../../components/TrustRow.astro";
 import BuyBox from "../../islands/BuyBox";
 import Gallery from "../../islands/Gallery";
+import RecentlyViewed from "../../islands/RecentlyViewed";
 import Base from "../../layouts/Base.astro";
+import { i18n } from "../../lib/i18n";
+import { GALLERY_SIZES } from "../../lib/images";
 import { storefront } from "../../lib/storefront";
 
 const sf = storefront(Astro.request);
 const [shop, page] = await Promise.all([sf.shop(), sf.product(Astro.params.slug ?? "")]);
 if (!page) return Astro.rewrite("/404");
 const { product: p } = page;
-const m = shop.messages;
-const fmt = (d: string) =>
-  new Date(d).toLocaleDateString(shop.locale, {
-    weekday: "short",
-    day: "numeric",
-    month: "numeric",
-  });
+const { t, pick } = i18n(shop);
+// An optional slot must never take the page down with it.
+const recommended = await sf
+  .recommendations(`product:${p.id}`)
+  .then((r) => r.products)
+  .catch(() => []);
 const firstImage = p.images[0];
 const BUY_KEYS = [
+  "price.current",
   "price.original",
+  "price.discount",
   "price.lowest_30_days",
   "price.unit",
   "product.vat_included",
   "product.unavailable",
+  "product.combination_unavailable",
+  "product.sku",
   "product.in_stock",
   "product.low_stock",
   "product.backorder",
@@ -33,65 +42,33 @@ const BUY_KEYS = [
   "cart.added",
   "cart.add_failed",
 ];
-const g = p.gpsr;
 ---
 
-<Base shop={shop} seo={page.seo} lcp={firstImage && { image: firstImage, sizes: "(min-width: 48rem) 50vw, calc(100vw - 2rem)" }}>
-  <Breadcrumbs items={page.breadcrumbs} label={t(m, "nav.breadcrumbs")} />
-  <div class="grid gap-6 md:grid-cols-2 md:gap-10">
-    <Gallery client:visible images={p.images} label={t(m, "product.gallery")} />
-    <div class="flex flex-col gap-5">
-      <div>
-        {p.brand && <p class="text-sm text-muted-foreground">{p.brand}</p>}
-        <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{p.name}</h1>
+<Base shop={shop} seo={page.seo} template="product" bottomBar lcp={firstImage && { image: firstImage, sizes: GALLERY_SIZES }}>
+  <div class="container-shop">
+    <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
+    <div class="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10 lg:gap-14">
+      <Gallery client:visible images={p.images} labels={pick(["product.gallery", "product.image", "product.prev_image", "product.next_image"])} />
+      <div class="flex flex-col gap-6 md:sticky md:top-36 md:self-start">
+        <div>
+          {p.brand && <p class="eyebrow mb-2 text-identity-ink">{p.brand}</p>}
+          <h1 class="text-3xl leading-tight font-extrabold md:text-4xl">{p.name}</h1>
+          {p.short_description && <p class="mt-2 text-muted-foreground">{p.short_description}</p>}
+        </div>
+        <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} />
+        <div class="border-t border-border pt-5">
+          <TrustRow shop={shop} layout="list" delivery={page.delivery_estimate} />
+        </div>
       </div>
-      <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(m, BUY_KEYS)} />
-      <ul class="grid gap-2 border-y border-border py-4 text-sm text-muted-foreground">
-        {page.delivery_estimate && <li>🚚 {t(m, "product.delivery", { from: fmt(page.delivery_estimate.from), to: fmt(page.delivery_estimate.to) })}</li>}
-        <li>↩︎ {shop.trust.returns}</li>
-        <li>💳 {shop.trust.payments.join(" · ")}</li>
-      </ul>
     </div>
-  </div>
 
-  <section class="mt-10 grid gap-8 md:grid-cols-2" aria-label={t(m, "product.details")}>
-    <div>
-      <h2 class="mb-3 font-display text-xl font-bold">{t(m, "product.description")}</h2>
-      <!-- description_html is sanitized by the platform (contract: the only unescaped HTML). -->
-      <div class="grid gap-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5" set:html={p.description_html} />
-    </div>
-    <div>
-      <h2 class="mb-3 font-display text-xl font-bold">{t(m, "product.parameters")}</h2>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-        {
-          p.parameters.map((x) => (
-            <>
-              <dt class="text-muted-foreground">{x.name}</dt>
-              <dd>{x.value}</dd>
-            </>
-          ))
-        }
-      </dl>
-      {
-        g && (
-          <details class="mt-6 text-sm">
-            <summary class="cursor-pointer font-semibold">{t(m, "product.safety")}</summary>
-            {g.manufacturer && (
-              <p class="mt-2 text-muted-foreground">
-                {t(m, "product.manufacturer")}: {g.manufacturer.name}, {g.manufacturer.address}
-                {g.manufacturer.email && <>, {g.manufacturer.email}</>}
-              </p>
-            )}
-            {g.eu_responsible_person && (
-              <p class="text-muted-foreground">
-                {t(m, "product.eu_responsible")}: {g.eu_responsible_person.name}, {g.eu_responsible_person.address}
-              </p>
-            )}
-            {g.safety_info && <p class="mt-2 text-muted-foreground">{g.safety_info}</p>}
-            {g.warnings && <p class="mt-2 text-muted-foreground">{t(m, "product.warnings")}: {g.warnings}</p>}
-          </details>
-        )
-      }
-    </div>
-  </section>
+    <ProductDetails product={p} shop={shop} />
+    <RecommendationSlot products={recommended} shop={shop} title={t("product.recommended")} id="recommended" />
+    <RecentlyViewed
+      client:idle
+      title={t("product.recently_viewed")}
+      base={shop.base_path}
+      current={{ slug: p.slug, name: p.name, image: firstImage && imageUrl(firstImage, 360) }}
+    />
+  </div>
 </Base>

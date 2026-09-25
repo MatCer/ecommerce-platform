@@ -1,0 +1,12 @@
+---
+import * as icons from "../lib/icons";
+
+/** Decorative icon (aria-hidden): the accessible name always comes from visible or sr-only text. */
+interface Props {
+  name: keyof typeof icons;
+  class?: string;
+}
+const { name, class: className = "size-5" } = Astro.props;
+---
+
+<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class={`shrink-0 ${className}`}><path d={icons[name]} /></svg>

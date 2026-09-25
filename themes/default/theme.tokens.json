@@ -11,6 +11,7 @@
     "identity-ink": "oklch(0.425 0.115 256)",
     "identity-wash": "oklch(0.965 0.012 252)",
     "panel": "oklch(0.245 0.05 258)",
+    "panel-foreground": "oklch(0.94 0.01 255)",
     "buy": "oklch(0.81 0.155 72)",
     "buy-hover": "oklch(0.77 0.16 66)",
     "stock-in": "oklch(0.5 0.125 150)",

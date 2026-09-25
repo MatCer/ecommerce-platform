@@ -10,7 +10,7 @@
  *   Counted as gzip -9 of each script body (the budget's unit) and as the actual transfer size.
  * - LCP/TBT/CLS: Lighthouse, default mobile preset (Moto G Power, slow 4G, 4× CPU), median of
  *   `--runs`. Runs are serial (machine limits).
- * - axe (WCAG 2.1 AA) serious/critical violations, CSP violations, third-party origins.
+ * - axe (WCAG 2.2 AA) serious/critical violations, CSP violations, third-party origins.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -24,7 +24,7 @@ import { BUDGET, judge, median, type PageResult } from "./budget.ts";
 const { values } = parseArgs({
   options: {
     base: { type: "string", default: "http://demo.localhost:8280" },
-    pages: { type: "string", default: "/,/c/trika,/p/tricko-basic" },
+    pages: { type: "string", default: "/,/c/trika,/p/tricko-basic,/search?q=mikina" },
     runs: { type: "string", default: "3" },
     out: { type: "string", default: ".perf/report.json" },
     "no-fail": { type: "boolean", default: false },
@@ -113,7 +113,7 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
     ? []
     : (
         await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
           .analyze()
       ).violations.map((v) => ({
         id: v.id,

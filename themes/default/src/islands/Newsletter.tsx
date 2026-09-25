@@ -19,13 +19,15 @@ export default function Newsletter(props: { labels: Messages }) {
   }
 
   return (
-    <Show when={state() !== "done"} fallback={<p role="status">{l("newsletter.done")}</p>}>
-      <form
-        onSubmit={submit}
-        class="flex max-w-md flex-col gap-2 sm:flex-row"
-        method="post"
-        action="/_p/newsletter"
-      >
+    <Show
+      when={state() !== "done"}
+      fallback={
+        <p role="status" class="font-semibold text-card">
+          {l("newsletter.done")}
+        </p>
+      }
+    >
+      <form onSubmit={submit} class="flex max-w-sm flex-col gap-2 sm:flex-row">
         <label for="nl-email" class="sr-only">
           {l("newsletter.email")}
         </label>
@@ -35,22 +37,24 @@ export default function Newsletter(props: { labels: Messages }) {
           type="email"
           required
           autocomplete="email"
-          placeholder="vas@email.cz"
-          class="h-11 flex-1 rounded-md border border-white/20 bg-white/10 px-3 text-card placeholder:text-card/60"
+          placeholder={l("newsletter.placeholder")}
+          aria-invalid={state() === "error"}
+          aria-describedby={state() === "error" ? "nl-error" : undefined}
+          class="h-11 min-w-0 flex-1 rounded-md border border-white/25 bg-white/10 px-3 text-card placeholder:text-panel-foreground/70 focus-visible:outline-card"
         />
         <button
           type="submit"
           disabled={state() === "busy"}
-          class="h-11 rounded-md bg-card px-5 font-semibold text-panel"
+          class="btn bg-card text-panel hover:bg-panel-foreground"
         >
           {l("newsletter.submit")}
         </button>
-        <Show when={state() === "error"}>
-          <p role="alert" class="text-sm">
-            {l("newsletter.invalid")}
-          </p>
-        </Show>
       </form>
+      <Show when={state() === "error"}>
+        <p id="nl-error" role="alert" class="mt-2 text-sm text-card">
+          {l("newsletter.invalid")}
+        </p>
+      </Show>
     </Show>
   );
 }

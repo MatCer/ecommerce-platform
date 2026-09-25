@@ -1,4 +1,7 @@
 import type {
+  BlogIndex,
+  BlogPost,
+  CmsPage,
   HomePage,
   ListingPage,
   ProductPage,
@@ -89,6 +92,11 @@ export function createStorefront({
     /** Product recommendations; `context` is `product:<id>`, `cart` or `home` (spec §8.2). */
     recommendations: (context: string) =>
       required<Recommendations>(`/recommendations${qs({ context })}`),
+    /** CMS page (`/pages/<slug>`); `null` until it exists (WP13). */
+    cms: (slug: string) => get<CmsPage>(`/pages/cms/${segment(slug)}`),
+    /** Blog index and articles; `null` until the blog exists (WP13). */
+    blog: () => get<BlogIndex>("/pages/blog"),
+    blogPost: (slug: string) => get<BlogPost>(`/pages/blog/${segment(slug)}`),
   };
 }
 

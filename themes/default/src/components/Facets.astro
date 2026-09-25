@@ -1,0 +1,107 @@
+---
+import type { ListingPage, ShopModel } from "@platform/storefront-sdk/types";
+import FacetForm from "../islands/FacetForm";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * Filters and sort as a plain GET form (progressive enhancement, spec §9.1): it works without
+ * JS through the submit buttons. Phones get the facets in a native popover sheet; from 48rem
+ * the same element sits inline as a row of dropdowns. The FacetForm island only adds
+ * behaviour (submit on change on desktop, close dropdowns on outside click / Escape).
+ * Values without a match are shown disabled (A23); counts are not shown in M1.
+ */
+interface Props {
+  page: ListingPage;
+  shop: ShopModel;
+  action: string;
+}
+const { page, shop, action } = Astro.props;
+const { t } = i18n(shop);
+const selected = page.facets.flatMap((f) => f.values.filter((v) => v.selected).map((v) => ({ ...v, facet: f.label })));
+const clearHref = page.category ? (page.breadcrumbs.at(-1)?.href ?? action) : `${action}?${new URLSearchParams({ q: page.query ?? "" })}`;
+---
+
+<form id="facets" method="get" action={action} class="group/facets mb-4 flex flex-wrap items-center gap-2 border-y border-border py-3">
+  {page.query && <input type="hidden" name="q" value={page.query} />}
+  {
+    page.facets.length > 0 && (
+      <button type="button" popovertarget="filter-sheet" class="btn btn-secondary md:hidden">
+        <Icon name="sliders" />
+        {t("listing.filters")}
+        {selected.length > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-full bg-identity-ink px-1 text-xs text-card">{selected.length}</span>}
+      </button>
+    )
+  }
+  <div id="filter-sheet" popover class="sheet md:static md:block md:h-auto md:w-auto md:translate-none md:overflow-visible md:bg-transparent md:shadow-none">
+    <div class="flex h-16 items-center justify-between border-b border-border px-4 md:hidden">
+      <h2 class="text-lg font-bold">{t("listing.filters")}</h2>
+      <button type="button" popovertarget="filter-sheet" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-muted">
+        <Icon name="close" class="size-6" />
+        <span class="sr-only">{t("nav.close")}</span>
+      </button>
+    </div>
+    <div class="divide-y divide-border px-4 md:flex md:flex-wrap md:gap-2 md:divide-y-0 md:px-0">
+      {
+        page.facets.map((f) => {
+          const n = f.values.filter((v) => v.selected).length;
+          return (
+            <details name="facet" class="group/facet relative py-2 md:py-0">
+              <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-semibold md:min-h-10 md:rounded-md md:border md:border-border md:bg-card md:px-3 md:text-sm md:hover:border-muted-foreground md:group-open/facet:border-identity [&::-webkit-details-marker]:hidden">
+                <span>
+                  {f.label}
+                  {n > 0 && <span class="ml-1 text-identity-ink">({n})</span>}
+                </span>
+                <Icon name="chevronDown" class="size-4 transition-transform group-open/facet:rotate-180" />
+              </summary>
+              <fieldset class="pt-2 pb-3 md:absolute md:top-full md:left-0 md:z-20 md:mt-2 md:w-max md:max-w-[22rem] md:surface md:p-3 md:shadow-lift">
+                <legend class="sr-only">{f.label}</legend>
+                <div class="flex flex-wrap gap-2">
+                  {f.values.map((v) => (
+                    <label class="chip">
+                      <input class="sr-only" type="checkbox" name={f.key} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
+                      {v.label}
+                    </label>
+                  ))}
+                </div>
+                <button type="submit" class="btn btn-primary mt-3 hidden w-full md:flex md:group-data-[enhanced]/facets:hidden">{t("listing.apply")}</button>
+              </fieldset>
+            </details>
+          );
+        })
+      }
+    </div>
+    <div class="sticky bottom-0 mt-4 grid gap-2 border-t border-border bg-card p-4 md:hidden">
+      <button type="submit" class="btn btn-primary w-full">{t("listing.show")}</button>
+      {selected.length > 0 && <a href={clearHref} class="btn btn-secondary w-full">{t("listing.clear")}</a>}
+    </div>
+  </div>
+  <label class="ml-auto flex items-center gap-2 text-sm">
+    <span class="text-muted-foreground">{t("listing.sort")}</span>
+    <select name="sort" class="h-10 rounded-md border border-border bg-card pr-8 pl-3 font-semibold">
+      {page.sort.map((s) => <option value={s.value} selected={s.selected}>{s.label}</option>)}
+    </select>
+  </label>
+  <button type="submit" class="btn btn-secondary min-h-10 group-data-[enhanced]/facets:hidden">{t("listing.apply")}</button>
+</form>
+<FacetForm client:idle form="facets" />
+
+{
+  selected.length > 0 && (
+    <div class="mb-5 flex flex-wrap items-center gap-2">
+      <h2 class="sr-only">{t("listing.active_filters")}</h2>
+      <ul class="contents">
+        {selected.map((v) => (
+          <li>
+            <a href={v.href} class="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-identity-wash px-3 text-sm font-medium text-identity-ink hover:bg-identity hover:text-card">
+              <span class="sr-only">{t("listing.remove_filter", { label: `${v.facet} ${v.label}` })}</span>
+              <span aria-hidden="true">{v.label}</span>
+              <Icon name="close" class="size-3.5" />
+            </a>
+          </li>
+        ))}
+      </ul>
+      <a href={clearHref} class="ml-1 text-sm font-semibold text-identity-ink underline underline-offset-4">{t("listing.clear")}</a>
+    </div>
+  )
+}

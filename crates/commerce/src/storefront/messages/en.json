@@ -156,6 +156,7 @@
   "sort.recommended": "Recommended",
   "trust.carriers": "Pickup points · Courier",
   "trust.delivery": "Delivery within 2 business days",
+  "trust.free_shipping_from": "Free delivery from {amount}",
   "trust.payments": "Card · Bank transfer · Cash on delivery",
   "trust.returns": "Free returns within 30 days"
 }
