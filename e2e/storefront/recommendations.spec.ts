@@ -100,3 +100,21 @@ test("recently viewed: live prices, rehydrated without identity", async ({ page,
   await expect(recent.getByRole("link", { name: /Mikina Fleece/ })).toBeVisible();
   await expect(recent.getByText(/Kč/).first()).toBeVisible();
 });
+
+test("recently viewed: without personalization consent no ids are kept or sent (A20)", async ({
+  page,
+  context,
+}) => {
+  await decideConsent(context, CZ, "analytics");
+  const sent: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("context=recent")) sent.push(r.url());
+  });
+  for (const slug of ["mikina-fleece", "cepice-merino", "tricko-basic"]) {
+    await page.goto(`${CZ}/p/${slug}`);
+    await hydrated(page);
+  }
+  expect(await page.evaluate(() => localStorage.getItem("sf:personalization:recent"))).toBeNull();
+  expect(sent).toEqual([]);
+  await expect(page.getByRole("region", { name: "Naposledy prohlížené" })).toHaveCount(0);
+});
