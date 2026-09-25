@@ -84,9 +84,14 @@ pub fn validate(rows: &[Row], d: &Defaults, report: &mut ImportReport) -> Vec<Re
         let mut c = Check::new(row, report);
         let email = c.req("email", table::email);
         let locale = c.opt("locale", table::locale);
-        let any = ["consent_at", "consent_source", "consent_ip", "consent_text_version"]
-            .iter()
-            .any(|f| c.has(f));
+        let any = [
+            "consent_at",
+            "consent_source",
+            "consent_ip",
+            "consent_text_version",
+        ]
+        .iter()
+        .any(|f| c.has(f));
         let evidence = if any {
             let at = c.req("consent_at", |v| table::past_time(v, d.now));
             let source = c.req("consent_source", |v| table::text(v, 200));
@@ -104,7 +109,11 @@ pub fn validate(rows: &[Row], d: &Defaults, report: &mut ImportReport) -> Vec<Re
         if let Some(e) = &email
             && !seen.insert(e.clone())
         {
-            c.fail(Some("email"), "duplicate", format!("{e} appears on an earlier line"));
+            c.fail(
+                Some("email"),
+                "duplicate",
+                format!("{e} appears on an earlier line"),
+            );
         }
         if !c.ok {
             report.invalid_rows += 1;
@@ -249,8 +258,7 @@ pub async fn apply(
         return Ok((created, Outcome::Pending));
     };
     let subject = Subject::Email(r.email.clone());
-    consent::record_imported_grant(tx, &subject, ConsentPurpose::EmailMarketing, &tv, e.at)
-        .await?;
+    consent::record_imported_grant(tx, &subject, ConsentPurpose::EmailMarketing, &tv, e.at).await?;
     let mut subjects = vec![subject];
     subjects.extend(s.customer_id.map(Subject::Customer));
     let granted = consent::latest_any(tx, &subjects, ConsentPurpose::EmailMarketing)
@@ -284,10 +292,33 @@ mod tests {
     fn evidence_needs_a_time_and_a_source() {
         let rows = [
             Row::of(2, &[("email", "a@example.com")]),
-            Row::of(3, &[("email", "b@example.com"), ("consent_at", "2023-05-01"), ("consent_source", "checkout box"), ("consent_ip", "192.0.2.7"), ("consent_text_version", "v3")]),
-            Row::of(4, &[("email", "c@example.com"), ("consent_at", "2023-05-01")]),
-            Row::of(5, &[("email", "d@example.com"), ("consent_ip", "192.0.2.7")]),
-            Row::of(6, &[("email", "e@example.com"), ("consent_at", "2023-05-01"), ("consent_source", "form"), ("consent_text_version", "v 3")]),
+            Row::of(
+                3,
+                &[
+                    ("email", "b@example.com"),
+                    ("consent_at", "2023-05-01"),
+                    ("consent_source", "checkout box"),
+                    ("consent_ip", "192.0.2.7"),
+                    ("consent_text_version", "v3"),
+                ],
+            ),
+            Row::of(
+                4,
+                &[("email", "c@example.com"), ("consent_at", "2023-05-01")],
+            ),
+            Row::of(
+                5,
+                &[("email", "d@example.com"), ("consent_ip", "192.0.2.7")],
+            ),
+            Row::of(
+                6,
+                &[
+                    ("email", "e@example.com"),
+                    ("consent_at", "2023-05-01"),
+                    ("consent_source", "form"),
+                    ("consent_text_version", "v 3"),
+                ],
+            ),
             Row::of(7, &[("email", "A@example.com")]),
         ];
         let mut report = ImportReport::default();
@@ -297,10 +328,20 @@ mod tests {
         let e = out[1].evidence.as_ref().unwrap();
         assert_eq!(e.source, "checkout box");
         assert_eq!(e.ip.unwrap().to_string(), "192.0.2.7");
-        let codes: Vec<(u64, &str)> = report.errors.iter().map(|e| (e.line, e.code.as_str())).collect();
+        let codes: Vec<(u64, &str)> = report
+            .errors
+            .iter()
+            .map(|e| (e.line, e.code.as_str()))
+            .collect();
         assert_eq!(
             codes,
-            [(4, "missing"), (5, "missing"), (5, "missing"), (6, "invalid_text_version"), (7, "duplicate")]
+            [
+                (4, "missing"),
+                (5, "missing"),
+                (5, "missing"),
+                (6, "invalid_text_version"),
+                (7, "duplicate")
+            ]
         );
     }
 }

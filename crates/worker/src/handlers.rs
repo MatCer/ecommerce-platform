@@ -8,6 +8,7 @@ use commerce::feeds::{export, import};
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
 use commerce::payments::{bank, stripe};
+use commerce::portability::{export as data_export, imports as data_imports};
 use commerce::pricing::intervals;
 use commerce::search::{self, Meili, index::Rebuilt};
 use commerce::storefront::PublicUrls;
@@ -134,6 +135,7 @@ pub fn all(
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
     let (import_storage, export_storage) = (storage.clone(), storage.clone());
+    let (data_import_storage, data_export_storage) = (storage.clone(), storage.clone());
     let sweep_storage = storage.clone();
     let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
     let webhooks = extra.webhooks.clone();
@@ -161,6 +163,12 @@ pub fn all(
             feed_export(ctx, job, export_storage.clone(), e3.urls.clone())
         })
         .register(export::ALL_JOB, feed_export_all)
+        .register(data_imports::JOB, move |ctx, job| {
+            data_import(ctx, job, data_import_storage.clone())
+        })
+        .register(data_export::JOB, move |ctx, job| {
+            data_export_job(ctx, job, data_export_storage.clone())
+        })
         .register(search::SYNONYMS_JOB, move |ctx, job| {
             search_synonyms(ctx, job, m4.clone())
         })
@@ -473,6 +481,54 @@ async fn feed_import(
                 tenant,
                 run,
                 "the import failed repeatedly; try again",
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            Err(JobError::Permanent(e.to_string()))
+        }
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+/// CSV import step (WP13b): `analyze` or `apply`.
+async fn data_import(ctx: Ctx, job: Job, storage: Storage) -> Result<(), JobError> {
+    let (tenant, id) = tenant_and(&job, "import_id")?;
+    let step = job
+        .payload
+        .get("step")
+        .and_then(|s| s.as_str())
+        .unwrap_or("analyze")
+        .to_owned();
+    match data_imports::run_step(&ctx.db, &storage, tenant, id, &step).await {
+        Ok(()) => Ok(()),
+        Err(e) if job.attempts >= job.max_attempts => {
+            tracing::error!(%id, error = %e, "data import gave up");
+            data_imports::fail(
+                &ctx.db,
+                tenant,
+                id,
+                "the import failed repeatedly; try again",
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            Err(JobError::Permanent(e.to_string()))
+        }
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+/// Full tenant export (WP13b).
+async fn data_export_job(ctx: Ctx, job: Job, storage: Storage) -> Result<(), JobError> {
+    let (tenant, id) = tenant_and(&job, "export_id")?;
+    match data_export::run(&ctx.db, &storage, tenant, id).await {
+        Ok(()) => Ok(()),
+        Err(e) if job.attempts >= job.max_attempts => {
+            tracing::error!(%id, error = %e, "data export gave up");
+            data_export::fail(
+                &ctx.db,
+                tenant,
+                id,
+                "the export failed repeatedly; try again",
             )
             .await
             .map_err(|e| JobError::Retry(e.to_string()))?;

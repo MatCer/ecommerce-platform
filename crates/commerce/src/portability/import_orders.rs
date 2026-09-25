@@ -193,11 +193,17 @@ pub fn validate(rows: &[Row], d: &Defaults, report: &mut ImportReport) -> Vec<Re
                         c.fail(
                             None,
                             "conflicting_order",
-                            format!("order {number} has different order columns on an earlier line"),
+                            format!(
+                                "order {number} has different order columns on an earlier line"
+                            ),
                         );
                         entry.1 = false;
                     } else if r.lines.len() == MAX_LINES {
-                        c.fail(None, "too_many_lines", format!("more than {MAX_LINES} lines"));
+                        c.fail(
+                            None,
+                            "too_many_lines",
+                            format!("more than {MAX_LINES} lines"),
+                        );
                         entry.1 = false;
                     } else {
                         r.lines.extend(l);
@@ -307,9 +313,33 @@ mod tests {
     #[test]
     fn groups_lines_by_order_number() {
         let rows = [
-            row(2, &with(&[("item_name", "Tričko"), ("quantity", "2"), ("unit_price", "100")])),
-            row(3, &with(&[("item_name", "Hrnek"), ("quantity", "1"), ("unit_price", "100"), ("sku", "MUG")])),
-            row(4, &[("order_number", "1002"), ("placed_at", "2024-03-02"), ("email", "b@example.com"), ("currency", "eur"), ("total", "5")]),
+            row(
+                2,
+                &with(&[
+                    ("item_name", "Tričko"),
+                    ("quantity", "2"),
+                    ("unit_price", "100"),
+                ]),
+            ),
+            row(
+                3,
+                &with(&[
+                    ("item_name", "Hrnek"),
+                    ("quantity", "1"),
+                    ("unit_price", "100"),
+                    ("sku", "MUG"),
+                ]),
+            ),
+            row(
+                4,
+                &[
+                    ("order_number", "1002"),
+                    ("placed_at", "2024-03-02"),
+                    ("email", "b@example.com"),
+                    ("currency", "eur"),
+                    ("total", "5"),
+                ],
+            ),
         ];
         let mut report = ImportReport::default();
         let out = validate(&rows, &d(), &mut report);
@@ -325,16 +355,61 @@ mod tests {
     #[test]
     fn a_bad_row_drops_its_whole_order() {
         let rows = [
-            row(2, &with(&[("item_name", "Tričko"), ("quantity", "2"), ("unit_price", "100")])),
-            row(3, &with(&[("item_name", "Hrnek"), ("quantity", "zero"), ("unit_price", "100")])),
-            row(4, &[("order_number", "1001"), ("placed_at", "2024-03-01 10:00"), ("email", "other@example.com"), ("currency", "CZK"), ("total", "300")]),
-            row(5, &[("order_number", "1003"), ("placed_at", "2099-01-01"), ("email", "c@example.com"), ("currency", "CZK"), ("total", "1")]),
-            row(6, &[("order_number", "1004"), ("email", "d@example.com"), ("currency", "CZK"), ("total", "1"), ("street", "Main 1")]),
+            row(
+                2,
+                &with(&[
+                    ("item_name", "Tričko"),
+                    ("quantity", "2"),
+                    ("unit_price", "100"),
+                ]),
+            ),
+            row(
+                3,
+                &with(&[
+                    ("item_name", "Hrnek"),
+                    ("quantity", "zero"),
+                    ("unit_price", "100"),
+                ]),
+            ),
+            row(
+                4,
+                &[
+                    ("order_number", "1001"),
+                    ("placed_at", "2024-03-01 10:00"),
+                    ("email", "other@example.com"),
+                    ("currency", "CZK"),
+                    ("total", "300"),
+                ],
+            ),
+            row(
+                5,
+                &[
+                    ("order_number", "1003"),
+                    ("placed_at", "2099-01-01"),
+                    ("email", "c@example.com"),
+                    ("currency", "CZK"),
+                    ("total", "1"),
+                ],
+            ),
+            row(
+                6,
+                &[
+                    ("order_number", "1004"),
+                    ("email", "d@example.com"),
+                    ("currency", "CZK"),
+                    ("total", "1"),
+                    ("street", "Main 1"),
+                ],
+            ),
         ];
         let mut report = ImportReport::default();
         let out = validate(&rows, &d(), &mut report);
         assert!(out.is_empty());
-        let codes: Vec<(u64, &str)> = report.errors.iter().map(|e| (e.line, e.code.as_str())).collect();
+        let codes: Vec<(u64, &str)> = report
+            .errors
+            .iter()
+            .map(|e| (e.line, e.code.as_str()))
+            .collect();
         assert!(codes.contains(&(3, "invalid_quantity")), "{codes:?}");
         assert!(codes.contains(&(4, "conflicting_order")), "{codes:?}");
         assert!(codes.contains(&(5, "in_future")), "{codes:?}");

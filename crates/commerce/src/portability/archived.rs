@@ -88,7 +88,11 @@ pub async fn list(tx: &mut TenantTx, f: &ArchivedOrderFilter) -> Result<Archived
     let more = items.len() > limit;
     items.truncate(limit);
     Ok(ArchivedOrderPage {
-        next_cursor: if more { items.last().map(|o| o.id) } else { None },
+        next_cursor: if more {
+            items.last().map(|o| o.id)
+        } else {
+            None
+        },
         items,
     })
 }

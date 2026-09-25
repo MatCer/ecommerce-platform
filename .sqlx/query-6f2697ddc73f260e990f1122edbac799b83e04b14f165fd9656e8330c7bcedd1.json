@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET email = NULL, customer_id = NULL, updated_at = now()\n         WHERE lower(btrim(email)) = $1 OR customer_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6f2697ddc73f260e990f1122edbac799b83e04b14f165fd9656e8330c7bcedd1"
+}

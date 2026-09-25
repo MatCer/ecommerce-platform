@@ -187,8 +187,15 @@ pub async fn create(tx: &mut TenantTx, actor: &str) -> Result<DataExport, Error>
     j.max_attempts = 3;
     j.idempotency_key = Some(format!("{JOB}:{id}"));
     queue::enqueue(&mut **tx, &j).await?;
-    audit::record(tx, actor, "data_export.created", "data_export", Some(&id.to_string()), &json!({}))
-        .await?;
+    audit::record(
+        tx,
+        actor,
+        "data_export.created",
+        "data_export",
+        Some(&id.to_string()),
+        &json!({}),
+    )
+    .await?;
     get(tx, id).await
 }
 
@@ -206,8 +213,15 @@ pub async fn download(
     .fetch_optional(&mut **tx)
     .await?
     .ok_or(Error::NotFound)?;
-    audit::record(tx, actor, "data_export.downloaded", "data_export", Some(&id.to_string()), &json!({}))
-        .await?;
+    audit::record(
+        tx,
+        actor,
+        "data_export.downloaded",
+        "data_export",
+        Some(&id.to_string()),
+        &json!({}),
+    )
+    .await?;
     Ok(ExportDownload {
         url: crate::documents::download_url(storage, &key, "export.zip").await?,
         expires_at: Utc::now() + chrono::Duration::seconds(300),
@@ -265,8 +279,14 @@ pub async fn tables(tx: &mut TenantTx) -> Result<Vec<ExportTable>, Error> {
              AND NOT (c.relname::text = ANY($2))
            GROUP BY c.relname
            ORDER BY c.relname"#,
-        &SKIPPED_COLUMNS.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>(),
-        &SKIPPED_TABLES.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>()
+        &SKIPPED_COLUMNS
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect::<Vec<_>>(),
+        &SKIPPED_TABLES
+            .iter()
+            .map(|s| (*s).to_owned())
+            .collect::<Vec<_>>()
     )
     .fetch_all(&mut **tx)
     .await?;
@@ -348,7 +368,8 @@ async fn write_manifest(
                 "url": storage.media_url(&v.key),
             })).collect::<Vec<_>>(),
         });
-        zip.write_all(line.to_string().as_bytes()).map_err(internal)?;
+        zip.write_all(line.to_string().as_bytes())
+            .map_err(internal)?;
         zip.write_all(b"\n").map_err(internal)?;
     }
     Ok(())

@@ -123,7 +123,10 @@ pub fn read(
     let mut columns: Vec<(&'static str, usize)> = Vec::new();
     for f in fields {
         let wanted = mapping.get(f.name).map_or(f.name, String::as_str);
-        match headers.iter().position(|h| h.eq_ignore_ascii_case(wanted.trim())) {
+        match headers
+            .iter()
+            .position(|h| h.eq_ignore_ascii_case(wanted.trim()))
+        {
             Some(i) => columns.push((f.name, i)),
             None if mapping.contains_key(f.name) => {
                 return Err(FileError(format!(
@@ -182,14 +185,14 @@ pub fn text(v: &str, max: usize) -> CellResult<String> {
 }
 
 pub fn email(v: &str) -> CellResult<String> {
-    crate::staff::normalize_email(v).map_err(|_| ("invalid_email", format!("{v:?} is not an email address")))
+    crate::staff::normalize_email(v)
+        .map_err(|_| ("invalid_email", format!("{v:?} is not an email address")))
 }
 
 pub fn phone(v: &str) -> CellResult<String> {
     let ok = v.len() <= 40
         && v.chars().any(|c| c.is_ascii_digit())
-        && v
-            .chars()
+        && v.chars()
             .all(|c| c.is_ascii_digit() || " +-()/.".contains(c));
     if ok {
         Ok(v.to_owned())
@@ -203,7 +206,10 @@ pub fn locale(v: &str) -> CellResult<String> {
     if ok {
         Ok(v.to_owned())
     } else {
-        Err(("invalid_locale", format!("{v:?} is not a locale like cs or cs-CZ")))
+        Err((
+            "invalid_locale",
+            format!("{v:?} is not a locale like cs or cs-CZ"),
+        ))
     }
 }
 
@@ -223,7 +229,10 @@ pub fn country(v: &str) -> CellResult<String> {
     if up.len() == 2 && up.bytes().all(|b| b.is_ascii_uppercase()) {
         Ok(up)
     } else {
-        Err(("invalid_country", format!("{v:?} is not a two-letter country code")))
+        Err((
+            "invalid_country",
+            format!("{v:?} is not a two-letter country code"),
+        ))
     }
 }
 
@@ -232,7 +241,10 @@ pub fn currency(v: &str) -> CellResult<String> {
     if up.len() == 3 && up.bytes().all(|b| b.is_ascii_uppercase()) {
         Ok(up)
     } else {
-        Err(("invalid_currency", format!("{v:?} is not a currency code like CZK")))
+        Err((
+            "invalid_currency",
+            format!("{v:?} is not a currency code like CZK"),
+        ))
     }
 }
 
@@ -269,16 +281,21 @@ pub fn past_time(v: &str, now: DateTime<Utc>) -> CellResult<DateTime<Utc>> {
         .map(|t| t.with_timezone(&Utc))
         .ok()
         .or_else(|| {
-            ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M"]
-                .iter()
-                .find_map(|f| NaiveDateTime::parse_from_str(v, f).ok())
-                .or_else(|| {
-                    ["%Y-%m-%d", "%d.%m.%Y"]
-                        .iter()
-                        .find_map(|f| NaiveDate::parse_from_str(v, f).ok())
-                        .and_then(|d| d.and_hms_opt(0, 0, 0))
-                })
-                .map(crate::invoicing::prague::from_local)
+            [
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d %H:%M",
+                "%d.%m.%Y %H:%M:%S",
+                "%d.%m.%Y %H:%M",
+            ]
+            .iter()
+            .find_map(|f| NaiveDateTime::parse_from_str(v, f).ok())
+            .or_else(|| {
+                ["%Y-%m-%d", "%d.%m.%Y"]
+                    .iter()
+                    .find_map(|f| NaiveDate::parse_from_str(v, f).ok())
+                    .and_then(|d| d.and_hms_opt(0, 0, 0))
+            })
+            .map(crate::invoicing::prague::from_local)
         });
     let floor = NaiveDate::from_ymd_opt(1990, 1, 1)
         .and_then(|d| d.and_hms_opt(0, 0, 0))
@@ -301,7 +318,11 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
 
-    const FIELDS: [Field; 3] = [field("email", true), field("name", false), field("phone", false)];
+    const FIELDS: [Field; 3] = [
+        field("email", true),
+        field("name", false),
+        field("phone", false),
+    ];
 
     fn map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs
@@ -312,14 +333,24 @@ mod tests {
 
     #[test]
     fn reads_comma_and_semicolon_files_with_a_bom() {
-        let t = read(b"\xEF\xBB\xBFEmail,Name\na@x.cz,Anna\n\n", &FIELDS, &map(&[])).unwrap();
+        let t = read(
+            b"\xEF\xBB\xBFEmail,Name\na@x.cz,Anna\n\n",
+            &FIELDS,
+            &map(&[]),
+        )
+        .unwrap();
         assert_eq!(t.headers, ["Email", "Name"]);
         assert_eq!(t.rows.len(), 1, "blank lines are skipped");
         assert_eq!(t.rows[0].get("email"), Some("a@x.cz"));
         assert_eq!(t.rows[0].line, 2);
         assert_eq!(t.rows[0].get("phone"), None);
 
-        let t = read("e-mail;jméno\n\"b@x.cz\";\"Bára; Nová\"\n".as_bytes(), &FIELDS, &map(&[("email", "E-mail"), ("name", "jméno")])).unwrap();
+        let t = read(
+            "e-mail;jméno\n\"b@x.cz\";\"Bára; Nová\"\n".as_bytes(),
+            &FIELDS,
+            &map(&[("email", "E-mail"), ("name", "jméno")]),
+        )
+        .unwrap();
         assert_eq!(t.rows[0].get("name"), Some("Bára; Nová"));
     }
 
@@ -360,7 +391,10 @@ mod tests {
     fn parses_past_times_in_several_formats() {
         let now = "2026-09-25T12:00:00Z".parse().unwrap();
         let t = |v: &str| past_time(v, now).map(|t| t.to_rfc3339());
-        assert_eq!(t("2024-03-01T10:00:00Z").unwrap(), "2024-03-01T10:00:00+00:00");
+        assert_eq!(
+            t("2024-03-01T10:00:00Z").unwrap(),
+            "2024-03-01T10:00:00+00:00"
+        );
         // Local Czech time: winter UTC+1, summer UTC+2.
         assert_eq!(t("2024-03-01 10:00").unwrap(), "2024-03-01T09:00:00+00:00");
         assert_eq!(t("1.7.2024 10:00").unwrap(), "2024-07-01T08:00:00+00:00");

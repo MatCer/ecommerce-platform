@@ -147,7 +147,11 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
     let codes: Vec<(u64, &str)> = r.errors.iter().map(|e| (e.line, e.code.as_str())).collect();
     assert_eq!(codes, [(4, "invalid_email"), (5, "duplicate")]);
     assert_eq!(r.preview[0]["email"], "anna@example.com");
-    assert_eq!(c.count("SELECT count(*) FROM customers").await, 0, "dry run writes nothing");
+    assert_eq!(
+        c.count("SELECT count(*) FROM customers").await,
+        0,
+        "dry run writes nothing"
+    );
 
     let run = c.step(run.id, "apply").await;
     assert_eq!(run.status, RunStatus::Applied, "{:?}", run.error);
@@ -157,7 +161,11 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
         c.count("SELECT count(*) FROM customers WHERE email = 'boris@example.com' AND password_hash IS NULL AND locale = 'cs'").await,
         1
     );
-    assert_eq!(c.count("SELECT count(*) FROM customer_addresses WHERE is_default AND country = 'CZ'").await, 1);
+    assert_eq!(
+        c.count("SELECT count(*) FROM customer_addresses WHERE is_default AND country = 'CZ'")
+            .await,
+        1
+    );
     // The CSV (personal data) is gone once applied.
     let key = Path::from(format!("data-imports/{}/{}.csv", c.shop.tenant, run.id));
     assert!(c.storage.private.head(&key).await.is_err());
@@ -169,20 +177,33 @@ async fn customers_import_reports_rows_and_reimports_idempotently(db: PgPool) {
     assert_eq!((again.progress.created, again.progress.updated), (0, 2));
     assert_eq!(c.count("SELECT count(*) FROM customers").await, 2);
     assert_eq!(c.count("SELECT count(*) FROM customer_addresses").await, 1);
-    assert_eq!(c.side_effects().await, before, "customer imports have no side effects");
+    assert_eq!(
+        c.side_effects().await,
+        before,
+        "customer imports have no side effects"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_bad_file_or_mapping_fails_the_run_and_can_be_reanalyzed(db: PgPool) {
     let c = setup(db).await;
-    let run = c.analyzed(Kind::Customers, "Jmeno\nAnna\n", Mapping::new()).await;
+    let run = c
+        .analyzed(Kind::Customers, "Jmeno\nAnna\n", Mapping::new())
+        .await;
     assert_eq!(run.status, RunStatus::Failed);
     assert!(run.error.unwrap().contains("email"));
     // A new mapping fixes it without a new upload.
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    imports::analyze(&mut tx, "boss", run.id, &AnalyzeInput { mapping: Some(mapping(&[("email", "Jmeno")])) })
-        .await
-        .unwrap();
+    imports::analyze(
+        &mut tx,
+        "boss",
+        run.id,
+        &AnalyzeInput {
+            mapping: Some(mapping(&[("email", "Jmeno")])),
+        },
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     imports::run_step(&c.runtime, &c.storage, c.shop.tenant, run.id, "analyze")
         .await
@@ -192,9 +213,16 @@ async fn a_bad_file_or_mapping_fails_the_run_and_can_be_reanalyzed(db: PgPool) {
     assert_eq!(run.status, RunStatus::Analyzed, "{:?}", run.error);
     assert_eq!(run.report.unwrap().errors[0].code, "invalid_email");
     // Unknown mapping fields and applying before the dry run are refused.
-    let err = imports::analyze(&mut tx, "boss", run.id, &AnalyzeInput { mapping: Some(mapping(&[("password", "x")])) })
-        .await
-        .unwrap_err();
+    let err = imports::analyze(
+        &mut tx,
+        "boss",
+        run.id,
+        &AnalyzeInput {
+            mapping: Some(mapping(&[("password", "x")])),
+        },
+    )
+    .await
+    .unwrap_err();
     assert!(err.to_string().contains("not a customers field"), "{err}");
 }
 
@@ -208,13 +236,21 @@ A-3,2024-04-01,guest@example.com,EUR,12.5,,,,,,,,Kniha,-1,12.5
 #[sqlx::test(migrations = "../../migrations")]
 async fn historical_orders_are_archived_without_side_effects(db: PgPool) {
     let c = setup(db).await;
-    c.import(Kind::Customers, "email,name\nanna@example.com,Anna\n").await;
-    let stock_before = c.count("SELECT coalesce(sum(on_hand), 0)::bigint FROM inventory_levels").await;
+    c.import(Kind::Customers, "email,name\nanna@example.com,Anna\n")
+        .await;
+    let stock_before = c
+        .count("SELECT coalesce(sum(on_hand), 0)::bigint FROM inventory_levels")
+        .await;
     let before = c.side_effects().await;
 
     let run = c.analyzed(Kind::Orders, ORDERS, Mapping::new()).await;
     let r = run.report.clone().unwrap();
-    assert_eq!((r.rows, r.records, r.invalid_rows), (4, 2, 1), "{:?}", r.errors);
+    assert_eq!(
+        (r.rows, r.records, r.invalid_rows),
+        (4, 2, 1),
+        "{:?}",
+        r.errors
+    );
     assert_eq!(r.counts["lines"], 3);
     assert_eq!(r.counts["linked_to_customer"], 1);
     let run = c.step(run.id, "apply").await;
@@ -231,7 +267,10 @@ async fn historical_orders_are_archived_without_side_effects(db: PgPool) {
     .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(a1.placed_at.to_rfc3339(), "2024-03-01T09:00:00+00:00");
-    assert_eq!((a1.total_minor, a1.currency.as_str(), a1.n), (30_000, "CZK", 2));
+    assert_eq!(
+        (a1.total_minor, a1.currency.as_str(), a1.n),
+        (30_000, "CZK", 2)
+    );
     assert_eq!(a1.status_label.as_deref(), Some("Vyřízeno"));
     assert!(a1.customer_id.is_some(), "linked to the imported customer");
     assert_eq!(a1.address.unwrap()["city"], "Praha");
@@ -240,7 +279,8 @@ async fn historical_orders_are_archived_without_side_effects(db: PgPool) {
     // No side effects of any kind (A28), stock untouched.
     assert_eq!(c.side_effects().await, before);
     assert_eq!(
-        c.count("SELECT coalesce(sum(on_hand), 0)::bigint FROM inventory_levels").await,
+        c.count("SELECT coalesce(sum(on_hand), 0)::bigint FROM inventory_levels")
+            .await,
         stock_before
     );
 
@@ -313,20 +353,45 @@ withdrew@example.com,2023-05-01,old shop,,
     assert_eq!(o.get("kept_unsubscribed"), Some(&1), "{o:?}");
 
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    let rows = sqlx::query!("SELECT id, email, status, confirmed_at, consent_evidence FROM subscribers ORDER BY email")
-        .fetch_all(&mut *tx)
-        .await
-        .unwrap();
+    let rows = sqlx::query!(
+        "SELECT id, email, status, confirmed_at, consent_evidence FROM subscribers ORDER BY email"
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
     let by = |e: &str| rows.iter().find(|r| r.email == e).unwrap();
     let yes = by("yes@example.com");
     assert_eq!(yes.status, "subscribed");
-    assert_eq!(yes.confirmed_at.unwrap().to_rfc3339(), "2023-05-01T08:00:00+00:00");
+    assert_eq!(
+        yes.confirmed_at.unwrap().to_rfc3339(),
+        "2023-05-01T08:00:00+00:00"
+    );
     let ev = yes.consent_evidence.as_ref().unwrap();
-    assert_eq!((ev["source"].as_str(), ev["ip"].as_str(), ev["text_version"].as_str()), (Some("old shop checkout box"), Some("192.0.2.7"), Some("v3")));
-    assert_eq!(subscribers::may_receive(&mut tx, yes.id).await.unwrap(), None);
-    for e in ["nothing@example.com", "bounced@example.com", "withdrew@example.com"] {
+    assert_eq!(
+        (
+            ev["source"].as_str(),
+            ev["ip"].as_str(),
+            ev["text_version"].as_str()
+        ),
+        (Some("old shop checkout box"), Some("192.0.2.7"), Some("v3"))
+    );
+    assert_eq!(
+        subscribers::may_receive(&mut tx, yes.id).await.unwrap(),
+        None
+    );
+    for e in [
+        "nothing@example.com",
+        "bounced@example.com",
+        "withdrew@example.com",
+    ] {
         assert_eq!(by(e).status, "pending", "{e}");
-        assert!(subscribers::may_receive(&mut tx, by(e).id).await.unwrap().is_some(), "{e}");
+        assert!(
+            subscribers::may_receive(&mut tx, by(e).id)
+                .await
+                .unwrap()
+                .is_some(),
+            "{e}"
+        );
     }
     assert_eq!(by("gone@example.com").status, "unsubscribed");
     // The consent record carries the evidence time; the later withdrawal still wins.
@@ -338,21 +403,32 @@ withdrew@example.com,2023-05-01,old shop,,
     .unwrap();
     assert_eq!(grant.to_rfc3339(), "2023-05-01T08:00:00+00:00");
     assert_eq!(
-        consent::latest(&mut tx, &Subject::Email("withdrew@example.com".into()), ConsentPurpose::EmailMarketing).await.unwrap(),
+        consent::latest(
+            &mut tx,
+            &Subject::Email("withdrew@example.com".into()),
+            ConsentPurpose::EmailMarketing
+        )
+        .await
+        .unwrap(),
         Some(false)
     );
     tx.commit().await.unwrap();
     // Nothing was mailed (no confirmation either); re-import adds no second record.
     assert_eq!(c.side_effects().await, before);
     c.import(Kind::Subscribers, csv).await;
-    assert_eq!(c.count("SELECT count(*) FROM consent_records WHERE source = 'import'").await, 3);
+    assert_eq!(
+        c.count("SELECT count(*) FROM consent_records WHERE source = 'import'")
+            .await,
+        3
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn tenant_export_zips_every_table_without_secrets(db: PgPool) {
     let c = setup(db).await;
     let other = testkit::storefront::shop(&c.runtime, "other").await;
-    c.import(Kind::Customers, "email,name\nanna@example.com,Anna\n").await;
+    c.import(Kind::Customers, "email,name\nanna@example.com,Anna\n")
+        .await;
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     sqlx::query("UPDATE customers SET password_hash = '$argon2id$v=19$secret'")
         .execute(&mut *tx)
@@ -371,34 +447,68 @@ async fn tenant_export_zips_every_table_without_secrets(db: PgPool) {
     .unwrap();
     tx.commit().await.unwrap();
     let mut tx = tenant_tx(&c.runtime, other.tenant).await.unwrap();
-    sqlx::query("INSERT INTO customers (tenant_id, email, locale) VALUES ($1, 'foreign@example.com', 'cs')")
-        .bind(other.tenant)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO customers (tenant_id, email, locale) VALUES ($1, 'foreign@example.com', 'cs')",
+    )
+    .bind(other.tenant)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     let e = export::create(&mut tx, "boss").await.unwrap();
-    assert!(export::create(&mut tx, "boss").await.is_err(), "one export at a time");
+    assert!(
+        export::create(&mut tx, "boss").await.is_err(),
+        "one export at a time"
+    );
     tx.commit().await.unwrap();
-    export::run(&c.runtime, &c.storage, c.shop.tenant, e.id).await.unwrap();
+    export::run(&c.runtime, &c.storage, c.shop.tenant, e.id)
+        .await
+        .unwrap();
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     let done = export::get(&mut tx, e.id).await.unwrap();
     assert_eq!(done.status, export::ExportStatus::Ready);
-    let link = export::download(&mut tx, &c.storage, "boss", e.id).await.unwrap();
+    let link = export::download(&mut tx, &c.storage, "boss", e.id)
+        .await
+        .unwrap();
     assert!(link.url.contains("X-Amz-Expires=300"), "{}", link.url);
     tx.commit().await.unwrap();
 
     let key = Path::from(format!("exports/{}/{}.zip", c.shop.tenant, e.id));
-    let bytes = c.storage.private.get(&key).await.unwrap().bytes().await.unwrap();
+    let bytes = c
+        .storage
+        .private
+        .get(&key)
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap();
     assert_eq!(done.size_bytes, Some(bytes.len() as i64));
     let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes.to_vec())).unwrap();
     let names: Vec<String> = zip.file_names().map(str::to_owned).collect();
-    for want in ["customers.jsonl", "orders.jsonl", "products.jsonl", "subscribers.jsonl", "consent_records.jsonl", "audit_log.jsonl", "assets-manifest.jsonl", "README.txt"] {
-        assert!(names.iter().any(|n| n == want), "{want} missing from {names:?}");
+    for want in [
+        "customers.jsonl",
+        "orders.jsonl",
+        "products.jsonl",
+        "subscribers.jsonl",
+        "consent_records.jsonl",
+        "audit_log.jsonl",
+        "assets-manifest.jsonl",
+        "README.txt",
+    ] {
+        assert!(
+            names.iter().any(|n| n == want),
+            "{want} missing from {names:?}"
+        );
     }
-    for never in ["customer_sessions.jsonl", "order_tokens.jsonl", "data_exports.jsonl", "idempotency_keys.jsonl"] {
+    for never in [
+        "customer_sessions.jsonl",
+        "order_tokens.jsonl",
+        "data_exports.jsonl",
+        "idempotency_keys.jsonl",
+    ] {
         assert!(!names.iter().any(|n| n == never), "{never} exported");
     }
     let mut all = String::new();
@@ -406,17 +516,35 @@ async fn tenant_export_zips_every_table_without_secrets(db: PgPool) {
         zip.by_index(i).unwrap().read_to_string(&mut all).unwrap();
     }
     assert!(all.contains("anna@example.com"));
-    assert!(!all.contains("foreign@example.com"), "another tenant's data leaked");
+    assert!(
+        !all.contains("foreign@example.com"),
+        "another tenant's data leaked"
+    );
     assert!(!all.contains("argon2id") && !all.contains("password_hash"));
-    assert!(!all.contains("confirm_token_hash") && !all.contains("\\\\x"), "bytea leaked");
+    assert!(
+        !all.contains("confirm_token_hash") && !all.contains("\\\\x"),
+        "bytea leaked"
+    );
     let mut customers = String::new();
-    zip.by_name("customers.jsonl").unwrap().read_to_string(&mut customers).unwrap();
+    zip.by_name("customers.jsonl")
+        .unwrap()
+        .read_to_string(&mut customers)
+        .unwrap();
     let row: serde_json::Value = serde_json::from_str(customers.lines().next().unwrap()).unwrap();
     assert_eq!(row["email"], "anna@example.com");
 }
 
 async fn finished_order(c: &Ctx, email: &str) -> Uuid {
-    let id = testkit::storefront::raw_order(&c.runtime, &c.shop, c.shop.cz, "CZK", 12_900, 1, "delivered").await;
+    let id = testkit::storefront::raw_order(
+        &c.runtime,
+        &c.shop,
+        c.shop.cz,
+        "CZK",
+        12_900,
+        1,
+        "delivered",
+    )
+    .await;
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     sqlx::query("UPDATE orders SET email = $2, notes = 'ring twice', phone = '+420 777 000 000' WHERE id = $1")
         .bind(id)
@@ -485,18 +613,43 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     let c = setup(db).await;
     c.import(Kind::Customers, "email,name,street,city,postal_code,country\nanna@example.com,Anna,Dlouhá 1,Praha,11000,CZ\n").await;
     c.import(Kind::Orders, "order_number,placed_at,email,currency,total,name\nOLD-1,2022-01-01,anna@example.com,CZK,10,Anna\n").await;
-    c.import(Kind::Subscribers, "email,consent_at,consent_source\nanna@example.com,2022-01-01,old shop\n").await;
+    c.import(
+        Kind::Subscribers,
+        "email,consent_at,consent_source\nanna@example.com,2022-01-01,old shop\n",
+    )
+    .await;
     let order = finished_order(&c, "anna@example.com").await;
-    let open = testkit::storefront::raw_order(&c.runtime, &c.shop, c.shop.cz, "CZK", 100, 1, "processing").await;
+    let open =
+        testkit::storefront::raw_order(&c.runtime, &c.shop, c.shop.cz, "CZK", 100, 1, "processing")
+            .await;
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    sqlx::query("UPDATE orders SET email = 'anna@example.com' WHERE id = $1").bind(open).execute(&mut *tx).await.unwrap();
-    let cid: Uuid = sqlx::query_scalar("SELECT id FROM customers WHERE email = 'anna@example.com'").fetch_one(&mut *tx).await.unwrap();
-    consent::record_server(&mut tx, &Subject::Customer(cid), ConsentPurpose::Analytics, true, "v1", "admin", None).await.unwrap();
+    sqlx::query("UPDATE orders SET email = 'anna@example.com' WHERE id = $1")
+        .bind(open)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let cid: Uuid = sqlx::query_scalar("SELECT id FROM customers WHERE email = 'anna@example.com'")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    consent::record_server(
+        &mut tx,
+        &Subject::Customer(cid),
+        ConsentPurpose::Analytics,
+        true,
+        "v1",
+        "admin",
+        None,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
 
     // Access: everything in one document.
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    let doc = privacy::access(&mut tx, "boss", " Anna@Example.com ").await.unwrap();
+    let doc = privacy::access(&mut tx, "boss", " Anna@Example.com ")
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(doc["customer"]["email"], "anna@example.com");
     assert!(doc["customer"].get("password_hash").is_none());
@@ -509,18 +662,46 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     assert_eq!(doc["consents"].as_array().unwrap().len(), 2);
 
     // Erasure: confirmation must match; an open order blocks it.
-    let req = |confirm: &str| ErasureRequest { email: "anna@example.com".into(), confirm_email: confirm.into() };
+    let req = |confirm: &str| ErasureRequest {
+        email: "anna@example.com".into(),
+        confirm_email: confirm.into(),
+    };
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    let err = privacy::erase(&mut tx, "boss", &req("other@example.com")).await.unwrap_err();
+    let err = privacy::erase(&mut tx, "boss", &req("other@example.com"))
+        .await
+        .unwrap_err();
     assert!(err.to_string().contains("repeat"), "{err}");
-    let err = privacy::erase(&mut tx, "boss", &req("ANNA@example.com")).await.unwrap_err();
-    assert!(matches!(err, platform::Error::Conflict { code: "erasure_blocked", .. }), "{err}");
-    sqlx::query("UPDATE orders SET status = 'cancelled' WHERE id = $1").bind(open).execute(&mut *tx).await.unwrap();
-    let report = privacy::erase(&mut tx, "boss", &req("ANNA@example.com")).await.unwrap();
+    let err = privacy::erase(&mut tx, "boss", &req("ANNA@example.com"))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            platform::Error::Conflict {
+                code: "erasure_blocked",
+                ..
+            }
+        ),
+        "{err}"
+    );
+    sqlx::query("UPDATE orders SET status = 'cancelled' WHERE id = $1")
+        .bind(open)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let report = privacy::erase(&mut tx, "boss", &req("ANNA@example.com"))
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
     assert_eq!(report.customer_id, Some(cid));
-    assert_eq!((report.orders_anonymized, report.archived_orders_anonymized), (2, 1));
-    assert_eq!((report.invoices_retained, report.subscribers_deleted), (1, 1));
+    assert_eq!(
+        (report.orders_anonymized, report.archived_orders_anonymized),
+        (2, 1)
+    );
+    assert_eq!(
+        (report.invoices_retained, report.subscribers_deleted),
+        (1, 1)
+    );
     assert_eq!(report.consent_records_pseudonymized, 2);
 
     let n = |sql: &'static str| c.count(sql);
@@ -528,29 +709,59 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     assert_eq!(n("SELECT count(*) FROM customer_addresses").await, 0);
     assert_eq!(n("SELECT count(*) FROM subscribers").await, 0);
     assert_eq!(n("SELECT count(*) FROM orders WHERE email = 'erased@erased.invalid' AND notes IS NULL AND phone IS NULL AND customer_id IS NULL").await, 2);
-    assert_eq!(n("SELECT count(*) FROM order_addresses WHERE name = '[erased]' AND country = 'CZ'").await, 1);
+    assert_eq!(
+        n("SELECT count(*) FROM order_addresses WHERE name = '[erased]' AND country = 'CZ'").await,
+        1
+    );
     assert_eq!(n("SELECT count(*) FROM archived_orders WHERE email = 'erased@erased.invalid' AND name IS NULL").await, 1);
-    assert_eq!(n("SELECT count(*) FROM consent_records WHERE subject_id LIKE 'erased-%'").await, 2);
-    assert_eq!(n("SELECT count(*) FROM consent_records WHERE subject_id IN ('anna@example.com')").await, 0);
+    assert_eq!(
+        n("SELECT count(*) FROM consent_records WHERE subject_id LIKE 'erased-%'").await,
+        2
+    );
+    assert_eq!(
+        n("SELECT count(*) FROM consent_records WHERE subject_id IN ('anna@example.com')").await,
+        0
+    );
     assert_eq!(n("SELECT count(*) FROM withdrawals WHERE email = 'erased@erased.invalid' AND iban IS NULL AND declaration = '[erased]'").await, 1);
-    assert_eq!(n("SELECT count(*) FROM order_events WHERE kind = 'note' AND data = '{}'").await, 1);
+    assert_eq!(
+        n("SELECT count(*) FROM order_events WHERE kind = 'note' AND data = '{}'").await,
+        1
+    );
     // Invoices stay exactly as issued (tax law).
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    let doc: serde_json::Value = sqlx::query_scalar("SELECT document FROM invoices WHERE order_id = $1").bind(order).fetch_one(&mut *tx).await.unwrap();
+    let doc: serde_json::Value =
+        sqlx::query_scalar("SELECT document FROM invoices WHERE order_id = $1")
+            .bind(order)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
     assert_eq!(doc["customer"]["name"], "Anna Nová");
     // The audit entry names no one.
-    let audit: serde_json::Value = sqlx::query_scalar("SELECT diff FROM audit_log WHERE action = 'privacy.erased'").fetch_one(&mut *tx).await.unwrap();
+    let audit: serde_json::Value =
+        sqlx::query_scalar("SELECT diff FROM audit_log WHERE action = 'privacy.erased'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
     assert!(!audit.to_string().contains("anna"), "{audit}");
     // Nothing is left to find.
-    let doc = privacy::access(&mut tx, "boss", "anna@example.com").await.unwrap();
-    assert!(doc["customer"].is_null() && doc["orders"].as_array().unwrap().is_empty(), "{doc}");
+    let doc = privacy::access(&mut tx, "boss", "anna@example.com")
+        .await
+        .unwrap();
+    assert!(
+        doc["customer"].is_null() && doc["orders"].as_array().unwrap().is_empty(),
+        "{doc}"
+    );
     tx.commit().await.unwrap();
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn new_tables_are_tenant_isolated(db: PgPool) {
     let c = setup(db).await;
-    c.import(Kind::Orders, "order_number,placed_at,email,currency,total\nA-1,2024-01-01,a@example.com,CZK,1\n").await;
+    c.import(
+        Kind::Orders,
+        "order_number,placed_at,email,currency,total\nA-1,2024-01-01,a@example.com,CZK,1\n",
+    )
+    .await;
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
     export::create(&mut tx, "boss").await.unwrap();
     tx.commit().await.unwrap();
@@ -558,16 +769,19 @@ async fn new_tables_are_tenant_isolated(db: PgPool) {
     let other = testkit::storefront::shop(&c.runtime, "iso2").await;
     let mut tx = tenant_tx(&c.runtime, other.tenant).await.unwrap();
     for table in ["data_imports", "archived_orders", "data_exports"] {
-        let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap();
+        let n: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
         assert_eq!(n, 0, "{table} leaks across tenants");
-        let touched = sqlx::query(sqlx::AssertSqlSafe(format!("UPDATE {table} SET tenant_id = tenant_id")))
-            .execute(&mut *tx)
-            .await
-            .unwrap()
-            .rows_affected();
+        let touched = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {table} SET tenant_id = tenant_id"
+        )))
+        .execute(&mut *tx)
+        .await
+        .unwrap()
+        .rows_affected();
         assert_eq!(touched, 0, "{table} writable across tenants");
     }
     let err = sqlx::query(
@@ -581,12 +795,23 @@ async fn new_tables_are_tenant_isolated(db: PgPool) {
     // Consent erasure only touches the current tenant.
     tx.rollback().await.unwrap();
     let mut tx = tenant_tx(&c.runtime, c.shop.tenant).await.unwrap();
-    consent::record_server(&mut tx, &Subject::Email("same@example.com".into()), ConsentPurpose::EmailMarketing, true, "v1", "admin", None).await.unwrap();
+    consent::record_server(
+        &mut tx,
+        &Subject::Email("same@example.com".into()),
+        ConsentPurpose::EmailMarketing,
+        true,
+        "v1",
+        "admin",
+        None,
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     let mut tx = tenant_tx(&c.runtime, other.tenant).await.unwrap();
-    let n: i64 = sqlx::query_scalar("SELECT platform.erase_consent_subject('email', 'same@example.com')")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
+    let n: i64 =
+        sqlx::query_scalar("SELECT platform.erase_consent_subject('email', 'same@example.com')")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
     assert_eq!(n, 0, "erasure reached another tenant's consent records");
 }

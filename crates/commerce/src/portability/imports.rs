@@ -28,9 +28,9 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use super::import_subscribers as subscribers;
 use super::table::{self, Field, Row, Table};
 use super::{import_customers as customers, import_orders as orders};
-use super::import_subscribers as subscribers;
 use crate::audit;
 use crate::markets::invalid;
 use crate::media::{self, UploadTarget};
@@ -161,7 +161,13 @@ pub struct ImportReport {
 }
 
 impl ImportReport {
-    pub(super) fn error(&mut self, line: u64, field: Option<&str>, code: &str, detail: impl Into<String>) {
+    pub(super) fn error(
+        &mut self,
+        line: u64,
+        field: Option<&str>,
+        code: &str,
+        detail: impl Into<String>,
+    ) {
         if self.errors.len() < MAX_LISTED {
             self.errors.push(RowError {
                 line,
@@ -301,9 +307,21 @@ impl Records {
 
     fn preview(&self) -> Vec<BTreeMap<String, String>> {
         match self {
-            Self::Customers(r) => r.iter().take(PREVIEW).map(customers::Record::preview).collect(),
-            Self::Orders(r) => r.iter().take(PREVIEW).map(orders::Record::preview).collect(),
-            Self::Subscribers(r) => r.iter().take(PREVIEW).map(subscribers::Record::preview).collect(),
+            Self::Customers(r) => r
+                .iter()
+                .take(PREVIEW)
+                .map(customers::Record::preview)
+                .collect(),
+            Self::Orders(r) => r
+                .iter()
+                .take(PREVIEW)
+                .map(orders::Record::preview)
+                .collect(),
+            Self::Subscribers(r) => r
+                .iter()
+                .take(PREVIEW)
+                .map(subscribers::Record::preview)
+                .collect(),
         }
     }
 }
@@ -494,7 +512,8 @@ pub async fn create(
         method: "PUT".into(),
         url: url.to_string(),
         headers: BTreeMap::from([("content-type".to_owned(), UPLOAD_CONTENT_TYPE.to_owned())]),
-        expires_at: Utc::now() + chrono::Duration::from_std(media::UPLOAD_URL_TTL).map_err(internal)?,
+        expires_at: Utc::now()
+            + chrono::Duration::from_std(media::UPLOAD_URL_TTL).map_err(internal)?,
     };
     audit::record(
         tx,
@@ -547,8 +566,15 @@ pub async fn analyze(
     .await?;
     let j = job(tx.tenant_id(), id, "analyze");
     queue::enqueue(&mut **tx, &j).await?;
-    audit::record(tx, actor, "data_import.analyze", "data_import", Some(&id.to_string()), &json!({}))
-        .await?;
+    audit::record(
+        tx,
+        actor,
+        "data_import.analyze",
+        "data_import",
+        Some(&id.to_string()),
+        &json!({}),
+    )
+    .await?;
     get(tx, id).await
 }
 
@@ -569,8 +595,15 @@ pub async fn apply(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<DataImpor
     .await?;
     let j = job(tx.tenant_id(), id, "apply");
     queue::enqueue(&mut **tx, &j).await?;
-    audit::record(tx, actor, "data_import.apply", "data_import", Some(&id.to_string()), &json!({}))
-        .await?;
+    audit::record(
+        tx,
+        actor,
+        "data_import.apply",
+        "data_import",
+        Some(&id.to_string()),
+        &json!({}),
+    )
+    .await?;
     get(tx, id).await
 }
 
@@ -640,7 +673,13 @@ pub async fn run_step(
         storage.private.put(&key, PutPayload::from(bytes)).await?;
     }
     let Some(bytes) = read_object(storage, &key).await? else {
-        return fail(db, tenant_id, id, "the uploaded CSV is gone; upload it again").await;
+        return fail(
+            db,
+            tenant_id,
+            id,
+            "the uploaded CSV is gone; upload it again",
+        )
+        .await;
     };
     let (kind, mapping, d2) = (r.kind, r.mapping.clone(), d.clone());
     let parsed = tokio::task::spawn_blocking(move || validate(kind, &bytes, &mapping, &d2))
@@ -686,7 +725,10 @@ pub async fn run_step(
                 Records::Orders(v) => orders::apply(&mut tx, &v[i], id).await?,
                 Records::Subscribers(v) => {
                     let (created, outcome) = subscribers::apply(&mut tx, &v[i], &d, id).await?;
-                    *progress.outcomes.entry(outcome.key().to_owned()).or_default() += 1;
+                    *progress
+                        .outcomes
+                        .entry(outcome.key().to_owned())
+                        .or_default() += 1;
                     created
                 }
             };

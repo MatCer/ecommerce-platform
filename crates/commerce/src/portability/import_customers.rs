@@ -79,7 +79,11 @@ pub fn validate(rows: &[Row], _d: &Defaults, report: &mut ImportReport) -> Vec<R
             let postal_code = c.req("postal_code", |v| table::text(v, 20));
             let country = c.req("country", table::country);
             if name.is_none() {
-                c.fail(Some("name"), "missing", "an address needs the customer's name");
+                c.fail(
+                    Some("name"),
+                    "missing",
+                    "an address needs the customer's name",
+                );
             }
             match (street, city, postal_code, country, &name) {
                 (Some(street), Some(city), Some(postal_code), Some(country), Some(n)) => {
@@ -100,7 +104,11 @@ pub fn validate(rows: &[Row], _d: &Defaults, report: &mut ImportReport) -> Vec<R
         if let Some(e) = &email
             && !seen.insert(e.clone())
         {
-            c.fail(Some("email"), "duplicate", format!("{e} appears on an earlier line"));
+            c.fail(
+                Some("email"),
+                "duplicate",
+                format!("{e} appears on an earlier line"),
+            );
         }
         if !c.ok {
             report.invalid_rows += 1;
