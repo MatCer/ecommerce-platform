@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search_product_state SET read_at = $2, indexed_at = now() WHERE product_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed6e847f543aca0b4b455ecabfb5a35fd46069026a1d261198f53d0b597c7ca0"
+}

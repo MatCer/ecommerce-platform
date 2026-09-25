@@ -156,21 +156,18 @@ async fn rebuild_needs_an_admin_and_is_queued_and_audited(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::ACCEPTED, "{body}");
     let job_id = body["job_id"].as_i64().unwrap();
-    // A double click shares the job.
-    let (_, again, _) = Call::post("/admin/v1/search/rebuild", json!({}))
-        .token(&owner)
-        .tenant(s.tenant)
-        .send(&s.s)
-        .await;
-    assert_eq!(again["job_id"].as_i64(), Some(job_id));
-
-    let (kind, tenant): (String, Option<Uuid>) =
-        sqlx::query_as("SELECT kind, tenant_id FROM queue.jobs WHERE id = $1")
-            .bind(job_id)
-            .fetch_one(&db)
-            .await
-            .unwrap();
-    assert_eq!((kind.as_str(), tenant), ("search.rebuild", Some(s.tenant)));
+    let (kind, tenant, versioned, due): (String, Option<Uuid>, bool, bool) = sqlx::query_as(
+        "SELECT kind, tenant_id, payload ? 'dispatched_at', run_at <= now()
+         FROM queue.jobs WHERE id = $1",
+    )
+    .bind(job_id)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        (kind.as_str(), tenant, versioned, due),
+        ("search.rebuild", Some(s.tenant), true, true)
+    );
 
     let (status, body, _) = Call::get("/admin/v1/search/status")
         .token(&clerk)
@@ -226,7 +223,7 @@ async fn storefront_search_and_suggest_end_to_end(db: PgPool) {
         ],
     )
     .await;
-    commerce::search::index::index_product(&s.runtime, &admin, s.tenant, product.id, 1)
+    commerce::search::index::index_product(&s.runtime, &admin, s.tenant, product.id, None)
         .await
         .unwrap();
     admin

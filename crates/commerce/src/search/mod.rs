@@ -26,11 +26,11 @@ use uuid::Uuid;
 
 pub use meili::{Meili, MeiliError};
 
-/// (Re)indexes one product: `{"product_id"}`. The job id is the indexing version.
+/// (Re)indexes one product: `{"product_id", "dispatched_at"}`.
 pub const INDEX_PRODUCT_JOB: &str = "search.index_product";
-/// Reindexes the products of a changed category: `{"category_id"}`.
+/// Reindexes the products of a changed category: `{"category_id", "dispatched_at"}`.
 pub const REINDEX_CATEGORY_JOB: &str = "search.reindex_category";
-/// Rebuilds all indexes of a tenant into new indexes and swaps them in: `{}`.
+/// Rebuilds all indexes of a tenant into new indexes and swaps them in: `{"dispatched_at"}`.
 pub const REBUILD_JOB: &str = "search.rebuild";
 
 /// Bumped whenever [`index::settings`] changes; indexes with an older version get the new
@@ -39,10 +39,11 @@ pub const SETTINGS_VERSION: i32 = 1;
 
 /// Meilisearch outages can last a while; indexing jobs keep retrying (capped backoff).
 const JOB_ATTEMPTS: i32 = 25;
-/// Changes to one product within this window are indexed by one job.
-const DEBOUNCE: Duration = Duration::from_secs(2);
-/// Rebuild requests (settings-relevant catalog changes) are coalesced over this window.
-const REBUILD_DEBOUNCE: Duration = Duration::from_secs(10);
+/// Indexing jobs wait this long, so a burst of changes to one product is indexed once: the
+/// first job to run reads everything, the others are dropped as stale.
+const DELAY: Duration = Duration::from_secs(2);
+/// Rebuild requests from catalog changes wait longer (they tend to come in bursts too).
+const REBUILD_DELAY: Duration = Duration::from_secs(10);
 
 /// The live index of a tenant + locale (A27: full tenant UUID).
 pub fn index_uid(tenant_id: Uuid, locale: &str) -> String {
@@ -55,66 +56,84 @@ pub fn market_key(code: &str) -> String {
     code.replace('-', "_")
 }
 
-/// A job whose idempotency key is shared by all requests in the same `window`, running only
-/// after the window closed (+ one window of slack for slow dispatch transactions), so every
-/// change inside the window is visible to it. ponytail: time buckets; a per-key "pending"
-/// flag in the queue would remove the fixed delay.
-fn debounced(
+/// The database clock. Search job versions (`dispatched_at`) and indexing reads are compared
+/// on this one clock, never on application clocks.
+pub async fn db_clock<'c>(db: impl sqlx::PgExecutor<'c>) -> Result<DateTime<Utc>, sqlx::Error> {
+    sqlx::query_scalar!(r#"SELECT clock_timestamp() AS "now!""#)
+        .fetch_one(db)
+        .await
+}
+
+/// A search job versioned by `dispatched_at` (spec A27): a database-clock instant taken after
+/// the triggering change committed. The job is stale, and dropped, when an indexing run read
+/// the catalog after that instant. No idempotency key: coalescing into an existing job could
+/// hide a change behind a job that already read the catalog.
+fn versioned(
     kind: &'static str,
-    key: String,
-    payload: Value,
+    mut payload: Value,
     tenant_id: Uuid,
-    now: DateTime<Utc>,
-    window: Duration,
+    dispatched_at: DateTime<Utc>,
+    delay: Duration,
 ) -> NewJob<'static> {
-    let w = i64::try_from(window.as_millis()).unwrap_or(i64::MAX).max(1);
-    let bucket = now.timestamp_millis().div_euclid(w);
-    let run_at = DateTime::<Utc>::from_timestamp_millis((bucket + 2) * w);
+    payload["dispatched_at"] = json!(dispatched_at);
     let mut job = NewJob::new(kind, payload);
     job.tenant_id = Some(tenant_id);
-    job.run_at = run_at;
+    job.run_at = chrono::Duration::from_std(delay)
+        .ok()
+        .map(|d| dispatched_at + d);
     job.max_attempts = JOB_ATTEMPTS;
-    job.idempotency_key = Some(format!("{key}:{bucket}"));
     job
 }
 
-pub fn index_product_job(tenant_id: Uuid, product_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
-    debounced(
+/// The version of a search job (`None`: no version, never considered stale).
+pub fn dispatched_at(payload: &Value) -> Option<DateTime<Utc>> {
+    payload
+        .get("dispatched_at")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+}
+
+pub fn index_product_job(
+    tenant_id: Uuid,
+    product_id: Uuid,
+    dispatched_at: DateTime<Utc>,
+) -> NewJob<'static> {
+    versioned(
         INDEX_PRODUCT_JOB,
-        format!("search:product:{tenant_id}:{product_id}"),
         json!({ "product_id": product_id }),
         tenant_id,
-        now,
-        DEBOUNCE,
+        dispatched_at,
+        DELAY,
     )
 }
 
-pub fn rebuild_job(tenant_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
-    debounced(
+pub fn rebuild_job(tenant_id: Uuid, dispatched_at: DateTime<Utc>) -> NewJob<'static> {
+    versioned(
         REBUILD_JOB,
-        format!("search:rebuild:{tenant_id}"),
         json!({}),
         tenant_id,
-        now,
-        REBUILD_DEBOUNCE,
+        dispatched_at,
+        REBUILD_DELAY,
     )
 }
 
-/// A rebuild requested by staff: runs now; requests in the same window share the job.
-pub fn manual_rebuild_job(tenant_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
-    let mut job = rebuild_job(tenant_id, now);
-    job.run_at = None;
-    job.idempotency_key = job.idempotency_key.map(|k| format!("{k}:manual"));
-    job
+/// A rebuild requested by staff: runs right away.
+pub fn manual_rebuild_job(tenant_id: Uuid, requested_at: DateTime<Utc>) -> NewJob<'static> {
+    versioned(
+        REBUILD_JOB,
+        json!({}),
+        tenant_id,
+        requested_at,
+        Duration::ZERO,
+    )
 }
 
 /// The search job an outbox event triggers, if any (the dispatcher enqueues it next to the
-/// generic subscribers).
+/// generic subscribers). `dispatched_at`: the database clock after the events were claimed.
 pub fn job_for_event(
     tenant_id: Option<Uuid>,
     event_type: &str,
     payload: &Value,
-    now: DateTime<Utc>,
+    dispatched_at: DateTime<Utc>,
 ) -> Option<NewJob<'static>> {
     let tenant_id = tenant_id?;
     let id = |field: &str| {
@@ -125,21 +144,25 @@ pub fn job_for_event(
     };
     match event_type {
         "product.created" | "product.updated" | "product.deleted" | "price.changed"
-        | "inventory.changed" => Some(index_product_job(tenant_id, id("product_id")?, now)),
-        "category.updated" | "category.moved" | "category.deleted" => {
-            let category_id = id("category_id")?;
-            Some(debounced(
-                REINDEX_CATEGORY_JOB,
-                format!("search:category:{tenant_id}:{category_id}"),
-                json!({ "category_id": category_id }),
-                tenant_id,
-                now,
-                DEBOUNCE,
-            ))
+        | "inventory.changed" => Some(index_product_job(
+            tenant_id,
+            id("product_id")?,
+            dispatched_at,
+        )),
+        // Memberships still exist in Postgres, so the affected products can be found.
+        "category.updated" | "category.moved" => Some(versioned(
+            REINDEX_CATEGORY_JOB,
+            json!({ "category_id": id("category_id")? }),
+            tenant_id,
+            dispatched_at,
+            DELAY,
+        )),
+        // A deleted category's memberships are gone; filterable parameters, markets and market
+        // price lists shape every document: rebuild.
+        "category.deleted" | "parameter.updated" | "parameter.deleted" | "market.created"
+        | "market.updated" | "price_list.created" | "price_list.updated" => {
+            Some(rebuild_job(tenant_id, dispatched_at))
         }
-        // Filterable parameters, markets and market price lists shape every document.
-        "parameter.updated" | "parameter.deleted" | "market.created" | "market.updated"
-        | "price_list.created" | "price_list.updated" => Some(rebuild_job(tenant_id, now)),
         _ => None,
     }
 }
@@ -167,15 +190,16 @@ mod tests {
     }
 
     #[test]
-    fn product_events_in_one_window_share_a_job_that_runs_after_it() {
+    fn jobs_carry_their_version_and_run_after_the_delay() {
         let (t, p) = (Uuid::now_v7(), Uuid::now_v7());
-        let a = index_product_job(t, p, at(0));
-        let b = index_product_job(t, p, at(1_999));
-        let c = index_product_job(t, p, at(2_000));
-        assert_eq!(a.idempotency_key, b.idempotency_key);
-        assert_ne!(a.idempotency_key, c.idempotency_key);
-        assert!(a.run_at.is_some_and(|r| r >= at(4_000)));
-        assert_eq!(a.tenant_id, Some(t));
+        let job = index_product_job(t, p, at(123));
+        assert_eq!(dispatched_at(&job.payload), Some(at(123)));
+        assert_eq!(job.payload["product_id"], json!(p));
+        assert_eq!(job.run_at, Some(at(2_123)));
+        assert_eq!(job.tenant_id, Some(t));
+        assert!(job.idempotency_key.is_none());
+        assert_eq!(manual_rebuild_job(t, at(5)).run_at, Some(at(5)));
+        assert_eq!(dispatched_at(&json!({})), None);
     }
 
     #[test]
@@ -191,10 +215,13 @@ mod tests {
             job_for_event(Some(t), "category.moved", &cat, at(0)).map(|j| j.kind),
             Some(REINDEX_CATEGORY_JOB)
         );
-        assert_eq!(
-            job_for_event(Some(t), "market.created", &json!({}), at(0)).map(|j| j.kind),
-            Some(REBUILD_JOB)
-        );
+        for ty in ["category.deleted", "market.created", "parameter.updated"] {
+            assert_eq!(
+                job_for_event(Some(t), ty, &cat, at(0)).map(|j| j.kind),
+                Some(REBUILD_JOB),
+                "{ty}"
+            );
+        }
         assert!(job_for_event(Some(t), "coupon.created", &json!({}), at(0)).is_none());
         assert!(job_for_event(None, "product.updated", &payload, at(0)).is_none());
         assert!(job_for_event(Some(t), "product.updated", &json!({}), at(0)).is_none());

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT product_id, indexed_version FROM search_product_state\n         WHERE product_id = ANY($1) ORDER BY product_id FOR UPDATE",
+  "query": "SELECT product_id, read_at FROM search_product_state\n         WHERE product_id = ANY($1) ORDER BY product_id FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -16,12 +16,12 @@
       },
       {
         "ordinal": 1,
-        "name": "indexed_version",
-        "type_info": "Int8",
+        "name": "read_at",
+        "type_info": "Timestamptz",
         "origin": {
           "Table": {
             "table": "search_product_state",
-            "name": "indexed_version"
+            "name": "read_at"
           }
         }
       }
@@ -33,8 +33,8 @@
     },
     "nullable": [
       false,
-      false
+      true
     ]
   },
-  "hash": "7b7ee18b74bd91c1d0c5461a4fd2f024955d073069c72f5201c3a785b7e93488"
+  "hash": "aa9c776e07fbef03ad17a0eb8b6bdeb27fc8ffdddeca4d762a1a2ec9f08389a0"
 }

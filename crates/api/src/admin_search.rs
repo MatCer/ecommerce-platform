@@ -56,7 +56,8 @@ pub struct RebuildQueued {
 
 /// Rebuilds every index of the tenant from the catalog into new indexes and swaps them in
 /// atomically; searches keep being answered from the old ones meanwhile. Owner or admin.
-/// Requests within 10 seconds share one rebuild.
+/// A request made while a rebuild is already running is served by a second rebuild after it,
+/// unless one started after the request anyway.
 #[utoipa::path(
     post,
     path = "/admin/v1/search/rebuild",
@@ -74,7 +75,8 @@ async fn rebuild(
 ) -> Result<(StatusCode, Json<RebuildQueued>), Error> {
     staff.require(Role::Admin)?;
     let job_id = in_tx(&s, staff.tenant_id, async |tx| {
-        let job = search::manual_rebuild_job(tx.tenant_id(), chrono::Utc::now());
+        let now = search::db_clock(&mut **tx).await?;
+        let job = search::manual_rebuild_job(tx.tenant_id(), now);
         let id = platform::queue::enqueue(&mut **tx, &job).await?;
         audit::record(
             tx,

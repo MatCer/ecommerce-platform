@@ -9,7 +9,7 @@ use commerce::catalog::products::{self, OptionValue, ProductInput, ProductOption
 use commerce::inventory::{self, Adjustment};
 use commerce::money::Currency;
 use commerce::pricing::{self, NewPriceList};
-use commerce::search::index::{self, Indexed};
+use commerce::search::index::{self, Indexed, Rebuilt};
 use commerce::search::query::{self, SearchRequest, SearchResult, Sort};
 use commerce::search::{Meili, index_uid};
 use platform::db::tenant_tx;
@@ -26,7 +26,6 @@ struct Shop {
     sk: Uuid,
     cz_list: Uuid,
     sk_list: Uuid,
-    version: i64,
 }
 
 /// A tenant with markets `cz` (cs, CZK) and `sk` (sk, EUR), each with its own price list.
@@ -67,7 +66,6 @@ async fn shop(db: &PgPool) -> Shop {
         sk,
         cz_list,
         sk_list,
-        version: 0,
     }
 }
 
@@ -160,17 +158,12 @@ impl Shop {
         product.id
     }
 
-    async fn index(&mut self, product: Uuid) -> Indexed {
-        self.version += 1;
-        index::index_product(
-            &self.runtime,
-            &self.meili,
-            self.tenant,
-            product,
-            self.version,
-        )
-        .await
-        .unwrap()
+    /// Indexes as a job dispatched now would.
+    async fn index(&self, product: Uuid) -> Indexed {
+        let now = commerce::search::db_clock(&self.runtime).await.unwrap();
+        index::index_product(&self.runtime, &self.meili, self.tenant, product, Some(now))
+            .await
+            .unwrap()
     }
 
     async fn settle(&self) {
@@ -249,7 +242,7 @@ fn set(v: &[&str]) -> BTreeSet<String> {
 #[sqlx::test(migrations = "../../migrations")]
 #[ignore = "needs Meilisearch: make test-search"]
 async fn filters_and_facets_are_variant_correct(db: PgPool) {
-    let mut s = shop(&db).await;
+    let s = shop(&db).await;
     let c = |color, size| [("color", color), ("size", size)];
     // A: red/m + blue/xl. "red + xl" must not match (cross-variant).
     let (ar, ab) = (c("red", "m"), c("blue", "xl"));
@@ -375,6 +368,21 @@ async fn filters_and_facets_are_variant_correct(db: PgPool) {
     assert_eq!(shown(&all, "opt.color"), set(&["blue", "red"]));
     assert_eq!(available(&all, "opt.fit"), set(&["regular", "slim"]));
 
+    // An exact SKU returns exactly its product (and facets for it), however it is typed.
+    let sku = s
+        .search(
+            s.cz,
+            "cs",
+            SearchRequest {
+                q: "bbb-0".into(),
+                ..req(&[])
+            },
+        )
+        .await;
+    assert_eq!(ids(&sku), BTreeSet::from([b]));
+    assert_eq!((sku.total, sku.total_pages), (1, 1));
+    assert_eq!(shown(&sku, "opt.color"), set(&["red"]));
+
     // Cross-variant: A has red and xl, but not in one variant.
     let red_xl = s
         .search(
@@ -494,7 +502,7 @@ async fn filters_and_facets_are_variant_correct(db: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 #[ignore = "needs Meilisearch: make test-search"]
 async fn stale_versions_changes_and_rehydration(db: PgPool) {
-    let mut s = shop(&db).await;
+    let s = shop(&db).await;
     let (r, bl) = ([("color", "red")], [("color", "blue")]);
     let p = s
         .product(
@@ -517,12 +525,15 @@ async fn stale_versions_changes_and_rehydration(db: PgPool) {
             ],
         )
         .await;
+    // A job dispatched before an indexing run read the catalog is stale and dropped; one
+    // dispatched after it is not.
+    let dispatched_before = commerce::search::db_clock(&s.runtime).await.unwrap();
     assert_eq!(s.index(p).await, Indexed::Done);
-    // An older job arriving late is dropped.
-    let late = index::index_product(&s.runtime, &s.meili, s.tenant, p, s.version - 1)
+    let late = index::index_product(&s.runtime, &s.meili, s.tenant, p, Some(dispatched_before))
         .await
         .unwrap();
     assert_eq!(late, Indexed::Stale);
+    assert_eq!(s.index(p).await, Indexed::Done);
     s.settle().await;
     assert_eq!(
         s.search(s.cz, "cs", req(&[("opt.color", &["blue"])]))
@@ -563,6 +574,28 @@ async fn stale_versions_changes_and_rehydration(db: PgPool) {
         1
     );
 
+    // Rehydration never substitutes another variant for one that stopped matching.
+    let red = products::get(&mut tenant_tx(&s.runtime, s.tenant).await.unwrap(), p)
+        .await
+        .unwrap()
+        .variants[0]
+        .id;
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    let adj = Adjustment {
+        delta: None,
+        on_hand: Some(0),
+        note: None,
+    };
+    inventory::adjust(&mut tx, ACTOR, red, "sold-out", &adj)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let mut only_in_stock = req(&[("opt.color", &["red"])]);
+    only_in_stock.in_stock = true;
+    let r = s.search(s.cz, "cs", only_in_stock).await;
+    assert_eq!(r.total, 1, "not reindexed yet");
+    assert!(r.items.is_empty(), "the red variant is sold out now");
+
     // Rehydration drops products that stopped being visible before the index caught up.
     let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
     sqlx::query("UPDATE products SET status = 'archived' WHERE id = $1")
@@ -583,7 +616,7 @@ async fn stale_versions_changes_and_rehydration(db: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 #[ignore = "needs Meilisearch: make test-search"]
 async fn rebuild_swaps_in_a_complete_index(db: PgPool) {
-    let mut s = shop(&db).await;
+    let s = shop(&db).await;
     let one = [("size", "m")];
     let a = s
         .product(
@@ -615,10 +648,11 @@ async fn rebuild_swaps_in_a_complete_index(db: PgPool) {
     s.settle().await;
     assert_eq!(s.search(s.cz, "cs", req(&[])).await.total, 1);
 
-    assert!(
-        index::rebuild(&s.runtime, &s.meili, s.tenant, 1000)
+    assert_eq!(
+        index::rebuild(&s.runtime, &s.meili, s.tenant, 1000, None)
             .await
-            .unwrap()
+            .unwrap(),
+        Rebuilt::Done
     );
     s.settle().await;
     let after = s.search(s.cz, "cs", req(&[])).await;
@@ -640,12 +674,45 @@ async fn rebuild_swaps_in_a_complete_index(db: PgPool) {
     // The temporary index is gone.
     let tmp = format!("{}__r1000", index_uid(s.tenant, "cs"));
     assert!(!s.meili.index_exists(&tmp).await.unwrap());
+
+    // A request dispatched before that rebuild started is already served.
+    let old = chrono::Utc::now() - chrono::Duration::hours(1);
+    assert_eq!(
+        index::rebuild(&s.runtime, &s.meili, s.tenant, 1001, Some(old))
+            .await
+            .unwrap(),
+        Rebuilt::Stale
+    );
+
+    // An interrupted rebuild left a registered, half-filled index behind: the next one
+    // removes it and completes.
+    let stuck = format!("{}__r999", index_uid(s.tenant, "cs"));
+    s.meili.create_index(&stuck).await.unwrap();
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    sqlx::query("UPDATE search_indexes SET building_uid = $1 WHERE locale = 'cs'")
+        .bind(&stuck)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        index::rebuild(&s.runtime, &s.meili, s.tenant, 1002, None)
+            .await
+            .unwrap(),
+        Rebuilt::Done
+    );
+    s.settle().await;
+    assert!(!s.meili.index_exists(&stuck).await.unwrap());
+    assert_eq!(
+        ids(&s.search(s.cz, "cs", req(&[])).await),
+        BTreeSet::from([a, b])
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 #[ignore = "needs Meilisearch: make test-search"]
 async fn zero_result_queries_are_counted_without_personal_data(db: PgPool) {
-    let mut s = shop(&db).await;
+    let s = shop(&db).await;
     let one = [("size", "m")];
     let a = s
         .product(
@@ -702,7 +769,7 @@ async fn zero_result_queries_are_counted_without_personal_data(db: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 #[ignore = "needs Meilisearch: make test-search"]
 async fn cs_sk_query_fixtures(db: PgPool) {
-    let mut s = shop(&db).await;
+    let s = shop(&db).await;
     let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fixtures/search/");
     let catalog = std::fs::read_to_string(format!("{root}cs-sk-catalog.tsv")).unwrap();
     let mut by_sku: HashMap<String, Uuid> = HashMap::new();
@@ -726,12 +793,12 @@ async fn cs_sk_query_fixtures(db: PgPool) {
         testkit::pricing::set_prices(&s.runtime, s.tenant, s.sk_list, &[(v, 400)]).await;
         by_sku.insert(sku.to_owned(), product.id);
     }
-    assert!(
-        index::rebuild(&s.runtime, &s.meili, s.tenant, 1)
+    assert_eq!(
+        index::rebuild(&s.runtime, &s.meili, s.tenant, 1, None)
             .await
-            .unwrap()
+            .unwrap(),
+        Rebuilt::Done
     );
-    s.version = 1;
     s.settle().await;
 
     let queries = std::fs::read_to_string(format!("{root}cs-sk-queries.tsv")).unwrap();
@@ -773,4 +840,55 @@ async fn cs_sk_query_fixtures(db: PgPool) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// RLS on the search tables (spec §5.2): no reads or writes across tenants. No Meilisearch.
+#[sqlx::test(migrations = "../../migrations")]
+async fn search_tables_are_tenant_isolated(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (a, _) = testkit::tenant(&runtime, "alpha").await;
+    let (b, _) = testkit::tenant(&runtime, "beta").await;
+    let inserts = [
+        "INSERT INTO search_indexes (tenant_id, locale, settings_version) VALUES ($1, 'cs', 1)",
+        "INSERT INTO search_product_state (tenant_id, product_id) VALUES ($1, gen_random_uuid())",
+        "INSERT INTO search_zero_results (tenant_id, day, locale, query)
+         VALUES ($1, current_date, 'cs', 'x')",
+    ];
+    for sql in inserts {
+        // Own rows: fine. Another tenant's: rejected by the policy.
+        let mut tx = tenant_tx(&runtime, b).await.unwrap();
+        sqlx::query(sql).bind(b).execute(&mut *tx).await.unwrap();
+        tx.commit().await.unwrap();
+        let mut tx = tenant_tx(&runtime, a).await.unwrap();
+        let err = sqlx::query(sql)
+            .bind(b)
+            .execute(&mut *tx)
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("row-level security"),
+            "{sql}: {err}"
+        );
+    }
+    let mut tx = tenant_tx(&runtime, a).await.unwrap();
+    for table in [
+        "search_indexes",
+        "search_product_state",
+        "search_zero_results",
+    ] {
+        let n: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert_eq!(n, 0, "{table} leaks across tenants");
+        let updated = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {table} SET tenant_id = tenant_id"
+        )))
+        .execute(&mut *tx)
+        .await
+        .unwrap()
+        .rows_affected();
+        assert_eq!(updated, 0, "{table}");
+    }
 }

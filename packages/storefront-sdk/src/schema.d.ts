@@ -529,7 +529,8 @@ export interface paths {
         /**
          * Rebuilds every index of the tenant from the catalog into new indexes and swaps them in
          *     atomically; searches keep being answered from the old ones meanwhile. Owner or admin.
-         *     Requests within 10 seconds share one rebuild.
+         *     A request made while a rebuild is already running is served by a second rebuild after it,
+         *     unless one started after the request anyway.
          */
         post: operations["rebuild"];
         delete?: never;

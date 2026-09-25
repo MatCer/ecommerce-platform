@@ -234,7 +234,7 @@ async fn outbox_fans_out_once_and_atomically(db: PgPool) {
 
 /// Catalog, price and stock events become one debounced search job per product (§11.1).
 #[sqlx::test(migrations = "../../migrations")]
-async fn outbox_debounces_search_indexing_per_product(db: PgPool) {
+async fn outbox_versions_search_indexing_per_product(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let (tenant, _) = testkit::tenant(&runtime, "alpha").await;
     let product = testkit::catalog::product(&runtime, tenant, "TS", 2).await;
@@ -255,7 +255,7 @@ async fn outbox_debounces_search_indexing_per_product(db: PgPool) {
             .unwrap();
     assert_eq!(payload["product_id"], json!(product.id));
 
-    // product.created + inventory.changed (+ category/price-free) in one window → one job.
+    // product.created + inventory.changed in one dispatch batch → one versioned job.
     while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
     let jobs: Vec<(serde_json::Value, Option<uuid::Uuid>, bool)> = sqlx::query_as(
         "SELECT payload, tenant_id, run_at > now() FROM queue.jobs
@@ -265,9 +265,10 @@ async fn outbox_debounces_search_indexing_per_product(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(jobs.len(), 1, "{jobs:?}");
-    assert_eq!(jobs[0].0, json!({ "product_id": product.id }));
+    assert_eq!(jobs[0].0["product_id"], json!(product.id));
+    assert!(commerce::search::dispatched_at(&jobs[0].0).is_some());
     assert_eq!(jobs[0].1, Some(tenant));
-    assert!(jobs[0].2, "runs after the debounce window");
+    assert!(jobs[0].2, "runs after the delay");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -302,7 +302,6 @@ type RawFacets = Vec<(String, Vec<(String, bool, bool)>)>;
 #[derive(Debug, Default, PartialEq, Eq)]
 struct Plan {
     queries: Vec<Value>,
-    exact: Option<usize>,
     available: Option<usize>,
     /// facet key → query index
     per_facet: BTreeMap<String, usize>,
@@ -311,10 +310,24 @@ struct Plan {
 
 const FACET_PATTERNS: [&str; 3] = ["opt.*", "param.*", "brand"];
 
-fn plan(scope: &Scope, req: &SearchRequest, facets: bool) -> Plan {
+/// `skus = q OR eans = q` for a query that could be a SKU or EAN (one token, ≤ 64 chars).
+fn exact_clause(q: &str) -> Option<String> {
+    let raw = q.trim();
+    (!raw.is_empty() && raw.chars().count() <= 64 && !raw.contains(char::is_whitespace))
+        .then(|| format!("skus = {0} OR eans = {0}", quote(raw)))
+}
+
+/// The multi-search for `req`. With `exact` (the query is a known SKU/EAN) the results are
+/// exactly the matching products: the clause replaces the text query.
+fn plan(scope: &Scope, req: &SearchRequest, facets: bool, exact: Option<&str>) -> Plan {
     let uid = index_uid(scope.tenant_id, &scope.locale);
-    let q = lang::analyze(&req.q, &scope.locale);
-    let base = base_clauses(scope, req);
+    let q = if exact.is_some() {
+        String::new()
+    } else {
+        lang::analyze(&req.q, &scope.locale)
+    };
+    let mut base = base_clauses(scope, req);
+    base.extend(exact.map(str::to_owned));
     let refinements = refinement_clauses(scope, req);
     let all = and(base
         .iter()
@@ -336,15 +349,6 @@ fn plan(scope: &Scope, req: &SearchRequest, facets: bool) -> Plan {
         "page": req.page, "hitsPerPage": req.per_page,
         "attributesToRetrieve": ["id", "product_id"],
     }));
-    let raw = req.q.trim();
-    if req.page == 1 && !raw.is_empty() && raw.len() <= 64 && !raw.contains(char::is_whitespace) {
-        let exact = format!("skus = {0} OR eans = {0}", quote(raw));
-        p.exact = Some(p.queries.len());
-        p.queries.push(json!({
-            "indexUid": uid, "q": "", "filter": format!("{all} AND ({exact})"), "limit": 5,
-            "attributesToRetrieve": ["id", "product_id"],
-        }));
-    }
     if !facets {
         return p;
     }
@@ -404,7 +408,14 @@ fn distribution(result: Option<&Value>) -> BTreeMap<String, BTreeSet<String>> {
 /// query for its facet (the full filter, or the filter without the facet's own clause if the
 /// facet is refined) still has it.
 fn facets_from(plan: &Plan, results: &[Value], req: &SearchRequest) -> RawFacets {
-    let universe = distribution(plan.universe.and_then(|i| results.get(i)));
+    let mut universe = distribution(plan.universe.and_then(|i| results.get(i)));
+    // Selected values are always listed, even past the engine's per-facet value cap.
+    // ponytail: facets over `maxValuesPerFacet` (100) values are cut there; add facet search
+    // when a catalog needs more.
+    for (key, values) in &req.filters {
+        let listed = universe.entry(key.clone()).or_default();
+        listed.extend(values.iter().map(|v| v.trim().to_owned()));
+    }
     let available = distribution(plan.available.and_then(|i| results.get(i)));
     let mut out = vec![];
     for (key, values) in universe {
@@ -474,7 +485,21 @@ pub async fn search(
     req: &SearchRequest,
 ) -> Result<SearchResult, Error> {
     req.validate()?;
-    let plan = plan(scope, req, true);
+    // Exact SKU/EAN first (spec §11.1): a query that is a SKU or EAN of a sellable variant
+    // returns exactly those products; anything else is a text search.
+    let exact = match exact_clause(&req.q) {
+        Some(clause) => {
+            let probe = json!({
+                "indexUid": index_uid(scope.tenant_id, &scope.locale), "q": "", "limit": 1,
+                "filter": and(base_clauses(scope, req).into_iter().chain([clause.clone()])),
+                "attributesToRetrieve": ["id", "product_id"],
+            });
+            let found = meili.multi_search(&[probe]).await?;
+            (!hit_ids(found.first()).is_empty()).then_some(clause)
+        }
+        None => None,
+    };
+    let plan = plan(scope, req, true, exact.as_deref());
     let results = meili.multi_search(&plan.queries).await?;
     let hits = results.first();
     let total = hits
@@ -487,17 +512,7 @@ pub async fn search(
         .and_then(|n| u32::try_from(n).ok())
         .unwrap_or(0);
 
-    let mut ids = plan
-        .exact
-        .map(|i| hit_ids(results.get(i)))
-        .unwrap_or_default();
-    for id in hit_ids(hits) {
-        if !ids.iter().any(|(_, p)| *p == id.1) {
-            ids.push(id);
-        }
-    }
-    ids.truncate(req.per_page as usize);
-    let items = rehydrate(tx, storage, scope, &ids).await?;
+    let items = rehydrate(tx, storage, scope, req, &hit_ids(hits)).await?;
 
     let raw_facets = facets_from(&plan, &results, req);
     let facets = label_facets(tx, &scope.locale, raw_facets).await?;
@@ -519,12 +534,40 @@ pub async fn search(
     })
 }
 
-/// Current storefront data for `ids` (variant, product), in order; products that are no
-/// longer active, translated or priced in the market are left out.
+/// A variant's current sellable state (rehydration).
+struct Current {
+    id: Uuid,
+    price: i64,
+    in_stock: bool,
+    options: BTreeMap<String, String>,
+}
+
+impl Current {
+    /// The request's option, stock and price filters still hold for this variant now.
+    /// (Parameter and brand filters change only with a product edit, which reindexes it.)
+    fn satisfies(&self, req: &SearchRequest) -> bool {
+        let options_ok = req.filters.iter().all(|(key, values)| {
+            key.strip_prefix("opt.").is_none_or(|code| {
+                self.options
+                    .get(code)
+                    .is_some_and(|v| values.iter().any(|s| s.trim().eq_ignore_ascii_case(v)))
+            })
+        });
+        options_ok
+            && (!req.in_stock || self.in_stock)
+            && req.price_min.is_none_or(|min| self.price >= min)
+            && req.price_max.is_none_or(|max| self.price <= max)
+    }
+}
+
+/// Current storefront data for `ids` (variant, product), in order. Products that are no
+/// longer active, translated or priced in the market, and hits whose matched variant no
+/// longer satisfies `req`, are left out.
 async fn rehydrate(
     tx: &mut TenantTx,
     storage: &Storage,
     scope: &Scope,
+    req: &SearchRequest,
     ids: &[(Uuid, Uuid)],
 ) -> Result<Vec<SearchHit>, Error> {
     let Some(price_list) = scope.price_list_id else {
@@ -545,10 +588,10 @@ async fn rehydrate(
     .map(|r| (r.id, (r.name, r.slug, r.brand)))
     .collect();
 
-    // product → [(variant, price, in stock)] for variants priced in the market now.
-    let mut variants: HashMap<Uuid, Vec<(Uuid, i64, bool)>> = HashMap::new();
+    // product → variants priced in the market now.
+    let mut variants: HashMap<Uuid, Vec<Current>> = HashMap::new();
     for r in sqlx::query!(
-        r#"SELECT v.product_id, v.id, pi.amount_minor,
+        r#"SELECT v.product_id, v.id, v.option_values, pi.amount_minor,
                   (NOT COALESCE(l.track, true) OR COALESCE(l.allow_backorder, false)
                    OR COALESCE(l.on_hand - l.reserved, 0) > 0) AS "in_stock!"
            FROM variants v
@@ -564,10 +607,12 @@ async fn rehydrate(
     .fetch_all(&mut **tx)
     .await?
     {
-        variants
-            .entry(r.product_id)
-            .or_default()
-            .push((r.id, r.amount_minor, r.in_stock));
+        variants.entry(r.product_id).or_default().push(Current {
+            id: r.id,
+            price: r.amount_minor,
+            in_stock: r.in_stock,
+            options: serde_json::from_value(r.option_values).unwrap_or_default(),
+        });
     }
 
     let mut images: HashMap<Uuid, Vec<AssetVariant>> = HashMap::new();
@@ -601,20 +646,20 @@ async fn rehydrate(
         .filter_map(|(variant, product)| {
             let (name, slug, brand) = rows.get(product)?.clone();
             let priced = variants.get(product)?;
-            // The matched variant if it is still priced, else the cheapest one.
-            let (variant_id, price, _) = priced
+            // The matched variant, only if it still satisfies the request now; the index
+            // catches up with the change shortly (never substitute another variant).
+            let matched = priced
                 .iter()
-                .find(|(v, _, _)| v == variant)
-                .or_else(|| priced.iter().min_by_key(|(_, p, _)| *p))
-                .copied()?;
+                .find(|v| v.id == *variant)
+                .filter(|v| v.satisfies(req))?;
             Some(SearchHit {
                 product_id: *product,
-                variant_id,
+                variant_id: matched.id,
                 name,
                 slug,
                 brand,
-                price: Money::new(price, scope.currency).view(locale),
-                in_stock: priced.iter().any(|(_, _, s)| *s),
+                price: Money::new(matched.price, scope.currency).view(locale),
+                in_stock: priced.iter().any(|v| v.in_stock),
                 image: images.get(product).cloned().unwrap_or_default(),
             })
         })
@@ -699,12 +744,26 @@ async fn label_facets(
     Ok(facets)
 }
 
-/// Counts a query without results (normalized text only, A20).
+/// The form a zero-result query is logged in, or `None` when it must not be stored (A20):
+/// only short product-like queries, folded; anything that looks like contact data (an e-mail
+/// address, a phone or account number: `@` or 6+ digits) or free text (more than 6 words, over
+/// 64 characters) is dropped. Nothing ties it to a shopper; rows expire after 90 days.
+fn zero_result_text(q: &str) -> Option<String> {
+    let digits = q.chars().filter(char::is_ascii_digit).count();
+    let folded = lang::fold(q);
+    let ok = !q.contains('@')
+        && digits < 6
+        && !folded.is_empty()
+        && folded.chars().count() <= 64
+        && folded.split(' ').count() <= 6;
+    ok.then_some(folded)
+}
+
+/// Counts a query without results (see [`zero_result_text`]).
 pub async fn record_zero_result(tx: &mut TenantTx, locale: &str, q: &str) -> Result<(), Error> {
-    let normalized: String = lang::fold(q).chars().take(MAX_QUERY_CHARS).collect();
-    if normalized.is_empty() {
+    let Some(normalized) = zero_result_text(q) else {
         return Ok(());
-    }
+    };
     let tenant_id = tx.tenant_id();
     sqlx::query!(
         "INSERT INTO search_zero_results (tenant_id, day, locale, query)
@@ -789,27 +848,27 @@ pub async fn suggest(
         per_page: u32::try_from(SUGGEST_LIMIT - categories.len()).unwrap_or(1),
         ..Default::default()
     };
-    let mut plan = plan(scope, &req, false);
-    // Also match the word being typed as a prefix of the folded names (unstemmed).
-    let mut prefix = plan.queries[0].clone();
+    // Exact SKU/EAN matches, then stemmed matches, then the word being typed as a prefix of
+    // the folded names (unstemmed). One list, no pagination: merging is safe here.
+    let mut queries = plan(scope, &req, false, None).queries;
+    let mut prefix = queries[0].clone();
     prefix["q"] = json!(lang::analyze_prefix(q, &scope.locale));
-    let prefix_at = plan.queries.len();
-    plan.queries.push(prefix);
-    let results = meili.multi_search(&plan.queries).await?;
-    let mut ids = plan
-        .exact
-        .map(|i| hit_ids(results.get(i)))
-        .unwrap_or_default();
-    for id in hit_ids(results.first())
-        .into_iter()
-        .chain(hit_ids(results.get(prefix_at)))
-    {
+    queries.push(prefix);
+    if let Some(exact) = exact_clause(q) {
+        let mut e = queries[0].clone();
+        e["q"] = json!("");
+        e["filter"] = json!(and(base_clauses(scope, &req).into_iter().chain([exact])));
+        queries.insert(0, e);
+    }
+    let results = meili.multi_search(&queries).await?;
+    let mut ids: Vec<(Uuid, Uuid)> = vec![];
+    for id in results.iter().flat_map(|r| hit_ids(Some(r))) {
         if !ids.iter().any(|(_, p)| *p == id.1) {
             ids.push(id);
         }
     }
     ids.truncate(req.per_page as usize);
-    let products = rehydrate(tx, storage, scope, &ids).await?;
+    let products = rehydrate(tx, storage, scope, &req, &ids).await?;
     Ok(Suggestions {
         categories,
         products,
@@ -903,7 +962,7 @@ mod tests {
             price_min: Some(100),
             ..req()
         };
-        let p = plan(&scope(), &r, true);
+        let p = plan(&scope(), &r, true, None);
         let hits = &p.queries[0];
         assert_eq!(hits["indexUid"], format!("t_{}_cs", Uuid::from_u128(7)));
         assert_eq!(hits["q"], "pansk trick");
@@ -929,27 +988,32 @@ mod tests {
             universe["facets"],
             json!(["opt.*", "param.*", "brand", "price.cz"])
         );
-        // A token with whitespace is no SKU: no exact query.
-        assert!(p.exact.is_none());
+        // A query with whitespace is no SKU.
+        assert!(exact_clause(&r.q).is_none());
     }
 
     #[test]
-    fn single_token_queries_also_look_up_exact_skus() {
+    fn an_exact_sku_replaces_the_text_query() {
         let r = SearchRequest {
             q: "TS-RED-M".into(),
             category_id: Some(Uuid::from_u128(9)),
             ..req()
         };
-        let p = plan(&scope(), &r, false);
-        let exact = &p.queries[p.exact.unwrap_or_default()];
+        let exact = exact_clause(&r.q);
         assert_eq!(
-            exact["filter"],
-            format!(
-                r#"(active_in_markets = "cz") AND (category_ids = "{}") AND (skus = "TS-RED-M" OR eans = "TS-RED-M")"#,
-                Uuid::from_u128(9)
-            )
+            exact.as_deref(),
+            Some(r#"skus = "TS-RED-M" OR eans = "TS-RED-M""#)
         );
-        assert_eq!(p.queries.len(), 2);
+        let p = plan(&scope(), &r, true, exact.as_deref());
+        let expected = format!(
+            r#"(active_in_markets = "cz") AND (category_ids = "{}") AND (skus = "TS-RED-M" OR eans = "TS-RED-M")"#,
+            Uuid::from_u128(9)
+        );
+        for q in &p.queries {
+            assert_eq!(q["filter"], expected.as_str(), "facets see the same set");
+            assert_eq!(q["q"], "");
+        }
+        assert!(exact_clause(&"x".repeat(65)).is_none());
     }
 
     #[test]
@@ -962,16 +1026,14 @@ mod tests {
             )]),
             ..req()
         };
-        let p = plan(&scope(), &r, true);
+        let p = plan(&scope(), &r, true, None);
         assert_eq!(
             p.queries[0]["filter"],
             r#"(active_in_markets = "cz") AND (brand IN ["a\" OR active_in_markets EXISTS OR brand = \"b"])"#
         );
         assert_eq!(
-            p.queries[1]["filter"]
-                .as_str()
-                .map(|f| f.ends_with(r#"(skus = "x\"OR" OR eans = "x\"OR")"#)),
-            Some(true)
+            exact_clause(&r.q).as_deref(),
+            Some(r#"skus = "x\"OR" OR eans = "x\"OR""#)
         );
     }
 
@@ -988,9 +1050,10 @@ mod tests {
                 ..req()
             },
             false,
+            None,
         );
         assert_eq!(p.queries[0]["sort"], json!(["price.sk_eu:desc"]));
-        let p = plan(&s, &req(), false);
+        let p = plan(&s, &req(), false, None);
         assert_eq!(
             p.queries[0]["sort"],
             json!(["popularity:desc", "created_at:desc"])
@@ -1002,6 +1065,7 @@ mod tests {
                 ..req()
             },
             false,
+            None,
         );
         assert_eq!(p.queries[0]["sort"], json!([]));
     }
@@ -1012,7 +1076,7 @@ mod tests {
             filters: filters(&[("opt.color", &["red"])]),
             ..req()
         };
-        let p = plan(&scope(), &r, true);
+        let p = plan(&scope(), &r, true, None);
         let mut results = vec![json!({}); p.queries.len()];
         results[p.universe.unwrap_or_default()] = json!({ "facetDistribution": {
             "opt.color": { "blue": 3, "green": 1, "red": 2 },
@@ -1053,5 +1117,89 @@ mod tests {
                 max_minor: 900
             })
         );
+    }
+
+    #[test]
+    fn selected_values_stay_listed_beyond_the_value_cap() {
+        let r = SearchRequest {
+            filters: filters(&[("brand", &["Zeta"])]),
+            ..req()
+        };
+        let p = plan(&scope(), &r, true, None);
+        let mut results = vec![json!({}); p.queries.len()];
+        // The universe was cut before "Zeta"; the facet's own query still reaches it.
+        results[p.universe.unwrap_or_default()] =
+            json!({ "facetDistribution": { "brand": { "Acme": 1 } } });
+        results[p.per_facet["brand"]] =
+            json!({ "facetDistribution": { "brand": { "Acme": 1, "Zeta": 1 } } });
+        let facets = facets_from(&p, &results, &r);
+        assert_eq!(
+            facets,
+            vec![(
+                "brand".to_owned(),
+                vec![
+                    ("Acme".to_owned(), false, true),
+                    ("Zeta".to_owned(), true, true)
+                ]
+            )]
+        );
+    }
+
+    #[test]
+    fn zero_result_log_keeps_only_product_like_queries() {
+        assert_eq!(
+            zero_result_text("Modré  TRIČKO"),
+            Some("modre tricko".to_owned())
+        );
+        for personal in [
+            "jan.novak@example.cz",
+            "+420 777 123 456",
+            "777123456",
+            "účet 1234567890/0100",
+            "please call me back tomorrow morning about my order",
+            "",
+        ] {
+            assert_eq!(zero_result_text(personal), None, "{personal}");
+        }
+        assert!(zero_result_text("iphone 15").is_some());
+    }
+
+    #[test]
+    fn rehydration_rechecks_the_matched_variant() {
+        let v = Current {
+            id: Uuid::from_u128(1),
+            price: 500,
+            in_stock: false,
+            options: [("color".to_owned(), "red".to_owned())].into(),
+        };
+        assert!(v.satisfies(&req()));
+        assert!(v.satisfies(&SearchRequest {
+            filters: filters(&[("opt.color", &["blue", "RED"]), ("brand", &["x"])]),
+            ..req()
+        }));
+        for r in [
+            SearchRequest {
+                filters: filters(&[("opt.color", &["blue"])]),
+                ..req()
+            },
+            SearchRequest {
+                filters: filters(&[("opt.size", &["xl"])]),
+                ..req()
+            },
+            SearchRequest {
+                in_stock: true,
+                ..req()
+            },
+            SearchRequest {
+                price_max: Some(499),
+                ..req()
+            },
+            SearchRequest {
+                price_min: Some(501),
+                ..req()
+            },
+        ] {
+            assert!(!v.satisfies(&r), "{r:?}");
+        }
     }
 }

@@ -1,19 +1,21 @@
 //! Index lifecycle and indexing (spec §11.1, A23, A27).
 //!
 //! Ordering guarantees:
-//! - Every write for a product happens while its `search_product_state` row is locked, and
-//!   Meilisearch applies the tasks of an index in enqueue order, so documents land in the order
-//!   their Postgres state was read. A job whose version (job id) is not newer than the recorded
-//!   one is dropped as stale: a later job already read newer state.
+//! - Every write for a product happens while its `search_product_state` row is locked, and the
+//!   lock is held until Meilisearch applied the writes (tasks of an index apply in enqueue
+//!   order). Documents therefore land in the order their Postgres state was read.
+//! - Jobs are versioned by `dispatched_at`, a database-clock instant taken after the
+//!   triggering change committed. A run records when it read the catalog (`read_at`); a job
+//!   dispatched before the last `read_at` is stale and dropped, because that read already saw
+//!   its change.
 //! - During a rebuild, incremental jobs also write to the index being built. They hold a
-//!   per-tenant advisory lock in shared mode while choosing their targets and enqueueing
-//!   writes; the swap takes it exclusively, so no write goes to an index that was just
-//!   swapped out.
+//!   per-tenant advisory lock in shared mode while choosing their targets and writing; the
+//!   swap takes it exclusively, so no write goes to an index that was just swapped out.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
 use serde_json::{Value, json};
@@ -28,6 +30,8 @@ use super::{SETTINGS_VERSION, index_uid};
 const REBUILD_BATCH: i64 = 200;
 const SETTINGS_WAIT: Duration = Duration::from_secs(300);
 const REBUILD_WAIT: Duration = Duration::from_secs(1800);
+/// Incremental writes are small; a slower engine fails the job, which retries.
+const WRITE_WAIT: Duration = Duration::from_secs(60);
 
 /// Index settings (versioned by [`SETTINGS_VERSION`]). Text fields hold normalized text
 /// (`lang::analyze`), so Meilisearch's own language handling only sees folded ASCII stems.
@@ -129,8 +133,11 @@ pub async fn ensure_indexes(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Resu
 }
 
 /// Locks the state rows of `products` (in id order, so concurrent lockers cannot deadlock)
-/// and returns their indexed versions.
-async fn lock_products(tx: &mut TenantTx, products: &[Uuid]) -> Result<BTreeMap<Uuid, i64>, Error> {
+/// and returns when each was last read for indexing.
+async fn lock_products(
+    tx: &mut TenantTx,
+    products: &[Uuid],
+) -> Result<BTreeMap<Uuid, Option<DateTime<Utc>>>, Error> {
     let tenant_id = tx.tenant_id();
     sqlx::query!(
         "INSERT INTO search_product_state (tenant_id, product_id)
@@ -141,14 +148,14 @@ async fn lock_products(tx: &mut TenantTx, products: &[Uuid]) -> Result<BTreeMap<
     .execute(&mut **tx)
     .await?;
     Ok(sqlx::query!(
-        "SELECT product_id, indexed_version FROM search_product_state
+        "SELECT product_id, read_at FROM search_product_state
          WHERE product_id = ANY($1) ORDER BY product_id FOR UPDATE",
         products
     )
     .fetch_all(&mut **tx)
     .await?
     .into_iter()
-    .map(|r| (r.product_id, r.indexed_version))
+    .map(|r| (r.product_id, r.read_at))
     .collect())
 }
 
@@ -176,63 +183,81 @@ fn id_list(ids: impl IntoIterator<Item = String>) -> String {
 
 /// Replaces the documents of `products` in `uid` with `docs`: adds the new documents, then
 /// deletes the products' documents that are no longer produced (removed variants, products
-/// that became invisible). Both tasks are enqueued in this order.
+/// that became invisible). Both tasks are enqueued in this order; returns them.
 async fn replace_products(
     meili: &Meili,
     uid: &str,
     products: &[Uuid],
     docs: &[Value],
-) -> Result<(), MeiliError> {
+) -> Result<Vec<Task>, MeiliError> {
     let products = id_list(products.iter().map(Uuid::to_string));
+    let mut tasks = vec![];
     let filter = if docs.is_empty() {
         format!("product_id IN {products}")
     } else {
-        meili.add_documents(uid, docs).await?;
+        tasks.push(meili.add_documents(uid, docs).await?);
         let keep = id_list(
             docs.iter()
                 .filter_map(|d| d.get("id").and_then(Value::as_str).map(str::to_owned)),
         );
         format!("product_id IN {products} AND NOT id IN {keep}")
     };
-    meili.delete_by_filter(uid, &filter).await?;
+    tasks.push(meili.delete_by_filter(uid, &filter).await?);
+    Ok(tasks)
+}
+
+/// Waits until every task succeeded (any failure is an error: the job retries).
+async fn wait_all(meili: &Meili, tasks: &[Task], limit: Duration) -> Result<(), Error> {
+    for task in tasks {
+        meili.wait(*task, limit).await?;
+    }
     Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Indexed {
     Done,
-    /// A newer job already indexed the product.
+    /// A run that read the catalog after `dispatched_at` already indexed the product.
     Stale,
 }
 
-/// (Re)indexes one product at `version` (the job id).
+/// (Re)indexes one product. `dispatched_at` is the job's version (a database-clock instant
+/// after the triggering change committed; `None`: always index). The product's state row
+/// stays locked until Meilisearch applied every write, and `read_at` (when this run read the
+/// catalog) is recorded only then, so a failed write is retried and never hides a change.
 pub async fn index_product(
     db: &PgPool,
     meili: &Meili,
     tenant_id: Uuid,
     product_id: Uuid,
-    version: i64,
+    dispatched_at: Option<DateTime<Utc>>,
 ) -> Result<Indexed, Error> {
     ensure_indexes(db, meili, tenant_id).await?;
     let mut tx = tenant_tx(db, tenant_id).await?;
     lock_tenant(&mut tx, false).await?;
-    let versions = lock_products(&mut tx, &[product_id]).await?;
-    if versions.get(&product_id).is_some_and(|v| *v >= version) {
+    let read = lock_products(&mut tx, &[product_id]).await?;
+    let last_read = read.get(&product_id).copied().flatten();
+    if let (Some(last), Some(version)) = (last_read, dispatched_at)
+        && last > version
+    {
         return Ok(Indexed::Stale);
     }
+    // Everything committed before this instant is visible to the reads below.
+    let read_at = super::db_clock(&mut *tx).await?;
     let ctx = documents::load_context(&mut tx).await?;
     let docs = build(&mut tx, &ctx, &[product_id]).await?;
+    let mut tasks = vec![];
     for (locale, uids) in targets(&mut tx).await? {
         let docs = docs.get(&locale).map(Vec::as_slice).unwrap_or_default();
         for uid in uids {
-            replace_products(meili, &uid, &[product_id], docs).await?;
+            tasks.extend(replace_products(meili, &uid, &[product_id], docs).await?);
         }
     }
+    wait_all(meili, &tasks, WRITE_WAIT).await?;
     sqlx::query!(
-        "UPDATE search_product_state SET indexed_version = $2, indexed_at = now()
-         WHERE product_id = $1",
+        "UPDATE search_product_state SET read_at = $2, indexed_at = now() WHERE product_id = $1",
         product_id,
-        version
+        read_at
     )
     .execute(&mut *tx)
     .await?;
@@ -254,16 +279,11 @@ async fn build(
     Ok(out)
 }
 
-/// Products whose documents or memberships involve `category_id` (or its subtree), so a
-/// renamed, moved or deleted category reaches every affected document.
-pub async fn category_products(
-    db: &PgPool,
-    meili: &Meili,
-    tenant_id: Uuid,
-    category_id: Uuid,
-) -> Result<BTreeSet<Uuid>, Error> {
-    let mut tx = tenant_tx(db, tenant_id).await?;
-    let mut products: BTreeSet<Uuid> = sqlx::query_scalar!(
+/// Products in `category_id` or its subtree: a renamed or moved category changes their
+/// category names and ancestor ids. (Deleted categories trigger a rebuild instead: their
+/// memberships are gone by then.)
+pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<Vec<Uuid>, Error> {
+    Ok(sqlx::query_scalar!(
         r#"WITH RECURSIVE sub AS (
                SELECT id FROM categories WHERE id = $1
                UNION SELECT c.id FROM categories c JOIN sub ON c.parent_id = sub.id
@@ -272,39 +292,8 @@ pub async fn category_products(
            WHERE category_id IN (SELECT id FROM sub)"#,
         category_id
     )
-    .fetch_all(&mut *tx)
-    .await?
-    .into_iter()
-    .collect();
-    let locales: Vec<String> = sqlx::query_scalar!("SELECT locale FROM search_indexes")
-        .fetch_all(&mut *tx)
-        .await?;
-    tx.commit().await?;
-    // Documents list ancestors too, so this finds products under the whole subtree.
-    let filter = format!("category_ids = {}", quote(&category_id.to_string()));
-    for locale in locales {
-        let uid = index_uid(tenant_id, &locale);
-        let mut offset = 0;
-        loop {
-            let page = match meili
-                .fetch_documents(&uid, &filter, &["product_id"], offset, 1000)
-                .await
-            {
-                Err(e) if e.code() == Some("index_not_found") => break,
-                other => other?,
-            };
-            products.extend(
-                page.iter()
-                    .filter_map(|d| d.get("product_id").and_then(Value::as_str))
-                    .filter_map(|s| Uuid::parse_str(s).ok()),
-            );
-            if page.len() < 1000 {
-                break;
-            }
-            offset += page.len();
-        }
-    }
-    Ok(products)
+    .fetch_all(&mut **tx)
+    .await?)
 }
 
 /// Current state of a tenant's search indexes (admin status endpoint).
@@ -316,7 +305,7 @@ pub struct IndexStatus {
     pub settings_version: i32,
     /// A rebuild is filling a new index.
     pub rebuilding: bool,
-    pub rebuilt_at: Option<chrono::DateTime<Utc>>,
+    pub rebuilt_at: Option<DateTime<Utc>>,
     /// Documents (sellable variants) written by the last rebuild.
     pub documents: Option<i64>,
 }
@@ -341,52 +330,75 @@ pub async fn status(tx: &mut TenantTx) -> Result<Vec<IndexStatus>, Error> {
     .collect())
 }
 
-/// Rebuilds every locale index of the tenant into fresh indexes (`<live>__r<version>`) and
-/// swaps them in atomically. `Ok(false)`: another rebuild of this tenant is running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rebuilt {
+    Done,
+    /// A completed rebuild started after `dispatched_at`: nothing to do.
+    Stale,
+    /// Another rebuild of this tenant is running; try again later.
+    Busy,
+}
+
+/// Rebuilds every locale index of the tenant into fresh indexes (`<live>__r<job_id>`) and
+/// swaps them in atomically.
 pub async fn rebuild(
     db: &PgPool,
     meili: &Meili,
     tenant_id: Uuid,
-    version: i64,
-) -> Result<bool, Error> {
-    // One rebuild per tenant at a time; the session lock dies with the connection.
-    let mut guard = db.acquire().await?;
+    job_id: i64,
+    dispatched_at: Option<DateTime<Utc>>,
+) -> Result<Rebuilt, Error> {
+    // One rebuild per tenant at a time, via a session lock on a connection taken out of the
+    // pool: if this future is dropped (lease lost, shutdown) the connection closes and the
+    // lock goes with it, instead of lingering on a pooled connection.
+    let mut conn = db.acquire().await?.detach();
     let key = format!("search-rebuild:{tenant_id}");
     let locked = sqlx::query_scalar!(
         r#"SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS "ok!""#,
         key
     )
-    .fetch_one(&mut *guard)
+    .fetch_one(&mut conn)
     .await?;
     if !locked {
-        return Ok(false);
+        return Ok(Rebuilt::Busy);
     }
-    let result = rebuild_locked(db, meili, tenant_id, version).await;
-    sqlx::query!("SELECT pg_advisory_unlock(hashtextextended($1, 0))", key)
-        .fetch_one(&mut *guard)
-        .await?;
-    result.map(|()| true)
+    let result = rebuild_locked(db, meili, tenant_id, job_id, dispatched_at).await;
+    // Closing the session releases the lock.
+    let _ = sqlx::Connection::close(conn).await;
+    result
 }
 
 async fn rebuild_locked(
     db: &PgPool,
     meili: &Meili,
     tenant_id: Uuid,
-    version: i64,
-) -> Result<(), Error> {
+    job_id: i64,
+    dispatched_at: Option<DateTime<Utc>>,
+) -> Result<Rebuilt, Error> {
     ensure_indexes(db, meili, tenant_id).await?;
 
     // 1. Fresh indexes, registered as build targets (incremental jobs start writing to them).
-    //    An index left over by a crashed rebuild is unregistered first (under the exclusive
-    //    lock, so no job still targets it) and then deleted.
+    //    An index left over by an interrupted rebuild is unregistered first (under the
+    //    exclusive lock, so no job still targets it) and then deleted.
     let mut tx = tenant_tx(db, tenant_id).await?;
+    let last_start: Option<DateTime<Utc>> =
+        sqlx::query_scalar!("SELECT min(rebuild_started_at) FROM search_indexes")
+            .fetch_one(&mut *tx)
+            .await?;
+    if let (Some(last), Some(version)) = (last_start, dispatched_at)
+        && last > version
+    {
+        return Ok(Rebuilt::Stale);
+    }
     lock_tenant(&mut tx, true).await?;
     let previous: Vec<String> = sqlx::query_scalar!(
-        r#"UPDATE search_indexes SET building_uid = NULL WHERE building_uid IS NOT NULL
-           RETURNING building_uid AS "uid!""#
+        r#"SELECT building_uid AS "uid!" FROM search_indexes WHERE building_uid IS NOT NULL"#
     )
     .fetch_all(&mut *tx)
     .await?;
+    sqlx::query!("UPDATE search_indexes SET building_uid = NULL WHERE building_uid IS NOT NULL")
+        .execute(&mut *tx)
+        .await?;
     let locales: Vec<String> =
         sqlx::query_scalar!("SELECT locale FROM search_indexes ORDER BY locale")
             .fetch_all(&mut *tx)
@@ -397,7 +409,9 @@ async fn rebuild_locked(
     }
     let mut building = BTreeMap::new();
     for locale in &locales {
-        let uid = format!("{}__r{version}", index_uid(tenant_id, locale));
+        let uid = format!("{}__r{job_id}", index_uid(tenant_id, locale));
+        // A retry of this job may find its own half-filled index: start from scratch.
+        drop_index(meili, &uid).await?;
         create_with_settings(meili, &uid).await?;
         building.insert(locale.clone(), uid);
     }
@@ -411,10 +425,12 @@ async fn rebuild_locked(
         .execute(&mut *tx)
         .await?;
     }
+    // Catalog reads below start after this instant (and after the targets are registered).
+    let started_at = super::db_clock(&mut *tx).await?;
     tx.commit().await?;
 
     // 2. Fill them, a batch of products at a time, under the products' row locks.
-    let mut last: BTreeMap<String, Task> = BTreeMap::new();
+    let mut tasks: Vec<Task> = vec![];
     let mut counts: BTreeMap<String, i64> = BTreeMap::new();
     let mut cursor = Uuid::nil();
     loop {
@@ -436,18 +452,14 @@ async fn rebuild_locked(
             if let Some(uid) = building.get(&locale)
                 && !docs.is_empty()
             {
-                last.insert(
-                    locale.clone(),
-                    meili.add_documents(uid, &docs).await.map_err(Error::from)?,
-                );
+                tasks.push(meili.add_documents(uid, &docs).await?);
                 *counts.entry(locale).or_default() += i64::try_from(docs.len()).unwrap_or(i64::MAX);
             }
         }
         tx.commit().await?;
     }
-    for task in last.values() {
-        meili.wait(*task, REBUILD_WAIT).await.map_err(Error::from)?;
-    }
+    // Every batch must have landed: a failed one would swap in an incomplete index.
+    wait_all(meili, &tasks, REBUILD_WAIT).await?;
 
     // 3. Swap all locales at once, under the exclusive tenant lock.
     let mut tx = tenant_tx(db, tenant_id).await?;
@@ -457,15 +469,16 @@ async fn rebuild_locked(
         .map(|(locale, uid)| (index_uid(tenant_id, locale), uid.clone()))
         .collect();
     if !pairs.is_empty() {
-        let task = meili.swap(&pairs).await.map_err(Error::from)?;
-        meili.wait(task, SETTINGS_WAIT).await.map_err(Error::from)?;
+        let task = meili.swap(&pairs).await?;
+        meili.wait(task, SETTINGS_WAIT).await?;
     }
     for locale in building.keys() {
         sqlx::query!(
-            "UPDATE search_indexes SET building_uid = NULL, rebuilt_at = now(), documents = $2,
-                    updated_at = now()
+            "UPDATE search_indexes SET building_uid = NULL, rebuild_started_at = $2,
+                    rebuilt_at = now(), documents = $3, updated_at = now()
              WHERE locale = $1",
             locale,
+            started_at,
             counts.get(locale).copied().unwrap_or(0)
         )
         .execute(&mut *tx)
@@ -480,7 +493,7 @@ async fn rebuild_locked(
         }
     }
     tracing::info!(%tenant_id, ?counts, "search indexes rebuilt");
-    Ok(())
+    Ok(Rebuilt::Done)
 }
 
 /// Deletes an index and waits for it (a missing index is fine).

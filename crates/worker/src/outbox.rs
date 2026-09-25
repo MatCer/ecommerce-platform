@@ -14,7 +14,7 @@ use crate::handlers;
 const BATCH: i32 = 100;
 
 /// The job kinds subscribed to an event type. Later WPs add webhooks, emails, analytics and
-/// cache purges here. Search jobs are debounced per product (`commerce::search::job_for_event`).
+/// cache purges here. Search jobs are versioned per product (`commerce::search::job_for_event`).
 pub fn subscribers(_event_type: &str) -> &'static [&'static str] {
     &[handlers::EVENTS_LOG]
 }
@@ -23,12 +23,14 @@ pub fn subscribers(_event_type: &str) -> &'static [&'static str] {
 pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
     let mut tx = db.begin().await?;
     let events = queue::claim_outbox(&mut *tx, BATCH).await?;
-    // After the claim: every event's source transaction committed before this instant, which
-    // the debounced search jobs rely on.
-    let now = chrono::Utc::now();
+    // Database clock after the claim: every claimed event's transaction committed before it.
+    // It versions the search jobs (spec A27); one job per product and kind per batch.
+    let now = commerce::search::db_clock(&mut *tx).await?;
+    let mut search_jobs = std::collections::HashSet::new();
     for event in &events {
         if let Some(job) =
             commerce::search::job_for_event(event.tenant_id, &event.event_type, &event.payload, now)
+            && search_jobs.insert((job.tenant_id, job.kind, job.payload.to_string()))
         {
             queue::enqueue(&mut *tx, &job).await?;
         }

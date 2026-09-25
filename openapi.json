@@ -3152,7 +3152,7 @@
         "tags": [
           "search"
         ],
-        "summary": "Rebuilds every index of the tenant from the catalog into new indexes and swaps them in\natomically; searches keep being answered from the old ones meanwhile. Owner or admin.\nRequests within 10 seconds share one rebuild.",
+        "summary": "Rebuilds every index of the tenant from the catalog into new indexes and swaps them in\natomically; searches keep being answered from the old ones meanwhile. Owner or admin.\nA request made while a rebuild is already running is served by a second rebuild after it,\nunless one started after the request anyway.",
         "operationId": "rebuild",
         "parameters": [
           {
