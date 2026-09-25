@@ -1,6 +1,6 @@
 /** WP19 watchdog through the shop edge, checkout-origin confirmation and inventory outbox. */
 import { expect, type Page, test } from "@playwright/test";
-import { run, signInOwner, sql } from "../admin/support";
+import { expectAccessible, run, signInOwner, sql } from "../admin/support";
 import { CZ, checkoutOf, mail, newPage } from "./support";
 
 let admin: Page;
@@ -57,7 +57,8 @@ test("back-in-stock watch confirms, fires once and can unsubscribe", async ({ br
   )?.[0];
   if (!unsubscribe) throw new Error("watch unsubscribe link missing");
   await shopper.goto(unsubscribe);
-  await expect(shopper.getByRole("status")).toContainText("zrušeno");
+  await expect(shopper.getByRole("heading", { name: "Upozornění zrušeno" })).toBeVisible();
+  await expect(shopper.getByRole("status")).toContainText("nedostanete");
   await shopper.context().close();
 });
 
@@ -106,4 +107,49 @@ test("abandoned cart mail restores checkout once through the dev clock", async (
   await replay.getByRole("button", { name: "Pokračovat k pokladně" }).click();
   await expect(replay).toHaveURL(/restore-cart\?invalid=1/);
   await replay.context().close();
+});
+
+test("price-drop watch form works without JavaScript and asks for confirmation", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, locale: "cs-CZ" });
+  const shopper = await context.newPage();
+  await shopper.goto(`${CZ}/p/tricko-henley`);
+  const watch = shopper.locator("#watch");
+  await watch.getByText("Hlídat produkt").click();
+  await expect(watch.getByText(/Nejdřív vám pošleme e-mail s potvrzovacím odkazem/)).toBeVisible();
+  await expectAccessible(shopper, "product watch form");
+
+  // A malformed price comes back as an error on the same page.
+  await watch.getByLabel("klesne cena").check();
+  await watch.getByLabel(/Cena klesne na/).fill("12,345");
+  await watch.getByLabel("E-mail").fill(`watch-form-${run}@example.test`);
+  await watch.getByRole("button", { name: "Hlídat" }).click();
+  await expect(shopper).toHaveURL(/[?&]watch=invalid#watch$/);
+  await expect(shopper.getByRole("alert")).toContainText("Zkontrolujte e-mail a cenu");
+
+  const email = `watch-form-${run}@example.test`;
+  await watch.getByLabel("klesne cena").check();
+  await watch.getByLabel(/Cena klesne na/).fill("1,50");
+  await watch.getByLabel("E-mail").fill(email);
+  await watch.getByRole("button", { name: "Hlídat" }).click();
+  await expect(shopper).toHaveURL(/[?&]watch=ok#watch$/);
+  await expect(shopper.getByRole("status")).toContainText("potvrďte hlídání");
+  expect(
+    sql(`SELECT kind || ':' || target_minor || ':' || status FROM flow_watches
+      WHERE email='${email}'`),
+  ).toBe("price_drop:150:pending");
+
+  const confirmation = await mail(email, "Potvrďte upozornění na produkt");
+  const link = confirmation.Text.match(
+    /https?:\/\/[^\s]+\/watch\/confirm\?token=[0-9a-f]{64}/,
+  )?.[0];
+  if (!link) throw new Error("watch confirmation link missing");
+  await shopper.goto(link);
+  await expect(shopper.getByRole("heading", { name: "Potvrďte hlídání" })).toBeVisible();
+  await expectAccessible(shopper, "watch confirmation");
+  await shopper.getByRole("button", { name: "Potvrdit hlídání" }).click();
+  await expect(shopper.getByRole("status")).toContainText("Hlídání je potvrzené");
+  expect(sql(`SELECT status FROM flow_watches WHERE email='${email}'`)).toBe("confirmed");
+  await context.close();
 });
