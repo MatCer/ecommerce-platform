@@ -1488,7 +1488,10 @@ export interface components {
             value: string;
         };
         FacetView: {
-            /** @description Query parameter name. */
+            /**
+             * @description Facet key (`opt.color`, `param.material`, `brand`); the listing query parameter is
+             *     `f.<key>` (`?f.opt.color=red`).
+             */
             key: string;
             kind: components["schemas"]["FacetKind"];
             label: string;

@@ -20,14 +20,23 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
   const total = () => props.images.length;
   let strip: HTMLDivElement | undefined;
 
-  onMount(() =>
-    "requestIdleCallback" in window
-      ? requestIdleCallback(() => setHydrated(true))
-      : setTimeout(() => setHydrated(true), 200),
-  );
+  // The other photos wait for the page's load event (the LCP photo has arrived by then), or for
+  // the first touch/key on the gallery, whichever comes first.
+  onMount(() => {
+    const reveal = () =>
+      "requestIdleCallback" in window
+        ? requestIdleCallback(() => setHydrated(true))
+        : setTimeout(() => setHydrated(true), 200);
+    if (document.readyState === "complete") reveal();
+    else addEventListener("load", reveal, { once: true });
+  });
   const shown = () => (hydrated() ? props.images : props.images.slice(0, 1));
 
-  const go = (i: number) => {
+  const go = (i: number): void => {
+    if (!hydrated()) {
+      setHydrated(true);
+      return void requestAnimationFrame(() => go(i));
+    }
     const target = Math.max(0, Math.min(i, total() - 1));
     const el = strip?.children[target] as HTMLElement | undefined;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -35,7 +44,7 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
     setCurrent(target);
   };
   createEffect(
-    on(imageIndex, (i) => i !== null && hydrated() && go(i), { defer: true }),
+    on(imageIndex, (i) => i !== null && go(i), { defer: true }),
   );
   const onScroll = () => {
     if (strip) setCurrent(Math.round(strip.scrollLeft / strip.clientWidth));
@@ -47,6 +56,8 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
         <div
           ref={strip}
           onScroll={onScroll}
+          onPointerDown={() => setHydrated(true)}
+          onFocus={() => setHydrated(true)}
           class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-xl bg-muted [scrollbar-width:none]"
           role="group"
           aria-roledescription="carousel"

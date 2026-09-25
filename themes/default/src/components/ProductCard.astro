@@ -2,7 +2,7 @@
 import { imageAttrs } from "@platform/storefront-sdk/format";
 import type { ProductCard, ShopModel } from "@platform/storefront-sdk/types";
 import { i18n, productHref } from "../lib/i18n";
-import { CARD_SIZES } from "../lib/images";
+import { CARD_SIZES, cardImage } from "../lib/images";
 import StockLine from "./StockLine.astro";
 
 /**
@@ -19,7 +19,7 @@ interface Props {
 }
 const { product: p, shop, eager = false, priority = false } = Astro.props;
 const { t } = i18n(shop);
-const [main, hover] = p.images;
+const [main, hover] = p.images.map(cardImage);
 const img = main && imageAttrs(main, { sizes: CARD_SIZES, priority, width: 360 });
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 // A18: a reduction (badge, strikethrough, %) only with the page model's reference price.

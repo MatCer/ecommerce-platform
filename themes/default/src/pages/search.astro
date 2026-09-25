@@ -2,12 +2,12 @@
 import Listing from "../components/Listing.astro";
 import Base from "../layouts/Base.astro";
 import { i18n } from "../lib/i18n";
-import { CARD_SIZES } from "../lib/images";
+import { CARD_SIZES, cardImage } from "../lib/images";
 import { listingQuery, storefront } from "../lib/storefront";
 
 const sf = storefront(Astro.request);
 const [shop, page] = await Promise.all([sf.shop(), sf.search(listingQuery(Astro.url))]);
-const first = page.products[0]?.images[0];
+const first = page.products[0]?.images[0] && cardImage(page.products[0].images[0]);
 // An empty query still lists the catalog; its heading must not read "Results for “”".
 const title = page.query?.trim() ? page.title : i18n(shop).t("search.title");
 ---

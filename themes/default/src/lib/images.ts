@@ -1,3 +1,5 @@
+import type { Image } from "@platform/storefront-sdk/types";
+
 /**
  * `sizes` of every image slot, in one place. They must describe the rendered width exactly:
  * a loose guess (plain `50vw`) makes the browser pick the next, 2-4× heavier variant, and the
@@ -18,3 +20,28 @@ export const GALLERY_SIZES = "(min-width: 80rem) 43rem, (min-width: 48rem) 55vw,
 
 /** Gallery thumbnails and cart/search thumbnails. */
 export const THUMB_SIZES = "4rem";
+
+/**
+ * Drops srcset candidates wider than `max` px: a card never renders wider than ~300 CSS px, so
+ * 960 w files only bloat the HTML (every card repeats its srcsets).
+ */
+export function capped(img: Image, max: number): Image {
+  const keep = (srcset: string) =>
+    srcset
+      .split(",")
+      .map((c) => c.trim())
+      .filter((c) => {
+        const w = Number(/(\d+)w$/.exec(c)?.[1] ?? 0);
+        return w > 0 && w <= max;
+      })
+      .join(", ");
+  return {
+    ...img,
+    srcset: keep(img.srcset),
+    srcset_webp: keep(img.srcset_webp),
+    srcset_fallback: keep(img.srcset_fallback),
+  };
+}
+
+/** A product-card photo (a grid's LCP preload must use this same image). */
+export const cardImage = (img: Image) => capped(img, 720);

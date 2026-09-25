@@ -2191,7 +2191,7 @@
         "properties": {
           "key": {
             "type": "string",
-            "description": "Query parameter name."
+            "description": "Facet key (`opt.color`, `param.material`, `brand`); the listing query parameter is\n`f.<key>` (`?f.opt.color=red`)."
           },
           "kind": {
             "$ref": "#/components/schemas/FacetKind"

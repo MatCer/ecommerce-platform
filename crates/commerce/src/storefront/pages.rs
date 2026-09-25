@@ -508,7 +508,8 @@ pub struct FacetValueView {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct FacetView {
-    /// Query parameter name.
+    /// Facet key (`opt.color`, `param.material`, `brand`); the listing query parameter is
+    /// `f.<key>` (`?f.opt.color=red`).
     pub key: String,
     pub label: String,
     pub kind: FacetKind,
