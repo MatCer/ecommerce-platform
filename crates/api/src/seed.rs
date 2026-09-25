@@ -631,7 +631,10 @@ impl Seeder<'_> {
             img = img.fliph();
         }
         let mut rgb = img.to_rgb8();
-        grain(&mut rgb, u64::from(color.hue.unsigned_abs()) + u64::from(mirrored));
+        grain(
+            &mut rgb,
+            u64::from(color.hue.unsigned_abs()) + u64::from(mirrored),
+        );
         let mut out = Cursor::new(Vec::new());
         DynamicImage::ImageRgb8(rgb).write_to(&mut out, ImageFormat::Jpeg)?;
         Ok(out.into_inner())

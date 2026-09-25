@@ -45,7 +45,11 @@ try {
   await page.goto(new URL("/", values.base).href);
   await budget(page);
   await page.getByRole("button", { name: /Odmítnout|Odmietnuť|Reject/ }).click();
-  await page.getByRole("navigation", { name: /^(Kategorie|Kategórie|Categories)$/ }).getByRole("link").first().click();
+  await page
+    .getByRole("navigation", { name: /^(Kategorie|Kategórie|Categories)$/ })
+    .getByRole("link")
+    .first()
+    .click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/category.png` });
   await budget(page);
@@ -59,9 +63,18 @@ try {
   await expect(page.getByRole("dialog", { name: /Košík|Cart/ })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/cart.png` });
 
+  // The platform's own view of the cart, before the handoff rotates the shop capability.
+  const before = (await (await page.request.get(new URL("/_p/cart", page.url()).href)).json()) as {
+    total?: { formatted?: string };
+    vat?: { rate: string }[];
+  };
   await page.getByRole("button", { name: /pokladně|pokladni|checkout/i }).click();
   await page.waitForURL(/\/\/checkout\./);
   await expect(page.getByRole("heading", { name: /Souhrn|Súhrn|Summary/ })).toBeVisible();
+  // The checkout origin shows the same cart: same total (incl. VAT) and the VAT recap.
+  await expect(page.locator("[data-cart-total]")).toHaveText(before.total?.formatted ?? "?");
+  for (const row of before.vat ?? [])
+    await expect(page.locator(`[data-vat-rate="${row.rate}"]`)).toBeVisible();
   await page.screenshot({ path: `${values.shots}/checkout.png` });
   if (errors.length) throw new Error(`console errors:\n${errors.join("\n")}`);
   console.log(`smoke: ok (${page.url()}; calls ${calls.join(" ")})`);

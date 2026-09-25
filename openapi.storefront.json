@@ -12,7 +12,9 @@
   "paths": {
     "/storefront/v1/cart": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "The cart with totals and VAT recomputed now (shop or checkout capability).",
         "operationId": "get_cart",
         "parameters": [
@@ -41,7 +43,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -76,7 +81,9 @@
         }
       },
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Creates an empty cart; the capability comes back in `X-Cart-Token` (the edge stores it in\nthe HttpOnly `cart` cookie).",
         "operationId": "create_cart",
         "parameters": [
@@ -105,7 +112,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -132,7 +142,9 @@
     },
     "/storefront/v1/cart/coupons": {
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Applies a coupon (one per cart; replaces an earlier one). `422` with the coupon's reason\n(`coupon_not_found`, `coupon_min_subtotal`, ...) when it does not apply.",
         "operationId": "apply_coupon",
         "parameters": [
@@ -161,7 +173,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -208,7 +223,9 @@
     },
     "/storefront/v1/cart/coupons/{code}": {
       "delete": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "operationId": "remove_coupon",
         "parameters": [
           {
@@ -236,7 +253,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -272,7 +292,9 @@
     },
     "/storefront/v1/cart/handoff": {
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Starts the checkout handoff (A1): revokes the shop capability (the edge clears the `cart`\ncookie) and returns a single-use handoff token.",
         "operationId": "start_handoff",
         "parameters": [
@@ -301,7 +323,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -348,7 +373,9 @@
     },
     "/storefront/v1/cart/lines": {
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "operationId": "add_line",
         "parameters": [
           {
@@ -376,7 +403,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -442,7 +472,9 @@
     },
     "/storefront/v1/cart/lines/{id}": {
       "delete": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "operationId": "remove_line",
         "parameters": [
           {
@@ -470,7 +502,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -505,7 +540,9 @@
         }
       },
       "patch": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Sets the quantity (0 removes the line).",
         "operationId": "update_line",
         "parameters": [
@@ -534,7 +571,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -581,7 +621,9 @@
     },
     "/storefront/v1/checkout/handoff": {
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Redeems a handoff token on the checkout origin (A1): consumed atomically; returns a new\ncheckout-scoped capability. `400 invalid_handoff` when unknown, used, expired or minted for\nanother market.",
         "operationId": "redeem_handoff",
         "parameters": [
@@ -610,7 +652,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -648,7 +693,9 @@
     },
     "/storefront/v1/events": {
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Events beacon (`/_p/e`). ponytail: accepted and dropped until WP14 stores consented events\nand server counters (A20).",
         "operationId": "events",
         "parameters": [
@@ -677,7 +724,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -690,7 +740,9 @@
     },
     "/storefront/v1/files/{name}": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "`robots.txt`, `llms.txt`, `sitemap.xml` (index) or `sitemap-<n>.xml` (chunk).",
         "operationId": "file",
         "parameters": [
@@ -719,7 +771,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -753,7 +808,9 @@
     },
     "/storefront/v1/newsletter/subscribe": {
       "post": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Newsletter sign-up. ponytail: validates and accepts; storage and the double opt-in mail\narrive with the newsletter module (M2).",
         "operationId": "newsletter",
         "parameters": [
@@ -782,7 +839,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -820,7 +880,9 @@
     },
     "/storefront/v1/pages/category/{slug}": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "A category listing with facets, sort options and pagination. Filtered or re-sorted URLs\nare `noindex,follow` with a canonical to the category (spec §9.5).",
         "operationId": "category",
         "parameters": [
@@ -849,7 +911,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -905,7 +970,9 @@
     },
     "/storefront/v1/pages/home": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "operationId": "home",
         "parameters": [
           {
@@ -933,7 +1000,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -952,7 +1022,9 @@
     },
     "/storefront/v1/pages/product/{slug}": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "operationId": "product_page",
         "parameters": [
           {
@@ -980,7 +1052,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -1016,7 +1091,9 @@
     },
     "/storefront/v1/pages/search": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Search results (name search until WP7's Meilisearch); always `noindex`.",
         "operationId": "search",
         "parameters": [
@@ -1045,7 +1122,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -1090,7 +1170,9 @@
     },
     "/storefront/v1/recommendations": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "operationId": "recommendations",
         "parameters": [
           {
@@ -1118,7 +1200,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -1146,7 +1231,9 @@
     },
     "/storefront/v1/redirects/resolve": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "The redirect for a path the theme could not render (the edge asks on 404, spec §9.5).",
         "operationId": "resolve_redirect",
         "parameters": [
@@ -1175,7 +1262,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -1212,7 +1302,9 @@
     },
     "/storefront/v1/search/suggest": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Typeahead: up to 5 products and 3 categories.",
         "operationId": "suggest",
         "parameters": [
@@ -1241,7 +1333,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           {
@@ -1269,7 +1364,9 @@
     },
     "/storefront/v1/shop": {
       "get": {
-        "tags": ["storefront"],
+        "tags": [
+          "storefront"
+        ],
         "summary": "Layout data: shop name, locale, markets, menus, consent config, messages, theme tokens.",
         "operationId": "shop",
         "parameters": [
@@ -1298,7 +1395,10 @@
             "description": "Locale hint (one of the market's locales).",
             "required": false,
             "schema": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         ],
@@ -1338,7 +1438,10 @@
     "schemas": {
       "Alternate": {
         "type": "object",
-        "required": ["locale", "href"],
+        "required": [
+          "locale",
+          "href"
+        ],
         "properties": {
           "href": {
             "type": "string"
@@ -1351,12 +1454,19 @@
       },
       "Badge": {
         "type": "string",
-        "enum": ["sale", "new"]
+        "enum": [
+          "sale",
+          "new"
+        ]
       },
       "CacheHints": {
         "type": "object",
         "description": "Cache hints the edge reads from every page model (spec §8.2, A2).",
-        "required": ["public", "max_age", "tags"],
+        "required": [
+          "public",
+          "max_age",
+          "tags"
+        ],
         "properties": {
           "max_age": {
             "type": "integer",
@@ -1378,7 +1488,10 @@
       },
       "CartCoupon": {
         "type": "object",
-        "required": ["code", "applied"],
+        "required": [
+          "code",
+          "applied"
+        ],
         "properties": {
           "applied": {
             "type": "boolean",
@@ -1388,7 +1501,10 @@
             "type": "string"
           },
           "reason": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Why not (`coupon_min_subtotal`, `coupon_not_active`, ...)."
           }
         }
@@ -1565,7 +1681,10 @@
       },
       "CategoryTile": {
         "type": "object",
-        "required": ["label", "href"],
+        "required": [
+          "label",
+          "href"
+        ],
         "properties": {
           "href": {
             "type": "string"
@@ -1587,7 +1706,12 @@
       },
       "CategoryView": {
         "type": "object",
-        "required": ["id", "slug", "name", "description_html"],
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description_html"
+        ],
         "properties": {
           "description_html": {
             "type": "string"
@@ -1606,7 +1730,9 @@
       },
       "CheckoutCart": {
         "type": "object",
-        "required": ["cart_token"],
+        "required": [
+          "cart_token"
+        ],
         "properties": {
           "cart_token": {
             "type": "string",
@@ -1616,7 +1742,10 @@
       },
       "ConsentConfig": {
         "type": "object",
-        "required": ["purposes", "policy_url"],
+        "required": [
+          "purposes",
+          "policy_url"
+        ],
         "properties": {
           "policy_url": {
             "type": "string"
@@ -1632,11 +1761,19 @@
       },
       "ConsentPurpose": {
         "type": "string",
-        "enum": ["analytics", "ads", "personalization", "email_marketing", "review_invites"]
+        "enum": [
+          "analytics",
+          "ads",
+          "personalization",
+          "email_marketing",
+          "review_invites"
+        ]
       },
       "CouponCode": {
         "type": "object",
-        "required": ["code"],
+        "required": [
+          "code"
+        ],
         "properties": {
           "code": {
             "type": "string"
@@ -1647,11 +1784,23 @@
       "Currency": {
         "type": "string",
         "description": "Currencies used by EU markets: the euro and the member states' own currencies.\n`BGN` is historic (Bulgaria adopted the euro on 2026-01-01) and kept for old documents.",
-        "enum": ["BGN", "CZK", "DKK", "EUR", "HUF", "PLN", "RON", "SEK"]
+        "enum": [
+          "BGN",
+          "CZK",
+          "DKK",
+          "EUR",
+          "HUF",
+          "PLN",
+          "RON",
+          "SEK"
+        ]
       },
       "DeliveryEstimate": {
         "type": "object",
-        "required": ["from", "to"],
+        "required": [
+          "from",
+          "to"
+        ],
         "properties": {
           "from": {
             "type": "string",
@@ -1665,11 +1814,20 @@
       },
       "FacetKind": {
         "type": "string",
-        "enum": ["option", "parameter"]
+        "enum": [
+          "option",
+          "parameter"
+        ]
       },
       "FacetValueView": {
         "type": "object",
-        "required": ["value", "label", "selected", "disabled", "href"],
+        "required": [
+          "value",
+          "label",
+          "selected",
+          "disabled",
+          "href"
+        ],
         "properties": {
           "disabled": {
             "type": "boolean",
@@ -1692,7 +1850,12 @@
       },
       "FacetView": {
         "type": "object",
-        "required": ["key", "label", "kind", "values"],
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "values"
+        ],
         "properties": {
           "key": {
             "type": "string",
@@ -1714,22 +1877,34 @@
       },
       "GpsrPartyView": {
         "type": "object",
-        "required": ["name", "address"],
+        "required": [
+          "name",
+          "address"
+        ],
         "properties": {
           "address": {
             "type": "string"
           },
           "email": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "name": {
             "type": "string"
           },
           "phone": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "url": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1758,16 +1933,24 @@
             ]
           },
           "safety_info": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "warnings": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
       "HandoffToken": {
         "type": "object",
-        "required": ["token"],
+        "required": [
+          "token"
+        ],
         "properties": {
           "token": {
             "type": "string",
@@ -1777,7 +1960,11 @@
       },
       "Hero": {
         "type": "object",
-        "required": ["title", "subtitle", "cta"],
+        "required": [
+          "title",
+          "subtitle",
+          "cta"
+        ],
         "properties": {
           "cta": {
             "$ref": "#/components/schemas/Link"
@@ -1802,7 +1989,13 @@
       },
       "HomePage": {
         "type": "object",
-        "required": ["hero", "categories", "featured", "seo", "cache"],
+        "required": [
+          "hero",
+          "categories",
+          "featured",
+          "seo",
+          "cache"
+        ],
         "properties": {
           "cache": {
             "$ref": "#/components/schemas/CacheHints"
@@ -1831,7 +2024,15 @@
       "Image": {
         "type": "object",
         "description": "An image with every generated width. Render `srcset` (AVIF) with a `sizes` that matches the\nreal slot; `src` is a JPEG/PNG fallback. `width`/`height` are the intrinsic size of the\nlargest variant (use them for the aspect ratio: no layout shift).",
-        "required": ["alt", "width", "height", "src", "srcset", "srcset_webp", "srcset_fallback"],
+        "required": [
+          "alt",
+          "width",
+          "height",
+          "src",
+          "srcset",
+          "srcset_webp",
+          "srcset_fallback"
+        ],
         "properties": {
           "alt": {
             "type": "string"
@@ -1866,7 +2067,9 @@
       },
       "LineUpdate": {
         "type": "object",
-        "required": ["quantity"],
+        "required": [
+          "quantity"
+        ],
         "properties": {
           "quantity": {
             "type": "integer",
@@ -1878,7 +2081,10 @@
       },
       "Link": {
         "type": "object",
-        "required": ["label", "href"],
+        "required": [
+          "label",
+          "href"
+        ],
         "properties": {
           "href": {
             "type": "string"
@@ -1940,7 +2146,10 @@
             }
           },
           "query": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "The search query (absent on category pages)."
           },
           "seo": {
@@ -1970,7 +2179,14 @@
       },
       "MarketLink": {
         "type": "object",
-        "required": ["code", "name", "locale", "currency", "href", "current"],
+        "required": [
+          "code",
+          "name",
+          "locale",
+          "currency",
+          "href",
+          "current"
+        ],
         "properties": {
           "code": {
             "type": "string"
@@ -1996,7 +2212,11 @@
       },
       "MenuItem": {
         "type": "object",
-        "required": ["label", "href", "children"],
+        "required": [
+          "label",
+          "href",
+          "children"
+        ],
         "properties": {
           "children": {
             "type": "array",
@@ -2014,7 +2234,10 @@
       },
       "Menus": {
         "type": "object",
-        "required": ["main", "footer"],
+        "required": [
+          "main",
+          "footer"
+        ],
         "properties": {
           "footer": {
             "type": "array",
@@ -2033,7 +2256,11 @@
       "MoneyView": {
         "type": "object",
         "description": "The API shape of an amount (spec §8.1): `{amount_minor, currency, formatted}`.",
-        "required": ["amount_minor", "currency", "formatted"],
+        "required": [
+          "amount_minor",
+          "currency",
+          "formatted"
+        ],
         "properties": {
           "amount_minor": {
             "type": "integer",
@@ -2050,7 +2277,9 @@
       },
       "NewLine": {
         "type": "object",
-        "required": ["variant_id"],
+        "required": [
+          "variant_id"
+        ],
         "properties": {
           "quantity": {
             "type": "integer",
@@ -2066,7 +2295,9 @@
       },
       "NewsletterSignup": {
         "type": "object",
-        "required": ["email"],
+        "required": [
+          "email"
+        ],
         "properties": {
           "email": {
             "type": "string"
@@ -2075,7 +2306,9 @@
       },
       "NewsletterStatus": {
         "type": "object",
-        "required": ["status"],
+        "required": [
+          "status"
+        ],
         "properties": {
           "status": {
             "type": "string",
@@ -2085,7 +2318,10 @@
       },
       "OptionValueView": {
         "type": "object",
-        "required": ["code", "name"],
+        "required": [
+          "code",
+          "name"
+        ],
         "properties": {
           "code": {
             "type": "string"
@@ -2097,7 +2333,11 @@
       },
       "OptionView": {
         "type": "object",
-        "required": ["code", "name", "values"],
+        "required": [
+          "code",
+          "name",
+          "values"
+        ],
         "properties": {
           "code": {
             "type": "string"
@@ -2115,10 +2355,16 @@
       },
       "Pagination": {
         "type": "object",
-        "required": ["page", "pages"],
+        "required": [
+          "page",
+          "pages"
+        ],
         "properties": {
           "next": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "page": {
             "type": "integer",
@@ -2131,13 +2377,20 @@
             "minimum": 0
           },
           "prev": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
       "ParameterView": {
         "type": "object",
-        "required": ["key", "name", "value"],
+        "required": [
+          "key",
+          "name",
+          "value"
+        ],
         "properties": {
           "key": {
             "type": "string"
@@ -2153,10 +2406,15 @@
       "PriceView": {
         "type": "object",
         "description": "A selling price with its Omnibus reference (A18). `reference_price` and\n`discount_percent` are present only when a reduction may be claimed; they are computed\nagainst the lowest price of the 30 days before the reduction, never `compare_at`.",
-        "required": ["price"],
+        "required": [
+          "price"
+        ],
         "properties": {
           "discount_percent": {
-            "type": ["integer", "null"],
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int32",
             "minimum": 0
           },
@@ -2188,14 +2446,22 @@
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details body.",
-        "required": ["type", "title", "status", "code"],
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
         "properties": {
           "code": {
             "type": "string",
             "description": "Stable machine-readable error code, e.g. `not_found`."
           },
           "detail": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "integer",
@@ -2218,7 +2484,15 @@
           },
           {
             "type": "object",
-            "required": ["id", "slug", "name", "images", "price_varies", "stock", "badges"],
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "images",
+              "price_varies",
+              "stock",
+              "badges"
+            ],
             "properties": {
               "badges": {
                 "type": "array",
@@ -2227,7 +2501,10 @@
                 }
               },
               "brand": {
-                "type": ["string", "null"]
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "id": {
                 "type": "string",
@@ -2273,7 +2550,10 @@
         ],
         "properties": {
           "brand": {
-            "type": ["string", "null"]
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "description_html": {
             "type": "string",
@@ -2331,7 +2611,12 @@
       },
       "ProductPage": {
         "type": "object",
-        "required": ["product", "breadcrumbs", "seo", "cache"],
+        "required": [
+          "product",
+          "breadcrumbs",
+          "seo",
+          "cache"
+        ],
         "properties": {
           "breadcrumbs": {
             "type": "array",
@@ -2363,7 +2648,10 @@
       },
       "Recommendations": {
         "type": "object",
-        "required": ["products", "cache"],
+        "required": [
+          "products",
+          "cache"
+        ],
         "properties": {
           "cache": {
             "$ref": "#/components/schemas/CacheHints"
@@ -2379,7 +2667,10 @@
       "ResolvedRedirect": {
         "type": "object",
         "description": "What the edge needs to answer a redirect.",
-        "required": ["to_path", "code"],
+        "required": [
+          "to_path",
+          "code"
+        ],
         "properties": {
           "code": {
             "type": "integer",
@@ -2393,7 +2684,11 @@
       },
       "SearchSuggest": {
         "type": "object",
-        "required": ["query", "products", "categories"],
+        "required": [
+          "query",
+          "products",
+          "categories"
+        ],
         "properties": {
           "categories": {
             "type": "array",
@@ -2414,7 +2709,13 @@
       },
       "Seo": {
         "type": "object",
-        "required": ["title", "description", "canonical", "alternates", "json_ld"],
+        "required": [
+          "title",
+          "description",
+          "canonical",
+          "alternates",
+          "json_ld"
+        ],
         "properties": {
           "alternates": {
             "type": "array",
@@ -2434,7 +2735,10 @@
             "description": "JSON-LD documents for `<script type=\"application/ld+json\">`."
           },
           "robots": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "`noindex,follow` on filtered listings (spec §9.5); absent otherwise."
           },
           "title": {
@@ -2544,11 +2848,22 @@
       },
       "Sort": {
         "type": "string",
-        "enum": ["recommended", "price_asc", "price_desc", "newest", "name"]
+        "enum": [
+          "recommended",
+          "price_asc",
+          "price_desc",
+          "newest",
+          "name"
+        ]
       },
       "SortOption": {
         "type": "object",
-        "required": ["value", "label", "selected", "href"],
+        "required": [
+          "value",
+          "label",
+          "selected",
+          "href"
+        ],
         "properties": {
           "href": {
             "type": "string"
@@ -2566,11 +2881,20 @@
       },
       "StockState": {
         "type": "string",
-        "enum": ["in_stock", "low_stock", "backorder", "out_of_stock"]
+        "enum": [
+          "in_stock",
+          "low_stock",
+          "backorder",
+          "out_of_stock"
+        ]
       },
       "SuggestProduct": {
         "type": "object",
-        "required": ["slug", "name", "price"],
+        "required": [
+          "slug",
+          "name",
+          "price"
+        ],
         "properties": {
           "image": {
             "oneOf": [
@@ -2595,7 +2919,9 @@
       },
       "Tracking": {
         "type": "object",
-        "required": ["rum_sample_rate"],
+        "required": [
+          "rum_sample_rate"
+        ],
         "properties": {
           "rum_sample_rate": {
             "type": "number",
@@ -2606,7 +2932,11 @@
       },
       "Trust": {
         "type": "object",
-        "required": ["delivery", "returns", "payments"],
+        "required": [
+          "delivery",
+          "returns",
+          "payments"
+        ],
         "properties": {
           "delivery": {
             "type": "string"
@@ -2625,7 +2955,10 @@
       "UnitPrice": {
         "type": "object",
         "description": "Price per unit of measure (EU price indication directive), e.g. per 1 kg.",
-        "required": ["price", "unit"],
+        "required": [
+          "price",
+          "unit"
+        ],
         "properties": {
           "price": {
             "$ref": "#/components/schemas/MoneyView"
@@ -2643,14 +2976,23 @@
           },
           {
             "type": "object",
-            "required": ["id", "sku", "options", "stock", "is_default"],
+            "required": [
+              "id",
+              "sku",
+              "options",
+              "stock",
+              "is_default"
+            ],
             "properties": {
               "id": {
                 "type": "string",
                 "format": "uuid"
               },
               "image_index": {
-                "type": ["integer", "null"],
+                "type": [
+                  "integer",
+                  "null"
+                ],
                 "format": "int32",
                 "description": "Index into `product.images` of this variant's first image.",
                 "minimum": 0
@@ -2680,7 +3022,12 @@
       },
       "VatRow": {
         "type": "object",
-        "required": ["rate", "net", "vat", "gross"],
+        "required": [
+          "rate",
+          "net",
+          "vat",
+          "gross"
+        ],
         "properties": {
           "gross": {
             "$ref": "#/components/schemas/MoneyView"

@@ -81,6 +81,9 @@ async function createInstance(
   );
   const mf = new Miniflare({
     port: 0,
+    // No request.cf lookup: Miniflare would fetch it from the internet at startup and cache it
+    // under node_modules (read-only in the image). Themes get the placeholder object.
+    cf: false,
     log: new Log(LogLevel.WARN, { prefix: `workerd:${id.slice(0, 8)}` }),
     workers: [
       {

@@ -331,7 +331,10 @@ pub(crate) mod tests {
             target_widths(4000),
             vec![160, 320, 480, 640, 720, 960, 1280, 1920]
         );
-        assert_eq!(target_widths(1000), vec![160, 320, 480, 640, 720, 960, 1000]);
+        assert_eq!(
+            target_widths(1000),
+            vec![160, 320, 480, 640, 720, 960, 1000]
+        );
         assert_eq!(target_widths(640), vec![160, 320, 480, 640]);
         assert_eq!(target_widths(100), vec![100]);
         assert_eq!(scaled_height(4000, 3000, 160), 120);
