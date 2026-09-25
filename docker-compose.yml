@@ -198,6 +198,9 @@ services:
       ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
       SMTP_URL: smtp://mailpit:1025
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
+      # Sign-ins per client IP and minute (default 10). Locally every e2e browser shares one
+      # IP (the Docker gateway), so the stack allows more.
+      AUTH_SIGNIN_RATE_MAX: ${AUTH_SIGNIN_RATE_MAX:-120}
     depends_on:
       postgres: { condition: service_healthy }
       mailpit: { condition: service_started }

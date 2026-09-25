@@ -52,11 +52,19 @@ export function createAuth(cfg: Config, database: BetterAuthOptions["database"],
     database,
     trustedOrigins: [cfg.adminOrigin],
     telemetry: { enabled: false },
-    // Rate limits are per client IP (sign-in, sign-up, password/email change: 3 per 10 s; the
-    // rest 100 per minute). The IP comes only from the header the reverse proxy sets: without
+    // Rate limits are per client IP: sign-in `signInRateMax` per minute, sign-up and
+    // password/email changes 3 per 10 s, the rest 100 per 10 s (Better Auth's defaults). The IP comes only from the header the reverse proxy sets: without
     // it every request would share one bucket.
     advanced: { ipAddress: { ipAddressHeaders: [cfg.clientIpHeader] } },
-    rateLimit: { enabled: true, window: 60, max: 100 },
+    rateLimit: {
+      enabled: true,
+      window: 10,
+      max: 100,
+      customRules: {
+        "/sign-in/*": { window: 60, max: cfg.signInRateMax },
+        "/magic-link/*": { window: 60, max: cfg.signInRateMax },
+      },
+    },
     databaseHooks: {
       user: {
         update: {
