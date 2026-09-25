@@ -559,7 +559,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["restore"];
+        post: operations["restore_cart"];
         delete?: never;
         options?: never;
         head?: never;
@@ -575,7 +575,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["unsubscribe_cart"];
+        post: operations["flow_unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1067,7 +1067,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["confirm"];
+        post: operations["watch_confirm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1083,7 +1083,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["subscribe"];
+        post: operations["watch_subscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1099,7 +1099,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["unsubscribe"];
+        post: operations["watch_unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4000,7 +4000,7 @@ export interface operations {
             };
         };
     };
-    restore: {
+    restore_cart: {
         parameters: {
             query?: never;
             header: {
@@ -4036,7 +4036,7 @@ export interface operations {
             };
         };
     };
-    unsubscribe_cart: {
+    flow_unsubscribe: {
         parameters: {
             query?: never;
             header: {
@@ -5254,7 +5254,7 @@ export interface operations {
             };
         };
     };
-    confirm: {
+    watch_confirm: {
         parameters: {
             query?: never;
             header: {
@@ -5290,7 +5290,7 @@ export interface operations {
             };
         };
     };
-    subscribe: {
+    watch_subscribe: {
         parameters: {
             query?: never;
             header: {
@@ -5320,7 +5320,7 @@ export interface operations {
             };
         };
     };
-    unsubscribe: {
+    watch_unsubscribe: {
         parameters: {
             query?: never;
             header: {

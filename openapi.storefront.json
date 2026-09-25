@@ -3290,7 +3290,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "restore",
+        "operationId": "restore_cart",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -3353,7 +3353,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "unsubscribe_cart",
+        "operationId": "flow_unsubscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -5771,7 +5771,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "confirm",
+        "operationId": "watch_confirm",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -5834,7 +5834,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "subscribe",
+        "operationId": "watch_subscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -5896,7 +5896,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "unsubscribe",
+        "operationId": "watch_unsubscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",

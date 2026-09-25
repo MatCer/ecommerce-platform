@@ -1105,7 +1105,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_runs"];
+        get: operations["list_flow_runs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1121,7 +1121,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["run_detail"];
+        get: operations["flow_run_detail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1139,7 +1139,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["cancel_run"];
+        post: operations["cancel_flow_run"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1155,7 +1155,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["advance_clock"];
+        post: operations["advance_flow_clock"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3943,7 +3943,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["restore"];
+        post: operations["restore_cart"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3959,7 +3959,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["unsubscribe_cart"];
+        post: operations["flow_unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4451,7 +4451,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["confirm"];
+        post: operations["watch_confirm"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4467,7 +4467,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["subscribe"];
+        post: operations["watch_subscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4483,7 +4483,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["unsubscribe"];
+        post: operations["watch_unsubscribe"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4806,10 +4806,6 @@ export interface components {
              */
             shipments: components["schemas"]["ShipmentView"][];
             withdrawals: components["schemas"]["Withdrawal"][];
-        };
-        AdvanceInput: {
-            /** Format: int64 */
-            hours: number;
         };
         /** @description A visitor's interests (only ever loaded with `personalization` consent, A20). */
         Affinity: {
@@ -5623,10 +5619,6 @@ export interface components {
             /** @description Where to redirect (exactly what the campaign linked to). */
             url: string;
         };
-        ClockState: {
-            /** Format: date-time */
-            now: string;
-        };
         CmsPage: {
             blocks: components["schemas"]["BlockView"][];
             breadcrumbs: components["schemas"]["Link"][];
@@ -6074,17 +6066,6 @@ export interface components {
             /** @description Optional message to the shop (a reason is not required by law). */
             note?: string | null;
         };
-        Definition: {
-            config: components["schemas"]["FlowConfig"];
-            enabled: boolean;
-            /** Format: uuid */
-            id: string;
-            kind: string;
-        };
-        DefinitionChange: {
-            config: components["schemas"]["FlowConfig"];
-            enabled: boolean;
-        };
         Delivery: {
             /** Format: int32 */
             attempts: number;
@@ -6365,6 +6346,14 @@ export interface components {
             field: string;
             locale: string;
         };
+        FlowClock: {
+            /** Format: date-time */
+            now: string;
+        };
+        FlowClockAdvance: {
+            /** Format: int64 */
+            hours: number;
+        };
         FlowConfig: {
             /**
              * Format: int32
@@ -6374,14 +6363,59 @@ export interface components {
             /** @description Hours after the triggering cart activity; only abandoned carts use several steps. */
             delays_hours: number[];
         };
+        FlowDefinition: {
+            config: components["schemas"]["FlowConfig"];
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+        };
+        FlowDefinitionChange: {
+            config: components["schemas"]["FlowConfig"];
+            enabled: boolean;
+        };
         FlowList: {
-            items: components["schemas"]["Definition"][];
+            items: components["schemas"]["FlowDefinition"][];
             /**
              * Format: date-time
              * @description The tenant's shifted test-clock time; absent when the clock is unavailable
              *     (production), so the admin hides its control.
              */
             test_clock_now?: string | null;
+        };
+        FlowRun: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            due_at: string;
+            exit_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            last_error?: string | null;
+            /** Format: int32 */
+            next_step: number;
+            /** Format: uuid */
+            source_id: string;
+            source_kind: string;
+            status: string;
+        };
+        FlowRunDetail: {
+            run: components["schemas"]["FlowRun"];
+            steps: components["schemas"]["FlowStep"][];
+        };
+        FlowRunList: {
+            items: components["schemas"]["FlowRun"][];
+        };
+        FlowStep: {
+            /** Format: date-time */
+            executed_at: string;
+            /** Format: uuid */
+            message_id?: string | null;
+            reason?: string | null;
+            status: string;
+            /** Format: int32 */
+            step_number: number;
         };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
@@ -8442,30 +8476,6 @@ export interface components {
             conditions?: components["schemas"]["Condition"][];
             match?: components["schemas"]["Match"];
         };
-        Run: {
-            /** Format: int32 */
-            attempts: number;
-            /** Format: date-time */
-            due_at: string;
-            exit_reason?: string | null;
-            /** Format: uuid */
-            id: string;
-            kind: string;
-            last_error?: string | null;
-            /** Format: int32 */
-            next_step: number;
-            /** Format: uuid */
-            source_id: string;
-            source_kind: string;
-            status: string;
-        };
-        RunDetail: {
-            run: components["schemas"]["Run"];
-            steps: components["schemas"]["StepRecord"][];
-        };
-        RunList: {
-            items: components["schemas"]["Run"][];
-        };
         /** @enum {string} */
         RunStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
         Sale: {
@@ -8872,16 +8882,6 @@ export interface components {
             checks: Record<string, never>;
             /** @description `building`, `ready` or `failed`. */
             status: string;
-        };
-        StepRecord: {
-            /** Format: date-time */
-            executed_at: string;
-            /** Format: uuid */
-            message_id?: string | null;
-            reason?: string | null;
-            status: string;
-            /** Format: int32 */
-            step_number: number;
         };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
@@ -12391,7 +12391,7 @@ export interface operations {
             };
         };
     };
-    list_runs: {
+    list_flow_runs: {
         parameters: {
             query?: never;
             header: {
@@ -12408,12 +12408,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunList"];
+                    "application/json": components["schemas"]["FlowRunList"];
                 };
             };
         };
     };
-    run_detail: {
+    flow_run_detail: {
         parameters: {
             query?: never;
             header: {
@@ -12432,7 +12432,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunDetail"];
+                    "application/json": components["schemas"]["FlowRunDetail"];
                 };
             };
             404: {
@@ -12443,7 +12443,7 @@ export interface operations {
             };
         };
     };
-    cancel_run: {
+    cancel_flow_run: {
         parameters: {
             query?: never;
             header: {
@@ -12462,7 +12462,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunDetail"];
+                    "application/json": components["schemas"]["FlowRunDetail"];
                 };
             };
             404: {
@@ -12473,7 +12473,7 @@ export interface operations {
             };
         };
     };
-    advance_clock: {
+    advance_flow_clock: {
         parameters: {
             query?: never;
             header: {
@@ -12485,7 +12485,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AdvanceInput"];
+                "application/json": components["schemas"]["FlowClockAdvance"];
             };
         };
         responses: {
@@ -12494,7 +12494,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClockState"];
+                    "application/json": components["schemas"]["FlowClock"];
                 };
             };
             /** @description Unavailable in production */
@@ -12520,7 +12520,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DefinitionChange"];
+                "application/json": components["schemas"]["FlowDefinitionChange"];
             };
         };
         responses: {
@@ -12529,7 +12529,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Definition"];
+                    "application/json": components["schemas"]["FlowDefinition"];
                 };
             };
         };
@@ -20263,7 +20263,7 @@ export interface operations {
             };
         };
     };
-    restore: {
+    restore_cart: {
         parameters: {
             query?: never;
             header: {
@@ -20299,7 +20299,7 @@ export interface operations {
             };
         };
     };
-    unsubscribe_cart: {
+    flow_unsubscribe: {
         parameters: {
             query?: never;
             header: {
@@ -21517,7 +21517,7 @@ export interface operations {
             };
         };
     };
-    confirm: {
+    watch_confirm: {
         parameters: {
             query?: never;
             header: {
@@ -21553,7 +21553,7 @@ export interface operations {
             };
         };
     };
-    subscribe: {
+    watch_subscribe: {
         parameters: {
             query?: never;
             header: {
@@ -21583,7 +21583,7 @@ export interface operations {
             };
         };
     };
-    unsubscribe: {
+    watch_unsubscribe: {
         parameters: {
             query?: never;
             header: {

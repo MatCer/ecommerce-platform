@@ -65,6 +65,7 @@ impl FlowConfig {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = FlowDefinition)]
 pub struct Definition {
     pub id: Uuid,
     pub kind: String,
@@ -73,6 +74,7 @@ pub struct Definition {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+#[schema(as = FlowDefinitionChange)]
 #[serde(deny_unknown_fields)]
 pub struct DefinitionChange {
     pub enabled: bool,
@@ -80,6 +82,7 @@ pub struct DefinitionChange {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = FlowRun)]
 pub struct Run {
     pub id: Uuid,
     pub kind: String,
@@ -94,6 +97,7 @@ pub struct Run {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = FlowStep)]
 pub struct StepRecord {
     pub step_number: i32,
     pub status: String,
@@ -103,6 +107,7 @@ pub struct StepRecord {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+#[schema(as = FlowRunDetail)]
 pub struct RunDetail {
     pub run: Run,
     pub steps: Vec<StepRecord>,

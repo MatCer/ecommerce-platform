@@ -17,11 +17,11 @@ use crate::admin::parse_json;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
-        .routes(routes!(subscribe))
-        .routes(routes!(confirm))
-        .routes(routes!(unsubscribe))
-        .routes(routes!(unsubscribe_cart))
-        .routes(routes!(restore))
+        .routes(routes!(watch_subscribe))
+        .routes(routes!(watch_confirm))
+        .routes(routes!(watch_unsubscribe))
+        .routes(routes!(flow_unsubscribe))
+        .routes(routes!(restore_cart))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -35,7 +35,7 @@ pub struct RestoreResult {
 }
 
 #[utoipa::path(post,path="/storefront/v1/watch/subscribe",tag="storefront",params(StorefrontHeaders),request_body=WatchInput,responses((status=202,body=WatchStatus)))]
-async fn subscribe(
+async fn watch_subscribe(
     shopper: Shopper,
     State(s): State<AppState>,
     headers: HeaderMap,
@@ -57,7 +57,7 @@ async fn subscribe(
 }
 
 #[utoipa::path(post,path="/storefront/v1/watch/confirm",tag="storefront",params(StorefrontHeaders),request_body=TokenInput,responses((status=200,body=WatchStatus),(status=404)))]
-async fn confirm(
+async fn watch_confirm(
     shopper: Shopper,
     State(s): State<AppState>,
     body: Bytes,
@@ -79,7 +79,7 @@ async fn confirm(
 }
 
 #[utoipa::path(post,path="/storefront/v1/watch/unsubscribe",tag="storefront",params(StorefrontHeaders),request_body=TokenInput,responses((status=200,body=WatchStatus)))]
-async fn unsubscribe(
+async fn watch_unsubscribe(
     shopper: Shopper,
     State(s): State<AppState>,
     body: Bytes,
@@ -98,7 +98,7 @@ async fn unsubscribe(
 }
 
 #[utoipa::path(post,path="/storefront/v1/flows/unsubscribe",tag="storefront",params(StorefrontHeaders),request_body=TokenInput,responses((status=200,body=WatchStatus)))]
-async fn unsubscribe_cart(
+async fn flow_unsubscribe(
     shopper: Shopper,
     State(s): State<AppState>,
     body: Bytes,
@@ -117,7 +117,7 @@ async fn unsubscribe_cart(
 }
 
 #[utoipa::path(post,path="/storefront/v1/flows/restore-cart",tag="storefront",params(StorefrontHeaders),request_body=TokenInput,responses((status=200,body=RestoreResult),(status=404)))]
-async fn restore(
+async fn restore_cart(
     shopper: Shopper,
     State(s): State<AppState>,
     body: Bytes,

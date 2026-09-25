@@ -18,10 +18,10 @@ pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(list_flows))
         .routes(routes!(configure_flow))
-        .routes(routes!(list_runs))
-        .routes(routes!(run_detail))
-        .routes(routes!(cancel_run))
-        .routes(routes!(advance_clock))
+        .routes(routes!(list_flow_runs))
+        .routes(routes!(flow_run_detail))
+        .routes(routes!(cancel_flow_run))
+        .routes(routes!(advance_flow_clock))
 }
 
 #[derive(Serialize, ToSchema)]
@@ -32,6 +32,7 @@ pub struct FlowList {
     pub test_clock_now: Option<chrono::DateTime<chrono::Utc>>,
 }
 #[derive(Serialize, ToSchema)]
+#[schema(as = FlowRunList)]
 pub struct RunList {
     pub items: Vec<Run>,
 }
@@ -75,14 +76,17 @@ async fn configure_flow(
 }
 
 #[utoipa::path(get,path="/admin/v1/flows/runs",tag="flows",security(("staff_jwt"=[])),params(TenantHeader),responses((status=200,body=RunList)))]
-async fn list_runs(staff: TenantStaff, State(s): State<AppState>) -> Result<Json<RunList>, Error> {
+async fn list_flow_runs(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+) -> Result<Json<RunList>, Error> {
     Ok(Json(RunList {
         items: in_tx(&s, staff.tenant_id, async |tx| flows::runs(tx, 100).await).await?,
     }))
 }
 
 #[utoipa::path(get,path="/admin/v1/flows/runs/{id}",tag="flows",security(("staff_jwt"=[])),params(TenantHeader,("id"=Uuid,Path)),responses((status=200,body=RunDetail),(status=404)))]
-async fn run_detail(
+async fn flow_run_detail(
     staff: TenantStaff,
     State(s): State<AppState>,
     Path(id): Path<Uuid>,
@@ -96,7 +100,7 @@ async fn run_detail(
 }
 
 #[utoipa::path(post,path="/admin/v1/flows/runs/{id}/cancel",tag="flows",security(("staff_jwt"=[])),params(TenantHeader,("id"=Uuid,Path)),responses((status=200,body=RunDetail),(status=404)))]
-async fn cancel_run(
+async fn cancel_flow_run(
     staff: TenantStaff,
     State(s): State<AppState>,
     Path(id): Path<Uuid>,
@@ -111,17 +115,19 @@ async fn cancel_run(
 }
 
 #[derive(Deserialize, ToSchema)]
+#[schema(as = FlowClockAdvance)]
 #[serde(deny_unknown_fields)]
 pub struct AdvanceInput {
     pub hours: i64,
 }
 #[derive(Serialize, ToSchema)]
+#[schema(as = FlowClock)]
 pub struct ClockState {
     pub now: chrono::DateTime<chrono::Utc>,
 }
 
 #[utoipa::path(post,path="/admin/v1/flows/test-clock/advance",tag="flows",security(("staff_jwt"=[])),params(TenantHeader),request_body=AdvanceInput,responses((status=200,body=ClockState),(status=404,description="Unavailable in production")))]
-async fn advance_clock(
+async fn advance_flow_clock(
     staff: TenantStaff,
     State(s): State<AppState>,
     body: Bytes,

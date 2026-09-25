@@ -4914,7 +4914,7 @@
         "tags": [
           "flows"
         ],
-        "operationId": "list_runs",
+        "operationId": "list_flow_runs",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -4932,7 +4932,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunList"
+                  "$ref": "#/components/schemas/FlowRunList"
                 }
               }
             }
@@ -4950,7 +4950,7 @@
         "tags": [
           "flows"
         ],
-        "operationId": "run_detail",
+        "operationId": "flow_run_detail",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -4977,7 +4977,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunDetail"
+                  "$ref": "#/components/schemas/FlowRunDetail"
                 }
               }
             }
@@ -4996,7 +4996,7 @@
         "tags": [
           "flows"
         ],
-        "operationId": "cancel_run",
+        "operationId": "cancel_flow_run",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -5023,7 +5023,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RunDetail"
+                  "$ref": "#/components/schemas/FlowRunDetail"
                 }
               }
             }
@@ -5042,7 +5042,7 @@
         "tags": [
           "flows"
         ],
-        "operationId": "advance_clock",
+        "operationId": "advance_flow_clock",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -5059,7 +5059,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AdvanceInput"
+                "$ref": "#/components/schemas/FlowClockAdvance"
               }
             }
           },
@@ -5070,7 +5070,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ClockState"
+                  "$ref": "#/components/schemas/FlowClock"
                 }
               }
             }
@@ -5116,7 +5116,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DefinitionChange"
+                "$ref": "#/components/schemas/FlowDefinitionChange"
               }
             }
           },
@@ -5127,7 +5127,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Definition"
+                  "$ref": "#/components/schemas/FlowDefinition"
                 }
               }
             }
@@ -18370,7 +18370,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "restore",
+        "operationId": "restore_cart",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -18433,7 +18433,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "unsubscribe_cart",
+        "operationId": "flow_unsubscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -20851,7 +20851,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "confirm",
+        "operationId": "watch_confirm",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -20914,7 +20914,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "subscribe",
+        "operationId": "watch_subscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -20976,7 +20976,7 @@
         "tags": [
           "storefront"
         ],
-        "operationId": "unsubscribe",
+        "operationId": "watch_unsubscribe",
         "parameters": [
           {
             "name": "X-Storefront-Token",
@@ -22152,19 +22152,6 @@
             }
           }
         }
-      },
-      "AdvanceInput": {
-        "type": "object",
-        "required": [
-          "hours"
-        ],
-        "properties": {
-          "hours": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "additionalProperties": false
       },
       "Affinity": {
         "type": "object",
@@ -24905,18 +24892,6 @@
           }
         }
       },
-      "ClockState": {
-        "type": "object",
-        "required": [
-          "now"
-        ],
-        "properties": {
-          "now": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "CmsPage": {
         "type": "object",
         "required": [
@@ -26419,46 +26394,6 @@
         },
         "additionalProperties": false
       },
-      "Definition": {
-        "type": "object",
-        "required": [
-          "id",
-          "kind",
-          "enabled",
-          "config"
-        ],
-        "properties": {
-          "config": {
-            "$ref": "#/components/schemas/FlowConfig"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "kind": {
-            "type": "string"
-          }
-        }
-      },
-      "DefinitionChange": {
-        "type": "object",
-        "required": [
-          "enabled",
-          "config"
-        ],
-        "properties": {
-          "config": {
-            "$ref": "#/components/schemas/FlowConfig"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
       "Delivery": {
         "type": "object",
         "required": [
@@ -27353,6 +27288,31 @@
         },
         "additionalProperties": false
       },
+      "FlowClock": {
+        "type": "object",
+        "required": [
+          "now"
+        ],
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FlowClockAdvance": {
+        "type": "object",
+        "required": [
+          "hours"
+        ],
+        "properties": {
+          "hours": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
+      },
       "FlowConfig": {
         "type": "object",
         "required": [
@@ -27378,6 +27338,46 @@
         },
         "additionalProperties": false
       },
+      "FlowDefinition": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "enabled",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/FlowConfig"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          }
+        }
+      },
+      "FlowDefinitionChange": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/FlowConfig"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "FlowList": {
         "type": "object",
         "required": [
@@ -27387,7 +27387,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Definition"
+              "$ref": "#/components/schemas/FlowDefinition"
             }
           },
           "test_clock_now": {
@@ -27397,6 +27397,128 @@
             ],
             "format": "date-time",
             "description": "The tenant's shifted test-clock time; absent when the clock is unavailable\n(production), so the admin hides its control."
+          }
+        }
+      },
+      "FlowRun": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "source_kind",
+          "source_id",
+          "status",
+          "next_step",
+          "due_at",
+          "attempts"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "exit_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "next_step": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_kind": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "FlowRunDetail": {
+        "type": "object",
+        "required": [
+          "run",
+          "steps"
+        ],
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/FlowRun"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowStep"
+            }
+          }
+        }
+      },
+      "FlowRunList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlowRun"
+            }
+          }
+        }
+      },
+      "FlowStep": {
+        "type": "object",
+        "required": [
+          "step_number",
+          "status",
+          "executed_at"
+        ],
+        "properties": {
+          "executed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "step_number": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -33885,94 +34007,6 @@
         },
         "additionalProperties": false
       },
-      "Run": {
-        "type": "object",
-        "required": [
-          "id",
-          "kind",
-          "source_kind",
-          "source_id",
-          "status",
-          "next_step",
-          "due_at",
-          "attempts"
-        ],
-        "properties": {
-          "attempts": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "due_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "exit_reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "kind": {
-            "type": "string"
-          },
-          "last_error": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "next_step": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "source_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "source_kind": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "RunDetail": {
-        "type": "object",
-        "required": [
-          "run",
-          "steps"
-        ],
-        "properties": {
-          "run": {
-            "$ref": "#/components/schemas/Run"
-          },
-          "steps": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StepRecord"
-            }
-          }
-        }
-      },
-      "RunList": {
-        "type": "object",
-        "required": [
-          "items"
-        ],
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Run"
-            }
-          }
-        }
-      },
       "RunStatus": {
         "type": "string",
         "enum": [
@@ -35213,40 +35247,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "StepRecord": {
-        "type": "object",
-        "required": [
-          "step_number",
-          "status",
-          "executed_at"
-        ],
-        "properties": {
-          "executed_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "message_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string"
-          },
-          "step_number": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
       },
       "StockState": {
         "type": "string",
