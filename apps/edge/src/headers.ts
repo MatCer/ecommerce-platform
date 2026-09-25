@@ -12,14 +12,12 @@ export function stripUntrusted(headers: Headers): Headers {
   return out;
 }
 
-/** Request headers a theme worker may see. Everything else (cookies, auth, ...) is dropped. */
-const THEME_REQUEST_ALLOW = new Set([
-  "accept",
-  "accept-language",
-  "user-agent",
-  "sec-purpose",
-  "if-none-match",
-]);
+/**
+ * Request headers a theme worker may see. Everything else (cookies, auth, Accept-Language,
+ * User-Agent, ...) is dropped: theme HTML is cached per (tenant, market, locale, path), so any
+ * header the output could vary on would poison that cache. Locale comes from the market.
+ */
+const THEME_REQUEST_ALLOW = new Set(["accept"]);
 
 export function themeRequestHeaders(incoming: Headers): Headers {
   const out = new Headers();

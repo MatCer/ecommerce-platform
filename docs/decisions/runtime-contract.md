@@ -138,8 +138,9 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
 
 - Before resolving, the edge strips client `X-Tenant`, `X-Market`, `X-Locale`, `X-Storefront-*`,
   `X-Forwarded-*`, `Forwarded`, `X-Real-IP`, `X-Platform-*`, `X-Cart-Token`, `CF-Connecting-IP`.
-  The theme worker receives only `accept`, `accept-language`, `user-agent`, `sec-purpose`,
-  `if-none-match` + the context id: **no cookies, no Authorization**. Worker responses lose
+  The theme worker receives only `accept` + the context id: **no cookies, no Authorization, no
+  Accept-Language/User-Agent** (HTML is cached per tenant/market/locale/path, so any header the
+  output could vary on would poison the cache; locale comes from the market). Worker responses lose
   `set-cookie`, any worker CSP, hop-by-hop and `mf-*` headers. The worker URL is rebuilt from the
   configured scheme + validated Host.
 - **Theme CSP:** `default-src 'self'; script-src 'self' <hashes>; style-src 'self' <hash>;
@@ -217,9 +218,12 @@ compose `edge` + stub API behind Caddy **over TLS + HTTP/2**, fixture photos ~35
 
 | Page | LCP | TBT | CLS | JS gz (A26) | JS gz + RUM sampled | 3rd-party | axe serious/critical | storefront calls |
 |---|---|---|---|---|---|---|---|---|
-| `/` | 1127 ms | 0 ms | 0.009 | 21.1 kB | 25.9 kB | 0 | 0 | 2 |
-| `/c/trika` | 1201 ms | 0 ms | 0.019 | 22.1 kB | 27.0 kB | 0 | 0 | 2 |
-| `/p/tricko-basic` | 1277 ms | 0 ms | 0.000 | 24.3 kB | 29.2 kB | 0 | 0 | 2 |
+| `/` | 1127 ms | 0 ms | 0.009 | 21.1 kB | 26.0 kB | 0 | 0 | 2 |
+| `/c/trika` | 1202 ms | 0 ms | 0.014 | 22.2 kB | 27.0 kB | 0 | 0 | 2 |
+| `/p/tricko-basic` | 1352 ms | 0 ms | 0.000 | 24.4 kB | 29.2 kB | 0 | 0 | 2 |
+
+Final run on the compose stack. Repeated 3-run medians of the same build gave PDP LCP between
+1.20 and 1.35 s; home (1.13 s) and category (1.20 s) were stable.
 
 Budget: LCP ≤ 1.5 s, TBT ≤ 150 ms, CLS ≤ 0.05, JS ≤ 30 kB (home 35). **All pass.** Every planned
 island is wired: variant picker + add to cart (`BuyBox`), mini cart drawer with free-shipping bar
@@ -245,7 +249,7 @@ What it took (each change was measured):
 5. Home: the measured LCP element was a lazily loaded featured card, not the category tiles. It is
    now eager + `fetchpriority=high` + preloaded.
 
-Headroom: the PDP has 5.7 kB left, but only 0.8 kB when the RUM sample loads `web-vitals`
+Headroom: the PDP has 5.6 kB of JS left, but only 0.8 kB when the RUM sample loads `web-vitals`
 (attribution build, 4.9 kB). Recommendation for WP8/WP14: count RUM outside the lab budget (it
 loads after consent, for 10 % of visits) or replace `web-vitals/attribution` with a ~1 kB
 `PerformanceObserver` reporter.

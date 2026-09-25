@@ -135,7 +135,7 @@ describe("header hygiene (A2)", () => {
     expect(names).not.toContain("cookie");
     expect(names).not.toContain("authorization");
     expect(headers.find(([k]) => k === "x-platform-ctx")?.[1]).not.toBe("forged");
-    expect(headers).toContainEqual(["accept-language", "cs"]);
+    expect(headers).not.toContainEqual(["accept-language", "cs"]); // not part of the cache key
     expect(url).toBe("http://demo.localhost/pages/headers");
   });
 
