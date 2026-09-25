@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO theme_revisions (tenant_id, number, parent_id, artifact_id, origin, status,\n                                      created_by, published_at)\n         SELECT $1, coalesce(max(number), 0) + 1, $2, $3, 'default', 'published', $4, now()\n         FROM theme_revisions\n         RETURNING id, number, artifact_id, status, published_at",
+  "query": "INSERT INTO theme_revisions (tenant_id, number, parent_id, artifact_id, origin, status,\n                                      created_by, published_at)\n         SELECT $1, coalesce(max(number), 0) + 1, $2, $3, 'default', 'published', $4, now()\n         FROM theme_revisions\n         RETURNING id, number, artifact_id AS \"artifact_id!\", status, published_at",
   "describe": {
     "columns": [
       {
@@ -27,7 +27,7 @@
       },
       {
         "ordinal": 2,
-        "name": "artifact_id",
+        "name": "artifact_id!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -70,10 +70,10 @@
     "nullable": [
       false,
       false,
-      false,
+      true,
       false,
       true
     ]
   },
-  "hash": "4a62c2ecd8273468b3f649930a114ec4bbfb1ea945d3ebdc59f1bf755ef68742"
+  "hash": "f6e602cbf2c137d837514fb3745d5e3885b007362c410bdb8cd898c7179d7318"
 }

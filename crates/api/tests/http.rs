@@ -42,6 +42,10 @@ fn state(db: PgPool) -> AppState {
         webhooks: None,
         ads: None,
         rate_limit: std::sync::Arc::new(api::rate_limit::StorefrontLimiter::new(1, 1)),
+        themes: None,
+        builder_token: Some(api::auth::ServiceToken::new(
+            "builder-token-for-http-tests-0123456789",
+        )),
         carriers: None,
     }
 }
@@ -180,6 +184,49 @@ async fn oversized_body_is_problem_json() {
     let res = send(app(state(dead_db()), false), req).await;
     assert!(res.headers().contains_key("x-request-id"));
     assert_problem(res, StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large").await;
+}
+
+#[tokio::test]
+async fn theme_uploads_have_their_own_body_limits() {
+    assert_eq!(api::body_limit("/admin/v1/products"), BODY_LIMIT_BYTES);
+    assert_eq!(
+        api::body_limit("/admin/v1/themes/revisions/upload"),
+        20 * 1024 * 1024
+    );
+    assert!(api::body_limit("/internal/v1/themes/revisions/x/artifact") > 50 * 1024 * 1024);
+    assert_eq!(
+        api::body_limit("/internal/v1/themes/revisions/x/status"),
+        BODY_LIMIT_BYTES
+    );
+    let req = Request::post("/admin/v1/themes/revisions/upload")
+        .header(header::CONTENT_LENGTH, 21 * 1024 * 1024)
+        .body(Body::empty())
+        .unwrap();
+    let res = send(app(state(dead_db()), false), req).await;
+    assert_problem(res, StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large").await;
+}
+
+/// A7: the builder token and the edge's internal token are not interchangeable.
+#[tokio::test]
+async fn builder_and_edge_tokens_are_distinct() {
+    let rev = "/internal/v1/themes/revisions/0192f000-0000-7000-8000-000000000000/build";
+    for token in ["unused-in-these-tests", "wrong"] {
+        let req = Request::get(rev)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap();
+        let res = send(app(state(dead_db()), false), req).await;
+        assert_problem(res, StatusCode::UNAUTHORIZED, "invalid_token").await;
+    }
+    let req = Request::get("/internal/v1/previews/resolve?host=preview-1--demo.localhost&token=x")
+        .header(
+            header::AUTHORIZATION,
+            "Bearer builder-token-for-http-tests-0123456789",
+        )
+        .body(Body::empty())
+        .unwrap();
+    let res = send(app(state(dead_db()), false), req).await;
+    assert_problem(res, StatusCode::UNAUTHORIZED, "invalid_token").await;
 }
 
 #[tokio::test]

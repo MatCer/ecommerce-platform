@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE theme_revisions SET artifact_id = $2, status = 'checking', status_changed_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8185bbbcac4e896bd99922318dc7f76ae866d121c95d9920cc780b18a1103ffe"
+}

@@ -1,5 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { validateTokens } from "./tokens.ts";
 
 /**
  * Theme contract lint (spec §9.1, §12.3 gates). Static checks only; the runtime boundary (A7)
@@ -81,9 +83,30 @@ async function walk(dir: string, rel = ""): Promise<string[]> {
   return out;
 }
 
+/**
+ * Platform-owned files (§9.1): a theme source may carry them, but only unchanged. The build
+ * always uses the platform's copies.
+ */
+export const PLATFORM_FILES = ["package.json", "astro.config.mjs", "tsconfig.json"] as const;
+
+const readOptional = (p: string) => readFile(p, "utf8").catch(() => null);
+
+function sameJson(a: string, b: string | null): boolean {
+  try {
+    return isDeepStrictEqual(JSON.parse(a), JSON.parse(b ?? "null"));
+  } catch {
+    return false;
+  }
+}
+
 export async function lintTheme(
   themeDir: string,
-  opts: { referencePackageJson?: string } = {},
+  opts: {
+    /** The platform's theme directory: platform-owned files must equal its copies. */
+    referenceDir?: string;
+    /** @deprecated use `referenceDir`; compares only the dependencies of package.json. */
+    referencePackageJson?: string;
+  } = {},
 ): Promise<Violation[]> {
   const v: Violation[] = [];
   const files = new Set(await walk(themeDir, "src").then((fs) => fs));
@@ -112,6 +135,36 @@ export async function lintTheme(
         }
       }
     });
+  }
+  // A6: tokens are schema-validated data.
+  const tokens = await readOptional(path.join(themeDir, "theme.tokens.json"));
+  try {
+    if (tokens === null) throw new Error("theme.tokens.json is missing");
+    validateTokens(JSON.parse(tokens));
+  } catch (err) {
+    v.push({
+      file: "theme.tokens.json",
+      line: 0,
+      rule: "tokens",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+  if (opts.referenceDir) {
+    for (const f of PLATFORM_FILES) {
+      const mine = await readOptional(path.join(themeDir, f));
+      if (mine === null) continue;
+      const ref = await readOptional(path.join(opts.referenceDir, f));
+      const pkg = f === "package.json";
+      if (pkg ? !sameJson(mine, ref) : mine !== ref)
+        v.push({
+          file: f,
+          line: 0,
+          rule: pkg ? "locked-deps" : "locked-files",
+          message: pkg
+            ? "package.json is platform-owned: dependencies and scripts cannot change"
+            : `${f} is platform-owned and cannot change`,
+        });
+    }
   }
   if (opts.referencePackageJson) {
     const deps = (p: string) =>

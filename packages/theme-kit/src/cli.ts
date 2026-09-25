@@ -58,8 +58,10 @@ if (command === "pack") {
     allowPositionals: true,
     options: { reference: { type: "string" } },
   });
+  // `--reference` is the platform's theme directory (or, as before, its package.json).
+  const ref = values.reference;
   const violations = await lintTheme(positionals[0] ?? ".", {
-    referencePackageJson: values.reference,
+    referenceDir: ref && (ref.endsWith("package.json") ? path.dirname(ref) : ref),
   });
   for (const v of violations) console.log(`${v.file}:${v.line} ${v.rule}: ${v.message}`);
   console.log(
@@ -68,7 +70,7 @@ if (command === "pack") {
   process.exit(violations.length ? 1 : 0);
 } else {
   console.error(
-    "usage: theme-kit pack ... | theme-kit verify [--root dir] <id>... | theme-kit lint <theme-dir> [--reference package.json]",
+    "usage: theme-kit pack ... | theme-kit verify [--root dir] <id>... | theme-kit lint <theme-dir> [--reference <platform theme dir>]",
   );
   process.exit(2);
 }

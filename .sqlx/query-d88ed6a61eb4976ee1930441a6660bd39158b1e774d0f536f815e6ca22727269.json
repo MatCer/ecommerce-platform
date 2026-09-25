@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE theme_revisions SET status = $2, checks = $3, status_changed_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d88ed6a61eb4976ee1930441a6660bd39158b1e774d0f536f815e6ca22727269"
+}

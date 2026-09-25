@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { ArtifactFetcher } from "./artifacts.ts";
 import { Counters } from "./counters.ts";
 import { createGateway } from "./gateway.ts";
-import { ApiResolver } from "./sites.ts";
+import { ApiPreviewResolver, ApiResolver } from "./sites.ts";
 
 function required(name: string): string {
   const v = process.env[name];
@@ -26,6 +26,9 @@ const gateway = createGateway({
   purgeToken: required("EDGE_PURGE_TOKEN"),
   packetaWidgetUrl: process.env.PACKETA_WIDGET_URL || undefined,
   counters,
+  // WP23: theme previews, verified by the API; framed only by the admin origin (A21).
+  previews: new ApiPreviewResolver(apiOrigin, serviceToken),
+  adminOrigin: process.env.ADMIN_ORIGIN || undefined,
 });
 
 const port = Number(process.env.PORT ?? 8787);
@@ -38,6 +41,23 @@ console.log(JSON.stringify({ level: "info", msg: "edge listening", port, adminPo
 
 // A30: one instance per artifact; idle ones are disposed and recreated on demand.
 const idle = setInterval(() => void gateway.pool.evictIdle(10 * 60_000), 60_000);
+// Local artifact copies unused for 7 days are dropped (re-downloaded on demand).
+const prune = setInterval(
+  () =>
+    void gateway
+      .pruneArtifacts(7 * 86_400_000)
+      .then(
+        (removed) =>
+          removed.length &&
+          console.log(JSON.stringify({ level: "info", msg: "pruned artifacts", removed })),
+      )
+      .catch((err) =>
+        console.log(
+          JSON.stringify({ level: "warn", msg: "artifact prune failed", err: String(err) }),
+        ),
+      ),
+  3_600_000,
+);
 
 // A20: cookieless counters go to the API every 30 s (kept for the next flush on failure).
 const flushCounters = () =>
@@ -51,6 +71,7 @@ const flushing = setInterval(() => void flushCounters(), 30_000);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     clearInterval(idle);
+    clearInterval(prune);
     clearInterval(flushing);
     for (const s of servers) s.close();
     void flushCounters()

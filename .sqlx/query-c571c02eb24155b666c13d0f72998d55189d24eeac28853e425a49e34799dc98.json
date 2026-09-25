@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH m AS (SELECT default_locale FROM markets ORDER BY created_at LIMIT 1),\n           cat AS (\n               SELECT c.id, ct.slug, count(*) AS n, c.position\n               FROM categories c\n               JOIN m ON true\n               JOIN category_translations ct ON ct.category_id = c.id AND ct.locale = m.default_locale\n               JOIN product_categories pc ON pc.category_id = c.id\n               JOIN products p ON p.id = pc.product_id AND p.status = 'active'\n               GROUP BY c.id, ct.slug, c.position\n               ORDER BY n DESC, c.position, ct.slug LIMIT 1)\n           SELECT cat.slug AS \"category!\", pt.slug AS \"product!\"\n           FROM cat\n           JOIN m ON true\n           JOIN product_categories pc ON pc.category_id = cat.id\n           JOIN products p ON p.id = pc.product_id AND p.status = 'active'\n           JOIN product_translations pt ON pt.product_id = p.id AND pt.locale = m.default_locale\n           ORDER BY pc.position, p.created_at LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "category!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "category_translations",
+            "name": "slug"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "product!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c571c02eb24155b666c13d0f72998d55189d24eeac28853e425a49e34799dc98"
+}

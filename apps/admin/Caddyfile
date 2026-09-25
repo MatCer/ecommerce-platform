@@ -11,9 +11,10 @@
 
 	# CSP for the admin origin (spec §14). No inline scripts; the API and the public media
 	# bucket are the only other origins. Inline style attributes come from positioning code in
-	# Kobalte overlays. API_ORIGIN / MEDIA_ORIGIN are set per deployment.
+	# Kobalte overlays. API_ORIGIN / MEDIA_ORIGIN are set per deployment; PREVIEW_FRAME_SRC is
+	# where theme previews live (WP23; the iframe itself is sandboxed, A21).
 	header {
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: {$MEDIA_ORIGIN}; font-src 'self'; connect-src 'self' {$API_ORIGIN} {$MEDIA_ORIGIN}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: {$MEDIA_ORIGIN}; font-src 'self'; connect-src 'self' {$API_ORIGIN} {$MEDIA_ORIGIN}; frame-src {$PREVIEW_FRAME_SRC:'none'}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 		X-Content-Type-Options nosniff
 		Referrer-Policy same-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"

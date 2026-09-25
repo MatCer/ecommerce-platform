@@ -19,6 +19,7 @@ import { gzipSync } from "node:zlib";
 import { AxeBuilder } from "@axe-core/playwright";
 import lighthouse from "lighthouse";
 import { type BrowserContext, chromium } from "playwright";
+import { addCookie, chromiumArgs, freshSubrequests, parseCookie } from "./browser.ts";
 import { BUDGET, judge, median, type PageResult } from "./budget.ts";
 
 const { values } = parseArgs({
@@ -30,8 +31,12 @@ const { values } = parseArgs({
     "no-fail": { type: "boolean", default: false },
     "skip-lighthouse": { type: "boolean", default: false },
     explain: { type: "boolean", default: false },
+    /** `name=value` sent with every request (the preview token cookie, WP23). */
+    cookie: { type: "string" },
   },
 });
+const cookie = parseCookie(values.cookie);
+const extraArgs = chromiumArgs();
 
 const base = new URL(values.base);
 const pages = values.pages.split(",").filter(Boolean);
@@ -66,8 +71,9 @@ async function settle(ctx: BrowserContext, quietMs = 800, maxMs = 15_000) {
 }
 
 async function measureJs(url: string, opts: { withRum: boolean }) {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: extraArgs });
   const ctx = await browser.newContext({ ...MOBILE, ignoreHTTPSErrors: LOCAL_TLS });
+  await addCookie(ctx, base, cookie);
   if (opts.withRum) {
     // Worst case: every purpose granted (loads everything consent unlocks) + the RUM sample.
     const all = "analytics,ads,personalization,email_marketing,review_invites";
@@ -99,9 +105,8 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
   });
 
   await page.goto(url, { waitUntil: "networkidle" });
-  // An Authorization header makes the edge bypass its HTML cache (A2): a fresh render to count.
-  const fresh = await ctx.request.get(url, { headers: { authorization: "Bearer measure" } });
-  const subrequests = Number(fresh.headers()["x-edge-subrequests"] ?? Number.NaN);
+  // A fresh (uncached) render's page-model calls.
+  const subrequests = await freshSubrequests(page, url);
   await settle(ctx);
   // A26: scroll the full page so every client:visible island is triggered.
   const height = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -151,6 +156,7 @@ async function measureLighthouse(url: string) {
     args: [
       `--remote-debugging-port=${port}`,
       ...(LOCAL_TLS ? ["--ignore-certificate-errors"] : []),
+      ...extraArgs,
     ],
   });
   try {
@@ -159,6 +165,7 @@ async function measureLighthouse(url: string) {
       output: "json",
       logLevel: "error",
       onlyCategories: ["performance"],
+      ...(cookie ? { extraHeaders: { cookie: `${cookie.name}=${cookie.value}` } } : {}),
     });
     const audits = result?.lhr.audits ?? {};
     if (values.explain) {

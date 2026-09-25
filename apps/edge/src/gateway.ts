@@ -1,4 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
+import { readdir, rename, rm, stat } from "node:fs/promises";
+import path from "node:path";
 import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
 import type { ArtifactFetcher } from "./artifacts.ts";
 import {
@@ -26,6 +28,8 @@ import {
   CachedResolver,
   classifyHost,
   normalizeHost,
+  PREVIEW_HOST_RE,
+  type PreviewResolver,
   type Site,
   type SiteResolver,
   splitLocale,
@@ -59,6 +63,10 @@ export interface GatewayOptions {
   counters?: Counters;
   renderTimeoutMs?: number;
   log?: (event: Record<string, unknown>) => void;
+  /** Theme previews (`preview-<n>--<shop>`, WP23): token verification through the API. */
+  previews?: PreviewResolver;
+  /** The admin origin, the only one allowed to frame previews (A21). */
+  adminOrigin?: string;
 }
 
 const SPECULATION_RULES = JSON.stringify({
@@ -180,6 +188,14 @@ function readCookie(headers: Headers, name: string): string | undefined {
 }
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+/** Preview access (A21): the token from the admin's link, kept in a partitioned cookie. */
+const PREVIEW_COOKIE = "__Host-preview";
+const PREVIEW_TOKEN_RE = /^[0-9a-f]{32}\.\d{1,12}\.[0-9a-f]{64}$/;
+const PREVIEW_NOTICE = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="robots" content="noindex">
+<title>Checkout is disabled in preview</title>
+<main><h1>Checkout is disabled in preview</h1>
+<p>This is a preview of an unpublished theme revision. Carts are not handed over to the checkout.</p>
+<p><a href="/">Back to the preview</a></p></main></html>`;
 const IDEMPOTENCY_KEY_RE = /^[\x21-\x7e]{1,255}$/;
 /** A path on the same shop: one leading slash, no `//` or `/\` host smuggling, no spaces. */
 const SAME_SHOP_PATH = /^\/(?![/\\])[^\s\\]*$/;
@@ -209,13 +225,19 @@ export function createGateway(opts: GatewayOptions) {
   const registry = new ContextRegistry();
   const cache = new HtmlCache();
   const manifests = new Map<string, Promise<ArtifactManifest>>();
+  /** When each local artifact was last needed (artifact GC of the cache volume). */
+  const used = new Map<string, number>();
+  /** Artifacts being deleted: loads wait for the deletion, then download afresh. */
+  const pruning = new Map<string, Promise<void>>();
   const revalidating = new Set<string>();
   let outboundDenied = 0;
 
   const manifest = (id: string) => {
+    used.set(id, Date.now());
     let m = manifests.get(id);
     if (!m) {
       m = (async () => {
+        await pruning.get(id);
         await opts.artifacts?.ensure(id);
         return readManifest(opts.artifactRoot, id);
       })();
@@ -348,6 +370,8 @@ export function createGateway(opts: GatewayOptions) {
       scriptHashes: m.csp.script_hashes,
       styleHashes: m.csp.style_hashes,
       checkoutOrigin: `${scheme}://checkout.${site.shop_host}${port}`,
+      // A21: only the admin may frame a preview; shops are never framed.
+      frameAncestors: site.preview && opts.adminOrigin ? opts.adminOrigin : undefined,
     });
     return {
       ...securityHeaders("theme", csp),
@@ -369,8 +393,8 @@ export function createGateway(opts: GatewayOptions) {
   ): Promise<Response> {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
-    // A20: counted before the cache, without identifiers (template + day only).
-    if (req.method === "GET") opts.counters?.page(site, templateOf(url.pathname));
+    // A20: counted before the cache, without identifiers (template + day only). Not previews.
+    if (req.method === "GET" && !site.preview) opts.counters?.page(site, templateOf(url.pathname));
     const artifact = site.theme_artifact;
     if (!artifact)
       return text(503, "This shop has not been published yet", { "retry-after": "60" });
@@ -382,7 +406,7 @@ export function createGateway(opts: GatewayOptions) {
       method: req.method,
       url: normalized,
       origin: "shop",
-      preview: false,
+      preview: Boolean(site.preview),
       headers: req.headers,
     });
     const key = [
@@ -1074,6 +1098,17 @@ ${
     }
     if (p === "/_p/cart" || p.startsWith("/_p/cart/"))
       return cartProxy(site, req, p.slice("/_p/cart".length), host, port);
+    if (site.preview) {
+      // Previews never hand a cart to the real checkout, count page views or collect events.
+      if (p === "/_p/checkout/start")
+        return new Response(PREVIEW_NOTICE, {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "content-security-policy": "default-src 'none'; frame-ancestors 'self'",
+          },
+        });
+      if (p === "/_p/e" || p === "/_p/newsletter") return new Response(null, { status: 204 });
+    }
     if (p === "/_p/checkout/start") return checkoutStart(site, req, host, port);
     if (p.startsWith("/_p/public/"))
       return publicProxy(site, req, url, p.slice("/_p/public".length));
@@ -1268,7 +1303,7 @@ ${
     // Canonical URL the worker sees: public scheme + the validated host.
     const publicUrl = new URL(`${url.pathname}${url.search}`, `${scheme}://${host}${port}`);
 
-    if (host.startsWith("preview-")) return text(404, "Previews are not available yet"); // M3 (WP23)
+    if (host.startsWith("preview-")) return preview(request, req, publicUrl, host, port, clientIp);
     const origin = classifyHost(host);
     const resolved = await resolver.resolve(origin.shopHost);
     if (!resolved) return text(404, "Unknown shop");
@@ -1277,6 +1312,57 @@ ${
     return origin.kind === "shop"
       ? shop(site, req, publicUrl, host, port, clientIp)
       : checkout(site, req, publicUrl, host, port, clientIp);
+  }
+
+  /**
+   * `preview-<n>--<shop>` (WP23, A21). The admin's link carries `?preview_token=`; the edge has
+   * the API verify it (tenant + revision + expiry, HMAC), swaps it for a host-only partitioned
+   * cookie (the preview lives in the admin's iframe) and redirects to the clean URL. Every
+   * response is `no-store` + `noindex`; theme pages may be framed by the admin origin only.
+   */
+  async function preview(
+    raw: Request,
+    req: Request,
+    url: URL,
+    host: string,
+    port: string,
+    clientIp: string | undefined,
+  ): Promise<Response> {
+    const denied = (why: string) =>
+      text(401, `${why} Open the preview again from the admin.`, {
+        "x-robots-tag": "noindex, nofollow",
+        "referrer-policy": "no-referrer",
+      });
+    if (!opts.previews || !PREVIEW_HOST_RE.test(host)) return text(404, "Unknown preview");
+    const fromLink = url.searchParams.get("preview_token");
+    const token = fromLink ?? readCookie(raw.headers, PREVIEW_COOKIE);
+    if (!token || !PREVIEW_TOKEN_RE.test(token))
+      return denied("This preview link is missing or invalid.");
+    const resolved = await opts.previews.resolve(host, token);
+    if (!resolved?.preview)
+      return denied("This preview link has expired or is not valid for this revision.");
+    if (fromLink !== null) {
+      const clean = new URL(url);
+      clean.searchParams.delete("preview_token");
+      const maxAge = Math.max(0, Math.floor((resolved.preview.expiresAt - Date.now()) / 1000));
+      return new Response(null, {
+        status: 303,
+        headers: {
+          location: `${clean.pathname}${clean.search}`,
+          "set-cookie": `${PREVIEW_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=${maxAge}`,
+          "cache-control": "no-store",
+          "referrer-policy": "no-referrer",
+          "x-robots-tag": "noindex, nofollow",
+        },
+      });
+    }
+    const site: Site = { ...resolved, clientIp };
+    const res = await shop(site, req, url, host, port, clientIp);
+    const headers = new Headers(res.headers);
+    headers.set("cache-control", "no-store");
+    headers.set("x-robots-tag", "noindex, nofollow");
+    headers.set("x-preview-revision", String(resolved.preview.revision));
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   }
 
   async function fetchHandler(request: Request): Promise<Response> {
@@ -1322,10 +1408,43 @@ ${
     return Response.json({ purged });
   }
 
+  /**
+   * Artifact GC for the local cache (follow-up WP2): removes unpacked artifacts nobody needed
+   * for `maxAgeMs` and that no worker runs. They are downloaded (and verified) again on demand.
+   */
+  async function pruneArtifacts(maxAgeMs: number, now = Date.now()): Promise<string[]> {
+    const removed: string[] = [];
+    for (const e of await readdir(opts.artifactRoot, { withFileTypes: true }).catch(() => [])) {
+      if (!e.isDirectory() || !/^[0-9a-f]{32}$/.test(e.name)) continue;
+      const id = e.name;
+      const dir = path.join(opts.artifactRoot, id);
+      const mtime = (await stat(dir).catch(() => null))?.mtimeMs ?? now;
+      // Decided synchronously, after the last await: no request can start using the
+      // artifact between this check and marking it as being pruned.
+      if (pool.ids().has(id) || now - (used.get(id) ?? mtime) < maxAgeMs) continue;
+      let done: () => void = () => {};
+      pruning.set(id, new Promise<void>((r) => (done = r)));
+      manifests.delete(id);
+      used.delete(id);
+      try {
+        // Renamed away first: a concurrent download starts from a clean slate.
+        const trash = path.join(opts.artifactRoot, `.prune-${id}-${Date.now()}`);
+        await rename(dir, trash);
+        await rm(trash, { recursive: true, force: true });
+        removed.push(id);
+      } finally {
+        pruning.delete(id);
+        done();
+      }
+    }
+    return removed;
+  }
+
   return {
     fetch: fetchHandler,
     admin,
     pool,
+    pruneArtifacts,
     cache,
     registry,
     get outboundDenied() {

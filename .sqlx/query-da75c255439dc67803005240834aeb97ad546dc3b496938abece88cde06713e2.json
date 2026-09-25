@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE theme_revisions\n             SET status = 'failed', status_changed_at = now(),\n                 checks = checks || jsonb_build_object('failures', $2::jsonb)\n             WHERE status IN ('draft', 'building', 'checking')\n               AND status_changed_at < now() - make_interval(mins => $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "da75c255439dc67803005240834aeb97ad546dc3b496938abece88cde06713e2"
+}

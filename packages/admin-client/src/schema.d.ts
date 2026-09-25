@@ -2086,6 +2086,178 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/themes/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Revisions, newest first (at most 100), with the active one marked. */
+        get: operations["list_revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/fork": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forks the default theme into a tenant-owned source revision and queues its build. */
+        post: operations["fork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** A new revision from the latest default theme with the shop's current design tokens. */
+        post: operations["reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A revision that changes only the design tokens (`theme.tokens.json`) of a base revision
+         *     (default: the active one). Its build skips the type check, Lighthouse and the smoke test;
+         *     the JS/calls budgets and axe still run.
+         */
+        post: operations["edit_tokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Uploads a theme source archive (`.tar.gz`, at most 20 MB, expanded at most 50 MB) for power
+         *     users. Structural problems (symlinks, `..`, absolute paths, files outside `src/`,
+         *     `public/`, `checks/`, oversize) are refused with every reason listed (A6); contract
+         *     violations (dependencies, foreign fetch, ...) fail the build's gates with reasons.
+         */
+        post: operations["upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One revision with its check report (budget numbers, axe, smoke, failures), design tokens
+         *     and screenshots (presigned, 5 minutes).
+         */
+        get: operations["get_revision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A preview link for a built revision: `preview-<n>--<shop>` with an HMAC token bound to the
+         *     tenant, the revision and a 1-hour expiry (A21). Never cached, `noindex`, no checkout.
+         */
+        post: operations["preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publishes a revision that passed the checks, or rolls back to an earlier published one:
+         *     the active pointer moves atomically, then the edge is purged (Admin, login at most 15
+         *     minutes old, audited).
+         */
+        post: operations["publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/themes/revisions/{id}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A presigned download (5 minutes) of a revision's source archive. */
+        get: operations["source"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/webhooks": {
         parameters: {
             query?: never;
@@ -2294,6 +2466,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/previews/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A preview host + token → the shop's site with the previewed revision's artifact (A21).
+         *     404 for anything not authentic, expired, or not matching the host's tenant and revision.
+         */
+        get: operations["preview_resolve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/resolve": {
         parameters: {
             query?: never;
@@ -2305,6 +2497,98 @@ export interface paths {
         get: operations["resolve"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/themes/revisions/{id}/artifact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The built artifact as an uncompressed tar of its directory: registered (content-addressed,
+         *     A22) and attached; the revision moves to `checking`. Returns the preview host, a preview
+         *     token and the pages for the browser gates.
+         */
+        put: operations["build_artifact"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/themes/revisions/{id}/build": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What to build: the revision, whether it is token-only, the tenant's `ASTRO_KEY`. */
+        get: operations["build_spec"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/themes/revisions/{id}/screenshots/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** A gate screenshot (PNG; `home|category|product` × `mobile|desktop`), private bucket. */
+        put: operations["build_screenshot"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/themes/revisions/{id}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The revision's source archive (`.tar.gz`, validated when it was stored). */
+        get: operations["build_source"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/themes/revisions/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Builder status callback (spec §8.4): `building`, then `failed` or (after the artifact)
+         *     `ready`, with the gate report.
+         */
+        post: operations["build_status"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3835,6 +4119,20 @@ export interface components {
             published_at: string;
             title: string;
         };
+        BuildSpec: {
+            /** @description The tenant's `ASTRO_KEY` (hex of 32 bytes): reproducible builds. */
+            astro_key_hex: string;
+            change: string;
+            /** Format: int32 */
+            number: number;
+            /** Format: uuid */
+            revision_id: string;
+            status: string;
+            /** Format: uuid */
+            tenant_id: string;
+            /** @description Token-only change: the heavy gates (types, Lighthouse, smoke) are skipped. */
+            tokens_only: boolean;
+        };
         BulkPlan: {
             /** Format: date-time */
             applied_at?: string | null;
@@ -4059,6 +4357,15 @@ export interface components {
         ChargeKind: "shipping" | "payment_fee" | "rounding";
         /** @enum {string} */
         CheckCode: "legal_entity" | "tax_profile" | "legal_pages" | "gpsr";
+        /** @description What the builder needs to run the browser gates against the preview. */
+        CheckSpec: {
+            artifact_id: string;
+            /** @description Pages the budgets are measured on: home, a category, a product. */
+            pages: string[];
+            /** @description `preview-<n>--<shop>`: the checks reach it over TLS through the public proxy. */
+            preview_host: string;
+            preview_token: string;
+        };
         /** @enum {string} */
         CheckStatus: "ok" | "degraded" | "fail";
         CheckoutAddress: {
@@ -4459,6 +4766,12 @@ export interface components {
         };
         /** @enum {string} */
         DocumentStatus: "pending" | "ready" | "failed";
+        /** @description A presigned download (source archive). */
+        Download: {
+            /** Format: date-time */
+            expires_at: string;
+            url: string;
+        };
         /** @description A 5-minute download link (A21). */
         DownloadLink: {
             url: string;
@@ -5834,6 +6147,25 @@ export interface components {
             /** Format: int32 */
             quantity: number;
         };
+        PreviewLink: {
+            /** Format: date-time */
+            expires_at: string;
+            /** @description `preview-<n>--<shop>` URL carrying the token once; the edge swaps it for a cookie. */
+            url: string;
+        };
+        /** @description What the edge serves on a preview host: the shop's site with the previewed artifact. */
+        PreviewSite: {
+            /**
+             * Format: date-time
+             * @description The token's expiry; the edge caches the answer at most until then.
+             */
+            expires_at: string;
+            /** Format: uuid */
+            revision_id: string;
+            /** Format: int32 */
+            revision_number: number;
+            site: components["schemas"]["Resolved"];
+        };
         /**
          * @description Why the base prices change (recorded on the price intervals).
          * @enum {string}
@@ -6324,6 +6656,49 @@ export interface components {
             sku: string;
             status: components["schemas"]["ReturnLineStatus"];
         };
+        RevisionDetail: {
+            /** @description The builder's gate report: `pipeline`, `sandbox`, `steps[]`, `failures[]`. */
+            checks: Record<string, never>;
+            revision: components["schemas"]["RevisionSummary"];
+            screenshots: components["schemas"]["Screenshot"][];
+            /** @description Design tokens of the built artifact (`colors`, `fonts`, `radius`), if built. */
+            tokens?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            } | null;
+        };
+        RevisionList: {
+            items: components["schemas"]["RevisionSummary"][];
+        };
+        RevisionSummary: {
+            /** @description The revision the shop currently serves. */
+            active: boolean;
+            artifact_id?: string | null;
+            /** @description `default`, `fork`, `tokens`, `upload`, `reset` or `ai`. */
+            change: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            /** @description Why the gates failed (from the check report), empty otherwise. */
+            failures: string[];
+            /** @description A tenant-owned source archive exists (downloadable). */
+            has_source: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            number: number;
+            /** @description `default` (follows the shared default theme) or `custom` (tenant-owned source). */
+            origin: string;
+            /** Format: uuid */
+            parent_id?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** @description `draft`, `building`, `checking`, `ready`, `failed`, `published` or `superseded`. */
+            status: string;
+            /** Format: date-time */
+            status_changed_at: string;
+        };
         /**
          * @description Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
          *     management or exports.
@@ -6423,6 +6798,12 @@ export interface components {
             name: string;
             /** Format: uuid */
             product_id: string;
+        };
+        Screenshot: {
+            /** @description `home-mobile`, `product-desktop`, ... */
+            name: string;
+            /** @description Presigned URL, valid for 5 minutes (A21). */
+            url: string;
         };
         SearchHit: {
             brand?: string | null;
@@ -6696,6 +7077,12 @@ export interface components {
              */
             matched: number;
         };
+        StatusUpdate: {
+            /** @description The gate report (JSON object, at most 256 kB). */
+            checks: Record<string, never>;
+            /** @description `building`, `ready` or `failed`. */
+            status: string;
+        };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
         StorefrontToken: {
@@ -6852,6 +7239,19 @@ export interface components {
         };
         /** @enum {string} */
         Tender: "cash" | "card" | "unknown";
+        TokensInput: {
+            /**
+             * Format: uuid
+             * @description The revision whose source is edited; default: the active revision.
+             */
+            base_revision_id?: string | null;
+            /** @description `{colors, fonts, radius}`: allowlisted keys and values (A6). */
+            tokens: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
         /**
          * @description Voice of generated descriptions.
          * @enum {string}
@@ -13205,6 +13605,356 @@ export interface operations {
             };
         };
     };
+    list_revisions: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionList"];
+                };
+            };
+        };
+    };
+    fork: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            /** @description builds_in_progress | default_source_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    reset: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            /** @description builds_in_progress | default_source_missing */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    edit_tokens: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokensInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_tokens */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    upload: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/gzip": number[];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_archive (detail: one reason per line) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_revision: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewLink"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_built | no_domain */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    publish: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            /** @description reauth_required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_publishable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    source: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Download"];
+                };
+            };
+            /** @description no such revision, or it follows the default theme */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_webhooks: {
         parameters: {
             query?: never;
@@ -13707,6 +14457,46 @@ export interface operations {
             };
         };
     };
+    preview_resolve: {
+        parameters: {
+            query: {
+                /** @description `preview-<n>--<shop host>` (port allowed). */
+                host: string;
+                /** @description The preview token from the admin's link (A21). */
+                token: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewSite"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     resolve: {
         parameters: {
             query: {
@@ -13736,6 +14526,190 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    build_artifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-tar": number[];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckSpec"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_artifact */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    build_spec: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuildSpec"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    build_screenshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                /** @description e.g. home-mobile */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "image/png": number[];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    build_source: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/gzip": number[];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    build_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            /** @description invalid_transition */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
