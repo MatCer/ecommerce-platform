@@ -296,7 +296,8 @@ async fn only_one_cron_leader_and_one_job_per_slot(db: PgPool) {
         .await
         .unwrap();
     let keys: Vec<String> = sqlx::query_scalar(
-        "SELECT idempotency_key FROM queue.jobs WHERE kind = 'maintenance.cleanup' ORDER BY id",
+        "SELECT idempotency_key FROM queue.jobs
+         WHERE kind IN ('maintenance.cleanup', 'feeds.export_all') ORDER BY id",
     )
     .fetch_all(&db)
     .await
@@ -618,7 +619,13 @@ async fn mail_jobs_deliver_and_retry_an_uncertain_transactional_send(db: PgPool)
             None,
             worker::handlers::Extra::disabled().unwrap(),
         ),
-        fast_config(),
+        // The retry must not run before the server is switched to accepting below (under a
+        // loaded test run a 10 ms backoff raced the switch and the retry was dropped too).
+        RunnerConfig {
+            backoff_base: Duration::from_millis(500),
+            backoff_cap: Duration::from_millis(1000),
+            ..fast_config()
+        },
     );
     // The first send dies after DATA (uncertain); the one retry then meets a working server.
     wait_for_email(&runtime, tenant, "uncertain").await;
