@@ -1,0 +1,79 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import { Button } from "@platform/ui";
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, shopUrl } from "../../lib/api";
+
+// Newsletter preferences (WP18): linked from the footer of every campaign email with the
+// recipient's token. Unsubscribing is one button (the email's List-Unsubscribe header does the
+// same without a page, RFC 8058); subscribing again sends a fresh double opt-in email.
+const api = checkoutApi(Astro.request);
+const token = Astro.url.searchParams.get("t") ?? "";
+const done = Astro.url.searchParams.get("done");
+const [shop, prefs] = await Promise.all([api.shop(), api.newsletterPreferences(token)]);
+const m = shop?.messages ?? {};
+const status = prefs?.status;
+const statusKey =
+  status === "subscribed"
+    ? "nl.status_subscribed"
+    : status === "pending"
+      ? "nl.status_pending"
+      : status === "bounced" || status === "complained"
+        ? "nl.status_undeliverable"
+        : "nl.status_unsubscribed";
+const canUnsubscribe = status === "subscribed" || status === "pending";
+const canResubscribe = status === "unsubscribed" && done !== "resubscribed";
+---
+
+<Checkout
+  title={t(m, "nl.preferences_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid max-w-xl gap-4">
+    <h1 class="font-display text-2xl font-bold">{t(m, "nl.preferences_title")}</h1>
+    {
+      done === "unsubscribed" && (
+        <p role="status" class="font-semibold">
+          {t(m, "nl.unsubscribed")}
+        </p>
+      )
+    }
+    {
+      done === "resubscribed" && (
+        <p role="status" class="font-semibold">
+          {t(m, "nl.resubscribed")}
+        </p>
+      )
+    }
+    {
+      prefs ? (
+        <>
+          <p>{t(m, statusKey, { email: prefs.email })}</p>
+          {canUnsubscribe && (
+            <form method="post" action="/_p/newsletter/unsubscribe" class="grid justify-items-start">
+              <input type="hidden" name="t" value={token} />
+              <Button type="submit" variant="primary">
+                {t(m, "nl.unsubscribe_button")}
+              </Button>
+            </form>
+          )}
+          {canResubscribe && (
+            <form method="post" action="/_p/newsletter/resubscribe" class="grid justify-items-start">
+              <input type="hidden" name="t" value={token} />
+              <Button type="submit">{t(m, "nl.resubscribe_button")}</Button>
+            </form>
+          )}
+        </>
+      ) : (
+        <p role="alert">{t(m, "nl.invalid")}</p>
+      )
+    }
+    <a href="/consent" class="text-sm text-identity-ink underline">
+      {t(m, "consent.preferences_title")}
+    </a>
+    <a href={shopUrl(Astro.url)} class="text-sm text-identity-ink underline">{t(m, "nl.back")}</a>
+  </div>
+</Checkout>

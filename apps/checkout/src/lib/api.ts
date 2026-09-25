@@ -5,6 +5,8 @@ import type {
   CheckoutView,
   ConsentState,
   Customer,
+  NewsletterConfirmation,
+  NewsletterPreferences,
   Order,
   OrderPage,
   ShopModel,
@@ -39,8 +41,19 @@ export function checkoutApi(request: Request) {
     orders: async () => (await get<OrderPage>("/customer/orders"))?.items ?? [],
     customerOrder: (id: string) =>
       /^[0-9a-f-]{36}$/.test(id) ? get<Order>(`/customer/orders/${id}`) : Promise.resolve(null),
+    // WP18: newsletter links (capability tokens from the emails; 404 = invalid or used).
+    newsletterConfirmation: (token: string) =>
+      TOKEN.test(token)
+        ? get<NewsletterConfirmation>(`/newsletter/confirmation?token=${token}`)
+        : Promise.resolve(null),
+    newsletterPreferences: (token: string) =>
+      TOKEN.test(token)
+        ? get<NewsletterPreferences>(`/newsletter/preferences?t=${token}`)
+        : Promise.resolve(null),
   };
 }
+
+const TOKEN = /^[0-9a-f]{64}$/;
 
 /** The shop origin of this checkout origin (`checkout.demo.localhost` → `demo.localhost`). */
 export function shopUrl(url: URL): string {

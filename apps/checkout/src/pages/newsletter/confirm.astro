@@ -1,0 +1,47 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import { Button } from "@platform/ui";
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, shopUrl } from "../../lib/api";
+
+// Newsletter double opt-in (WP18, A20). Opening the link only shows the address; the button
+// confirms (a plain POST form, no JS), so mail scanners that follow links subscribe nobody.
+const api = checkoutApi(Astro.request);
+const token = Astro.url.searchParams.get("token") ?? "";
+const done = Astro.url.searchParams.get("done");
+const [shop, pending] = await Promise.all([
+  api.shop(),
+  done ? Promise.resolve(null) : api.newsletterConfirmation(token),
+]);
+const m = shop?.messages ?? {};
+---
+
+<Checkout
+  title={t(m, "nl.confirm_title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  <div class="grid max-w-xl gap-4">
+    <h1 class="font-display text-2xl font-bold">{t(m, "nl.confirm_title")}</h1>
+    {
+      done === "1" ? (
+        <p role="status" class="font-semibold">
+          {t(m, "nl.confirmed")}
+        </p>
+      ) : pending ? (
+        <form method="post" action="/_p/newsletter/confirm" class="grid justify-items-start gap-4">
+          <p>{t(m, "nl.confirm_intro", { email: pending.email })}</p>
+          <input type="hidden" name="token" value={token} />
+          <Button type="submit" variant="primary">
+            {t(m, "nl.confirm_button")}
+          </Button>
+        </form>
+      ) : (
+        <p role="alert">{t(m, "nl.invalid")}</p>
+      )
+    }
+    <a href={shopUrl(Astro.url)} class="text-sm text-identity-ink underline">{t(m, "nl.back")}</a>
+  </div>
+</Checkout>

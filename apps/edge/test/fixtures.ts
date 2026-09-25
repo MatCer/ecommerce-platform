@@ -235,6 +235,19 @@ export function fakeApi() {
       });
     if (p.startsWith("/checkout") || p.startsWith("/orders/"))
       return Response.json({ path: p, cart_seen: req.headers.get("x-cart-token") });
+    // WP18: newsletter links (token "a…a" is valid, anything else is not).
+    if (p === "/newsletter/click") {
+      const q = new URL(req.url).searchParams;
+      return q.get("s") === "good"
+        ? Response.json({ url: q.get("u") })
+        : Response.json({ code: "not_found" }, { status: 404 });
+    }
+    if (["/newsletter/unsubscribe", "/newsletter/confirmation", "/newsletter/resubscribe"].includes(p)) {
+      const token = (JSON.parse(calls.at(-1)?.body || "{}") as { token?: string }).token;
+      return token === "a".repeat(64)
+        ? Response.json({ status: "ok" }, { status: p.endsWith("resubscribe") ? 202 : 200 })
+        : Response.json({ code: "not_found" }, { status: 404 });
+    }
     if (p === "/newsletter/subscribe")
       return Response.json(
         { tenant, body: JSON.parse(calls.at(-1)?.body || "null") },

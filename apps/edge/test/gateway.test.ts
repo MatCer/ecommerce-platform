@@ -543,6 +543,78 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
   });
 });
 
+describe("newsletter links on the checkout origin (WP18)", () => {
+  const checkout = "http://checkout.demo.localhost:8280";
+  const token = "a".repeat(64);
+  const formHeaders = { origin: checkout, "content-type": "application/x-www-form-urlencoded" };
+
+  test("RFC 8058 one-click unsubscribe works cross-origin with the token in the URL", async () => {
+    api.calls.length = 0;
+    const res = await get(
+      `${checkout}/_p/newsletter/unsubscribe?t=${token}`,
+      { "content-type": "application/x-www-form-urlencoded" },
+      { method: "POST", body: "List-Unsubscribe=One-Click" },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(api.calls.at(-1)?.url).toBe("http://api.test/storefront/v1/newsletter/unsubscribe");
+    expect(JSON.parse(api.calls.at(-1)?.body ?? "")).toEqual({ token });
+    expect(api.calls.at(-1)?.headers["x-tenant"]).toBe("t-demo");
+    const bad = await get(
+      `${checkout}/_p/newsletter/unsubscribe?t=nope`,
+      {},
+      { method: "POST", body: "List-Unsubscribe=One-Click" },
+    );
+    expect(bad.status).toBe(404);
+    expect((await get(`${checkout}/_p/newsletter/unsubscribe?t=${token}`)).status).toBe(405);
+  });
+
+  test("the preference page's forms redirect back; confirm and resubscribe are same-origin", async () => {
+    const unsub = await get(`${checkout}/_p/newsletter/unsubscribe`, formHeaders, {
+      method: "POST",
+      body: `t=${token}`,
+    });
+    expect(unsub.status).toBe(303);
+    expect(unsub.headers.get("location")).toBe(`/newsletter?t=${token}&done=unsubscribed`);
+    const confirm = await get(`${checkout}/_p/newsletter/confirm`, formHeaders, {
+      method: "POST",
+      body: `token=${token}`,
+    });
+    expect(confirm.headers.get("location")).toBe("/newsletter/confirm?done=1");
+    const used = await get(`${checkout}/_p/newsletter/confirm`, formHeaders, {
+      method: "POST",
+      body: "token=zzz",
+    });
+    expect(used.headers.get("location")).toBe("/newsletter/confirm");
+    const resub = await get(`${checkout}/_p/newsletter/resubscribe`, formHeaders, {
+      method: "POST",
+      body: `t=${token}`,
+    });
+    expect(resub.headers.get("location")).toBe(`/newsletter?t=${token}&done=resubscribed`);
+    const cross = await get(
+      `${checkout}/_p/newsletter/confirm`,
+      { "content-type": "application/x-www-form-urlencoded" },
+      { method: "POST", body: `token=${token}` },
+    );
+    expect(cross.status).toBe(403);
+  });
+
+  test("tracked clicks redirect only to targets the API signed", async () => {
+    const target = "https://demo.localhost/p/tricko?x=1";
+    const ok = await get(
+      `${checkout}/_p/newsletter/click?t=${token}&u=${encodeURIComponent(target)}&s=good`,
+    );
+    expect(ok.status).toBe(302);
+    expect(ok.headers.get("location")).toBe(target);
+    expect(ok.headers.get("referrer-policy")).toBe("no-referrer");
+    const forged = await get(
+      `${checkout}/_p/newsletter/click?t=${token}&u=${encodeURIComponent("https://evil.example/")}&s=bad`,
+    );
+    expect(forged.status).toBe(404);
+    expect(forged.headers.get("location")).toBeNull();
+  });
+});
+
 describe("checkout, order page and fake gateway (WP10)", () => {
   const checkout = "http://checkout.demo.localhost:8280";
   const json = { origin: checkout, "content-type": "application/json" };

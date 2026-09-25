@@ -1041,6 +1041,88 @@ ${
     });
   }
 
+  /**
+   * Newsletter links on the checkout origin (WP18). Tokens are capabilities from the emails:
+   * - `POST /_p/newsletter/confirm` (the confirmation page's form, same-origin) → 303 back;
+   * - `POST /_p/newsletter/unsubscribe?t=` is the RFC 8058 one-click URL of `List-Unsubscribe`:
+   *   the mailbox provider POSTs `List-Unsubscribe=One-Click` from its servers (no cookies,
+   *   no Origin), so it is not same-origin checked; the preference page's form posts `t` in the
+   *   body and gets a 303 back to the page;
+   * - `POST /_p/newsletter/resubscribe` (same-origin form) → a new double opt-in mail;
+   * - `GET /_p/newsletter/click?t=&u=&s=`: the API verifies the signature, counts the click and
+   *   returns the target, never an arbitrary URL (no open redirect).
+   */
+  async function newsletterLinks(
+    site: Site,
+    req: Request,
+    url: URL,
+    action: string,
+    host: string,
+    port: string,
+  ): Promise<Response> {
+    const noStore = { "cache-control": "no-store", "referrer-policy": "no-referrer" };
+    const api = (path: string, init?: RequestInit) =>
+      upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/newsletter/${path}`, {
+          ...init,
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+        }),
+      );
+    const back = (location: string) =>
+      new Response(null, { status: 303, headers: { location, ...noStore } });
+    if (action === "click") {
+      if (req.method !== "GET" && req.method !== "HEAD")
+        return text(405, "Method not allowed", { allow: "GET" });
+      const q = new URLSearchParams();
+      for (const k of ["t", "u", "s"]) q.set(k, url.searchParams.get(k) ?? "");
+      const res = await api(`click?${q}`);
+      const target = res.ok ? ((await res.json()) as { url?: unknown }).url : null;
+      if (typeof target !== "string" || !/^https?:\/\//.test(target)) {
+        await res.body?.cancel();
+        return text(404, "Not found", noStore);
+      }
+      return new Response(null, { status: 302, headers: { location: target, ...noStore } });
+    }
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+    if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+    const form = new URLSearchParams(new TextDecoder().decode(raw));
+    if (action === "unsubscribe") {
+      const token = url.searchParams.get("t") ?? form.get("t") ?? "";
+      const res = await api("unsubscribe", {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      });
+      await res.body?.cancel();
+      // One-click (RFC 8058): the answer is for a machine; anything else returns to the page.
+      if (form.get("List-Unsubscribe") === "One-Click" || !sameOrigin(req, host, port))
+        return text(res.ok ? 200 : 404, res.ok ? "Unsubscribed" : "Not found", noStore);
+      const tok = /^[0-9a-f]{64}$/.test(token) ? token : "";
+      return back(`/newsletter?t=${tok}${res.ok ? "&done=unsubscribed" : ""}`);
+    }
+    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    if (action === "confirm") {
+      const token = form.get("token") ?? "";
+      const res = await api("confirmation", {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      });
+      await res.body?.cancel();
+      return back(res.ok ? "/newsletter/confirm?done=1" : "/newsletter/confirm");
+    }
+    if (action === "resubscribe") {
+      const token = form.get("t") ?? "";
+      const res = await api("resubscribe", {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      });
+      await res.body?.cancel();
+      const tok = /^[0-9a-f]{64}$/.test(token) ? token : "";
+      return back(`/newsletter?t=${tok}${res.ok ? "&done=resubscribed" : ""}`);
+    }
+    return problem(404, "not_found", "unknown platform route");
+  }
+
   // --- origins -------------------------------------------------------------------------------
 
   async function shop(
@@ -1146,6 +1228,8 @@ ${
       return fakePay(site, req, url, p.slice("/_p/fake-pay/".length), host, port);
     if (p === "/_p/consent")
       return consentProxy(site, req, host, port, clientIp, capabilityCookie(req, SESSION_COOKIE));
+    const nl = /^\/_p\/newsletter\/(confirm|unsubscribe|resubscribe|click)$/.exec(p);
+    if (nl?.[1]) return newsletterLinks(site, req, url, nl[1], host, port);
     if (p === "/start") {
       const h = url.searchParams.get("h") ?? "";
       // Only the shop's own 303 (a same-site navigation) may redeem a handoff. A link planted by
@@ -1234,7 +1318,11 @@ ${
     headers.set("cache-control", "no-store");
     // A sign-in link (`/account/verify?token=`) or an order page (`/o/<token>`, A4) must not
     // leak its capability through Referer.
-    if (url.searchParams.has("token") || url.pathname.startsWith("/o/"))
+    if (
+      url.searchParams.has("token") ||
+      url.searchParams.has("t") ||
+      url.pathname.startsWith("/o/")
+    )
       headers.set("referrer-policy", "no-referrer");
     return new Response(req.method === "HEAD" ? null : r.body, { status: r.status, headers });
   }
