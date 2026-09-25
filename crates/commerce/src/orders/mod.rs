@@ -280,6 +280,14 @@ pub async fn link_guest_orders(tx: &mut TenantTx, customer_id: Uuid) -> Result<u
     .rows_affected())
 }
 
+/// The customer an order belongs to (`None` for a guest order), `404` for unknown orders.
+pub async fn customer_of(tx: &mut TenantTx, id: Uuid) -> Result<Option<Uuid>, Error> {
+    sqlx::query_scalar!("SELECT customer_id FROM orders WHERE id = $1", id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)
+}
+
 // ---------------------------------------------------------------------------------------
 // Read models
 

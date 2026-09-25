@@ -37,6 +37,7 @@ fn state(db: PgPool) -> AppState {
         admin_origin: axum::http::HeaderValue::from_static("http://admin.localhost:8080"),
         public_urls: commerce::storefront::PublicUrls::default(),
         edge: api::edge::EdgePurge::disabled(),
+        checkout: Default::default(),
     }
 }
 

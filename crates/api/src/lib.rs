@@ -6,6 +6,7 @@ pub mod admin;
 pub mod admin_catalog;
 pub mod admin_inventory;
 pub mod admin_media;
+pub mod admin_orders;
 pub mod admin_pricing;
 pub mod admin_promotions;
 pub mod admin_search;
@@ -19,6 +20,7 @@ pub mod internal;
 pub mod seed;
 pub mod storefront;
 pub mod storefront_search;
+pub mod webhooks;
 
 use std::sync::Arc;
 
@@ -70,6 +72,8 @@ pub struct AppState {
     /// How public storefront URLs look (canonicals, sitemaps).
     pub public_urls: commerce::storefront::PublicUrls,
     pub edge: edge::EdgePurge,
+    /// Payment gateways and the pickup-point widget (WP10).
+    pub checkout: Arc<commerce::checkout::Settings>,
 }
 
 #[derive(OpenApi)]
@@ -88,6 +92,8 @@ pub struct AppState {
         (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "search", description = "Admin API: search index status and rebuilds"),
         (name = "storefront-admin", description = "Admin API: redirects and the storefront token"),
+        (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
+        (name = "webhooks", description = "Payment provider webhooks (signed)"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
         (name = "internal", description = "Internal API for platform services (service token)")
     )
@@ -131,9 +137,11 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_inventory::routes())
         .merge(admin_search::routes())
         .merge(admin_storefront::routes())
+        .merge(admin_orders::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())
+        .merge(webhooks::routes())
         .split_for_parts()
 }
 

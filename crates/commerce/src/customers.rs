@@ -475,14 +475,15 @@ pub async fn consume_magic_link(
         )
         .execute(&mut **tx)
         .await?;
-        // A5: only now may guest orders with this address be linked to the account (WP10).
-        queue::publish(
-            &mut **tx,
-            EMAIL_VERIFIED_EVENT,
-            &json!({ "customer_id": c.id }),
-        )
-        .await?;
     }
+    // A5: the link proved control of the address, so guest orders placed with it (also those
+    // placed since an earlier verification) may join the account (`orders.link_guest`).
+    queue::publish(
+        &mut **tx,
+        EMAIL_VERIFIED_EVENT,
+        &json!({ "customer_id": c.id }),
+    )
+    .await?;
     let session_token = create_session(tx, c.id, true).await?;
     after_sign_in(tx, ctx, c.id, cart_token, consent_subject).await?;
     let session = authenticate(tx, &session_token)

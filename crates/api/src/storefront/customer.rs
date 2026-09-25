@@ -18,6 +18,7 @@ use commerce::customers::{
     self, Address, AddressInput, CustomerView, MagicLinkRequest, MagicLinkToken, PasswordChange,
     PasswordLogin, PasswordOutcome, SignedIn,
 };
+use commerce::orders::{self, OrderPage, OrderView};
 use commerce::privacy;
 use platform::Error;
 use platform::db::TenantTx;
@@ -47,6 +48,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(set_password))
         .routes(routes!(list_addresses, add_address))
         .routes(routes!(update_address, delete_address))
+        .routes(routes!(my_orders))
+        .routes(routes!(my_order))
 }
 
 pub(crate) fn header_str<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
@@ -415,4 +418,56 @@ async fn delete_address(
     })
     .await?;
     Ok(no_store(StatusCode::NO_CONTENT.into_response()))
+}
+
+/// The signed-in customer's orders, newest first: placed while signed in, or guest orders
+/// with the account's email once it was verified (A5).
+#[utoipa::path(
+    get,
+    path = "/storefront/v1/customer/orders",
+    tag = "storefront",
+    params(StorefrontHeaders, SessionHeader),
+    responses(
+        (status = 200, body = OrderPage),
+        (status = 401, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn my_orders(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Response, Error> {
+    let page = as_customer(&s, &shopper, &headers, async |tx, c| {
+        orders::list(tx, Some(c), None, None, 50).await
+    })
+    .await?;
+    Ok(no_store(Json(page).into_response()))
+}
+
+#[utoipa::path(
+    get,
+    path = "/storefront/v1/customer/orders/{id}",
+    tag = "storefront",
+    params(StorefrontHeaders, SessionHeader, IdParam),
+    responses(
+        (status = 200, body = OrderView),
+        (status = 401, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn my_order(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    path: Result<Path<Uuid>, PathRejection>,
+) -> Result<Response, Error> {
+    let id = path_id(path)?;
+    let view = as_customer(&s, &shopper, &headers, async |tx, c| {
+        if orders::customer_of(tx, id).await? != Some(c) {
+            return Err(Error::NotFound);
+        }
+        orders::view(tx, id).await
+    })
+    .await?;
+    Ok(no_store(Json(view).into_response()))
 }

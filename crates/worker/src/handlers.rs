@@ -33,6 +33,11 @@ const MEDIA_CONCURRENCY: usize = 1;
 /// Staff invitation email for a `staff.invited` event (spec §11.4, WP9).
 pub const STAFF_INVITE_MAIL: &str = "staff.invite_mail";
 
+/// `customer.email_verified` → link the guest orders placed with that email (A5, WP10).
+pub const LINK_GUEST_ORDERS: &str = "orders.link_guest";
+/// Payment timeouts (A10): cancel unpaid orders whose payment window closed. Every minute.
+pub const PAYMENTS_EXPIRE: &str = "payments.expire";
+
 pub fn all(
     storage: Storage,
     meili: Meili,
@@ -65,6 +70,8 @@ pub fn all(
             media_purge(job, purge_storage.clone())
         })
         .register(intervals::TRANSITION_JOB, price_transition)
+        .register(LINK_GUEST_ORDERS, link_guest_orders)
+        .register(PAYMENTS_EXPIRE, payments_expire)
 }
 
 /// Delivers one email (A14). A message that could not be handed over is retried with backoff
@@ -290,4 +297,35 @@ async fn media_purge(job: Job, storage: Storage) -> Result<(), JobError> {
     media::purge(&storage, &keys("private")?, &keys("public")?)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))
+}
+
+/// `customer.email_verified` (A5): the address is proven, so its guest orders join the account.
+async fn link_guest_orders(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("guest linking without tenant".into()))?;
+    let customer = job
+        .payload
+        .pointer("/payload/customer_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| JobError::Permanent("payload has no customer_id".into()))?;
+    let mut tx = platform::db::tenant_tx(&ctx.db, tenant).await?;
+    let linked = commerce::orders::link_guest_orders(&mut tx, customer)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tx.commit().await?;
+    tracing::info!(%tenant, %customer, linked, "guest orders linked");
+    Ok(())
+}
+
+/// A10: cancels unpaid orders whose payment window closed and releases their stock.
+async fn payments_expire(ctx: Ctx, _job: Job) -> Result<(), JobError> {
+    let expired = commerce::checkout::expire_due(&ctx.db, 500)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    if expired > 0 {
+        tracing::info!(expired, "unpaid orders expired");
+    }
+    Ok(())
 }

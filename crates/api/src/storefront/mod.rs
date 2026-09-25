@@ -10,9 +10,11 @@
 //! session (`X-Customer-Session`, checkout origin only).
 
 mod cart;
+mod checkout;
 mod consent;
 pub mod customer;
 mod files;
+mod orders;
 mod pages;
 
 use axum::extract::FromRequestParts;
@@ -39,6 +41,8 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .merge(pages::routes())
         .merge(cart::routes())
         .merge(customer::routes())
+        .merge(checkout::routes())
+        .merge(orders::routes())
         .merge(consent::routes())
         .merge(files::routes())
 }
