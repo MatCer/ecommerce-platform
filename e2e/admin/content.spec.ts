@@ -286,7 +286,7 @@ test("creates and deletes a redirect", async () => {
   await form.getByLabel("To path").fill("https://evil.example");
   await form.getByRole("button", { name: "Create", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("same shop");
-  await row.getByRole("button", { name: "Delete: /stara-akce" }).click();
+  await row.getByRole("button", { name: /^Delete\s*: \/stara-akce$/ }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete", exact: true }).click();
   await expect(row).toHaveCount(0);
 });
