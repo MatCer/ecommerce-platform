@@ -40,6 +40,5 @@
 | WP13a | Feed import applies product by product and feeds render in memory per market; batch/stream for 100k-item catalogs | later (perf) |
 | WP13a | Legal templates are starting points; every shop needs a lawyer's review (the admin says so) | pre-launch |
 | WP13a | Orders/customers CSV import, tenant data export, customer access/erasure (A29) | WP13b |
-| WP17 | The hourly rollup recomputes the tenant's co-purchases, scores and customer affinity in full (stats only for the last 2 days); fine for demo-sized shops, narrow it for large catalogs/order books | later (perf) |
-| WP17 | Search popularity changes are reindexed after the rollup commits; a crash in between leaves that change unindexed until the product's next change or a rebuild | later |
+| WP17 | The hourly rollup recomputes the tenant's co-purchases, scores and customer affinity in full (stats for the last 2 days; the nightly run recomputes all 400 retained days so late cancellations leave every result); fine for demo-sized shops, narrow it to changed orders for large catalogs/order books | later (perf) |
 | WP17 | `customer_affinity` is rolled up (consent-filtered) but only the staff "why recommended" view reads it; the shop origin never knows the customer | WP18 (personalized product blocks) |
