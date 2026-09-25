@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT n.price_list_id, n.variant_id, v.product_id, pl.currency, n.amount_minor, n.cause,\n                n.sale_id, p.amount_minor AS \"before?\"\n         FROM price_intervals n\n         JOIN variants v ON v.id = n.variant_id\n         JOIN price_lists pl ON pl.id = n.price_list_id\n         LEFT JOIN price_intervals p ON p.price_list_id = n.price_list_id\n              AND p.variant_id = n.variant_id AND p.valid_to = n.valid_from\n         WHERE n.valid_from = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "price_list_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "price_list_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "price_lists",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "cause",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "cause"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "sale_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "sale_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "before?",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "amount_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "17c7ce5f0a028dafe05f98864aa2ddff7c66b07f1e14bcd429e947f612d151fb"
+}

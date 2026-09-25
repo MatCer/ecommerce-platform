@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, coupon_id, order_ref, redeemed_at FROM coupon_redemptions\n         WHERE coupon_id = $1 AND order_ref = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "coupon_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "coupon_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "order_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "order_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "redeemed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "redeemed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7c32a7968fe0963d528202d81b89d54ce50120c21d16ba6b1a4a987287743984"
+}

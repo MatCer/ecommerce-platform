@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM variant_prices WHERE price_list_id = $1 AND variant_id = $2\n         RETURNING amount_minor, compare_at_minor",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "compare_at_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "compare_at_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "84ef310c1e9468ecdc770df01ce6ff80316e8dac8957b15dd1f59d8de527db4d"
+}

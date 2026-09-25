@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO price_intervals (id, tenant_id, price_list_id, variant_id, amount_minor,\n                                          valid_from, valid_to, cause, sale_id, imported)\n             SELECT id, $1, list, variant, amount, valid_from, valid_to, cause, sale_id, imported\n             FROM UNNEST($2::uuid[], $3::uuid[], $4::uuid[], $5::bigint[], $6::timestamptz[],\n                         $7::timestamptz[], $8::text[], $9::uuid[], $10::bool[])\n                  AS u (id, list, variant, amount, valid_from, valid_to, cause, sale_id, imported)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray",
+        "Int8Array",
+        "TimestamptzArray",
+        "TimestamptzArray",
+        "TextArray",
+        "UuidArray",
+        "BoolArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40cc0b77ec23c0798e7e72ee72523195ca591d3240fa70a3e6e60f4093aaff42"
+}

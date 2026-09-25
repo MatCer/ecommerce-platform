@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE coupons SET code = $2, kind = $3, value = $4, currency = $5,\n                            min_subtotal_minor = $6, starts_at = $7, ends_at = $8,\n                            usage_limit = $9, per_customer_limit = $10, published = $11,\n                            updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Int4",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "15f06f2aacd0d3464c2d3bbbf15d13c9f8dd1c752dc647fb2962fe1f0296ccde"
+}

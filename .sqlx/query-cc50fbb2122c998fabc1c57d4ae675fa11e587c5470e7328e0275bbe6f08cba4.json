@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE price_intervals p SET valid_to = u.valid_to\n             FROM UNNEST($1::uuid[], $2::timestamptz[]) AS u (id, valid_to)\n             WHERE p.id = u.id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc50fbb2122c998fabc1c57d4ae675fa11e587c5470e7328e0275bbe6f08cba4"
+}

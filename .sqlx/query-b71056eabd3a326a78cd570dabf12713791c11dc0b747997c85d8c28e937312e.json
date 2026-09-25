@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO tax_profiles (tenant_id, establishment_country, vat_payer, vat_id, sk_ic_dph,\n                                   distance_sales_mode, origin_threshold_confirmed_at,\n                                   cash_rounding_in_vat_base)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n         ON CONFLICT (tenant_id) DO UPDATE SET\n             establishment_country = EXCLUDED.establishment_country,\n             vat_payer = EXCLUDED.vat_payer, vat_id = EXCLUDED.vat_id,\n             sk_ic_dph = EXCLUDED.sk_ic_dph,\n             distance_sales_mode = EXCLUDED.distance_sales_mode,\n             origin_threshold_confirmed_at = EXCLUDED.origin_threshold_confirmed_at,\n             cash_rounding_in_vat_base = EXCLUDED.cash_rounding_in_vat_base,\n             updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b71056eabd3a326a78cd570dabf12713791c11dc0b747997c85d8c28e937312e"
+}

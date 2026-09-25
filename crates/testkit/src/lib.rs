@@ -8,6 +8,7 @@
 #![allow(clippy::unwrap_used)]
 
 pub mod catalog;
+pub mod pricing;
 
 use std::sync::Arc;
 

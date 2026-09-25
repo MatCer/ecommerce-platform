@@ -1,0 +1,184 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, code, kind, value, currency, min_subtotal_minor, starts_at, ends_at,\n                usage_limit, per_customer_limit, used_count, published, created_at, updated_at\n         FROM coupons WHERE code = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "value",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "min_subtotal_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "min_subtotal_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "starts_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "starts_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "ends_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "ends_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "usage_limit",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "usage_limit"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "per_customer_limit",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "per_customer_limit"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "used_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "used_count"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "published",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "published"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c66130facb969c0402796d154c1b2bfc74464f44f8cf99e1aa4e7b69764d4098"
+}
