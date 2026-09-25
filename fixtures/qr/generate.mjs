@@ -5,8 +5,9 @@
 // Regenerate (only when adding cases; the library version is pinned below):
 //   dir=$(mktemp -d) && (cd "$dir" && pnpm init >/dev/null && pnpm add bysquare@4.0.2)
 //   node fixtures/qr/generate.mjs "$dir/node_modules/bysquare" > fixtures/qr/paybysquare.json
-import { pathToFileURL } from "node:url";
+
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = process.argv[2];
 if (!root) throw new Error("usage: node generate.mjs <path to node_modules/bysquare>");
