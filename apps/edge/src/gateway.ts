@@ -1318,11 +1318,11 @@ ${
     headers.set("cache-control", "no-store");
     // A sign-in link (`/account/verify?token=`) or an order page (`/o/<token>`, A4) must not
     // leak its capability through Referer.
-    if (
-      url.searchParams.has("token") ||
-      url.searchParams.has("t") ||
-      url.pathname.startsWith("/o/")
-    )
+    // Newsletter pages (WP18) post their forms to this origin: `same-origin` keeps the token
+    // from other sites while the browser still sends a real Origin (not `null`) with the form.
+    if (url.pathname === "/newsletter" || url.pathname.startsWith("/newsletter/"))
+      headers.set("referrer-policy", "same-origin");
+    else if (url.searchParams.has("token") || url.pathname.startsWith("/o/"))
       headers.set("referrer-policy", "no-referrer");
     return new Response(req.method === "HEAD" ? null : r.body, { status: r.status, headers });
   }

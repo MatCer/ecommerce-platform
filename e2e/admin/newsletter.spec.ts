@@ -56,7 +56,7 @@ test("staff segment subscribers, build a campaign, preview it and send a test", 
   await expect(page.getByRole("heading", { name: "Segments", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "New segment" }).first().click();
   const dialog = page.getByRole("dialog", { name: "New segment" });
-  await dialog.getByLabel("Name", { exact: true }).fill(segment);
+  await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(segment);
   await dialog.getByLabel("New condition").selectOption("locale");
   await dialog.getByRole("button", { name: "Add condition" }).click();
   // Kobalte checkboxes: click the label, like a user.
@@ -74,11 +74,11 @@ test("staff segment subscribers, build a campaign, preview it and send a test", 
   await expect(page.getByRole("heading", { name: "Campaigns", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "New campaign" }).first().click();
   await expect(page.getByRole("heading", { name: "New campaign", level: 1 })).toBeVisible();
-  await page.getByLabel("Name", { exact: true }).fill(campaign);
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill(campaign);
   await page.getByLabel("Recipients").selectOption({ label: segment });
-  await page.getByLabel("Subject", { exact: true }).fill(`Podzimní novinky ${run}`);
+  await page.getByRole("textbox", { name: "Subject", exact: true }).fill(`Podzimní novinky ${run}`);
   await addBlock(page, "Heading");
-  await page.getByLabel("Heading text", { exact: true }).fill("Podzim je tu");
+  await page.getByRole("textbox", { name: "Heading text", exact: true }).fill("Podzim je tu");
   await addBlock(page, "Text");
   await page
     .getByRole("textbox", { name: "Body text", exact: true })
@@ -162,7 +162,7 @@ test("owners block an address and edit an email text", async ({ page }) => {
   const texts = page.getByRole("region", { name: "Email texts" });
   await texts.getByLabel("Email template").selectOption("newsletter_confirm");
   await texts.getByLabel("Language").selectOption("cs");
-  const subject = texts.getByLabel("Subject", { exact: true });
+  const subject = texts.getByRole("textbox", { name: "Subject", exact: true });
   await subject.fill(`Potvrďte odběr {shop} ${run}`);
   await texts.getByRole("button", { name: "Save texts" }).click();
   await expect(page.getByText("Changes saved").last()).toBeVisible();

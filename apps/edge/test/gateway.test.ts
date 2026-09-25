@@ -996,6 +996,10 @@ describe("platform routes backed by the real API (WP6)", () => {
     const verify = await get(`${co}/account/verify?token=${"a".repeat(64)}`);
     expect(verify.headers.get("referrer-policy")).toBe("no-referrer");
     expect(verify.headers.get("cache-control")).toBe("no-store");
+    // Newsletter pages post forms to their own origin: `no-referrer` would make the browser
+    // send `Origin: null` (refused as cross-origin); `same-origin` still hides the token.
+    const nl = await get(`${co}/newsletter/confirm?token=${"a".repeat(64)}`);
+    expect(nl.headers.get("referrer-policy")).toBe("same-origin");
   });
 
   test("consent: first-party cookies for the shop host after a choice only", async () => {
