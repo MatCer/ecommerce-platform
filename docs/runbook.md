@@ -119,6 +119,16 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 | Bounces | `POST /webhooks/ses` (HTTP Basic, `MAIL_EVENTS_SECRET`, unset = off). Permanent bounce: suppressed for every stream, subscriber `bounced`; complaint: suppressed for marketing, subscriber `complained` + consent withdrawal. Only the recipient of the referenced message is ever suppressed. Staff can remove a suppression in Admin → Emails (audited). |
 | Links | Unsubscribe/preference/click links carry a per-recipient token (hashed at rest); click targets are HMAC-signed per campaign, so the redirect is never open. |
 
+## 6c. AI theme editing (WP24)
+
+| What | How |
+|---|---|
+| Runs | Admin → Theme → "Edit with AI": status, turns/check runs, tool steps, diff, last check report. DB: `ai_theme_runs` (per tenant, RLS). |
+| Stuck run | A run silent for 60 min is failed by the hourly `themes.maintenance` (`interrupted`); a worker restart mid-run does the same on the job retry. The merchant starts a new run. |
+| Cost | `ai_usage` rows with `feature = 'theme_edit'` (Admin → Settings → AI). Per-run caps: 25 turns, 4 check runs, 3 M tokens, USD 8, 45 min. |
+| Logs | worker `ai turn` (model, stop reason, tokens, cache reads, ms) and `ai theme run finished` (status, turns, checks, tokens, cost); never prompt or file content. |
+| Manual smoke with a real key | `.env`: `ANTHROPIC_API_KEY=sk-ant-...`, `make up && make seed && make theme-build`, then in the admin run a few prompts from `docs/decisions/ai-edit-prompts.md` on the demo shop; check `cache_read` > 0 from the second turn on, the diff, the report, accept → preview → publish → rollback. |
+
 ## 7. Backups and restore
 
 ### Local (A29)
@@ -193,6 +203,9 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
       (`PPL_API_URL`, OAuth scope `myapi2`) were built from public docs and are only exercised
       against `apps/mocks`; carrier-side cancellation of a voided label is manual (portal).
       Real COD payout files (Packeta/PPL) still go through the generic CSV import.
+- [ ] **AI theme editing**: the manual smoke of §6c with a real key (the loop only ran against
+      the scripted fake agent); Opus 5.5 tool-use behaviour (no forced tool choice, preserved
+      thinking blocks echoed unchanged) and the prompt cache hit rate.
 - [ ] **SES**: domain verified with DKIM, SPF, DMARC; production access granted; a
       configuration set per stream publishes Bounce + Complaint to an SNS topic with an HTTPS
       subscription `https://ses:<MAIL_EVENTS_SECRET>@api.<domain>/webhooks/ses` (confirm the
