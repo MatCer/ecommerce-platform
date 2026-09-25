@@ -44,7 +44,7 @@ jobs:
       MEILI_ADMIN_KEY: 39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.1
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
