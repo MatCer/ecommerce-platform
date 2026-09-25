@@ -188,14 +188,6 @@ impl<'a> Call<'a> {
         }
     }
 
-    pub fn patch(uri: &'a str, body: Value) -> Self {
-        Self {
-            method: "PATCH",
-            body: Some(body),
-            ..Self::get(uri)
-        }
-    }
-
     pub fn header(mut self, name: &'a str, value: impl Into<String>) -> Self {
         self.headers.push((name, value.into()));
         self

@@ -192,15 +192,9 @@ async fn seed_demo(db: &PgPool, env: &CliEnv, owner_email: &str) -> anyhow::Resu
     let tenant_id = match existing {
         Some(id) => id,
         None => {
-            create_tenant(
-                db,
-                env,
-                crate::seed::TENANT,
-                "Lnen & Co.",
-                owner_email,
-            )
-            .await?
-            .tenant_id
+            create_tenant(db, env, crate::seed::TENANT, "Lnen & Co.", owner_email)
+                .await?
+                .tenant_id
         }
     };
     let storage = Storage::s3(&S3Config::from_env()?)?;
