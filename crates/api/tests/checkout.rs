@@ -694,3 +694,73 @@ async fn admin_manages_methods_and_reads_orders(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{list}");
 }
+
+/// WP20: a placed order becomes an ad-platform purchase only when the request's consent
+/// subject grants `ads` (resolved from the records, in the placement transaction).
+#[sqlx::test(migrations = "../../migrations")]
+async fn purchases_reach_ad_platforms_only_with_ads_consent(db: PgPool) {
+    use commerce::consent::{self, ConsentChoice, Purposes, Source, Subject, new_anon_id};
+    let c = setup(db).await;
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO ad_platforms (tenant_id, platform, enabled, market_ids)
+         VALUES ($1, 'sklik', true, ARRAY[$2]::uuid[])",
+    )
+    .bind(c.shop.tenant)
+    .bind(c.shop.cz)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let (yes, no) = (new_anon_id(), new_anon_id());
+    for (who, ads) in [(&yes, true), (&no, false)] {
+        let choice = ConsentChoice {
+            purposes: Purposes {
+                ads: Some(ads),
+                ..Purposes::default()
+            },
+            text_version: "v1".into(),
+            source: Source::Banner,
+        };
+        consent::record(&mut tx, &Subject::Anon(who.clone()), &choice, None)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+
+    for (who, key) in [(&no, "k-no"), (&yes, "k-yes")] {
+        let cart = c.checkout_cart().await;
+        let view = c.fill(&cart).await;
+        let (status, placed, _) = c
+            .checkout(
+                &cart,
+                Call::post(
+                    "/storefront/v1/checkout/place-order",
+                    Ctx::place_body(&view),
+                )
+                .key(key)
+                .header("x-consent-subject", who.clone())
+                .header("x-client-user-agent", "Mozilla/5.0 (e2e)"),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{placed}");
+    }
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    let rows: Vec<(String, String, Option<String>)> =
+        sqlx::query_as("SELECT subject, event_name, user_agent FROM ad_deliveries")
+            .fetch_all(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        rows,
+        [(
+            yes.clone(),
+            "purchase".to_owned(),
+            Some("Mozilla/5.0 (e2e)".to_owned())
+        )]
+    );
+}

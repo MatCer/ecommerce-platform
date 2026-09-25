@@ -50,6 +50,10 @@
 | WP11 | `platform.provider_events` keeps payloads indefinitely (PaymentIntent objects may hold billing details); add a retention rule to WP14's `ops.sweep` (e.g. drop payloads of processed events after 90 days) | later (ops) |
 | WP11 | Fio tokens share WP14's single `SECRETS_KEY` (no key id in the ciphertext); no rotation tooling | later |
 | WP11 | Payment reminder and email due dates are the UTC date of the deadline | later |
+| WP20 | Seznam SEM S2S attribution normally needs the `sid`/`udid` cookies of its `sul.js` browser script, which the platform does not load (no third-party scripts); matching relies on hashed email/phone. Capturing the `sznaiid` click id at the edge would help | later |
+| WP20 | Google Ads gets purchases only (Data Manager API offline conversions / enhanced conversions for leads by hashed email/phone); no gclid capture, no refund retractions | later |
+| WP20 | Meta receives no `client_ip_address` (IPs are only stored hashed, §14) and no `fbp`/`fbc` (no Meta pixel); match quality relies on hashed email/phone/external_id + user agent | accepted |
+| WP20 | Ad-platform rate limits and Google access-token caches are per worker process | later (scale-out) |
 | WP22 | Translations cover names, descriptions, SEO, page blocks and menu labels; option/value names, parameter texts and image alt texts are not translated by AI yet | later |
 | WP22 | One entity per proposal: no "translate every product missing sk" batch job (bulk plans cover non-text fields) | later |
 | WP22 | The AI quota is a soft limit (concurrent calls may overshoot by one call); no superadmin UI for quotas (CLI `set-ai-quota`) | later (only if it matters) |

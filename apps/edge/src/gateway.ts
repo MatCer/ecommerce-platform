@@ -614,8 +614,8 @@ export function createGateway(opts: GatewayOptions) {
     }
     const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
     const session = capabilityCookie(req, SESSION_COOKIE);
-    // A20: place-order links a consented visitor's purchase to their analytics session.
-    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    // A20: place-order links a consented visitor's purchase to their analytics session and
+    // (WP20) to the ad platforms; the API resolves both consents from its records.
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1${apiPath}${rest}`, {
         method: req.method,
@@ -623,7 +623,7 @@ export function createGateway(opts: GatewayOptions) {
           ...(body ? { "content-type": "application/json" } : {}),
           ...(cart ? { "x-cart-token": cart } : {}),
           ...(session ? { "x-customer-session": session } : {}),
-          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+          ...consentSubject(req),
           ...(clientIp ? { "x-client-ip": clientIp } : {}),
           ...(key ? { "idempotency-key": key } : {}),
         }),
@@ -968,14 +968,14 @@ ${
     const capped = await readCapped(req.body, MAX_EVENTS_BODY).catch(() => null);
     if (!capped) return problem(413, "payload_too_large", "events batch too large");
     const body = capped.buffer;
-    // A20: the API stores events only if this subject's consent records grant `analytics`.
-    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    // A20: the API stores events only if this subject's consent records grant `analytics`,
+    // and forwards them to ad platforms only if they grant `ads` (WP20).
     await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/events`, {
         method: "POST",
         headers: apiHeaders(site, {
           "content-type": "application/json",
-          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+          ...consentSubject(req),
         }),
         body,
       }),
@@ -1380,9 +1380,16 @@ function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Prom
 }
 
 /** The anonymous consent subject from its cookie, as an API header (A20). */
+/**
+ * The consent subject (A20) and, with it, the browser's user agent: Meta requires it on
+ * website events, and the API keeps it only while an `ads`-consented delivery is open (WP20).
+ * Nothing without a consent cookie.
+ */
 function consentSubject(req: Request): Record<string, string> {
   const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
-  return subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {};
+  if (!subject || !CONSENT_ID_RE.test(subject)) return {};
+  const ua = (req.headers.get("user-agent") ?? "").replace(/[^\x20-\x7e]/g, "").slice(0, 512);
+  return { "x-consent-subject": subject, ...(ua ? { "x-client-user-agent": ua } : {}) };
 }
 
 /** API answers keep a rate limit's `Retry-After` (spec §8.1) when proxied. */

@@ -1504,6 +1504,18 @@
                 "null"
               ]
             }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1584,6 +1596,18 @@
             "name": "X-Client-Ip",
             "in": "header",
             "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
             "required": false,
             "schema": {
               "type": [
@@ -2735,7 +2759,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nAlways `202`, so the answer does not reveal the consent state.",
+        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nPage views and shopping steps also go to the enabled ad platforms while the subject grants\n`ads` (WP20). Always `202`, so the answer does not reveal the consent state.",
         "operationId": "events",
         "parameters": [
           {
@@ -2797,6 +2821,18 @@
             "name": "X-Client-Ip",
             "in": "header",
             "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
             "required": false,
             "schema": {
               "type": [

@@ -40,6 +40,7 @@ fn state(db: PgPool) -> AppState {
         checkout: Default::default(),
         ai: commerce::ai::Ai::fake(),
         webhooks: None,
+        ads: None,
         rate_limit: std::sync::Arc::new(api::rate_limit::StorefrontLimiter::new(1, 1)),
     }
 }

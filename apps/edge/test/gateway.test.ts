@@ -1038,6 +1038,8 @@ describe("analytics (A20) and client addresses (§8.1)", () => {
           "content-type": "text/plain",
           cookie: `__Secure-consent_id=${"c".repeat(32)}`,
           "x-consent-subject": "d".repeat(32),
+          "x-client-user-agent": "forged",
+          "user-agent": "Mozilla/5.0 (Test)é",
         },
         { method: "POST", body: JSON.stringify({ events: [{ type: "page_view" }] }) },
       );
@@ -1045,6 +1047,16 @@ describe("analytics (A20) and client addresses (§8.1)", () => {
       const sent = api.calls.find((c) => c.url.endsWith("/storefront/v1/events"));
       expect(sent?.headers["x-consent-subject"]).toBe("c".repeat(32)); // the cookie, not a header
       expect(sent?.headers["x-client-ip"]).toBe("198.51.100.4");
+      // WP20: the browser's own user agent (printable ASCII), for ad platforms that need it.
+      expect(sent?.headers["x-client-user-agent"]).toBe("Mozilla/5.0 (Test)");
+      api.calls.length = 0;
+      await hit(
+        "http://demo.localhost:8280/_p/e",
+        { ...ip, origin: "http://demo.localhost:8280", "user-agent": "Mozilla/5.0 (Test)" },
+        { method: "POST", body: JSON.stringify({ events: [{ type: "page_view" }] }) },
+      );
+      const anonymous = api.calls.find((c) => c.url.endsWith("/storefront/v1/events"));
+      expect(anonymous?.headers["x-client-user-agent"]).toBeUndefined(); // no consent cookie
 
       // Cart writes carry the subject too: the API records add-to-cart for consented visitors.
       api.calls.length = 0;

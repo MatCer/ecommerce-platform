@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT platform, enabled, paused, test_mode, market_ids, settings, credentials_ciphertext,\n                credentials_hint, updated_at\n         FROM ad_platforms WHERE platform = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "enabled",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "test_mode",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "test_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "market_ids",
+        "type_info": "UuidArray",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "market_ids"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "settings",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "settings"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "credentials_ciphertext",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "credentials_ciphertext"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "credentials_hint",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "credentials_hint"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "25000a0479c803ffc390a9b87bfb89df4fba220db783eaf172c379bdcf771299"
+}

@@ -203,8 +203,15 @@ async fn track(s: &AppState, shopper: &Shopper, headers: &HeaderMap, event: &ser
         return;
     };
     let body = json!({ "events": [event] }).to_string();
+    let ua = super::customer::header_str(headers, super::customer::CLIENT_UA_HEADER);
     let stored = with_ctx(s, shopper, async |tx, ctx| {
         commerce::analytics::ingest(tx, ctx.market.id, Some(subject), body.as_bytes(), ctx.now)
+            .await?;
+        // WP20: forwarded to ad platforms only while the subject grants `ads`.
+        let events: Vec<_> = commerce::analytics::clean_event(event)
+            .into_iter()
+            .collect();
+        commerce::adtracking::capture_events(tx, ctx.market.id, Some(subject), &events, ua, ctx.now)
             .await
     })
     .await;
@@ -413,7 +420,8 @@ async fn redeem_handoff(
 /// `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
 /// records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
 /// `analytics` right now; purposes the client claims are ignored and unknown props dropped.
-/// Always `202`, so the answer does not reveal the consent state.
+/// Page views and shopping steps also go to the enabled ad platforms while the subject grants
+/// `ads` (WP20). Always `202`, so the answer does not reveal the consent state.
 #[utoipa::path(
     post,
     path = "/storefront/v1/events",
@@ -428,11 +436,20 @@ async fn events(
     body: Bytes,
 ) -> Result<StatusCode, Error> {
     let subject = super::customer::header_str(&headers, super::customer::CONSENT_SUBJECT_HEADER);
-    let stored = with_ctx(&s, &shopper, async |tx, ctx| {
-        commerce::analytics::ingest(tx, ctx.market.id, subject, &body, ctx.now).await
+    let ua = super::customer::header_str(&headers, super::customer::CLIENT_UA_HEADER);
+    let (stored, forwarded) = with_ctx(&s, &shopper, async |tx, ctx| {
+        let stored =
+            commerce::analytics::ingest(tx, ctx.market.id, subject, &body, ctx.now).await?;
+        // WP20: the same events go to the ad platforms only while the subject grants `ads`
+        // (resolved from the consent records here and again when sending).
+        let events = commerce::analytics::parse_batch(&body);
+        let forwarded =
+            commerce::adtracking::capture_events(tx, ctx.market.id, subject, &events, ua, ctx.now)
+                .await?;
+        Ok((stored, forwarded))
     })
     .await?;
-    tracing::debug!(stored, "events beacon");
+    tracing::debug!(stored, forwarded, "events beacon");
     Ok(StatusCode::ACCEPTED)
 }
 
