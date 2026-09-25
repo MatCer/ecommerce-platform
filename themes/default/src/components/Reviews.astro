@@ -45,8 +45,8 @@ const date = (d: string) =>
           </div>
           <dl class="grid gap-1.5 text-sm">
             {[5, 4, 3, 2, 1].map((n) => (
-              <div class="grid grid-cols-[4.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
-                <dt>{t("reviews.star_row", { n })}</dt>
+              <div class="grid grid-cols-[6.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
+                <dt class="whitespace-nowrap">{t("reviews.star_row", { n })}</dt>
                 <dd class="contents">
                   <progress
                     max={s.count}
