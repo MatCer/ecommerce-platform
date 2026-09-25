@@ -53,9 +53,10 @@ export default function CartDrawer(props: {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a backdrop click closes; Escape is native to <dialog>
     <dialog
       ref={dialog}
-      onClose={() => setOpen(false)}
+      onClose={() => dialog?.open || setOpen(false)}
       onClick={(e) => e.target === dialog && setOpen(false)}
       aria-labelledby="cart-title"
       class="m-0 ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground shadow-sheet backdrop:bg-foreground/45"
@@ -123,10 +124,7 @@ export default function CartDrawer(props: {
                     />
                   </a>
                   <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
-                    <a
-                      href={`${props.base}/p/${line.slug}`}
-                      class="font-semibold hover:underline"
-                    >
+                    <a href={`${props.base}/p/${line.slug}`} class="font-semibold hover:underline">
                       {line.product_name}
                     </a>
                     <p class="text-muted-foreground">{line.variant_label}</p>
@@ -134,11 +132,10 @@ export default function CartDrawer(props: {
                       <p class="font-semibold text-sale">{l("cart.unavailable")}</p>
                     </Show>
                     <div class="mt-auto flex items-center justify-between gap-2 pt-1">
-                      <div
-                        class="flex items-center rounded-md border border-border"
-                        role="group"
-                        aria-label={`${l("cart.quantity")}: ${line.product_name}`}
-                      >
+                      <fieldset class="flex items-center rounded-md border border-border">
+                        <legend class="sr-only">
+                          {l("cart.quantity")}: {line.product_name}
+                        </legend>
                         <button
                           type="button"
                           class="grid size-9 place-items-center disabled:text-subtle"
@@ -160,7 +157,7 @@ export default function CartDrawer(props: {
                           <Icon d={plus} class="size-4" />
                           <span class="sr-only">{l("cart.increase")}</span>
                         </button>
-                      </div>
+                      </fieldset>
                       <button
                         type="button"
                         class="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-sale"

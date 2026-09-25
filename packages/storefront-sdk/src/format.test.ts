@@ -51,7 +51,6 @@ test("the LCP preload and the img share one sizes value", () => {
   expect(attrs).toMatchObject({ sizes: "50vw", srcset: img.srcset, loading: "eager" });
 });
 
-
 test("platform messages: placeholders, missing keys, island subsets", () => {
   const m = { "listing.count": "{count} produktů", "cart.add": "Přidat do košíku" };
   expect(t(m, "listing.count", { count: 3 })).toBe("3 produktů");

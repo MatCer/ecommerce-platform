@@ -15,6 +15,15 @@ let loading: Promise<void> | null = null;
 
 export { added, cart, open, setOpen };
 
+/**
+ * Opens the drawer even if a close is still settling (the dialog's `close` event is async, so
+ * `open` can briefly read true while the dialog is already shut).
+ */
+export function openCart() {
+  setOpen(false);
+  setOpen(true);
+}
+
 export function loadCart() {
   loading ??= api.get().then(
     (c) => void setCart(c),

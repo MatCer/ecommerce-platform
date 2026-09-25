@@ -16,7 +16,8 @@ export const TILE_SIZES =
   "(min-width: 80rem) 21.5rem, (min-width: 48rem) calc(29vw - 1.5rem), calc(50vw - 1.5rem)";
 
 /** Product gallery: full width on phones, 7/12 of the container from 48rem. */
-export const GALLERY_SIZES = "(min-width: 80rem) 43rem, (min-width: 48rem) 55vw, calc(100vw - 2rem)";
+export const GALLERY_SIZES =
+  "(min-width: 80rem) 43rem, (min-width: 48rem) 55vw, calc(100vw - 2rem)";
 
 /** Gallery thumbnails and cart/search thumbnails. */
 export const THUMB_SIZES = "4rem";

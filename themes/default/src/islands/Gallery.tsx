@@ -43,9 +43,7 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
     strip?.scrollTo({ left: el?.offsetLeft ?? 0, behavior: reduce ? "auto" : "smooth" });
     setCurrent(target);
   };
-  createEffect(
-    on(imageIndex, (i) => i !== null && go(i), { defer: true }),
-  );
+  createEffect(on(imageIndex, (i) => i !== null && go(i), { defer: true }));
   const onScroll = () => {
     if (strip) setCurrent(Math.round(strip.scrollLeft / strip.clientWidth));
   };
@@ -53,13 +51,12 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
   return (
     <div class="flex flex-col gap-3">
       <div class="relative">
-        <div
+        <section
           ref={strip}
           onScroll={onScroll}
           onPointerDown={() => setHydrated(true)}
           onFocus={() => setHydrated(true)}
           class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-xl bg-muted [scrollbar-width:none]"
-          role="group"
           aria-roledescription="carousel"
           aria-label={l("product.gallery")}
           tabindex="0"
@@ -79,7 +76,7 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
               />
             )}
           </For>
-        </div>
+        </section>
         <Show when={total() > 1}>
           <button
             type="button"

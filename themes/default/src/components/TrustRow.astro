@@ -16,9 +16,19 @@ interface Props {
 const { shop, layout, delivery } = Astro.props;
 const { t } = i18n(shop);
 const day = (d: string) =>
-  new Date(`${d}T12:00:00Z`).toLocaleDateString(shop.locale, { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" });
+  new Date(`${d}T12:00:00Z`).toLocaleDateString(shop.locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "numeric",
+    timeZone: "UTC",
+  });
 const rows = [
-  { icon: "truck", text: delivery ? t("product.delivery", { from: day(delivery.from), to: day(delivery.to) }) : shop.trust.delivery },
+  {
+    icon: "truck",
+    text: delivery
+      ? t("product.delivery", { from: day(delivery.from), to: day(delivery.to) })
+      : shop.trust.delivery,
+  },
   { icon: "returns", text: shop.trust.returns },
   { icon: "card", text: shop.trust.payments.join(" · ") },
 ] as const;

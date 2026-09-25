@@ -4,7 +4,7 @@
  * Needs `make up && make seed && make theme-build`.
  */
 import { expect, type Page, test } from "@playwright/test";
-import { CZ, decideConsent, expectAccessible, SK, screenshot } from "./support";
+import { CZ, decideConsent, expectAccessible, hydrated, SK, screenshot } from "./support";
 
 const main = (page: Page) => page.getByRole("main");
 
@@ -16,11 +16,17 @@ test.describe("browsing", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectAccessible(page, "home");
 
-    await page.getByRole("navigation", { name: "Kategorie" }).getByRole("link", { name: /Oblečení/ }).click();
+    await page
+      .getByRole("navigation", { name: "Kategorie" })
+      .getByRole("link", { name: /Oblečení/ })
+      .click();
     await expect(page).toHaveURL(`${CZ}/c/obleceni`);
     await expect(page.getByRole("heading", { level: 1, name: "Oblečení" })).toBeVisible();
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${CZ}/c/obleceni`);
-    await expect(page.locator('link[hreflang="sk-SK"]')).toHaveAttribute("href", `${SK}/c/oblecenie`);
+    await expect(page.locator('link[hreflang="sk-SK"]')).toHaveAttribute(
+      "href",
+      `${SK}/c/oblecenie`,
+    );
     await expectAccessible(page, "category");
 
     await main(page).getByRole("link", { name: "Mikiny", exact: true }).click();
@@ -53,7 +59,10 @@ test.describe("browsing", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "cs");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${SK}/cs`);
     // Links the page model and the theme build carry the prefix; prices stay in euro.
-    await page.getByRole("navigation", { name: "Kategorie" }).getByRole("link", { name: /Oblečení/ }).click();
+    await page
+      .getByRole("navigation", { name: "Kategorie" })
+      .getByRole("link", { name: /Oblečení/ })
+      .click();
     await expect(page).toHaveURL(`${SK}/cs/c/obleceni`);
     await main(page).getByRole("link", { name: "Mikina Fleece" }).first().click();
     await expect(page).toHaveURL(`${SK}/cs/p/mikina-fleece`);
@@ -68,6 +77,7 @@ test.describe("browsing", () => {
 test("filters are a GET form: facet, active chip, noindex, removal", async ({ page, context }) => {
   await decideConsent(context);
   await page.goto(`${CZ}/c/obleceni`);
+  await hydrated(page);
   const size = page.getByRole("group", { name: "Velikost" });
   await page.locator("summary", { hasText: "Velikost" }).click();
   await size.getByText("M", { exact: true }).click();
@@ -90,7 +100,10 @@ test("filters work without JavaScript", async ({ browser }) => {
   await page.goto(`${CZ}/c/obleceni`);
   await page.locator("summary", { hasText: "Materiál" }).click();
   await page.getByRole("group", { name: "Materiál" }).getByText("Len", { exact: true }).click();
-  await page.getByRole("group", { name: "Materiál" }).getByRole("button", { name: "Použít" }).click();
+  await page
+    .getByRole("group", { name: "Materiál" })
+    .getByRole("button", { name: "Použít" })
+    .click();
   await expect(page).toHaveURL(/f\.param\.material=/);
   await expect(page.getByRole("link", { name: /Odebrat filtr: Materiál Len/ })).toBeVisible();
   await ctx.close();
@@ -101,7 +114,10 @@ test.describe("search", () => {
     test(`results for "${q}" (diacritics-insensitive)`, async ({ page, context }) => {
       await decideConsent(context);
       await page.goto(`${CZ}/search?${new URLSearchParams({ q })}`);
-      await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex,follow");
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+        "content",
+        "noindex,follow",
+      );
       await expect(main(page).getByRole("link", { name: "Čepice Merino" })).toBeVisible();
     });
   }
@@ -112,6 +128,7 @@ test.describe("search", () => {
   }) => {
     await decideConsent(context);
     await page.goto(`${CZ}/`);
+    await hydrated(page);
     const box = page.getByRole("combobox", { name: "Hledat" });
     await box.fill("cepice mer");
     const list = page.getByRole("listbox");
@@ -138,6 +155,7 @@ test.describe("search", () => {
 test("variant selection, add to cart, cart drawer, checkout origin", async ({ page, context }) => {
   await decideConsent(context);
   await page.goto(`${CZ}/p/mikina-fleece`);
+  await hydrated(page);
   // The radios are visually hidden inside their chip labels: click the chips like a user.
   await page.locator("label", { hasText: "Cihlová" }).click();
   await page.locator("label", { hasText: /^L$/ }).click();
@@ -159,6 +177,7 @@ test("variant selection, add to cart, cart drawer, checkout origin", async ({ pa
 test("keyboard only: skip link, header, product page, cart", async ({ page, context }) => {
   await decideConsent(context);
   await page.goto(`${CZ}/p/mikina-fleece`);
+  await hydrated(page);
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Přeskočit na obsah" })).toBeFocused();
   await page.keyboard.press("Enter");
@@ -200,6 +219,7 @@ test.describe("consent (A20)", () => {
     context,
   }) => {
     await page.goto(`${CZ}/p/mikina-fleece`);
+    await hydrated(page);
     const banner = page.getByRole("region", { name: "Souhlas s cookies" });
     await expect(banner).toBeVisible();
     await expectAccessible(page, "product with consent banner");
@@ -219,14 +239,15 @@ test.describe("consent (A20)", () => {
     await expect(banner).toBeHidden();
     await page.reload();
     // Personalization granted: this visit is remembered for "recently viewed".
-    await expect.poll(() => page.evaluate(() => localStorage.getItem("sf:recent"))).toContain(
-      "mikina-fleece",
-    );
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("sf:recent")))
+      .toContain("mikina-fleece");
   });
 
   test("recently viewed appears only with personalization consent", async ({ page, context }) => {
     await decideConsent(context, CZ, "personalization");
     await page.goto(`${CZ}/p/mikina-fleece`);
+    await hydrated(page);
     await expect.poll(() => page.evaluate(() => localStorage.getItem("sf:recent"))).toBeTruthy();
     await page.goto(`${CZ}/p/cepice-merino`);
     const recent = page.getByRole("region", { name: "Naposledy prohlížené" });
@@ -250,7 +271,7 @@ test.describe("screenshots", () => {
         ["product", `${CZ}/p/mikina-fleece`],
         ["search", `${CZ}/search?q=mikina`],
         ["sk-category", `${SK}/c/oblecenie`],
-      ]) {
+      ] as const) {
         await page.goto(url, { waitUntil: "networkidle" });
         // Lazy images below the fold: scroll through once so the full-page shot is complete.
         await page.evaluate(async () => {

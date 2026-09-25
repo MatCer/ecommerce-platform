@@ -592,7 +592,10 @@ export function createGateway(opts: GatewayOptions) {
     );
     if (res.status === 404 || res.status === 405) {
       await res.body?.cancel();
-      return Response.json({ recorded: false }, { status: 202, headers: { "cache-control": "no-store" } });
+      return Response.json(
+        { recorded: false },
+        { status: 202, headers: { "cache-control": "no-store" } },
+      );
     }
     return new Response(await res.arrayBuffer(), {
       status: res.status,

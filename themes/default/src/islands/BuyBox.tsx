@@ -1,7 +1,7 @@
 import { type Messages, t } from "@platform/storefront-sdk/format";
 import type { ProductOption, StockState, Variant } from "@platform/storefront-sdk/types";
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { addToCart, setOpen } from "../lib/cart-store";
+import { addToCart, openCart } from "../lib/cart-store";
 import Icon from "../lib/Icon";
 import { check } from "../lib/icons";
 import { setImageIndex } from "../lib/product-store";
@@ -39,7 +39,9 @@ export default function BuyBox(props: Props) {
   let mainButton: HTMLButtonElement | undefined;
 
   const variant = createMemo(() =>
-    props.variants.find((v) => Object.entries(selected()).every(([k, val]) => v.options[k] === val)),
+    props.variants.find((v) =>
+      Object.entries(selected()).every(([k, val]) => v.options[k] === val),
+    ),
   );
   const available = (code: string, value: string) =>
     props.variants.some(
@@ -71,7 +73,7 @@ export default function BuyBox(props: Props) {
     try {
       await addToCart(v.id);
       setState("added");
-      setOpen(true);
+      openCart();
       reset = setTimeout(() => setState("idle"), 2000);
     } catch {
       setState("error");
@@ -124,7 +126,11 @@ export default function BuyBox(props: Props) {
       </Show>
       <span
         class="price"
-        classList={{ "text-sale": Boolean(reduced()), "text-3xl": !p.compact, "text-xl": p.compact }}
+        classList={{
+          "text-sale": Boolean(reduced()),
+          "text-3xl": !p.compact,
+          "text-xl": p.compact,
+        }}
       >
         {variant()?.price.formatted ?? first?.price.formatted}
       </span>

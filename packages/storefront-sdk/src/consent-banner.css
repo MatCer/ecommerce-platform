@@ -17,7 +17,7 @@
   border-radius: var(--radius-xl, 0.875rem);
   background: var(--color-card, #fff);
   color: var(--color-foreground, #1b1f2a);
-  font: 0.9375rem/1.5 var(--font-sans, system-ui, sans-serif);
+  font: 0.9375rem / 1.5 var(--font-sans, system-ui, sans-serif);
   box-shadow: 0 1rem 2.5rem -0.75rem rgb(0 0 0 / 0.28);
 }
 @media (width >= 48rem) {
@@ -27,7 +27,7 @@
 }
 .pf-consent__title {
   margin: 0 0 0.25rem;
-  font: 700 1.0625rem/1.3 var(--font-display, inherit);
+  font: 700 1.0625rem / 1.3 var(--font-sans, system-ui, sans-serif);
 }
 .pf-consent__title:focus {
   outline: none;
@@ -82,7 +82,7 @@
   border-radius: var(--radius-md, 0.5rem);
   background: var(--color-foreground, #1b1f2a);
   color: var(--color-card, #fff);
-  font: 600 0.9375rem/1 var(--font-sans, system-ui, sans-serif);
+  font: 600 0.9375rem / 1 var(--font-sans, system-ui, sans-serif);
   cursor: pointer;
 }
 .pf-consent__btn:hover {
@@ -95,7 +95,7 @@
   border: 0;
   background: none;
   color: var(--color-identity-ink, #274c8a);
-  font: 600 0.9375rem/1 var(--font-sans, system-ui, sans-serif);
+  font: 600 0.9375rem / 1 var(--font-sans, system-ui, sans-serif);
   text-decoration: underline;
   text-underline-offset: 0.2em;
   cursor: pointer;

@@ -59,7 +59,12 @@ export async function saveConsent(
   // A beacon survives navigation and its answer is not ours to handle (a 404 before the
   // endpoint exists stays silent); fetch only where beacons are unavailable.
   const body = JSON.stringify({ purposes: granted });
-  if (globalThis.navigator?.sendBeacon?.("/_p/consent", new Blob([body], { type: "application/json" })))
+  if (
+    globalThis.navigator?.sendBeacon?.(
+      "/_p/consent",
+      new Blob([body], { type: "application/json" }),
+    )
+  )
     return;
   try {
     await post("/_p/consent", {

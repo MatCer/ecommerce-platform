@@ -1,7 +1,7 @@
 import { type Messages, t } from "@platform/storefront-sdk/format";
 import type { Money } from "@platform/storefront-sdk/types";
 import { type Component, createEffect, createSignal, on, onMount, Show } from "solid-js";
-import { added, cart, loadCart, open, setOpen } from "../lib/cart-store";
+import { added, cart, loadCart, open, openCart } from "../lib/cart-store";
 import Icon from "../lib/Icon";
 import { bag } from "../lib/icons";
 
@@ -43,7 +43,7 @@ export default function MiniCart(props: {
       <button
         type="button"
         class="relative grid size-11 place-items-center rounded-md hover:bg-muted lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold"
-        onClick={() => setOpen(true)}
+        onClick={openCart}
         onPointerEnter={() => void load()}
         onFocus={() => void load()}
         aria-haspopup="dialog"

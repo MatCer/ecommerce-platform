@@ -1,7 +1,7 @@
 import { hitThumb, suggest } from "@platform/storefront-sdk/client";
 import { type Messages, t } from "@platform/storefront-sdk/format";
 import type { SearchSuggest } from "@platform/storefront-sdk/types";
-import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import Icon from "../lib/Icon";
 import { search as searchIcon } from "../lib/icons";
 
@@ -14,7 +14,12 @@ type Option = { id: string; href: string; label: string; kind: "category" | "pro
  */
 export default function SearchBox(props: { q?: string; base: string; labels: Messages }) {
   const l = (key: string, args?: Record<string, string>) => t(props.labels, key, args);
-  const [q, setQ] = createSignal(props.q ?? "");
+  // Read before hydration applies `value`: the server-rendered input may already hold text.
+  const typed =
+    typeof document === "undefined"
+      ? ""
+      : ((document.getElementById("sb-q") as HTMLInputElement | null)?.value ?? "");
+  const [q, setQ] = createSignal(typed || props.q || "");
   const [result, setResult] = createSignal<SearchSuggest | null>(null);
   const [active, setActive] = createSignal(-1);
   const [open, setOpen] = createSignal(false);
@@ -22,6 +27,10 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
   let ctrl: AbortController | undefined;
   let root: HTMLElement | undefined;
   onCleanup(() => clearTimeout(timer));
+  // Text typed before hydration (the island loads on idle) is picked up, not overwritten.
+  onMount(() => {
+    if (typed && typed !== props.q) onInput(typed);
+  });
 
   const searchHref = (query: string) => `${props.base}/search?${new URLSearchParams({ q: query })}`;
   const options = createMemo<Option[]>(() => {
@@ -134,7 +143,7 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
           <span class="sr-only">{l("search.label")}</span>
         </button>
       </form>
-      <ul
+      <div
         id="sb-list"
         role="listbox"
         aria-label={l("search.label")}
@@ -143,8 +152,8 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
       >
         <For each={options()}>
           {(o, i) => (
-            // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is handled on the combobox input (APG pattern)
-            <li
+            // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/useFocusableInteractive: APG combobox, focus stays in the input (aria-activedescendant) and the keys are handled there
+            <div
               id={optionId(i())}
               role="option"
               aria-selected={active() === i()}
@@ -168,14 +177,16 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
                 )}
               </Show>
               <span class="flex-1">{o.label}</span>
-              <Show when={hit(o.id)}>{(h) => <span class="price">{h().price.formatted}</span>}</Show>
+              <Show when={hit(o.id)}>
+                {(h) => <span class="price">{h().price.formatted}</span>}
+              </Show>
               <Show when={o.kind === "category"}>
                 <span class="text-xs text-muted-foreground">{l("nav.categories")}</span>
               </Show>
-            </li>
+            </div>
           )}
         </For>
-      </ul>
+      </div>
     </search>
   );
 }

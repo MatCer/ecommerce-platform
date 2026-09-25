@@ -10,7 +10,8 @@ const sf = storefront(Astro.request);
 const [shop, blog] = await Promise.all([sf.shop(), sf.blog()]);
 if (!blog) return Astro.rewrite("/404");
 const { t } = i18n(shop);
-const date = (d: string) => new Date(d).toLocaleDateString(shop.locale, { dateStyle: "long", timeZone: "UTC" });
+const date = (d: string) =>
+  new Date(d).toLocaleDateString(shop.locale, { dateStyle: "long", timeZone: "UTC" });
 ---
 
 <Base shop={shop} seo={blog.seo} template="blog">

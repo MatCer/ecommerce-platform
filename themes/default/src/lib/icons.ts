@@ -4,7 +4,8 @@
  * `components/Icon.astro`.
  */
 export const search = "M20 20l-4.2-4.2M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z";
-export const bag = "M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 8Zm4 0V6.5a3 3 0 0 1 6 0V8";
+export const bag =
+  "M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 8Zm4 0V6.5a3 3 0 0 1 6 0V8";
 export const user = "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8.5c.8-3.4 3.6-5.5 7-5.5s6.2 2.1 7 5.5";
 export const menu = "M4 7h16M4 12h16M4 17h16";
 export const close = "M6 6l12 12M18 6 6 18";

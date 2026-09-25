@@ -17,7 +17,10 @@ const tiles = home.categories.slice(0, 4);
 const tile = tiles[0]?.image;
 const lcp = tile
   ? { image: tile, sizes: TILE_SIZES }
-  : home.featured[0]?.images[0] && { image: cardImage(home.featured[0].images[0]), sizes: CARD_SIZES };
+  : home.featured[0]?.images[0] && {
+      image: cardImage(home.featured[0].images[0]),
+      sizes: CARD_SIZES,
+    };
 ---
 
 <Base shop={shop} seo={home.seo} template="home" lcp={lcp}>

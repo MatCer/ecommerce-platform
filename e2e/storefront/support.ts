@@ -41,10 +41,21 @@ export async function expectAccessible(page: Page, name: string) {
   expect(bad, `axe on ${name}`).toEqual([]);
 }
 
+/** Waits until every `client:idle` island has hydrated (Astro drops `ssr` when done). */
+export async function hydrated(page: Page) {
+  await page.waitForFunction(() => !document.querySelector('astro-island[client="idle"][ssr]'));
+}
+
 /** Screenshots for the PR (`WP8_SCREENSHOTS=1 make e2e args=storefront`). */
 export async function screenshot(page: Page, name: string) {
   if (!process.env.WP8_SCREENSHOTS) return;
   const dir = join(root, "docs/screenshots/wp8");
   mkdirSync(dir, { recursive: true });
-  await page.screenshot({ path: join(dir, `${name}.png`), fullPage: true });
+  // JPEG: the grainy demo photos make full-page PNGs ~1 MB each.
+  await page.screenshot({
+    path: join(dir, `${name}.jpg`),
+    fullPage: true,
+    type: "jpeg",
+    quality: 72,
+  });
 }

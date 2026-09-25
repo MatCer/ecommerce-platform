@@ -5,4 +5,5 @@ import { createSignal } from "solid-js";
  * choosing a colour shows that variant's first photo.
  */
 const [imageIndex, setImageIndex] = createSignal<number | null>(null);
+
 export { imageIndex, setImageIndex };
