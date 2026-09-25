@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE assets SET status = 'ready', variants = $2, error = NULL, updated_at = now()\n         WHERE id = $1 AND status = 'processing'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9ed1ce901bdc0f15d1e82eb9b8430b220a19a2fbaf8e1cadad4349b7fcfda9a4"
+}

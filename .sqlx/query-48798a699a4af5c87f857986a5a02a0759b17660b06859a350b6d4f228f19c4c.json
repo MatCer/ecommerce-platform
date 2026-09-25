@@ -1,0 +1,60 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT ON (country, code) country, code, trim_scale(rate)::text AS \"rate!\", valid_from\n           FROM platform.tax_categories\n           WHERE valid_from <= $1 AND ($2::text IS NULL OR country = $2)\n           ORDER BY country, code, valid_from DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.tax_categories",
+            "name": "country"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.tax_categories",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "rate!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "valid_from",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "platform.tax_categories",
+            "name": "valid_from"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "48798a699a4af5c87f857986a5a02a0759b17660b06859a350b6d4f228f19c4c"
+}

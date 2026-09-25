@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, status, filename, mime, bytes, width, height, sha256, variants, error,\n                created_at, updated_at\n         FROM assets WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "filename",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "filename"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "mime",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "mime"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "bytes",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "bytes"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "width",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "width"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "height",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "height"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "sha256",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "sha256"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "variants",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "variants"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "error",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "error"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "37b83b0d0c28bad3a17f6c1c745119890c309629f020b92ba034c5c950cbae03"
+}

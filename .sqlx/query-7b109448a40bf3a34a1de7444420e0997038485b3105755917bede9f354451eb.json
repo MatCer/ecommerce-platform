@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pv.parameter_id, v.sku AS \"variant_sku?\", pv.value\n         FROM product_parameter_values pv LEFT JOIN variants v ON v.id = pv.variant_id\n         WHERE pv.product_id = $1 ORDER BY pv.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "parameter_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "parameter_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_sku?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "sku"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "value"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7b109448a40bf3a34a1de7444420e0997038485b3105755917bede9f354451eb"
+}

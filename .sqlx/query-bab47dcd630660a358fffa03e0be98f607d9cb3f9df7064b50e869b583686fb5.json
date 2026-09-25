@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SET CONSTRAINTS variants_sku_unique, variants_options_unique DEFERRED",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "bab47dcd630660a358fffa03e0be98f607d9cb3f9df7064b50e869b583686fb5"
+}

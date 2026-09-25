@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, sku, ean, option_values, weight_g, is_default FROM variants\n         WHERE product_id = $1 ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "sku",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "sku"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "ean",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "ean"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "option_values",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "option_values"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "weight_g",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "weight_g"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "is_default",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "is_default"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "033122d3ab7aa09835637511916c51a6fe8eac3443def49765667784a8b5926e"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE products SET status = $2, brand = $3, gpsr = $4, unit_measure = $5,\n                unit_quantity = $6::float8, heureka_category = $7, google_category = $8,\n                updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Float8",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d2f849e96811f4d34f0fddaaa6e9923baf2b1c41215cdc56ff4bb91018d6ec64"
+}

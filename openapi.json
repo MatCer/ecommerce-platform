@@ -10,6 +10,334 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/assets": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Assets, newest first.",
+        "operationId": "list_assets",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AssetStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/assets/uploads": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Starts an image upload: returns a pending asset and a presigned `PUT` URL (15 minutes)\ninto private storage. Upload the file there with the returned headers, then call\n`complete`. Honors `Idempotency-Key`.",
+        "operationId": "create_upload",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`unsupported_type`, `file_too_large`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/assets/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "An asset with its public variant URLs once `ready`.",
+        "operationId": "get_asset",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Deletes an asset no product uses (`409 asset_in_use`); its files are removed afterwards.",
+        "operationId": "delete_asset",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/assets/{id}/complete": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Verifies the uploaded file (size, sniffed type, dimensions) and queues the variants.\nA rejected file is deleted and the asset stays `pending` (upload again, then retry).\nCalling it again on a processing or ready asset returns it unchanged.",
+        "operationId": "complete_upload",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`upload_missing`, `asset_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`unsupported_type`, `file_too_large`, `image_too_large`, `corrupt_image`, `size_mismatch`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/audit-log": {
       "get": {
         "tags": [
@@ -69,6 +397,382 @@
             }
           },
           "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/categories": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "operationId": "category_tree",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryTree"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Creates a category at the end of its siblings. Honors `Idempotency-Key`.",
+        "operationId": "create_category",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCategory"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/categories/{id}": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "operationId": "get_category",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Updates translations and image; use `/move` to change the parent or position.",
+        "operationId": "update_category",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Deletes a category without subcategories (`409 has_children` otherwise).",
+        "operationId": "delete_category",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/categories/{id}/move": {
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Moves a category with its subtree. Into its own subtree: `422 category_cycle`.",
+        "operationId": "move_category",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoryMove"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -266,6 +970,759 @@
         ]
       }
     },
+    "/admin/v1/parameters": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "operationId": "list_parameters",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParameterList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Honors `Idempotency-Key`.",
+        "operationId": "create_parameter",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Parameter"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/parameters/{id}": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "operationId": "get_parameter",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Parameter"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "The kind cannot change while products have values (`409 parameter_in_use`).",
+        "operationId": "update_parameter",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Parameter"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Deletes the parameter and its values on all products.",
+        "operationId": "delete_parameter",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/products": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Products, newest first, with filters and cursor pagination.",
+        "operationId": "list_products",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProductStatus"
+            }
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "description": "Only products in this category (not its subcategories).",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Case-insensitive substring of a product name (any locale) or a SKU.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Creates a product document (attributes, translations, options, variants, categories,\nmedia, parameter values, tax categories). Honors `Idempotency-Key`.",
+        "operationId": "create_product",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`sku_taken`, `slug_taken`, `idempotency_conflict`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/products/{id}": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "operationId": "get_product",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Replaces the whole product document. Variants listed with an `id` are updated in place\n(their ids stay stable), variants without one are created, unlisted ones are deleted.",
+        "operationId": "replace_product",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "catalog"
+        ],
+        "operationId": "delete_product",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/tax-categories": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Tax categories and rates in force on a date. Products map to one per country\n(`tax_categories` in the product document) and default to `standard`.",
+        "operationId": "list_tax_categories",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "description": "ISO 3166-1 alpha-2, e.g. `CZ`; all EU countries when omitted.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "description": "Rates in force on this date (default today).",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxCategoryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -375,6 +1832,151 @@
   },
   "components": {
     "schemas": {
+      "Asset": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "variants",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why processing failed."
+          },
+          "filename": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mime": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sniffed type of the original (after `complete`)."
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssetStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetVariant"
+            }
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AssetPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Asset"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AssetStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "ready",
+          "failed"
+        ]
+      },
+      "AssetVariant": {
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "format",
+          "key",
+          "bytes"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "format": {
+            "type": "string",
+            "description": "`avif`, `webp`, `jpeg` or `png`."
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "key": {
+            "type": "string",
+            "description": "Public-bucket key."
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "AuditEntry": {
         "type": "object",
         "required": [
@@ -435,6 +2037,183 @@
           }
         }
       },
+      "BTreeMap": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "propertyNames": {
+          "type": "string"
+        }
+      },
+      "Category": {
+        "type": "object",
+        "required": [
+          "id",
+          "position",
+          "translations",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "image_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryTranslation"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CategoryMove": {
+        "type": "object",
+        "required": [
+          "position"
+        ],
+        "properties": {
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "New parent, `null` for the root level."
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "description": "0-based index among the new siblings; larger values append."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CategoryNode": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Category"
+          },
+          {
+            "type": "object",
+            "required": [
+              "children"
+            ],
+            "properties": {
+              "children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CategoryNode"
+                }
+              }
+            }
+          }
+        ],
+        "description": "A category with its subtree."
+      },
+      "CategoryTranslation": {
+        "type": "object",
+        "required": [
+          "locale",
+          "name",
+          "slug"
+        ],
+        "properties": {
+          "description_html": {
+            "type": "string",
+            "description": "Sanitized on write."
+          },
+          "locale": {
+            "type": "string",
+            "example": "cs"
+          },
+          "name": {
+            "type": "string",
+            "example": "Trička"
+          },
+          "seo_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seo_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string",
+            "example": "tricka"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CategoryTree": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryNode"
+            },
+            "description": "Root categories with nested `children`, siblings in position order."
+          }
+        }
+      },
+      "CategoryUpdate": {
+        "type": "object",
+        "required": [
+          "translations"
+        ],
+        "properties": {
+          "image_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryTranslation"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "CheckStatus": {
         "type": "string",
         "enum": [
@@ -460,6 +2239,77 @@
             "$ref": "#/components/schemas/CheckStatus"
           }
         }
+      },
+      "Gpsr": {
+        "type": "object",
+        "description": "EU General Product Safety Regulation data (Regulation (EU) 2023/988, art. 19).",
+        "properties": {
+          "eu_responsible_person": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GpsrParty",
+                "description": "Required when the manufacturer is established outside the EU."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "manufacturer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/GpsrParty"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "safety_info": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "Safety information per locale."
+          },
+          "warnings": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "Warnings per locale."
+          }
+        },
+        "additionalProperties": false
+      },
+      "GpsrParty": {
+        "type": "object",
+        "description": "Name, postal address and an electronic contact (email or URL).",
+        "required": [
+          "name",
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "Health": {
         "type": "object",
@@ -588,6 +2438,36 @@
           }
         }
       },
+      "NewCategory": {
+        "type": "object",
+        "required": [
+          "translations"
+        ],
+        "properties": {
+          "image_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "`null` for a root category. The new category is appended to its siblings."
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryTranslation"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "NewMarket": {
         "type": "object",
         "required": [
@@ -647,6 +2527,176 @@
         },
         "additionalProperties": false
       },
+      "NewUpload": {
+        "type": "object",
+        "required": [
+          "content_type",
+          "size"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "`image/jpeg`, `image/png`, `image/webp` or `image/gif`. Must be sent with the PUT.",
+            "example": "image/jpeg"
+          },
+          "filename": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Original file name, for display only.",
+            "example": "tricko.jpg"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Exact size in bytes (at most 20 MB); `complete` checks the uploaded file against it.",
+            "example": 184320,
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "OptionValue": {
+        "type": "object",
+        "required": [
+          "code",
+          "name_i18n"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "red"
+          },
+          "name_i18n": {
+            "$ref": "#/components/schemas/BTreeMap"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Parameter": {
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name_i18n",
+          "kind",
+          "filterable",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "filterable": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ParameterKind"
+          },
+          "name_i18n": {
+            "$ref": "#/components/schemas/BTreeMap"
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ParameterInput": {
+        "type": "object",
+        "required": [
+          "key",
+          "name_i18n",
+          "kind"
+        ],
+        "properties": {
+          "filterable": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string",
+            "description": "Unique per tenant, e.g. `material`.",
+            "example": "material"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ParameterKind",
+            "description": "Cannot change while values exist."
+          },
+          "name_i18n": {
+            "$ref": "#/components/schemas/BTreeMap"
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Display unit for numbers, e.g. `cm`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ParameterKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "number",
+          "bool"
+        ]
+      },
+      "ParameterList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Parameter"
+            }
+          }
+        }
+      },
+      "ParameterValue": {
+        "type": "object",
+        "required": [
+          "parameter_id",
+          "value"
+        ],
+        "properties": {
+          "parameter_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "description": "`{\"cs\": \"bavlna\"}` for text parameters, a number or a boolean otherwise."
+          },
+          "variant_sku": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Variant-level value (by SKU); omit for a product-level value."
+          }
+        },
+        "additionalProperties": false
+      },
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details body.",
@@ -680,6 +2730,394 @@
             "description": "Always `about:blank`; `code` carries the specific error kind."
           }
         }
+      },
+      "Product": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "gpsr",
+          "translations",
+          "options",
+          "variants",
+          "category_ids",
+          "media",
+          "parameters",
+          "tax_categories",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "google_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gpsr": {
+            "$ref": "#/components/schemas/Gpsr"
+          },
+          "heureka_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductMedia"
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOption"
+            }
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProductStatus"
+          },
+          "tax_categories": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductTranslation"
+            }
+          },
+          "unit_measure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitMeasure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit_quantity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Variant"
+            }
+          }
+        }
+      },
+      "ProductInput": {
+        "type": "object",
+        "description": "A product document, as written by `POST /products` and `PUT /products/{id}`.",
+        "required": [
+          "translations"
+        ],
+        "properties": {
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "google_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gpsr": {
+            "$ref": "#/components/schemas/Gpsr"
+          },
+          "heureka_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductMedia"
+            },
+            "description": "In display order."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductOption"
+            }
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterValue"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProductStatus"
+          },
+          "tax_categories": {
+            "type": "object",
+            "description": "Country -> tax category code (`reduced`, ...); countries not listed use `standard` (A3).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductTranslation"
+            }
+          },
+          "unit_measure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnitMeasure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit_quantity": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Content in `unit_measure` units (0.75 for 750 ml with `l`); set together with it."
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantInput"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductMedia": {
+        "type": "object",
+        "required": [
+          "asset_id"
+        ],
+        "properties": {
+          "alt_i18n": {
+            "$ref": "#/components/schemas/BTreeMap"
+          },
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "variant_sku": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Shows the image for one variant only (by SKU)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductOption": {
+        "type": "object",
+        "required": [
+          "code",
+          "name_i18n",
+          "values"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Referenced by `variants[].option_values`, e.g. `color`.",
+            "example": "color"
+          },
+          "name_i18n": {
+            "$ref": "#/components/schemas/BTreeMap"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionValue"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next page; absent on the last page."
+          }
+        }
+      },
+      "ProductStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "active",
+          "archived"
+        ]
+      },
+      "ProductSummary": {
+        "type": "object",
+        "description": "A row of the product list.",
+        "required": [
+          "id",
+          "status",
+          "name",
+          "variant_count",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "default_sku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "Locale -> name."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProductStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variant_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProductTranslation": {
+        "type": "object",
+        "required": [
+          "locale",
+          "name",
+          "slug"
+        ],
+        "properties": {
+          "description_html": {
+            "type": "string",
+            "description": "Sanitized on write: unsafe markup is removed."
+          },
+          "locale": {
+            "type": "string",
+            "example": "cs"
+          },
+          "name": {
+            "type": "string",
+            "example": "Tričko Basic"
+          },
+          "seo_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seo_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "short_description": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Unique per tenant and locale.",
+            "example": "tricko-basic"
+          }
+        },
+        "additionalProperties": false
       },
       "Readiness": {
         "type": "object",
@@ -758,6 +3196,48 @@
           "owner"
         ]
       },
+      "TaxCategory": {
+        "type": "object",
+        "required": [
+          "country",
+          "code",
+          "rate",
+          "valid_from"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "reduced"
+          },
+          "country": {
+            "type": "string",
+            "example": "CZ"
+          },
+          "rate": {
+            "type": "string",
+            "description": "Percent as a decimal string, e.g. `\"12\"` or `\"13.5\"`.",
+            "example": "12"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "TaxCategoryList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaxCategory"
+            }
+          }
+        }
+      },
       "TaxMode": {
         "type": "string",
         "description": "Whether prices are entered gross (B2C, default) or net.",
@@ -765,6 +3245,158 @@
           "gross",
           "net"
         ]
+      },
+      "UnitMeasure": {
+        "type": "string",
+        "description": "Basis of the unit price shown next to the price (per kg, per l, ...).",
+        "enum": [
+          "kg",
+          "l",
+          "m",
+          "m2",
+          "pcs"
+        ]
+      },
+      "Upload": {
+        "type": "object",
+        "required": [
+          "asset",
+          "upload"
+        ],
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/Asset"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/UploadTarget"
+          }
+        }
+      },
+      "UploadTarget": {
+        "type": "object",
+        "description": "Where and how to upload the file.",
+        "required": [
+          "method",
+          "url",
+          "headers",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "headers": {
+            "type": "object",
+            "description": "Headers the upload must send exactly as given (they are part of the signature).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "method": {
+            "type": "string",
+            "example": "PUT"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "Variant": {
+        "type": "object",
+        "required": [
+          "id",
+          "sku",
+          "option_values",
+          "is_default"
+        ],
+        "properties": {
+          "ean": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "option_values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "sku": {
+            "type": "string"
+          },
+          "weight_g": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "VariantInput": {
+        "type": "object",
+        "required": [
+          "sku"
+        ],
+        "properties": {
+          "ean": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "GTIN-8/12/13/14 with a valid check digit."
+          },
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Existing variant to update; omit for a new variant."
+          },
+          "is_default": {
+            "type": "boolean",
+            "description": "At most one; defaults to the first variant."
+          },
+          "option_values": {
+            "type": "object",
+            "description": "One value code per product option: `{\"color\": \"red\", \"size\": \"m\"}`.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "sku": {
+            "type": "string",
+            "description": "Unique per tenant.",
+            "example": "TS-RED-M"
+          },
+          "weight_g": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
       }
     },
     "securitySchemes": {
@@ -788,6 +3420,14 @@
     {
       "name": "admin",
       "description": "Admin API: staff JWT from the auth service + X-Tenant-Id"
+    },
+    {
+      "name": "catalog",
+      "description": "Admin API: products, categories, parameters, tax categories"
+    },
+    {
+      "name": "media",
+      "description": "Admin API: image assets (presigned uploads, variants)"
     },
     {
       "name": "internal",

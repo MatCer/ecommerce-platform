@@ -1,0 +1,131 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, status, brand, gpsr, unit_measure, unit_quantity::float8 AS unit_quantity,\n                  heureka_category, google_category, created_at, updated_at\n           FROM products WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "brand",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "brand"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "gpsr",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "gpsr"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "unit_measure",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "unit_measure"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "unit_quantity",
+        "type_info": "Float8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "heureka_category",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "heureka_category"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "google_category",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "google_category"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      null,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "67ca529285900154532e074da70dd799f12297db6bfbd7e6bada6a64fb69f230"
+}

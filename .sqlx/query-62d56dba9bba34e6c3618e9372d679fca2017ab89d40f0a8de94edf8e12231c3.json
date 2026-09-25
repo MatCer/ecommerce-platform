@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_tax_categories WHERE product_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62d56dba9bba34e6c3618e9372d679fca2017ab89d40f0a8de94edf8e12231c3"
+}

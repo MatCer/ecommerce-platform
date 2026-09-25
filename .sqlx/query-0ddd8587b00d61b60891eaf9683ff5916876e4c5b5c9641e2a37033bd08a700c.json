@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_categories (tenant_id, product_id, category_id, position)\n             SELECT $1, $2, $3, coalesce(max(position) + 1, 0)\n             FROM product_categories WHERE category_id = $3\n             ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0ddd8587b00d61b60891eaf9683ff5916876e4c5b5c9641e2a37033bd08a700c"
+}

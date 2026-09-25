@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM variants WHERE product_id = $1 AND NOT (id = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "66fc0b1c00a23d5bfddc14a5e797ca3e8cd0a1be7153b9c980e9aa31a1dd608d"
+}

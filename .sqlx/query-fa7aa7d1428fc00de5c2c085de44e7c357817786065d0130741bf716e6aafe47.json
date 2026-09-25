@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM assets WHERE variants @> $1) AS \"shared!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shared!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "fa7aa7d1428fc00de5c2c085de44e7c357817786065d0130741bf716e6aafe47"
+}
