@@ -30,6 +30,8 @@ uuid.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true
+image.workspace = true
+object_store.workspace = true
 testkit.workspace = true
 
 [lints]

@@ -2,6 +2,8 @@
 //! (`/admin/v1`, staff JWT) and the Internal API (`/internal/v1`, service token).
 
 pub mod admin;
+pub mod admin_catalog;
+pub mod admin_media;
 pub mod auth;
 pub mod cli;
 pub mod internal;
@@ -61,6 +63,8 @@ pub struct AppState {
     tags(
         (name = "health", description = "Liveness and readiness"),
         (name = "admin", description = "Admin API: staff JWT from the auth service + X-Tenant-Id"),
+        (name = "catalog", description = "Admin API: products, categories, parameters, tax categories"),
+        (name = "media", description = "Admin API: image assets (presigned uploads, variants)"),
         (name = "internal", description = "Internal API for platform services (service token)")
     )
 )]
@@ -95,6 +99,8 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .routes(routes!(healthz))
         .routes(routes!(readyz))
         .merge(admin::routes())
+        .merge(admin_catalog::routes())
+        .merge(admin_media::routes())
         .merge(internal::routes())
         .split_for_parts()
 }
