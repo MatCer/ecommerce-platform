@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO events (id, tenant_id, at, type, anon_id, session_id, market_id, props,\n                             consent_purposes)\n         SELECT $1, tenant_id, placed_at, 'purchase', $3, $4, market_id,\n                jsonb_build_object('order_id', id, 'total_minor', total_minor, 'currency', currency),\n                $5\n         FROM orders WHERE id = $2\n         ON CONFLICT (tenant_id, at, id) DO UPDATE\n         SET anon_id = EXCLUDED.anon_id, session_id = EXCLUDED.session_id,\n             consent_purposes = EXCLUDED.consent_purposes\n         WHERE events.anon_id IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2c0ca2c02eb5c938305557eba0a7beb5dd5aceeedb03e95aef91c01bf51a9a54"
+}

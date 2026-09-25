@@ -1,0 +1,51 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (placed_at AT TIME ZONE 'UTC')::date AS \"date!\", currency AS \"currency!\",\n                  sum(total_minor)::bigint AS \"revenue_minor!\", count(*) AS \"orders!\"\n           FROM orders\n           WHERE placed_at >= $1 AND placed_at < $2 AND status <> 'cancelled'\n             AND ($3::uuid IS NULL OR market_id = $3)\n           GROUP BY 1, 2 ORDER BY 1, 2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "date!",
+        "type_info": "Date",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "currency!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "revenue_minor!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "orders!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ebdca4407e26a516ae5d00b2ad387e01044f76cdd2b18375f1ea24342c65a2dd"
+}

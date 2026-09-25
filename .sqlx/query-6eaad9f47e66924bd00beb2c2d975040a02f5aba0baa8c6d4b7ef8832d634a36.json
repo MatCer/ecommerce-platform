@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT query AS \"query!\", sum(count)::bigint AS \"count!\"\n           FROM search_zero_results\n           WHERE day BETWEEN $1 AND $2\n             AND ($3::uuid IS NULL OR locale = ANY (SELECT unnest(locales) FROM markets WHERE id = $3))\n           GROUP BY query ORDER BY 2 DESC, 1 LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "query!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_zero_results",
+            "name": "query"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "6eaad9f47e66924bd00beb2c2d975040a02f5aba0baa8c6d4b7ef8832d634a36"
+}

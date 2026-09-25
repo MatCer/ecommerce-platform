@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.product_id, min(l.name) AS \"name!\", o.currency AS \"currency!\",\n                  sum(l.quantity)::bigint AS \"units!\", sum(l.total_minor)::bigint AS \"revenue_minor!\"\n           FROM order_lines l JOIN orders o ON o.id = l.order_id\n           WHERE o.placed_at >= $1 AND o.placed_at < $2 AND o.status <> 'cancelled'\n             AND ($3::uuid IS NULL OR o.market_id = $3)\n           GROUP BY l.product_id, (CASE WHEN l.product_id IS NULL THEN l.name END), o.currency\n           ORDER BY 4 DESC, 5 DESC LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "currency!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "units!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "revenue_minor!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      null,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "91d548768d277e0005dddb4790ff7b1db5def7cdc4e8ba5ef5df1e9c5bee58d4"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE webhook_subscriptions\n         SET secret_ciphertext = $2, secret_hint = $3, updated_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "52c103a4f77ef0b87845aa11a05167d7a98d88707c36198612d5eb6cc5fb1b7a"
+}

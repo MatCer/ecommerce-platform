@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM search_indexes WHERE locale = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dd9469e7c78fd2bcfad1c9232952b2203e92bec326e0dcfe80bd28c1e466cb56"
+}
