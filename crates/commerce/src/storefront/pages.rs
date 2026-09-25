@@ -37,21 +37,17 @@ pub struct Menus {
     pub footer: Vec<MenuItem>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ConsentPurpose {
-    Analytics,
-    Ads,
-    Personalization,
-    EmailMarketing,
-    ReviewInvites,
-}
+pub use crate::consent::ConsentPurpose;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ConsentConfig {
-    /// Purposes the banner asks for (placeholder until WP9's consent model, A20).
+    /// Purposes the banner asks for (A20).
     pub purposes: Vec<ConsentPurpose>,
     pub policy_url: String,
+    /// Version of the consent texts; post it back with the choice (`POST /_p/consent`).
+    pub text_version: String,
+    /// The preferences page on the checkout origin.
+    pub preferences_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -213,6 +209,8 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
                 ConsentPurpose::Personalization,
             ],
             policy_url: "/pages/cookies".into(),
+            text_version: crate::consent::TEXT_VERSION.into(),
+            preferences_url: ctx.checkout_url("/consent"),
         },
         free_shipping_threshold: None,
         tracking: Tracking {

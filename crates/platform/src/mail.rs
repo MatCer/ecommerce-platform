@@ -113,9 +113,9 @@ pub struct Outgoing<'a> {
     pub subject: &'a str,
     pub html: &'a str,
     pub text: &'a str,
-    /// Stable per message (`<id@host>`), so a duplicate after an uncertain send can be
-    /// recognised by the receiver (spec §13).
-    pub message_id: &'a str,
+    /// Stable per message: the Message-ID becomes `<id@from-domain>`, so a duplicate after an
+    /// uncertain send can be recognised by the receiver (spec §13).
+    pub id: &'a str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,7 +196,7 @@ fn build(t: &Transport, msg: &Outgoing<'_>) -> Result<Message, String> {
         .from(from)
         .to(to)
         .subject(msg.subject)
-        .message_id(Some(msg.message_id.to_owned()))
+        .message_id(Some(format!("<{}@{}>", msg.id, t.from.email.domain())))
         .header(header::MIME_VERSION_1_0)
         .multipart(MultiPart::alternative_plain_html(
             msg.text.to_owned(),

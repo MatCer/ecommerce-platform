@@ -33,6 +33,9 @@ pub enum Error {
     /// Input failed validation. `code` is a stable snake_case identifier.
     #[error("{detail}")]
     Validation { code: &'static str, detail: String },
+    /// A rate limit was hit (`too_many_attempts`, ...).
+    #[error("too many requests: {code}")]
+    TooManyRequests { code: &'static str },
     #[error("service unavailable: {0}")]
     Unavailable(String),
     #[error(transparent)]
@@ -54,6 +57,7 @@ impl Error {
             Self::Forbidden { .. } => StatusCode::FORBIDDEN,
             Self::Conflict { .. } => StatusCode::CONFLICT,
             Self::Validation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::TooManyRequests { .. } => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Database(_) | Self::Storage(_) | Self::Internal(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -69,6 +73,7 @@ impl Error {
             Self::BadRequest { code, .. }
             | Self::Unauthorized { code }
             | Self::Forbidden { code }
+            | Self::TooManyRequests { code }
             | Self::Conflict { code, .. }
             | Self::Validation { code, .. } => code,
             Self::Unavailable(_) => "service_unavailable",
@@ -83,7 +88,8 @@ impl Error {
             | Self::MethodNotAllowed
             | Self::PayloadTooLarge
             | Self::Unauthorized { .. }
-            | Self::Forbidden { .. } => None,
+            | Self::Forbidden { .. }
+            | Self::TooManyRequests { .. } => None,
             Self::BadRequest { detail, .. }
             | Self::Conflict { detail, .. }
             | Self::Validation { detail, .. } => Some(detail.clone()),

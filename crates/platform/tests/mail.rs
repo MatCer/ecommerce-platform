@@ -28,7 +28,7 @@ fn message(to: &str) -> Outgoing<'_> {
         subject: "Přihlášení",
         html: "<p>Ahoj</p>",
         text: "Ahoj",
-        message_id: "<0192-test@mail.test>",
+        id: "0192-test",
     }
 }
 
