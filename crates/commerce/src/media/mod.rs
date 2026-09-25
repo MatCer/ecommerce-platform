@@ -1,11 +1,14 @@
 //! Media assets (spec §7.5, §8.3, A21).
 //!
 //! Upload flow: `create_upload` issues a presigned PUT into the private bucket (the content
-//! type is part of the signature) -> the client uploads -> `complete` verifies
-//! the object (size, sniffed type, header dimensions) and queues `media.process` -> the worker
-//! re-encodes it into responsive variants in the public bucket (`process`) and the asset
-//! becomes `ready` (`asset.ready` event). Public keys are content-addressed:
-//! `media/<tenant>/<sha256 of the bytes>.<ext>`, immutable and safe to cache forever.
+//! type is part of the signature) -> the client uploads to `uploads/<tenant>/<asset>` ->
+//! `complete` verifies the object (size, sniffed type, header dimensions) and copies the
+//! verified bytes to `originals/<tenant>/<asset>`, a key only the server writes, so a later
+//! PUT with a still-valid URL cannot swap what gets processed -> the worker re-encodes it into
+//! responsive variants in the public bucket (`process`) and the asset becomes `ready`
+//! (`asset.ready` event). Public keys are content-addressed per asset:
+//! `media/<tenant>/<asset>/<sha256 of the bytes>.<ext>`, immutable and safe to cache forever;
+//! no two assets share an object, so deleting one never breaks another.
 
 pub mod encode;
 
@@ -158,8 +161,14 @@ fn internal(e: impl std::fmt::Display) -> Error {
     Error::Internal(e.to_string())
 }
 
-fn original_key(tenant_id: Uuid, id: Uuid) -> Path {
+/// Where the client uploads (presigned PUT).
+fn upload_key(tenant_id: Uuid, id: Uuid) -> Path {
     Path::from(format!("uploads/{tenant_id}/{id}"))
+}
+
+/// The verified original: written only by `complete`.
+fn original_key(tenant_id: Uuid, id: Uuid) -> Path {
+    Path::from(format!("originals/{tenant_id}/{id}"))
 }
 
 /// Creates a pending asset and a presigned upload URL into the private bucket.
@@ -172,7 +181,7 @@ pub async fn create_upload(
     input.validate()?;
     let tenant_id = tx.tenant_id();
     let id = crate::id::new_id();
-    let key = original_key(tenant_id, id);
+    let key = upload_key(tenant_id, id);
     let size = i64::try_from(input.size).map_err(internal)?;
     sqlx::query!(
         "INSERT INTO assets (id, tenant_id, filename, key, mime, bytes) VALUES ($1, $2, $3, $4, $5, $6)",
@@ -267,33 +276,40 @@ pub async fn complete(
     let bytes = storage.private.get_range(&key, 0..meta.size).await?;
     let verified = tokio::task::spawn_blocking(move || {
         let sha = hex::encode(Sha256::digest(&bytes));
-        encode::verify(&bytes).map(|v| (v, sha, bytes.len()))
+        encode::verify(&bytes).map(|v| (v, sha, bytes))
     })
     .await
     .map_err(internal)?;
-    let (verified, sha256, len) = match verified {
+    let (verified, sha256, bytes) = match verified {
         Ok(v) => v,
         Err(rejected) => {
             storage.private.delete(&key).await?;
             return Err(invalid(rejected.code(), rejected.detail()));
         }
     };
-    if row.bytes.and_then(|b| usize::try_from(b).ok()) != Some(len) {
+    if row.bytes.and_then(|b| usize::try_from(b).ok()) != Some(bytes.len()) {
         storage.private.delete(&key).await?;
         return Err(invalid(
             "size_mismatch",
             "the uploaded file does not have the declared size",
         ));
     }
+    let original = original_key(tx.tenant_id(), id);
+    storage
+        .private
+        .put(&original, PutPayload::from(bytes))
+        .await?;
+    storage.private.delete(&key).await?;
     sqlx::query!(
-        "UPDATE assets SET status = 'processing', mime = $2, width = $3, height = $4, sha256 = $5,
-                updated_at = now()
+        "UPDATE assets SET status = 'processing', key = $6, mime = $2, width = $3, height = $4,
+                sha256 = $5, updated_at = now()
          WHERE id = $1",
         id,
         verified.mime,
         i32::try_from(verified.width).map_err(internal)?,
         i32::try_from(verified.height).map_err(internal)?,
-        sha256
+        sha256,
+        original.as_ref()
     )
     .execute(&mut **tx)
     .await?;
@@ -325,10 +341,10 @@ pub enum Processed {
     Skipped,
 }
 
-/// Worker step: re-encodes the original into public variants. Idempotent: keys are
+/// Worker step: re-encodes the verified original into public variants. Idempotent: keys are
 /// content-addressed, and only a `processing` asset is updated. Storage and database errors
-/// are returned for a retry. CPU-heavy work runs on a blocking thread; callers bound how many
-/// run at once.
+/// are returned for a retry (see [`mark_failed`] for the last attempt). CPU-heavy work runs
+/// on a blocking thread; callers bound how many run at once.
 pub async fn process(
     db: &PgPool,
     storage: &Storage,
@@ -336,35 +352,36 @@ pub async fn process(
     id: Uuid,
 ) -> Result<Processed, Error> {
     let mut tx = tenant_tx(db, tenant_id).await?;
-    let row = sqlx::query!("SELECT status, key FROM assets WHERE id = $1", id)
+    let row = sqlx::query!("SELECT status, key, sha256 FROM assets WHERE id = $1", id)
         .fetch_optional(&mut *tx)
         .await?;
     tx.commit().await?;
     let Some(row) = row.filter(|r| r.status == "processing") else {
         return Ok(Processed::Skipped);
     };
-    let original = storage
-        .private
-        .get(&Path::from(row.key))
-        .await?
-        .bytes()
-        .await?;
-    let rendered = tokio::task::spawn_blocking(move || encode::render(&original))
-        .await
-        .map_err(internal)?;
+    let key = Path::from(row.key);
+    // Bounded download of the verified original, checked against the digest from `complete`.
+    let size = storage.private.head(&key).await?.size;
+    if size > encode::MAX_BYTES {
+        mark_failed(db, tenant_id, id, &encode::Rejected::TooLarge.detail()).await?;
+        return Ok(Processed::Failed);
+    }
+    let original = storage.private.get_range(&key, 0..size).await?;
+    let expected = row.sha256.unwrap_or_default();
+    let rendered = tokio::task::spawn_blocking(move || {
+        if hex::encode(Sha256::digest(&original)) != expected {
+            return Err(encode::Rejected::Corrupt(
+                "the original changed after verification".into(),
+            ));
+        }
+        encode::render(&original)
+    })
+    .await
+    .map_err(internal)?;
     let encoded = match rendered {
         Ok(e) => e,
         Err(rejected) => {
-            let mut tx = tenant_tx(db, tenant_id).await?;
-            sqlx::query!(
-                "UPDATE assets SET status = 'failed', error = $2, updated_at = now()
-                 WHERE id = $1 AND status = 'processing'",
-                id,
-                rejected.detail()
-            )
-            .execute(&mut *tx)
-            .await?;
-            tx.commit().await?;
+            mark_failed(db, tenant_id, id, &rejected.detail()).await?;
             return Ok(Processed::Failed);
         }
     };
@@ -372,7 +389,7 @@ pub async fn process(
     let mut variants = Vec::with_capacity(encoded.len());
     for e in encoded {
         let key = format!(
-            "media/{tenant_id}/{}.{}",
+            "media/{tenant_id}/{id}/{}.{}",
             hex::encode(Sha256::digest(&e.bytes)),
             e.format.ext()
         );
@@ -416,16 +433,40 @@ pub async fn process(
         queue::publish(&mut *tx, "asset.ready", &json!({ "asset_id": id })).await?;
     }
     tx.commit().await?;
-    Ok(if updated == 1 {
-        Processed::Ready
-    } else {
-        Processed::Skipped
-    })
+    if updated == 1 {
+        return Ok(Processed::Ready);
+    }
+    // Deleted (or failed) while encoding: its purge may already have run, so remove what
+    // this run wrote.
+    let keys: Vec<String> = variants.into_iter().map(|v| v.key).collect();
+    purge(storage, &[], &keys).await?;
+    Ok(Processed::Skipped)
+}
+
+/// Marks a `processing` asset as failed with a client-safe reason (undecodable image, or the
+/// job's last attempt failing on storage or database errors).
+pub async fn mark_failed(
+    db: &PgPool,
+    tenant_id: Uuid,
+    id: Uuid,
+    reason: &str,
+) -> Result<(), Error> {
+    let mut tx = tenant_tx(db, tenant_id).await?;
+    sqlx::query!(
+        "UPDATE assets SET status = 'failed', error = $2, updated_at = now()
+         WHERE id = $1 AND status = 'processing'",
+        id,
+        reason
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 /// Deletes an asset that no product uses (`409 asset_in_use` otherwise); categories lose it
-/// as their image. The objects are removed by a `media.purge` job after commit; public
-/// variants shared with another asset of the tenant (same bytes) are kept.
+/// as their image. The objects (upload, original, variants) are removed by a `media.purge`
+/// job after commit.
 pub async fn delete(
     tx: &mut TenantTx,
     storage: &Storage,
@@ -433,7 +474,7 @@ pub async fn delete(
     id: Uuid,
 ) -> Result<(), Error> {
     let before = get(tx, storage, id).await?;
-    let key = sqlx::query_scalar!("SELECT key FROM assets WHERE id = $1 FOR UPDATE", id)
+    sqlx::query!("SELECT id FROM assets WHERE id = $1 FOR UPDATE", id)
         .fetch_one(&mut **tx)
         .await?;
     sqlx::query!("DELETE FROM assets WHERE id = $1", id)
@@ -451,21 +492,15 @@ pub async fn delete(
                 e.into()
             }
         })?;
-    let mut public_keys = Vec::new();
-    for v in &before.variants {
-        let shared = sqlx::query_scalar!(
-            r#"SELECT EXISTS (SELECT 1 FROM assets WHERE variants @> $1) AS "shared!""#,
-            json!([{ "key": v.key }])
-        )
-        .fetch_one(&mut **tx)
-        .await?;
-        if !shared {
-            public_keys.push(v.key.clone());
-        }
-    }
+    let public_keys: Vec<&str> = before.variants.iter().map(|v| v.key.as_str()).collect();
+    let tenant_id = tx.tenant_id();
+    let private_keys = [
+        upload_key(tenant_id, id).to_string(),
+        original_key(tenant_id, id).to_string(),
+    ];
     let mut job = NewJob::new(
         PURGE_JOB,
-        json!({ "private": [key], "public": public_keys }),
+        json!({ "private": private_keys, "public": public_keys }),
     );
     job.tenant_id = Some(tx.tenant_id());
     queue::enqueue(&mut **tx, &job).await?;

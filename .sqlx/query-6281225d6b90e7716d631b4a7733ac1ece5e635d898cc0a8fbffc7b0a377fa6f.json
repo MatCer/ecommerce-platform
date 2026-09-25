@@ -1,34 +1,34 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT status, key FROM assets WHERE id = $1",
+  "query": "SELECT id, kind FROM parameters WHERE id = ANY($1) ORDER BY id FOR SHARE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "status",
-        "type_info": "Text",
+        "name": "id",
+        "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "assets",
-            "name": "status"
+            "table": "parameters",
+            "name": "id"
           }
         }
       },
       {
         "ordinal": 1,
-        "name": "key",
+        "name": "kind",
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "assets",
-            "name": "key"
+            "table": "parameters",
+            "name": "kind"
           }
         }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "ab02ddfec9964c48741edd2f7d54317520ead2906c6ac3125d72d9f92ff8175d"
+  "hash": "6281225d6b90e7716d631b4a7733ac1ece5e635d898cc0a8fbffc7b0a377fa6f"
 }

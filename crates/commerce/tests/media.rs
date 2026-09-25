@@ -285,3 +285,98 @@ async fn undecodable_originals_fail_and_used_assets_cannot_be_deleted(db: PgPool
     );
     assert_eq!(upload(0).validate().unwrap_err().code(), "file_too_large");
 }
+
+/// Uploads `bytes` as a new asset and completes it.
+async fn completed(runtime: &PgPool, storage: &Storage, tenant: Uuid, bytes: Vec<u8>) -> Uuid {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    let up = media::create_upload(&mut tx, storage, "u1", &upload(bytes.len()))
+        .await
+        .unwrap();
+    put(storage, tenant, up.asset.id, bytes).await;
+    media::complete(&mut tx, storage, "u1", up.asset.id)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    up.asset.id
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn uploads_after_complete_cannot_change_what_is_processed(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let storage = testkit::memory_storage();
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let id = completed(&runtime, &storage, tenant, jpeg(200, 100)).await;
+
+    // The verified bytes moved to a server-only key; the upload key is free again.
+    let original = Path::from(format!("originals/{tenant}/{id}"));
+    assert!(storage.private.head(&original).await.is_ok());
+    // A second PUT with the still-valid upload URL is simply ignored.
+    put(&storage, tenant, id, jpeg(300, 300)).await;
+    assert_eq!(
+        media::process(&runtime, &storage, tenant, id)
+            .await
+            .unwrap(),
+        Processed::Ready
+    );
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let asset = media::get(&mut tx, &storage, id).await.unwrap();
+    assert_eq!(asset.variants.iter().map(|v| v.width).max(), Some(200));
+    tx.rollback().await.unwrap();
+
+    // An original that no longer matches the verified digest is refused.
+    let tampered = completed(&runtime, &storage, tenant, jpeg(64, 64)).await;
+    storage
+        .private
+        .put(
+            &Path::from(format!("originals/{tenant}/{tampered}")),
+            PutPayload::from(jpeg(65, 64)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        media::process(&runtime, &storage, tenant, tampered)
+            .await
+            .unwrap(),
+        Processed::Failed
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn deleting_an_asset_keeps_an_identical_one_intact(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let storage = testkit::memory_storage();
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let photo = jpeg(120, 80);
+    let a = completed(&runtime, &storage, tenant, photo.clone()).await;
+    let b = completed(&runtime, &storage, tenant, photo).await;
+    for id in [a, b] {
+        media::process(&runtime, &storage, tenant, id)
+            .await
+            .unwrap();
+    }
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let kept = media::get(&mut tx, &storage, b).await.unwrap();
+    media::delete(&mut tx, &storage, "u1", a).await.unwrap();
+    tx.commit().await.unwrap();
+    let purge: serde_json::Value =
+        sqlx::query_scalar("SELECT payload FROM queue.jobs WHERE kind = $1")
+            .bind(media::PURGE_JOB)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    let keys = |k: &str| -> Vec<String> { serde_json::from_value(purge[k].clone()).unwrap() };
+    media::purge(&storage, &keys("private"), &keys("public"))
+        .await
+        .unwrap();
+    for v in &kept.variants {
+        assert!(
+            storage
+                .public
+                .head(&Path::from(v.key.as_str()))
+                .await
+                .is_ok(),
+            "{} deleted with the other asset",
+            v.key
+        );
+    }
+}

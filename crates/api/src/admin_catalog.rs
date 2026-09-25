@@ -12,7 +12,7 @@ use chrono::{NaiveDate, Utc};
 use commerce::catalog::categories::{
     self, Category, CategoryMove, CategoryNode, CategoryUpdate, NewCategory,
 };
-use commerce::catalog::parameters::{self, Parameter, ParameterInput};
+use commerce::catalog::parameters::{self, Parameter, ParameterInput, ParameterPage};
 use commerce::catalog::products::{
     self, Product, ProductFilter, ProductInput, ProductPage, ProductStatus,
 };
@@ -386,25 +386,39 @@ async fn delete_category(
 // ---------------------------------------------------------------------------------------
 // Parameters
 
-#[derive(Serialize, ToSchema)]
-pub struct ParameterList {
-    pub items: Vec<Parameter>,
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ParameterQuery {
+    /// `next_cursor` from the previous page.
+    pub cursor: Option<String>,
+    /// Page size, 1-100 (default 100).
+    pub limit: Option<i64>,
 }
 
+/// Parameters ordered by key.
 #[utoipa::path(
     get,
     path = "/admin/v1/parameters",
     tag = "catalog",
     security(("staff_jwt" = [])),
-    params(TenantHeader),
-    responses((status = 200, body = ParameterList))
+    params(TenantHeader, ParameterQuery),
+    responses(
+        (status = 200, body = ParameterPage),
+        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+    )
 )]
 async fn list_parameters(
     staff: TenantStaff,
     State(s): State<AppState>,
-) -> Result<Json<ParameterList>, Error> {
-    let items = in_tx(&s, staff.tenant_id, async |tx| parameters::list(tx).await).await?;
-    Ok(Json(ParameterList { items }))
+    query: Result<Query<ParameterQuery>, QueryRejection>,
+) -> Result<Json<ParameterPage>, Error> {
+    let q = query_params(query)?;
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            parameters::list(tx, q.cursor.as_deref(), q.limit.unwrap_or(100)).await
+        })
+        .await?,
+    ))
 }
 
 /// Honors `Idempotency-Key`.

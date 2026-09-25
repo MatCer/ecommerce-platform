@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, key, name_i18n, kind, unit, filterable, created_at, updated_at\n         FROM parameters ORDER BY key",
+  "query": "SELECT id, key, name_i18n, kind, unit, filterable, created_at, updated_at\n         FROM parameters WHERE $1::text IS NULL OR key > $1 ORDER BY key LIMIT $2",
   "describe": {
     "columns": [
       {
@@ -93,7 +93,10 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Text",
+        "Int8"
+      ]
     },
     "nullable": [
       false,
@@ -106,5 +109,5 @@
       false
     ]
   },
-  "hash": "c639af845515f00ff961becd6c100d6db3c05e2f2ffcea70971addd6b22c61f3"
+  "hash": "45e858fbf5202d6e23d6095f05f39578912c63a96a19c67a0e402a471d595901"
 }

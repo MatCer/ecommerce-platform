@@ -305,11 +305,11 @@ impl ProductInput {
         self.gpsr.validate()?;
         match (self.unit_measure, self.unit_quantity) {
             (None, None) => {}
-            (Some(_), Some(q)) if q.is_finite() && q > 0.0 && q <= 1_000_000.0 => {}
+            (Some(_), Some(q)) if unit_quantity_valid(q) => {}
             _ => {
                 return Err(invalid(
                     "invalid_unit",
-                    "unit_measure and unit_quantity (0 < q <= 1e6) are set together",
+                    "unit_measure and unit_quantity (0.0001-1000000, at most 4 decimals) are set together",
                 ));
             }
         }
@@ -496,6 +496,12 @@ impl ProductInput {
         }
         Ok(())
     }
+}
+
+/// Fits `numeric(12, 4)` exactly: positive, at most 1e6, at most 4 decimal places.
+fn unit_quantity_valid(q: f64) -> bool {
+    let scaled = q * 10_000.0;
+    q.is_finite() && (0.0001..=1_000_000.0).contains(&q) && (scaled - scaled.round()).abs() < 1e-6
 }
 
 fn all_unique<T: Ord>(items: impl Iterator<Item = T>) -> bool {
@@ -833,7 +839,8 @@ async fn save_variants(
 async fn check_references(tx: &mut TenantTx, p: &ProductInput) -> Result<(), Error> {
     let ids: Vec<Uuid> = p.parameters.iter().map(|v| v.parameter_id).collect();
     let kinds: HashMap<Uuid, String> =
-        sqlx::query!("SELECT id, kind FROM parameters WHERE id = ANY($1)", &ids)
+        // FOR SHARE: a concurrent kind change waits until these values are committed.
+        sqlx::query!("SELECT id, kind FROM parameters WHERE id = ANY($1) ORDER BY id FOR SHARE", &ids)
             .fetch_all(&mut **tx)
             .await?
             .into_iter()
@@ -864,11 +871,13 @@ fn position(i: usize) -> i32 {
     i32::try_from(i).unwrap_or(i32::MAX)
 }
 
+/// The document, read consistently: the row lock waits for (and then blocks) a concurrent
+/// `replace`, so the separate child queries below cannot mix two versions.
 pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<Product, Error> {
     let row = sqlx::query!(
         r#"SELECT id, status, brand, gpsr, unit_measure, unit_quantity::float8 AS unit_quantity,
                   heureka_category, google_category, created_at, updated_at
-           FROM products WHERE id = $1"#,
+           FROM products WHERE id = $1 FOR SHARE"#,
         id
     )
     .fetch_optional(&mut **tx)
@@ -1254,6 +1263,14 @@ mod tests {
         p.validate().unwrap();
         p.unit_quantity = Some(f64::NAN);
         assert_eq!(code_of(&p), "invalid_unit");
+        for bad in [0.00001, 0.12345, 0.0, -1.0, 1_000_000.5] {
+            p.unit_quantity = Some(bad);
+            assert_eq!(code_of(&p), "invalid_unit", "{bad}");
+        }
+        for ok in [0.0001, 0.75, 1.5, 0.3333, 1_000_000.0] {
+            p.unit_quantity = Some(ok);
+            p.validate().unwrap();
+        }
 
         let mut p = tshirt();
         p.tax_categories.insert("cz".into(), "reduced".into());

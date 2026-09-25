@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, status, brand, gpsr, unit_measure, unit_quantity::float8 AS unit_quantity,\n                  heureka_category, google_category, created_at, updated_at\n           FROM products WHERE id = $1",
+  "query": "SELECT id, status, brand, gpsr, unit_measure, unit_quantity::float8 AS unit_quantity,\n                  heureka_category, google_category, created_at, updated_at\n           FROM products WHERE id = $1 FOR SHARE",
   "describe": {
     "columns": [
       {
@@ -127,5 +127,5 @@
       false
     ]
   },
-  "hash": "67ca529285900154532e074da70dd799f12297db6bfbd7e6bada6a64fb69f230"
+  "hash": "3cb94d22608f2763e58d2bd3795603344e5b7c4479c9c31fd5ed5645e618fd9a"
 }

@@ -196,6 +196,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Parameters ordered by key. */
         get: operations["list_parameters"];
         put?: never;
         /** Honors `Idempotency-Key`. */
@@ -607,8 +608,10 @@ export interface components {
         };
         /** @enum {string} */
         ParameterKind: "text" | "number" | "bool";
-        ParameterList: {
+        ParameterPage: {
             items: components["schemas"]["Parameter"][];
+            /** @description Pass as `cursor` for the next page (the last key); absent on the last page. */
+            next_cursor?: string | null;
         };
         ParameterValue: {
             /** Format: uuid */
@@ -1446,7 +1449,12 @@ export interface operations {
     };
     list_parameters: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `next_cursor` from the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 100). */
+                limit?: number;
+            };
             header: {
                 /** @description The tenant to act in; the caller must be a member. */
                 "X-Tenant-Id": string;
@@ -1461,7 +1469,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ParameterList"];
+                    "application/json": components["schemas"]["ParameterPage"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

@@ -808,3 +808,79 @@ async fn testkit_fixtures_build_valid_products(db: PgPool) {
     assert!(single.options.is_empty());
     assert_eq!(single.category_ids, vec![child.id]);
 }
+
+fn lock_timeout(err: &platform::Error) -> bool {
+    matches!(err, platform::Error::Database(e)
+        if e.as_database_error().and_then(|d| d.code()).as_deref() == Some("55P03"))
+}
+
+async fn impatient_tx(runtime: &PgPool, tenant: Uuid) -> TenantTx {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query("SET LOCAL lock_timeout = '300ms'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_writers_are_serialized(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let mut setup = tenant_tx(&runtime, tenant).await.unwrap();
+    let param = parameters::create(
+        &mut setup,
+        "u1",
+        &ParameterInput {
+            key: "width".into(),
+            name_i18n: i18n(&[("cs", "Šířka")]),
+            kind: ParameterKind::Number,
+            unit: None,
+            filterable: false,
+        },
+    )
+    .await
+    .unwrap();
+    setup.commit().await.unwrap();
+
+    // A product save holding a number value blocks changing the parameter to text.
+    let mut saving = tenant_tx(&runtime, tenant).await.unwrap();
+    let mut input = tshirt("W", "w");
+    input.parameters = vec![ParameterValue {
+        parameter_id: param.id,
+        variant_sku: None,
+        value: json!(42),
+    }];
+    let product = products::create(&mut saving, "u1", &input).await.unwrap();
+    let mut changing = impatient_tx(&runtime, tenant).await;
+    let to_text = ParameterInput {
+        key: "width".into(),
+        name_i18n: i18n(&[("cs", "Šířka")]),
+        kind: ParameterKind::Text,
+        unit: None,
+        filterable: false,
+    };
+    let err = parameters::update(&mut changing, "u2", param.id, &to_text)
+        .await
+        .unwrap_err();
+    assert!(lock_timeout(&err), "{err:?}");
+    changing.rollback().await.unwrap();
+    saving.commit().await.unwrap();
+    let mut changing = tenant_tx(&runtime, tenant).await.unwrap();
+    let err = parameters::update(&mut changing, "u2", param.id, &to_text)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "parameter_in_use");
+    changing.rollback().await.unwrap();
+
+    // A read waits for an in-flight replace instead of mixing two versions.
+    let mut replacing = tenant_tx(&runtime, tenant).await.unwrap();
+    products::replace(&mut replacing, "u1", product.id, &tshirt("W", "w2"))
+        .await
+        .unwrap();
+    let mut reading = impatient_tx(&runtime, tenant).await;
+    let err = products::get(&mut reading, product.id).await.unwrap_err();
+    assert!(lock_timeout(&err), "{err:?}");
+    reading.rollback().await.unwrap();
+    replacing.commit().await.unwrap();
+}

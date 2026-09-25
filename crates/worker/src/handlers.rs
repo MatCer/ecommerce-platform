@@ -89,9 +89,23 @@ async fn media_process(
         .acquire()
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
-    let outcome = media::process(&ctx.db, &storage, tenant, asset)
-        .await
-        .map_err(|e| JobError::Retry(e.to_string()))?;
+    let outcome = match media::process(&ctx.db, &storage, tenant, asset).await {
+        Ok(outcome) => outcome,
+        // Last attempt: record the failure on the asset instead of leaving it `processing`.
+        Err(e) if job.attempts >= job.max_attempts => {
+            tracing::error!(%asset, error = %e, "media processing gave up");
+            media::mark_failed(
+                &ctx.db,
+                tenant,
+                asset,
+                "processing failed repeatedly; upload the image again",
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            return Err(JobError::Permanent(e.to_string()));
+        }
+        Err(e) => return Err(JobError::Retry(e.to_string())),
+    };
     tracing::info!(%asset, ?outcome, "media processed");
     if outcome == Processed::Failed {
         tracing::warn!(%asset, "image could not be decoded; asset marked failed");

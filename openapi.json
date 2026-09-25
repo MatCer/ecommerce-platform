@@ -975,6 +975,7 @@
         "tags": [
           "catalog"
         ],
+        "summary": "Parameters ordered by key.",
         "operationId": "list_parameters",
         "parameters": [
           {
@@ -986,6 +987,25 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 100).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
           }
         ],
         "responses": {
@@ -993,7 +1013,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ParameterList"
+                  "$ref": "#/components/schemas/ParameterPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -2659,7 +2688,7 @@
           "bool"
         ]
       },
-      "ParameterList": {
+      "ParameterPage": {
         "type": "object",
         "required": [
           "items"
@@ -2670,6 +2699,13 @@
             "items": {
               "$ref": "#/components/schemas/Parameter"
             }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `cursor` for the next page (the last key); absent on the last page."
           }
         }
       },

@@ -103,15 +103,37 @@ fn internal(e: serde_json::Error) -> Error {
     Error::Internal(e.to_string())
 }
 
-/// All parameters, by key. ponytail: unpaginated; tenants have tens to hundreds of them.
-pub async fn list(tx: &mut TenantTx) -> Result<Vec<Parameter>, Error> {
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ParameterPage {
+    pub items: Vec<Parameter>,
+    /// Pass as `cursor` for the next page (the last key); absent on the last page.
+    pub next_cursor: Option<String>,
+}
+
+pub const MAX_PAGE: i64 = 100;
+
+/// Parameters by key, keyset-paginated on the key.
+pub async fn list(
+    tx: &mut TenantTx,
+    cursor: Option<&str>,
+    limit: i64,
+) -> Result<ParameterPage, Error> {
+    if !(1..=MAX_PAGE).contains(&limit) {
+        return Err(invalid(
+            "invalid_limit",
+            format!("limit must be between 1 and {MAX_PAGE}"),
+        ));
+    }
     let rows = sqlx::query!(
         "SELECT id, key, name_i18n, kind, unit, filterable, created_at, updated_at
-         FROM parameters ORDER BY key"
+         FROM parameters WHERE $1::text IS NULL OR key > $1 ORDER BY key LIMIT $2",
+        cursor,
+        limit + 1
     )
     .fetch_all(&mut **tx)
     .await?;
-    rows.into_iter()
+    let mut items = rows
+        .into_iter()
         .map(|r| {
             Ok(Parameter {
                 id: r.id,
@@ -124,7 +146,16 @@ pub async fn list(tx: &mut TenantTx) -> Result<Vec<Parameter>, Error> {
                 updated_at: r.updated_at,
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, Error>>()?;
+    let limit = usize::try_from(limit).unwrap_or(usize::MAX);
+    let more = items.len() > limit;
+    items.truncate(limit);
+    let next_cursor = if more {
+        items.last().map(|p| p.key.clone())
+    } else {
+        None
+    };
+    Ok(ParameterPage { items, next_cursor })
 }
 
 pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<Parameter, Error> {
@@ -188,6 +219,11 @@ pub async fn update(
     input: &ParameterInput,
 ) -> Result<Parameter, Error> {
     input.validate()?;
+    // Serializes with product saves validating values of this parameter (FOR SHARE there).
+    sqlx::query!("SELECT id FROM parameters WHERE id = $1 FOR UPDATE", id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)?;
     let before = get(tx, id).await?;
     if before.kind != input.kind {
         let used = sqlx::query_scalar!(
