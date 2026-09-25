@@ -3,6 +3,7 @@
  * delivers signed events to the mock receiver; a failing receiver shows up as a retrying
  * delivery (HTTP 500) in the log, and a succeeded delivery can be redelivered.
  */
+
 import {
   type APIRequestContext,
   type BrowserContext,
@@ -10,6 +11,7 @@ import {
   type Page,
   test,
 } from "@playwright/test";
+import { testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, run, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
@@ -72,7 +74,7 @@ async function expectDelivery(row: RegExp) {
 test.beforeAll(async ({ browser, request }) => {
   createTenant(`wh-${run}`, `Webhooks ${run}`, owner);
   await request.delete(`${MOCKS}/webhooks/${bucket}`);
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
   const since = new Date(Date.now() - 1000);

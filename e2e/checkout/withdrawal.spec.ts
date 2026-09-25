@@ -119,6 +119,8 @@ test("guest withdrawal: emailed link, explicit confirmation, receipt, restock an
   await row.getByRole("button", { name: "Refund withdrawal" }).click();
   await admin.getByRole("dialog").getByRole("button", { name: "Refund withdrawal" }).click();
   await eventually(async () => (await order(page, CZ, token)).status === "returned");
+  // Return state commits before the refund job settles the payment; assert that transition too.
+  await eventually(async () => (await order(page, CZ, token)).payment.status === "refunded");
   const refunded = await order(page, CZ, token);
   expect(refunded.payment.status).toBe("refunded");
   const shipping = sql(

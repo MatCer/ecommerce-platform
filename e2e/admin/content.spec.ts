@@ -1,6 +1,8 @@
 /** WP13a: owner content, legal readiness, feed migration and search settings. */
+
 import { join } from "node:path";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, root, run, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
@@ -28,7 +30,7 @@ async function addBlock(name: string) {
 
 test.beforeAll(async ({ browser }) => {
   createTenant(`content-${run}`, `Content ${run}`, owner);
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
 });

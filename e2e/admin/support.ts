@@ -1,4 +1,5 @@
 /** Helpers for the admin e2e suite: stack env, superadmin CLI, Mailpit, axe, screenshots. */
+
 import { execFileSync } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -8,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
 import AxeBuilder from "@axe-core/playwright";
 import { type Browser, expect, type Page } from "@playwright/test";
+import { testContext } from "../rate-client";
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -28,31 +30,34 @@ function env(name: string, fallback: string): string {
 export const mailpit = `http://127.0.0.1:${env("MAILPIT_UI_PORT", "58025")}`;
 export const run = Date.now().toString(36);
 
+/** Direct exec avoids Compose's per-call project resolution and bounds a stuck test probe. */
+export function dockerExec(service: "api" | "postgres", args: string[]): string {
+  const project = env("COMPOSE_PROJECT_NAME", "ecommerce");
+  return execFileSync("docker", ["exec", `${project}-${service}-1`, ...args], {
+    cwd: root,
+    env: process.env,
+    encoding: "utf8",
+    timeout: 20_000,
+  });
+}
+
 /** Superadmin CLI in the api container (like `make admin args=...`). */
 export function createTenant(
   slug: string,
   name: string,
   ownerEmail: string,
 ): { tenant_id: string } {
-  const out = execFileSync(
-    "docker",
-    [
-      "compose",
-      "exec",
-      "-T",
-      "api",
-      "/usr/local/bin/api",
-      "admin",
-      "create-tenant",
-      "--slug",
-      slug,
-      "--name",
-      name,
-      "--owner-email",
-      ownerEmail,
-    ],
-    { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
-  );
+  const out = dockerExec("api", [
+    "/usr/local/bin/api",
+    "admin",
+    "create-tenant",
+    "--slug",
+    slug,
+    "--name",
+    name,
+    "--owner-email",
+    ownerEmail,
+  ]);
   return JSON.parse(out) as { tenant_id: string };
 }
 
@@ -196,24 +201,7 @@ export async function totp(secret: string): Promise<string> {
  * assertions the UI does not show (WP12: invoice dates, stock). Returns psql's unaligned output.
  */
 export function sql(query: string): string {
-  return execFileSync(
-    "docker",
-    [
-      "compose",
-      "exec",
-      "-T",
-      "postgres",
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "app",
-      "-At",
-      "-c",
-      query,
-    ],
-    { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
-  ).trim();
+  return dockerExec("postgres", ["psql", "-U", "postgres", "-d", "app", "-At", "-c", query]).trim();
 }
 
 /** Runs a worker job now instead of waiting for its cron slot (e.g. `shipping.track`). */
@@ -227,7 +215,7 @@ export function enqueueJob(kind: string): void {
 /** The seeded demo owner, signed in once per file (the auth service rate-limits sign-ins). */
 export async function signInOwner(browser: Browser): Promise<Page> {
   const owner = "owner@lnen.example";
-  const page = await (await browser.newContext()).newPage();
+  const page = await (await testContext(browser)).newPage();
   await useEnglish(page);
   await page.goto("/login");
   const since = new Date(Date.now() - 1000);

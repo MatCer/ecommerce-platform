@@ -122,13 +122,13 @@ jobs:
           load: true
           cache-from: type=gha,scope=mocks
           cache-to: type=gha,scope=mocks,mode=max
-      # Built only: the auth service needs Postgres to start (it migrates its schema).
       - name: Build auth image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/auth/Dockerfile
           tags: ecommerce-auth:ci
+          load: true
           cache-from: type=gha,scope=auth
           cache-to: type=gha,scope=auth,mode=max
       - name: Build admin image
@@ -149,7 +149,7 @@ jobs:
           load: true
           cache-from: type=gha,scope=theme-builder
           cache-to: type=gha,scope=theme-builder,mode=max
-      - run: scripts/smoke-images.sh ecommerce-rust:ci ecommerce-mocks:ci ecommerce-theme-builder:ci
+      - run: scripts/smoke-images.sh ecommerce-rust:ci ecommerce-mocks:ci ecommerce-theme-builder:ci ecommerce-auth:ci
 
   ts:
     name: TypeScript (Biome, typecheck, vitest)
@@ -165,3 +165,45 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run typecheck
       - run: pnpm test
+
+  acceptance:
+    name: M1 browser, accessibility and performance
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'acceptance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: "6"
+      COMPOSE_PROJECT_NAME: acceptance
+    steps:
+      - name: Free disk space for the full stack
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @platform/e2e exec playwright install --with-deps chromium
+      - name: Isolate Compose networks
+        run: |
+          cp .env.example .env
+          sed -i 's/^COMPOSE_PROJECT_NAME=.*/COMPOSE_PROJECT_NAME=acceptance/' .env
+          cat > docker-compose.override.yml <<'EOF'
+          networks:
+            default:
+              ipam:
+                config:
+                  - subnet: 10.213.15.0/24
+            theme-check:
+              ipam:
+                config:
+                  - subnet: 10.213.115.0/24
+          EOF
+      - run: make up
+      - run: make seed
+      - run: make perf
+      - run: make e2e
+      - name: Stop acceptance stack
+        if: always()
+        run: docker compose -p acceptance down -v

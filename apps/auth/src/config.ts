@@ -28,6 +28,8 @@ export interface Config {
    * one IP there.
    */
   signInRateMax: number;
+  /** Local Playwright-only HMAC secret; refused unless APP_ENV=dev. */
+  e2eRateSecret?: string;
   port: number;
 }
 
@@ -76,6 +78,13 @@ function signInRateMax(raw: string | undefined): number {
 export function loadConfig(env: Env = process.env): Config {
   const port = Number(env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error("PORT is invalid");
+  const e2eRateSecret = env.E2E_RATE_SECRET?.trim() || undefined;
+  if (e2eRateSecret && env.APP_ENV !== "dev") {
+    throw new Error("E2E_RATE_SECRET is allowed only when APP_ENV=dev");
+  }
+  if (e2eRateSecret && e2eRateSecret.length < 32) {
+    throw new Error("E2E_RATE_SECRET must be at least 32 characters");
+  }
   return {
     databaseUrl: required(env, "DATABASE_URL"),
     secret: secret(env, "BETTER_AUTH_SECRET"),
@@ -87,6 +96,7 @@ export function loadConfig(env: Env = process.env): Config {
     internalToken: secret(env, "AUTH_INTERNAL_TOKEN"),
     clientIpHeader: clientIpHeader(env.AUTH_CLIENT_IP_HEADER),
     signInRateMax: signInRateMax(env.AUTH_SIGNIN_RATE_MAX),
+    e2eRateSecret,
     port,
   };
 }

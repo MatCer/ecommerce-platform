@@ -43,6 +43,22 @@ pub const TENANT: &str = "demo";
 const ACTOR: &str = "seed";
 const SK_HOST: &str = "demo-sk.localhost";
 
+/// Only the pre-WP16 stock text is replaced on reruns; merchant-edited legal copy survives.
+fn legacy_review_copy(blocks: &[commerce::content::Block]) -> bool {
+    blocks.iter().any(|block| {
+        let commerce::content::Block::RichText { html } = block else {
+            return false;
+        };
+        [
+            "nezveřejňuje recenze",
+            "nezverejňuje recenzie",
+            "does not publish customer reviews",
+        ]
+        .iter()
+        .any(|old| html.contains(old))
+    })
+}
+
 /// A color variant of a fixture photo: the image is the fixture with its hue rotated.
 struct Color {
     code: &'static str,
@@ -1427,7 +1443,7 @@ impl Seeder<'_> {
                 &mut tx,
                 ACTOR,
                 &LegalEntity {
-                    company_name: "Demo Shop s.r.o.".into(),
+                    company_name: "Lnen & Co. s.r.o.".into(),
                     company_id: "12345678".into(),
                     street: "Dlouhá 1".into(),
                     city: "Praha 1".into(),
@@ -1456,6 +1472,57 @@ impl Seeder<'_> {
                 translations: p.translations,
             };
             content::update(&mut tx, ACTOR, id, &input).await?;
+        }
+
+        // Demo databases seeded before WP16 still have the old stock disclosure saying the
+        // shop has no reviews. Refresh only that exact legacy copy; preserve edited pages.
+        let review_id = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM pages WHERE legal_type = 'reviews' LIMIT 1",
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(review_id) = review_id {
+            let mut page = content::get(&mut tx, review_id).await?;
+            let mut refreshed = false;
+            let legal_entity = legal::entity(&mut tx).await?.entity;
+            let shop_name: String =
+                sqlx::query_scalar("SELECT name FROM platform.tenants WHERE id = $1")
+                    .bind(tenant_id)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            let vat_id = tax::get(&mut tx).await?.and_then(|profile| profile.vat_id);
+            for translation in &mut page.translations {
+                if !legacy_review_copy(&translation.blocks) {
+                    continue;
+                }
+                if let Some((title, blocks)) = legal::render(
+                    &translation.locale,
+                    content::LegalType::Reviews,
+                    &legal_entity,
+                    &shop_name,
+                    vat_id.as_deref(),
+                ) {
+                    translation.title = title;
+                    translation.blocks = blocks;
+                    refreshed = true;
+                }
+            }
+            if refreshed {
+                content::update(
+                    &mut tx,
+                    ACTOR,
+                    review_id,
+                    &PageInput {
+                        kind: page.kind,
+                        legal_type: page.legal_type,
+                        status: page.status,
+                        published_at: page.published_at,
+                        image_asset_id: page.image_asset_id,
+                        translations: page.translations,
+                    },
+                )
+                .await?;
+            }
         }
 
         let text = |html: &str| Block::RichText { html: html.into() };
@@ -1490,14 +1557,14 @@ impl Seeder<'_> {
                 PageKind::Page,
                 vec![
                     tr("cs", "Kontakt", "kontakt", vec![
-                        text("<p>Demo Shop s.r.o., Dlouhá 1, 110 00 Praha 1</p><p>E-mail: <a href=\"mailto:info@demo.localhost\">info@demo.localhost</a>, telefon +420 800 123 456 (Po–Pá 9–17).</p>"),
+                        text("<p>Lnen &amp; Co. s.r.o., Dlouhá 1, 110 00 Praha 1</p><p>E-mail: <a href=\"mailto:info@demo.localhost\">info@demo.localhost</a>, telefon +420 800 123 456 (Po–Pá 9–17).</p>"),
                         Block::Faq { items: vec![
                             FaqItem { question: "Kdy mi přijde objednávka?".into(), answer_html: "<p>Obvykle do dvou pracovních dnů.</p>".into() },
                             FaqItem { question: "Jak vrátit zboží?".into(), answer_html: "<p>Do 14 dnů bez udání důvodu, viz Odstoupení od smlouvy.</p>".into() },
                         ]},
                     ]),
                     tr("sk", "Kontakt", "kontakt", vec![
-                        text("<p>Demo Shop s.r.o., Dlouhá 1, 110 00 Praha 1</p><p>E-mail: <a href=\"mailto:info@demo.localhost\">info@demo.localhost</a></p>"),
+                        text("<p>Lnen &amp; Co. s.r.o., Dlouhá 1, 110 00 Praha 1</p><p>E-mail: <a href=\"mailto:info@demo.localhost\">info@demo.localhost</a></p>"),
                     ]),
                 ],
             ),
@@ -1574,6 +1641,18 @@ impl Seeder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_review_copy_is_detected_without_overwriting_current_copy() {
+        let old = [commerce::content::Block::RichText {
+            html: "Náš obchod nezveřejňuje recenze zákazníků.".into(),
+        }];
+        let current = [commerce::content::Block::RichText {
+            html: "Zveřejňujeme ověřené pozitivní i negativní recenze.".into(),
+        }];
+        assert!(legacy_review_copy(&old));
+        assert!(!legacy_review_copy(&current));
+    }
 
     #[test]
     fn slugs_and_prices() {

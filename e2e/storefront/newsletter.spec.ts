@@ -11,11 +11,13 @@
  * Recipient B's category affinity is inserted directly (the hourly WP17 rollup derives it from
  * orders; that path has its own tests).
  */
+
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { magicLink, mailpit, root, run, useEnglish } from "../admin/support.ts";
+import { testContext } from "../rate-client";
 import { CZ, decideConsent, expectAccessible } from "./support.ts";
 
 const port = new URL(CZ).port;
@@ -138,7 +140,7 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
   const started = new Date(Date.now() - 5_000).toISOString();
   const a = `nl-a-${run}@example.com`;
   const b = `nl-b-${run}@example.com`;
-  const shopper = await browser.newContext({ locale: "cs-CZ" });
+  const shopper = await testContext(browser, { locale: "cs-CZ" });
   await decideConsent(shopper);
   const page = await shopper.newPage();
   await subscribe(page, a);
@@ -153,7 +155,7 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
   ).toBe("true,double_opt_in");
 
   // Staff: an Admin API token of the demo owner.
-  const staff = await browser.newContext({ locale: "en-US" });
+  const staff = await testContext(browser, { locale: "en-US" });
   const admin = await staff.newPage();
   await useEnglish(admin);
   const since = new Date(Date.now() - 1000);

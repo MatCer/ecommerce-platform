@@ -1,11 +1,13 @@
 /**
  * Customer account on the checkout origin (WP9, spec A1, A4, A5, A20) against the seeded demo
- * shop (`make up && make seed && make theme-build`): email-link sign-in via Mailpit, addresses,
+ * shop (`make up && make seed`): email-link sign-in via Mailpit, addresses,
  * password, sign-out, password sign-in, cart merge, the theme's consent banner → the platform
  * record → the preferences page.
  */
+
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, mailpit, run } from "../admin/support";
+import { rateHeaders, testContext } from "../rate-client";
 
 const port = process.env.HTTP_PORT ?? "8080";
 const shop = `http://demo.localhost:${port}`;
@@ -18,7 +20,7 @@ test.describe.configure({ mode: "serial" });
 let page: Page;
 
 test.beforeAll(async ({ browser }) => {
-  page = await (await browser.newContext({ locale: "cs-CZ" })).newPage();
+  page = await (await testContext(browser, { locale: "cs-CZ" })).newPage();
 });
 
 test.afterAll(async () => {
@@ -49,12 +51,14 @@ async function accountLink(to: string, since: Date): Promise<string> {
 /** Puts `quantity` of a seeded variant into a new shop-origin cart and hands it to checkout. */
 async function cartToCheckout(quantity: number): Promise<void> {
   await page.goto(`${shop}/`);
-  const product = await page.request.get(`${shop}/_p/public/pages/product/tricko-basic`);
+  const product = await page.request.get(`${shop}/_p/public/pages/product/tricko-basic`, {
+    headers: rateHeaders(page),
+  });
   expect(product.ok()).toBe(true);
   const model = (await product.json()) as { product: { variants: { id: string }[] } };
   const variant = model.product.variants[0]?.id;
   const added = await page.request.post(`${shop}/_p/cart/lines`, {
-    headers: { origin: shop },
+    headers: { origin: shop, ...rateHeaders(page) },
     data: { variant_id: variant, quantity },
   });
   expect(added.status()).toBe(200);

@@ -3,8 +3,10 @@
  * a shop cart handed to checkout, the address form, the pickup-point widget, placing the
  * order, the fake gateway and the order model.
  */
+
 import { type Browser, expect, type Page } from "@playwright/test";
 import { mailpit } from "../admin/support";
+import { rateHeaders, testContext } from "../rate-client";
 
 const port = process.env.HTTP_PORT ?? "8080";
 export const CZ = `http://demo.localhost:${port}`;
@@ -31,7 +33,7 @@ export interface OrderModel {
 }
 
 export async function newPage(browser: Browser, locale = "cs-CZ"): Promise<Page> {
-  const ctx = await browser.newContext({ locale });
+  const ctx = await testContext(browser, { locale });
   // A decided consent keeps the theme's banner closed.
   await ctx.addCookies([
     { name: "consent", value: "", url: CZ },
@@ -50,7 +52,9 @@ export async function toCheckout(
 ): Promise<CartModel> {
   await page.goto(`${shop}/`);
   const model = (await (
-    await page.request.get(`${shop}/_p/public/pages/product/${slug}`)
+    await page.request.get(`${shop}/_p/public/pages/product/${slug}`, {
+      headers: rateHeaders(page),
+    })
   ).json()) as {
     product: { variants: { id: string }[] };
   };
@@ -58,7 +62,7 @@ export async function toCheckout(
   let added = 0;
   for (const v of model.product.variants) {
     const res = await page.request.post(`${shop}/_p/cart/lines`, {
-      headers: { origin: shop },
+      headers: { origin: shop, ...rateHeaders(page) },
       data: { variant_id: v.id, quantity },
     });
     added = res.status();
@@ -67,12 +71,14 @@ export async function toCheckout(
   expect(added).toBe(200);
   if (coupon) {
     const applied = await page.request.post(`${shop}/_p/cart/coupons`, {
-      headers: { origin: shop },
+      headers: { origin: shop, ...rateHeaders(page) },
       data: { code: coupon },
     });
     expect(applied.status()).toBe(200);
   }
-  const cart = (await (await page.request.get(`${shop}/_p/cart`)).json()) as CartModel;
+  const cart = (await (
+    await page.request.get(`${shop}/_p/cart`, { headers: rateHeaders(page) })
+  ).json()) as CartModel;
   await Promise.all([
     page.waitForURL(`${checkoutOf(shop)}/`),
     page.evaluate(() => {

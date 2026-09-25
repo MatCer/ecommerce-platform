@@ -13,6 +13,13 @@ function required(name: string): string {
 const artifactRoot = required("ARTIFACT_ROOT");
 const apiOrigin = required("API_ORIGIN");
 const serviceToken = required("INTERNAL_API_TOKEN");
+const e2eRateSecret = process.env.E2E_RATE_SECRET?.trim() || undefined;
+if (e2eRateSecret && process.env.APP_ENV !== "dev") {
+  throw new Error("E2E_RATE_SECRET is allowed only when APP_ENV=dev");
+}
+if (e2eRateSecret && e2eRateSecret.length < 32) {
+  throw new Error("E2E_RATE_SECRET must be at least 32 characters");
+}
 const counters = new Counters();
 const gateway = createGateway({
   artifactRoot,
@@ -29,6 +36,7 @@ const gateway = createGateway({
   // WP23: theme previews, verified by the API; framed only by the admin origin (A21).
   previews: new ApiPreviewResolver(apiOrigin, serviceToken),
   adminOrigin: process.env.ADMIN_ORIGIN || undefined,
+  e2eRateSecret,
 });
 
 const port = Number(process.env.PORT ?? 8787);

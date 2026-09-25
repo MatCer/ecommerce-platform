@@ -3,7 +3,7 @@
  * history and runs the backfill rollup). Bought together on the product page, bestsellers on
  * the home page for everyone, personal picks only with the server-side `personalization`
  * consent (A20), the cart drawer cross-sell, recently viewed with live prices (rehydrated
- * without identity), and private answers never cached (A2). Needs `make up && make seed && make theme-build`.
+ * without identity), and private answers never cached (A2). Needs `make up && make seed`.
  */
 import { expect, type Page, test } from "@playwright/test";
 import { CZ, decideConsent, expectAccessible, grantConsent, hydrated } from "./support";

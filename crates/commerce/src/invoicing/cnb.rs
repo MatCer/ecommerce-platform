@@ -13,7 +13,7 @@
 //! EMU|euro|1|EUR|24,305
 //! ```
 
-use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveTime, Utc, Weekday};
 use platform::Error;
 use sqlx::PgPool;
 
@@ -89,13 +89,15 @@ pub fn parse(text: &str) -> Result<Fixing, ParseError> {
 }
 
 /// Whether `fixing_date` is the rate for a taxable supply on `duzp`, asked at `now`: the same
-/// date always; an earlier one when `duzp` is in the past (ČNB already fell back for a weekend
-/// or holiday) or today's fixing would have been published by now (today is a holiday).
+/// date always; an earlier one when `duzp` is in the past, today is a known weekend (no fixing
+/// will be published), or today's fixing would have been published by now (today is a holiday).
 pub fn acceptable(fixing_date: NaiveDate, duzp: NaiveDate, now: DateTime<Utc>) -> bool {
     let today = prague::date(now);
     let published = NaiveTime::from_hms_opt(PUBLISHED_BY.0, PUBLISHED_BY.1, 0)
         .is_some_and(|t| prague::time(now) >= t);
-    fixing_date == duzp || (fixing_date < duzp && (duzp < today || published))
+    let weekend = matches!(duzp.weekday(), Weekday::Sat | Weekday::Sun);
+    fixing_date == duzp
+        || (fixing_date < duzp && (duzp < today || (duzp == today && (weekend || published))))
 }
 
 /// Downloads the fixing valid on `date`.
@@ -224,6 +226,23 @@ mod tests {
 
     #[test]
     fn earlier_fixings_are_accepted_only_when_final() {
+        // A weekend has no same-day fixing: Friday is final from the first minute of Saturday.
+        assert!(acceptable(
+            d(2026, 9, 25),
+            d(2026, 9, 26),
+            at("2026-09-25T22:10:00Z")
+        ));
+        assert!(acceptable(
+            d(2026, 9, 25),
+            d(2026, 9, 27),
+            at("2026-09-27T06:00:00Z")
+        ));
+        // A future weekend cannot use a rate before its supply date.
+        assert!(!acceptable(
+            d(2026, 9, 25),
+            d(2026, 9, 27),
+            at("2026-09-25T09:00:00Z")
+        ));
         // Saturday 26 Sep: ČNB answers with Friday's fixing; the supply is in the past.
         assert!(acceptable(
             d(2026, 9, 25),

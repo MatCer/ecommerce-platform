@@ -1,10 +1,11 @@
 /**
- * WP20 acceptance against the seeded demo shop (`make up && make seed && make theme-build`):
+ * WP20 acceptance against the seeded demo shop (`make up && make seed`):
  * the owner configures the four ad platforms and tests a connection; orders and a beacon of a
  * visitor who allowed ads reach the vendor mocks with hashed identifiers, a visitor who refused
  * ads sends nothing; withdrawing consent cancels a delivery held by a paused platform; a vendor
  * failure is retried and ends as a failed delivery in the log.
  */
+
 import { createHash } from "node:crypto";
 import {
   type APIRequestContext,
@@ -14,6 +15,7 @@ import {
   type Page,
   test,
 } from "@playwright/test";
+import { testContext } from "../rate-client";
 import { expectAccessible, magicLink, run, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
@@ -50,7 +52,7 @@ async function accepted(request: APIRequestContext, platform: string): Promise<s
 
 /** A shopper who answers the theme's consent banner: ads only, or refuse everything. */
 async function shopper(browser: Browser, ads: boolean): Promise<Page> {
-  const ctx = await browser.newContext({ locale: "cs-CZ" });
+  const ctx = await testContext(browser, { locale: "cs-CZ" });
   const p = await ctx.newPage();
   await p.goto(`${CZ}/p/tricko-henley`);
   const banner = p.getByRole("region", { name: "Souhlas s cookies" });
@@ -173,7 +175,7 @@ async function expectDelivery(row: RegExp) {
 test.beforeAll(async ({ browser, request }) => {
   for (const p of ["meta", "ga4", "google", "sklik"])
     await request.delete(`${MOCKS}/ads/${p}/requests`);
-  admin = await browser.newContext();
+  admin = await testContext(browser);
   page = await admin.newPage();
   await useEnglish(page);
   const since = new Date(Date.now() - 1000);

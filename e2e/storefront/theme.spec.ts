@@ -1,9 +1,11 @@
 /**
  * Default theme on the seeded demo shop (WP8): browsing CZ + SK (+ the /cs locale prefix),
  * filters, search, variants, cart, checkout handoff, keyboard-only use, consent and axe.
- * Needs `make up && make seed && make theme-build`.
+ * Needs `make up && make seed`.
  */
+
 import { expect, type Page, test } from "@playwright/test";
+import { testContext } from "../rate-client";
 import { CZ, decideConsent, expectAccessible, hydrated, SK, screenshot } from "./support";
 
 const main = (page: Page) => page.getByRole("main");
@@ -95,7 +97,7 @@ test("filters are a GET form: facet, active chip, noindex, removal", async ({ pa
 });
 
 test("filters work without JavaScript", async ({ browser }) => {
-  const ctx = await browser.newContext({ javaScriptEnabled: false });
+  const ctx = await testContext(browser, { javaScriptEnabled: false });
   const page = await ctx.newPage();
   await page.goto(`${CZ}/c/obleceni`);
   await page.locator("summary", { hasText: "Materiál" }).click();
@@ -216,7 +218,7 @@ test("keyboard only: skip link, header, product page, cart", async ({ page, cont
 test("phone sheets (menu, filters): Escape closes, focus never stays behind an open sheet", async ({
   browser,
 }) => {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const ctx = await testContext(browser, { viewport: { width: 390, height: 844 } });
   await decideConsent(ctx);
   const page = await ctx.newPage();
   await page.goto(`${CZ}/c/obleceni`);
@@ -244,7 +246,7 @@ test("RUM: a consented, sampled visit beacons its Web Vitals on leave; no consen
   browser,
 }) => {
   for (const consent of ["analytics", ""]) {
-    const ctx = await browser.newContext();
+    const ctx = await testContext(browser);
     await decideConsent(ctx, CZ, consent);
     await ctx.addInitScript(() => {
       Math.random = () => 0; // inside the 10 % sample
@@ -318,38 +320,4 @@ test.describe("consent (A20)", () => {
     const recent = page.getByRole("region", { name: "Naposledy prohlížené" });
     await expect(recent.getByRole("link", { name: "Mikina Fleece" })).toBeVisible();
   });
-});
-
-test.describe("screenshots", () => {
-  test.skip(!process.env.WP8_SCREENSHOTS, "set WP8_SCREENSHOTS=1 to refresh docs/screenshots/wp8");
-  for (const [name, viewport] of [
-    ["mobile", { width: 390, height: 844 }],
-    ["desktop", { width: 1366, height: 900 }],
-  ] as const) {
-    test(name, async ({ browser }) => {
-      const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 });
-      await decideConsent(ctx);
-      const page = await ctx.newPage();
-      for (const [slug, url] of [
-        ["home", `${CZ}/`],
-        ["category", `${CZ}/c/obleceni`],
-        ["product", `${CZ}/p/mikina-fleece`],
-        ["search", `${CZ}/search?q=mikina`],
-        ["sk-category", `${SK}/c/oblecenie`],
-      ] as const) {
-        await page.goto(url, { waitUntil: "networkidle" });
-        // Lazy images below the fold: scroll through once so the full-page shot is complete.
-        await page.evaluate(async () => {
-          for (let y = 0; y < document.body.scrollHeight; y += 600) {
-            window.scrollTo(0, y);
-            await new Promise((r) => setTimeout(r, 60));
-          }
-          window.scrollTo(0, 0);
-        });
-        await page.waitForLoadState("networkidle");
-        await screenshot(page, `${slug}-${name}`);
-      }
-      await ctx.close();
-    });
-  }
 });

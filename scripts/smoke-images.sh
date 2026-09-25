@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Smoke-tests built images without the rest of the stack (used by CI, runnable locally):
-#   scripts/smoke-images.sh <rust-image> <mocks-image> [<theme-builder-image>]
+#   scripts/smoke-images.sh <rust-image> <mocks-image> [<theme-builder-image>] [<auth-image>]
 # api: /healthz 200, `api healthcheck` exits 0, /readyz fails closed (503) with no dependencies.
 # worker: stays up without a database, exits 0 on SIGTERM. mocks: /healthz 200.
 # theme-builder (WP23): /healthz 200 and /readyz 503 without the sandbox proxy; the sandbox
@@ -9,14 +9,17 @@ set -euo pipefail
 rust_image=$1
 mocks_image=$2
 builder_image=${3:-}
+auth_image=${4:-}
 suffix=$$
 api=smoke-api-$suffix
 worker=smoke-worker-$suffix
 mocks=smoke-mocks-$suffix
 builder=smoke-builder-$suffix
 proxy=smoke-proxy-$suffix
+postgres=smoke-postgres-$suffix
+auth=smoke-auth-$suffix
 
-cleanup() { docker rm -f "$api" "$worker" "$mocks" "$builder" "$proxy" >/dev/null 2>&1 || true; }
+cleanup() { docker rm -f "$api" "$worker" "$mocks" "$builder" "$proxy" "$auth" "$postgres" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
 # Nothing listens on port 1: dependencies are down, which the processes must tolerate.
@@ -42,6 +45,8 @@ fail() {
   docker logs "$api" 2>&1 | tail -20 >&2 || true
   docker logs "$worker" 2>&1 | tail -20 >&2 || true
   docker logs "$mocks" 2>&1 | tail -20 >&2 || true
+  docker logs "$auth" 2>&1 | tail -20 >&2 || true
+  docker logs "$postgres" 2>&1 | tail -20 >&2 || true
   exit 1
 }
 
@@ -59,6 +64,33 @@ docker stop -t 10 "$worker" >/dev/null
 [[ $(docker inspect -f '{{.State.ExitCode}}' "$worker") == 0 ]] || fail "worker did not exit cleanly"
 docker stop -t 10 "$api" >/dev/null
 [[ $(docker inspect -f '{{.State.ExitCode}}' "$api") == 0 ]] || fail "api did not exit cleanly"
+
+if [[ -n $auth_image ]]; then
+  # Better Auth migrates on boot; a real disposable Postgres proves the image starts and serves
+  # HTTP. They share one temporary network namespace, so no Compose project is touched.
+  docker run -d --name "$postgres" -p 127.0.0.1::3000 \
+    -e POSTGRES_PASSWORD=smoke-local-password postgres:17.11 >/dev/null
+  for _ in $(seq 30); do
+    docker exec "$postgres" pg_isready -U postgres >/dev/null 2>&1 && break
+    sleep 1
+  done
+  docker exec "$postgres" pg_isready -U postgres >/dev/null 2>&1 || fail "Postgres for auth"
+  docker run -d --name "$auth" --network "container:$postgres" \
+    -e DATABASE_URL=postgres://postgres:smoke-local-password@127.0.0.1:5432/postgres \
+    -e BETTER_AUTH_SECRET=smoke-better-auth-secret-0123456789abcdef \
+    -e BETTER_AUTH_URL=http://admin.localhost:8080 \
+    -e ADMIN_ORIGIN=http://admin.localhost:8080 \
+    -e SMTP_URL=smtp://127.0.0.1:1 \
+    -e AUTH_INTERNAL_TOKEN=smoke-auth-internal-token-0123456789abcdef \
+    "$auth_image" >/dev/null
+  auth_url="http://$(docker port "$postgres" 3000/tcp)"
+  curl -fsS --retry 30 --retry-delay 1 --retry-all-errors "$auth_url/healthz" >/dev/null \
+    || fail "auth /healthz with Postgres"
+  docker stop -t 10 "$auth" >/dev/null
+  [[ $(docker inspect -f '{{.State.ExitCode}}' "$auth") == 0 ]] \
+    || fail "auth did not exit cleanly"
+  echo "auth image OK: migrated and served /healthz against disposable Postgres"
+fi
 
 if [[ -n $builder_image ]]; then
   sandbox_env=(-e SANDBOX_IMAGE="$builder_image" -e SANDBOX_LABEL=smoke -e SANDBOX_VOLUME=smoke_theme-work

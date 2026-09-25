@@ -6,9 +6,10 @@
  *
  * Note: every run raises the demo shop's SK T-shirt prices by 5 %.
  */
-import { execFileSync } from "node:child_process";
+
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { expectAccessible, magicLink, root, useEnglish } from "./support.ts";
+import { testContext } from "../rate-client";
+import { dockerExec, expectAccessible, magicLink, sql as querySql, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
 const owner = "owner@lnen.example";
@@ -16,33 +17,15 @@ const productName = "Tričko s dlouhým rukávem";
 let context: BrowserContext;
 let page: Page;
 
-function compose(args: string[]): string {
-  return execFileSync("docker", ["compose", ...args], {
-    cwd: root,
-    env: { ...process.env, COMPOSE_PROFILES: "full" },
-    encoding: "utf8",
-  });
-}
-
 /** Superadmin override of the demo shop's AI allowance (`undefined` = plan default). */
 function setQuota(tokens?: number): void {
   const extra = tokens === undefined ? [] : ["--tokens", String(tokens)];
-  compose([
-    "exec",
-    "-T",
-    "api",
-    "/usr/local/bin/api",
-    "admin",
-    "set-ai-quota",
-    "--tenant",
-    "demo",
-    ...extra,
-  ]);
+  dockerExec("api", ["/usr/local/bin/api", "admin", "set-ai-quota", "--tenant", "demo", ...extra]);
 }
 
 /** One query as the database superuser (checks only; RLS does not apply). */
 function sql(query: string): string[] {
-  return compose(["exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "app", "-tAc", query])
+  return querySql(query)
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
@@ -83,7 +66,7 @@ async function openProduct(): Promise<void> {
 
 test.beforeAll(async ({ browser }) => {
   setQuota();
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
   await page.goto("/login");

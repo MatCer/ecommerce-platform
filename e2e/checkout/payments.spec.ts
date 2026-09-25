@@ -6,9 +6,11 @@
  * in the exceptions queue, and cash on delivery delivered → collected in cash (rounding) →
  * remitted in the order detail.
  */
+
 import { createHmac } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, magicLink, run, useEnglish } from "../admin/support";
+import { testContext } from "../rate-client";
 import {
   acceptAndPlace,
   CZ,
@@ -64,7 +66,7 @@ function camt053(id: string, amountMinor: number, vs: string): Buffer {
 let admin: Page;
 
 test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   admin = await ctx.newPage();
   await useEnglish(admin);
   await admin.goto("/login");

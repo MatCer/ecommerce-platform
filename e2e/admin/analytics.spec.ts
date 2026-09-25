@@ -3,7 +3,9 @@
  * controls; the seeded demo shop (`make seed`) shows sales after an order is placed, the
  * "consented sessions" funnel label (A20), charts with text alternatives, and passes axe.
  */
+
 import { expect, type Page, test } from "@playwright/test";
+import { testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, run, useEnglish } from "./support.ts";
 
 const port = process.env.HTTP_PORT ?? "8080";
@@ -100,11 +102,11 @@ test("a new shop shows the empty state; the range controls drive the URL", async
 test("the demo shop dashboard shows sales, the consented-sessions funnel and passes axe", async ({
   browser,
 }) => {
-  const shopper = await (await browser.newContext({ locale: "sk-SK" })).newPage();
+  const shopper = await (await testContext(browser, { locale: "sk-SK" })).newPage();
   await placeSkOrder(shopper);
   await shopper.context().close();
 
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   const page = await ctx.newPage();
   await signIn(page, "owner@lnen.example");
 

@@ -1,12 +1,15 @@
 /**
  * Checkout and order placement (WP10) against the seeded demo shop
- * (`make up && make seed && make theme-build`): guest checkout with a Packeta pickup point from
+ * (`make up && make seed`): guest checkout with a Packeta pickup point from
  * the mock widget and the fake gateway, the confirmation page and email, SK home delivery,
  * a failed payment retried, coupon + sale totals, a signed-in customer's account, and a guest
  * order linked after an email-link sign-in (A5).
  */
+
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, magicLink, mailpit, run, useEnglish } from "../admin/support";
+import { testContext } from "../rate-client";
+import { hydrated } from "../storefront/support";
 import {
   acceptAndPlace,
   CZ,
@@ -92,6 +95,57 @@ test("guest checkout in CZ: Packeta pickup point, fake payment, confirmation pag
   expect(confirmation.Text).toContain("Z-BOX Praha 1");
   expect(confirmation.Text).toContain("Sazba DPH 21 %");
   expect(confirmation.Text).toMatch(/\/o\/[0-9a-f]{64}/);
+  await page.context().close();
+});
+
+test("keyboard only: product to cart to COD checkout", async ({ browser }) => {
+  const page = await newPage(browser);
+  await page.goto(`${CZ}/p/mikina-oversize`);
+  await hydrated(page);
+  const variant = page.getByRole("radio", { name: "Popelavá" });
+  await variant.focus();
+  await page.keyboard.press("Space");
+  const add = page.getByRole("button", { name: "Přidat do košíku" }).first();
+  await add.focus();
+  await page.keyboard.press("Enter");
+  const drawer = page.getByRole("dialog", { name: /Košík/ });
+  await expect(drawer).toBeVisible();
+  const checkout = drawer.getByRole("button", { name: "K pokladně" });
+  await checkout.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(`${checkoutOf(CZ)}/`);
+  // The checkout form is SSR HTML until its client:load island attaches input handlers.
+  await page.waitForFunction(() => !document.querySelector('astro-island[client="load"][ssr]'));
+
+  const typeInto = async (selector: string, value: string) => {
+    await page.locator(selector).focus();
+    await page.keyboard.type(value);
+  };
+  await typeInto('input[autocomplete="email"]', `keyboard-${run}@example.test`);
+  await typeInto('input[autocomplete="section-billing name"]', "Jana Nováková");
+  await typeInto('input[autocomplete="section-billing street-address"]', "Dlouhá 12");
+  await typeInto('input[autocomplete="section-billing postal-code"]', "110 00");
+  await typeInto('input[autocomplete="section-billing address-level2"]', "Praha");
+  const shipping = page.getByRole("radio", { name: /PPL/ }).first();
+  await shipping.focus();
+  await page.keyboard.press("Space");
+  await expect(shipping).toBeChecked();
+  const cod = page.getByRole("radio", { name: /Dobírka/ });
+  await expect(cod).toBeEnabled();
+  await cod.focus();
+  await page.keyboard.press("Space");
+  await expect(cod).toBeChecked();
+  for (const name of [/^Souhlasím s obchodn/, /^Beru na vědom/]) {
+    const checkbox = page.getByRole("checkbox", { name });
+    await checkbox.focus();
+    await page.keyboard.press("Space");
+    await expect(checkbox).toBeChecked();
+  }
+  const place = page.getByRole("button", { name: "Objednat s povinností platby" });
+  await place.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/o\/[0-9a-f]{64}$/);
+  await expect(page.getByTestId("order-status")).toHaveText("Potvrzená");
   await page.context().close();
 });
 
@@ -225,7 +279,7 @@ test("a guest order joins the account after an email-link sign-in (A5)", async (
 test("the admin lists the order and shows its detail; shipping and payment settings render", async ({
   browser,
 }) => {
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   const page = await ctx.newPage();
   await useEnglish(page);
   const owner = "owner@lnen.example";

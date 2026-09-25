@@ -2,16 +2,17 @@
 
 | From | Gap | Owner |
 |---|---|---|
-| WP0 | CI doesn't smoke-test the auth image (needs Postgres) | WP15 |
-| WP1 | The smoke scripts are manual; move them into the e2e suite | WP15 |
+| WP0 | ~~CI does not smoke-test the auth image~~: CI now boots it against disposable Postgres and checks `/healthz` + clean shutdown in `scripts/smoke-images.sh`. | done (WP15) |
+| WP1 | ~~Manual smoke paths lack browser coverage~~: staff, catalog, search, checkout and cross-tenant checks are in `e2e/`; smoke scripts remain optional diagnostics. | done (WP15) |
 | WP2 | ~~Artifact GC (private bucket `artifacts/` + edge cache volume)~~ done in WP23 (`themes.maintenance`, edge `pruneArtifacts`) | done |
-| WP2 | Page-model gaps left after WP8: size chart, dispatch cutoff + holidays; font library (recently viewed has live prices since WP17) | WP15 |
+| WP2 | Moved: size chart, dispatch cutoff/holidays and font library need new merchant data controls and storefront presentation; visual UI work is excluded from WP15. | UI agent / later content model |
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
-| WP5 | No invitation-accepted status in the staff list | WP15 |
-| WP5 | No e2e for the >15 min reauth or a tenant switch mid-request; the auth rate limit makes quick e2e reruns 429 | WP15 |
+| WP5 | Moved: the staff table needs an invitation-accepted state and supporting API field; this changes admin UI beyond semantic fixes. | UI agent |
+| WP5 | Moved: a deterministic >15 min reauth / tenant-switch-in-flight browser test needs an auth test clock and request barrier; unit freshness and tenant RLS tests exist, but this browser race remains for security acceptance. | WP25 |
+| WP5 | ~~Quick e2e reruns share the auth IP bucket~~: signed per-context local identities separate buckets; the secret is refused outside `APP_ENV=dev`. | done (WP15) |
 | WP6 | ~~Artifact builds are not reproducible~~ done in WP23: fixed `ASTRO_KEY` for the default artifact, per-tenant HMAC-derived key for tenant builds | done |
-| WP6 | Cart creation and the handoff start are not keyed by Idempotency-Key (a lost response leaves an orphaned cart / needs a new cart); place-order is keyed since WP10 | WP15 |
+| WP6 | Moved: cart creation and handoff still lack `Idempotency-Key` replay after a lost response. One order per cart and idempotent placement prevent duplicate charges; retrying a lost handoff needs a new cart. This is recovery work beyond the local happy-path gate. | later (checkout reliability) |
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | Payment/carrier marks in `/shop` are generic catalog text (legal/CMS links come from published pages since WP13a; the checkout still links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale) | WP11 / WP12 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
@@ -19,13 +20,13 @@
 | WP10 | Stripe and bank transfer are configurable but not offered at checkout (no adapter); the order email has a bank-transfer placeholder | WP11 |
 | WP10 | COD cash rounding is not applied at placement (the tender is unknown until collection, A16) | WP11 |
 | WP10 | The Packeta widget key is a platform setting (`PACKETA_API_KEY`); per-tenant carrier credentials and verifying the chosen point against the Packeta API | WP12 |
-| WP10 | The real Packeta widget (`library.js` + callback) is only exercised against the local mock; validate on the pre-launch checklist | WP15 |
+| WP10 | Moved: real Packeta `library.js` and callback require carrier credentials/sandbox; the local suite tests the mock and keyboard path. | pre-launch checklist (§9) |
 | WP10 | No cancellation email when an unpaid order expires; refunds of late/duplicate payments are done by hand and then marked settled in the exceptions queue (WP11), no refund UI yet | WP12 |
 | WP10 | Payment timeouts are one global scan per minute (orders expire up to ~1.5 min late); per-tenant order numbers serialize placements of one tenant on the counter row | later (perf) |
 | WP14 | Meilisearch is not backed up; a restore rebuilds every tenant's index (`api admin reindex`), search is degraded until it finishes | accepted (A27) |
 | WP14 | Mailpit (local test mail) is not backed up | accepted (local only) |
 | WP14 | Local backups mirror buckets to files: object metadata is dropped (Content-Type restored from the extension, public Cache-Control re-applied); prod relies on R2 versioning/replication instead | accepted (local only) |
-| WP14 | Prod backup automation (PITR config, nightly dump job to a separate EU R2 account, bucket versioning, quarterly drill) is documented, not built | WP15 / pre-launch |
+| WP14 | Moved: PITR, off-account R2 dump automation, versioning and quarterly drill require a production account; the local backup/restore drill is available. | pre-launch infrastructure |
 | WP14 | `SECRETS_KEY` rotation (re-encrypt stored secrets) is a manual, unsupported operation | later |
 | WP14 | A failed local restore leaves database `app` partial (DROP/CREATE DATABASE cannot be transactional); rerun it | accepted (local only) |
 | WP14 | Storefront rate limits are in-process buckets per API replica (N replicas allow N× the rate) | later (scale-out / CDN rate limiting) |
@@ -40,7 +41,7 @@
 | WP11 | `payments::refund(attempt)` (Stripe with `refund_application_fee` and the refund id as idempotency key, bank/COD recorded) and `payments::retry_refund` have no admin screen yet; a Stripe refund whose outcome is unknown stays `pending` until retried or reconciled by `refund.*` webhooks; WP12 wires them into returns/withdrawals and a pending-refund list | WP12 |
 | WP11 | COD `delivered` is set by hand (or the carrier CSV stub `POST /admin/v1/cod-reports`); carrier tracking and real COD payout imports (Packeta/PPL) | WP12 |
 | WP11 | The QR code in emails is inline SVG: Gmail and some clients do not render it (the text instructions always are); a CID PNG attachment needs attachments in the mail pipeline | WP14 / pre-launch |
-| WP11 | The real Stripe Payment Element, Stripe-hosted onboarding and Connect webhooks are only exercised against stripe-mock + the simulator; validate with Stripe test keys, plus a manual scan of both QR codes in banking apps (A25) | WP15 (pre-launch checklist) |
+| WP11 | Moved: real Stripe test-mode onboarding/Payment Element/webhooks and bank-app QR scans require external accounts/apps; local mocks and QR vectors are covered. | pre-launch checklist (§9) |
 | WP11 | `platform.provider_events` keeps payloads indefinitely (PaymentIntent objects may hold billing details); add a retention rule to WP14's `ops.sweep` (e.g. drop payloads of processed events after 90 days) | later (ops) |
 | WP11 | Fio tokens share WP14's single `SECRETS_KEY` (no key id in the ciphertext); no rotation tooling | later |
 | WP11 | Payment reminder and email due dates are the UTC date of the deadline | later |
@@ -57,13 +58,13 @@
 | WP23 | Theme source archives and screenshots of old revisions are never deleted (small; artifacts are GC'd) | later (ops) |
 | WP23 | ~~`client:visible` lint~~ done in WP24 (`client-visible`, every use in `.astro`); still open: stale-preload lint, image-bytes budget, desktop CLS run in the gates | later |
 | WP23 | ~~No diff view between revisions~~ done in WP24 (`GET /themes/revisions/{id}/diff`, "Show changes" in the report); no "rebuild" action (a new token edit/upload/reset creates a new revision) | later |
-| WP20/WP22 | Full e2e with 4 workers: checkout handoff `/start` timeouts in 2 specs + shared demo-owner sign-ins hit the auth rate limit; make the suite reliable (per-spec users, IP-aware auth limits from WP12) | WP15 |
+| WP20/WP22 | ~~Full four-worker e2e handoff/auth collisions~~: signed per-context local rate identities isolate parallel browsers; checkout and account journeys remain in the full suite. | done (WP15) |
 | WP12 | Packeta/PPL are built from public docs and exercised only against `apps/mocks` (request shapes, home-delivery carrier ids, COD rounding rules); carrier-side cancellation of a voided label and an unanswered shipment announcement (`label_in_progress`) are reconciled by hand in the carrier portal | pre-launch checklist |
-| WP12 | Carrier-specific COD payout imports (Packeta/PPL report formats) are not built; payouts go through the generic CSV (`POST /admin/v1/cod-reports`) | WP15 |
+| WP12 | Moved: carrier-specific COD payout file formats need real carrier sample files; the generic CSV endpoint covers local pilot reconciliation. | pre-launch carrier integration |
 | WP12 | Invoice/credit-note Typst templates and the COD cash-rounding treatment (rounding at collection, after the dispatch invoice, outside the VAT base) need accountant approval before real use | pre-launch |
 | WP12 | Presigned PDF downloads are named by their key (`FV…pdf`); no `Content-Disposition` override (object_store's signer lacks response-header params) | later |
-| WP12 | Payment/carrier marks in the theme's `/shop` are still generic text | WP15 |
-| WP12 | Full e2e with 4 workers from one IP still hits the storefront rate limit (`429` on `/_p/cart/lines`) in 1-2 checkout specs; they pass alone | WP15 |
+| WP12 | Moved: payment/carrier marks in the theme footer are generic strings, not verified provider marks; replacement is visual theme work. | UI agent |
+| WP12 | ~~Parallel checkout specs share a storefront IP bucket~~: signed per-context local identities keep the production limiter intact. | done (WP15) |
 | WP18 | No open tracking at all (privacy default); the optional consented tracking pixel of §11.5 is not built | later (only if merchants ask) |
 | WP18 | Marketing message bodies stay in `email_messages` indefinitely (one row per recipient); add a retention rule to `ops.sweep` (e.g. drop bodies of final marketing mail after 30 days) | later (ops) |
 | WP18 | The marketing rate is one platform constant (500 messages per tenant and minute) and limits how fast campaign messages are queued, not SMTP itself (a backlog after an outage drains faster); per-tenant quotas, a delivery-time rate limit | later |
@@ -81,10 +82,10 @@
 | WP13b | The export's assets manifest lists public image variants only; merchant-uploaded originals and invoice PDFs (private bucket) are not in the zip | later |
 | WP13b | Any later module holding customer data (WP19 flows, watchdogs) must be added to `privacy::access`/`erase` (a new FK to `customers` without `ON DELETE` would make erasure fail) | WP19 |
 | WP13b | Re-importing an old CSV after an erasure brings the person back; the import cannot know (no tombstones by design) | later (privacy) |
-| WP13b | The admin has no customer list yet: imported customers are visible through the GDPR access export, subscribers, archived orders and orders | WP15 |
+| WP13b | Moved: customer list needs an admin route, table, search and permission UX; existing export and order views expose data for the pilot. | UI agent |
 | WP13b | The import UI maps columns only when a run is created; re-checking with a new mapping is API-only (`analyze` takes `mapping`) | later |
 | WP16 | Review invites: after delivery (default 7 days) and only with the `review_invites` consent, call `commerce::reviews::issue_tokens(tx, order_id, now)` and mail one `reviews::review_url(ctx, token)` per product (the e2e writes its token via SQL until then) | WP19 |
 | WP16 | ~~GDPR erasure/export must cover `reviews` and `review_tokens`~~ done in WP13b | done |
 | WP16 | The product page shows the 20 newest published reviews (summary and JSON-LD cover all); no pagination, sorting or filtering by rating yet | later |
 | WP16 | Tokens are issued per order, not per returned/withdrawn line: a line returned after delivery can still be reviewed while its token lives | later |
-| WP16 | Seeded demos keep the old "reviews" legal page text (templates install only missing pages); re-install or edit it | WP15 (seed polish) |
+| WP16 | ~~Old seeded review disclosure survives reruns~~: `make seed` refreshes only the pre-WP16 stock text and preserves merchant edits. | done (WP15) |
