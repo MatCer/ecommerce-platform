@@ -271,7 +271,7 @@ export const sk: Dictionary = {
     file: "Súbor výpisu",
     importButton: "Importovať",
     imported:
-      "{imported} nových, {duplicates} už importovaných, {debits} odchádzajúcich preskočených: {matched} spárovaných, {exceptions} na vybavenie.",
+      "{{imported}} nových, {{duplicates}} už importovaných, {{debits}} odchádzajúcich preskočených: {{matched}} spárovaných, {{exceptions}} na vybavenie.",
     noAccount: "Najprv nastavte prijímajúci účet v nastaveniach platieb.",
     bankAccount: "Prijímajúci bankový účet",
     bankAccountDesc:
@@ -283,7 +283,7 @@ export const sk: Dictionary = {
     fioTokenHint:
       "Uloží sa šifrovane a už sa nezobrazí. S ním sa nové platby sťahujú každých 10 minút.",
     fioConnected: "Fio API pripojené",
-    fioSynced: "Posledné stiahnutie: {at}",
+    fioSynced: "Posledné stiahnutie: {{at}}",
     clearFio: "Odpojiť Fio API",
     saveAccount: "Uložiť účet",
     stripeTitle: "Stripe (karty, Apple Pay, Google Pay)",

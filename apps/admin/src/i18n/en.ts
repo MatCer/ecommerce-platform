@@ -268,7 +268,7 @@ export const en = {
     file: "Statement file",
     importButton: "Import",
     imported:
-      "{imported} new, {duplicates} already imported, {debits} debits skipped: {matched} matched, {exceptions} to resolve.",
+      "{{imported}} new, {{duplicates}} already imported, {{debits}} debits skipped: {{matched}} matched, {{exceptions}} to resolve.",
     noAccount: "Set the receiving bank account in Payments settings first.",
     bankAccount: "Receiving bank account",
     bankAccountDesc:
@@ -280,7 +280,7 @@ export const en = {
     fioTokenHint:
       "Stored encrypted and never shown again. With it, new payments are downloaded every 10 minutes.",
     fioConnected: "Fio API connected",
-    fioSynced: "Last download: {at}",
+    fioSynced: "Last download: {{at}}",
     clearFio: "Disconnect the Fio API",
     saveAccount: "Save account",
     stripeTitle: "Stripe (cards, Apple Pay, Google Pay)",
