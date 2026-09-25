@@ -190,12 +190,11 @@ async fn serve() -> anyhow::Result<()> {
             ops.storefront_rate_burst,
         )),
         carriers: Some(commerce::carriers::Carriers::new(
-            reqwest::Client::builder().build()?,
             fulfillment.packeta_api_url.to_string(),
             fulfillment.packeta_validate_url.to_string(),
             fulfillment.ppl_api_url.to_string(),
             checkout.payments.secrets.clone(),
-        )),
+        )?),
         checkout,
     };
     let limiter = state.rate_limit.clone();

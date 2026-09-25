@@ -534,13 +534,13 @@ async fn create_refund(
         &staff.user.user_id,
         id,
         &input,
-        None,
     )
     .await?;
     Ok((StatusCode::CREATED, Json(out)))
 }
 
-/// Repeats a pending Stripe refund with the same idempotency key.
+/// Retries a refund: a pending Stripe refund with the same idempotency key, or the payout of a
+/// documented refund whose provider refund failed (no second credit note). Admin.
 #[utoipa::path(
     post,
     path = "/admin/v1/refunds/{id}/retry",
@@ -550,6 +550,7 @@ async fn create_refund(
     responses(
         (status = 200, body = commerce::payments::Refund),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "not_retryable", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn retry_refund(
@@ -560,7 +561,14 @@ async fn retry_refund(
     staff.require(Role::Admin)?;
     let id = path_id(id)?;
     Ok(Json(
-        commerce::payments::retry_refund(&s.db, &s.checkout.payments, staff.tenant_id, id).await?,
+        refunds::retry(
+            &s.db,
+            &s.checkout.payments,
+            staff.tenant_id,
+            &staff.user.user_id,
+            id,
+        )
+        .await?,
     ))
 }
 

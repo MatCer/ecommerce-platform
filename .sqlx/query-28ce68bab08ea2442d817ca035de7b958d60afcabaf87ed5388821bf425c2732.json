@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.variant_id AS \"variant_id!\",\n                  sum(l.quantity - coalesce((SELECT sum(r.quantity) FROM return_lines r\n                      WHERE r.order_line_id = l.id\n                        AND r.status IN ('received', 'refunded')), 0))::int AS \"quantity!\"\n           FROM order_lines l WHERE l.order_id = $1 AND l.variant_id IS NOT NULL\n           GROUP BY l.variant_id ORDER BY l.variant_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "variant_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "quantity!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "28ce68bab08ea2442d817ca035de7b958d60afcabaf87ed5388821bf425c2732"
+}

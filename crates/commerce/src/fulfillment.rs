@@ -273,6 +273,14 @@ async fn shipment_request(
 
 /// Creates the shipment and its label at the carrier (personal pickup: no carrier). The order
 /// must be confirmed or processing (paid, or cash on delivery) and not fulfilled yet.
+///
+/// Two phases, both outside any transaction, each persisted before the next: the carrier
+/// accepts the shipment (its reference is stored), then the label is fetched and stored. A
+/// failure after the first phase leaves the shipment `creating` with its reference, and calling
+/// this again resumes with the label instead of creating a second shipment. A carrier that
+/// refuses the shipment cancels the row (fix the order, retry); an unanswered first call leaves
+/// the outcome unknown (`creating` without a reference: check the carrier portal, then cancel
+/// the label and retry).
 pub async fn create_label(
     db: &sqlx::PgPool,
     carriers: &Carriers,
@@ -293,21 +301,6 @@ pub async fn create_label(
             detail: "only confirmed (paid or cash on delivery) orders can be shipped".into(),
         });
     }
-    if let Some(s) = live(&mut tx, order_id).await? {
-        return Err(Error::Conflict {
-            code: if s.status == ShipmentStatus::Creating {
-                "label_in_progress"
-            } else {
-                "label_exists"
-            },
-            detail: "the order already has a shipment; cancel it first".into(),
-        });
-    }
-    // The fulfillment machine must allow a label now (unfulfilled).
-    fulfillment_transition(
-        fulfillment_of(&mut tx, order_id).await?,
-        FulfillmentCommand::CreateLabel,
-    )?;
     let snapshot = sqlx::query_scalar!(
         "SELECT shipping_method_snapshot FROM orders WHERE id = $1",
         order_id
@@ -315,78 +308,136 @@ pub async fn create_label(
     .fetch_one(&mut *tx)
     .await?;
     let carrier = method_carrier(&snapshot)?;
-    let req = shipment_request(&mut tx, order_id, input.weight_g).await?;
     let account = match CarrierKind::of(carrier) {
         Some(kind) => Some(carriers::account(&mut tx, carriers, kind).await?),
         None => None,
     };
-    let id = crate::id::new_id();
-    sqlx::query!(
-        "INSERT INTO shipments (id, tenant_id, order_id, carrier, status, created_by)
-         VALUES ($1, $2, $3, $4, 'creating', $5)",
-        id,
-        tenant_id,
-        order_id,
-        carrier.as_str(),
-        actor
-    )
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
-
-    // The carrier call runs outside any transaction.
-    let created = match &account {
-        Some(a) => match carriers.create(a, carrier, &req).await {
-            Ok(c) => Some(c),
-            Err(e) => {
-                let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-                sqlx::query!(
-                    "UPDATE shipments SET status = 'cancelled', carrier_status = $2,
-                         updated_at = now()
-                     WHERE id = $1 AND status = 'creating'",
-                    id,
-                    e.to_string().chars().take(200).collect::<String>()
-                )
-                .execute(&mut *tx)
-                .await?;
-                tx.commit().await?;
-                return Err(e);
+    // Resume a shipment the carrier already accepted, or start a new one.
+    let (id, mut announced) = match live(&mut tx, order_id).await? {
+        Some(s) if s.status == ShipmentStatus::Creating => match s.carrier_ref.clone() {
+            Some(carrier_ref) => (
+                s.id,
+                Some(carriers::Announced {
+                    carrier_ref,
+                    tracking_number: s.tracking_number.clone(),
+                    tracking_url: s.tracking_url.clone(),
+                }),
+            ),
+            None => {
+                return Err(Error::Conflict {
+                    code: "label_in_progress",
+                    detail: "the carrier has not confirmed the shipment; check its portal, then \
+                             cancel the label and retry"
+                        .into(),
+                });
             }
         },
-        None => None,
-    };
-    let key = match &created {
-        Some(c) => {
-            let key = label_key(tenant_id, id);
-            storage
-                .private
-                .put(
-                    &object_store::path::Path::from(key.as_str()),
-                    c.label_pdf.clone().into(),
-                )
-                .await?;
-            Some(key)
+        Some(_) => {
+            return Err(Error::Conflict {
+                code: "label_exists",
+                detail: "the order already has a shipment; cancel it first".into(),
+            });
         }
-        None => None,
+        None => {
+            // The fulfillment machine must allow a label now (unfulfilled).
+            fulfillment_transition(
+                fulfillment_of(&mut tx, order_id).await?,
+                FulfillmentCommand::CreateLabel,
+            )?;
+            let id = crate::id::new_id();
+            sqlx::query!(
+                "INSERT INTO shipments (id, tenant_id, order_id, carrier, status, created_by)
+                 VALUES ($1, $2, $3, $4, 'creating', $5)",
+                id,
+                tenant_id,
+                order_id,
+                carrier.as_str(),
+                actor
+            )
+            .execute(&mut *tx)
+            .await?;
+            (id, None)
+        }
     };
+    let req = shipment_request(&mut tx, order_id, input.weight_g).await?;
+    tx.commit().await?;
+
+    let mut label = None;
+    if let Some(a) = &account {
+        if announced.is_none() {
+            match carriers.announce(a, carrier, &req).await {
+                Ok(ann) => {
+                    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+                    sqlx::query!(
+                        "UPDATE shipments SET carrier_ref = $2, tracking_number = $3,
+                             tracking_url = $4, updated_at = now()
+                         WHERE id = $1 AND status = 'creating'",
+                        id,
+                        ann.carrier_ref,
+                        ann.tracking_number,
+                        ann.tracking_url
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                    tx.commit().await?;
+                    announced = Some(ann);
+                }
+                Err(e) => {
+                    let refused = matches!(e, Error::Validation { .. });
+                    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+                    sqlx::query!(
+                        "UPDATE shipments SET carrier_status = $2,
+                             status = CASE WHEN $3 THEN 'cancelled' ELSE status END,
+                             updated_at = now()
+                         WHERE id = $1 AND status = 'creating'",
+                        id,
+                        if refused {
+                            e.to_string().chars().take(200).collect::<String>()
+                        } else {
+                            "carrier outcome unknown".to_owned()
+                        },
+                        refused
+                    )
+                    .execute(&mut *tx)
+                    .await?;
+                    tx.commit().await?;
+                    return Err(e);
+                }
+            }
+        }
+        let ann = announced
+            .as_ref()
+            .ok_or_else(|| Error::Internal("announced shipment missing".into()))?;
+        // A failure here keeps the reference: the next call resumes with the label.
+        let l = carriers.label(a, ann).await?;
+        let key = label_key(tenant_id, id);
+        storage
+            .private
+            .put(
+                &object_store::path::Path::from(key.as_str()),
+                l.pdf.clone().into(),
+            )
+            .await?;
+        label = Some((l, key));
+    }
 
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
     let mut o = orders::lock(&mut tx, order_id).await?;
     let updated = sqlx::query!(
         "UPDATE shipments SET status = 'label_created', carrier_ref = $2, tracking_number = $3,
-             tracking_url = $4, label_key = $5, updated_at = now()
+             tracking_url = $4, label_key = $5, carrier_status = NULL, updated_at = now()
          WHERE id = $1 AND status = 'creating'",
         id,
-        created.as_ref().map(|c| c.carrier_ref.clone()),
-        created.as_ref().map(|c| c.tracking_number.clone()),
-        created.as_ref().map(|c| c.tracking_url.clone()),
-        key
+        label.as_ref().map(|(l, _)| l.carrier_ref.clone()),
+        label.as_ref().map(|(l, _)| l.tracking_number.clone()),
+        label.as_ref().map(|(l, _)| l.tracking_url.clone()),
+        label.as_ref().map(|(_, k)| k.clone())
     )
     .execute(&mut *tx)
     .await?
     .rows_affected();
     if updated == 0 {
-        // Cancelled meanwhile by an admin: the carrier's packet stays orphaned (logged).
+        // Cancelled meanwhile by an admin: the carrier's shipment stays orphaned (logged).
         tracing::warn!(shipment = %id, "shipment cancelled while its label was being created");
         return Err(Error::Conflict {
             code: "label_cancelled",
@@ -402,7 +453,7 @@ pub async fn create_label(
         order_id,
         "label_created",
         &json!({ "shipment_id": id, "carrier": carrier,
-                 "tracking_number": created.as_ref().map(|c| &c.tracking_number) }),
+                 "tracking_number": label.as_ref().map(|(l, _)| &l.tracking_number) }),
         actor,
     )
     .await?;
@@ -602,6 +653,20 @@ pub async fn returned_to_sender(
             detail: "only a dispatched parcel can come back".into(),
         });
     }
+    let unpaid = !matches!(
+        o.payment_status.as_str(),
+        "paid" | "partially_refunded" | "refunded"
+    );
+    // The correction needs the dispatch invoice (A17): refuse before anything changes.
+    if unpaid
+        && invoicing::invoice_of(tx, order_id).await?.is_none()
+        && invoicing::expects_invoice(tx, order_id).await?
+    {
+        return Err(Error::Conflict {
+            code: "invoice_pending",
+            detail: "the order's invoice is being issued; retry in a moment".into(),
+        });
+    }
     apply_fulfillment(tx, order_id, FulfillmentCommand::ReturnToSender, actor).await?;
     orders::apply_order(
         tx,
@@ -611,10 +676,14 @@ pub async fn returned_to_sender(
     )
     .await?;
     set_shipment(tx, s.id, ShipmentStatus::Returned).await?;
+    // Units a withdrawal already brought back were restocked there (A13: once).
     let lines = sqlx::query!(
-        r#"SELECT variant_id AS "variant_id!", sum(quantity)::int AS "quantity!"
-           FROM order_lines WHERE order_id = $1 AND variant_id IS NOT NULL
-           GROUP BY variant_id ORDER BY variant_id"#,
+        r#"SELECT l.variant_id AS "variant_id!",
+                  sum(l.quantity - coalesce((SELECT sum(r.quantity) FROM return_lines r
+                      WHERE r.order_line_id = l.id
+                        AND r.status IN ('received', 'refunded')), 0))::int AS "quantity!"
+           FROM order_lines l WHERE l.order_id = $1 AND l.variant_id IS NOT NULL
+           GROUP BY l.variant_id ORDER BY l.variant_id"#,
         order_id
     )
     .fetch_all(&mut **tx)
@@ -624,13 +693,9 @@ pub async fn returned_to_sender(
         ref_type: "returned_parcel",
         ref_id: &ref_id,
     };
-    for l in lines {
+    for l in lines.into_iter().filter(|l| l.quantity > 0) {
         inventory::restock(tx, actor, &r, l.variant_id, l.quantity).await?;
     }
-    let unpaid = !matches!(
-        o.payment_status.as_str(),
-        "paid" | "partially_refunded" | "refunded"
-    );
     if unpaid && invoicing::invoice_of(tx, order_id).await?.is_some() {
         let src = invoicing::order_source(tx, order_id).await?;
         let mut doc_lines = Vec::new();

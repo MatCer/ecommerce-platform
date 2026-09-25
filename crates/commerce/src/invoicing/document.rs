@@ -520,6 +520,57 @@ pub fn credit_note(
     )
 }
 
+/// Credit notes convert their own VAT recap to CZK, so partial reversals can drift from the
+/// original's CZK recap by rounding. When a credit note completes the reversal of a rate's net
+/// or VAT (with the `prior` credit notes of the same invoice), its CZK amount becomes whatever
+/// of the original's CZK amount is left, so all reversals sum exactly to the original.
+pub fn settle_czk_residual(
+    original: &Document,
+    original_czk: &CzkRecap,
+    prior: &[Document],
+    this_recap: &[RecapRow],
+    this_czk: &mut CzkRecap,
+) {
+    let sum = |docs: &[Document], rate: TaxRate, czk: bool| -> (i64, i64) {
+        docs.iter()
+            .flat_map(|d| {
+                if czk {
+                    d.czk_recap
+                        .as_ref()
+                        .map(|c| c.rows.clone())
+                        .unwrap_or_default()
+                } else {
+                    d.vat_recap.clone()
+                }
+            })
+            .filter(|r| r.rate == rate)
+            .fold((0, 0), |(n, v), r| (n + r.net_minor, v + r.vat_minor))
+    };
+    for row in &mut this_czk.rows {
+        let rate = row.rate;
+        let Some(orig) = original.vat_recap.iter().find(|r| r.rate == rate) else {
+            continue;
+        };
+        let Some(orig_czk) = original_czk.rows.iter().find(|r| r.rate == rate) else {
+            continue;
+        };
+        let Some(this) = this_recap.iter().find(|r| r.rate == rate) else {
+            continue;
+        };
+        let (prior_net, prior_vat) = sum(prior, rate, false);
+        let (prior_czk_net, prior_czk_vat) = sum(prior, rate, true);
+        // Credit notes are negative: a component is fully reversed when −(prior + this) = orig.
+        if -(prior_net + this.net_minor) == orig.net_minor {
+            row.net_minor = -orig_czk.net_minor - prior_czk_net;
+        }
+        if -(prior_vat + this.vat_minor) == orig.vat_minor {
+            row.vat_minor = -orig_czk.vat_minor - prior_czk_vat;
+        }
+        row.gross_minor = row.net_minor + row.vat_minor;
+    }
+    this_czk.vat_minor = this_czk.rows.iter().map(|r| r.vat_minor).sum();
+}
+
 /// A refunded goods line as a (positive) document line.
 pub fn refunded_goods_line(l: &SourceLine, quantity: i32, gross: i64, vat: i64) -> DocLine {
     DocLine {

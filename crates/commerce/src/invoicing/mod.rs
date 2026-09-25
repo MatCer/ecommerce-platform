@@ -386,30 +386,32 @@ pub async fn issue(
     tx.commit().await?;
 
     let rate = if document::needs_czk_recap(src.vat_payer, &supplier.country, src.currency) {
-        match cnb::rate_for(db, &rates.http, &rates.url, src.currency, duzp, now).await? {
-            Some(r) => Some(r),
-            None => {
-                let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-                let warned = sqlx::query_scalar!(
-                    r#"SELECT EXISTS (SELECT 1 FROM order_events
-                                      WHERE order_id = $1 AND kind = 'invoice_delayed') AS "x!""#,
-                    order_id
+        match cnb::rate_for(db, &rates.http, &rates.url, src.currency, duzp, now).await {
+            Ok(Some(r)) => Some(r),
+            Ok(None) => {
+                warn_delayed(
+                    db,
+                    tenant_id,
+                    order_id,
+                    "exchange_rate_unpublished",
+                    src.currency,
+                    duzp,
                 )
-                .fetch_one(&mut *tx)
                 .await?;
-                if !warned {
-                    orders::event(
-                        &mut tx,
-                        order_id,
-                        "invoice_delayed",
-                        &json!({ "reason": "exchange_rate_unavailable", "currency": src.currency,
-                                 "taxable_supply_date": duzp }),
-                        "system",
-                    )
-                    .await?;
-                }
-                tx.commit().await?;
                 return Ok(Issued::RateUnavailable);
+            }
+            Err(e) => {
+                // ČNB unreachable: the admin sees why the invoice waits; the job retries.
+                warn_delayed(
+                    db,
+                    tenant_id,
+                    order_id,
+                    "exchange_rate_unavailable",
+                    src.currency,
+                    duzp,
+                )
+                .await?;
+                return Err(e);
             }
         }
     } else {
@@ -440,6 +442,48 @@ pub async fn issue(
     let id = insert(&mut tx, series, order_id, &doc, "system").await?;
     tx.commit().await?;
     Ok(Issued::New(id))
+}
+
+/// Records once per order why its invoice waits (`invoice_delayed`, shown in the admin).
+async fn warn_delayed(
+    db: &PgPool,
+    tenant_id: Uuid,
+    order_id: Uuid,
+    reason: &str,
+    currency: Currency,
+    duzp: NaiveDate,
+) -> Result<(), Error> {
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let warned = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM order_events
+                          WHERE order_id = $1 AND kind = 'invoice_delayed') AS "x!""#,
+        order_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if !warned {
+        orders::event(
+            &mut tx,
+            order_id,
+            "invoice_delayed",
+            &json!({ "reason": reason, "currency": currency, "taxable_supply_date": duzp }),
+            "system",
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// A later issue attempt for an order whose ČNB fixing is not published yet: a fresh job every
+/// 30 minutes, so waiting for publication never uses up the job's failure retries.
+pub fn delayed_issue_job(tenant_id: Uuid, order_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
+    let slot = now.timestamp().div_euclid(1800);
+    let mut job = NewJob::new(ISSUE_JOB, json!({ "payload": { "order_id": order_id } }));
+    job.tenant_id = Some(tenant_id);
+    job.run_at = Some(now + chrono::Duration::minutes(30));
+    job.idempotency_key = Some(format!("invoice_issue_wait:{order_id}:{slot}"));
+    job
 }
 
 /// Whether the order has (or will get) an invoice, so a refund must come with a credit note.
@@ -482,7 +526,7 @@ pub async fn issue_credit_note(
         paid: true,
         ..orig_doc.payment.clone()
     };
-    let doc = document::credit_note(
+    let mut doc = document::credit_note(
         &src,
         Issue {
             number,
@@ -501,6 +545,18 @@ pub async fn issue_credit_note(
         },
         reason,
     );
+    if let (Some(orig), Some(this)) = (&orig_doc.czk_recap, doc.czk_recap.as_mut()) {
+        let prior = sqlx::query_scalar!(
+            "SELECT document FROM invoices WHERE original_id = $1",
+            original_id
+        )
+        .fetch_all(&mut **tx)
+        .await?
+        .into_iter()
+        .filter_map(|d| serde_json::from_value::<Document>(d).ok())
+        .collect::<Vec<_>>();
+        document::settle_czk_residual(&orig_doc, orig, &prior, &doc.vat_recap, this);
+    }
     Ok(Some(insert(tx, series, order_id, &doc, actor).await?))
 }
 

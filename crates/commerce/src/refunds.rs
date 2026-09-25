@@ -12,9 +12,10 @@
 //! Also here: cancelling an order (release stock, refund what was paid) and returning money
 //! the order cannot keep (A10 late/duplicate payments).
 
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use platform::Error;
 use platform::db::TenantTx;
+use platform::queue::{self, NewJob};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -23,7 +24,8 @@ use uuid::Uuid;
 use crate::invoicing::{
     self,
     document::{
-        DocLine, RefundLine, Reversed, refunded_charge_lines, refunded_goods_line, reverse_units,
+        DocLine, LineKind, RefundLine, Reversed, refunded_charge_lines, refunded_goods_line,
+        reverse_units,
     },
 };
 use crate::markets::invalid;
@@ -245,8 +247,253 @@ fn clean_iban(iban: Option<&str>) -> Result<Option<String>, Error> {
     }
 }
 
-/// Refunds part or all of a paid order (see the module docs). `withdrawal_id`: the refund of an
-/// A19 withdrawal (its lines).
+/// Finalizes a refund whose inline completion did not run (a crash after the payout was
+/// recorded): payload `{refund_id}`; idempotent.
+pub const FINALIZE_JOB: &str = "refunds.finalize";
+
+/// A recorded refund, not yet paid out and finalized.
+pub(crate) struct Prepared {
+    refund_id: Uuid,
+    manual: bool,
+    plan: RefundPlan,
+}
+
+/// Records a refund under the (locked) order: checks, plans (A15) and reserves it in the
+/// payment ledger, and schedules its finalization as a backstop, all in the caller's
+/// transaction. The payout and the credit note follow in [`complete`] after the commit.
+pub(crate) async fn prepare(
+    tx: &mut TenantTx,
+    order: &mut orders::OrderRow,
+    actor: &str,
+    input: &RefundInput,
+    withdrawal_id: Option<Uuid>,
+) -> Result<Prepared, Error> {
+    let iban = clean_iban(input.iban.as_deref())?;
+    let order_id = order.id;
+    if !matches!(order.payment_status.as_str(), "paid" | "partially_refunded") {
+        return Err(Error::Conflict {
+            code: "nothing_to_refund",
+            detail: "the order is not paid".into(),
+        });
+    }
+    let attempt = sqlx::query_scalar!("SELECT paid_attempt_id FROM orders WHERE id = $1", order_id)
+        .fetch_one(&mut **tx)
+        .await?
+        .ok_or_else(|| Error::Conflict {
+            code: "nothing_to_refund",
+            detail: "the order has no retained payment".into(),
+        })?;
+    // The credit note needs the invoice: refuse before any money moves (A17).
+    if invoicing::invoice_of(tx, order_id).await?.is_none()
+        && invoicing::expects_invoice(tx, order_id).await?
+    {
+        return Err(Error::Conflict {
+            code: "invoice_pending",
+            detail: "the order's invoice is being issued; retry in a moment".into(),
+        });
+    }
+    let plan = plan(tx, order_id, input).await?;
+    let recorded = payments::record_refund(
+        tx,
+        order,
+        attempt,
+        plan.amount.amount_minor,
+        input.reason.as_deref(),
+        actor,
+        &RefundDetails {
+            lines: Some(plan.ledger.clone()),
+            withdrawal_id,
+            iban,
+        },
+    )
+    .await;
+    let (refund_id, manual) = match recorded {
+        Err(Error::Database(e)) if crate::unique_violation(&e) => {
+            return Err(Error::Conflict {
+                code: "already_refunded",
+                detail: "the withdrawal is being refunded or was refunded".into(),
+            });
+        }
+        other => other?,
+    };
+    let mut job = NewJob::new(FINALIZE_JOB, json!({ "refund_id": refund_id }));
+    job.tenant_id = Some(tx.tenant_id());
+    job.run_at = Some(Utc::now() + Duration::minutes(5));
+    job.idempotency_key = Some(format!("refund_finalize:{refund_id}"));
+    queue::enqueue(&mut **tx, &job).await?;
+    Ok(Prepared {
+        refund_id,
+        manual,
+        plan,
+    })
+}
+
+/// Pays a prepared refund out (Stripe outside any transaction; bank/COD were recorded as done)
+/// and finalizes it. A rejected payout is an error and leaves no credit note.
+pub(crate) async fn complete(
+    db: &sqlx::PgPool,
+    payments_cfg: &Payments,
+    urls: &PublicUrls,
+    tenant_id: Uuid,
+    actor: &str,
+    prepared: Prepared,
+) -> Result<RefundOutcome, Error> {
+    let submitted = if prepared.manual {
+        None
+    } else {
+        Some(payments::submit_refund(db, payments_cfg, tenant_id, prepared.refund_id).await)
+    };
+    let credit_note_id = finalize(db, urls, tenant_id, prepared.refund_id, actor).await?;
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let refund = payments::refund_row(&mut tx, prepared.refund_id).await?;
+    tx.commit().await?;
+    match (refund.status, submitted) {
+        (RefundStatus::Failed, Some(Err(e))) => Err(e),
+        (RefundStatus::Failed, _) => Err(Error::Conflict {
+            code: "refund_rejected",
+            detail: "the payment provider rejected the refund".into(),
+        }),
+        // A pending Stripe refund whose outcome is unknown: recorded, reported as pending.
+        _ => Ok(RefundOutcome {
+            refund,
+            credit_note_id,
+            plan: prepared.plan,
+        }),
+    }
+}
+
+/// The refund's credit note, email and (for a withdrawal) completion, once, unless the payout
+/// failed. Rebuilt from the refund's ledger, so a crash anywhere before is resumed by the
+/// [`FINALIZE_JOB`]. A credit note reverses only what the original invoice carried (the cash
+/// rounding of a COD collection happens after its dispatch invoice).
+pub async fn finalize(
+    db: &sqlx::PgPool,
+    urls: &PublicUrls,
+    tenant_id: Uuid,
+    refund_id: Uuid,
+    actor: &str,
+) -> Result<Option<Uuid>, Error> {
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let order_id = sqlx::query_scalar!("SELECT order_id FROM refunds WHERE id = $1", refund_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+    orders::lock(&mut tx, order_id).await?;
+    let r = sqlx::query!(
+        "SELECT r.status, r.finalized_at, r.credit_note_id, r.lines, r.withdrawal_id, r.iban,
+                r.reason, r.amount_minor, a.method
+         FROM refunds r JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
+        refund_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if r.finalized_at.is_some() {
+        return Ok(r.credit_note_id);
+    }
+    let finish = async |tx: &mut TenantTx, credit_note: Option<Uuid>| -> Result<(), Error> {
+        sqlx::query!(
+            "UPDATE refunds SET finalized_at = now(), credit_note_id = coalesce(credit_note_id, $2)
+             WHERE id = $1",
+            refund_id,
+            credit_note
+        )
+        .execute(&mut **tx)
+        .await?;
+        Ok(())
+    };
+    let Some(ledger) = r.lines.filter(|_| r.status != "failed") else {
+        // A rejected payout (nothing to document) or an amount-only refund.
+        finish(&mut tx, None).await?;
+        tx.commit().await?;
+        return Ok(r.credit_note_id);
+    };
+    let src = invoicing::order_source(&mut tx, order_id).await?;
+    let loc = Locale::from_tag(&src.locale);
+    let money = |m: i64| Money::new(m, src.currency).format(loc);
+    let mut doc_lines = Vec::new();
+    let mut email_lines = Vec::new();
+    for entry in ledger.as_array().into_iter().flatten() {
+        let n = |k: &str| entry.get(k).and_then(Value::as_i64).unwrap_or(0);
+        if let Some(charge) = entry.get("charge").and_then(Value::as_str) {
+            if let Some(c) = src.charges.iter().find(|c| {
+                serde_json::to_value(c.kind)
+                    .ok()
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    == Some(charge)
+            }) {
+                doc_lines.extend(refunded_charge_lines(c, &src.locale, src.vat_payer));
+                email_lines.push(json!({ "name": c.name, "quantity": 1,
+                                         "amount": money(n("gross_minor")) }));
+            }
+            continue;
+        }
+        let line_id = entry
+            .get("order_line_id")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse::<Uuid>().ok());
+        if let Some(l) = src.lines.iter().find(|l| Some(l.id) == line_id) {
+            let q = i32::try_from(n("quantity")).unwrap_or(0);
+            doc_lines.push(refunded_goods_line(l, q, n("gross_minor"), n("vat_minor")));
+            email_lines.push(json!({ "name": l.name, "quantity": q,
+                                     "amount": money(n("gross_minor")) }));
+        }
+    }
+    // Only what the original invoice documented is reversed by the credit note.
+    if let Some(original) = invoicing::invoice_of(&mut tx, order_id).await? {
+        let (_, doc, _) = invoicing::get(&mut tx, original).await?;
+        let invoiced_rounding = doc.lines.iter().any(|l| l.kind == LineKind::Rounding);
+        if !invoiced_rounding {
+            doc_lines.retain(|l| l.kind != LineKind::Rounding);
+        }
+    }
+    let credit_note = invoicing::issue_credit_note(
+        &mut tx,
+        order_id,
+        doc_lines,
+        r.reason.clone(),
+        actor,
+        Utc::now(),
+    )
+    .await?;
+    finish(&mut tx, credit_note).await?;
+    orders::event(
+        &mut tx,
+        order_id,
+        "refunded",
+        &json!({ "refund_id": refund_id, "amount_minor": r.amount_minor, "lines": ledger,
+                 "credit_note_id": credit_note, "status": r.status }),
+        actor,
+    )
+    .await?;
+    let method = match (r.method.as_str(), &r.iban) {
+        ("stripe", _) => "card",
+        (_, Some(_)) => "bank",
+        _ => "other",
+    };
+    orders::mail::send(
+        &mut tx,
+        urls,
+        order_id,
+        Template::OrderRefunded,
+        json!({ "refund": {
+            "amount": money(r.amount_minor),
+            "method": method,
+            "iban": r.iban.clone().unwrap_or_default(),
+            "lines": email_lines,
+        } }),
+        format!("order_refunded:{refund_id}"),
+        &[],
+    )
+    .await?;
+    if let Some(w) = r.withdrawal_id {
+        crate::withdrawals::complete_refund(&mut tx, w, actor).await?;
+    }
+    tx.commit().await?;
+    Ok(credit_note)
+}
+
+/// Refunds part or all of a paid order (see the module docs).
 #[allow(clippy::too_many_arguments)]
 pub async fn refund_order(
     db: &sqlx::PgPool,
@@ -256,130 +503,75 @@ pub async fn refund_order(
     actor: &str,
     order_id: Uuid,
     input: &RefundInput,
-    withdrawal_id: Option<Uuid>,
 ) -> Result<RefundOutcome, Error> {
-    let iban = clean_iban(input.iban.as_deref())?;
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
     let mut order = orders::lock(&mut tx, order_id).await?;
-    if !matches!(order.payment_status.as_str(), "paid" | "partially_refunded") {
-        return Err(Error::Conflict {
-            code: "nothing_to_refund",
-            detail: "the order is not paid".into(),
-        });
+    let prepared = prepare(&mut tx, &mut order, actor, input, None).await?;
+    tx.commit().await?;
+    complete(db, payments_cfg, urls, tenant_id, actor, prepared).await
+}
+
+/// Retries a refund: a `pending` Stripe refund is resubmitted with the same idempotency key; a
+/// refund whose payout `failed` after its credit note was issued is paid out again against
+/// that credit note (no second accounting correction). `409 not_retryable` otherwise.
+pub async fn retry(
+    db: &sqlx::PgPool,
+    payments_cfg: &Payments,
+    tenant_id: Uuid,
+    actor: &str,
+    refund_id: Uuid,
+) -> Result<Refund, Error> {
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let r = sqlx::query!(
+        "SELECT order_id, attempt_id, amount_minor, status, credit_note_id, iban, reason
+         FROM refunds WHERE id = $1",
+        refund_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    if r.status == "pending" {
+        tx.commit().await?;
+        return payments::retry_refund(db, payments_cfg, tenant_id, refund_id).await;
     }
-    let attempt = sqlx::query_scalar!("SELECT paid_attempt_id FROM orders WHERE id = $1", order_id)
-        .fetch_one(&mut *tx)
-        .await?
-        .ok_or_else(|| Error::Conflict {
-            code: "nothing_to_refund",
-            detail: "the order has no retained payment".into(),
-        })?;
-    // The credit note needs the invoice: refuse before any money moves (A17).
-    if invoicing::invoice_of(&mut tx, order_id).await?.is_none()
-        && invoicing::expects_invoice(&mut tx, order_id).await?
-    {
+    let Some(credit_note) = r.credit_note_id.filter(|_| r.status == "failed") else {
         return Err(Error::Conflict {
-            code: "invoice_pending",
-            detail: "the order's invoice is being issued; retry in a moment".into(),
+            code: "not_retryable",
+            detail:
+                "only pending refunds, or failed payouts of a documented refund, can be retried"
+                    .into(),
         });
-    }
-    let plan = plan(&mut tx, order_id, input).await?;
-    let (refund_id, manual) = payments::record_refund(
+    };
+    let mut order = orders::lock(&mut tx, r.order_id).await?;
+    let (id, manual) = payments::record_refund(
         &mut tx,
         &mut order,
-        attempt,
-        plan.amount.amount_minor,
-        input.reason.as_deref(),
+        r.attempt_id,
+        r.amount_minor,
+        r.reason.as_deref(),
         actor,
         &RefundDetails {
-            lines: Some(plan.ledger.clone()),
-            withdrawal_id,
-            iban: iban.clone(),
+            lines: None,
+            withdrawal_id: None,
+            iban: r.iban,
         },
     )
     .await?;
+    sqlx::query!(
+        "UPDATE refunds SET credit_note_id = $2, finalized_at = now() WHERE id = $1",
+        id,
+        credit_note
+    )
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
-
-    let submitted = if manual {
-        None
-    } else {
-        Some(payments::submit_refund(db, payments_cfg, tenant_id, refund_id).await)
-    };
-    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    let refund = payments::refund_row(&mut tx, refund_id).await?;
-    if refund.status == RefundStatus::Failed {
+    if manual {
+        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+        let out = payments::refund_row(&mut tx, id).await?;
         tx.commit().await?;
-        return Err(match submitted {
-            Some(Err(e)) => e,
-            _ => Error::Conflict {
-                code: "refund_rejected",
-                detail: "the payment provider rejected the refund".into(),
-            },
-        });
+        return Ok(out);
     }
-    orders::lock(&mut tx, order_id).await?;
-    let credit_note = invoicing::issue_credit_note(
-        &mut tx,
-        order_id,
-        plan.doc_lines.clone(),
-        input.reason.clone(),
-        actor,
-        Utc::now(),
-    )
-    .await?;
-    if let Some(cn) = credit_note {
-        sqlx::query!(
-            "UPDATE refunds SET credit_note_id = $2 WHERE id = $1",
-            refund_id,
-            cn
-        )
-        .execute(&mut *tx)
-        .await?;
-    }
-    orders::event(
-        &mut tx,
-        order_id,
-        "refunded",
-        &json!({ "refund_id": refund_id, "amount_minor": plan.amount.amount_minor,
-                 "lines": plan.ledger, "credit_note_id": credit_note, "status": refund.status }),
-        actor,
-    )
-    .await?;
-    let method = match (refund.status, manual, &iban) {
-        (_, false, _) => "card",
-        (_, true, Some(_)) => "bank",
-        _ => "other",
-    };
-    orders::mail::send(
-        &mut tx,
-        urls,
-        order_id,
-        Template::OrderRefunded,
-        json!({ "refund": {
-            "amount": plan.amount.formatted,
-            "method": method,
-            "iban": iban.clone().unwrap_or_default(),
-            "lines": plan.lines.iter().map(|l| json!({
-                "name": l.name, "quantity": l.quantity, "amount": l.amount.formatted,
-            })).collect::<Vec<_>>(),
-        } }),
-        format!("order_refunded:{refund_id}"),
-        &[],
-    )
-    .await?;
-    let refund = payments::refund_row(&mut tx, refund_id).await?;
-    tx.commit().await?;
-    // A pending Stripe refund answered "unavailable": recorded, reported as pending.
-    if let Some(Err(e)) = submitted
-        && refund.status != RefundStatus::Pending
-    {
-        return Err(e);
-    }
-    Ok(RefundOutcome {
-        refund,
-        credit_note_id: credit_note,
-        plan,
-    })
+    payments::submit_refund(db, payments_cfg, tenant_id, id).await
 }
 
 /// Everything still refundable of an order: all remaining units, and the charges.
@@ -523,30 +715,18 @@ pub async fn cancel(
         &[],
     )
     .await?;
-    let full = if paid {
-        Some(full_input(&mut tx, order_id).await?)
+    // The refund obligation commits with the cancellation (A17.1: a credit note follows).
+    let prepared = if paid {
+        let mut input = full_input(&mut tx, order_id).await?;
+        input.reason = Some(reason.unwrap_or("order cancelled").to_owned());
+        input.iban = iban;
+        Some(prepare(&mut tx, &mut o, actor, &input, None).await?)
     } else {
         None
     };
     tx.commit().await?;
-    let refund = match full {
-        Some(mut input) => {
-            input.reason = Some(reason.unwrap_or("order cancelled").to_owned());
-            input.iban = iban;
-            Some(
-                refund_order(
-                    db,
-                    payments_cfg,
-                    urls,
-                    tenant_id,
-                    actor,
-                    order_id,
-                    &input,
-                    None,
-                )
-                .await?,
-            )
-        }
+    let refund = match prepared {
+        Some(p) => Some(complete(db, payments_cfg, urls, tenant_id, actor, p).await?),
         None => None,
     };
     Ok(CancelOutcome { refund })

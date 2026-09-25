@@ -1166,12 +1166,11 @@ impl Seeder<'_> {
         };
         let fc = platform::config::FulfillmentConfig::from_env()?;
         let c = Carriers::new(
-            reqwest::Client::new(),
             fc.packeta_api_url.to_string(),
             fc.packeta_validate_url.to_string(),
             fc.ppl_api_url.to_string(),
             Some(std::sync::Arc::new(platform::crypto::SecretBox::new(&key))),
-        );
+        )?;
         let mut tx = self.tx(tenant_id).await?;
         let existing = carriers::accounts(&mut tx).await?;
         for (kind, input) in [

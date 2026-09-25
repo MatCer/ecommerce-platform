@@ -715,15 +715,79 @@ async fn set_line(
     Ok(next)
 }
 
+/// The withdrawal's order, locked; the withdrawal is read after the lock (fresh states).
+async fn locked(tx: &mut TenantTx, id: Uuid) -> Result<(orders::OrderRow, Withdrawal), Error> {
+    let order_id = sqlx::query_scalar!("SELECT order_id FROM withdrawals WHERE id = $1", id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let o = orders::lock(tx, order_id).await?;
+    Ok((o, get(tx, id).await?))
+}
+
+/// A13: the order status derives from the return line states; once every unit is back (received
+/// or refunded) the order is `returned`.
+async fn settle_order(
+    tx: &mut TenantTx,
+    o: &mut orders::OrderRow,
+    actor: &str,
+) -> Result<(), Error> {
+    let per_line = sqlx::query!(
+        "SELECT l.quantity, coalesce(array_agg(r.quantity) FILTER (WHERE r.id IS NOT NULL), '{}')
+                    AS \"returned!\",
+                coalesce(array_agg(r.status) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"states!\"
+         FROM order_lines l LEFT JOIN return_lines r ON r.order_line_id = l.id
+         WHERE l.order_id = $1 GROUP BY l.id, l.quantity",
+        o.id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let summary_input: Vec<(u32, Vec<(u32, ReturnLineStatus)>)> = per_line
+        .into_iter()
+        .map(|r| {
+            (
+                u32::try_from(r.quantity).unwrap_or(0),
+                r.returned
+                    .into_iter()
+                    .zip(r.states)
+                    .filter_map(|(q, s)| Some((u32::try_from(q).ok()?, s.parse().ok()?)))
+                    .collect(),
+            )
+        })
+        .collect();
+    if return_summary(&summary_input) == ReturnSummary::Full
+        && matches!(o.status.as_str(), "shipped" | "delivered")
+    {
+        orders::apply_order(
+            tx,
+            o,
+            OrderCommand::MarkReturned(ReturnSummary::Full),
+            actor,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
 /// The merchant confirms the goods arrived: every line is restocked (A13, movement identity
 /// `restock/return_line/<id>`, exactly once).
 pub async fn receive(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Withdrawal, Error> {
-    let w = get(tx, id).await?;
-    orders::lock(tx, w.order_id).await?;
+    let (mut o, w) = locked(tx, id).await?;
     if w.goods_received_at.is_some() {
         return Err(Error::Conflict {
             code: "already_received",
             detail: "the goods were already received".into(),
+        });
+    }
+    // A parcel that came back undelivered was restocked as a whole already.
+    let fulfillment =
+        sqlx::query_scalar!("SELECT fulfillment_status FROM orders WHERE id = $1", o.id)
+            .fetch_one(&mut **tx)
+            .await?;
+    if fulfillment == "returned" {
+        return Err(Error::Conflict {
+            code: "parcel_returned",
+            detail: "the whole parcel came back and was restocked".into(),
         });
     }
     for l in &w.lines {
@@ -755,6 +819,7 @@ pub async fn receive(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Withdra
     )
     .execute(&mut **tx)
     .await?;
+    settle_order(tx, &mut o, actor).await?;
     orders::event(
         tx,
         w.order_id,
@@ -778,7 +843,7 @@ pub async fn receive(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Withdra
 /// The customer proved dispatch of the goods (A19: the refund may then go out before they
 /// arrive).
 pub async fn record_proof(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Withdrawal, Error> {
-    let w = get(tx, id).await?;
+    let (_, w) = locked(tx, id).await?;
     sqlx::query!(
         "UPDATE withdrawals SET return_proof_at = coalesce(return_proof_at, now()) WHERE id = $1",
         id
@@ -797,9 +862,8 @@ pub async fn record_proof(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Wi
 }
 
 /// Refunds a withdrawal once the goods (or a proof of dispatch) arrived: its lines, plus the
-/// shipping and payment fee when nothing else of the order remains; the order becomes
-/// `returned` when every line is back.
-#[allow(clippy::too_many_arguments)]
+/// shipping and payment fee when nothing else of the order remains. At most one refund per
+/// withdrawal (a unique index; a concurrent second request gets `409 already_refunded`).
 pub async fn refund(
     db: &sqlx::PgPool,
     payments: &Payments,
@@ -809,7 +873,7 @@ pub async fn refund(
     id: Uuid,
 ) -> Result<RefundOutcome, Error> {
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    let w = get(&mut tx, id).await?;
+    let (mut o, w) = locked(&mut tx, id).await?;
     if w.status != "open" {
         return Err(Error::Conflict {
             code: "already_refunded",
@@ -847,64 +911,32 @@ pub async fn refund(
         input.shipping = remaining.shipping;
         input.payment_fee = remaining.payment_fee;
     }
+    let prepared = refunds::prepare(&mut tx, &mut o, actor, &input, Some(id)).await?;
     tx.commit().await?;
-    let outcome = refunds::refund_order(
-        db,
-        payments,
-        urls,
-        tenant_id,
-        actor,
-        w.order_id,
-        &input,
-        Some(id),
-    )
-    .await?;
-    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
-    let mut o = orders::lock(&mut tx, w.order_id).await?;
+    refunds::complete(db, payments, urls, tenant_id, actor, prepared).await
+}
+
+/// Marks a withdrawal refunded (called by the refund's finalization, under the order lock):
+/// each line moves on from its current state, and the order becomes `returned` when every
+/// unit is back.
+pub(crate) async fn complete_refund(tx: &mut TenantTx, id: Uuid, actor: &str) -> Result<(), Error> {
+    let (mut o, w) = locked(tx, id).await?;
+    if w.status == "refunded" {
+        return Ok(());
+    }
     for l in &w.lines {
-        set_line(&mut tx, l, ReturnCommand::Refund).await?;
+        if matches!(
+            l.status,
+            ReturnLineStatus::Approved | ReturnLineStatus::Received
+        ) {
+            set_line(tx, l, ReturnCommand::Refund).await?;
+        }
     }
     sqlx::query!(
         "UPDATE withdrawals SET status = 'refunded', refunded_at = now() WHERE id = $1",
         id
     )
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
-    // A13: the order status derives from the line states.
-    let per_line = sqlx::query!(
-        "SELECT l.quantity, coalesce(array_agg(r.quantity) FILTER (WHERE r.id IS NOT NULL), '{}')
-                    AS \"returned!\",
-                coalesce(array_agg(r.status) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"states!\"
-         FROM order_lines l LEFT JOIN return_lines r ON r.order_line_id = l.id
-         WHERE l.order_id = $1 GROUP BY l.id, l.quantity",
-        w.order_id
-    )
-    .fetch_all(&mut *tx)
-    .await?;
-    let summary_input: Vec<(u32, Vec<(u32, ReturnLineStatus)>)> = per_line
-        .into_iter()
-        .map(|r| {
-            (
-                u32::try_from(r.quantity).unwrap_or(0),
-                r.returned
-                    .into_iter()
-                    .zip(r.states)
-                    .filter_map(|(q, s)| Some((u32::try_from(q).ok()?, s.parse().ok()?)))
-                    .collect(),
-            )
-        })
-        .collect();
-    if return_summary(&summary_input) == ReturnSummary::Full
-        && matches!(o.status.as_str(), "shipped" | "delivered")
-    {
-        orders::apply_order(
-            &mut tx,
-            &mut o,
-            OrderCommand::MarkReturned(ReturnSummary::Full),
-            actor,
-        )
-        .await?;
-    }
-    tx.commit().await?;
-    Ok(outcome)
+    settle_order(tx, &mut o, actor).await
 }

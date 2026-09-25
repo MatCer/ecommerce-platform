@@ -175,7 +175,12 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
                       </td>
                       <td class={tdClass}>{formatDateTime(refund.created_at)}</td>
                       <td class={tdClass}>
-                        <Show when={refund.status === "pending"}>
+                        <Show
+                          when={
+                            refund.status === "pending" ||
+                            (refund.status === "failed" && refund.credit_note_id)
+                          }
+                        >
                           <RetryRefund id={refund.id} />
                         </Show>
                       </td>

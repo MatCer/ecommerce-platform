@@ -1477,7 +1477,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Repeats a pending Stripe refund with the same idempotency key. */
+        /**
+         * Retries a refund: a pending Stripe refund with the same idempotency key, or the payout of a
+         *     documented refund whose provider refund failed (no second credit note). Admin.
+         */
         post: operations["retry_refund"];
         delete?: never;
         options?: never;
@@ -10493,6 +10496,15 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_retryable */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

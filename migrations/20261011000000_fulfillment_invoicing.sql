@@ -189,10 +189,18 @@ ALTER TABLE refunds
     -- plus charges [{"charge": "shipping", ...}]; NULL for amount-only refunds (A10 exceptions).
     ADD COLUMN lines          jsonb CHECK (jsonb_typeof(lines) = 'array'),
     ADD COLUMN iban           text CHECK (iban ~ '^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$'),
+    -- The credit note, refund email and withdrawal completion are done (`refunds.finalize`,
+    -- resumable after a crash between the payout and the accounting).
+    ADD COLUMN finalized_at   timestamptz,
     ADD CONSTRAINT refunds_credit_note_fk FOREIGN KEY (tenant_id, credit_note_id)
         REFERENCES invoices (tenant_id, id),
     ADD CONSTRAINT refunds_withdrawal_fk FOREIGN KEY (tenant_id, withdrawal_id)
         REFERENCES withdrawals (tenant_id, id);
+-- A withdrawal is refunded once (concurrent requests: one wins). Payout retries after a failed
+-- provider refund carry no lines and are not counted.
+CREATE UNIQUE INDEX refunds_withdrawal_once ON refunds (tenant_id, withdrawal_id)
+    WHERE withdrawal_id IS NOT NULL AND lines IS NOT NULL AND status <> 'failed';
+CREATE INDEX refunds_unfinalized ON refunds (tenant_id, created_at) WHERE finalized_at IS NULL;
 
 -- ---------------------------------------------------------------------------------------
 -- Generated documents (packing slips, label sheets): rendered by the worker into the private

@@ -6943,7 +6943,7 @@
         "tags": [
           "fulfillment"
         ],
-        "summary": "Repeats a pending Stripe refund with the same idempotency key.",
+        "summary": "Retries a refund: a pending Stripe refund with the same idempotency key, or the payout of a\ndocumented refund whose provider refund failed (no second credit note). Admin.",
         "operationId": "retry_refund",
         "parameters": [
           {
@@ -6977,6 +6977,16 @@
             }
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_retryable",
             "content": {
               "application/problem+json": {
                 "schema": {

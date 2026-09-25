@@ -116,7 +116,7 @@ pub fn all(
     let wp12 = extra.fulfillment.clone();
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
-    let (urls2, urls3, urls4) = (urls.clone(), urls.clone(), urls.clone());
+    let (urls2, urls3, urls4, urls5) = (urls.clone(), urls.clone(), urls.clone(), urls.clone());
     let (f1, f2, f3, f4) = (wp12.clone(), wp12.clone(), wp12.clone(), wp12.clone());
     let wp12_track = wp12;
     let (s1, s2, s3) = (storage.clone(), storage.clone(), storage.clone());
@@ -148,6 +148,9 @@ pub fn all(
         })
         .register(commerce::documents::RENDER_JOB, move |ctx, job| {
             document_render(ctx, job, f4.clone(), s3.clone())
+        })
+        .register(commerce::refunds::FINALIZE_JOB, move |ctx, job| {
+            refund_finalize(ctx, job, urls5.clone())
         })
         .register(SHIPPING_TRACK, move |ctx, job| {
             shipping_track(ctx, job, wp12_track.clone(), urls3.clone())
@@ -736,9 +739,18 @@ async fn invoice_issue(ctx: Ctx, job: Job, f: Option<Fulfillment>) -> Result<(),
     let (tenant, order) = payload_id(&job, "/payload/order_id")?;
     let f = wp12(f)?;
     match commerce::invoicing::issue(&ctx.db, &f.rates, tenant, order, chrono::Utc::now()).await {
-        Ok(commerce::invoicing::Issued::RateUnavailable) => Err(JobError::Retry(
-            "the ČNB rate for the taxable supply date is not published yet".into(),
-        )),
+        Ok(commerce::invoicing::Issued::RateUnavailable) => {
+            // Waiting for ČNB is not a failure: a fresh job later, the order shows the delay.
+            let now = chrono::Utc::now();
+            queue::enqueue(
+                &ctx.db,
+                &commerce::invoicing::delayed_issue_job(tenant, order, now),
+            )
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+            tracing::info!(%tenant, %order, "invoice waits for the ČNB fixing");
+            Ok(())
+        }
         Ok(outcome) => {
             tracing::info!(%tenant, %order, ?outcome, "invoice issue");
             Ok(())
@@ -800,4 +812,13 @@ async fn shipping_track(
         tracing::info!(polled, "shipments tracked");
     }
     Ok(())
+}
+
+/// Backstop for a refund whose credit note / email / withdrawal completion did not run inline.
+async fn refund_finalize(ctx: Ctx, job: Job, urls: PublicUrls) -> Result<(), JobError> {
+    let (tenant, id) = payload_id(&job, "/refund_id")?;
+    commerce::refunds::finalize(&ctx.db, &urls, tenant, id, "system")
+        .await
+        .map(|_| ())
+        .map_err(|e| JobError::Retry(e.to_string()))
 }

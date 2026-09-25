@@ -63,8 +63,10 @@ impl CarrierKind {
     }
 }
 
-/// PPL access tokens per client id, with their expiry.
-type TokenCache = HashMap<String, (String, DateTime<Utc>)>;
+/// PPL access tokens per credential (SHA-256 of client id + secret), with their expiry. Keyed
+/// by the whole credential: a tenant that knows another's client id but not its secret never
+/// gets that tenant's token.
+type TokenCache = HashMap<Vec<u8>, (String, DateTime<Utc>)>;
 
 /// Endpoints and shared state (the PPL token cache).
 #[derive(Clone)]
@@ -89,21 +91,27 @@ impl std::fmt::Debug for Carriers {
 }
 
 impl Carriers {
+    /// The client follows no redirects: every URL called is platform configuration or checked
+    /// against it (the PPL label URL).
     pub fn new(
-        http: reqwest::Client,
         packeta_url: String,
         packeta_validate_url: String,
         ppl_url: String,
         secrets: Option<Arc<SecretBox>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let http = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .timeout(TIMEOUT)
+            .build()
+            .map_err(|e| Error::Internal(format!("carrier HTTP client: {e}")))?;
+        Ok(Self {
             http,
             packeta_url,
             packeta_validate_url,
             ppl_url: ppl_url.trim_end_matches('/').to_owned(),
             secrets,
             ppl_tokens: Arc::default(),
-        }
+        })
     }
 
     fn secrets(&self) -> Result<&SecretBox, Error> {
@@ -114,19 +122,30 @@ impl Carriers {
         })
     }
 
-    /// A cached PPL token for these client credentials, or a fresh one.
-    pub(crate) fn cached_ppl_token(&self, client_id: &str) -> Option<String> {
+    fn token_key(client_id: &str, secret: &str) -> Vec<u8> {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(format!("{client_id}\0{secret}").as_bytes()).to_vec()
+    }
+
+    /// A cached PPL token for exactly these client credentials.
+    pub(crate) fn cached_ppl_token(&self, client_id: &str, secret: &str) -> Option<String> {
         let tokens = self.ppl_tokens.lock().ok()?;
         tokens
-            .get(client_id)
+            .get(&Self::token_key(client_id, secret))
             .filter(|(_, until)| *until > Utc::now())
             .map(|(t, _)| t.clone())
     }
 
-    pub(crate) fn store_ppl_token(&self, client_id: &str, token: String, until: DateTime<Utc>) {
+    pub(crate) fn store_ppl_token(
+        &self,
+        client_id: &str,
+        secret: &str,
+        token: String,
+        until: DateTime<Utc>,
+    ) {
         if let Ok(mut tokens) = self.ppl_tokens.lock() {
-            // ponytail: unbounded only in theory (one entry per configured PPL account).
-            tokens.insert(client_id.to_owned(), (token, until));
+            // ponytail: unbounded only in theory (one entry per configured PPL credential).
+            tokens.insert(Self::token_key(client_id, secret), (token, until));
         }
     }
 }
@@ -383,12 +402,24 @@ pub struct ShipmentRequest {
     pub weight_g: i64,
 }
 
+/// A shipment the carrier accepted (phase 1). Persisted before the label is fetched, so a
+/// failure afterwards resumes instead of creating a second shipment. PPL answers
+/// asynchronously: its reference is the batch (`batch:/shipment/batch/<id>`) until the label
+/// phase learns the shipment number.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Created {
+pub struct Announced {
+    pub carrier_ref: String,
+    pub tracking_number: Option<String>,
+    pub tracking_url: Option<String>,
+}
+
+/// The label of an announced shipment (phase 2), with its final references.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Label {
     pub carrier_ref: String,
     pub tracking_number: String,
     pub tracking_url: String,
-    pub label_pdf: Vec<u8>,
+    pub pdf: Vec<u8>,
 }
 
 /// A carrier's tracking state mapped onto ours.
@@ -406,20 +437,35 @@ pub enum Tracked {
 }
 
 impl Carriers {
-    pub async fn create(
+    /// Phase 1: announces the shipment. `Err(Validation)`: the carrier refused it (nothing
+    /// exists there); any other error leaves the outcome unknown.
+    pub async fn announce(
         &self,
         account: &Account,
         method: crate::shipping::Carrier,
         req: &ShipmentRequest,
-    ) -> Result<Created, Error> {
+    ) -> Result<Announced, Error> {
         match &account.credentials {
             Credentials::Packeta { api_password } => {
-                packeta::create(self, api_password, &account.sender_label, method, req).await
+                packeta::announce(self, api_password, &account.sender_label, method, req).await
             }
             Credentials::Ppl {
                 client_id,
                 client_secret,
-            } => ppl::create(self, client_id, client_secret, req).await,
+            } => ppl::announce(self, client_id, client_secret, req).await,
+        }
+    }
+
+    /// Phase 2: the label (and final references) of an announced shipment; repeatable.
+    pub async fn label(&self, account: &Account, announced: &Announced) -> Result<Label, Error> {
+        match &account.credentials {
+            Credentials::Packeta { api_password } => {
+                packeta::label(self, api_password, announced).await
+            }
+            Credentials::Ppl {
+                client_id,
+                client_secret,
+            } => ppl::label(self, client_id, client_secret, announced).await,
         }
     }
 
@@ -444,6 +490,26 @@ impl Carriers {
 /// Carrier kind from a stored name.
 pub fn parse_kind(s: &str) -> Result<CarrierKind, Error> {
     CarrierKind::parse(s).ok_or_else(|| Error::Internal(format!("unknown carrier {s}")))
+}
+
+/// Reads a response body up to `max` bytes (larger answers are refused while streaming, never
+/// buffered whole).
+pub(crate) async fn read_capped(
+    carrier: &str,
+    mut res: reqwest::Response,
+    max: usize,
+) -> Result<Vec<u8>, Error> {
+    if res.content_length().is_some_and(|n| n > max as u64) {
+        return Err(unavailable(carrier, "response too large"));
+    }
+    let mut out = Vec::new();
+    while let Some(chunk) = res.chunk().await.map_err(|e| unavailable(carrier, e))? {
+        if out.len() + chunk.len() > max {
+            return Err(unavailable(carrier, "response too large"));
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(out)
 }
 
 /// Minor units as a decimal string (`12900` → `129.00`).
@@ -479,5 +545,24 @@ mod tests {
         assert_eq!(decimal(12_900), "129.00");
         assert_eq!(decimal(5), "0.05");
         assert_eq!(decimal(-150), "-1.50");
+    }
+
+    #[test]
+    fn ppl_tokens_are_cached_per_whole_credential() {
+        let c = Carriers::new(
+            "http://p".into(),
+            "http://v".into(),
+            "http://ppl".into(),
+            None,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+        let until = Utc::now() + chrono::Duration::minutes(5);
+        c.store_ppl_token("shared-id", "secret-of-a", "token-a".into(), until);
+        assert_eq!(
+            c.cached_ppl_token("shared-id", "secret-of-a").as_deref(),
+            Some("token-a")
+        );
+        // Another tenant with the same client id but not the secret gets nothing.
+        assert_eq!(c.cached_ppl_token("shared-id", "guessed-secret"), None);
     }
 }

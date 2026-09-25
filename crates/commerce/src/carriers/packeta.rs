@@ -17,7 +17,9 @@ use quick_xml::escape::escape;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{Carriers, Created, MAX_LABEL_BYTES, ShipmentRequest, TIMEOUT, Tracked, decimal};
+use super::{
+    Announced, Carriers, Label, MAX_LABEL_BYTES, ShipmentRequest, TIMEOUT, Tracked, decimal,
+};
 use crate::shipping::Carrier;
 
 const NAME: &str = "Packeta";
@@ -88,7 +90,9 @@ async fn call(c: &Carriers, body: String) -> Result<String, Error> {
     if !res.status().is_success() {
         return Err(super::unavailable(NAME, format!("HTTP {}", res.status())));
     }
-    let text = res.text().await.map_err(|e| super::unavailable(NAME, e))?;
+    // A base64 label is the largest answer.
+    let bytes = super::read_capped(NAME, res, MAX_LABEL_BYTES * 2).await?;
+    let text = String::from_utf8(bytes).map_err(|_| super::unavailable(NAME, "not UTF-8"))?;
     match text_of(&text, "status").as_deref() {
         Some("ok") => Ok(text),
         Some("fault") => {
@@ -113,13 +117,13 @@ fn split_name(full: &str) -> (String, String) {
     }
 }
 
-pub(crate) async fn create(
+pub(crate) async fn announce(
     c: &Carriers,
     password: &str,
     sender: &str,
     method: Carrier,
     req: &ShipmentRequest,
-) -> Result<Created, Error> {
+) -> Result<Announced, Error> {
     let (name, surname) = split_name(&req.recipient_name);
     let mut attrs = vec![
         el("number", &req.reference),
@@ -168,12 +172,33 @@ pub(crate) async fn create(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| super::unavailable(NAME, "no packet id"))?;
     let barcode = text_of(&created, "barcode").unwrap_or_else(|| format!("Z{id}"));
+    Ok(Announced {
+        tracking_url: Some(tracking_url(&barcode)),
+        carrier_ref: id,
+        tracking_number: Some(barcode),
+    })
+}
+
+fn tracking_url(barcode: &str) -> String {
+    format!("https://tracking.packeta.com/cs/?id={barcode}")
+}
+
+pub(crate) async fn label(
+    c: &Carriers,
+    password: &str,
+    announced: &Announced,
+) -> Result<Label, Error> {
+    let id = &announced.carrier_ref;
+    let barcode = announced
+        .tracking_number
+        .clone()
+        .unwrap_or_else(|| format!("Z{id}"));
     let label = call(
         c,
         format!(
             "<packetLabelPdf>{}{}<format>A6 on A6</format><offset>0</offset></packetLabelPdf>",
             el("apiPassword", password),
-            el("packetId", &id)
+            el("packetId", id)
         ),
     )
     .await?;
@@ -184,11 +209,11 @@ pub(crate) async fn create(
     if !pdf.starts_with(b"%PDF") || pdf.len() > MAX_LABEL_BYTES {
         return Err(super::unavailable(NAME, "label is not a PDF"));
     }
-    Ok(Created {
-        tracking_url: format!("https://tracking.packeta.com/cs/?id={barcode}"),
-        carrier_ref: id,
+    Ok(Label {
+        tracking_url: tracking_url(&barcode),
+        carrier_ref: id.clone(),
         tracking_number: barcode,
-        label_pdf: pdf,
+        pdf,
     })
 }
 
@@ -244,7 +269,8 @@ pub async fn validate_point(c: &Carriers, api_key: &str, point_id: &str) -> Resu
     if !res.status().is_success() {
         return Err(super::unavailable(NAME, format!("HTTP {}", res.status())));
     }
-    let v: Validation = res.json().await.map_err(|e| super::unavailable(NAME, e))?;
+    let body = super::read_capped(NAME, res, 64 * 1024).await?;
+    let v: Validation = serde_json::from_slice(&body).map_err(|e| super::unavailable(NAME, e))?;
     Ok(v.is_valid)
 }
 

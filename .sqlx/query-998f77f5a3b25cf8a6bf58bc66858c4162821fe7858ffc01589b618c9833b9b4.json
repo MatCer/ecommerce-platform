@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT EXISTS (SELECT 1 FROM order_events\n                                      WHERE order_id = $1 AND kind = 'invoice_delayed') AS \"x!\"",
+  "query": "SELECT EXISTS (SELECT 1 FROM order_events\n                          WHERE order_id = $1 AND kind = 'invoice_delayed') AS \"x!\"",
   "describe": {
     "columns": [
       {
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "d8c70b89ac6ab4fa26f95661ff5c9c9e759a345bfb2006f4631210df067288ff"
+  "hash": "998f77f5a3b25cf8a6bf58bc66858c4162821fe7858ffc01589b618c9833b9b4"
 }

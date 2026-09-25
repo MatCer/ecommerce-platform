@@ -55,12 +55,12 @@ fn rates() -> Rates {
 
 fn carriers() -> Carriers {
     Carriers::new(
-        reqwest::Client::new(),
         "http://127.0.0.1:1/packeta".into(),
         "http://127.0.0.1:1/validate".into(),
         "http://127.0.0.1:1/ppl".into(),
         None,
     )
+    .unwrap()
 }
 
 struct Setup {
@@ -418,7 +418,6 @@ async fn prepaid_invoice_dispatch_and_partial_refund_with_credit_note(db: PgPool
         ACTOR,
         order,
         &one(1),
-        None,
     )
     .await
     .unwrap();
@@ -433,7 +432,6 @@ async fn prepaid_invoice_dispatch_and_partial_refund_with_credit_note(db: PgPool
         ACTOR,
         order,
         &one(2),
-        None,
     )
     .await
     .unwrap_err();
@@ -455,7 +453,6 @@ async fn prepaid_invoice_dispatch_and_partial_refund_with_credit_note(db: PgPool
         ACTOR,
         order,
         &one(1),
-        None,
     )
     .await
     .unwrap();
@@ -532,6 +529,21 @@ async fn cod_is_invoiced_on_dispatch_and_a_returned_parcel_is_restocked(db: PgPo
     })
     .await
     .unwrap();
+    // The dispatch invoice must exist before a returned parcel can be corrected.
+    let early = run(&runtime, t, async |tx| {
+        fulfillment::returned_to_sender(tx, ACTOR, order, Utc::now()).await
+    })
+    .await;
+    assert!(
+        matches!(
+            early,
+            Err(Error::Conflict {
+                code: "invoice_pending",
+                ..
+            })
+        ),
+        "{early:?}"
+    );
     let Issued::New(invoice) = invoicing::issue(&runtime, &rates(), t, order, Utc::now())
         .await
         .unwrap()
@@ -798,6 +810,19 @@ async fn withdrawal_link_declaration_receipt_restock_and_refund(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(w.status, "refunded");
+    // Refunded once: a repeated (or concurrent) request is refused.
+    let again = withdrawals::refund(&runtime, &settings().payments, &urls, t, ACTOR, w.id).await;
+    assert!(
+        matches!(
+            again,
+            Err(Error::Conflict {
+                code: "already_refunded",
+                ..
+            })
+        ),
+        "{again:?}"
+    );
+
     assert_eq!(w.iban.as_deref(), Some("CZ6508000000192000145399"));
 }
 
@@ -888,4 +913,60 @@ async fn wp12_tables_are_isolated_per_tenant(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(own[0].status, ShipmentStatus::Delivered);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_returned_parcel_after_a_withdrawal_restocks_only_what_is_not_back(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "wp12-restock").await;
+    let t = s.shop.tenant;
+    let (order, attempt) = place(&runtime, &s, MethodKind::BankTransfer).await;
+    pay(&runtime, t, attempt).await;
+    invoicing::issue(&runtime, &rates(), t, order, Utc::now())
+        .await
+        .unwrap();
+    ship_and_deliver(&runtime, &s, order).await;
+    let (v0, v1) = (s.shop.variants[0], s.shop.variants[1]);
+    let (a0, a1) = (
+        on_hand(&runtime, t, v0).await.0,
+        on_hand(&runtime, t, v1).await.0,
+    );
+    // The second line (1 × variant 1) is withdrawn and comes back.
+    let w = run(&runtime, t, async |tx| {
+        let c = ctx(tx, s.shop.cz).await;
+        let f = withdrawals::form(tx, order).await?;
+        let line = f.lines[1].order_line_id;
+        withdrawals::declare(
+            tx,
+            &c,
+            order,
+            &DeclareInput {
+                lines: vec![RefundLine {
+                    order_line_id: line,
+                    quantity: 1,
+                }],
+                iban: Some("CZ6508000000192000145399".into()),
+                note: None,
+                confirm: true,
+            },
+            "account",
+        )
+        .await
+    })
+    .await
+    .unwrap();
+    run(&runtime, t, async |tx| {
+        withdrawals::receive(tx, ACTOR, w.id).await
+    })
+    .await
+    .unwrap();
+    assert_eq!(on_hand(&runtime, t, v1).await.0, a1 + 1);
+    // Then the (whole) parcel is reported back: only what is not back yet is restocked.
+    run(&runtime, t, async |tx| {
+        fulfillment::returned_to_sender(tx, ACTOR, order, Utc::now()).await
+    })
+    .await
+    .unwrap();
+    assert_eq!(on_hand(&runtime, t, v0).await.0, a0 + 2);
+    assert_eq!(on_hand(&runtime, t, v1).await.0, a1 + 1, "never twice");
 }

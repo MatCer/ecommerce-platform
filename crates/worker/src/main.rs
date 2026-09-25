@@ -121,13 +121,12 @@ fn fulfillment(ops: &platform::config::OpsConfig) -> anyhow::Result<handlers::Fu
         .build()?;
     Ok(handlers::Fulfillment {
         carriers: commerce::carriers::Carriers::new(
-            http.clone(),
             c.packeta_api_url.to_string(),
             c.packeta_validate_url.to_string(),
             c.ppl_api_url.to_string(),
             ops.secrets_key
                 .map(|k| std::sync::Arc::new(platform::crypto::SecretBox::new(&k))),
-        ),
+        )?,
         rates: commerce::invoicing::Rates {
             http,
             url: c.cnb_rates_url.to_string(),

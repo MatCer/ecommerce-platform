@@ -374,3 +374,67 @@ async fn invoice_pdf_renders() {
     assert!(pdf.starts_with(b"%PDF-"), "not a PDF");
     assert!(pdf.len() > 5_000);
 }
+
+#[test]
+fn partial_credit_notes_add_up_to_the_original_czk_recap() {
+    let mut src = cz_order();
+    src.currency = Currency::Eur;
+    src.charges.clear();
+    src.lines = vec![SourceLine {
+        id: id(7),
+        name: "Odznak".into(),
+        options_label: String::new(),
+        sku: "PIN".into(),
+        quantity: 2,
+        unit_gross_minor: 6,
+        total_minor: 12,
+        tax_rate: rate("21"),
+        tax_minor: 2,
+    }];
+    let inv = document::invoice(
+        &src,
+        issue(
+            "FV202600009",
+            d(2026, 9, 24),
+            "stripe",
+            true,
+            Some(eur_rate()),
+        ),
+    );
+    let orig = inv.czk_recap.clone().unwrap();
+    // €0.02 VAT × 24.305 = CZK 0.4861 → 0.49; each €0.01 alone → 0.24.
+    assert_eq!(orig.rows[0].vat_minor, 49);
+    let line = src.lines[0].clone();
+    let original = OriginalRef {
+        id: id(9),
+        number: "FV202600009".into(),
+        issued_on: d(2026, 9, 24),
+    };
+    let note = |n: &str, done: Reversed, prior: &[Document]| {
+        let (g, v) = reverse_units(2, 12, 2, done, 1);
+        let mut cn = document::credit_note(
+            &src,
+            issue(n, d(2026, 9, 25), "stripe", true, Some(eur_rate())),
+            vec![refunded_goods_line(&line, 1, g, v)],
+            original.clone(),
+            None,
+        );
+        let mut czk = cn.czk_recap.clone().unwrap();
+        document::settle_czk_residual(&inv, &orig, prior, &cn.vat_recap, &mut czk);
+        cn.czk_recap = Some(czk);
+        (cn, g, v)
+    };
+    let (first, g1, v1) = note("DB202600001", Reversed::default(), &[]);
+    let done = Reversed {
+        quantity: 1,
+        gross_minor: g1,
+        vat_minor: v1,
+    };
+    let (second, _, _) = note("DB202600002", done, std::slice::from_ref(&first));
+    let czk = |d: &Document| d.czk_recap.as_ref().unwrap().rows[0].clone();
+    assert_eq!(-(czk(&first).vat_minor + czk(&second).vat_minor), 49);
+    assert_eq!(
+        -(czk(&first).net_minor + czk(&second).net_minor),
+        orig.rows[0].net_minor
+    );
+}
