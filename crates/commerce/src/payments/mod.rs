@@ -856,6 +856,200 @@ pub async fn apply_outcome(
     attempt(tx, attempt_id).await
 }
 
+// ---------------------------------------------------------------------------------------
+// Refunds (§7.4, A11; the admin flows arrive with WP12)
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RefundStatus {
+    Pending,
+    Succeeded,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct Refund {
+    pub id: Uuid,
+    pub order_id: Uuid,
+    pub attempt_id: Uuid,
+    pub amount_minor: i64,
+    pub currency: String,
+    pub status: RefundStatus,
+    pub provider_ref: Option<String>,
+    pub reason: Option<String>,
+}
+
+/// Refunds `amount_minor` of an order's successful payment. Stripe refunds go through the API
+/// with the refund id as idempotency key and `refund_application_fee=true` (A11); bank transfer
+/// and cash on delivery are paid back outside the platform, so they are recorded as done.
+/// The order's payment becomes `partially_refunded` / `refunded`. `409 nothing_to_refund`
+/// when the amount exceeds what is left.
+pub async fn refund(
+    db: &sqlx::PgPool,
+    payments: &Payments,
+    tenant_id: Uuid,
+    order_id: Uuid,
+    amount_minor: i64,
+    reason: Option<&str>,
+    actor: &str,
+) -> Result<Refund, Error> {
+    let reason = reason.map(str::trim).filter(|r| !r.is_empty());
+    if reason.is_some_and(|r| r.chars().count() > 500) {
+        return Err(invalid(
+            "invalid_refund",
+            "the reason is at most 500 characters",
+        ));
+    }
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    orders::lock(&mut tx, order_id).await?;
+    let paid = sqlx::query!(
+        r#"SELECT a.id, a.method, a.amount_minor, a.currency, a.provider_ref,
+                  a.amount_minor - coalesce((SELECT sum(r.amount_minor) FROM refunds r
+                      WHERE r.attempt_id = a.id AND r.status <> 'failed'), 0)::bigint AS "left!"
+           FROM payment_attempts a
+           WHERE a.order_id = $1 AND a.status = 'succeeded'
+           ORDER BY a.completed_at DESC LIMIT 1"#,
+        order_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| Error::Conflict {
+        code: "nothing_to_refund",
+        detail: "the order has no successful payment".into(),
+    })?;
+    if amount_minor <= 0 || amount_minor > paid.left {
+        return Err(Error::Conflict {
+            code: "nothing_to_refund",
+            detail: format!("at most {} can be refunded", paid.left.max(0)),
+        });
+    }
+    let method = MethodKind::parse(&paid.method)?;
+    let id = crate::id::new_id();
+    let manual = method != MethodKind::Stripe;
+    sqlx::query!(
+        "INSERT INTO refunds (id, tenant_id, order_id, attempt_id, amount_minor, currency, reason,
+             status, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        id,
+        tenant_id,
+        order_id,
+        paid.id,
+        amount_minor,
+        paid.currency,
+        reason,
+        if manual { "succeeded" } else { "pending" },
+        actor
+    )
+    .execute(&mut *tx)
+    .await?;
+    audit::record(
+        &mut tx,
+        actor,
+        "refund.created",
+        "order",
+        Some(&order_id.to_string()),
+        &json!({ "refund_id": id, "amount_minor": amount_minor, "method": method,
+                 "reason": reason }),
+    )
+    .await?;
+    tx.commit().await?;
+
+    let status = if manual {
+        RefundStatus::Succeeded
+    } else {
+        // The API call runs outside the transaction; the refund id makes a retry idempotent.
+        let s = payments.stripe.as_ref().ok_or_else(unavailable)?;
+        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+        let account = stripe::account(&mut tx)
+            .await?
+            .ok_or_else(unavailable)?
+            .account_id;
+        tx.commit().await?;
+        let pi = paid
+            .provider_ref
+            .as_deref()
+            .ok_or_else(|| Error::Internal("Stripe payment without intent".into()))?;
+        let (status, provider_ref) = match s.refund(&account, pi, amount_minor, id).await {
+            Ok((re, status)) => (
+                match status.as_str() {
+                    "succeeded" => RefundStatus::Succeeded,
+                    "failed" | "canceled" => RefundStatus::Failed,
+                    _ => RefundStatus::Pending,
+                },
+                Some(re),
+            ),
+            Err(e) => {
+                tracing::warn!(refund = %id, error = %e, "stripe refund failed");
+                (RefundStatus::Failed, None)
+            }
+        };
+        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+        sqlx::query!(
+            "UPDATE refunds SET status = $2, provider_ref = $3, updated_at = now() WHERE id = $1",
+            id,
+            match status {
+                RefundStatus::Pending => "pending",
+                RefundStatus::Succeeded => "succeeded",
+                RefundStatus::Failed => "failed",
+            },
+            provider_ref
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        status
+    };
+    if status == RefundStatus::Succeeded {
+        // Stripe's `charge.refunded` arrives later and finds the state already applied.
+        let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+        let mut order = orders::lock(&mut tx, order_id).await?;
+        let refunded = sqlx::query_scalar!(
+            r#"SELECT coalesce(sum(amount_minor), 0)::bigint AS "sum!" FROM refunds
+               WHERE attempt_id = $1 AND status = 'succeeded'"#,
+            paid.id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        let full = refunded >= paid.amount_minor;
+        let target = if full {
+            "refunded"
+        } else {
+            "partially_refunded"
+        };
+        if order.payment_status != target
+            && matches!(order.payment_status.as_str(), "paid" | "partially_refunded")
+        {
+            orders::apply_payment(&mut tx, &mut order, PaymentCommand::Refund { full }, actor)
+                .await?;
+        }
+        tx.commit().await?;
+    }
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let r = sqlx::query!(
+        "SELECT id, order_id, attempt_id, amount_minor, currency, status, provider_ref, reason
+         FROM refunds WHERE id = $1",
+        id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    if status == RefundStatus::Failed {
+        return Err(Error::Unavailable(
+            "the refund failed at the provider".into(),
+        ));
+    }
+    Ok(Refund {
+        id: r.id,
+        order_id: r.order_id,
+        attempt_id: r.attempt_id,
+        amount_minor: r.amount_minor,
+        currency: r.currency,
+        status,
+        provider_ref: r.provider_ref,
+        reason: r.reason,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
