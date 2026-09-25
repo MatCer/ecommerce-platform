@@ -4999,7 +4999,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "The current choice: the signed-in customer's (checkout origin), else the anonymous\nsubject's. `text_version: null` means no choice yet.",
+        "summary": "The current choice: cookie purposes from the anonymous subject (this browser), email\npurposes from the signed-in customer (checkout origin). `text_version: null` means no choice\nyet.",
         "operationId": "get_consent",
         "parameters": [
           {

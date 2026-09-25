@@ -143,8 +143,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The current choice: the signed-in customer's (checkout origin), else the anonymous
-         *     subject's. `text_version: null` means no choice yet.
+         * The current choice: cookie purposes from the anonymous subject (this browser), email
+         *     purposes from the signed-in customer (checkout origin). `text_version: null` means no choice
+         *     yet.
          */
         get: operations["get_consent"];
         put?: never;
