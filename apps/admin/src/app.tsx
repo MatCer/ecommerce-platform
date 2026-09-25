@@ -24,6 +24,10 @@ const Sales = lazy(() => import("./pages/Sales.tsx"));
 const Coupons = lazy(() => import("./pages/Coupons.tsx"));
 const Inventory = lazy(() => import("./pages/Inventory.tsx"));
 const TaxProfile = lazy(() => import("./pages/TaxProfile.tsx"));
+const ShippingMethods = lazy(() => import("./pages/ShippingMethods.tsx"));
+const PaymentMethods = lazy(() => import("./pages/PaymentMethods.tsx"));
+const Orders = lazy(() => import("./pages/Orders.tsx"));
+const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -74,6 +78,10 @@ export function App() {
           <Route path="/sales" component={Sales} />
           <Route path="/coupons" component={Coupons} />
           <Route path="/markets" component={Markets} />
+          <Route path="/orders" component={Orders} />
+          <Route path="/orders/:id" component={OrderDetail} />
+          <Route path="/settings/shipping" component={ShippingMethods} />
+          <Route path="/settings/payments" component={PaymentMethods} />
           <Route path="/settings/tax" component={TaxProfile} />
           <Route path="/staff" component={Staff} />
           <Route path="/audit-log" component={AuditLog} />
