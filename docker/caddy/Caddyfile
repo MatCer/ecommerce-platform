@@ -15,9 +15,13 @@ http://api.localhost {
 	reverse_proxy api:8000
 }
 
+# Better Auth rate-limits per client IP (WP12): Caddy overwrites X-Real-IP with the peer
+# address, the only IP header the auth service trusts (AUTH_CLIENT_IP_HEADER).
 http://auth.localhost {
 	respond /internal/* "not found" 404
-	reverse_proxy auth:3000
+	reverse_proxy auth:3000 {
+		header_up X-Real-IP {remote_host}
+	}
 }
 
 http://mail.localhost {
@@ -46,7 +50,9 @@ http://mocks.localhost {
 # from the SPA. On the admin origin the cookie is first-party (auth.localhost keeps JWKS).
 http://admin.localhost {
 	handle /api/auth/* {
-		reverse_proxy auth:3000
+		reverse_proxy auth:3000 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	handle {
 		reverse_proxy admin:80
