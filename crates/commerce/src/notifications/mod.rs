@@ -219,6 +219,35 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
         ("campaign.mjml", include_str!("templates/campaign.mjml")),
         ("campaign.txt", include_str!("templates/campaign.txt")),
         (
+            "abandoned_cart.mjml",
+            include_str!("templates/abandoned_cart.mjml"),
+        ),
+        (
+            "abandoned_cart.txt",
+            include_str!("templates/abandoned_cart.txt"),
+        ),
+        (
+            "watch_confirm.mjml",
+            include_str!("templates/watch_confirm.mjml"),
+        ),
+        (
+            "watch_confirm.txt",
+            include_str!("templates/watch_confirm.txt"),
+        ),
+        (
+            "watch_alert.mjml",
+            include_str!("templates/watch_alert.mjml"),
+        ),
+        ("watch_alert.txt", include_str!("templates/watch_alert.txt")),
+        (
+            "review_invite.mjml",
+            include_str!("templates/review_invite.mjml"),
+        ),
+        (
+            "review_invite.txt",
+            include_str!("templates/review_invite.txt"),
+        ),
+        (
             "order_shipped.mjml",
             include_str!("templates/order_shipped.mjml"),
         ),
@@ -285,6 +314,10 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
 /// The templates with a subject line (layouts and skeletons have none).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Template {
+    AbandonedCart,
+    WatchConfirm,
+    WatchAlert,
+    ReviewInvite,
     MagicLink,
     PasswordChanged,
     StaffInvite,
@@ -329,6 +362,10 @@ impl Template {
 
     pub fn name(self) -> &'static str {
         match self {
+            Self::AbandonedCart => "abandoned_cart",
+            Self::WatchConfirm => "watch_confirm",
+            Self::WatchAlert => "watch_alert",
+            Self::ReviewInvite => "review_invite",
             Self::MagicLink => "magic_link",
             Self::PasswordChanged => "password_changed",
             Self::StaffInvite => "staff_invite",
@@ -647,7 +684,7 @@ pub async fn begin_send(
 ) -> Result<Result<Sending, Step>, Error> {
     let mut tx = tenant_tx(db, tenant).await?;
     let Some(m) = sqlx::query!(
-        r#"SELECT stream, to_email, subject, html, body_text, status, uncertain_count, attempts,
+        r#"SELECT stream, template, to_email, subject, html, body_text, status, uncertain_count, attempts,
                   subscriber_id, list_unsubscribe, attachments,
                   updated_at < now() - make_interval(secs => $2) AS "stale!"
            FROM email_messages WHERE id = $1 FOR UPDATE"#,
@@ -693,6 +730,10 @@ pub async fn begin_send(
                 Some(reason) => Some(reason),
                 None => crate::marketing::campaigns::delivery_refusal(&mut tx, id).await?,
             }
+        }
+        None if stream == Stream::Marketing => crate::flows::delivery_refusal(&mut tx, id).await?,
+        None if m.template == "review_invite" || m.template == "watch_alert" => {
+            crate::flows::delivery_refusal(&mut tx, id).await?
         }
         _ => None,
     };

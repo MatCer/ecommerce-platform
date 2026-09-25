@@ -933,6 +933,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/flows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_flows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/flows/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_runs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/flows/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["run_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/flows/runs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancel_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/flows/test-clock/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["advance_clock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/flows/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["configure_flow"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/go-live": {
         parameters: {
             query?: never;
@@ -3535,6 +3631,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/flows/restore-cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/flows/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["unsubscribe_cart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/newsletter/click": {
         parameters: {
             query?: never;
@@ -4011,6 +4139,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/watch/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/watch/subscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["subscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/watch/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["unsubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/withdrawals": {
         parameters: {
             query?: never;
@@ -4324,6 +4500,10 @@ export interface components {
              */
             shipments: components["schemas"]["ShipmentView"][];
             withdrawals: components["schemas"]["Withdrawal"][];
+        };
+        AdvanceInput: {
+            /** Format: int64 */
+            hours: number;
         };
         /** @description A visitor's interests (only ever loaded with `personalization` consent, A20). */
         Affinity: {
@@ -5025,6 +5205,10 @@ export interface components {
             /** @description Where to redirect (exactly what the campaign linked to). */
             url: string;
         };
+        ClockState: {
+            /** Format: date-time */
+            now: string;
+        };
         CmsPage: {
             blocks: components["schemas"]["BlockView"][];
             breadcrumbs: components["schemas"]["Link"][];
@@ -5370,6 +5554,17 @@ export interface components {
             /** @description Optional message to the shop (a reason is not required by law). */
             note?: string | null;
         };
+        Definition: {
+            config: components["schemas"]["FlowConfig"];
+            enabled: boolean;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+        };
+        DefinitionChange: {
+            config: components["schemas"]["FlowConfig"];
+            enabled: boolean;
+        };
         Delivery: {
             /** Format: int32 */
             attempts: number;
@@ -5603,6 +5798,18 @@ export interface components {
         FieldRef: {
             field: string;
             locale: string;
+        };
+        FlowConfig: {
+            /**
+             * Format: int32
+             * @description A private, one-use percent coupon on the final abandoned-cart step.
+             */
+            coupon_percent?: number | null;
+            /** @description Hours after the triggering cart activity; only abandoned carts use several steps. */
+            delays_hours: number[];
+        };
+        FlowList: {
+            items: components["schemas"]["Definition"][];
         };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
@@ -7478,6 +7685,9 @@ export interface components {
             code: number;
             to_path: string;
         };
+        RestoreResult: {
+            cart_token: string;
+        };
         /** @enum {string} */
         ReturnLineStatus: "requested" | "approved" | "received" | "refunded_awaiting_goods" | "refunded" | "rejected";
         ReturnLineView: {
@@ -7623,6 +7833,30 @@ export interface components {
         Rules: {
             conditions?: components["schemas"]["Condition"][];
             match?: components["schemas"]["Match"];
+        };
+        Run: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            due_at: string;
+            exit_reason?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            last_error?: string | null;
+            /** Format: int32 */
+            next_step: number;
+            /** Format: uuid */
+            source_id: string;
+            source_kind: string;
+            status: string;
+        };
+        RunDetail: {
+            run: components["schemas"]["Run"];
+            steps: components["schemas"]["StepRecord"][];
+        };
+        RunList: {
+            items: components["schemas"]["Run"][];
         };
         /** @enum {string} */
         RunStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
@@ -8031,6 +8265,16 @@ export interface components {
             /** @description `building`, `ready` or `failed`. */
             status: string;
         };
+        StepRecord: {
+            /** Format: date-time */
+            executed_at: string;
+            /** Format: uuid */
+            message_id?: string | null;
+            reason?: string | null;
+            status: string;
+            /** Format: int32 */
+            step_number: number;
+        };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
         StorefrontToken: {
@@ -8268,6 +8512,9 @@ export interface components {
         TestSent: {
             queued: number;
         };
+        TokenInput: {
+            token: string;
+        };
         TokensInput: {
             /**
              * Format: uuid
@@ -8497,6 +8744,17 @@ export interface components {
             /** Format: int64 */
             samples: number;
             template: string;
+        };
+        WatchInput: {
+            email: string;
+            kind: string;
+            /** Format: int64 */
+            target_minor?: number | null;
+            /** Format: uuid */
+            variant_id: string;
+        };
+        WatchStatus: {
+            status: string;
         };
         WeightTier: {
             /** Format: int64 */
@@ -11162,6 +11420,171 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_flows: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowList"];
+                };
+            };
+        };
+    };
+    list_runs: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunList"];
+                };
+            };
+        };
+    };
+    run_detail: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_run: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    advance_clock: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdvanceInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClockState"];
+                };
+            };
+            /** @description Unavailable in production */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    configure_flow: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinitionChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Definition"];
+                };
             };
         };
     };
@@ -18490,6 +18913,72 @@ export interface operations {
             };
         };
     };
+    restore: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreResult"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unsubscribe_cart: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchStatus"];
+                };
+            };
+        };
+    };
     click: {
         parameters: {
             query: {
@@ -19674,6 +20163,102 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    confirm: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchStatus"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    subscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchInput"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchStatus"];
+                };
+            };
+        };
+    };
+    unsubscribe: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchStatus"];
                 };
             };
         };

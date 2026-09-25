@@ -1073,6 +1073,145 @@ ${
     });
   }
 
+  /** Watch sign-up is a same-origin shop action; the API owns validation and double opt-in. */
+  async function watchSubscribe(
+    site: Site,
+    req: Request,
+    host: string,
+    port: string,
+  ): Promise<Response> {
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    const body = await readJsonBody(req, MAX_JSON_BODY);
+    if (body instanceof Response) return body;
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/watch/subscribe`, {
+        method: "POST",
+        headers: apiHeaders(site, { "content-type": "application/json" }),
+        body,
+      }),
+    );
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+        "cache-control": "no-store",
+      }),
+    });
+  }
+
+  /** Token actions on the checkout origin. A restore GET only renders a confirmation page;
+   * the explicit POST consumes the token, so mail link scanners cannot take the cart. */
+  async function flowLink(
+    site: Site,
+    req: Request,
+    url: URL,
+    host: string,
+    port: string,
+  ): Promise<Response> {
+    const p = url.pathname;
+    const noStore = { "cache-control": "no-store", "referrer-policy": "no-referrer" };
+    if (p === "/_p/flows/restore-cart") {
+      if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+      if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+      const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+      if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+      const token = new URLSearchParams(new TextDecoder().decode(raw)).get("token") ?? "";
+      if (!TOKEN_RE.test(token)) return text(404, "Not found", noStore);
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/flows/restore-cart`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({ token }),
+        }),
+      );
+      const data: unknown = res.ok ? await res.json() : null;
+      if (
+        !res.ok ||
+        !data ||
+        typeof data !== "object" ||
+        !("cart_token" in data) ||
+        typeof data.cart_token !== "string" ||
+        !TOKEN_RE.test(data.cart_token)
+      ) {
+        await res.body?.cancel();
+        return new Response(null, {
+          status: 303,
+          headers: { location: "/restore-cart?invalid=1", ...noStore },
+        });
+      }
+      return new Response(null, {
+        status: 303,
+        headers: {
+          location: "/",
+          "set-cookie": `${CHECKOUT_CART_COOKIE}=${data.cart_token}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+          ...noStore,
+        },
+      });
+    }
+    if (p === "/_p/watch/confirm") {
+      if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+      if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+      const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+      if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+      const token = new URLSearchParams(new TextDecoder().decode(raw)).get("token") ?? "";
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/watch/confirm`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({ token }),
+        }),
+      );
+      await res.body?.cancel();
+      return new Response(null, {
+        status: 303,
+        headers: {
+          location: res.ok ? "/watch/confirm?done=1" : "/watch/confirm?invalid=1",
+          ...noStore,
+        },
+      });
+    }
+    if (p === "/watch/unsubscribe") {
+      if (req.method !== "GET") return text(405, "Method not allowed", { allow: "GET" });
+      const token = url.searchParams.get("token") ?? "";
+      if (!TOKEN_RE.test(token)) return text(404, "Not found", noStore);
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/watch/unsubscribe`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({ token }),
+        }),
+      );
+      await res.body?.cancel();
+      return new Response(null, {
+        status: 303,
+        headers: { location: "/watch/unsubscribed", ...noStore },
+      });
+    }
+    if (p === "/flows/unsubscribe" || p === "/_p/flows/unsubscribe") {
+      const oneClick = p.startsWith("/_p/");
+      if (req.method !== (oneClick ? "POST" : "GET"))
+        return text(405, "Method not allowed", { allow: oneClick ? "POST" : "GET" });
+      const token = url.searchParams.get("token") ?? "";
+      if (!TOKEN_RE.test(token)) return text(404, "Not found", noStore);
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/flows/unsubscribe`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({ token }),
+        }),
+      );
+      await res.body?.cancel();
+      return oneClick
+        ? text(res.ok ? 200 : 404, res.ok ? "Unsubscribed" : "Not found", noStore)
+        : new Response(null, {
+            status: 303,
+            headers: { location: "/flows/unsubscribed", ...noStore },
+          });
+    }
+    return text(404, "Not found", noStore);
+  }
+
   /**
    * Newsletter links on the checkout origin (WP18). Tokens are capabilities from the emails:
    * - `POST /_p/newsletter/confirm` (the confirmation page's form, same-origin) → 303 back;
@@ -1247,6 +1386,7 @@ ${
     if (p === "/_p/recommendations") return recommendationsProxy(site, req, url);
     if (p === "/_p/e") return events(site, req, host, port);
     if (p === "/_p/newsletter") return newsletter(site, req, host, port);
+    if (p === "/_p/watch") return watchSubscribe(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {
       return new Response(SPECULATION_RULES, {
         headers: {
@@ -1324,6 +1464,14 @@ ${
     if (p === "/_p/consent")
       return consentProxy(site, req, host, port, clientIp, capabilityCookie(req, SESSION_COOKIE));
     if (p === "/_p/reviews") return reviewSubmit(site, req, host, port);
+    if (
+      p === "/_p/flows/restore-cart" ||
+      p === "/_p/watch/confirm" ||
+      p === "/watch/unsubscribe" ||
+      p === "/flows/unsubscribe" ||
+      p === "/_p/flows/unsubscribe"
+    )
+      return flowLink(site, req, url, host, port);
     const nl = /^\/_p\/newsletter\/(confirm|unsubscribe|resubscribe|click)$/.exec(p);
     if (nl?.[1]) return newsletterLinks(site, req, url, nl[1], host, port);
     if (p === "/start") {
@@ -1420,7 +1568,9 @@ ${
     if (
       url.pathname === "/newsletter" ||
       url.pathname.startsWith("/newsletter/") ||
-      url.pathname === "/review"
+      url.pathname === "/review" ||
+      url.pathname === "/watch/confirm" ||
+      url.pathname === "/restore-cart"
     )
       headers.set("referrer-policy", "same-origin");
     else if (

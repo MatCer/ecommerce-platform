@@ -150,6 +150,8 @@ pub fn all(
     let wp12_track = wp12;
     let (s1, s2, s3) = (storage.clone(), storage.clone(), storage.clone());
     let campaign_urls = e4.urls.clone();
+    let flow_event_urls = campaign_urls.clone();
+    let flow_tick_urls = campaign_urls.clone();
     Handlers::default()
         .register(EDGE_PURGE, move |_ctx, job| {
             edge_purge(job, e1.edge.clone())
@@ -196,6 +198,12 @@ pub fn all(
             search_rebuild(ctx, job, m3.clone())
         })
         .register(EVENTS_LOG, events_log)
+        .register(commerce::flows::EVENT_JOB, move |ctx, job| {
+            flow_event(ctx, job, flow_event_urls.clone())
+        })
+        .register(commerce::flows::TICK_JOB, move |ctx, job| {
+            flow_tick(ctx, job, flow_tick_urls.clone())
+        })
         .register(MAINTENANCE_CLEANUP, maintenance_cleanup)
         .register(media::PROCESS_JOB, move |ctx, job| {
             media_process(ctx, job, storage.clone(), encode_slots.clone())
@@ -623,6 +631,52 @@ async fn events_log(_ctx: Ctx, job: Job) -> Result<(), JobError> {
         tenant_id = job.tenant_id.map(tracing::field::display),
         "event"
     );
+    Ok(())
+}
+
+async fn flow_event(ctx: Ctx, job: Job, urls: PublicUrls) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("flow event without tenant".into()))?;
+    let kind = job
+        .payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| JobError::Permanent("flow event without type".into()))?;
+    let payload = job
+        .payload
+        .get("payload")
+        .ok_or_else(|| JobError::Permanent("flow event without payload".into()))?;
+    let mut tx = platform::db::tenant_tx(&ctx.db, tenant).await?;
+    let now = commerce::flows::effective_now(&mut tx)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    commerce::flows::on_event(&mut tx, &urls, kind, payload, now)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tx.commit().await?;
+    Ok(())
+}
+
+async fn flow_tick(ctx: Ctx, _job: Job, urls: PublicUrls) -> Result<(), JobError> {
+    let tenants = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM platform.tenants WHERE status='active' ORDER BY id",
+    )
+    .fetch_all(&ctx.db)
+    .await?;
+    for tenant in tenants {
+        let mut tx = platform::db::tenant_tx(&ctx.db, tenant).await?;
+        let now = commerce::flows::effective_now(&mut tx)
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+        commerce::flows::enroll_due(&mut tx, now)
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+        commerce::flows::execute_due(&mut tx, &urls, now)
+            .await
+            .map_err(|e| JobError::Retry(e.to_string()))?;
+        tx.commit().await?;
+    }
     Ok(())
 }
 

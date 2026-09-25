@@ -18,6 +18,7 @@ pub mod content;
 pub mod customers;
 pub mod documents;
 pub mod feeds;
+pub mod flows;
 pub mod fulfillment;
 pub mod id;
 pub mod idempotency;

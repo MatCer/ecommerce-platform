@@ -1141,6 +1141,11 @@ describe("platform routes backed by the real API (WP6)", () => {
     // send `Origin: null` (refused as cross-origin); `same-origin` still hides the token.
     const nl = await get(`${co}/newsletter/confirm?token=${"a".repeat(64)}`);
     expect(nl.headers.get("referrer-policy")).toBe("same-origin");
+    for (const path of ["watch/confirm", "restore-cart"]) {
+      const link = await get(`${co}/${path}?token=${"a".repeat(64)}`);
+      expect(link.headers.get("referrer-policy")).toBe("same-origin");
+      expect(link.headers.get("cache-control")).toBe("no-store");
+    }
   });
 
   test("consent: first-party cookies for the shop host after a choice only", async () => {

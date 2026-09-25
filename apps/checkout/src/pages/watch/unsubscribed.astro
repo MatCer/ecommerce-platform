@@ -1,0 +1,16 @@
+---
+import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, shopUrl } from "../../lib/api";
+
+const shop = await checkoutApi(Astro.request).shop();
+const language = (shop?.locale ?? "en").slice(0, 2);
+const title =
+  language === "cs"
+    ? "Upozornění zrušeno"
+    : language === "sk"
+      ? "Upozornenie zrušené"
+      : "Alert cancelled";
+---
+<Checkout title={title} shopName={shop?.name ?? ""} shopUrl={shopUrl(Astro.url)} lang={shop?.locale ?? "en"}>
+  <h1 class="font-display text-2xl font-bold" role="status">{title}</h1>
+</Checkout>

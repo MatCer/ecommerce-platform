@@ -288,6 +288,12 @@ pub(crate) async fn touch(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error>
     )
     .execute(&mut **tx)
     .await?;
+    platform::queue::publish(
+        &mut **tx,
+        "cart.changed",
+        &serde_json::json!({"cart_id":cart_id}),
+    )
+    .await?;
     Ok(())
 }
 
