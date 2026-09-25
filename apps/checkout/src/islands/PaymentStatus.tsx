@@ -41,7 +41,9 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
     if (p().method === "cod" || p().method === "bank_transfer") return;
     poll();
     const attempt = p().attempt;
-    if (p().method === "stripe" && p().can_pay && open() && attempt) {
+    // Back from Stripe's redirect after paying: wait for the webhook, do not offer paying again.
+    const returned = new URLSearchParams(location.search).get("redirect_status") === "succeeded";
+    if (p().method === "stripe" && p().can_pay && open() && attempt && !returned) {
       // Idempotent (A10): the same intent comes back; its client secret mounts the element.
       const r = await call<PaymentStart>("POST", `${base}/payment-attempts/${attempt.id}/init`, {});
       if (r.ok && r.data?.action) setAction(r.data.action);

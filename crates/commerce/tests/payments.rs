@@ -1171,6 +1171,30 @@ async fn stripe_failure_then_retry_then_success(db: PgPool) {
     let a = place(&runtime, &s, M::Cz, MethodKind::Stripe).await;
     let amount = total(&runtime, t, a.order_id).await;
     let acct = s.account.as_str();
+
+    // An event that races the intent id being stored is retried (job backoff), never lost.
+    let early = event(
+        "evt_early",
+        "payment_intent.payment_failed",
+        acct,
+        false,
+        intent("pi_a", a.attempt_id, amount, "czk"),
+    );
+    let client = stripe_client();
+    let sig = client.sign(&early, Utc::now()).unwrap();
+    assert!(
+        stripe::receive(&runtime, &client, &sig, &early)
+            .await
+            .unwrap()
+    );
+    let early_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM platform.provider_events WHERE event_id = 'evt_early'")
+            .fetch_one(&runtime)
+            .await
+            .unwrap();
+    let err = stripe::process_event(&runtime, early_id).await.unwrap_err();
+    assert_eq!(err.code(), "provider_ref_pending");
+
     let mut tx = tenant_tx(&runtime, t).await.unwrap();
     sqlx::query("UPDATE payment_attempts SET provider_ref = 'pi_a' WHERE id = $1")
         .bind(a.attempt_id)
@@ -1178,6 +1202,11 @@ async fn stripe_failure_then_retry_then_success(db: PgPool) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
+    // The retry applies it.
+    assert!(matches!(
+        stripe::process_event(&runtime, early_id).await.unwrap(),
+        Processed::Applied(_)
+    ));
     deliver(
         &runtime,
         &event(

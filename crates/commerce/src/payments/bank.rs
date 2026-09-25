@@ -664,7 +664,7 @@ pub async fn resolve(
         return Err(invalid(CODE, "the note is at most 500 characters"));
     }
     let line = sqlx::query!(
-        "SELECT status, attempt_id FROM bank_transactions WHERE id = $1 FOR UPDATE",
+        "SELECT status, attempt_id, currency FROM bank_transactions WHERE id = $1 FOR UPDATE",
         id
     )
     .fetch_optional(&mut **tx)
@@ -698,8 +698,8 @@ pub async fn resolve(
                 .map(str::trim)
                 .and_then(|n| n.parse().ok())
                 .ok_or_else(|| invalid(CODE, "assign needs the order number"))?;
-            let a = sqlx::query_scalar!(
-                "SELECT a.id FROM payment_attempts a JOIN orders o ON o.id = a.order_id
+            let a = sqlx::query!(
+                "SELECT a.id, a.currency FROM payment_attempts a JOIN orders o ON o.id = a.order_id
                  WHERE o.number = $1 AND a.method = 'bank_transfer'
                  ORDER BY a.created_at DESC LIMIT 1",
                 number
@@ -707,8 +707,11 @@ pub async fn resolve(
             .fetch_optional(&mut **tx)
             .await?
             .ok_or_else(|| invalid(CODE, "no bank-transfer order with this number"))?;
-            super::apply_outcome(tx, a, Outcome::Succeeded, actor).await?;
-            Some(a)
+            if a.currency != line.currency {
+                return Err(invalid(CODE, "the order is in another currency"));
+            }
+            super::apply_outcome(tx, a.id, Outcome::Succeeded, actor).await?;
+            Some(a.id)
         }
         ResolveAction::Dismiss => {
             if note.is_none() {

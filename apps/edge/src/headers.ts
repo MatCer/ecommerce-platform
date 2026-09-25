@@ -76,12 +76,12 @@ export function contentSecurityPolicy(
     ].join("; ");
   }
   const widget = opts.widgetOrigin ?? "https://widget.packeta.com";
-  const stripeScript = opts.stripe ? " https://js.stripe.com" : "";
+  const stripeScript = opts.stripe ? " https://js.stripe.com https://*.js.stripe.com" : "";
   return [
     ...common.map((d) => (d.startsWith("script-src") ? `${d}${stripeScript} ${widget}` : d)),
     `connect-src 'self'${opts.stripe ? " https://api.stripe.com" : ""}`,
     // Pickup-point widget and Stripe Payment Element (spec §9.4), loaded on interaction only.
-    `frame-src${opts.stripe ? " https://js.stripe.com https://hooks.stripe.com" : ""} ${widget}`,
+    `frame-src${opts.stripe ? " https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com" : ""} ${widget}`,
     "form-action 'self'",
   ].join("; ");
 }

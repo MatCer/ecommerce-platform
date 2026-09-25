@@ -736,7 +736,15 @@ async fn apply_intent(tx: &mut TenantTx, kind: &str, pi: &Value) -> Result<Proce
     if a.method != MethodKind::Stripe {
         return Ok(Processed::Rejected("not a Stripe attempt".into()));
     }
-    if a.provider_ref.is_none() || a.provider_ref.as_deref() != text(pi, "id") {
+    let Some(stored) = a.provider_ref.as_deref() else {
+        // The intent id is stored right after Stripe creates it, before the customer can pay;
+        // an event racing that write is retried (the job backs off) instead of being lost.
+        return Err(Error::Conflict {
+            code: "provider_ref_pending",
+            detail: "the attempt does not know its payment intent yet".into(),
+        });
+    };
+    if Some(stored) != text(pi, "id") {
         return Ok(Processed::Rejected("payment intent mismatch".into()));
     }
     if !text(pi, "currency").is_some_and(|c| c.eq_ignore_ascii_case(&a.currency)) {
