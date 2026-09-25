@@ -19,7 +19,7 @@ TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_P
 COMPOSE_FULL := COMPOSE_PROFILES=full docker compose
 COMPOSE_INFRA := COMPOSE_PROFILES=infra docker compose
 
-.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts lint fmt openapi openapi-check admin logs ps theme-build perf
+.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts lint fmt openapi openapi-check admin logs ps theme-build perf e2e
 
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -76,6 +76,9 @@ ps: ## Show stack status
 
 theme-build: ## Build + pack the default theme and checkout artifacts into .artifacts (spec A22)
 	scripts/build-artifacts.sh
+
+e2e: ## Playwright suites against the running stack (`make up` first; at most 4 workers)
+	HTTP_PORT=$(or $(HTTP_PORT),8080) pnpm --filter @platform/e2e exec playwright test $(args)
 
 perf: ## Lab budget + axe gate (spec §9.6/A26) against the running stack over HTTPS/h2
 	node packages/theme-kit/src/measure.ts --base https://demo.localhost:$(HTTPS_PORT) --runs 3

@@ -9,7 +9,8 @@ set +a
 
 http="http://%s.localhost:${HTTP_PORT:-8080}"
 api=$(printf "$http" api)
-auth=$(printf "$http" auth)
+# Better Auth is served on the admin origin (first-party session cookie, WP5).
+auth=$(printf "$http" admin)
 mailpit="http://127.0.0.1:${MAILPIT_UI_PORT:-58025}"
 compose=(docker compose)
 run=$RANDOM$RANDOM

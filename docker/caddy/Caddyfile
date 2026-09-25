@@ -26,9 +26,16 @@ http://s3.localhost {
 	reverse_proxy minio:9000
 }
 
-# Placeholder until the admin SPA work package lands.
+# Admin SPA (WP5). Better Auth is served on the admin origin too: `*.localhost` hosts are
+# separate sites, so a SameSite=Lax session cookie on auth.localhost would never reach fetches
+# from the SPA. On the admin origin the cookie is first-party (auth.localhost keeps JWKS).
 http://admin.localhost {
-	respond "{host} is not available yet" 502
+	handle /api/auth/* {
+		reverse_proxy auth:3000
+	}
+	handle {
+		reverse_proxy admin:80
+	}
 }
 
 # Everything else is a storefront host for the edge (WP2/WP6): <shop>.localhost,
