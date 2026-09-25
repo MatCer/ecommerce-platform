@@ -5,6 +5,7 @@ import RecommendationSlot from "../../components/RecommendationSlot.astro";
 import Reviews from "../../components/Reviews.astro";
 import Stars from "../../components/Stars.astro";
 import TrustRow from "../../components/TrustRow.astro";
+import WatchForm from "../../components/WatchForm.astro";
 import BuyBox from "../../islands/BuyBox";
 import Gallery from "../../islands/Gallery";
 import RecentlyViewed from "../../islands/RecentlyViewed";
@@ -68,6 +69,7 @@ const BUY_KEYS = [
           }
         </div>
         <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} selected={Astro.url.searchParams.get("variant")} />
+        <WatchForm shop={shop} product={p} selected={Astro.url.searchParams.get("variant")} />
         <div class="border-t border-border pt-5">
           <TrustRow shop={shop} layout="list" delivery={page.delivery_estimate} />
         </div>

@@ -190,6 +190,17 @@ function readCookie(headers: Headers, name: string): string | undefined {
 }
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+
+/**
+ * A shopper-typed price ("199", "199,90", "1 299.5") in minor units, or null when malformed.
+ * Shop currencies (CZK, EUR) have two decimals; the API bounds the value.
+ */
+export function priceToMinor(input: string): number | null {
+  const m = /^(\d{1,9})(?:[.,](\d{1,2}))?$/.exec(input.replace(/[\s\u00a0]/g, ""));
+  if (!m?.[1]) return null;
+  const minor = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
+  return minor > 0 ? minor : null;
+}
 /** Preview access (A21): the token from the admin's link, kept in a partitioned cookie. */
 const PREVIEW_COOKIE = "__Host-preview";
 const PREVIEW_TOKEN_RE = /^[0-9a-f]{32}\.\d{1,12}\.[0-9a-f]{64}$/;
@@ -1017,6 +1028,30 @@ ${
     return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
   }
 
+  /**
+   * 303 back to the shop page a plain HTML form was posted from, with `?<param>=<outcome>#<param>`
+   * for the theme to render. Same shop only (never an open redirect); the query keeps its other
+   * parameters.
+   */
+  function backToPage(
+    req: Request,
+    host: string,
+    port: string,
+    param: string,
+    outcome: string,
+  ): Response {
+    let back = new URL("/", `${scheme}://${host}${port}`);
+    const referer = URL.parse(req.headers.get("referer") ?? "");
+    if (referer && referer.host === `${host}${port}`) back = referer;
+    back.searchParams.set(param, outcome);
+    // `//evil.example/x` is a same-host path but a network-path reference as a Location.
+    const path = /^\/(?![/\\])/.test(back.pathname) ? back.pathname : "/";
+    return new Response(null, {
+      status: 303,
+      headers: { location: `${path}${back.search}#${param}`, "cache-control": "no-store" },
+    });
+  }
+
   /** Newsletter sign-up: same-origin JSON only; double opt-in is the API's job (§11.5). */
   async function newsletter(
     site: Site,
@@ -1040,20 +1075,7 @@ ${
         }),
       );
       await res.body?.cancel();
-      let back = new URL("/", `${scheme}://${host}${port}`);
-      const referer = URL.parse(req.headers.get("referer") ?? "");
-      // Same shop only (never an open redirect); the query keeps its other parameters.
-      if (referer && referer.host === `${host}${port}`) back = referer;
-      back.searchParams.set("newsletter", res.ok ? "ok" : "invalid");
-      // `//evil.example/x` is a same-host path but a network-path reference as a Location.
-      const path = /^\/(?![/\\])/.test(back.pathname) ? back.pathname : "/";
-      return new Response(null, {
-        status: 303,
-        headers: {
-          location: `${path}${back.search}#newsletter`,
-          "cache-control": "no-store",
-        },
-      });
+      return backToPage(req, host, port, "newsletter", res.ok ? "ok" : "invalid");
     }
     const body = await readJsonBody(req, MAX_JSON_BODY);
     if (body instanceof Response) return body;
@@ -1082,6 +1104,32 @@ ${
   ): Promise<Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+    // The product page's plain HTML form (works without JS): 303 back with
+    // `?watch=ok|invalid|unavailable#watch`. The target is a price in major units.
+    if ((req.headers.get("content-type") ?? "").startsWith("application/x-www-form-urlencoded")) {
+      const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+      if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+      const form = new URLSearchParams(new TextDecoder().decode(raw));
+      const kind = form.get("kind") ?? "";
+      const target = kind === "price_drop" ? (form.get("target") ?? "").trim() : "";
+      const targetMinor = target ? priceToMinor(target) : undefined;
+      if (targetMinor === null) return backToPage(req, host, port, "watch", "invalid");
+      const res = await upstream(
+        new Request(`${opts.apiOrigin}/storefront/v1/watch/subscribe`, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json" }),
+          body: JSON.stringify({
+            variant_id: form.get("variant_id") ?? "",
+            kind,
+            email: form.get("email") ?? "",
+            ...(targetMinor === undefined ? {} : { target_minor: targetMinor }),
+          }),
+        }),
+      );
+      await res.body?.cancel();
+      const outcome = res.ok ? "ok" : res.status === 404 ? "unavailable" : "invalid";
+      return backToPage(req, host, port, "watch", outcome);
+    }
     const body = await readJsonBody(req, MAX_JSON_BODY);
     if (body instanceof Response) return body;
     const res = await upstream(

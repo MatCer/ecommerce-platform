@@ -17,6 +17,7 @@ export const bank = "M3 10h18M5 10v7m4.7-7v7m4.6-7v7M19 10v7M3 20h18M12 4l9 4H3l
 export const cash = "M3 7h18v10H3zM12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6 10v4M18 10v4";
 export const pin =
   "M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z";
+export const bell = "M6 16v-5a6 6 0 1 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2 2 0 0 0 4 0";
 export const check = "M5 12.5l4.5 4.5L19 7.5";
 export const chevronDown = "M6 9l6 6 6-6";
 export const chevronLeft = "M15 6l-6 6 6 6";
