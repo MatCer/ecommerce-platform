@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE refunds SET credit_note_id = $2, retry_of = $3, finalized_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "692a001ef3813ffba214565e0d2abcbf74e36cd1b24774295d307910b65e832c"
+}

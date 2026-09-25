@@ -56,10 +56,12 @@ pub struct Extra {
     pub fulfillment: Option<Fulfillment>,
 }
 
-/// Carrier tracking, ČNB rates and PDF rendering (WP12).
+/// Carrier tracking, ČNB rates, PDF rendering and refund payouts (WP12).
 #[derive(Clone)]
 pub struct Fulfillment {
     pub carriers: commerce::carriers::Carriers,
+    /// Stripe (resumes refunds a crash left unsubmitted).
+    pub payments: commerce::payments::Payments,
     pub rates: commerce::invoicing::Rates,
     pub typst: commerce::documents::Typst,
 }
@@ -118,6 +120,7 @@ pub fn all(
     let urls = e4.urls.clone();
     let (urls2, urls3, urls4, urls5) = (urls.clone(), urls.clone(), urls.clone(), urls.clone());
     let (f1, f2, f3, f4) = (wp12.clone(), wp12.clone(), wp12.clone(), wp12.clone());
+    let f5 = wp12.clone();
     let wp12_track = wp12;
     let (s1, s2, s3) = (storage.clone(), storage.clone(), storage.clone());
     Handlers::default()
@@ -150,7 +153,7 @@ pub fn all(
             document_render(ctx, job, f4.clone(), s3.clone())
         })
         .register(commerce::refunds::FINALIZE_JOB, move |ctx, job| {
-            refund_finalize(ctx, job, urls5.clone())
+            refund_finalize(ctx, job, f5.clone(), urls5.clone())
         })
         .register(SHIPPING_TRACK, move |ctx, job| {
             shipping_track(ctx, job, wp12_track.clone(), urls3.clone())
@@ -814,11 +817,17 @@ async fn shipping_track(
     Ok(())
 }
 
-/// Backstop for a refund whose credit note / email / withdrawal completion did not run inline.
-async fn refund_finalize(ctx: Ctx, job: Job, urls: PublicUrls) -> Result<(), JobError> {
+/// Backstop for a refund whose payout submission or finalization (credit note, email,
+/// withdrawal completion) did not run inline.
+async fn refund_finalize(
+    ctx: Ctx,
+    job: Job,
+    f: Option<Fulfillment>,
+    urls: PublicUrls,
+) -> Result<(), JobError> {
     let (tenant, id) = payload_id(&job, "/refund_id")?;
-    commerce::refunds::finalize(&ctx.db, &urls, tenant, id, "system")
+    let f = wp12(f)?;
+    commerce::refunds::resume(&ctx.db, &f.payments, &urls, tenant, id)
         .await
-        .map(|_| ())
         .map_err(|e| JobError::Retry(e.to_string()))
 }

@@ -6986,7 +6986,7 @@
             }
           },
           "409": {
-            "description": "not_retryable",
+            "description": "not_retryable | retry_in_progress",
             "content": {
               "application/problem+json": {
                 "schema": {

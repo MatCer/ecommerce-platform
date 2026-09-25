@@ -511,28 +511,37 @@ pub async fn refund_order(
     complete(db, payments_cfg, urls, tenant_id, actor, prepared).await
 }
 
-/// Retries a refund: a `pending` Stripe refund is resubmitted with the same idempotency key; a
-/// refund whose payout `failed` after its credit note was issued is paid out again against
-/// that credit note (no second accounting correction). `409 not_retryable` otherwise.
+/// Retries a refund: a `pending` Stripe refund is resubmitted with the same idempotency key and
+/// then finalized; a refund whose payout `failed` after its credit note was issued is paid out
+/// again against that credit note (no second accounting correction). Every payout of such a
+/// chain points to its first refund, and at most one of them may be live (not failed): a
+/// second retry while one is pending or succeeded is `409 retry_in_progress`.
 pub async fn retry(
     db: &sqlx::PgPool,
     payments_cfg: &Payments,
+    urls: &PublicUrls,
     tenant_id: Uuid,
     actor: &str,
     refund_id: Uuid,
 ) -> Result<Refund, Error> {
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let order_id = sqlx::query_scalar!("SELECT order_id FROM refunds WHERE id = $1", refund_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let mut order = orders::lock(&mut tx, order_id).await?;
     let r = sqlx::query!(
-        "SELECT order_id, attempt_id, amount_minor, status, credit_note_id, iban, reason
+        "SELECT attempt_id, amount_minor, status, credit_note_id, iban, reason, retry_of
          FROM refunds WHERE id = $1",
         refund_id
     )
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or(Error::NotFound)?;
+    .fetch_one(&mut *tx)
+    .await?;
     if r.status == "pending" {
         tx.commit().await?;
-        return payments::retry_refund(db, payments_cfg, tenant_id, refund_id).await;
+        let out = payments::retry_refund(db, payments_cfg, tenant_id, refund_id).await?;
+        finalize(db, urls, tenant_id, refund_id, actor).await?;
+        return Ok(out);
     }
     let Some(credit_note) = r.credit_note_id.filter(|_| r.status == "failed") else {
         return Err(Error::Conflict {
@@ -542,8 +551,8 @@ pub async fn retry(
                     .into(),
         });
     };
-    let mut order = orders::lock(&mut tx, r.order_id).await?;
-    let (id, manual) = payments::record_refund(
+    let root = r.retry_of.unwrap_or(refund_id);
+    let recorded = payments::record_refund(
         &mut tx,
         &mut order,
         r.attempt_id,
@@ -557,13 +566,26 @@ pub async fn retry(
         },
     )
     .await?;
-    sqlx::query!(
-        "UPDATE refunds SET credit_note_id = $2, finalized_at = now() WHERE id = $1",
+    let (id, manual) = recorded;
+    let linked = sqlx::query!(
+        "UPDATE refunds SET credit_note_id = $2, retry_of = $3, finalized_at = now() WHERE id = $1",
         id,
-        credit_note
+        credit_note,
+        root
     )
     .execute(&mut *tx)
-    .await?;
+    .await;
+    match linked {
+        Err(e) if crate::unique_violation(&e) => {
+            return Err(Error::Conflict {
+                code: "retry_in_progress",
+                detail: "this refund is already being paid out again".into(),
+            });
+        }
+        other => {
+            other?;
+        }
+    }
     tx.commit().await?;
     if manual {
         let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
@@ -572,6 +594,46 @@ pub async fn retry(
         return Ok(out);
     }
     payments::submit_refund(db, payments_cfg, tenant_id, id).await
+}
+
+/// The durable backstop of a refund ([`FINALIZE_JOB`]): a Stripe refund left `pending` by a
+/// crash before its submission is submitted (or reconciled) first, then the refund is
+/// finalized. Without a Stripe client the job retries rather than finalize an unpaid refund.
+pub async fn resume(
+    db: &sqlx::PgPool,
+    payments_cfg: &Payments,
+    urls: &PublicUrls,
+    tenant_id: Uuid,
+    refund_id: Uuid,
+) -> Result<(), Error> {
+    let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
+    let r = sqlx::query!(
+        "SELECT r.status, r.finalized_at, a.method FROM refunds r
+         JOIN payment_attempts a ON a.id = r.attempt_id WHERE r.id = $1",
+        refund_id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    tx.commit().await?;
+    if r.finalized_at.is_some() {
+        return Ok(());
+    }
+    if r.status == "pending" && r.method == "stripe" {
+        if payments_cfg.stripe.is_none() {
+            return Err(Error::Unavailable(
+                "Stripe is not configured: the pending refund waits".into(),
+            ));
+        }
+        // Submitted (or reconciled): an unknown outcome stays pending for the webhooks, a
+        // rejection is `failed`; both are finalized below. Anything else retries the job.
+        match payments::retry_refund(db, payments_cfg, tenant_id, refund_id).await {
+            Ok(_) | Err(Error::Unavailable(_) | Error::Conflict { .. }) => {}
+            Err(e) => return Err(e),
+        }
+    }
+    finalize(db, urls, tenant_id, refund_id, "system").await?;
+    Ok(())
 }
 
 /// Everything still refundable of an order: all remaining units, and the charges.

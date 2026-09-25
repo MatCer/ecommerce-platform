@@ -361,7 +361,7 @@ pub enum Issued {
     New(Uuid),
     Existing(Uuid),
     NotDue,
-    /// The ČNB rate for the DUZP is not published yet: retry later.
+    /// The ČNB rate for the DUZP is not published yet, or ČNB is unreachable: retry later.
     RateUnavailable,
 }
 
@@ -401,7 +401,9 @@ pub async fn issue(
                 return Ok(Issued::RateUnavailable);
             }
             Err(e) => {
-                // ČNB unreachable: the admin sees why the invoice waits; the job retries.
+                // ČNB unreachable: the admin sees why the invoice waits, and the issue is
+                // rescheduled like an unpublished fixing (never given up).
+                tracing::warn!(%order_id, error = %e, "ČNB rates unavailable; invoice rescheduled");
                 warn_delayed(
                     db,
                     tenant_id,
@@ -411,7 +413,7 @@ pub async fn issue(
                     duzp,
                 )
                 .await?;
-                return Err(e);
+                return Ok(Issued::RateUnavailable);
             }
         }
     } else {

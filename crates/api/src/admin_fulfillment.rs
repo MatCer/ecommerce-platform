@@ -550,7 +550,7 @@ async fn create_refund(
     responses(
         (status = 200, body = commerce::payments::Refund),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
-        (status = 409, description = "not_retryable", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "not_retryable | retry_in_progress", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn retry_refund(
@@ -564,6 +564,7 @@ async fn retry_refund(
         refunds::retry(
             &s.db,
             &s.checkout.payments,
+            &s.public_urls,
             staff.tenant_id,
             &staff.user.user_id,
             id,

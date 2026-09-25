@@ -10503,7 +10503,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description not_retryable */
+            /** @description not_retryable | retry_in_progress */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -840,6 +840,34 @@ pub async fn receive(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Withdra
     get(tx, id).await
 }
 
+/// The whole parcel came back (restocked by the caller): open withdrawals of the order are
+/// received with it, without another stock movement.
+pub(crate) async fn received_with_parcel(tx: &mut TenantTx, order_id: Uuid) -> Result<(), Error> {
+    let ids = sqlx::query_scalar!(
+        "SELECT id FROM withdrawals WHERE order_id = $1 AND goods_received_at IS NULL",
+        order_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    for id in ids {
+        for l in get(tx, id).await?.lines {
+            if matches!(
+                l.status,
+                ReturnLineStatus::Approved | ReturnLineStatus::RefundedAwaitingGoods
+            ) {
+                set_line(tx, &l, ReturnCommand::Receive).await?;
+            }
+        }
+        sqlx::query!(
+            "UPDATE withdrawals SET goods_received_at = now() WHERE id = $1",
+            id
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
 /// The customer proved dispatch of the goods (A19: the refund may then go out before they
 /// arrive).
 pub async fn record_proof(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Withdrawal, Error> {

@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         },
         webhooks,
         fio: fio_poller(env, &ops)?,
-        fulfillment: Some(fulfillment(&ops)?),
+        fulfillment: Some(fulfillment(env, &ops)?),
     };
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
@@ -114,7 +114,10 @@ async fn main() -> anyhow::Result<()> {
 }
 
 /// Carriers (tracking), the ČNB client and the Typst renderer (WP12).
-fn fulfillment(ops: &platform::config::OpsConfig) -> anyhow::Result<handlers::Fulfillment> {
+fn fulfillment(
+    env: platform::config::AppEnv,
+    ops: &platform::config::OpsConfig,
+) -> anyhow::Result<handlers::Fulfillment> {
     let c = platform::config::FulfillmentConfig::from_env()?;
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
@@ -127,6 +130,13 @@ fn fulfillment(ops: &platform::config::OpsConfig) -> anyhow::Result<handlers::Fu
             ops.secrets_key
                 .map(|k| std::sync::Arc::new(platform::crypto::SecretBox::new(&k))),
         )?,
+        payments: commerce::payments::Payments {
+            fake: None,
+            stripe: platform::config::PaymentsConfig::from_env(env)?
+                .stripe
+                .map(|cfg| commerce::payments::stripe::Stripe::new(&cfg, http.clone())),
+            secrets: None,
+        },
         rates: commerce::invoicing::Rates {
             http,
             url: c.cnb_rates_url.to_string(),

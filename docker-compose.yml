@@ -345,6 +345,11 @@ services:
       SAFE_FETCH_ALLOW_HOSTS: mocks
       # WP11: Fio API polling (the local mock); tokens are encrypted with SECRETS_KEY.
       FIO_API_URL: ${FIO_API_URL:-http://mocks:4010/fio}
+      # WP12: Stripe for refunds a crash left unsubmitted (same settings as the api).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
+      STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
       # WP12: carrier tracking, ČNB rates (local mocks) and PDF rendering (Typst in the image).
       PACKETA_API_URL: ${PACKETA_API_URL:-http://mocks:4010/packeta/api/rest}
       PACKETA_VALIDATE_URL: ${PACKETA_VALIDATE_URL:-http://mocks:4010/packeta/pps/api/widget/v1/validate}

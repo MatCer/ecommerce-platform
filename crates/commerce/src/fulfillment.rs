@@ -696,6 +696,9 @@ pub async fn returned_to_sender(
     for l in lines.into_iter().filter(|l| l.quantity > 0) {
         inventory::restock(tx, actor, &r, l.variant_id, l.quantity).await?;
     }
+    // Withdrawn goods came back with the parcel (restocked just above): their withdrawals
+    // count as received, so they can be refunded.
+    crate::withdrawals::received_with_parcel(tx, order_id).await?;
     if unpaid && invoicing::invoice_of(tx, order_id).await?.is_some() {
         let src = invoicing::order_source(tx, order_id).await?;
         let mut doc_lines = Vec::new();
@@ -981,13 +984,18 @@ pub async fn actions(tx: &mut TenantTx, order_id: Uuid) -> Result<OrderActions, 
     .fetch_optional(&mut **tx)
     .await?
     .ok_or(Error::NotFound)?;
-    let s = live(tx, order_id).await?.map(|s| s.status);
+    let shipment = live(tx, order_id).await?;
+    // A shipment the carrier accepted but whose label is missing resumes (no second one).
+    let resumable = shipment
+        .as_ref()
+        .is_some_and(|s| s.status == ShipmentStatus::Creating && s.carrier_ref.is_some());
+    let s = shipment.map(|s| s.status);
     let status = o.status.as_str();
     let open = matches!(status, "pending" | "confirmed" | "processing");
     let paid = matches!(o.payment_status.as_str(), "paid" | "partially_refunded");
     Ok(OrderActions {
         start_processing: status == "confirmed",
-        create_label: matches!(status, "confirmed" | "processing") && s.is_none(),
+        create_label: matches!(status, "confirmed" | "processing") && (s.is_none() || resumable),
         cancel_label: matches!(
             s,
             Some(ShipmentStatus::Creating | ShipmentStatus::LabelCreated)

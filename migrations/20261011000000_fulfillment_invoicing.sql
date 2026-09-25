@@ -192,10 +192,17 @@ ALTER TABLE refunds
     -- The credit note, refund email and withdrawal completion are done (`refunds.finalize`,
     -- resumable after a crash between the payout and the accounting).
     ADD COLUMN finalized_at   timestamptz,
+    -- A payout retry of a documented refund whose provider refund failed: the first refund of
+    -- the chain (at most one live payout per chain, below).
+    ADD COLUMN retry_of       uuid,
     ADD CONSTRAINT refunds_credit_note_fk FOREIGN KEY (tenant_id, credit_note_id)
         REFERENCES invoices (tenant_id, id),
     ADD CONSTRAINT refunds_withdrawal_fk FOREIGN KEY (tenant_id, withdrawal_id)
-        REFERENCES withdrawals (tenant_id, id);
+        REFERENCES withdrawals (tenant_id, id),
+    ADD CONSTRAINT refunds_retry_of_fk FOREIGN KEY (tenant_id, retry_of)
+        REFERENCES refunds (tenant_id, id);
+CREATE UNIQUE INDEX refunds_one_live_retry ON refunds (tenant_id, retry_of)
+    WHERE retry_of IS NOT NULL AND status <> 'failed';
 -- A withdrawal is refunded once (concurrent requests: one wins). Payout retries after a failed
 -- provider refund carry no lines and are not counted.
 CREATE UNIQUE INDEX refunds_withdrawal_once ON refunds (tenant_id, withdrawal_id)

@@ -970,3 +970,99 @@ async fn a_returned_parcel_after_a_withdrawal_restocks_only_what_is_not_back(db:
     assert_eq!(on_hand(&runtime, t, v0).await.0, a0 + 2);
     assert_eq!(on_hand(&runtime, t, v1).await.0, a1 + 1, "never twice");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_returned_parcel_receives_open_withdrawals_and_payout_retries_are_single(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "wp12-parcel").await;
+    let t = s.shop.tenant;
+    let (order, attempt) = place(&runtime, &s, MethodKind::BankTransfer).await;
+    pay(&runtime, t, attempt).await;
+    invoicing::issue(&runtime, &rates(), t, order, Utc::now())
+        .await
+        .unwrap();
+    ship_and_deliver(&runtime, &s, order).await;
+    let w = run(&runtime, t, async |tx| {
+        let c = ctx(tx, s.shop.cz).await;
+        let f = withdrawals::form(tx, order).await?;
+        withdrawals::declare(
+            tx,
+            &c,
+            order,
+            &DeclareInput {
+                lines: vec![RefundLine {
+                    order_line_id: f.lines[1].order_line_id,
+                    quantity: 1,
+                }],
+                iban: Some("CZ6508000000192000145399".into()),
+                note: None,
+                confirm: true,
+            },
+            "account",
+        )
+        .await
+    })
+    .await
+    .unwrap();
+    // The parcel comes back before the withdrawn goods were recorded: they came with it.
+    run(&runtime, t, async |tx| {
+        fulfillment::returned_to_sender(tx, ACTOR, order, Utc::now()).await
+    })
+    .await
+    .unwrap();
+    let received = run(&runtime, t, async |tx| withdrawals::get(tx, w.id).await)
+        .await
+        .unwrap();
+    assert!(received.goods_received_at.is_some());
+    let urls = PublicUrls::default();
+    let out = withdrawals::refund(&runtime, &settings().payments, &urls, t, ACTOR, w.id)
+        .await
+        .unwrap();
+    assert!(out.credit_note_id.is_some());
+
+    // The provider later reports the payout failed: the credit note stands, the money is owed.
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    sqlx::query("UPDATE refunds SET status = 'failed' WHERE id = $1")
+        .bind(out.refund.id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let again = refunds::retry(
+        &runtime,
+        &settings().payments,
+        &urls,
+        t,
+        ACTOR,
+        out.refund.id,
+    )
+    .await
+    .unwrap();
+    assert_eq!(again.amount_minor, out.refund.amount_minor);
+    // One live payout per documented refund: retrying again is refused.
+    let twice = refunds::retry(
+        &runtime,
+        &settings().payments,
+        &urls,
+        t,
+        ACTOR,
+        out.refund.id,
+    )
+    .await;
+    assert!(
+        matches!(
+            twice,
+            Err(Error::Conflict {
+                code: "retry_in_progress",
+                ..
+            })
+        ),
+        "{twice:?}"
+    );
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let notes: i64 = sqlx::query_scalar("SELECT count(*) FROM invoices WHERE kind = 'credit_note'")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(notes, 1, "no second accounting correction");
+}
