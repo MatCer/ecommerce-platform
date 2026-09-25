@@ -59,8 +59,8 @@ services:
   # One-shot: the API's search-only key (tenant indexes `t_*`) and the worker's admin key
   # (spec A27; all indexes, because index swaps are tasks without an index and a key limited
   # by index patterns cannot read them). Fixed uids make the key values known in advance
-  # (.env.example); it fails when a value does not match. api/worker do not wait for it:
-  # until the keys exist, search is simply degraded.
+  # (.env.example); it fails when a value does not match. The API does not wait for it (until
+  # the keys exist, search is simply degraded); the worker does.
   meili-init:
     profiles: [infra, full]
     image: getmeili/meilisearch:v1.54.0@sha256:0bf32debcbfa8ba4e418679025f4935884972171513c92f0584689ff994a61df
@@ -290,6 +290,8 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
+      # Local stack only (prod provisions the keys out of band).
+      meili-init: { condition: service_completed_successfully }
 
 volumes:
   pg-data:
