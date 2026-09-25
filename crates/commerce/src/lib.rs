@@ -32,6 +32,7 @@ pub mod storefront;
 pub mod tax;
 pub mod tenancy;
 pub mod themes;
+pub mod webhooks;
 
 /// Postgres `unique_violation` (23505).
 fn unique_violation(e: &sqlx::Error) -> bool {

@@ -32,6 +32,7 @@ uuid.workspace = true
 webp.workspace = true
 
 [dev-dependencies]
+axum.workspace = true
 proptest.workspace = true
 testkit.workspace = true
 
