@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ad_deliveries\n         SET status = $2, attempts = coalesce($3, attempts), response_code = coalesce($4, response_code),\n             last_error = $5, updated_at = now(),\n             finished_at = CASE WHEN $6 THEN now() END,\n             user_agent = CASE WHEN $6 THEN NULL ELSE user_agent END\n         WHERE id = $1 AND status IN ('pending', 'retrying')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4",
+        "Int4",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0cb9fdf6ba4b9c0f9949993a09a4573fc41bcc541bfed3184a3bcfc586f6a09c"
+}

@@ -208,6 +208,19 @@ impl SafeClient {
         body: Vec<u8>,
         limits: Limits,
     ) -> Result<u16, FetchError> {
+        self.post_read(url, headers, body, limits)
+            .await
+            .map(|(status, _)| status)
+    }
+
+    /// Like [`Self::post`], but keeps the answer's body (up to the cap), e.g. an API's JSON.
+    pub async fn post_read(
+        &self,
+        url: &str,
+        headers: reqwest::header::HeaderMap,
+        body: Vec<u8>,
+        limits: Limits,
+    ) -> Result<(u16, Vec<u8>), FetchError> {
         let url = self.check(url)?;
         let mut res = self
             .http_no_redirect
@@ -218,14 +231,14 @@ impl SafeClient {
             .send()
             .await
             .map_err(request_error)?;
-        let mut read = 0u64;
+        let mut bytes = Vec::new();
         while let Some(chunk) = res.chunk().await.map_err(request_error)? {
-            read += chunk.len() as u64;
-            if read > limits.max_bytes {
+            if (bytes.len() + chunk.len()) as u64 > limits.max_bytes {
                 return Err(FetchError::TooLarge(limits.max_bytes));
             }
+            bytes.extend_from_slice(&chunk);
         }
-        Ok(res.status().as_u16())
+        Ok((res.status().as_u16(), bytes))
     }
 
     /// GETs `url` within `limits`. Non-2xx answers are errors.

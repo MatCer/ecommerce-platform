@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT platform, paused FROM ad_platforms WHERE enabled AND $1 = ANY (market_ids)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "paused"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ffd8c0b47db382a7420f471200373e1039ac2e1d132578e3cc9b519c58766c67"
+}

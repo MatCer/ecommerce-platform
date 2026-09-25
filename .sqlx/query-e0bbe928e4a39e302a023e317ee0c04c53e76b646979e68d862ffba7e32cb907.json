@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT sku, name, quantity, unit_gross_minor FROM order_lines\n         WHERE order_id = $1 ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "sku",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "sku"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "quantity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "unit_gross_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "unit_gross_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e0bbe928e4a39e302a023e317ee0c04c53e76b646979e68d862ffba7e32cb907"
+}

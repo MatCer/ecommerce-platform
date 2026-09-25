@@ -1,0 +1,215 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.platform, d.event_id, d.event_name, d.market_id, d.subject, d.customer_id,\n                d.order_id, d.props, d.user_agent, d.occurred_at, d.status,\n                p.enabled, p.paused, p.test_mode, p.settings, p.credentials_ciphertext,\n                (SELECT h.hostname FROM platform.domains h\n                 WHERE h.market_id = d.market_id AND h.verified_at IS NOT NULL\n                 ORDER BY h.is_primary DESC, h.hostname LIMIT 1) AS host\n         FROM ad_deliveries d\n         JOIN ad_platforms p ON p.tenant_id = d.tenant_id AND p.platform = d.platform\n         WHERE d.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "event_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "event_name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "order_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "props",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "props"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "user_agent",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "user_agent"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "occurred_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "enabled",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "test_mode",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "test_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "settings",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "settings"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "credentials_ciphertext",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "credentials_ciphertext"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "host",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "73001b0996b0cddf6ab1269b2bbc3177fce90bb0c22749725541ba0793900da2"
+}
