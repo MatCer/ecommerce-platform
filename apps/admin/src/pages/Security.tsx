@@ -17,7 +17,7 @@ interface Enrollment {
 export default function Security() {
   const qc = useQueryClient();
   const state = createQuery(() => ({
-    queryKey: ["security"],
+    queryKey: ["security", claims()?.sub],
     queryFn: async () => {
       const [session, accounts] = await Promise.all([
         authClient.getSession(),

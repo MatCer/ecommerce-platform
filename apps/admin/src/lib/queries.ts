@@ -23,6 +23,7 @@ export function useParameters() {
       const header = tenantHeader();
       const items: Schemas["Parameter"][] = [];
       let cursor: string | undefined;
+      let truncated = false;
       for (let page = 0; page < 50; page++) {
         const res = await unwrap(
           api.GET("/admin/v1/parameters", { params: { header, query: { limit: 100, cursor } } }),
@@ -30,8 +31,9 @@ export function useParameters() {
         items.push(...res.items);
         cursor = res.next_cursor ?? undefined;
         if (!cursor) break;
+        truncated = page === 49;
       }
-      return { items };
+      return { items, truncated };
     },
   }));
 }

@@ -11,7 +11,7 @@ import {
 } from "@platform/ui";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createEffect, createSignal, For, type JSX, Show } from "solid-js";
+import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { MediaManager } from "../components/MediaManager.tsx";
 import { PageHeader, QueryState } from "../components/Page.tsx";
@@ -19,7 +19,7 @@ import { ParameterValues } from "../components/ParameterValues.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { VariantsEditor } from "../components/VariantsEditor.tsx";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
-import { ApiError, api, idempotencyKey, tenantHeader, tenantId, unwrap } from "../lib/api.ts";
+import { ApiError, api, idempotencyKey, tenantHeader, unwrap } from "../lib/api.ts";
 import { categoryName, flatten } from "../lib/category-tree.ts";
 import { tenantKey } from "../lib/me.ts";
 import {
@@ -110,6 +110,10 @@ export default function ProductEditor() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const isNew = () => !params.id;
+  let alive = true;
+  onCleanup(() => {
+    alive = false;
+  });
   const [draft, setDraft] = createStore<ProductDraft>(emptyDraft());
   const [loaded, setLoaded] = createSignal<string | null>(null);
   const [saveError, setSaveError] = createSignal<string>();
@@ -153,6 +157,7 @@ export default function ProductEditor() {
     mutationFn: async () => {
       const body = draftToInput(draft);
       const header = idempotencyKey();
+      const base = tenantKey();
       const created = isNew();
       const product = await (created
         ? unwrap(api.POST("/admin/v1/products", { params: { header }, body }))
@@ -162,12 +167,14 @@ export default function ProductEditor() {
               body,
             }),
           ));
-      return { product, tenant: header["X-Tenant-Id"], created };
+      return { product, base, created, route: params.id };
     },
-    onSuccess: ({ product: p, tenant, created }) => {
-      qc.setQueryData(["t", tenant, "product", p.id], p);
-      void qc.invalidateQueries({ queryKey: ["t", tenant, "products"] });
-      if (tenant !== tenantId()) return;
+    onSuccess: ({ product: p, base, created, route }) => {
+      qc.setQueryData([...base, "product", p.id], p);
+      void qc.invalidateQueries({ queryKey: [...base, "products"] });
+      // Only the screen that started the save reacts (same user, shop, product and still open).
+      if (!alive || route !== params.id || JSON.stringify(base) !== JSON.stringify(tenantKey()))
+        return;
       setSaveError(undefined);
       setDraft(reconcile(draftFromProduct(p)));
       setLoaded(p.id);
@@ -178,6 +185,7 @@ export default function ProductEditor() {
       if (created) navigate(`/products/${p.id}`, { replace: true });
     },
     onError: (err) => {
+      if (!alive) return;
       setSaveError(errorMessage(err));
       document.getElementById("save-error")?.focus();
     },

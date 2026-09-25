@@ -95,6 +95,7 @@ export const cs: Dictionary = {
     invalid_options: "Každá vlastnost potřebuje název a alespoň jednu hodnotu.",
     invalid_weight: "Hmotnost se zadává v celých gramech (0 až 10 000 000).",
     too_many_variants: "Nejvýše 500 variant: snižte počet hodnot vlastností.",
+    invalid_parameter_value: "Číselný parametr má hodnotu, která není číslo.",
     has_children: "Nejdříve přesuňte nebo smažte podkategorie.",
     parameter_in_use: "Parametr ještě používají produkty.",
   },
@@ -353,6 +354,7 @@ export const cs: Dictionary = {
     emptyTitle: "Zatím žádné parametry",
     emptyDesc:
       "Parametry popisují produkty (materiál, délka…) a mohou sloužit jako filtry v obchodě.",
+    truncated: "Zobrazeno jen prvních {{count}} parametrů.",
     deleteTitle: "Smazat parametr {{name}}?",
     deleteDesc: "Hodnoty tohoto parametru se odstraní ze všech produktů.",
   },

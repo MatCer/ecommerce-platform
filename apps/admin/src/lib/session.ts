@@ -144,7 +144,13 @@ export async function requestPasswordReset(email: string): Promise<SignInResult>
   return error ? failure(error) : { kind: "ok" };
 }
 
+/** Better Auth revokes every session on reset, so the local one is forgotten too. */
 export async function resetPassword(tokenValue: string, newPassword: string) {
   const { error } = await authClient.resetPassword({ token: tokenValue, newPassword });
+  if (!error) {
+    generation += 1;
+    inflight = null;
+    setSession(null, null);
+  }
   return error ? failure(error) : ({ kind: "ok" } as const);
 }

@@ -131,6 +131,11 @@ export default function Parameters() {
               />
             }
           >
+            <Show when={page.truncated}>
+              <p role="status" class="mb-2 text-xs text-warning-700">
+                {t("parameters.truncated", { count: page.items.length })}
+              </p>
+            </Show>
             <div class="overflow-x-auto">
               <table class={tableClass}>
                 <thead>

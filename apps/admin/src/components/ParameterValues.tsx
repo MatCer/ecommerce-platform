@@ -83,8 +83,13 @@ export function ParameterValues(props: {
                           label={`${t("editor.value")}${p().unit ? ` (${p().unit})` : ""}`}
                           inputMode="decimal"
                           inputClass="figures text-right"
-                          value={typeof v().value === "number" ? String(v().value) : ""}
-                          onChange={(text) => set(i, { value: Number(text.replace(",", ".")) })}
+                          value={
+                            typeof v().value === "number" || typeof v().value === "string"
+                              ? String(v().value)
+                              : ""
+                          }
+                          // Kept as typed ("1." or "-") and parsed when the product is saved.
+                          onChange={(text) => set(i, { value: text })}
                         />
                       </Show>
                       <Show when={p().kind === "bool"}>

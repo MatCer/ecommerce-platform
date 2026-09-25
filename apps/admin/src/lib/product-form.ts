@@ -241,7 +241,10 @@ export function draftToInput(d: ProductDraft): ProductInput {
       is_default: v.is_default,
     })),
     category_ids: d.category_ids,
-    parameters: d.parameters,
+    // Number inputs hold their text until saving.
+    parameters: d.parameters.map((p) =>
+      typeof p.value === "string" ? { ...p, value: num(p.value, "invalid_parameter_value") } : p,
+    ),
     media: d.media.map((m) => ({ ...m, alt_i18n: compactI18n(m.alt_i18n ?? {}) })),
     gpsr: {
       manufacturer: partyInput(d.manufacturer),
