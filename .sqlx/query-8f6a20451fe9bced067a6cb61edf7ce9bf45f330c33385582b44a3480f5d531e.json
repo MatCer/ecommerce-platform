@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT t.slug FROM pages p JOIN page_translations t ON t.page_id = p.id\n         WHERE p.legal_type = 'reviews' AND p.status = 'published' AND p.published_at <= $1\n         ORDER BY (t.locale = $2) DESC, (t.locale = $3) DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "slug",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "page_translations",
+            "name": "slug"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8f6a20451fe9bced067a6cb61edf7ce9bf45f330c33385582b44a3480f5d531e"
+}

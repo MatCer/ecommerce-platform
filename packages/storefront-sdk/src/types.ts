@@ -114,3 +114,9 @@ export type WithdrawalForm = S["WithdrawalForm"];
 export type WithdrawalReceipt = S["WithdrawalReceipt"];
 export type DeclareInput = S["DeclareInput"];
 export type DocumentLinks = S["DocumentLinks"];
+/** Reviews (WP16): published reviews, rating summary and the verification page on a product. */
+export type ProductReviews = S["ProductReviews"];
+export type PublicReview = S["PublicReview"];
+export type RatingSummary = S["RatingSummary"];
+/** Reviews (WP16): the order line behind a review link. */
+export type ReviewInvitation = S["ReviewInvitation"];

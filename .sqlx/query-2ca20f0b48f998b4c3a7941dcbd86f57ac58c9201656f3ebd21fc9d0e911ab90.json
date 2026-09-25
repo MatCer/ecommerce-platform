@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE review_tokens SET used_at = now()\n         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()\n         RETURNING order_line_id, product_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_line_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_tokens",
+            "name": "order_line_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_tokens",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "2ca20f0b48f998b4c3a7941dcbd86f57ac58c9201656f3ebd21fc9d0e911ab90"
+}

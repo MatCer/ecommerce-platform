@@ -933,6 +933,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submits a review with a review link's token (single use). Plain text only; the review
+         *     waits for moderation.
+         */
+        post: operations["submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/reviews/invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the review form shows for a link (reading changes nothing). */
+        get: operations["invitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/search": {
         parameters: {
             query?: never;
@@ -1901,7 +1938,34 @@ export interface components {
             cache: components["schemas"]["CacheHints"];
             delivery_estimate?: components["schemas"]["DeliveryEstimate"] | null;
             product: components["schemas"]["ProductDetail"];
+            /** @description Published reviews, their summary and the verification disclosure link (WP16). */
+            reviews: components["schemas"]["ProductReviews"];
             seo: components["schemas"]["Seo"];
+        };
+        ProductReviews: {
+            /** @description Newest published reviews (at most 20). */
+            items: components["schemas"]["PublicReview"][];
+            summary?: components["schemas"]["RatingSummary"] | null;
+            /** @description The shop's published "how we verify reviews" page (Omnibus disclosure). */
+            verification_url?: string | null;
+        };
+        /** @description A published review as the shop shows it (plain text; escape on output). */
+        PublicReview: {
+            body: string;
+            customer_name: string;
+            /** Format: uuid */
+            id: string;
+            /** @description Language the review was written in (`lang` attribute). */
+            locale: string;
+            /** Format: date */
+            published_on: string;
+            /** Format: int32 */
+            rating: number;
+            /** @description The merchant's public reply. */
+            reply?: string | null;
+            title: string;
+            /** @description Written through a review link of a delivered order line. */
+            verified: boolean;
         };
         /** @description Per-purpose choices: `None` = not asked (or not part of this choice). */
         Purposes: {
@@ -1913,6 +1977,17 @@ export interface components {
         };
         /** @enum {string} */
         QrKind: "spayd" | "pay_by_square";
+        RatingSummary: {
+            /**
+             * Format: double
+             * @description Mean rating, one decimal.
+             */
+            average: number;
+            /** Format: int64 */
+            count: number;
+            /** @description Review counts for 1..5 stars (index 0 = 1 star). */
+            histogram: number[];
+        };
         Recommendations: {
             /**
              * @description Public for the anonymous variant; private (and `Cache-Control: private, no-store`)
@@ -1936,6 +2011,33 @@ export interface components {
             /** Format: int32 */
             code: number;
             to_path: string;
+        };
+        ReviewInput: {
+            /** @description 1-4000 characters of plain text. */
+            body: string;
+            /** @description Shown publicly (1-60 characters). */
+            name: string;
+            /**
+             * Format: int32
+             * @description 1-5 stars.
+             */
+            rating: number;
+            /** @description Optional headline (≤ 120 characters). */
+            title?: string;
+            /** @description The capability from the review link. */
+            token: string;
+        };
+        /** @description What the review form shows for a token (a read, no change). */
+        ReviewInvitation: {
+            /** Format: date-time */
+            expires_at: string;
+            options_label: string;
+            /** @description Product name and options as bought. */
+            product_name: string;
+        };
+        ReviewSubmitted: {
+            /** @description Always `pending`: the shop publishes reviews after moderation. */
+            status: string;
         };
         SearchHit: {
             brand?: string | null;
@@ -4693,6 +4795,100 @@ export interface operations {
                     "application/json": components["schemas"]["ResolvedRedirect"];
                 };
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    submit: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewSubmitted"];
+                };
+            };
+            /** @description Invalid, used or expired token */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description too_many_reviews */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    invitation: {
+        parameters: {
+            query: {
+                /** @description The token from the review link. */
+                token: string;
+            };
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewInvitation"];
+                };
+            };
+            /** @description Invalid, used or expired */
             404: {
                 headers: {
                     [name: string]: unknown;
