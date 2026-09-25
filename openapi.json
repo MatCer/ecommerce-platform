@@ -13031,18 +13031,19 @@
       },
       "CounterBatch": {
         "type": "object",
-        "description": "What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`).",
+        "description": "What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`). The edge\nresends a failed batch unchanged with the same `batch_id`; tenants that already counted it\nskip it, so a retry never counts twice.",
+        "required": [
+          "batch_id"
+        ],
         "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
           "counters": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PageCounter"
-            }
-          },
-          "searches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SearchCounter"
             }
           }
         },
@@ -13052,15 +13053,17 @@
         "type": "object",
         "required": [
           "counters",
-          "searches"
+          "replayed_tenants"
         ],
         "properties": {
           "counters": {
             "type": "integer",
+            "description": "Rows added now.",
             "minimum": 0
           },
-          "searches": {
+          "replayed_tenants": {
             "type": "integer",
+            "description": "Tenants that had counted this batch already (a retry).",
             "minimum": 0
           }
         }
@@ -13502,7 +13505,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/QueryCount"
-            }
+            },
+            "description": "Searches of consented visitors (minimized text)."
           },
           "traffic": {
             "$ref": "#/components/schemas/Traffic"
@@ -13517,7 +13521,8 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/QueryCount"
-            }
+            },
+            "description": "Searches without results (the search log, minimized; filtered by the market's locales)."
           }
         }
       },
@@ -18494,38 +18499,6 @@
           }
         }
       },
-      "SearchCounter": {
-        "type": "object",
-        "required": [
-          "tenant_id",
-          "day",
-          "locale",
-          "query",
-          "count"
-        ],
-        "properties": {
-          "count": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "day": {
-            "type": "string",
-            "format": "date"
-          },
-          "locale": {
-            "type": "string"
-          },
-          "query": {
-            "type": "string",
-            "description": "Raw query text; minimized before storage like the zero-result log (A20)."
-          },
-          "tenant_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        },
-        "additionalProperties": false
-      },
       "SearchHit": {
         "type": "object",
         "required": [
@@ -19631,7 +19604,7 @@
               "null"
             ],
             "format": "double",
-            "description": "Consented sessions with a purchase / consented sessions; `None` without sessions."
+            "description": "Consented sessions with a purchase / consented sessions (by session start day);\n`None` without sessions."
           },
           "funnel": {
             "type": "array",

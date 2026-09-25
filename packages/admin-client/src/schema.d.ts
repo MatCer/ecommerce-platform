@@ -2641,14 +2641,21 @@ export interface components {
             email: string;
             phone?: string | null;
         };
-        /** @description What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`). */
+        /**
+         * @description What the edge flushes every few seconds (`POST /internal/v1/analytics/counters`). The edge
+         *     resends a failed batch unchanged with the same `batch_id`; tenants that already counted it
+         *     skip it, so a retry never counts twice.
+         */
         CounterBatch: {
+            /** Format: uuid */
+            batch_id: string;
             counters?: components["schemas"]["PageCounter"][];
-            searches?: components["schemas"]["SearchCounter"][];
         };
         CountersRecorded: {
+            /** @description Rows added now. */
             counters: number;
-            searches: number;
+            /** @description Tenants that had counted this batch already (a retry). */
+            replayed_tenants: number;
         };
         Coupon: {
             /** @example PODZIM10 */
@@ -2780,9 +2787,11 @@ export interface components {
             /** Format: date */
             to: string;
             top_products: components["schemas"]["TopProduct"][];
+            /** @description Searches of consented visitors (minimized text). */
             top_searches: components["schemas"]["QueryCount"][];
             traffic: components["schemas"]["Traffic"];
             web_vitals: components["schemas"]["VitalP75"][];
+            /** @description Searches without results (the search log, minimized; filtered by the market's locales). */
             zero_result_searches: components["schemas"]["QueryCount"][];
         };
         Delivery: {
@@ -4360,17 +4369,6 @@ export interface components {
              */
             revenue_minor: number;
         };
-        SearchCounter: {
-            /** Format: int64 */
-            count: number;
-            /** Format: date */
-            day: string;
-            locale: string;
-            /** @description Raw query text; minimized before storage like the zero-result log (A20). */
-            query: string;
-            /** Format: uuid */
-            tenant_id: string;
-        };
         SearchHit: {
             brand?: string | null;
             /** @description The first product image, in the list-sized variants (up to 640 px). */
@@ -4731,7 +4729,8 @@ export interface components {
             consented_sessions: number;
             /**
              * Format: double
-             * @description Consented sessions with a purchase / consented sessions; `None` without sessions.
+             * @description Consented sessions with a purchase / consented sessions (by session start day);
+             *     `None` without sessions.
              */
             conversion_rate?: number | null;
             /** @description Labelled "consented sessions" (A20): visitors without consent are not in it. */
