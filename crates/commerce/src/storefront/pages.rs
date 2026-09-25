@@ -98,7 +98,8 @@ pub struct ShopModel {
     /// Placeholders until CMS pages exist (WP13).
     pub legal_pages: Vec<Link>,
     pub consent: ConsentConfig,
-    /// Free shipping from this order value; `None` until shipping methods exist (WP10).
+    /// Free shipping from this order value (the lowest threshold of the market's active
+    /// shipping methods); `None` when no method has one.
     pub free_shipping_threshold: Option<MoneyView>,
     pub tracking: Tracking,
     pub trust: Trust,
@@ -226,7 +227,9 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
             text_version: crate::consent::TEXT_VERSION.into(),
             preferences_url: ctx.checkout_url("/consent"),
         },
-        free_shipping_threshold: None,
+        free_shipping_threshold: crate::shipping::lowest_free_threshold(tx, ctx.market.id)
+            .await?
+            .map(|t| ctx.money(t)),
         tracking: Tracking {
             rum_sample_rate: 0.1,
         },

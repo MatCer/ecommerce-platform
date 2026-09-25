@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE payment_attempts SET status = 'expired', completed_at = now(), updated_at = now()\n                 WHERE order_id = $1 AND status = 'pending' AND id <> $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b2521cfd4624c01ec175f162594e93fa15bc3599a05e9ac8b40d57b125506dc0"
+}

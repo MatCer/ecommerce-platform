@@ -48,6 +48,11 @@ export interface GatewayOptions {
   scheme?: "http" | "https";
   /** Bearer token for `/_edge/purge` (distinct service token, spec A7). */
   purgeToken: string;
+  /**
+   * The pickup-point widget library (`PACKETA_WIDGET_URL`); its origin is allowed as a script
+   * and frame source on the checkout origin only. Default: Packeta's.
+   */
+  packetaWidgetUrl?: string;
   upstream?: Upstream;
   renderTimeoutMs?: number;
   log?: (event: Record<string, unknown>) => void;
@@ -90,6 +95,25 @@ const ACCOUNT_OPS: { method: string; path: RegExp }[] = [
   { method: "PUT", path: /^\/addresses\/[0-9a-f-]{36}$/ },
   { method: "DELETE", path: /^\/addresses\/[0-9a-f-]{36}$/ },
 ];
+
+/** Checkout operations on the checkout origin (`/_p/checkout/*`, WP10, spec §8.2). */
+const CHECKOUT_OPS: { method: string; path: RegExp }[] = [
+  { method: "GET", path: /^$/ },
+  { method: "PUT", path: /^\/(contact|addresses|shipping|payment)$/ },
+  { method: "POST", path: /^\/place-order$/ },
+];
+
+/** The order page's operations (`/_p/orders/<order token>/*`, A4, A10). */
+const ORDER_OPS: { method: string; path: RegExp }[] = [
+  { method: "GET", path: /^\/[0-9a-f]{64}$/ },
+  { method: "GET", path: /^\/[0-9a-f]{64}\/payment$/ },
+  { method: "POST", path: /^\/[0-9a-f]{64}\/payment-attempts$/ },
+  { method: "POST", path: /^\/[0-9a-f]{64}\/payment-attempts\/[0-9a-f-]{36}\/init$/ },
+];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** Where the fake pay page may send the customer back to: the order page only. */
+const ORDER_PAGE_RE = /^\/o\/[0-9a-f]{64}$/;
 
 const MAX_JSON_BODY = 16 * 1024;
 const MAX_EVENTS_BODY = 64 * 1024;
@@ -163,6 +187,8 @@ const EMPTY_CART = {
 
 export function createGateway(opts: GatewayOptions) {
   const scheme = opts.scheme ?? "https";
+  // The widget script and its iframe come from here (checkout CSP only).
+  const widgetOrigin = opts.packetaWidgetUrl ? new URL(opts.packetaWidgetUrl).origin : undefined;
   const upstream: Upstream = opts.upstream ?? ((r) => fetch(r));
   const log = opts.log ?? ((e) => console.log(JSON.stringify(e)));
   const resolver =
@@ -548,6 +574,148 @@ export function createGateway(opts: GatewayOptions) {
   }
 
   /**
+   * `/_p/checkout/*` and `/_p/orders/*` on the checkout origin (WP10) → the Storefront API.
+   * Same-origin JSON only for writes (CSRF, §14). The checkout cart capability, the session,
+   * the client IP and a validated `Idempotency-Key` go along as headers; the order routes are
+   * authorized by the order token in their path (A4).
+   */
+  async function checkoutProxy(
+    site: Site,
+    req: Request,
+    apiPath: string,
+    rest: string,
+    ops: { method: string; path: RegExp }[],
+    host: string,
+    port: string,
+    clientIp: string | undefined,
+  ): Promise<Response> {
+    if (!ops.some((o) => o.method === req.method && o.path.test(rest)))
+      return problem(404, "not_found", "unknown checkout operation");
+    if (req.method !== "GET" && !sameOrigin(req, host, port))
+      return problem(403, "cross_origin", "cross-origin request");
+    const key = req.headers.get("idempotency-key");
+    if (key !== null && !IDEMPOTENCY_KEY_RE.test(key))
+      return problem(400, "invalid_idempotency_key", "1-255 visible ASCII characters");
+    let body: ArrayBuffer | undefined;
+    if (req.method === "POST" || req.method === "PUT") {
+      const b = await readJsonBody(req, MAX_JSON_BODY);
+      if (b instanceof Response) return b;
+      body = b;
+    }
+    const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
+    const session = capabilityCookie(req, SESSION_COOKIE);
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1${apiPath}${rest}`, {
+        method: req.method,
+        headers: apiHeaders(site, {
+          ...(body ? { "content-type": "application/json" } : {}),
+          ...(cart ? { "x-cart-token": cart } : {}),
+          ...(session ? { "x-customer-session": session } : {}),
+          ...(clientIp ? { "x-client-ip": clientIp } : {}),
+          ...(key ? { "idempotency-key": key } : {}),
+        }),
+        body,
+      }),
+    );
+    const headers = new Headers({
+      "content-type": res.headers.get("content-type") ?? "application/json",
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
+    });
+    const replayed = res.headers.get("idempotent-replayed");
+    if (replayed) headers.set("idempotent-replayed", replayed);
+    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+  }
+
+  /**
+   * The fake gateway's "provider page" (`PAYMENTS_FAKE=1`, local and e2e only): Succeed/Fail
+   * buttons whose outcome the API signs and processes like a provider webhook. Plain HTML,
+   * no script; afterwards back to the order page (`?return=/o/<token>`, nothing else).
+   */
+  async function fakePay(
+    site: Site,
+    req: Request,
+    url: URL,
+    attempt: string,
+    host: string,
+    port: string,
+  ): Promise<Response> {
+    if (!UUID_RE.test(attempt)) return text(404, "Not found");
+    const api = `${opts.apiOrigin}/storefront/v1/checkout/fake-pay/${attempt}`;
+    // Paying needs the placing browser's cart or the customer's session (A4: the order token
+    // is read-only), exactly like the order page's payment routes.
+    const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
+    const session = capabilityCookie(req, SESSION_COOKIE);
+    const payer = {
+      ...(cart ? { "x-cart-token": cart } : {}),
+      ...(session ? { "x-customer-session": session } : {}),
+    };
+    const ret = url.searchParams.get("return") ?? "";
+    const back = ORDER_PAGE_RE.test(ret) ? ret : "/";
+    if (req.method === "POST") {
+      if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
+      const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+      if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+      const outcome = new URLSearchParams(new TextDecoder().decode(raw)).get("outcome");
+      if (outcome !== "succeeded" && outcome !== "failed")
+        return problem(400, "invalid_outcome", "outcome must be succeeded or failed");
+      const res = await upstream(
+        new Request(api, {
+          method: "POST",
+          headers: apiHeaders(site, { "content-type": "application/json", ...payer }),
+          body: JSON.stringify({ outcome }),
+        }),
+      );
+      await res.body?.cancel();
+      if (!res.ok && res.status !== 409) return text(res.status, "Payment could not be processed");
+      return new Response(null, {
+        status: 303,
+        headers: { location: back, "cache-control": "no-store", "referrer-policy": "no-referrer" },
+      });
+    }
+    if (req.method !== "GET" && req.method !== "HEAD")
+      return text(405, "Method not allowed", { allow: "GET, POST" });
+    const res = await upstream(new Request(api, { headers: apiHeaders(site, payer) }));
+    if (!res.ok) {
+      await res.body?.cancel();
+      return text(res.status === 404 || res.status === 403 ? res.status : 502, "Not found");
+    }
+    const p = (await res.json()) as {
+      order_number?: unknown;
+      amount?: { formatted?: unknown };
+      status?: unknown;
+    };
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+      );
+    const action = `/_p/fake-pay/${attempt}${back === "/" ? "" : `?return=${back}`}`;
+    const pending = p.status === "pending";
+    const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Test payment</title>
+<style>body{font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem}button{font:inherit;min-height:2.75rem;padding:0 1.25rem;margin:0 .5rem .5rem 0;border-radius:.5rem;border:1px solid #1b1f2a;cursor:pointer}.ok{background:#1b6e3a;color:#fff}:focus-visible{outline:3px solid #2b5aa8;outline-offset:2px}</style>
+<main><h1>Test payment</h1><p>Fake payment gateway (local and test environments only).</p>
+<p>Order <strong>${esc(p.order_number)}</strong>: <strong>${esc(p.amount?.formatted)}</strong></p>
+${
+  pending
+    ? `<form method="post" action="${esc(action)}"><button class="ok" name="outcome" value="succeeded">Pay</button><button name="outcome" value="failed">Fail the payment</button></form>`
+    : `<p role="status">This payment is ${esc(p.status)}.</p><p><a href="${esc(back)}">Back to the order</a></p>`
+}</main></html>`;
+    return new Response(req.method === "HEAD" ? null : html, {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        // `same-origin`, not `no-referrer`: with the latter the form post carries `Origin: null`
+        // and fails the CSRF check; the URL (order token) still never leaves the origin.
+        "referrer-policy": "same-origin",
+        "content-security-policy":
+          "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }
+
+  /**
    * `/_p/consent` on both origins (A20): the choice is recorded by the API, which mints the
    * anonymous subject on the first one. The cookies are scoped to the shop host so the
    * checkout subdomain (preferences page, sign-in linking) shares them.
@@ -901,6 +1069,16 @@ export function createGateway(opts: GatewayOptions) {
     const p = url.pathname;
     if (p.startsWith("/_p/account/"))
       return accountProxy(site, req, p.slice("/_p/account".length), host, port, clientIp);
+    if (p === "/_p/checkout" || p.startsWith("/_p/checkout/")) {
+      const rest = p.slice("/_p/checkout".length);
+      return checkoutProxy(site, req, "/checkout", rest, CHECKOUT_OPS, host, port, clientIp);
+    }
+    if (p.startsWith("/_p/orders/")) {
+      const rest = p.slice("/_p/orders".length);
+      return checkoutProxy(site, req, "/orders", rest, ORDER_OPS, host, port, clientIp);
+    }
+    if (p.startsWith("/_p/fake-pay/"))
+      return fakePay(site, req, url, p.slice("/_p/fake-pay/".length), host, port);
     if (p === "/_p/consent")
       return consentProxy(site, req, host, port, clientIp, capabilityCookie(req, SESSION_COOKIE));
     if (p === "/start") {
@@ -982,11 +1160,14 @@ export function createGateway(opts: GatewayOptions) {
     const csp = contentSecurityPolicy("checkout", {
       scriptHashes: m.csp.script_hashes,
       styleHashes: m.csp.style_hashes,
+      widgetOrigin,
     });
     for (const [k, v] of Object.entries(securityHeaders("checkout", csp))) headers.set(k, v);
     headers.set("cache-control", "no-store");
-    // A sign-in link (`/account/verify?token=`) must not leak through Referer.
-    if (url.searchParams.has("token")) headers.set("referrer-policy", "no-referrer");
+    // A sign-in link (`/account/verify?token=`) or an order page (`/o/<token>`, A4) must not
+    // leak its capability through Referer.
+    if (url.searchParams.has("token") || url.pathname.startsWith("/o/"))
+      headers.set("referrer-policy", "no-referrer");
     return new Response(req.method === "HEAD" ? null : r.body, { status: r.status, headers });
   }
 

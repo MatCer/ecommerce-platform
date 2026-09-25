@@ -381,10 +381,86 @@ impl StorefrontConfig {
     }
 }
 
+/// Checkout integrations (WP10). Not `Debug`: it holds the fake gateway's signing key.
+#[derive(Clone, PartialEq, Eq)]
+pub struct CheckoutConfig {
+    /// `PAYMENTS_FAKE=1`: the fake payment gateway (local and e2e only). Refused with
+    /// `APP_ENV=prod`: its pay page lets anyone mark an order paid.
+    pub payments_fake: bool,
+    /// `PAYMENTS_FAKE_SECRET`: key for the fake provider's event signatures (at least 16
+    /// characters). Unset: a random key per process (one API instance, local dev).
+    pub fake_secret: Option<String>,
+    /// `PACKETA_WIDGET_URL`: the pickup-point widget library (Packeta's
+    /// `https://widget.packeta.com/v6/www/js/library.js` or the local mock). Unset: pickup
+    /// points cannot be chosen.
+    pub packeta_widget_url: Option<Url>,
+    /// `PACKETA_API_KEY`: the widget's public API key.
+    pub packeta_api_key: Option<String>,
+}
+
+impl CheckoutConfig {
+    pub fn from_env(env: AppEnv) -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env, env)
+    }
+
+    pub fn from_lookup(lookup: Lookup, env: AppEnv) -> Result<Self, ConfigError> {
+        let payments_fake = match get(lookup, "PAYMENTS_FAKE").as_deref().map(str::trim) {
+            None | Some("0" | "false") => false,
+            Some("1" | "true") => true,
+            Some(other) => {
+                return Err(ConfigError::Invalid {
+                    name: "PAYMENTS_FAKE",
+                    reason: format!("expected 1 or 0, got {other:?}"),
+                });
+            }
+        };
+        if payments_fake && env == AppEnv::Prod {
+            return Err(ConfigError::Invalid {
+                name: "PAYMENTS_FAKE",
+                reason: "the fake payment gateway is refused with APP_ENV=prod".into(),
+            });
+        }
+        let fake_secret = get(lookup, "PAYMENTS_FAKE_SECRET");
+        if fake_secret.as_ref().is_some_and(|s| s.len() < 16) {
+            return Err(ConfigError::Invalid {
+                name: "PAYMENTS_FAKE_SECRET",
+                reason: "must be at least 16 characters".into(),
+            });
+        }
+        let packeta_widget_url = match get(lookup, "PACKETA_WIDGET_URL") {
+            None => None,
+            Some(_) => Some(url(lookup, "PACKETA_WIDGET_URL")?),
+        };
+        Ok(Self {
+            payments_fake,
+            fake_secret,
+            packeta_widget_url,
+            packeta_api_key: get(lookup, "PACKETA_API_KEY"),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn checkout_config_refuses_the_fake_gateway_in_prod() {
+        let fake = HashMap::from([("PAYMENTS_FAKE", "1")]);
+        let lookup = |k: &str| fake.get(k).map(|v| (*v).to_owned());
+        assert!(
+            CheckoutConfig::from_lookup(&lookup, AppEnv::Dev)
+                .unwrap()
+                .payments_fake
+        );
+        assert!(CheckoutConfig::from_lookup(&lookup, AppEnv::Prod).is_err());
+        let none = |_: &str| None;
+        let c = CheckoutConfig::from_lookup(&none, AppEnv::Prod).unwrap();
+        assert!(!c.payments_fake && c.packeta_widget_url.is_none());
+        let bad = |k: &str| (k == "PAYMENTS_FAKE").then(|| "yes".to_owned());
+        assert!(CheckoutConfig::from_lookup(&bad, AppEnv::Dev).is_err());
+    }
 
     #[test]
     fn storefront_defaults_to_https_without_purges() {

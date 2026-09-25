@@ -619,6 +619,459 @@
         }
       }
     },
+    "/storefront/v1/checkout": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The checkout of the handed-off cart: lines and totals, the market's shipping methods with\nlive rates, payment methods, the selections so far and what is still missing.",
+        "operationId": "get_checkout",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No checkout cart",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/addresses": {
+      "put": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Billing and delivery address. The delivery country must be one the market ships to and\nthe tax profile covers (A3); VAT follows it.",
+        "operationId": "put_addresses",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_address | ship_to_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/contact": {
+      "put": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "put_contact",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_email | invalid_phone",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/fake-pay/{attempt}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "What the fake pay page shows. `404` unless `PAYMENTS_FAKE=1`.",
+        "operationId": "fake_pay_page",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FakePayment"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The fake pay page's Succeed/Fail: the fake provider signs an event and it is processed\nexactly like `POST /webhooks/fake` (signature, amount and currency checked first).",
+        "operationId": "fake_pay",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FakePayInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FakePayment"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "attempt_finished",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/checkout/handoff": {
       "post": {
         "tags": [
@@ -680,6 +1133,292 @@
             }
           },
           "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/payment": {
+      "put": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "put_payment",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "unknown_payment_method | cod_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/place-order": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Places the order (A12): one order per cart, `Idempotency-Key` required (a retry with the\nsame key answers the same order with `Idempotent-Replayed: true` and a fresh order token).\n`version` and `total_minor` are what the customer saw: `409 cart_changed` /\n`409 price_changed` when they no longer hold. Stock is reserved and the coupon redeemed in\nthe same transaction; then the payment attempt is initialized at the provider (A10).",
+        "operationId": "place_order",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceOrderInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacedOrder"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "idempotency_key_required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No checkout cart",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "order_already_placed | cart_changed | price_changed | insufficient_stock | out_of_stock | cart_unavailable | coupon_* | idempotency_conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "legal_consent_required | checkout_incomplete | ship_to_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/shipping": {
+      "put": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "put_shipping",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "unknown_shipping_method | pickup_point_required | invalid_pickup_point",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1728,6 +2467,165 @@
         }
       }
     },
+    "/storefront/v1/customer/orders": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The signed-in customer's orders, newest first: placed while signed in, or guest orders\nwith the account's email once it was verified (A5).",
+        "operationId": "my_orders",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/orders/{id}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "my_order",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderView"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/customer/password": {
       "post": {
         "tags": [
@@ -2008,6 +2906,434 @@
             }
           },
           "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/orders/{token}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "get_order",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderView"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/orders/{token}/payment": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The payment status (A10), polled by the order page while a payment is under way.",
+        "operationId": "get_payment",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/orders/{token}/payment-attempts": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "A new payment attempt after a failed one, within the order's payment window (A10). Needs\nthe right to pay (`403 payment_not_allowed`).",
+        "operationId": "new_attempt",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentStart"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "retry_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/init": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Initializes (again) a pending attempt at its provider (A10): idempotent, for when the\nautomatic init after placement failed or the customer comes back to pay. Needs the right\nto pay; `409 payment_window_closed` after the order's payment deadline.",
+        "operationId": "init_attempt",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentStart"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "attempt_not_pending | payment_window_closed",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2912,6 +4238,29 @@
           }
         }
       },
+      "AddressesInput": {
+        "type": "object",
+        "required": [
+          "billing"
+        ],
+        "properties": {
+          "billing": {
+            "$ref": "#/components/schemas/CheckoutAddress"
+          },
+          "shipping": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckoutAddress",
+                "description": "Delivery address; `null` = the billing address."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "Alternate": {
         "type": "object",
         "required": [
@@ -2963,6 +4312,36 @@
           }
         }
       },
+      "AttemptStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "succeeded",
+          "failed",
+          "expired"
+        ]
+      },
+      "AttemptView": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          }
+        }
+      },
       "Badge": {
         "type": "string",
         "enum": [
@@ -2996,6 +4375,15 @@
             "description": "Purge tags (`product:<id>`, `category:<id>`, `shop`, ...)."
           }
         }
+      },
+      "Carrier": {
+        "type": "string",
+        "enum": [
+          "packeta_pickup",
+          "packeta_home",
+          "ppl",
+          "personal_pickup"
+        ]
       },
       "CartCoupon": {
         "type": "object",
@@ -3140,7 +4528,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/MoneyView",
-                "description": "`None` until shipping methods exist (WP10)."
+                "description": "What is missing to the market's lowest free-shipping threshold (zero once reached);\n`None` when no shipping method has a threshold."
               },
               {
                 "type": "null"
@@ -3259,6 +4647,55 @@
           }
         }
       },
+      "ChargeKind": {
+        "type": "string",
+        "enum": [
+          "shipping",
+          "payment_fee",
+          "rounding"
+        ]
+      },
+      "CheckoutAddress": {
+        "type": "object",
+        "required": [
+          "name",
+          "street",
+          "city",
+          "postal_code",
+          "country"
+        ],
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2."
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "CheckoutCart": {
         "type": "object",
         "required": [
@@ -3268,6 +4705,125 @@
           "cart_token": {
             "type": "string",
             "description": "Checkout-scoped cart capability (the edge sets it as the `__Host-cart` cookie)."
+          }
+        }
+      },
+      "CheckoutView": {
+        "type": "object",
+        "description": "Everything the one-page checkout renders. Recomputed on every read.",
+        "required": [
+          "cart",
+          "ship_to_countries",
+          "shipping_methods",
+          "payment_methods",
+          "totals",
+          "legal",
+          "missing"
+        ],
+        "properties": {
+          "billing_address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckoutAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cart": {
+            "$ref": "#/components/schemas/CartView"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal": {
+            "$ref": "#/components/schemas/Legal"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What is still missing before the order can be placed (`email`, `billing_address`,\n`shipping_method`, `pickup_point`, `payment_method`, `cart_unavailable`)."
+          },
+          "packeta": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PacketaWidget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payment_method": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MethodKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payment_methods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentOption"
+            }
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pickup_point": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PickupPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ship_to_countries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A3: where this market delivers."
+          },
+          "shipping_address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CheckoutAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipping_method_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "shipping_methods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShippingOption"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
           }
         }
       },
@@ -3350,6 +4906,24 @@
             "description": "Text version of the latest choice; `None` = no choice yet (show the banner)."
           }
         }
+      },
+      "ContactInput": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "CouponCode": {
         "type": "object",
@@ -3550,6 +5124,52 @@
           }
         }
       },
+      "FakePayInput": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FakePayment": {
+        "type": "object",
+        "required": [
+          "attempt_id",
+          "order_number",
+          "amount",
+          "status"
+        ],
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          }
+        }
+      },
+      "FulfillmentStatus": {
+        "type": "string",
+        "enum": [
+          "unfulfilled",
+          "label_created",
+          "shipped",
+          "delivered",
+          "returned"
+        ]
+      },
       "GpsrPartyView": {
         "type": "object",
         "required": [
@@ -3737,6 +5357,30 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
+          }
+        }
+      },
+      "Legal": {
+        "type": "object",
+        "required": [
+          "terms_url",
+          "withdrawal_url",
+          "privacy_url",
+          "text_version"
+        ],
+        "properties": {
+          "privacy_url": {
+            "type": "string"
+          },
+          "terms_url": {
+            "type": "string"
+          },
+          "text_version": {
+            "type": "string",
+            "description": "Recorded with the optional consents (A20)."
+          },
+          "withdrawal_url": {
+            "type": "string"
           }
         }
       },
@@ -3959,6 +5603,15 @@
           }
         }
       },
+      "MethodKind": {
+        "type": "string",
+        "enum": [
+          "stripe",
+          "bank_transfer",
+          "cod",
+          "fake"
+        ]
+      },
       "MoneyView": {
         "type": "object",
         "description": "The API shape of an amount (spec §8.1): `{amount_minor, currency, formatted}`.",
@@ -4022,6 +5675,45 @@
           }
         }
       },
+      "NextAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Go to the provider's page (relative or absolute URL).",
+            "required": [
+              "url",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "redirect"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Nothing to pay now (cash on delivery).",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "What the customer does next."
+      },
       "OptionValueView": {
         "type": "object",
         "required": [
@@ -4056,6 +5748,372 @@
             "items": {
               "$ref": "#/components/schemas/OptionValueView"
             }
+          }
+        }
+      },
+      "OrderAddress": {
+        "type": "object",
+        "required": [
+          "name",
+          "street",
+          "city",
+          "postal_code",
+          "country"
+        ],
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "company": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "postal_code": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          }
+        }
+      },
+      "OrderChargeView": {
+        "type": "object",
+        "required": [
+          "kind",
+          "total",
+          "tax"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ChargeKind"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          }
+        }
+      },
+      "OrderLineView": {
+        "type": "object",
+        "required": [
+          "sku",
+          "name",
+          "options_label",
+          "quantity",
+          "unit_price",
+          "discount",
+          "total",
+          "tax_rate",
+          "tax"
+        ],
+        "properties": {
+          "discount": {
+            "$ref": "#/components/schemas/MoneyView",
+            "description": "This line's share of the coupon (A15)."
+          },
+          "name": {
+            "type": "string"
+          },
+          "options_label": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "tax_rate": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "unit_price": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "variant_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "OrderPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next page; `null` on the last page."
+          }
+        }
+      },
+      "OrderStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "confirmed",
+          "processing",
+          "shipped",
+          "delivered",
+          "cancelled",
+          "returned"
+        ]
+      },
+      "OrderSummary": {
+        "type": "object",
+        "description": "One row of an order list.",
+        "required": [
+          "id",
+          "number",
+          "placed_at",
+          "email",
+          "status",
+          "payment_status",
+          "fulfillment_status",
+          "payment_method",
+          "total"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "exception": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fulfillment_status": {
+            "$ref": "#/components/schemas/FulfillmentStatus"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "payment_method": {
+            "$ref": "#/components/schemas/MethodKind"
+          },
+          "payment_status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "placed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          }
+        }
+      },
+      "OrderView": {
+        "type": "object",
+        "description": "An order as its customer sees it (`/o/<token>`, the account).",
+        "required": [
+          "id",
+          "number",
+          "placed_at",
+          "status",
+          "fulfillment_status",
+          "email",
+          "locale",
+          "currency",
+          "lines",
+          "charges",
+          "subtotal",
+          "discount",
+          "shipping_total",
+          "payment_fee",
+          "rounding",
+          "vat",
+          "vat_total",
+          "total",
+          "shipping",
+          "payment"
+        ],
+        "properties": {
+          "billing_address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrderAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "charges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderChargeView"
+            }
+          },
+          "coupon_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "discount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "email": {
+            "type": "string"
+          },
+          "exception": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`late_payment` (A10) when money arrived for an expired or cancelled order."
+          },
+          "fulfillment_status": {
+            "$ref": "#/components/schemas/FulfillmentStatus"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderLineView"
+            }
+          },
+          "locale": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": "string"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentView"
+          },
+          "payment_fee": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rounding": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/ShippingSummary"
+          },
+          "shipping_address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrderAddress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipping_total": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "vat": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VatRow"
+            }
+          },
+          "vat_total": {
+            "$ref": "#/components/schemas/MoneyView"
+          }
+        }
+      },
+      "Outcome": {
+        "type": "string",
+        "description": "Outcome of a payment attempt reported by a provider.",
+        "enum": [
+          "succeeded",
+          "failed"
+        ]
+      },
+      "PacketaWidget": {
+        "type": "object",
+        "description": "The Packeta pickup-point widget (spec §10.5): loaded on interaction on the checkout origin.",
+        "required": [
+          "script_url",
+          "api_key"
+        ],
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "description": "The widget's public API key."
+          },
+          "script_url": {
+            "type": "string",
+            "description": "`library.js` of the widget (Packeta's, or the local mock)."
           }
         }
       },
@@ -4149,6 +6207,227 @@
           }
         },
         "additionalProperties": false
+      },
+      "PaymentInput": {
+        "type": "object",
+        "required": [
+          "method"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/MethodKind"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PaymentOption": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "fee",
+          "selectable"
+        ],
+        "properties": {
+          "fee": {
+            "$ref": "#/components/schemas/MoneyView",
+            "description": "The fee charged with this method (COD: the shipping method's COD fee)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MethodKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "selectable": {
+            "type": "boolean",
+            "description": "False when it cannot be chosen with the current shipping method (COD)."
+          }
+        }
+      },
+      "PaymentStart": {
+        "type": "object",
+        "description": "What the client does after placing the order or starting a payment attempt.",
+        "required": [
+          "attempt_id"
+        ],
+        "properties": {
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NextAction",
+                "description": "`null` when the provider could not be reached yet: retry with\n`POST /orders/{token}/payment-attempts/{attempt}/init` (A10)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "unpaid",
+          "authorized",
+          "paid",
+          "partially_refunded",
+          "refunded",
+          "failed",
+          "expired"
+        ]
+      },
+      "PaymentView": {
+        "type": "object",
+        "required": [
+          "method",
+          "status",
+          "can_retry",
+          "can_pay"
+        ],
+        "properties": {
+          "attempt": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AttemptView",
+                "description": "The latest attempt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_pay": {
+            "type": "boolean",
+            "description": "Whether this viewer may start or continue payments: the order token alone is read-only\n(A4); the browser that placed the order or its signed-in customer may pay."
+          },
+          "can_retry": {
+            "type": "boolean",
+            "description": "Whether a new attempt can be started now (A10); only for a viewer who may pay."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Unpaid orders are cancelled after this."
+          },
+          "method": {
+            "$ref": "#/components/schemas/MethodKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          }
+        }
+      },
+      "PickupPoint": {
+        "type": "object",
+        "description": "A pickup point as chosen in the carrier's widget (snapshot).",
+        "required": [
+          "id",
+          "name",
+          "street",
+          "city",
+          "zip",
+          "country"
+        ],
+        "properties": {
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2, upper case."
+          },
+          "id": {
+            "type": "string",
+            "description": "The carrier's point id."
+          },
+          "name": {
+            "type": "string"
+          },
+          "street": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlaceOrderInput": {
+        "type": "object",
+        "required": [
+          "version",
+          "total_minor",
+          "accept_terms",
+          "accept_withdrawal"
+        ],
+        "properties": {
+          "accept_terms": {
+            "type": "boolean",
+            "description": "Terms and conditions (required)."
+          },
+          "accept_withdrawal": {
+            "type": "boolean",
+            "description": "Information about the right of withdrawal (required)."
+          },
+          "email_marketing": {
+            "type": "boolean",
+            "description": "Optional, unchecked by default (A20)."
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "review_invites": {
+            "type": "boolean",
+            "description": "Optional, unchecked by default (A20)."
+          },
+          "total_minor": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The total (minor units) the customer agreed to."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The cart `version` the summary was shown for."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlacedOrder": {
+        "type": "object",
+        "required": [
+          "order_id",
+          "number",
+          "confirmation_url",
+          "payment"
+        ],
+        "properties": {
+          "confirmation_url": {
+            "type": "string",
+            "description": "The order page on the checkout origin (`/o/<token>`, a read-only capability, A4)."
+          },
+          "number": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/PaymentStart"
+          }
+        }
       },
       "PriceRange": {
         "type": "object",
@@ -4629,6 +6908,106 @@
           }
         }
       },
+      "ShippingInput": {
+        "type": "object",
+        "required": [
+          "method_id"
+        ],
+        "properties": {
+          "method_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pickup_point": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PickupPoint",
+                "description": "Required for pickup-point carriers: the widget's selection."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ShippingOption": {
+        "type": "object",
+        "required": [
+          "id",
+          "carrier",
+          "name",
+          "cod_allowed",
+          "cod_fee",
+          "needs_pickup_point"
+        ],
+        "properties": {
+          "carrier": {
+            "$ref": "#/components/schemas/Carrier"
+          },
+          "cod_allowed": {
+            "type": "boolean"
+          },
+          "cod_fee": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "needs_pickup_point": {
+            "type": "boolean",
+            "description": "Pickup-point carriers: the widget to choose the point with."
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MoneyView",
+                "description": "The live rate for this cart; `null` when the cart cannot use the method (too heavy)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ShippingSummary": {
+        "type": "object",
+        "required": [
+          "carrier",
+          "name"
+        ],
+        "properties": {
+          "carrier": {
+            "$ref": "#/components/schemas/Carrier"
+          },
+          "name": {
+            "type": "string",
+            "description": "The method's name in the order's locale, as it was at placement."
+          },
+          "pickup_point": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PickupPoint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "ShopModel": {
         "type": "object",
         "required": [
@@ -4677,7 +7056,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/MoneyView",
-                "description": "Free shipping from this order value; `None` until shipping methods exist (WP10)."
+                "description": "Free shipping from this order value (the lowest threshold of the market's active\nshipping methods); `None` when no method has one."
               },
               {
                 "type": "null"
@@ -4824,6 +7203,44 @@
             "items": {
               "$ref": "#/components/schemas/SearchHit"
             }
+          }
+        }
+      },
+      "Totals": {
+        "type": "object",
+        "required": [
+          "subtotal",
+          "discount",
+          "shipping",
+          "payment_fee",
+          "vat",
+          "vat_total",
+          "total"
+        ],
+        "properties": {
+          "discount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "payment_fee": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "vat": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VatRow"
+            }
+          },
+          "vat_total": {
+            "$ref": "#/components/schemas/MoneyView"
           }
         }
       },

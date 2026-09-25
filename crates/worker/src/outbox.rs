@@ -18,6 +18,9 @@ const BATCH: i32 = 100;
 pub fn subscribers(event_type: &str) -> &'static [&'static str] {
     match event_type {
         commerce::staff::INVITED_EVENT => &[handlers::EVENTS_LOG, handlers::STAFF_INVITE_MAIL],
+        commerce::customers::EMAIL_VERIFIED_EVENT => {
+            &[handlers::EVENTS_LOG, handlers::LINK_GUEST_ORDERS]
+        }
         _ => &[handlers::EVENTS_LOG],
     }
 }

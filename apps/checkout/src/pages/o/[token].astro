@@ -1,10 +1,61 @@
 ---
+import { t } from "@platform/storefront-sdk/format";
+import OrderDetails from "../../components/OrderDetails.astro";
+import PaymentStatus from "../../islands/PaymentStatus";
 import Checkout from "../../layouts/Checkout.astro";
+import { checkoutApi, messages, shopUrl } from "../../lib/api";
 
-const shopUrl = `${Astro.url.protocol}//${Astro.url.host.replace(/^checkout\./, "")}/`;
+// The order page (A4): the order capability token is the only credential, read-only, 90 days.
+const api = checkoutApi(Astro.request);
+const token = Astro.params.token ?? "";
+const [shop, order] = await Promise.all([api.shop(), api.order(token)]);
+const m = shop?.messages ?? {};
+if (!order) Astro.response.status = 404;
+// The edge sends `Referrer-Policy: no-referrer` for /o/*: the token never leaks through Referer.
+const placedAt = order
+  ? new Intl.DateTimeFormat(shop?.locale ?? "cs", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(order.placed_at))
+  : "";
 ---
 
-<Checkout title="Stav objednávky" shopName="Obchod" shopUrl={shopUrl}>
-  <h1 class="font-display text-2xl font-bold">Stav objednávky</h1>
-  <p class="mt-2 text-muted-foreground">Stránka objednávky přes token (spec A4) přibude ve WP10.</p>
+<Checkout
+  title={order ? t(m, "order.title", { number: order.number }) : t(m, "order.status")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+  wide
+>
+  {
+    !order ? (
+      <p>
+        {t(m, "account.link_invalid")}{" "}
+        <a href={shopUrl(Astro.url)} class="text-identity-ink underline">{t(m, "checkout.back_to_shop")}</a>
+      </p>
+    ) : (
+      <div class="grid gap-5">
+        <div>
+          <p class="text-sm font-semibold text-identity-ink">{t(m, "order.thanks")}</p>
+          <h1 class="font-display text-2xl font-bold">{t(m, "order.title", { number: order.number })}</h1>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {t(m, "order.placed_at")}: {placedAt} · {t(m, "order.email_sent", { email: order.email })}
+          </p>
+        </div>
+        <section aria-labelledby="order-status" class="grid gap-2 rounded-lg border border-identity bg-identity-wash p-4">
+          <h2 id="order-status" class="font-display text-lg font-bold">
+            {t(m, "order.status")}: <span data-testid="order-status">{t(m, `order.status.${order.status}`)}</span>
+          </h2>
+          <PaymentStatus
+            client:load
+            m={messages(m, "order.", "checkout.error")}
+            token={token}
+            initial={order.payment}
+          />
+        </section>
+        <OrderDetails order={order} m={m} />
+      </div>
+    )
+  }
 </Checkout>

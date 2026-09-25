@@ -5,8 +5,8 @@ use anyhow::{Context, anyhow};
 use axum::http::HeaderValue;
 use clap::{Parser, Subcommand};
 use platform::config::{
-    ApiConfig, AppEnv, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig, StaffAuthConfig,
-    StorefrontConfig,
+    ApiConfig, AppEnv, CheckoutConfig, DbConfig, MeiliConfig, S3Config, ServiceTokenConfig,
+    StaffAuthConfig, StorefrontConfig,
 };
 use platform::storage::Storage;
 use sqlx::postgres::PgPoolOptions;
@@ -65,6 +65,33 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
+/// Payment gateways and the pickup-point widget from `CheckoutConfig`.
+fn checkout_settings(c: &CheckoutConfig) -> commerce::checkout::Settings {
+    let fake = c.payments_fake.then(|| {
+        tracing::warn!("PAYMENTS_FAKE=1: the fake payment gateway is enabled (local/e2e only)");
+        let secret = c
+            .fake_secret
+            .clone()
+            .map(String::into_bytes)
+            .unwrap_or_else(|| commerce::capability::mint().token.into_bytes());
+        commerce::payments::FakeGateway::new(secret)
+    });
+    let packeta = match (&c.packeta_widget_url, &c.packeta_api_key) {
+        (Some(url), Some(key)) => Some(commerce::checkout::PacketaWidget {
+            script_url: url.to_string(),
+            api_key: key.clone(),
+        }),
+        _ => {
+            tracing::warn!("PACKETA_WIDGET_URL/PACKETA_API_KEY not set: no pickup-point widget");
+            None
+        }
+    };
+    commerce::checkout::Settings {
+        payments: commerce::payments::Payments { fake },
+        packeta,
+    }
+}
+
 fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
@@ -106,6 +133,7 @@ async fn serve() -> anyhow::Result<()> {
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
+        checkout: Arc::new(checkout_settings(&CheckoutConfig::from_env(cfg.env)?)),
     };
     let app = api::app(state, cfg.env == AppEnv::Dev);
 

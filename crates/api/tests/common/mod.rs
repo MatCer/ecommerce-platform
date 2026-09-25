@@ -26,6 +26,7 @@ pub const X_B: &str = "21DQfDet_r7Z-araVddfSoCqc9Af3EhRfOgBskuJub0";
 pub const ISSUER: &str = "http://auth.localhost";
 pub const ADMIN_ORIGIN: &str = "http://admin.localhost:8180";
 pub const SERVICE_TOKEN: &str = "internal-test-token-0123456789abcdef";
+pub const FAKE_SECRET: &str = "fake-gateway-test-secret";
 
 pub fn jwk(kid: &str, x: &str) -> Value {
     json!({ "kty": "OKP", "crv": "Ed25519", "alg": "EdDSA", "kid": kid, "x": x })
@@ -135,6 +136,14 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
             port: Some(8080),
         },
         edge: api::edge::EdgePurge::disabled(),
+        checkout: Arc::new(commerce::checkout::Settings {
+            payments: commerce::payments::Payments {
+                fake: Some(commerce::payments::FakeGateway::new(
+                    FAKE_SECRET.as_bytes().to_vec(),
+                )),
+            },
+            packeta: None,
+        }),
     }
 }
 

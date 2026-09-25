@@ -23,9 +23,11 @@ use commerce::inventory::{self, Adjustment, LevelSettings};
 use commerce::markets::{self, NewMarket, TaxMode};
 use commerce::media::{self, NewUpload};
 use commerce::money::Currency;
+use commerce::payments::{MethodKind, PaymentMethodInput};
 use commerce::pricing::{self, NewPriceList, PriceChangeReason, PriceItem, PriceUpsert};
 use commerce::promotions::coupons::{self, CouponInput};
 use commerce::promotions::sales::{self, SaleDiscount, SaleInput, SaleTargets};
+use commerce::shipping::{self, Carrier, ShippingMethodInput, WeightTier};
 use commerce::storefront::listing::fold;
 use commerce::tax::{self, DistanceSalesMode, TaxProfileInput};
 use commerce::{search, tenancy, themes};
@@ -345,6 +347,7 @@ impl Seeder<'_> {
             }
         }
         self.promotions(tenant_id, &cats).await?;
+        self.checkout_methods(tenant_id, cz, sk).await?;
         let mut tx = self.tx(tenant_id).await?;
         themes::assign_default(&mut tx, ACTOR).await?;
         // A full search index build (WP7) for the demo catalog, run by the worker. Product
@@ -1030,6 +1033,86 @@ impl Seeder<'_> {
                 },
             )
             .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Shipping methods (Packeta pickup + home, PPL with weight tiers, personal pickup) and
+    /// payment methods (fake gateway where `PAYMENTS_FAKE=1`, cash on delivery) for CZ and SK.
+    async fn checkout_methods(&self, tenant_id: Uuid, cz: Uuid, sk: Uuid) -> anyhow::Result<()> {
+        let mut tx = self.tx(tenant_id).await?;
+        let names = |cs: &str, sk: &str, en: &str| {
+            I18n::from([
+                ("cs".to_owned(), cs.to_owned()),
+                ("sk".to_owned(), sk.to_owned()),
+                ("en".to_owned(), en.to_owned()),
+            ])
+        };
+        let tier = |up_to_g, price_minor| WeightTier {
+            up_to_g,
+            price_minor,
+        };
+        #[rustfmt::skip]
+        let methods = [
+            (cz, Carrier::PacketaPickup, names("Zásilkovna – výdejní místo", "Packeta – výdajné miesto", "Packeta pickup point"), 7900, Some(150_000), vec![], 2900, 0),
+            (cz, Carrier::PacketaHome, names("Zásilkovna – na adresu", "Packeta – na adresu", "Packeta home delivery"), 11_900, Some(250_000), vec![], 2900, 1),
+            (cz, Carrier::Ppl, names("PPL – kurýr", "PPL – kuriér", "PPL courier"), 12_900, None, vec![tier(5_000, 12_900), tier(30_000, 18_900)], 3900, 2),
+            (cz, Carrier::PersonalPickup, names("Osobní odběr – Praha", "Osobný odber – Praha", "Personal pickup – Prague"), 0, None, vec![], 0, 3),
+            (sk, Carrier::PacketaPickup, names("Zásilkovna – výdejní místo", "Packeta – výdajné miesto", "Packeta pickup point"), 290, Some(6_000), vec![], 150, 0),
+            (sk, Carrier::PacketaHome, names("Zásilkovna – na adresu", "Packeta – na adresu", "Packeta home delivery"), 490, Some(9_000), vec![], 150, 1),
+        ];
+        for (market, carrier, name_i18n, price, free, tiers, cod_fee, position) in methods {
+            if shipping::list(&mut tx, Some(market))
+                .await?
+                .iter()
+                .any(|m| m.carrier == carrier)
+            {
+                continue;
+            }
+            shipping::create(
+                &mut tx,
+                ACTOR,
+                &ShippingMethodInput {
+                    market_id: market,
+                    carrier,
+                    name_i18n,
+                    description_i18n: I18n::new(),
+                    price_minor: price,
+                    free_over_minor: free,
+                    weight_tiers: tiers,
+                    cod_allowed: carrier != Carrier::PersonalPickup,
+                    cod_fee_minor: cod_fee,
+                    active: true,
+                    position,
+                },
+            )
+            .await?;
+        }
+        let payments = commerce::payments::Payments::default();
+        for market in [cz, sk] {
+            for (kind, position) in [(MethodKind::Fake, 0), (MethodKind::Cod, 1)] {
+                let configured = commerce::payments::methods(&mut tx, &payments, market)
+                    .await?
+                    .iter()
+                    .any(|m| m.kind == kind && m.enabled);
+                if !configured {
+                    commerce::payments::configure(
+                        &mut tx,
+                        ACTOR,
+                        &payments,
+                        market,
+                        kind,
+                        &PaymentMethodInput {
+                            enabled: true,
+                            name_i18n: I18n::new(),
+                            timeout_minutes: None,
+                            position,
+                        },
+                    )
+                    .await?;
+                }
+            }
         }
         tx.commit().await?;
         Ok(())

@@ -62,6 +62,11 @@ fn catalog(locale: &str) -> &'static Catalog {
 }
 
 /// A message with `{name}` placeholders filled in (the key itself when missing).
+/// A catalog text in `locale` (labels that Rust puts into template variables).
+pub(crate) fn label(locale: &str, key: &str) -> String {
+    text(locale, key, &[])
+}
+
 fn text(locale: &str, key: &str, args: &[(&str, String)]) -> String {
     let mut out = catalog(locale)
         .get(key)
@@ -144,6 +149,14 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
         ),
         ("order.mjml", include_str!("templates/order.mjml")),
         ("order.txt", include_str!("templates/order.txt")),
+        (
+            "order_confirmation.mjml",
+            include_str!("templates/order_confirmation.mjml"),
+        ),
+        (
+            "order_confirmation.txt",
+            include_str!("templates/order_confirmation.txt"),
+        ),
     ] {
         // Templates are compiled into the binary and covered by tests.
         if let Err(e) = env.add_template(name, source) {
@@ -161,6 +174,8 @@ pub enum Template {
     StaffInvite,
     /// The order skeleton (WP10-12 add concrete order emails on top of it).
     Order,
+    /// Order placed (WP10): summary, VAT recap, delivery and payment.
+    OrderConfirmation,
 }
 
 impl Template {
@@ -170,6 +185,7 @@ impl Template {
             Self::PasswordChanged => "password_changed",
             Self::StaffInvite => "staff_invite",
             Self::Order => "order",
+            Self::OrderConfirmation => "order_confirmation",
         }
     }
 }
@@ -673,7 +689,10 @@ mod tests {
                 "totals": [{"label": "Doprava", "amount": "79 Kč"}],
                 "total": "877 Kč",
                 "url": "http://x/o/abc"
-            }
+            },
+            "vat": [{"rate": "21", "net": "724,79 Kč", "vat": "152,21 Kč"}],
+            "shipping": {"method": "Zásilkovna", "pickup_point": "Z-BOX, Dlouhá 1, 110 00 Praha", "address": null},
+            "payment": {"method": "Dobírka", "bank_transfer": false, "cod": true}
         });
         for locale in ["cs", "sk", "en"] {
             for t in [
@@ -681,6 +700,7 @@ mod tests {
                 Template::PasswordChanged,
                 Template::StaffInvite,
                 Template::Order,
+                Template::OrderConfirmation,
             ] {
                 let r = render(t, locale, &brand(), &vars).unwrap();
                 assert!(!r.subject.contains('{'), "{locale} {t:?}: {}", r.subject);
@@ -696,6 +716,13 @@ mod tests {
         assert_eq!(order.subject, "Objednávka 2026000123");
         assert!(order.html.contains("Zelená") && order.html.contains("877 Kč"));
         assert!(order.text.contains("2x Tričko (M / Zelená)  798 Kč"));
+        let confirmation = render(Template::OrderConfirmation, "cs", &brand(), &vars).unwrap();
+        assert_eq!(confirmation.subject, "Potvrzení objednávky 2026000123");
+        for text in [&confirmation.html, &confirmation.text] {
+            assert!(text.contains("Z-BOX, Dlouhá 1"), "{text}");
+            assert!(text.contains("152,21 Kč"));
+            assert!(text.contains("Zaplatíte při převzetí"));
+        }
     }
 
     #[test]

@@ -148,7 +148,8 @@ async fn magic_link_signs_in_once_and_verifies_the_address(db: PgPool) {
     .unwrap();
     assert_eq!(events, 1);
 
-    // Signing in again with a new link does not re-announce the verification.
+    // Every email-link sign-in proves the address again, so guest orders placed since the
+    // first verification get linked too (WP10).
     c.sign_in("jana@example.test", &[]).await;
     let events: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM queue.outbox WHERE type = 'customer.email_verified'",
@@ -156,7 +157,7 @@ async fn magic_link_signs_in_once_and_verifies_the_address(db: PgPool) {
     .fetch_one(&c.owner)
     .await
     .unwrap();
-    assert_eq!(events, 1);
+    assert_eq!(events, 2);
 }
 
 async fn body_id(c: &Ctx, session: &str) -> String {

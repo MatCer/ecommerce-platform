@@ -600,6 +600,7 @@ dependencies = [
  "argon2",
  "chrono",
  "hex",
+ "hmac",
  "image",
  "infer",
  "minijinja",

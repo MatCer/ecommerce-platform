@@ -1,65 +1,54 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import ContactStep from "../islands/ContactStep";
+import CheckoutForm from "../islands/CheckoutForm";
+import ResumePlacement from "../islands/ResumePlacement";
 import Checkout from "../layouts/Checkout.astro";
-import { checkoutApi } from "../lib/api";
+import { checkoutApi, messages, shopUrl } from "../lib/api";
 
+// One-page checkout (spec §9.4, WP10) of the cart handed off from the shop (A1).
 const api = checkoutApi(Astro.request);
-const [shop, cart] = await Promise.all([api.shop(), api.cart()]);
+const [shop, view, me] = await Promise.all([api.shop(), api.checkout(), api.me()]);
+const saved = me ? await api.addresses() : [];
 const m = shop?.messages ?? {};
-const shopUrl = `${Astro.url.protocol}//${Astro.url.host.replace(/^checkout\./, "")}/`;
+const back = shopUrl(Astro.url);
 ---
 
-<Checkout title={t(m, "checkout.title")} shopName={shop?.name ?? ""} shopUrl={shopUrl} lang={shop?.locale ?? "cs"}>
+<Checkout
+  title={t(m, "checkout.title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={back}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+  wide
+>
   <h1 class="mb-4 font-display text-2xl font-bold">{t(m, "checkout.title")}</h1>
   {
-    !cart || cart.lines.length === 0 ? (
+    !view || view.cart.lines.length === 0 ? (
+      <>
+      <ResumePlacement client:load m={messages(m, "checkout.resuming")} />
       <p>
-        {t(m, "checkout.empty")} <a href={shopUrl} class="text-identity-ink underline">{t(m, "checkout.back_to_shop")}</a>
+        {t(m, "checkout.empty")} <a href={back} class="text-identity-ink underline">{t(m, "checkout.back_to_shop")}</a>
       </p>
+      </>
     ) : (
-      <div class="grid gap-6 md:grid-cols-[1fr_18rem]">
-        <section aria-labelledby="contact" class="rounded-lg border border-border bg-card p-4">
-          <h2 id="contact" class="mb-3 font-display text-lg font-bold">1. {t(m, "checkout.contact")}</h2>
-          <ContactStep client:load />
-          <p class="mt-4 text-sm text-muted-foreground">{t(m, "checkout.next_steps")}</p>
-        </section>
-        <aside aria-labelledby="summary" class="rounded-lg border border-border bg-card p-4">
-          <h2 id="summary" class="mb-3 font-display text-lg font-bold">{t(m, "checkout.summary")}</h2>
-          <ul class="grid gap-2 text-sm">
-            {cart.lines.map((l) => (
-              <li class="flex justify-between gap-2">
-                <span>
-                  {l.quantity}× {l.product_name} <span class="text-muted-foreground">({l.variant_label})</span>
-                </span>
-                <span class="tabular-nums">{l.total.formatted}</span>
-              </li>
-            ))}
-          </ul>
-          <dl class="mt-3 grid gap-1 border-t border-border pt-3 text-sm">
-            <div class="flex justify-between">
-              <dt>{t(m, "cart.subtotal")}</dt>
-              <dd class="tabular-nums">{cart.subtotal.formatted}</dd>
-            </div>
-            {cart.discount.amount_minor > 0 && (
-              <div class="flex justify-between text-sale">
-                <dt>{t(m, "cart.discount")}{cart.coupon && ` (${cart.coupon.code})`}</dt>
-                <dd class="tabular-nums">−{cart.discount.formatted}</dd>
-              </div>
-            )}
-            {cart.vat.map((r) => (
-              <div class="flex justify-between text-muted-foreground" data-vat-rate={r.rate}>
-                <dt>{t(m, "checkout.vat", { rate: r.rate })}</dt>
-                <dd class="tabular-nums">{r.vat.formatted}</dd>
-              </div>
-            ))}
-            <div class="mt-1 flex justify-between border-t border-border pt-2 text-base font-bold">
-              <dt>{t(m, "cart.total")}</dt>
-              <dd class="tabular-nums" data-cart-total={cart.total.amount_minor}>{cart.total.formatted}</dd>
-            </div>
-          </dl>
-        </aside>
-      </div>
+      <CheckoutForm
+        client:load
+        m={messages(
+          m,
+          "checkout.",
+          "cart.",
+          "address.",
+          "account.email",
+          "account.invalid_email",
+          "legal.terms",
+          "consent.email_marketing_hint",
+        )}
+        locale={shop?.locale ?? "cs"}
+        initial={view}
+        customerEmail={me?.email}
+        saved={saved}
+        shopUrl={back}
+      />
     )
   }
 </Checkout>

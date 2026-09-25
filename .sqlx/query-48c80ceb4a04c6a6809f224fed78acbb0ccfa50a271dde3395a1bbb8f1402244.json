@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET billing_address = $2, shipping_address = $3, ship_to_country = $4,\n             updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "48c80ceb4a04c6a6809f224fed78acbb0ccfa50a271dde3395a1bbb8f1402244"
+}

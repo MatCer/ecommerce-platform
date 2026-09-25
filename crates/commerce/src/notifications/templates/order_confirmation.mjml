@@ -1,0 +1,25 @@
+{% extends "order.mjml" %}
+{% block intro %}
+        <mj-text>{{ t("order_confirmation.intro", shop=brand.shop_name) }}</mj-text>
+{% endblock %}
+{% block after_summary %}
+{%- if vat %}
+        <mj-table font-size="13px" color="{{ brand.colors.muted }}" padding="0 0 12px" cellpadding="4px">
+          <tr style="text-align: left;"><th>{{ t("order_confirmation.vat_rate") }}</th><th style="text-align: right;">{{ t("order_confirmation.vat_net") }}</th><th style="text-align: right;">{{ t("order_confirmation.vat_amount") }}</th></tr>
+{%- for row in vat %}
+          <tr><td>{{ row.rate }} %</td><td style="text-align: right; white-space: nowrap;">{{ row.net }}</td><td style="text-align: right; white-space: nowrap;">{{ row.vat }}</td></tr>
+{%- endfor %}
+        </mj-table>
+{%- endif %}
+        <mj-text font-weight="700" padding="12px 0 0">{{ t("order_confirmation.delivery") }}</mj-text>
+        <mj-text padding="0 0 6px">{{ shipping.method }}{% if shipping.pickup_point %}<br />{{ t("order_confirmation.pickup_point") }}: {{ shipping.pickup_point }}{% endif %}{% if shipping.address %}<br />{{ shipping.address }}{% endif %}</mj-text>
+        <mj-text font-weight="700" padding="12px 0 0">{{ t("order_confirmation.payment") }}</mj-text>
+        <mj-text padding="0 0 6px">{{ payment.method }}</mj-text>
+{%- if payment.bank_transfer %}
+        <mj-text>{{ t("order_confirmation.bank_transfer") }}</mj-text>
+{%- elif payment.cod %}
+        <mj-text>{{ t("order_confirmation.cod") }}</mj-text>
+{%- else %}
+        <mj-text>{{ t("order_confirmation.prepaid") }}</mj-text>
+{%- endif %}
+{% endblock %}

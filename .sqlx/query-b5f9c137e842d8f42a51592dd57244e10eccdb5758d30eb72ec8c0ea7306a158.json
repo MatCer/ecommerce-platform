@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO order_numbers (tenant_id, last) VALUES ($1, $2)\n         ON CONFLICT (tenant_id) DO UPDATE SET last = order_numbers.last + 1\n         RETURNING last",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_numbers",
+            "name": "last"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b5f9c137e842d8f42a51592dd57244e10eccdb5758d30eb72ec8c0ea7306a158"
+}

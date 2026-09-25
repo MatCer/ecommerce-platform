@@ -1,0 +1,184 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, market_id, carrier, name_i18n, description_i18n, price_minor, free_over_minor,\n                weight_tiers, cod_allowed, cod_fee_minor, active, position, created_at, updated_at\n         FROM shipping_methods WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "carrier",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "carrier"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "name_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "description_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "description_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "price_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "price_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "free_over_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "free_over_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "weight_tiers",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "weight_tiers"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "cod_allowed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "cod_allowed"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "cod_fee_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "cod_fee_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipping_methods",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "164618e0f39307b8bbaf29130a91af670c746808605dae059d930a02f3f35a1b"
+}

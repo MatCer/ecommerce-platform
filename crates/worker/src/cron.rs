@@ -23,11 +23,20 @@ pub struct Schedule {
     pub every: Duration,
 }
 
-pub const SCHEDULES: &[Schedule] = &[Schedule {
-    name: "maintenance.cleanup",
-    kind: handlers::MAINTENANCE_CLEANUP,
-    every: Duration::from_secs(3600),
-}];
+pub const SCHEDULES: &[Schedule] = &[
+    Schedule {
+        name: "maintenance.cleanup",
+        kind: handlers::MAINTENANCE_CLEANUP,
+        every: Duration::from_secs(3600),
+    },
+    // ponytail: one global scan per minute; an order expires up to ~1.5 min late (cron tick
+    // 30 s + slot). Schedule per order (`run_at`) if payment windows need to be exact.
+    Schedule {
+        name: "payments.expire",
+        kind: handlers::PAYMENTS_EXPIRE,
+        every: Duration::from_secs(60),
+    },
+];
 
 /// A dedicated connection holding the leader lock, or `None` if another worker leads.
 pub async fn try_lead(db: &PgPool) -> Result<Option<PgConnection>, sqlx::Error> {

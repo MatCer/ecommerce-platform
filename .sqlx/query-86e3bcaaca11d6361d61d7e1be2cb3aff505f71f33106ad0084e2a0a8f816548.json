@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO orders (id, tenant_id, number, market_id, cart_id, customer_id, email, phone,\n             locale, currency, status, payment_status, fulfillment_status, ship_to_country,\n             vat_payer, subtotal_minor, discount_minor, shipping_minor, payment_fee_minor,\n             tax_minor, rounding_minor, total_minor, vat_recap, coupon_id, coupon_code,\n             shipping_method_id, shipping_method_snapshot, payment_method, pickup_point, notes,\n             payment_expires_at, placed_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'unpaid', 'unfulfilled', $12, $13,\n                 $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29,\n                 $30)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Jsonb",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Jsonb",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "86e3bcaaca11d6361d61d7e1be2cb3aff505f71f33106ad0084e2a0a8f816548"
+}

@@ -295,11 +295,19 @@ async fn only_one_cron_leader_and_one_job_per_slot(db: PgPool) {
     cron::enqueue_due(&mut leader, cron::SCHEDULES, t + chrono::Duration::hours(1))
         .await
         .unwrap();
-    let keys: Vec<String> =
-        sqlx::query_scalar("SELECT idempotency_key FROM queue.jobs ORDER BY id")
-            .fetch_all(&db)
+    let keys: Vec<String> = sqlx::query_scalar(
+        "SELECT idempotency_key FROM queue.jobs WHERE kind = 'maintenance.cleanup' ORDER BY id",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    // The minutely payment-timeout scan got one job per distinct minute.
+    let expiries: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM queue.jobs WHERE kind = 'payments.expire'")
+            .fetch_one(&db)
             .await
             .unwrap();
+    assert_eq!(expiries, 3);
     let slot = t.timestamp() / 3600;
     assert_eq!(
         keys,
