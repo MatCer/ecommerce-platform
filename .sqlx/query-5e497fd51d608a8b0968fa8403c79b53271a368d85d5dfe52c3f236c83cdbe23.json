@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT key, name_i18n FROM parameters WHERE key = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "name_i18n"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5e497fd51d608a8b0968fa8403c79b53271a368d85d5dfe52c3f236c83cdbe23"
+}

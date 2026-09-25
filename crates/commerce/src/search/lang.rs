@@ -11,6 +11,8 @@
 //!   type without diacritics as often as with them; `ů` in the second-to-last position becomes
 //!   `o` before folding (Lucene's `*ů* → *o*`, so `stůl`/`stolu` meet), elsewhere `u`;
 //! - Lucene's `šť → sk` is dropped: after folding it would also rewrite every plain `st`;
+//! - the noun endings `ové`/`ovi` (`pánové`, `synovi`) are dropped: they split the very common
+//!   `-ový` adjectives of product names (`dubový` → `dubov`, but `dubové` → `dub`);
 //! - hand-written Slovak case endings are added (`om`, `ej`, `ov`, `och`, `iach`, `ia`, `ie`,
 //!   `iu`), from the Slovak declension tables (Pravidlá slovenského pravopisu, 2013):
 //!   instrumental `-om`, feminine adjective `-ej`, genitive plural `-ov`, locative plural
@@ -124,7 +126,7 @@ const CASE_ENDINGS: &[(usize, &[&str])] = &[
         5,
         &[
             "ech", "ich", "eho", "emi", "emu", "ete", "eti", "iho", "imi", "imu", "ach", "ata",
-            "aty", "ych", "ama", "ami", "ove", "ovi", "ymi", "och",
+            "aty", "ych", "ama", "ami", "ymi", "och",
         ],
     ),
     (5, &["ia", "ie", "iu"]),
@@ -260,6 +262,17 @@ mod tests {
         same("cs", &["ponožky", "ponožek", "ponožkách"]);
         same("cs", &["stůl", "stolu", "stoly", "stolem"]);
         same("cs", &["nůž", "nože", "nožem"]);
+        same(
+            "cs",
+            &[
+                "dubový",
+                "dubová",
+                "dubové",
+                "dubového",
+                "dubových",
+                "dubovou",
+            ],
+        );
     }
 
     #[test]

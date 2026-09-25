@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search_indexes SET building_uid = $2, updated_at = now() WHERE locale = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c41356b701fc0430d23e92f769018b032823b957716babfadc37b381f083d57"
+}

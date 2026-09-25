@@ -21,7 +21,12 @@ fn state(db: PgPool) -> AppState {
         db,
         auth_service: None,
         http: reqwest::Client::new(),
-        meili_url: DEAD_MEILI.parse().unwrap(),
+        meili: commerce::search::Meili::new(
+            reqwest::Client::new(),
+            DEAD_MEILI.parse().unwrap(),
+            "unused".into(),
+            Duration::from_secs(1),
+        ),
         storage: testkit::memory_storage(),
         staff_auth: std::sync::Arc::new(api::auth::StaffAuth::new(
             reqwest::Client::new(),
@@ -168,13 +173,13 @@ async fn readyz_fails_when_database_is_down() {
     assert_eq!(body["checks"]["storage"], "ok");
 }
 
-/// Real Postgres (`DATABASE_URL`). Search down must not fail readiness (spec A30).
+/// Real Postgres (`DATABASE_URL`). Search down degrades but does not fail readiness (A27).
 #[sqlx::test(migrations = "../../migrations")]
-async fn readyz_ok_with_database_even_if_search_is_down(db: PgPool) {
+async fn readyz_degraded_with_database_if_search_is_down(db: PgPool) {
     let res = get(app(state(db), false), "/readyz").await;
     assert_eq!(res.status(), StatusCode::OK);
     let body = json(res).await;
-    assert_eq!(body["status"], "ok");
+    assert_eq!(body["status"], "degraded");
     assert_eq!(body["checks"]["database"], "ok");
     assert_eq!(body["checks"]["meilisearch"], "fail");
 }

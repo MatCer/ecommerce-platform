@@ -1,0 +1,74 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT locale, settings_version, building_uid, rebuilt_at, documents\n         FROM search_indexes ORDER BY locale",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "settings_version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "settings_version"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "building_uid",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "building_uid"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "rebuilt_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "rebuilt_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "documents",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "documents"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "dc41f61daff77f15e2267075eef48671abf888b523592c5ba3ef90c0ec350ee4"
+}

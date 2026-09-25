@@ -1,0 +1,278 @@
+# Search relevance fixtures (spec §11.1): locale, query, SKU of the product expected in the top 5.
+# Catalog: cs-sk-catalog.tsv. Run: `make test-search` (real Meilisearch).
+# Kinds: exact, folded (no diacritics), inflection (case/number forms), typo, sku, ean, sk (Slovak).
+# locale	query	expected sku	kind
+cs	pánské bavlněné tričko	TRI-001	exact
+cs	panske bavlnene tricko	TRI-001	folded
+cs	pánská trička	TRI-001	inflection
+cs	bavlněných triček	TRI-001	inflection
+cs	tričkem	TRI-001	inflection
+cs	TRI-001	TRI-001	sku
+cs	8590000010014	TRI-001	ean
+cs	dámské tričko s potiskem	TRI-002	exact
+cs	damske tricko	TRI-002	folded
+cs	trička s potisky	TRI-002	inflection
+cs	potiskem	TRI-002	inflection
+cs	tri-002	TRI-002	sku
+sk	dámske tričko s potlačou	TRI-002	sk
+cs	mikina s kapucí	MIK-001	exact
+cs	mikiny	MIK-001	inflection
+cs	mikinu s kapucí	MIK-001	inflection
+cs	mikyna	MIK-001	typo
+cs	8590000010038	MIK-001	ean
+sk	mikina s kapucňou	MIK-001	sk
+cs	dětská mikina na zip	MIK-002	exact
+cs	detske mikiny	MIK-002	folded
+cs	dětských mikin	MIK-002	inflection
+cs	MIK-002	MIK-002	sku
+sk	detská mikina na zips	MIK-002	sk
+cs	zimní bunda	BUN-001	exact
+cs	zimni bundy	BUN-001	folded
+cs	zimních bund	BUN-001	inflection
+cs	zimní bundou	BUN-001	inflection
+cs	bunde	BUN-001	folded
+sk	zimná bunda	BUN-001	sk
+sk	zimnú bundu	BUN-001	sk
+cs	softshellová bunda	BUN-002	exact
+cs	softshellove bundy	BUN-002	folded
+cs	softshelovou	BUN-002	typo
+cs	8590000010069	BUN-002	ean
+sk	softshellovú bundu	BUN-002	sk
+cs	džínové kalhoty	KAL-001	exact
+cs	dzinove kalhoty	KAL-001	folded
+cs	džínových kalhot	KAL-001	inflection
+cs	kalhotách	KAL-001	inflection
+cs	KAL-001	KAL-001	sku
+sk	džínsové nohavice	KAL-001	sk
+sk	dzinsove nohavice	KAL-001	sk
+cs	sportovní kalhoty	KAL-002	exact
+cs	sportovni kalhoty	KAL-002	folded
+cs	sportovních kalhot	KAL-002	inflection
+cs	sprotovní kalhoty	KAL-002	typo
+sk	športové nohavice	KAL-002	sk
+sk	športových nohavíc	KAL-002	sk
+cs	kožené boty	BOT-001	exact
+cs	kozene boty	BOT-001	folded
+cs	kožených bot	BOT-001	inflection
+cs	koženými botami	BOT-001	inflection
+cs	BOT-001	BOT-001	sku
+sk	kožené topánky	BOT-001	sk
+sk	kozenych topanok	BOT-001	sk
+cs	běžecké boty	BOT-002	exact
+cs	bezecke boty	BOT-002	folded
+cs	běžeckých bot	BOT-002	inflection
+cs	8590000010106	BOT-002	ean
+sk	bežecké topánky	BOT-002	sk
+sk	bezecke topanky	BOT-002	sk
+cs	vlněné ponožky	PON-001	exact
+cs	vlnene ponozky	PON-001	folded
+cs	ponožek	PON-001	inflection
+cs	ponožkách	PON-001	inflection
+cs	ponozky	PON-001	folded
+sk	vlnené ponožky	PON-001	sk
+cs	košile s dlouhým rukávem	KOS-001	exact
+cs	kosile dlouhy rukav	KOS-001	folded
+cs	košili	KOS-001	inflection
+cs	košilí	KOS-001	inflection
+cs	KOS-001	KOS-001	sku
+sk	košeľa s dlhým rukávom	KOS-001	sk
+sk	kosela	KOS-001	sk
+cs	letní sukně	SUK-001	exact
+cs	letni sukne	SUK-001	folded
+cs	letních sukní	SUK-001	inflection
+cs	sukni	SUK-001	inflection
+sk	letná sukňa	SUK-001	sk
+sk	sukne	SUK-001	sk
+cs	šaty na léto	SAT-001	exact
+cs	saty na leto	SAT-001	folded
+cs	šatech na léto	SAT-001	inflection
+cs	8590000010144	SAT-001	ean
+sk	šaty na leto	SAT-001	sk
+cs	pletená čepice	CEP-001	exact
+cs	pletena cepice	CEP-001	folded
+cs	pletené čepici	CEP-001	inflection
+cs	čepic	CEP-001	inflection
+cs	CEP-001	CEP-001	sku
+sk	pletená čiapka	CEP-001	sk
+sk	ciapky	CEP-001	sk
+cs	kožené rukavice	RUK-001	exact
+cs	kozene rukavice	RUK-001	folded
+cs	rukavicemi	RUK-001	inflection
+cs	rukavic	RUK-001	inflection
+cs	rukavce	RUK-001	typo
+sk	kožené rukavice	RUK-001	sk
+cs	turistický batoh	BAT-001	exact
+cs	turisticky batoh	BAT-001	folded
+cs	turistické batohy	BAT-001	inflection
+cs	batohu	BAT-001	inflection
+cs	batohem	BAT-001	inflection
+cs	BAT-001	BAT-001	sku
+sk	turistický batoh	BAT-001	sk
+cs	kožená kabelka	KBL-001	exact
+cs	kozena kabelka	KBL-001	folded
+cs	kabelky	KBL-001	inflection
+cs	kabelek	KBL-001	inflection
+cs	kabelkou	KBL-001	inflection
+sk	kožená kabelka	KBL-001	sk
+cs	náramkové hodinky	HOD-001	exact
+cs	naramkove hodinky	HOD-001	folded
+cs	hodinek	HOD-001	inflection
+cs	hodinkách	HOD-001	inflection
+cs	8590000010199	HOD-001	ean
+sk	náramkové hodinky	HOD-001	sk
+cs	keramický hrnek	HRN-001	exact
+cs	keramicky hrnek	HRN-001	folded
+cs	hrnky	HRN-001	inflection
+cs	hrnku	HRN-001	inflection
+cs	keramických hrnků	HRN-001	inflection
+sk	keramický hrnček	HRN-001	sk
+cs	nerezová konvice	KON-001	exact
+cs	nerezova konvice	KON-001	folded
+cs	konvici	KON-001	inflection
+cs	konvic	KON-001	inflection
+cs	KON-001	KON-001	sku
+sk	nerezová kanvica	KON-001	sk
+sk	kanvicu	KON-001	sk
+cs	dubový stůl	STU-001	exact
+cs	dubovy stul	STU-001	folded
+cs	stolu	STU-001	inflection
+cs	dubové stoly	STU-001	inflection
+cs	stolem	STU-001	inflection
+sk	dubový stôl	STU-001	sk
+sk	stolom	STU-001	sk
+cs	jídelní židle	ZID-001	exact
+cs	jidelni zidle	ZID-001	folded
+cs	židlí	ZID-001	inflection
+cs	jídelních židlích	ZID-001	inflection
+cs	8590000010236	ZID-001	ean
+sk	jedálenská stolička	ZID-001	sk
+cs	stolní lampa	LAM-001	exact
+cs	stolni lampa	LAM-001	folded
+cs	lampy	LAM-001	inflection
+cs	lampou	LAM-001	inflection
+cs	LAM-001	LAM-001	sku
+sk	stolová lampa	LAM-001	sk
+cs	péřový polštář	POL-001	exact
+cs	perovy polstar	POL-001	folded
+cs	polštáře	POL-001	inflection
+cs	polštářů	POL-001	inflection
+sk	perový vankúš	POL-001	sk
+sk	vankuse	POL-001	sk
+cs	bavlněná přikrývka	PRI-001	exact
+cs	bavlnena prikryvka	PRI-001	folded
+cs	přikrývky	PRI-001	inflection
+cs	přikrývek	PRI-001	inflection
+cs	prikryvkou	PRI-001	folded
+sk	bavlnená prikrývka	PRI-001	sk
+cs	kuchyňský nůž	NUZ-001	exact
+cs	kuchynsky nuz	NUZ-001	folded
+cs	nože	NUZ-001	inflection
+cs	nožem	NUZ-001	inflection
+cs	8590000010274	NUZ-001	ean
+sk	kuchynský nôž	NUZ-001	sk
+cs	litinová pánev	PNV-001	exact
+cs	litinova panev	PNV-001	folded
+cs	pánve	PNV-001	inflection
+cs	litinové pánvi	PNV-001	inflection
+cs	PNV-001	PNV-001	sku
+sk	liatinová panvica	PNV-001	sk
+cs	bezdrátová sluchátka	SLU-001	exact
+cs	bezdratova sluchatka	SLU-001	folded
+cs	sluchátek	SLU-001	inflection
+cs	bezdrátových sluchátkách	SLU-001	inflection
+cs	sluchatka bezdratova	SLU-001	folded
+sk	bezdrôtové slúchadlá	SLU-001	sk
+cs	přenosný reproduktor	REP-001	exact
+cs	prenosny reproduktor	REP-001	folded
+cs	reproduktory	REP-001	inflection
+cs	reproduktorem	REP-001	inflection
+cs	reproduktr	REP-001	typo
+cs	REP-001	REP-001	sku
+sk	prenosný reproduktor	REP-001	sk
+cs	rychlonabíječka	NAB-001	exact
+cs	rychlonabijecka usb-c	NAB-001	folded
+cs	rychlonabíječky	NAB-001	inflection
+cs	8590000010311	NAB-001	ean
+sk	rýchlonabíjačka	NAB-001	sk
+cs	nabíjecí kabel usb-c	KAB-001	exact
+cs	nabijeci kabel	KAB-001	folded
+cs	kabely	KAB-001	inflection
+cs	kabelem	KAB-001	inflection
+cs	KAB-001	KAB-001	sku
+sk	nabíjací kábel	KAB-001	sk
+cs	kuchařka české kuchyně	KNI-001	exact
+cs	kucharka ceske kuchyne	KNI-001	folded
+cs	kuchařky	KNI-001	inflection
+cs	kuchařku	KNI-001	inflection
+sk	kuchárka českej kuchyne	KNI-001	sk
+cs	dřevěná stavebnice	HRA-001	exact
+cs	drevena stavebnice	HRA-001	folded
+cs	stavebnici	HRA-001	inflection
+cs	dřevěné stavebnice	HRA-001	inflection
+cs	8590000010342	HRA-001	ean
+sk	drevená stavebnica	HRA-001	sk
+cs	plyšový medvídek	MED-001	exact
+cs	plysovy medvidek	MED-001	folded
+cs	medvídka	MED-001	inflection
+cs	plyšoví medvídci	MED-001	inflection
+cs	MED-001	MED-001	sku
+sk	plyšový macko	MED-001	sk
+cs	hydratační krém	KRE-001	exact
+cs	hydratacni krem	KRE-001	folded
+cs	krémy	KRE-001	inflection
+cs	krémem	KRE-001	inflection
+cs	hydratacny	KRE-001	typo
+sk	hydratačný krém	KRE-001	sk
+cs	šampon na vlasy	SAM-001	exact
+cs	sampon na vlasy	SAM-001	folded
+cs	šamponem	SAM-001	inflection
+cs	šampony	SAM-001	inflection
+sk	šampón na vlasy	SAM-001	sk
+cs	zrnková káva	KAV-001	exact
+cs	zrnkova kava	KAV-001	folded
+cs	kávy	KAV-001	inflection
+cs	zrnkovou kávou	KAV-001	inflection
+cs	8590000010380	KAV-001	ean
+sk	zrnková káva	KAV-001	sk
+cs	zelený čaj	CAJ-001	exact
+cs	zeleny caj	CAJ-001	folded
+cs	zeleného čaje	CAJ-001	inflection
+cs	čajem	CAJ-001	inflection
+sk	zelený čaj	CAJ-001	sk
+cs	hořká čokoláda	COK-001	exact
+cs	horka cokolada	COK-001	folded
+cs	čokolády	COK-001	inflection
+cs	hořkou čokoládou	COK-001	inflection
+cs	cokoalda	COK-001	typo
+cs	COK-001	COK-001	sku
+sk	horká čokoláda	COK-001	sk
+cs	horské kolo	KOL-001	exact
+cs	horske kolo	KOL-001	folded
+cs	horská kola	KOL-001	inflection
+cs	horském kole	KOL-001	inflection
+sk	horský bicykel	KOL-001	sk
+sk	bicykle	KOL-001	sk
+cs	cyklistická helma	HEL-001	exact
+cs	cyklisticka helma	HEL-001	folded
+cs	helmy	HEL-001	inflection
+cs	helmou	HEL-001	inflection
+cs	8590000010427	HEL-001	ean
+sk	cyklistická prilba	HEL-001	sk
+sk	prilbu	HEL-001	sk
+cs	stan pro dva	STA-001	exact
+cs	stany	STA-001	inflection
+cs	stanem	STA-001	inflection
+cs	STA-001	STA-001	sku
+sk	stan pre dvoch	STA-001	sk
+cs	spací pytel	SPA-001	exact
+cs	spaci pytel	SPA-001	folded
+cs	spacím pytlem	SPA-001	inflection
+cs	spacích pytlů	SPA-001	inflection
+sk	spací vak	SPA-001	sk
+cs	sluneční brýle	BRY-001	exact
+cs	slunecni bryle	BRY-001	folded
+cs	slunečních brýlí	BRY-001	inflection
+cs	brýlemi	BRY-001	inflection
+cs	BRY-001	BRY-001	sku
+sk	slnečné okuliare	BRY-001	sk
+sk	okuliarov	BRY-001	sk

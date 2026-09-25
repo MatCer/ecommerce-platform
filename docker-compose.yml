@@ -56,6 +56,37 @@ services:
       timeout: 3s
       retries: 30
 
+  # One-shot: the API's search-only key (tenant indexes `t_*`) and the worker's admin key
+  # (spec A27; all indexes, because index swaps are tasks without an index and a key limited
+  # by index patterns cannot read them). Fixed uids make the key values known in advance
+  # (.env.example); it fails when a value does not match. api/worker do not wait for it:
+  # until the keys exist, search is simply degraded.
+  meili-init:
+    profiles: [infra, full]
+    image: getmeili/meilisearch:v1.54.0@sha256:0bf32debcbfa8ba4e418679025f4935884972171513c92f0584689ff994a61df
+    depends_on:
+      meilisearch: { condition: service_healthy }
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-meili-local-master-key-0123456789}
+      MEILI_SEARCH_KEY_UID: ${MEILI_SEARCH_KEY_UID:-4b3c2a10-6f1e-4d0a-9b7e-5c1f2e3d4a01}
+      MEILI_SEARCH_KEY: ${MEILI_SEARCH_KEY:-2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918}
+      MEILI_ADMIN_KEY_UID: ${MEILI_ADMIN_KEY_UID:-4b3c2a10-6f1e-4d0a-9b7e-5c1f2e3d4a02}
+      MEILI_ADMIN_KEY: ${MEILI_ADMIN_KEY:-39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6}
+    entrypoint: ["/bin/sh", "-euc"]
+    command:
+      - |
+        api() { curl -sS -H "Authorization: Bearer $$MEILI_MASTER_KEY" -H 'Content-Type: application/json' "$$@"; }
+        key() {
+          api -X POST http://meilisearch:7700/keys -o /dev/null --data \
+            "{\"uid\":\"$$1\",\"name\":\"$$2\",\"actions\":$$3,\"indexes\":$$4,\"expiresAt\":null}"
+          got=$$(api "http://meilisearch:7700/keys/$$1" | sed -n 's/.*"key":"\([0-9a-f]*\)".*/\1/p')
+          if [ "$$got" != "$$5" ]; then echo "meili-init: the $$2 key does not match .env" >&2; exit 1; fi
+          echo "meili-init: $$2 key ready"
+        }
+        key "$$MEILI_SEARCH_KEY_UID" api-search '["search"]' '["t_*"]' "$$MEILI_SEARCH_KEY"
+        key "$$MEILI_ADMIN_KEY_UID" worker-admin '["documents.*","indexes.*","settings.*","tasks.get"]' '["*"]' "$$MEILI_ADMIN_KEY"
+    restart: "no"
+
   # Upstream MinIO no longer publishes images; pgsty/minio is the maintained community build.
   minio:
     <<: *infra
@@ -215,6 +246,7 @@ services:
       <<: *runtime-db
       API_BIND: 0.0.0.0:8000
       MEILI_URL: http://meilisearch:7700
+      MEILI_SEARCH_KEY: ${MEILI_SEARCH_KEY:-2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918}
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-app-local}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-app-local-secret-key}
@@ -247,6 +279,8 @@ services:
     environment:
       <<: *runtime-db
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      MEILI_URL: http://meilisearch:7700
+      MEILI_ADMIN_KEY: ${MEILI_ADMIN_KEY:-39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b246901f6}
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_ENDPOINT: http://s3.localhost:${HTTP_PORT:-8080}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-app-local}

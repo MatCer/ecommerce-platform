@@ -1,0 +1,46 @@
+# sku	cs name	sk name	brand	ean (EAN-13, valid check digit)
+TRI-001	Pánské bavlněné tričko	Pánske bavlnené tričko	Acme	8590000010014
+TRI-002	Dámské tričko s potiskem	Dámske tričko s potlačou	Acme	8590000010021
+MIK-001	Mikina s kapucí	Mikina s kapucňou	Nordwear	8590000010038
+MIK-002	Dětská mikina na zip	Detská mikina na zips	Nordwear	8590000010045
+BUN-001	Zimní bunda	Zimná bunda	Alpina	8590000010052
+BUN-002	Softshellová bunda	Softshellová bunda	Alpina	8590000010069
+KAL-001	Džínové kalhoty	Džínsové nohavice	Denimo	8590000010076
+KAL-002	Sportovní kalhoty	Športové nohavice	Denimo	8590000010083
+BOT-001	Kožené boty	Kožené topánky	Ševec	8590000010090
+BOT-002	Běžecké boty	Bežecké topánky	Runfast	8590000010106
+PON-001	Vlněné ponožky	Vlnené ponožky	Ovečka	8590000010113
+KOS-001	Košile s dlouhým rukávem	Košeľa s dlhým rukávom	Elegant	8590000010120
+SUK-001	Letní sukně	Letná sukňa	Elegant	8590000010137
+SAT-001	Šaty na léto	Šaty na leto	Elegant	8590000010144
+CEP-001	Pletená čepice	Pletená čiapka	Ovečka	8590000010151
+RUK-001	Kožené rukavice	Kožené rukavice	Ševec	8590000010168
+BAT-001	Turistický batoh	Turistický batoh	Alpina	8590000010175
+KBL-001	Kožená kabelka	Kožená kabelka	Elegant	8590000010182
+HOD-001	Náramkové hodinky	Náramkové hodinky	Chrono	8590000010199
+HRN-001	Keramický hrnek	Keramický hrnček	Domov	8590000010205
+KON-001	Nerezová konvice	Nerezová kanvica	Domov	8590000010212
+STU-001	Dubový stůl	Dubový stôl	Drevo	8590000010229
+ZID-001	Jídelní židle	Jedálenská stolička	Drevo	8590000010236
+LAM-001	Stolní lampa	Stolová lampa	Světlo	8590000010243
+POL-001	Péřový polštář	Perový vankúš	Spánek	8590000010250
+PRI-001	Bavlněná přikrývka	Bavlnená prikrývka	Spánek	8590000010267
+NUZ-001	Kuchyňský nůž	Kuchynský nôž	Domov	8590000010274
+PNV-001	Litinová pánev	Liatinová panvica	Domov	8590000010281
+SLU-001	Bezdrátová sluchátka	Bezdrôtové slúchadlá	Zvuk	8590000010298
+REP-001	Přenosný reproduktor	Prenosný reproduktor	Zvuk	8590000010304
+NAB-001	Rychlonabíječka USB-C	Rýchlonabíjačka USB-C	Volt	8590000010311
+KAB-001	Nabíjecí kabel USB-C	Nabíjací kábel USB-C	Volt	8590000010328
+KNI-001	Kuchařka české kuchyně	Kuchárka českej kuchyne	Knihy	8590000010335
+HRA-001	Dřevěná stavebnice	Drevená stavebnica	Hračky	8590000010342
+MED-001	Plyšový medvídek	Plyšový macko	Hračky	8590000010359
+KRE-001	Hydratační krém	Hydratačný krém	Pleť	8590000010366
+SAM-001	Šampon na vlasy	Šampón na vlasy	Pleť	8590000010373
+KAV-001	Zrnková káva	Zrnková káva	Pražírna	8590000010380
+CAJ-001	Zelený čaj	Zelený čaj	Pražírna	8590000010397
+COK-001	Hořká čokoláda	Horká čokoláda	Kakao	8590000010403
+KOL-001	Horské kolo	Horský bicykel	Velo	8590000010410
+HEL-001	Cyklistická helma	Cyklistická prilba	Velo	8590000010427
+STA-001	Stan pro dva	Stan pre dvoch	Alpina	8590000010434
+SPA-001	Spací pytel	Spací vak	Alpina	8590000010441
+BRY-001	Sluneční brýle	Slnečné okuliare	Optika	8590000010458

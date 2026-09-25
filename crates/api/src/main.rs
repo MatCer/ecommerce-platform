@@ -79,7 +79,11 @@ async fn serve() -> anyhow::Result<()> {
         auth_service,
         db: db.clone(),
         http: http.clone(),
-        meili_url: MeiliConfig::from_env()?.url,
+        meili: {
+            let m = MeiliConfig::search_from_env()?;
+            // Short: a slow search degrades to 503 instead of holding storefront requests.
+            commerce::search::Meili::new(http.clone(), m.url, m.key, Duration::from_secs(2))
+        },
         storage: Storage::s3(&S3Config::from_env()?)?,
         staff_auth: Arc::new(api::auth::StaffAuth::new(http, auth.jwks_url, &auth.issuer)),
         internal_token: api::auth::ServiceToken::new(

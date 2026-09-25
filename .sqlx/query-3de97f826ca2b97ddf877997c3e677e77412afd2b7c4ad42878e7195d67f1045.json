@@ -1,0 +1,109 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.id, v.product_id, v.sku, v.ean, v.option_values, v.is_default,\n                COALESCE(l.track, true) AS \"track!\",\n                COALESCE(l.allow_backorder, false) AS \"allow_backorder!\",\n                COALESCE(l.on_hand - l.reserved, 0) AS \"available!\"\n         FROM variants v LEFT JOIN inventory_levels l ON l.variant_id = v.id\n         WHERE v.product_id = ANY($1)\n         ORDER BY v.product_id, v.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "sku",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "sku"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "ean",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "ean"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "option_values",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "option_values"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "is_default",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "is_default"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "track!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "allow_backorder!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "available!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3de97f826ca2b97ddf877997c3e677e77412afd2b7c4ad42878e7195d67f1045"
+}

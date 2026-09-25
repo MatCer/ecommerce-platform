@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO search_indexes (tenant_id, locale, settings_version) VALUES ($1, $2, $3)\n             ON CONFLICT (tenant_id, locale) DO UPDATE\n             SET settings_version = GREATEST(search_indexes.settings_version, EXCLUDED.settings_version),\n                 updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "edd1e89b1b4feb68f2eca236cd0a8b9a0f188c1bb77fe11cb94cdcaf8506bfda"
+}

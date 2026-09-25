@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.product_id, v.variant_id, p.key, p.filterable, v.value\n         FROM product_parameter_values v JOIN parameters p ON p.id = v.parameter_id\n         WHERE v.product_id = ANY($1) ORDER BY v.product_id, v.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "filterable",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "parameters",
+            "name": "filterable"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_parameter_values",
+            "name": "value"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b20d1deb5a51f2587b749174b9b552ba589c29ee48acd507542de158fe053993"
+}

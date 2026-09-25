@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT v.product_id, v.id, pi.amount_minor,\n                  (NOT COALESCE(l.track, true) OR COALESCE(l.allow_backorder, false)\n                   OR COALESCE(l.on_hand - l.reserved, 0) > 0) AS \"in_stock!\"\n           FROM variants v\n           JOIN price_intervals pi ON pi.variant_id = v.id AND pi.price_list_id = $2\n                AND pi.valid_from <= $3 AND (pi.valid_to IS NULL OR pi.valid_to > $3)\n           LEFT JOIN inventory_levels l ON l.variant_id = v.id\n           WHERE v.product_id = ANY($1)\n           ORDER BY v.product_id, v.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "in_stock!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "cab67b9426ddf0f30c06c9fc955175859040d87f03dc6cfa0e00a1094f98d4d2"
+}

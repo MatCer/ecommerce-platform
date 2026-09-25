@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT locale, settings_version FROM search_indexes",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "settings_version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "settings_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f4227d1c2243e82c0f99e3fd7aa4d288c902406b784a8a57d1729555a0c6ab3c"
+}

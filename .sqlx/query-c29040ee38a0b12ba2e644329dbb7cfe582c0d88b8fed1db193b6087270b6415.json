@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search_indexes SET building_uid = NULL WHERE building_uid IS NOT NULL\n           RETURNING building_uid AS \"uid!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "uid!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "building_uid"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "c29040ee38a0b12ba2e644329dbb7cfe582c0d88b8fed1db193b6087270b6415"
+}

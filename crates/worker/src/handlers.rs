@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use commerce::media::{self, Processed};
 use commerce::pricing::intervals;
+use commerce::search::{self, Meili};
 use platform::queue::{self, Job};
 use platform::storage::Storage;
 use tokio::sync::Semaphore;
@@ -24,10 +25,20 @@ const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
 /// when a dedicated media worker gets more cores.
 const MEDIA_CONCURRENCY: usize = 1;
 
-pub fn all(storage: Storage) -> Handlers {
+pub fn all(storage: Storage, meili: Meili) -> Handlers {
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
+    let (m1, m2, m3) = (meili.clone(), meili.clone(), meili);
     Handlers::default()
+        .register(search::INDEX_PRODUCT_JOB, move |ctx, job| {
+            search_index_product(ctx, job, m1.clone())
+        })
+        .register(search::REINDEX_CATEGORY_JOB, move |ctx, job| {
+            search_reindex_category(ctx, job, m2.clone())
+        })
+        .register(search::REBUILD_JOB, move |ctx, job| {
+            search_rebuild(ctx, job, m3.clone())
+        })
         .register(EVENTS_LOG, events_log)
         .register(MAINTENANCE_CLEANUP, maintenance_cleanup)
         .register(media::PROCESS_JOB, move |ctx, job| {
@@ -58,6 +69,57 @@ async fn price_transition(ctx: Ctx, job: Job) -> Result<(), JobError> {
     tx.commit().await?;
     tracing::info!(%tenant, %at, published, "price transition published");
     Ok(())
+}
+
+fn tenant_and(job: &Job, field: &str) -> Result<(Uuid, Uuid), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent(format!("{} without tenant", job.kind)))?;
+    let id = job
+        .payload
+        .get(field)
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| JobError::Permanent(format!("payload has no {field}")))?;
+    Ok((tenant, id))
+}
+
+/// (Re)indexes one product; the job id is the version (spec A27: stale versions dropped).
+async fn search_index_product(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
+    let (tenant, product) = tenant_and(&job, "product_id")?;
+    let outcome = search::index::index_product(&ctx.db, &meili, tenant, product, job.id)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::debug!(%tenant, %product, version = job.id, ?outcome, "product indexed");
+    Ok(())
+}
+
+/// A category changed: reindex every product whose documents mention it.
+async fn search_reindex_category(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
+    let (tenant, category) = tenant_and(&job, "category_id")?;
+    let products = search::index::category_products(&ctx.db, &meili, tenant, category)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    let now = chrono::Utc::now();
+    for product in &products {
+        queue::enqueue(&ctx.db, &search::index_product_job(tenant, *product, now)).await?;
+    }
+    tracing::info!(%tenant, %category, products = products.len(), "category reindex queued");
+    Ok(())
+}
+
+async fn search_rebuild(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("search rebuild without tenant".into()))?;
+    match search::index::rebuild(&ctx.db, &meili, tenant, job.id).await {
+        Ok(true) => Ok(()),
+        // Runs again after the current rebuild (backoff), so late changes are not lost.
+        Ok(false) => Err(JobError::Retry(
+            "another rebuild of this tenant is running".into(),
+        )),
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
 }
 
 async fn events_log(_ctx: Ctx, job: Job) -> Result<(), JobError> {

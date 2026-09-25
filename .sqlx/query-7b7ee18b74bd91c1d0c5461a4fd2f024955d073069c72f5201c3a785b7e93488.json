@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT product_id, indexed_version FROM search_product_state\n         WHERE product_id = ANY($1) ORDER BY product_id FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "search_product_state",
+            "name": "product_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "indexed_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "search_product_state",
+            "name": "indexed_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "7b7ee18b74bd91c1d0c5461a4fd2f024955d073069c72f5201c3a785b7e93488"
+}

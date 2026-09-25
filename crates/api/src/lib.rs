@@ -27,7 +27,6 @@ use platform::Error;
 use platform::error::PROBLEM_CONTENT_TYPE;
 use platform::health::{CheckStatus, Readiness};
 use platform::storage::Storage;
-use reqwest::Url;
 use serde::Serialize;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
@@ -54,7 +53,8 @@ pub struct AppState {
     /// The auth service's internal API (staff invitations); `None` when not configured.
     pub auth_service: Option<auth_service::AuthService>,
     pub http: reqwest::Client,
-    pub meili_url: Url,
+    /// Search-only key (A27): the API never writes to Meilisearch.
+    pub meili: commerce::search::Meili,
     pub storage: Storage,
     pub staff_auth: Arc<auth::StaffAuth>,
     pub internal_token: auth::ServiceToken,
@@ -260,7 +260,7 @@ async fn healthz() -> Json<Health> {
     )
 )]
 async fn readyz(State(s): State<AppState>) -> (StatusCode, Json<Readiness>) {
-    let report = platform::health::readiness(&s.db, &s.http, &s.meili_url, &s.storage).await;
+    let report = platform::health::readiness(&s.db, &s.http, s.meili.url(), &s.storage).await;
     let status = if report.is_ready() {
         StatusCode::OK
     } else {
