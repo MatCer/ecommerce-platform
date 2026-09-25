@@ -179,6 +179,8 @@ services:
       PUBLIC_SCHEME: http
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-api-token-0123456789abcdef}
       EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+      # WP23: theme previews may be framed by the admin only (A21).
+      ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
       # The widget origin is allowed in the checkout CSP (script + frame source) only.
       PACKETA_WIDGET_URL: ${PACKETA_WIDGET_URL:-http://mocks.localhost:${HTTP_PORT:-8080}/packeta/library.js}
     volumes: [edge-artifacts:/var/cache/artifacts]
@@ -229,6 +231,8 @@ services:
     environment:
       API_ORIGIN: http://api.localhost:${HTTP_PORT:-8080}
       MEDIA_ORIGIN: http://s3.localhost:${HTTP_PORT:-8080}
+      # WP23: the theme preview iframe (`preview-<n>--<shop>` hosts, A21).
+      PREVIEW_FRAME_SRC: http://*.localhost:${HTTP_PORT:-8080}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 2s
@@ -247,6 +251,9 @@ services:
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
+    # WP23: the theme builder's browser checks reach the shops (previews) only through Caddy,
+    # the one peer on the internal (no-egress) `theme-check` network.
+    networks: [default, theme-check]
 
   # Applies migrations as the owner role, then exits. api and worker wait for it.
   migrate:
@@ -287,6 +294,9 @@ services:
       PUBLIC_STOREFRONT_PORT: ${HTTP_PORT:-8080}
       EDGE_PURGE_URL: http://edge:8788/_edge/purge
       EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+      # WP23: preview tokens + per-tenant ASTRO_KEY (API only); the builder's service token.
+      THEME_SECRET: ${THEME_SECRET:-local-theme-secret-0123456789abcdef0123}
+      THEME_BUILDER_TOKEN: ${THEME_BUILDER_TOKEN:-local-theme-builder-token-0123456789abcdef}
       # Superadmin CLI (`make admin args=...`) only.
       AUTH_INTERNAL_URL: http://auth:3000/
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
@@ -359,6 +369,9 @@ services:
       SAFE_FETCH_ALLOW_HOSTS: mocks
       # WP11: Fio API polling (the local mock); tokens are encrypted with SECRETS_KEY.
       FIO_API_URL: ${FIO_API_URL:-http://mocks:4010/fio}
+      # WP23: theme builds are handed to the builder.
+      THEME_BUILDER_URL: http://theme-builder:4020/
+      THEME_BUILDER_TOKEN: ${THEME_BUILDER_TOKEN:-local-theme-builder-token-0123456789abcdef}
       # WP12: Stripe for refunds a crash left unsubmitted (same settings as the api).
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
@@ -379,9 +392,72 @@ services:
       meili-init: { condition: service_completed_successfully }
       mailpit: { condition: service_started }
 
+  # WP23 theme builder (spec §12.3, A6): builds + checks revisions in disposable sandbox
+  # containers of its own image. It holds no Docker socket: it asks the sandbox proxy below,
+  # which allows only sandbox containers of this image/label/volume/networks (see
+  # docs/decisions/theme-builder-sandbox.md). Jobs exchange files through the `theme-work`
+  # volume (subpath mounts per job).
+  theme-builder:
+    profiles: [full]
+    restart: unless-stopped
+    build: &theme-builder-build
+      context: .
+      dockerfile: apps/theme-builder/Dockerfile
+    image: ${COMPOSE_PROJECT_NAME:-ecommerce}-theme-builder:local
+    environment: &sandbox-env
+      API_ORIGIN: http://api:8000
+      THEME_BUILDER_TOKEN: ${THEME_BUILDER_TOKEN:-local-theme-builder-token-0123456789abcdef}
+      DOCKER_PROXY_URL: http://theme-sandbox-proxy:2375
+      SANDBOX_IMAGE: ${COMPOSE_PROJECT_NAME:-ecommerce}-theme-builder:local
+      SANDBOX_LABEL: ${COMPOSE_PROJECT_NAME:-ecommerce}
+      SANDBOX_VOLUME: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-work
+      SANDBOX_NETWORKS: none,${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check
+      CHECK_NETWORK: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check
+      PROXY_HOST: caddy
+      LIGHTHOUSE_RUNS: ${THEME_LIGHTHOUSE_RUNS:-3}
+    volumes: [theme-work:/work]
+    depends_on:
+      api: { condition: service_healthy }
+      theme-sandbox-proxy: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4020/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # The only holder of the Docker socket; runs no theme code. Not published, not in Caddy.
+  theme-sandbox-proxy:
+    profiles: [full]
+    restart: unless-stopped
+    build: *theme-builder-build
+    image: ${COMPOSE_PROJECT_NAME:-ecommerce}-theme-builder:local
+    command: ["node", "apps/theme-builder/src/proxy.ts"]
+    # Root inside this container only, to open the socket (its group differs per host).
+    user: root
+    environment:
+      <<: *sandbox-env
+      PORT: "2375"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
+  # Memory-backed and size-capped: sandbox outputs (written by theme code during builds)
+  # cannot fill the host's disk; build jobs are transient anyway.
+  theme-work:
+    name: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-work
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=1g,nr_inodes=200000,uid=1000,gid=1000,mode=0700
   edge-artifacts:
   pg-data:
   meili-data:
   minio-data:
   caddy-data:
+
+networks:
+  # WP23: browser checks of theme revisions. `internal`: no route out of the host; Caddy is
+  # the only other member.
+  theme-check:
+    name: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check
+    internal: true

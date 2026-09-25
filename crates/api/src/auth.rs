@@ -339,6 +339,24 @@ impl FromRequestParts<AppState> for Service {
     }
 }
 
+/// The theme builder (WP23), holding `THEME_BUILDER_TOKEN`. A separate token from the edge's
+/// `INTERNAL_API_TOKEN` (A7): neither is accepted in place of the other.
+pub struct BuilderService;
+
+impl FromRequestParts<AppState> for BuilderService {
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Error> {
+        let token = bearer(parts).ok_or(Error::Unauthorized {
+            code: "missing_token",
+        })?;
+        match &state.builder_token {
+            Some(t) if ServiceToken::new(token).0 == t.0 => Ok(Self),
+            _ => Err(invalid_token()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

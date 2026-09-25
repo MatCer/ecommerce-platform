@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT r.artifact_id, r.number FROM theme_active a\n         JOIN theme_revisions r ON r.id = a.revision_id",
+  "query": "SELECT r.artifact_id AS \"artifact_id!\", r.number FROM theme_active a\n         JOIN theme_revisions r ON r.id = a.revision_id",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "artifact_id",
+        "name": "artifact_id!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -30,9 +30,9 @@
       "Left": []
     },
     "nullable": [
-      false,
+      true,
       false
     ]
   },
-  "hash": "017a015285eeb6338e8a97dcc80efd9ff9ef260b626e31475c0da70e5a498804"
+  "hash": "fa0d08dcabaf4b5be6fee440afb6baeba1fc9adaa566ec303dd454d7225c2341"
 }

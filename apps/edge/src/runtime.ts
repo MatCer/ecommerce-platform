@@ -155,6 +155,11 @@ export class WorkerPool {
     return this.#instances.has(WorkerPool.key(id, scope));
   }
 
+  /** Artifact ids with a running instance (any scope). */
+  ids(): Set<string> {
+    return new Set([...this.#instances.keys()].map((k) => k.split("@")[0] ?? k));
+  }
+
   async #instance(id: string, scope: string | undefined): Promise<Instance> {
     const key = WorkerPool.key(id, scope);
     let pending = this.#instances.get(key);

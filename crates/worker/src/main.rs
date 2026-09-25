@@ -86,6 +86,7 @@ async fn main() -> anyhow::Result<()> {
         ai: commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?,
         webhooks,
         fio: fio_poller(env, &ops)?,
+        theme_builder: theme_builder()?,
         fulfillment: Some(fulfillment(env, &ops)?),
         ads,
     };
@@ -178,4 +179,22 @@ fn fio_poller(
             .timeout(Duration::from_secs(20))
             .build()?,
     }))
+}
+
+/// The theme builder (WP23) when both its URL and token are configured.
+fn theme_builder() -> anyhow::Result<Option<handlers::ThemeBuilder>> {
+    let cfg = platform::config::ThemeConfig::from_env()?;
+    Ok(match (cfg.builder_url, cfg.builder_token) {
+        (Some(url), Some(token)) => Some(handlers::ThemeBuilder {
+            url,
+            token,
+            http: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()?,
+        }),
+        _ => {
+            tracing::warn!("THEME_BUILDER_URL/THEME_BUILDER_TOKEN not set: theme builds wait");
+            None
+        }
+    })
 }

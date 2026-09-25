@@ -79,7 +79,9 @@ http://admin.localhost {
 # The same shops over TLS + HTTP/2 (local CA, `tls internal`), used by the performance gate:
 # production is served over h2/h3, and measuring over plain HTTP/1.1 penalises island pages
 # (6-connection limit, a TCP handshake per extra connection) by ~300-400 ms of simulated LCP.
-https://demo.localhost, https://demo-sk.localhost, https://checkout.demo.localhost, https://checkout.demo-sk.localhost {
+# `*.localhost` also covers theme previews (`preview-<n>--<shop>.localhost`, WP23): the theme
+# builder's checks measure them here, over h2, from the internal `theme-check` network.
+https://demo.localhost, https://demo-sk.localhost, https://checkout.demo.localhost, https://checkout.demo-sk.localhost, https://*.localhost {
 	tls internal
 	encode gzip
 	reverse_proxy edge:8787

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE theme_revisions r\n             SET artifact_id = NULL, status = 'failed', status_changed_at = now(),\n                 checks = CASE WHEN r.status = 'ready'\n                     THEN r.checks || jsonb_build_object('failures', $3::jsonb) ELSE r.checks END\n             WHERE r.artifact_id IS NOT NULL\n               AND r.status_changed_at < now() - make_interval(days => $1)\n               AND (r.status = 'failed'\n                    OR (r.status = 'ready' AND r.id NOT IN (\n                        SELECT id FROM theme_revisions WHERE status = 'ready'\n                        ORDER BY number DESC LIMIT $2)))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3c42381acdd64c590076f3d660e77107e2b40b5e65efce82f739b0445130c65a"
+}

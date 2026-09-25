@@ -257,6 +257,25 @@ importers:
         specifier: 0.35.4
         version: 0.35.4(@types/node@24.13.6)
 
+  apps/theme-builder:
+    dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.1.1(hono@4.13.8)
+      '@platform/theme-default':
+        specifier: workspace:*
+        version: link:../../themes/default
+      '@platform/theme-kit':
+        specifier: workspace:*
+        version: link:../../packages/theme-kit
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.63.0
+    devDependencies:
+      '@platform/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+
   e2e:
     devDependencies:
       '@axe-core/playwright':

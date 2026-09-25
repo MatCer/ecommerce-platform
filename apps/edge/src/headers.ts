@@ -51,6 +51,8 @@ export function contentSecurityPolicy(
      * pay (the checkout and the order page), never on account pages (WP11).
      */
     stripe?: boolean;
+    /** Who may frame the page (theme previews: the admin origin, A21); default nobody. */
+    frameAncestors?: string;
   },
 ): string {
   const hashes = (h: string[]) => h.map((x) => ` '${x}'`).join("");
@@ -64,7 +66,7 @@ export function contentSecurityPolicy(
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${opts.frameAncestors ?? "'none'"}`,
   ];
   if (profile === "theme") {
     return [

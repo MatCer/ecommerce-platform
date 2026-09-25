@@ -11617,6 +11617,552 @@
         ]
       }
     },
+    "/admin/v1/themes/revisions": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Revisions, newest first (at most 100), with the active one marked.",
+        "operationId": "list_revisions",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/fork": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Forks the default theme into a tenant-owned source revision and queues its build.",
+        "operationId": "fork",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "builds_in_progress | default_source_missing",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/reset": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "A new revision from the latest default theme with the shop's current design tokens.",
+        "operationId": "reset",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "builds_in_progress | default_source_missing",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/tokens": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "A revision that changes only the design tokens (`theme.tokens.json`) of a base revision\n(default: the active one). Its build skips the type check, Lighthouse and the smoke test;\nthe JS/calls budgets and axe still run.",
+        "operationId": "edit_tokens",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokensInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_tokens",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/upload": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Uploads a theme source archive (`.tar.gz`, at most 20 MB, expanded at most 50 MB) for power\nusers. Structural problems (symlinks, `..`, absolute paths, files outside `src/`,\n`public/`, `checks/`, oversize) are refused with every reason listed (A6); contract\nviolations (dependencies, foreign fetch, ...) fail the build's gates with reasons.",
+        "operationId": "upload",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/gzip": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_archive (detail: one reason per line)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/{id}": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "One revision with its check report (budget numbers, axe, smoke, failures), design tokens\nand screenshots (presigned, 5 minutes).",
+        "operationId": "get_revision",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/{id}/preview": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "A preview link for a built revision: `preview-<n>--<shop>` with an HMAC token bound to the\ntenant, the revision and a 1-hour expiry (A21). Never cached, `noindex`, no checkout.",
+        "operationId": "preview",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewLink"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_built | no_domain",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/{id}/publish": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Publishes a revision that passed the checks, or rolls back to an earlier published one:\nthe active pointer moves atomically, then the edge is purged (Admin, login at most 15\nminutes old, audited).",
+        "operationId": "publish",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "reauth_required",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_publishable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/themes/revisions/{id}/source": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "A presigned download (5 minutes) of a revision's source archive.",
+        "operationId": "source",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Download"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "no such revision, or it follows the default theme",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/webhooks": {
       "get": {
         "tags": [
@@ -12419,6 +12965,69 @@
         ]
       }
     },
+    "/internal/v1/previews/resolve": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "A preview host + token → the shop's site with the previewed revision's artifact (A21).\n404 for anything not authentic, expired, or not matching the host's tenant and revision.",
+        "operationId": "preview_resolve",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "query",
+            "description": "`preview-<n>--<shop host>` (port allowed).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "The preview token from the admin's link (A21).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewSite"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "service_token": []
+          }
+        ]
+      }
+    },
     "/internal/v1/resolve": {
       "get": {
         "tags": [
@@ -12469,6 +13078,308 @@
         "security": [
           {
             "service_token": []
+          }
+        ]
+      }
+    },
+    "/internal/v1/themes/revisions/{id}/artifact": {
+      "put": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "The built artifact as an uncompressed tar of its directory: registered (content-addressed,\nA22) and attached; the revision moves to `checking`. Returns the preview host, a preview\ntoken and the pages for the browser gates.",
+        "operationId": "build_artifact",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-tar": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckSpec"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_artifact",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "builder_token": []
+          }
+        ]
+      }
+    },
+    "/internal/v1/themes/revisions/{id}/build": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "What to build: the revision, whether it is token-only, the tenant's `ASTRO_KEY`.",
+        "operationId": "build_spec",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildSpec"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "builder_token": []
+          }
+        ]
+      }
+    },
+    "/internal/v1/themes/revisions/{id}/screenshots/{name}": {
+      "put": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "A gate screenshot (PNG; `home|category|product` × `mobile|desktop`), private bucket.",
+        "operationId": "build_screenshot",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "e.g. home-mobile",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Stored"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "builder_token": []
+          }
+        ]
+      }
+    },
+    "/internal/v1/themes/revisions/{id}/source": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "The revision's source archive (`.tar.gz`, validated when it was stored).",
+        "operationId": "build_source",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/gzip": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "builder_token": []
+          }
+        ]
+      }
+    },
+    "/internal/v1/themes/revisions/{id}/status": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Builder status callback (spec §8.4): `building`, then `failed` or (after the artifact)\n`ready`, with the gate report.",
+        "operationId": "build_status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "builder_token": []
           }
         ]
       }
@@ -20248,6 +21159,46 @@
           }
         }
       },
+      "BuildSpec": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "revision_id",
+          "number",
+          "change",
+          "status",
+          "tokens_only",
+          "astro_key_hex"
+        ],
+        "properties": {
+          "astro_key_hex": {
+            "type": "string",
+            "description": "The tenant's `ASTRO_KEY` (hex of 32 bytes): reproducible builds."
+          },
+          "change": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revision_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tokens_only": {
+            "type": "boolean",
+            "description": "Token-only change: the heavy gates (types, Lighthouse, smoke) are skipped."
+          }
+        }
+      },
       "BulkPlan": {
         "type": "object",
         "required": [
@@ -21175,6 +22126,35 @@
           "legal_pages",
           "gpsr"
         ]
+      },
+      "CheckSpec": {
+        "type": "object",
+        "description": "What the builder needs to run the browser gates against the preview.",
+        "required": [
+          "artifact_id",
+          "preview_host",
+          "preview_token",
+          "pages"
+        ],
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Pages the budgets are measured on: home, a category, a product."
+          },
+          "preview_host": {
+            "type": "string",
+            "description": "`preview-<n>--<shop>`: the checks reach it over TLS through the public proxy."
+          },
+          "preview_token": {
+            "type": "string"
+          }
+        }
       },
       "CheckStatus": {
         "type": "string",
@@ -22804,6 +23784,23 @@
           "ready",
           "failed"
         ]
+      },
+      "Download": {
+        "type": "object",
+        "description": "A presigned download (source archive).",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
       },
       "DownloadLink": {
         "type": "object",
@@ -27514,6 +28511,51 @@
         },
         "additionalProperties": false
       },
+      "PreviewLink": {
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": "string",
+            "description": "`preview-<n>--<shop>` URL carrying the token once; the edge swaps it for a cookie."
+          }
+        }
+      },
+      "PreviewSite": {
+        "type": "object",
+        "description": "What the edge serves on a preview host: the shop's site with the previewed artifact.",
+        "required": [
+          "site",
+          "revision_id",
+          "revision_number",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The token's expiry; the edge caches the answer at most until then."
+          },
+          "revision_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision_number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "site": {
+            "$ref": "#/components/schemas/Resolved"
+          }
+        }
+      },
       "PriceChangeReason": {
         "type": "string",
         "description": "Why the base prices change (recorded on the price intervals).",
@@ -29191,6 +30233,146 @@
           }
         }
       },
+      "RevisionDetail": {
+        "type": "object",
+        "required": [
+          "revision",
+          "checks",
+          "screenshots"
+        ],
+        "properties": {
+          "checks": {
+            "type": "object",
+            "description": "The builder's gate report: `pipeline`, `sandbox`, `steps[]`, `failures[]`."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/RevisionSummary"
+          },
+          "screenshots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Screenshot"
+            }
+          },
+          "tokens": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Design tokens of the built artifact (`colors`, `fonts`, `radius`), if built.",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RevisionList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RevisionSummary"
+            }
+          }
+        }
+      },
+      "RevisionSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "origin",
+          "change",
+          "status",
+          "created_by",
+          "created_at",
+          "status_changed_at",
+          "active",
+          "has_source",
+          "failures"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "The revision the shop currently serves."
+          },
+          "artifact_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "change": {
+            "type": "string",
+            "description": "`default`, `fork`, `tokens`, `upload`, `reset` or `ai`."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why the gates failed (from the check report), empty otherwise."
+          },
+          "has_source": {
+            "type": "boolean",
+            "description": "A tenant-owned source archive exists (downloadable)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "origin": {
+            "type": "string",
+            "description": "`default` (follows the shared default theme) or `custom` (tenant-owned source)."
+          },
+          "parent_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "`draft`, `building`, `checking`, `ready`, `failed`, `published` or `superseded`."
+          },
+          "status_changed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Role": {
         "type": "string",
         "description": "Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff\nmanagement or exports.",
@@ -29521,6 +30703,23 @@
           }
         },
         "additionalProperties": false
+      },
+      "Screenshot": {
+        "type": "object",
+        "required": [
+          "name",
+          "url"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "`home-mobile`, `product-desktop`, ..."
+          },
+          "url": {
+            "type": "string",
+            "description": "Presigned URL, valid for 5 minutes (A21)."
+          }
+        }
       },
       "SearchHit": {
         "type": "object",
@@ -30433,6 +31632,24 @@
           "complained"
         ]
       },
+      "StatusUpdate": {
+        "type": "object",
+        "required": [
+          "status",
+          "checks"
+        ],
+        "properties": {
+          "checks": {
+            "type": "object",
+            "description": "The gate report (JSON object, at most 256 kB)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`building`, `ready` or `failed`."
+          }
+        },
+        "additionalProperties": false
+      },
       "StockState": {
         "type": "string",
         "enum": [
@@ -31171,6 +32388,39 @@
             "minimum": 0
           }
         }
+      },
+      "TokensInput": {
+        "type": "object",
+        "required": [
+          "tokens"
+        ],
+        "properties": {
+          "base_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The revision whose source is edited; default: the active revision."
+          },
+          "tokens": {
+            "type": "object",
+            "description": "`{colors, fonts, radius}`: allowlisted keys and values (A6).",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "Tone": {
         "type": "string",
@@ -32055,6 +33305,11 @@
       }
     },
     "securitySchemes": {
+      "builder_token": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "THEME_BUILDER_TOKEN + X-Tenant-Id (theme builder only)"
+      },
       "service_token": {
         "type": "http",
         "scheme": "bearer"
@@ -32111,6 +33366,10 @@
     {
       "name": "storefront-admin",
       "description": "Admin API: redirects and the storefront token"
+    },
+    {
+      "name": "themes",
+      "description": "Admin API: theme revisions (fork, tokens, upload, reset), previews, publish and rollback"
     },
     {
       "name": "feeds",

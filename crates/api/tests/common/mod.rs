@@ -26,6 +26,8 @@ pub const X_B: &str = "21DQfDet_r7Z-araVddfSoCqc9Af3EhRfOgBskuJub0";
 pub const ISSUER: &str = "http://auth.localhost";
 pub const ADMIN_ORIGIN: &str = "http://admin.localhost:8180";
 pub const SERVICE_TOKEN: &str = "internal-test-token-0123456789abcdef";
+pub const THEME_SECRET: &str = "theme-secret-for-tests-0123456789abcdef";
+pub const BUILDER_TOKEN: &str = "theme-builder-test-token-0123456789abcdef";
 pub const FAKE_SECRET: &str = "fake-gateway-test-secret";
 pub const STRIPE_WEBHOOK_SECRET: &str = "whsec_api_test_0123456789";
 
@@ -176,6 +178,8 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
         )),
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
         mail_events: Some(api::auth::ServiceToken::new(MAIL_EVENTS_SECRET)),
+        themes: Some(commerce::themes::ThemeKeys::new(THEME_SECRET.as_bytes())),
+        builder_token: Some(api::auth::ServiceToken::new(BUILDER_TOKEN)),
         carriers: None,
     }
 }
@@ -241,6 +245,14 @@ impl<'a> Call<'a> {
             ..Self::get(uri)
         }
         .header("content-type", content_type.to_owned())
+    }
+
+    /// A PUT with a raw body and content type (builder uploads).
+    pub fn put_raw(uri: &'a str, body: impl Into<Vec<u8>>, content_type: &str) -> Self {
+        Self {
+            method: "PUT",
+            ..Self::post_raw(uri, body, content_type)
+        }
     }
 
     pub fn header(mut self, name: &'a str, value: impl Into<String>) -> Self {

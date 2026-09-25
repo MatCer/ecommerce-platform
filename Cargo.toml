@@ -64,6 +64,10 @@ mrml = { version = "6.0.1", default-features = false, features = ["parse", "rend
 # WP11 bank-transfer QR codes: QR matrix + SVG, CRC32 (already in the tree through png).
 qrcode = { version = "0.14.1", default-features = false, features = ["svg"] }
 crc32fast = "1.5.0"
+# WP23 theme source archives (A6): tar.gz read/write; flate2 and regex are already in the tree.
+tar = { version = "0.4.46", default-features = false }
+flate2 = "1.1.10"
+regex = "1.13.1"
 base64 = "0.23.1"
 
 [workspace.lints.rust]

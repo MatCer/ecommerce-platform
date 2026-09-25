@@ -53,6 +53,7 @@ const Campaigns = lazy(() => import("./pages/Campaigns.tsx"));
 const CampaignEditor = lazy(() => import("./pages/CampaignEditor.tsx"));
 const Emails = lazy(() => import("./pages/Emails.tsx"));
 const EmailBranding = lazy(() => import("./pages/EmailBranding.tsx"));
+const Themes = lazy(() => import("./pages/Themes.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -113,6 +114,7 @@ export function App() {
           <Route path="/content/menus" component={ContentMenus} />
           <Route path="/content/legal" component={ContentLegal} />
           <Route path="/content/redirects" component={Redirects} />
+          <Route path="/themes" component={Themes} />
           <Route path="/imports" component={Imports} />
           <Route path="/imports/:id" component={Imports} />
           <Route path="/feeds" component={ExportFeeds} />

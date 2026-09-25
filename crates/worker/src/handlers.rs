@@ -12,6 +12,7 @@ use commerce::pricing::intervals;
 use commerce::search::{self, Meili, index::Rebuilt};
 use commerce::storefront::PublicUrls;
 use commerce::storefront::purge::{self, Purge};
+use commerce::themes;
 use platform::auth_service::AuthService;
 use platform::crypto::SecretBox;
 use platform::edge::EdgePurge;
@@ -57,8 +58,18 @@ pub struct Extra {
     pub ads: Option<commerce::adtracking::AdTracking>,
     /// WP11: the Fio API poller (token key, API base URL).
     pub fio: Option<Fio>,
+    /// WP23: the theme builder (`THEME_BUILDER_URL` + `THEME_BUILDER_TOKEN`).
+    pub theme_builder: Option<ThemeBuilder>,
     /// WP12: carriers (tracking), the ČNB client and the Typst renderer.
     pub fulfillment: Option<Fulfillment>,
+}
+
+/// Hands revisions to the theme builder (WP23). Not `Debug`: it holds the service token.
+#[derive(Clone)]
+pub struct ThemeBuilder {
+    pub url: reqwest::Url,
+    pub token: String,
+    pub http: reqwest::Client,
 }
 
 /// Carrier tracking, ČNB rates, PDF rendering and refund payouts (WP12).
@@ -90,6 +101,7 @@ impl Extra {
             ai: Ai::fake(),
             webhooks: None,
             fio: None,
+            theme_builder: None,
             fulfillment: None,
             ads: None,
         })
@@ -128,6 +140,8 @@ pub fn all(
     let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
     let (ai1, ai2) = (extra.ai.clone(), extra.ai.clone());
+    let theme_builder = extra.theme_builder.clone();
+    let theme_storage = storage.clone();
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
     let (urls2, urls3, urls4, urls5) = (urls.clone(), urls.clone(), urls.clone(), urls.clone());
@@ -226,6 +240,62 @@ pub fn all(
             ai_plan(ctx, job, ai2.clone())
         })
         .register(plan::APPLY_JOB, ai_apply)
+        .register(themes::BUILD_JOB, move |_ctx, job| {
+            theme_build(job, theme_builder.clone())
+        })
+        .register(themes::MAINTENANCE_JOB, move |ctx, job| {
+            theme_maintenance(ctx, job, theme_storage.clone())
+        })
+}
+
+/// WP23: asks the theme builder to build a revision. The builder answers 202 at once and
+/// reports progress through its own callbacks; a revision it never picks up is failed by the
+/// maintenance job after 30 minutes.
+async fn theme_build(job: Job, builder: Option<ThemeBuilder>) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent("themes.build without tenant".into()))?;
+    let revision = job
+        .payload
+        .get("revision_id")
+        .and_then(|v| v.as_str())
+        .and_then(|v| Uuid::try_parse(v).ok())
+        .ok_or_else(|| JobError::Permanent("themes.build without revision_id".into()))?;
+    let b = builder.ok_or_else(|| {
+        JobError::Permanent("theme builder not configured (THEME_BUILDER_URL/TOKEN)".into())
+    })?;
+    let url = b
+        .url
+        .join("builds")
+        .map_err(|e| JobError::Permanent(e.to_string()))?;
+    let res = b
+        .http
+        .post(url)
+        .bearer_auth(&b.token)
+        .json(&serde_json::json!({ "tenant_id": tenant, "revision_id": revision }))
+        .send()
+        .await
+        .map_err(|e| JobError::Retry(format!("theme builder unreachable: {e}")))?;
+    let status = res.status();
+    if status.is_success() {
+        tracing::info!(%tenant, %revision, "theme build handed to the builder");
+        Ok(())
+    } else if status.is_client_error() && status != reqwest::StatusCode::TOO_MANY_REQUESTS {
+        Err(JobError::Permanent(format!(
+            "theme builder refused the build: {status}"
+        )))
+    } else {
+        Err(JobError::Retry(format!("theme builder answered {status}")))
+    }
+}
+
+/// Hourly (WP23): stuck builds fail, artifacts nobody references are deleted.
+async fn theme_maintenance(ctx: Ctx, _job: Job, storage: Storage) -> Result<(), JobError> {
+    let report = themes::maintenance(&ctx.db, &storage)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    tracing::info!(?report, "theme maintenance done");
+    Ok(())
 }
 
 /// A11: processes one stored provider event. Mismatches are recorded on the event (never
