@@ -983,6 +983,12 @@ describe("analytics (A20) and client addresses (§8.1)", () => {
       const sent = api.calls.find((c) => c.url.endsWith("/storefront/v1/events"));
       expect(sent?.headers["x-consent-subject"]).toBe("c".repeat(32)); // the cookie, not a header
       expect(sent?.headers["x-client-ip"]).toBe("198.51.100.4");
+
+      // A rate-limited API answer keeps its Retry-After through the edge (§8.1).
+      const limited = await hit("http://demo.localhost:8280/_p/public/pages/product/limited");
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("retry-after")).toBe("7");
+      expect(limited.headers.get("content-type")).toBe("application/problem+json");
     } finally {
       await counted.dispose();
     }

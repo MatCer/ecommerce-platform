@@ -580,7 +580,7 @@ export function createGateway(opts: GatewayOptions) {
     else if (res.ok && session) headers.append("set-cookie", sessionCookie(session));
     return new Response(res.status === 204 ? null : await res.arrayBuffer(), {
       status: res.status,
-      headers,
+      headers: withRetryAfter(res, headers),
     });
   }
 
@@ -638,7 +638,10 @@ export function createGateway(opts: GatewayOptions) {
     });
     const replayed = res.headers.get("idempotent-replayed");
     if (replayed) headers.set("idempotent-replayed", replayed);
-    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, headers),
+    });
   }
 
   /**
@@ -782,7 +785,10 @@ ${
         "set-cookie",
         `${CONSENT_COOKIE}=${encodeURIComponent(summary)}; ${scope}; Max-Age=${CONSENT_MAX_AGE}`,
       );
-    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, headers),
+    });
   }
 
   async function cartProxy(
@@ -856,7 +862,10 @@ ${
       // Expiry counts from the last use (§10.3): every successful use renews the cookie.
       headers.append("set-cookie", cartCookie(token));
     }
-    return new Response(await res.arrayBuffer(), { status: res.status, headers });
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, headers),
+    });
   }
 
   async function checkoutStart(
@@ -911,10 +920,10 @@ ${
     );
     return new Response(await res.arrayBuffer(), {
       status: res.status,
-      headers: {
+      headers: withRetryAfter(res, {
         "content-type": res.headers.get("content-type") ?? "application/json",
         "cache-control": "no-store",
-      },
+      }),
     });
   }
 
@@ -991,10 +1000,10 @@ ${
     );
     return new Response(await res.arrayBuffer(), {
       status: res.status,
-      headers: {
+      headers: withRetryAfter(res, {
         "content-type": res.headers.get("content-type") ?? "application/json",
         "cache-control": "no-store",
-      },
+      }),
     });
   }
 
@@ -1331,6 +1340,14 @@ function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Prom
       }, ms);
     }),
   ]).finally(() => clearTimeout(timer));
+}
+
+/** API answers keep a rate limit's `Retry-After` (spec §8.1) when proxied. */
+function withRetryAfter(res: Response, init: HeadersInit): Headers {
+  const headers = new Headers(init);
+  const retry = res.headers.get("retry-after");
+  if (res.status === 429 && retry && /^\d{1,5}$/.test(retry)) headers.set("retry-after", retry);
+  return headers;
 }
 
 function safeHost(url: string) {
