@@ -296,17 +296,16 @@ async fn granted(tx: &mut TenantTx, subject: &str) -> Result<Option<Vec<String>>
     ))
 }
 
-/// A beacon body (`{"events": [...], "path": "/..."}`): the valid events (at most
-/// [`MAX_BATCH`]) and the page path the client claims (checked by whoever uses it).
-pub fn parse_batch(body: &[u8]) -> (Vec<CleanEvent>, Option<String>) {
-    let v = serde_json::from_slice::<Value>(body).unwrap_or_default();
-    let events = v
-        .get("events")
-        .and_then(Value::as_array)
-        .map(|a| a.iter().take(MAX_BATCH).filter_map(clean_event).collect())
-        .unwrap_or_default();
-    let path = v.get("path").and_then(Value::as_str).map(str::to_owned);
-    (events, path)
+/// The valid events of a beacon body (`{"events": [...]}`), at most [`MAX_BATCH`].
+pub fn parse_batch(body: &[u8]) -> Vec<CleanEvent> {
+    serde_json::from_slice::<Value>(body)
+        .ok()
+        .and_then(|v| v.get("events").and_then(Value::as_array).cloned())
+        .unwrap_or_default()
+        .iter()
+        .take(MAX_BATCH)
+        .filter_map(clean_event)
+        .collect()
 }
 
 /// Stores a beacon batch when the subject granted `analytics`; returns how many events were
@@ -324,7 +323,7 @@ pub async fn ingest(
     let Some(purposes) = granted(tx, subject).await? else {
         return Ok(0);
     };
-    let mut events = parse_batch(body).0;
+    let mut events = parse_batch(body);
     if events.is_empty() {
         return Ok(0);
     }

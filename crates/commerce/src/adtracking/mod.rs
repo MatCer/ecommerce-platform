@@ -883,7 +883,7 @@ pub async fn cancel_for_subject(tx: &mut TenantTx, subject: &Subject) -> Result<
         "UPDATE ad_deliveries
          SET status = 'cancelled', last_error = 'ads consent withdrawn', user_agent = NULL,
              finished_at = now(), updated_at = now()
-         WHERE status IN ('pending', 'retrying', 'paused')
+         WHERE status IN ('pending', 'retrying', 'paused', 'sending')
            AND (subject = $1 OR customer_id = $2)",
         anon,
         customer
@@ -969,44 +969,16 @@ async fn insert(
     Ok(n)
 }
 
-/// A page path from the beacon, minimized: without query or fragment, and only if it looks
-/// like a catalog page (lowercase slug segments). Paths that can carry identifiers or
-/// capabilities (order pages, account, checkout, anything with `@`, `%`, tokens) become `/`.
-fn clean_path(p: Option<&str>) -> String {
-    const PRIVATE: [&str; 6] = ["o", "account", "checkout", "cart", "_p", "consent"];
-    let Some(p) = p.and_then(|p| p.split(['?', '#']).next()) else {
-        return "/".into();
-    };
-    let Some(rest) = p.strip_prefix('/') else {
-        return "/".into();
-    };
-    let segments: Vec<&str> = rest.split('/').collect();
-    let slug = |s: &str| {
-        (1..=100).contains(&s.len())
-            && s.bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-            // Long hex runs are tokens, not slugs.
-            && !(s.len() >= 24 && s.bytes().all(|b| b.is_ascii_hexdigit()))
-    };
-    let ok = p.len() <= 300
-        && segments.len() <= 6
-        && !PRIVATE.contains(&segments[0])
-        && segments
-            .iter()
-            .enumerate()
-            .all(|(i, s)| slug(s) || (s.is_empty() && i == segments.len() - 1));
-    if ok { p.to_owned() } else { "/".into() }
-}
-
 /// Browser-side events of a visitor (the beacon, and the cart steps the API records itself):
 /// forwarded only while the subject grants `ads`. Props: the catalog SKUs (the ids the export
-/// feeds use), the quantity and the page path.
+/// feeds use), the quantity and the page, derived here from the catalog (the product page in
+/// the market's default locale, else the home page): paths a client reports are never stored,
+/// so no identifier or capability in a URL can reach a vendor.
 pub async fn capture_events(
     tx: &mut TenantTx,
     market: Uuid,
     subject: Option<&str>,
     events: &[CleanEvent],
-    page_path: Option<&str>,
     user_agent: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<usize, Error> {
@@ -1017,7 +989,6 @@ pub async fn capture_events(
     if platforms.is_empty() || !ads_allowed(tx, subject, None).await? {
         return Ok(0);
     }
-    let path = clean_path(page_path);
     let mut n = 0;
     for e in events {
         if !matches!(
@@ -1027,20 +998,46 @@ pub async fn capture_events(
             continue;
         }
         let uuid = |k: &str| e.props[k].as_str().and_then(|s| Uuid::parse_str(s).ok());
-        let skus: Vec<String> = if let Some(variant) = uuid("variant_id") {
-            sqlx::query_scalar!("SELECT sku FROM variants WHERE id = $1", variant)
-                .fetch_all(&mut **tx)
-                .await?
-        } else if let Some(product) = uuid("product_id") {
-            sqlx::query_scalar!(
-                "SELECT sku FROM variants WHERE product_id = $1 ORDER BY position, id LIMIT 20",
-                product
-            )
-            .fetch_all(&mut **tx)
-            .await?
-        } else {
-            vec![]
+        let variant = uuid("variant_id");
+        let product = match (uuid("product_id"), variant) {
+            (Some(p), _) => Some(p),
+            (None, Some(v)) => {
+                sqlx::query_scalar!("SELECT product_id FROM variants WHERE id = $1", v)
+                    .fetch_optional(&mut **tx)
+                    .await?
+            }
+            (None, None) => None,
         };
+        let skus: Vec<String> =
+            match (variant, product) {
+                (Some(v), _) => {
+                    sqlx::query_scalar!("SELECT sku FROM variants WHERE id = $1", v)
+                        .fetch_all(&mut **tx)
+                        .await?
+                }
+                (None, Some(p)) => sqlx::query_scalar!(
+                    "SELECT sku FROM variants WHERE product_id = $1 ORDER BY position, id LIMIT 20",
+                    p
+                )
+                .fetch_all(&mut **tx)
+                .await?,
+                (None, None) => vec![],
+            };
+        let slug = match product {
+            Some(p) => {
+                sqlx::query_scalar!(
+                    "SELECT pt.slug FROM product_translations pt
+                     JOIN markets m ON m.id = $2 AND pt.locale = m.default_locale
+                     WHERE pt.product_id = $1",
+                    p,
+                    market
+                )
+                .fetch_optional(&mut **tx)
+                .await?
+            }
+            None => None,
+        };
+        let path = slug.map_or_else(|| "/".to_owned(), |s| format!("/p/{s}"));
         let mut props = json!({ "path": path });
         if !skus.is_empty() {
             props["skus"] = json!(skus);
@@ -1508,9 +1505,11 @@ async fn claim_send(
         let why = "ads consent not granted at send time";
         finish_in(&mut tx, id, "cancelled", None, None, Some(why)).await?;
         Some(Outcome::Cancelled)
-    } else {
-        finish_in(&mut tx, id, "sending", Some(attempt), None, None).await?;
+    } else if finish_in(&mut tx, id, "sending", Some(attempt), None, None).await? {
         None
+    } else {
+        // Cancelled (or finished) between the reads and this update.
+        Some(Outcome::Stale)
     };
     tx.commit().await?;
     Ok(outcome)
@@ -1917,26 +1916,6 @@ mod tests {
             classify(401),
             Err(Failure::Permanent(Some(401), _))
         ));
-    }
-
-    #[test]
-    fn page_paths_are_minimized() {
-        assert_eq!(clean_path(Some("/p/tee?utm=x#top")), "/p/tee");
-        assert_eq!(clean_path(Some("/sk/c/oblecenie/")), "/sk/c/oblecenie/");
-        assert_eq!(clean_path(Some("/")), "/");
-        for private in [
-            "//evil.example/x",
-            "https://x/",
-            "/alice@example.com",
-            "/p/alice%40example.com",
-            "/o/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            "/account/orders",
-            "/p/0123456789abcdef0123456789abcdef",
-            "/P/Tee",
-        ] {
-            assert_eq!(clean_path(Some(private)), "/", "{private}");
-        }
-        assert_eq!(clean_path(None), "/");
     }
 
     #[test]

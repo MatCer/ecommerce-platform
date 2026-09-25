@@ -21,8 +21,8 @@ CREATE TABLE ad_platforms (
 
 -- One forwarding of one event to one platform. Minimized on purpose: the consent subject
 -- (pseudonymous, needed to re-check `ads` at send time), the customer (so a refusal on the
--- account also stops it), the order, allowlisted props (product/variant ids, quantity, page
--- path) and the user agent (Meta requires it for website events; cleared once finished).
+-- account also stops it), the order, allowlisted props (SKUs, quantity, the catalog page it
+-- happened on) and the user agent (Meta requires it for website events; cleared once finished).
 -- Email and phone are read from the order and hashed only when sending: no raw PII here.
 -- `event_id` is shared by the platforms of one event and sent as the vendor's dedupe key.
 CREATE TABLE ad_deliveries (

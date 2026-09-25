@@ -20,7 +20,7 @@ per-tenant encrypted credentials, admin settings and local mocks.
     platform that takes the event, with a stable `event_id` (dedupe key sent to vendors) and
     enqueue a `adtracking.deliver` job. Only if `ads` is granted at capture time; nothing
     identifying is stored: the row keeps the consent subject (pseudonymous), the order id,
-    minimized props (product/variant ids, quantity, page path) and the user agent (needed by
+    minimized props (SKUs, quantity, the catalog page) and the user agent (needed by
     Meta for website events, dropped when the delivery finishes).
   - deliver: re-checks consent (anon subject grants `ads`, the customer has not refused it),
     builds the vendor payload at send time (email/phone read from the order and hashed in

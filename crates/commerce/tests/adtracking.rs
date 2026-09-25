@@ -358,17 +358,10 @@ async fn only_consented_subjects_are_captured(db: PgPool) {
     let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
     let now = chrono::Utc::now();
     for (who, expected) in [(&no, 0), (&unknown, 0), (&yes, 4)] {
-        let n = adtracking::capture_events(
-            &mut tx,
-            s.cz,
-            Some(who.as_str()),
-            &events,
-            Some("/p/tee?utm_source=x"),
-            Some("UA"),
-            now,
-        )
-        .await
-        .unwrap();
+        let n =
+            adtracking::capture_events(&mut tx, s.cz, Some(who.as_str()), &events, Some("UA"), now)
+                .await
+                .unwrap();
         assert_eq!(n, expected, "page_view + view_item to Meta and GA4 only");
     }
     let props: Value = sqlx::query_scalar(
@@ -377,7 +370,10 @@ async fn only_consented_subjects_are_captured(db: PgPool) {
     .fetch_one(&mut *tx)
     .await
     .unwrap();
-    assert_eq!(props["path"], "/p/tee");
+    assert_eq!(
+        props["path"], "/p/tee-cs",
+        "the product page from the catalog"
+    );
     assert_eq!(
         props["skus"].as_array().unwrap().len(),
         2,

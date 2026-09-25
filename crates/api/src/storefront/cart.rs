@@ -211,16 +211,8 @@ async fn track(s: &AppState, shopper: &Shopper, headers: &HeaderMap, event: &ser
         let events: Vec<_> = commerce::analytics::clean_event(event)
             .into_iter()
             .collect();
-        commerce::adtracking::capture_events(
-            tx,
-            ctx.market.id,
-            Some(subject),
-            &events,
-            None,
-            ua,
-            ctx.now,
-        )
-        .await
+        commerce::adtracking::capture_events(tx, ctx.market.id, Some(subject), &events, ua, ctx.now)
+            .await
     })
     .await;
     if let Err(e) = stored {
@@ -450,17 +442,10 @@ async fn events(
             commerce::analytics::ingest(tx, ctx.market.id, subject, &body, ctx.now).await?;
         // WP20: the same events go to the ad platforms only while the subject grants `ads`
         // (resolved from the consent records here and again when sending).
-        let (events, path) = commerce::analytics::parse_batch(&body);
-        let forwarded = commerce::adtracking::capture_events(
-            tx,
-            ctx.market.id,
-            subject,
-            &events,
-            path.as_deref(),
-            ua,
-            ctx.now,
-        )
-        .await?;
+        let events = commerce::analytics::parse_batch(&body);
+        let forwarded =
+            commerce::adtracking::capture_events(tx, ctx.market.id, subject, &events, ua, ctx.now)
+                .await?;
         Ok((stored, forwarded))
     })
     .await?;
