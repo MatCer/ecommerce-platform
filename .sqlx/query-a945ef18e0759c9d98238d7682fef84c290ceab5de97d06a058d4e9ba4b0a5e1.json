@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.id, a.currency FROM payment_attempts a JOIN orders o ON o.id = a.order_id\n                 WHERE o.number = $1 AND a.method = 'bank_transfer'\n                 ORDER BY a.created_at DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payment_attempts",
+            "name": "currency"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a945ef18e0759c9d98238d7682fef84c290ceab5de97d06a058d4e9ba4b0a5e1"
+}

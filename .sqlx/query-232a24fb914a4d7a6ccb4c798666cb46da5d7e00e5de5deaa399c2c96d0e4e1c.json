@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT status, attempt_id FROM bank_transactions WHERE id = $1 FOR UPDATE",
+  "query": "SELECT status, attempt_id, currency FROM bank_transactions WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -24,6 +24,17 @@
             "name": "attempt_id"
           }
         }
+      },
+      {
+        "ordinal": 2,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bank_transactions",
+            "name": "currency"
+          }
+        }
       }
     ],
     "parameters": {
@@ -33,8 +44,9 @@
     },
     "nullable": [
       false,
-      true
+      true,
+      false
     ]
   },
-  "hash": "43c2ee6df566d3cebbbe56d38a50795eaf9f18d7b58119fa988b06f8ec2d1704"
+  "hash": "232a24fb914a4d7a6ccb4c798666cb46da5d7e00e5de5deaa399c2c96d0e4e1c"
 }
