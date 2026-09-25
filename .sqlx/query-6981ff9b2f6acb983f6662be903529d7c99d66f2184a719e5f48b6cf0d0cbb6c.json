@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT product_b AS \"id!\", sum(count_90d)::float8 AS \"score!\"\n                   FROM co_purchases WHERE product_a = ANY($1)\n                   GROUP BY product_b ORDER BY 2 DESC, 1 LIMIT $2 OFFSET $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "co_purchases",
+            "name": "product_b"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "score!",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "6981ff9b2f6acb983f6662be903529d7c99d66f2184a719e5f48b6cf0d0cbb6c"
+}

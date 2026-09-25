@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH consenting AS (\n               SELECT subject_id FROM (\n                   SELECT DISTINCT ON (subject_id) subject_id, granted FROM consent_records\n                   WHERE subject_type = 'customer' AND purpose = 'personalization'\n                   ORDER BY subject_id, at DESC, id DESC\n               ) latest WHERE granted\n           ), bought AS (\n               SELECT o.customer_id, l.product_id,\n                      sum(l.quantity * power(0.5, extract(epoch FROM $2 - o.placed_at)::float8\n                                                  / 86400.0 / $3)) AS w\n               FROM orders o JOIN order_lines l ON l.order_id = o.id\n               WHERE o.customer_id IS NOT NULL AND o.status <> 'cancelled'\n                 AND o.placed_at > $2 - make_interval(days => $4::int) AND o.placed_at <= $2\n                 AND l.product_id IS NOT NULL\n                 AND o.customer_id::text IN (SELECT subject_id FROM consenting)\n               GROUP BY o.customer_id, l.product_id\n           )\n           INSERT INTO customer_affinity (tenant_id, customer_id, dim, key, score)\n           SELECT $1::uuid, b.customer_id, 'category', pc.category_id::text, sum(b.w)\n           FROM bought b JOIN product_categories pc ON pc.product_id = b.product_id\n           GROUP BY b.customer_id, pc.category_id\n           UNION ALL\n           SELECT $1::uuid, b.customer_id, 'brand', p.brand, sum(b.w)\n           FROM bought b JOIN products p ON p.id = b.product_id\n           WHERE p.brand IS NOT NULL\n           GROUP BY b.customer_id, p.brand",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Float8",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ef1b4e78075de206352a7a5b38225f9ae55fcc177cb4bc6bbdd6fc59a8caf988"
+}

@@ -37,6 +37,8 @@ export type Facet = S["FacetView"];
 export type ListingPage = S["ListingPage"];
 export type HomePage = S["HomePage"];
 export type Recommendations = S["Recommendations"];
+/** Where recommended products come from (`bought_together`, `bestsellers`, `personalized`, ...). */
+export type RecommendationStrategy = S["Strategy"];
 /** Typeahead (WP7): matching categories first, then products (`SearchHit`). */
 export type SearchSuggest = S["Suggestions"];
 /** Full search results with variant-correct facets (WP7, A23). */

@@ -219,6 +219,32 @@ pub async fn find(
     })
 }
 
+/// The products in the open shop cart behind `token`, for cross-sell (WP17). Read-only: no
+/// lock and no activity bump, so a recommendation read never extends or blocks a cart. An
+/// unknown, expired or other-market capability reads as an empty cart.
+pub async fn product_ids(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<Vec<Uuid>, Error> {
+    if !capability::well_formed(token) {
+        return Ok(Vec::new());
+    }
+    Ok(sqlx::query_scalar!(
+        r#"SELECT DISTINCT v.product_id AS "product_id!"
+           FROM carts c
+           JOIN cart_lines l ON l.cart_id = c.id
+           JOIN variants v ON v.id = l.variant_id
+           WHERE c.shop_token_hash = $1 AND c.status = 'open' AND c.market_id = $2
+             AND c.last_activity_at > $3"#,
+        capability::hash(token),
+        ctx.market.id,
+        Utc::now() - Duration::days(IDLE_DAYS)
+    )
+    .fetch_all(&mut **tx)
+    .await?)
+}
+
 /// The cart behind a **checkout** capability for order placement, locked for the rest of the
 /// transaction (A12), whether still open or already converted (an idempotent replay of
 /// place-order must find it). Returns the cart and whether it is still open.

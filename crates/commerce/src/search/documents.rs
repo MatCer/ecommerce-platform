@@ -126,6 +126,8 @@ pub struct ProductData {
     pub active: bool,
     pub brand: Option<String>,
     pub created_at: i64,
+    /// Time-decayed sales/interest score from the recommendation rollups (WP17).
+    pub popularity: i32,
     /// locale → (name, description html)
     pub translations: BTreeMap<String, (String, String)>,
     /// option code → value code → locale → label
@@ -180,7 +182,10 @@ pub async fn load_products(
     now: DateTime<Utc>,
 ) -> Result<Vec<ProductData>, Error> {
     let mut products: BTreeMap<Uuid, ProductData> = sqlx::query!(
-        "SELECT id, status, brand, created_at FROM products WHERE id = ANY($1)",
+        r#"SELECT p.id, p.status, p.brand, p.created_at,
+                  coalesce(pp.popularity, 0) AS "popularity!"
+           FROM products p LEFT JOIN product_popularity pp ON pp.product_id = p.id
+           WHERE p.id = ANY($1)"#,
         ids
     )
     .fetch_all(&mut **tx)
@@ -194,6 +199,7 @@ pub async fn load_products(
                 active: r.status == "active",
                 brand: r.brand,
                 created_at: r.created_at.timestamp(),
+                popularity: r.popularity,
                 ..Default::default()
             },
         )
@@ -433,8 +439,7 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
                 "in_stock": v.in_stock,
                 "active_in_markets": markets,
                 "is_default": v.is_default,
-                // ponytail: placeholder until the analytics rollups (WP14) feed sales counts.
-                "popularity": 0,
+                "popularity": p.popularity,
                 "created_at": p.created_at,
             });
             out.entry(locale.clone()).or_default().push(doc);
@@ -529,6 +534,7 @@ mod tests {
             active: true,
             brand: Some("Acme".into()),
             created_at: 1,
+            popularity: 42,
             translations: [(
                 "cs".to_owned(),
                 (
@@ -589,6 +595,7 @@ mod tests {
         assert_eq!(cs[1]["active_in_markets"], json!(["cz"]));
         assert_eq!(red["skus"], json!(["TS-1"]));
         assert_eq!(red["eans"], json!([]));
+        assert_eq!(red["popularity"], json!(42));
     }
 
     #[test]

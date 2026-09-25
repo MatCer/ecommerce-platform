@@ -84,7 +84,7 @@ edge: preview-<n>--<shop> ─► GET /internal/v1/previews/resolve (edge token) 
 ## Tasks
 
 ### 1. Migration + domain model (`commerce::themes`)
-Files: `migrations/20261013230000_theme_builder.sql`, `crates/commerce/src/themes.rs`
+Files: `migrations/20261012230000_theme_builder.sql`, `crates/commerce/src/themes.rs`
 (+ `themes/archive.rs`, `themes/preview.rs`), `crates/commerce/tests/themes.rs`.
 - `theme_revisions`: `artifact_id` nullable, `source_key`, `change`
   (`default|fork|tokens|upload|reset|ai`), `prompt`, `status_changed_at`, CHECKs (artifact

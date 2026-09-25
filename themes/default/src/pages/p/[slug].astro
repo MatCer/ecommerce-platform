@@ -1,5 +1,4 @@
 ---
-import { imageUrl } from "@platform/storefront-sdk/format";
 import Breadcrumbs from "../../components/Breadcrumbs.astro";
 import ProductDetails from "../../components/ProductDetails.astro";
 import RecommendationSlot from "../../components/RecommendationSlot.astro";
@@ -18,10 +17,12 @@ if (!page) return Astro.rewrite("/404");
 const { product: p } = page;
 const { t, pick } = i18n(shop);
 // An optional slot must never take the page down with it.
-const recommended = await sf
-  .recommendations(`product:${p.id}`)
-  .then((r) => r.products)
-  .catch(() => []);
+const recommended = await sf.recommendations(`product:${p.id}`, { limit: 4 }).catch(() => null);
+const recommendedTitle =
+  recommended?.title ??
+  t(
+    recommended?.strategy === "bought_together" ? "product.bought_together" : "product.recommended",
+  );
 const firstImage = p.images[0];
 const BUY_KEYS = [
   "price.current",
@@ -63,12 +64,7 @@ const BUY_KEYS = [
     </div>
 
     <ProductDetails product={p} shop={shop} />
-    <RecommendationSlot products={recommended} shop={shop} title={t("product.recommended")} id="recommended" />
-    <RecentlyViewed
-      client:idle
-      title={t("product.recently_viewed")}
-      base={shop.base_path}
-      current={{ slug: p.slug, name: p.name, image: firstImage && imageUrl(firstImage, 360) }}
-    />
+    <RecommendationSlot products={recommended?.products ?? []} shop={shop} title={recommendedTitle} id="recommended" />
+    <RecentlyViewed client:idle title={t("product.recently_viewed")} base={shop.base_path} current={p.id} labels={pick(["product.price_from"])} />
   </div>
 </Base>

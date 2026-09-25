@@ -54,6 +54,8 @@ pub struct Extra {
     pub urls: PublicUrls,
     pub ai: Ai,
     pub webhooks: Option<commerce::webhooks::Webhooks>,
+    /// Ad-platform forwarding (WP20); `None` without `SECRETS_KEY`.
+    pub ads: Option<commerce::adtracking::AdTracking>,
     /// WP11: the Fio API poller (token key, API base URL).
     pub fio: Option<Fio>,
     /// WP23: the theme builder (`THEME_BUILDER_URL` + `THEME_BUILDER_TOKEN`).
@@ -88,6 +90,7 @@ impl Extra {
             webhooks: None,
             fio: None,
             theme_builder: None,
+            ads: None,
         })
     }
 }
@@ -100,8 +103,10 @@ pub const PAYMENTS_EXPIRE: &str = "payments.expire";
 pub const PAYMENTS_REMIND: &str = "payments.remind";
 /// Downloads new transactions of accounts with a Fio API token and matches them (A25).
 pub const PAYMENTS_FIO_POLL: &str = "payments.fio_poll";
+pub use commerce::adtracking::{DELIVER_JOB as AD_DELIVER_JOB, REFUND_JOB as AD_REFUND_JOB};
 pub use commerce::analytics::{PARTITIONS_JOB, ROLLUP_JOB};
 pub use commerce::ops::SWEEP_JOB;
+pub use commerce::recommendations::ROLLUP_JOB as RECOMMENDATIONS_ROLLUP;
 pub use commerce::webhooks::{DELIVER_JOB, FANOUT_JOB};
 
 pub fn all(
@@ -117,6 +122,7 @@ pub fn all(
     let sweep_storage = storage.clone();
     let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
     let webhooks = extra.webhooks.clone();
+    let ads = extra.ads.clone();
     let (ai1, ai2) = (extra.ai.clone(), extra.ai.clone());
     let theme_builder = extra.theme_builder.clone();
     let theme_storage = storage.clone();
@@ -169,10 +175,15 @@ pub fn all(
         })
         .register(ROLLUP_JOB, analytics_rollup)
         .register(PARTITIONS_JOB, analytics_partitions)
+        .register(RECOMMENDATIONS_ROLLUP, recommendations_rollup)
         .register(FANOUT_JOB, webhooks_fanout)
         .register(DELIVER_JOB, move |ctx, job| {
             webhooks_deliver(ctx, job, webhooks.clone())
         })
+        .register(AD_DELIVER_JOB, move |ctx, job| {
+            ad_deliver(ctx, job, ads.clone())
+        })
+        .register(AD_REFUND_JOB, ad_refund)
         .register(SWEEP_JOB, move |ctx, job| {
             ops_sweep(ctx, job, sweep_storage.clone(), m5.clone())
         })
@@ -576,6 +587,9 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let customer_auth = sqlx::query_scalar!(r#"SELECT platform.purge_customer_auth() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
+    let ad_deliveries = sqlx::query_scalar!(r#"SELECT platform.purge_ad_deliveries() AS "n!""#)
+        .fetch_one(&ctx.db)
+        .await?;
     // A14: deliveries whose job died (or whose worker died mid-send) get a new job.
     let stalled = notifications::reconcile_jobs(&ctx.db)
         .await
@@ -589,6 +603,7 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         idempotency_keys = keys,
         zero_results,
         customer_auth,
+        ad_deliveries,
         "cleanup done"
     );
     Ok(())
@@ -710,6 +725,65 @@ async fn analytics_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
     Ok(())
 }
 
+/// Above this many changed products one index rebuild replaces the per-product jobs.
+const REINDEX_REBUILD_OVER: usize = 1000;
+
+/// Hourly (WP17): product stats of today and yesterday (everything retained, 400 days, at the
+/// 03:00 UTC slot, on a tenant's first run or on a `backfill` request), co-purchases,
+/// scores, customer affinity; then reindexes the products whose search popularity moved. The
+/// rollup marks them; a second transaction takes the marks and enqueues the jobs, so their
+/// version is drawn after the change committed (A27) and a crash in between only delays them.
+async fn recommendations_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    use commerce::recommendations::rollup;
+    let now = chrono::Utc::now();
+    let slot = job.payload.get("slot").and_then(serde_json::Value::as_i64);
+    let nightly = slot.is_some_and(|s| s.rem_euclid(24) == 3);
+    let backfill = job.payload.get("backfill") == Some(&serde_json::Value::Bool(true));
+    let tenants = match job.tenant_id {
+        Some(t) => vec![t],
+        None => {
+            sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+                .fetch_all(&ctx.db)
+                .await?
+        }
+    };
+    let retry = |e: platform::Error| JobError::Retry(e.to_string());
+    for tenant in &tenants {
+        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
+        let days = if backfill || !rollup::has_stats(&mut tx).await.map_err(retry)? {
+            rollup::BACKFILL_DAYS
+        } else if nightly {
+            rollup::NIGHTLY_DAYS
+        } else {
+            2
+        };
+        rollup::run(&mut tx, now, days).await.map_err(retry)?;
+        tx.commit().await?;
+
+        let mut tx = platform::db::tenant_tx(&ctx.db, *tenant).await?;
+        let changed = rollup::take_reindex(&mut tx).await.map_err(retry)?;
+        if changed.is_empty() {
+            continue;
+        }
+        let version = search::next_version(&mut *tx).await?;
+        if changed.len() > REINDEX_REBUILD_OVER {
+            queue::enqueue(&mut *tx, &search::rebuild_job(*tenant, version)).await?;
+        } else {
+            for product in &changed {
+                queue::enqueue(
+                    &mut *tx,
+                    &search::index_product_job(*tenant, *product, version),
+                )
+                .await?;
+            }
+        }
+        tx.commit().await?;
+        tracing::info!(%tenant, changed = changed.len(), "search popularity changed");
+    }
+    tracing::info!(tenants = tenants.len(), "recommendations rollup done");
+    Ok(())
+}
+
 /// Nightly: event partitions two months ahead, drop those past the 13-month retention.
 async fn analytics_partitions(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let created = sqlx::query_scalar!(r#"SELECT platform.ensure_event_partitions(2) AS "n!""#)
@@ -770,6 +844,61 @@ async fn webhooks_deliver(
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
     tracing::info!(%tenant, %delivery, attempt, ?outcome, "webhook delivery");
+    Ok(())
+}
+
+/// One ad-platform delivery attempt (WP20). A retryable failure retries the job (queue
+/// backoff); the delivery records every attempt and turns `dead` on the last one, and so
+/// does the job (dead-letter).
+async fn ad_deliver(
+    ctx: Ctx,
+    job: Job,
+    ads: Option<commerce::adtracking::AdTracking>,
+) -> Result<(), JobError> {
+    use commerce::adtracking::{self, Outcome};
+    let (tenant, delivery) = tenant_and(&job, "delivery_id")?;
+    let last = job.attempts >= job.max_attempts;
+    let result = match ads {
+        Some(ads) => adtracking::deliver(&ctx.db, &ads, tenant, delivery, job.attempts, last)
+            .await
+            .map_err(|e| e.to_string()),
+        None => Err("SECRETS_KEY is not configured".to_owned()),
+    };
+    let outcome = match result {
+        Ok(outcome) => outcome,
+        Err(why) => {
+            // The queue gives up after this attempt: the delivery must not stay open.
+            if last
+                && let Err(e) =
+                    adtracking::give_up(&ctx.db, tenant, delivery, "the delivery job gave up").await
+            {
+                tracing::warn!(%delivery, error = %e, "recording a dead ad delivery failed");
+            }
+            return Err(JobError::Retry(why));
+        }
+    };
+    tracing::info!(%tenant, %delivery, attempt = job.attempts, ?outcome, "ad delivery");
+    match outcome {
+        Outcome::Retry(why) => Err(JobError::Retry(why)),
+        Outcome::Dead => Err(JobError::Permanent("ad delivery failed permanently".into())),
+        _ => Ok(()),
+    }
+}
+
+/// `order.refunded` → refund deliveries for the platforms that take refunds (WP20).
+async fn ad_refund(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let Some(tenant) = job.tenant_id else {
+        return Ok(());
+    };
+    let event_id = job
+        .payload
+        .get("event_id")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| JobError::Permanent("payload has no event_id".into()))?;
+    let data = job.payload.get("payload").cloned().unwrap_or_default();
+    commerce::adtracking::capture_refund(&ctx.db, tenant, event_id, &data)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
     Ok(())
 }
 

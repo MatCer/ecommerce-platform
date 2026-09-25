@@ -3,6 +3,7 @@
 //! edge) and the Internal API (`/internal/v1`, service token).
 
 pub mod admin;
+pub mod admin_ad_tracking;
 pub mod admin_ai;
 pub mod admin_analytics;
 pub mod admin_catalog;
@@ -15,6 +16,7 @@ pub mod admin_payments;
 pub mod admin_platform;
 pub mod admin_pricing;
 pub mod admin_promotions;
+pub mod admin_recommendations;
 pub mod admin_search;
 pub mod admin_staff;
 pub mod admin_storefront;
@@ -86,6 +88,8 @@ pub struct AppState {
     pub ai: commerce::ai::Ai,
     /// Webhook secrets + SSRF-safe client; `None` without `SECRETS_KEY` (webhooks answer 503).
     pub webhooks: Option<commerce::webhooks::Webhooks>,
+    /// Ad-platform forwarding (WP20); `None` without `SECRETS_KEY` (its admin routes answer 503).
+    pub ads: Option<commerce::adtracking::AdTracking>,
     /// Storefront API rate limits (§8.1).
     pub rate_limit: Arc<rate_limit::StorefrontLimiter>,
     /// WP23: preview tokens + per-tenant `ASTRO_KEY` (`THEME_SECRET`); `None` = theme builder
@@ -109,6 +113,7 @@ pub struct AppState {
         (name = "media", description = "Admin API: image assets (presigned uploads, variants)"),
         (name = "pricing", description = "Admin API: tax profile, price lists, variant prices, price history"),
         (name = "promotions", description = "Admin API: sales and coupons"),
+        (name = "recommendations", description = "Admin API: collections, recommendation settings, why-recommended explanations"),
         (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "search", description = "Admin API: search index status and rebuilds"),
         (name = "storefront-admin", description = "Admin API: redirects and the storefront token"),
@@ -120,6 +125,7 @@ pub struct AppState {
         (name = "payments", description = "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"),
         (name = "analytics", description = "Admin API: the analytics dashboard"),
         (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
+        (name = "ad-tracking", description = "Admin API: ad-platform forwarders (Meta, GA4, Google Ads, Sklik) and their delivery log"),
         (name = "platform", description = "Admin API for platform superadmins: the job queue"),
         (name = "webhooks", description = "Payment provider webhooks (signed)"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
@@ -173,6 +179,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_media::routes())
         .merge(admin_pricing::routes())
         .merge(admin_promotions::routes())
+        .merge(admin_recommendations::routes())
         .merge(admin_inventory::routes())
         .merge(admin_search::routes())
         .merge(admin_storefront::routes())
@@ -184,6 +191,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_payments::routes())
         .merge(admin_analytics::routes())
         .merge(admin_webhooks::routes())
+        .merge(admin_ad_tracking::routes())
         .merge(admin_platform::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_stats_daily (tenant_id, date, market_id, product_id, views,\n                                            add_to_carts, purchases, revenue_minor)\n           SELECT $1, x.day, x.market_id, x.product_id, sum(x.views)::int, sum(x.adds)::int,\n                  sum(x.units)::int, sum(x.revenue)::bigint\n           FROM (\n               SELECT (e.at AT TIME ZONE 'UTC')::date AS day, e.market_id,\n                      (e.props->>'product_id')::uuid AS product_id,\n                      count(*) FILTER (WHERE e.type = 'view_item') AS views,\n                      count(*) FILTER (WHERE e.type = 'add_to_cart') AS adds,\n                      0::bigint AS units, 0::numeric AS revenue\n               FROM events e\n               WHERE e.at >= $2 AND e.at < $3 AND e.type IN ('view_item', 'add_to_cart')\n                 AND e.market_id IS NOT NULL\n                 AND e.props->>'product_id' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n               GROUP BY 1, 2, 3\n               UNION ALL\n               SELECT (o.placed_at AT TIME ZONE 'UTC')::date, o.market_id, l.product_id,\n                      0, 0, sum(l.quantity), sum(l.total_minor)\n               FROM orders o JOIN order_lines l ON l.order_id = o.id\n               WHERE o.placed_at >= $2 AND o.placed_at < $3 AND o.status <> 'cancelled'\n                 AND l.product_id IS NOT NULL\n               GROUP BY 1, 2, 3\n           ) x\n           JOIN products p ON p.id = x.product_id\n           JOIN markets m ON m.id = x.market_id\n           GROUP BY x.day, x.market_id, x.product_id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1092f7c3e1f1e8d51fc7f83afda853ae1b8c732f556759295cdef5225f408e5f"
+}

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO carts (tenant_id, market_id, locale, currency, status, created_at,\n                                    updated_at, last_activity_at)\n                 VALUES ($1, $2, $3, $4, 'converted', $5, $5, $5) RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bc4fe1277fe6ce886cd334b4b9cb4028bcb883a685abc08bd70f071b1d745a53"
+}

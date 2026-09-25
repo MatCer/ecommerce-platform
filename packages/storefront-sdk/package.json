@@ -9,6 +9,7 @@
     "./client": "./src/client.ts",
     "./consent": "./src/consent.ts",
     "./consent-banner": "./src/ConsentBanner.tsx",
+    "./recommendations": "./src/recommendations.ts",
     "./format": "./src/format.ts",
     "./types": "./src/types.ts"
   },

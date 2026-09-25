@@ -471,7 +471,8 @@ export interface paths {
          *     `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
          *     records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
          *     `analytics` right now; purposes the client claims are ignored and unknown props dropped.
-         *     Always `202`, so the answer does not reveal the consent state.
+         *     Page views and shopping steps also go to the enabled ad platforms while the subject grants
+         *     `ads` (WP20). Always `202`, so the answer does not reveal the consent state.
          */
         post: operations["events"];
         delete?: never;
@@ -761,6 +762,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),
+         *     seasonal collections, personalized picks and recently viewed, each filtered by market
+         *     visibility, status and availability, falling back to bestsellers. Without visitor headers
+         *     the answer is public and cacheable; with a cart or consent subject it is private
+         *     (`Cache-Control: private, no-store`, A2). Personal signals are used only while the
+         *     subject's `personalization` consent is granted (A20). `recent` ignores visitor headers.
+         */
         get: operations["recommendations"];
         put?: never;
         post?: never;
@@ -1249,7 +1258,15 @@ export interface components {
         HomePage: {
             cache: components["schemas"]["CacheHints"];
             categories: components["schemas"]["CategoryTile"][];
+            /**
+             * @description Public home recommendations: an open seasonal collection, else the market's best
+             *     sellers (newest products in a shop without sales). Personal picks ("for you") are a
+             *     separate, private request (`/recommendations?context=home` via `/_p/recommendations`).
+             */
             featured: components["schemas"]["ProductCard"][];
+            featured_strategy?: components["schemas"]["Strategy"] | null;
+            /** @description The seasonal collection's heading, if `featured` is one. */
+            featured_title?: string | null;
             /** @description Placeholder built from the catalog until CMS blocks exist (WP13). */
             hero: components["schemas"]["Hero"];
             seo: components["schemas"]["Seo"];
@@ -1664,8 +1681,15 @@ export interface components {
         /** @enum {string} */
         QrKind: "spayd" | "pay_by_square";
         Recommendations: {
+            /**
+             * @description Public for the anonymous variant; private (and `Cache-Control: private, no-store`)
+             *     when the request carried a cart or a consent subject (A2).
+             */
             cache: components["schemas"]["CacheHints"];
             products: components["schemas"]["ProductCard"][];
+            strategy?: components["schemas"]["Strategy"] | null;
+            /** @description A merchant collection's heading when the products come from one. */
+            title?: string | null;
         };
         /** @description What the edge needs to answer a redirect. */
         ResolvedRedirect: {
@@ -1803,6 +1827,11 @@ export interface components {
         Source: "banner" | "preferences" | "checkout" | "linked";
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
+        /**
+         * @description Where a recommended product came from.
+         * @enum {string}
+         */
+        Strategy: "bought_together" | "bestsellers" | "seasonal" | "collection" | "recently_viewed" | "personalized" | "newest";
         Suggestions: {
             categories: components["schemas"]["CategorySuggestion"][];
             products: components["schemas"]["SearchHit"][];
@@ -2593,6 +2622,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -2625,6 +2656,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3227,6 +3260,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3857,8 +3892,18 @@ export interface operations {
     recommendations: {
         parameters: {
             query?: {
-                /** @description `product:<id>`, `cart` or `home`. */
+                /**
+                 * @description `product:<id>`, `category:<id>`, `collection:<id>`, `home` (default), `cart` or
+                 *     `recent`.
+                 */
                 context?: string;
+                /** @description Products, 1-24 (default 8). */
+                limit?: number;
+                /**
+                 * @description `recent` only: the device's recently viewed product ids, comma-separated (at most 12);
+                 *     validated and rehydrated with live prices, never linked to a visitor.
+                 */
+                ids?: string;
             };
             header: {
                 /** @description The tenant's public storefront token. */
@@ -3867,6 +3912,13 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description Shop cart capability (`cart` cookie): cross-sell for the cart's products. */
+                "X-Cart-Token"?: string | null;
+                /**
+                 * @description Anonymous consent subject: personalization and recently viewed when its records grant
+                 *     `personalization` (A20).
+                 */
+                "X-Consent-Subject"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3879,6 +3931,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Recommendations"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

@@ -1,0 +1,167 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.platform, d.event_id, d.event_name, d.subject, d.order_id, d.props,\n                d.user_agent, d.occurred_at, d.status, p.test_mode, p.settings,\n                p.credentials_ciphertext,\n                (SELECT h.hostname FROM platform.domains h\n                 WHERE h.market_id = d.market_id AND h.verified_at IS NOT NULL\n                 ORDER BY h.is_primary DESC, h.hostname LIMIT 1) AS host\n         FROM ad_deliveries d\n         JOIN ad_platforms p ON p.tenant_id = d.tenant_id AND p.platform = d.platform\n         WHERE d.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "platform",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "platform"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "event_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "event_name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "order_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "props",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "props"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "user_agent",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "user_agent"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "occurred_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "test_mode",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "test_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "settings",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "settings"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "credentials_ciphertext",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "credentials_ciphertext"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "host",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      null
+    ]
+  },
+  "hash": "989dba5b31e723860fcfd0630c044169a613580940b9a19add34c3f7a6e0427f"
+}

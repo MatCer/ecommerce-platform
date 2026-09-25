@@ -652,6 +652,7 @@ dependencies = [
  "chrono",
  "crc32fast",
  "flate2",
+ "governor",
  "hex",
  "hmac",
  "image",

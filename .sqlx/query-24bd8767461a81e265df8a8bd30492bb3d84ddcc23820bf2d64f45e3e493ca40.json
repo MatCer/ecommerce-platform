@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO product_scores (tenant_id, market_id, product_id, sales_score, popularity)\n           SELECT $1, market_id, product_id,\n                  sum(purchases * power(0.5, ($2::date - date)::float8 / $3)),\n                  sum((purchases * $5 + add_to_carts * $6 + views)\n                      * power(0.5, ($2::date - date)::float8 / $3))\n           FROM product_stats_daily\n           WHERE date > $2::date - $4::int AND date <= $2\n           GROUP BY market_id, product_id\n           HAVING sum(purchases + add_to_carts + views) > 0",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Float8",
+        "Int4",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "24bd8767461a81e265df8a8bd30492bb3d84ddcc23820bf2d64f45e3e493ca40"
+}

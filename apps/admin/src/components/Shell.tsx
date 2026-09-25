@@ -33,6 +33,7 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/categories", label: () => t("nav.categories"), min: "staff" },
       { href: "/parameters", label: () => t("nav.parameters"), min: "staff" },
       { href: "/inventory", label: () => t("nav.inventory"), min: "staff" },
+      { href: "/collections", label: () => t("nav.collections"), min: "staff" },
       { href: "/ai/bulk-edit", label: () => t("nav.aiBulk"), min: "staff" },
     ],
   },
@@ -66,6 +67,11 @@ const groups: { label: () => string; items: NavItem[] }[] = [
     label: () => t("nav.settings"),
     items: [
       { href: "/settings/search", label: () => t("content.search"), min: "staff" },
+      {
+        href: "/settings/recommendations",
+        label: () => t("nav.recommendations"),
+        min: "staff",
+      },
       { href: "/settings/ai", label: () => t("nav.aiSettings"), min: "staff" },
       { href: "/markets", label: () => t("nav.markets"), min: "staff" },
       { href: "/settings/shipping", label: () => t("shipping.title"), min: "staff" },
@@ -74,6 +80,7 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/staff", label: () => t("nav.staff"), min: "admin" },
       { href: "/audit-log", label: () => t("nav.auditLog"), min: "admin" },
       { href: "/settings/webhooks", label: () => t("nav.webhooks"), min: "admin" },
+      { href: "/settings/ad-tracking", label: () => t("nav.adTracking"), min: "admin" },
     ],
   },
   {

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM customer_affinity",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d3dc554d6234041a31f0b9f2de180f09875ad650fa636c7644bc93053759d7a6"
+}

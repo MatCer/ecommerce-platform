@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 ammonia.workspace = true
 argon2.workspace = true
+governor.workspace = true
 minijinja.workspace = true
 chrono.workspace = true
 crc32fast.workspace = true
