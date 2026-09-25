@@ -107,7 +107,10 @@ test("sklik checks the SEM S2S shape; failures can be injected", async () => {
     event_data: { sem_id: "sem", currency: "CZK", value: 1 },
   };
   expect((await post("/ads/sklik/rtgconv", body)).status).toBe(200);
-  expect((await post("/ads/sklik/rtgconv", { ...body, event_data: { sem_id: "sem", currency: "EUR" } })).status).toBe(400);
+  expect(
+    (await post("/ads/sklik/rtgconv", { ...body, event_data: { sem_id: "sem", currency: "EUR" } }))
+      .status,
+  ).toBe(400);
 
   await app.request("/ads/sklik/config", {
     method: "PUT",

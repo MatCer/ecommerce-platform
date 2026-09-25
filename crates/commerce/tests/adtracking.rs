@@ -30,6 +30,8 @@ type Got = Arc<Mutex<Vec<(String, Value)>>>;
 struct Vendor {
     status: Arc<Mutex<u16>>,
     got: Got,
+    /// The OAuth token endpoint answers after this many milliseconds.
+    token_delay_ms: Arc<Mutex<u64>>,
 }
 
 /// One server for every vendor path; records `(path?query, JSON body)`.
@@ -37,10 +39,13 @@ async fn vendor() -> (String, Vendor) {
     let v = Vendor {
         status: Arc::new(Mutex::new(200)),
         got: Arc::default(),
+        token_delay_ms: Arc::default(),
     };
     async fn any(State(v): State<Vendor>, uri: OriginalUri, body: String) -> (StatusCode, String) {
         let path = uri.0.to_string();
         if path.ends_with("/google/token") {
+            let delay = *v.token_delay_ms.lock().unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
             return (
                 StatusCode::OK,
                 json!({ "access_token": "ya29.test", "expires_in": 3600 }).to_string(),
@@ -323,10 +328,12 @@ async fn config_is_validated_sealed_and_isolated(db: PgPool) {
             .iter()
             .all(|p| !p.enabled && !p.has_credentials)
     );
-    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM ad_platforms")
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap();
+    let n: i64 = sqlx::query_scalar(
+        "SELECT (SELECT count(*) FROM ad_platforms) + (SELECT count(*) FROM ad_deliveries)",
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
     assert_eq!(n, 0);
     tx.commit().await.unwrap();
 }
@@ -737,4 +744,122 @@ async fn pause_holds_and_resume_requeues_and_refunds_follow_purchases(db: PgPool
         .await
         .unwrap();
     assert_eq!(purged, 0, "nothing is 90 days old");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_withdrawal_during_preparation_or_a_removed_market_stops_the_send(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = shop(&runtime, "adrace").await;
+    let (base, v) = vendor().await;
+    let a = ads(&base);
+    configure(&runtime, &a, &s).await;
+    // Other tenants' deliveries are invisible.
+    let other = shop(&runtime, "adrace2").await;
+    let anon = new_anon_id();
+    consent_for(&runtime, s.tenant, &anon, true).await;
+    let order = purchase(&runtime, &s, s.cz, "CZK", &anon).await;
+    let id_of = |platform: &'static str| {
+        let runtime = runtime.clone();
+        let tenant = s.tenant;
+        async move {
+            let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+            let id: Uuid = sqlx::query_scalar(
+                "SELECT id FROM ad_deliveries WHERE order_id = $1 AND platform = $2",
+            )
+            .bind(order)
+            .bind(platform)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+            id
+        }
+    };
+    let google = id_of("google_ads").await;
+    let mut tx = tenant_tx(&runtime, other.tenant).await.unwrap();
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM ad_deliveries")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(seen, 0);
+
+    // The OAuth exchange is slow; consent is withdrawn meanwhile: nothing is sent.
+    *v.token_delay_ms.lock().unwrap() = 700;
+    let (r, a2, t) = (runtime.clone(), a.clone(), s.tenant);
+    let sending =
+        tokio::spawn(async move { adtracking::deliver(&r, &a2, t, google, 1, false).await });
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    consent_for(&runtime, s.tenant, &anon, false).await;
+    // Cancelled by the withdrawal itself (the job then finds it finished) or at the claim.
+    let outcome = sending.await.unwrap().unwrap();
+    assert!(
+        matches!(outcome, Outcome::Stale | Outcome::Cancelled),
+        "{outcome:?}"
+    );
+    assert!(
+        v.got.lock().unwrap().is_empty(),
+        "nothing reached the vendor"
+    );
+
+    // A market removed from a platform stops its queued deliveries.
+    let anon2 = new_anon_id();
+    consent_for(&runtime, s.tenant, &anon2, true).await;
+    let order2 = purchase(&runtime, &s, s.cz, "CZK", &anon2).await;
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    adtracking::update(
+        &mut tx,
+        &a,
+        "staff",
+        Platform::Meta,
+        &PlatformUpdate {
+            market_ids: Some(vec![s.sk]),
+            ..PlatformUpdate::default()
+        },
+    )
+    .await
+    .unwrap();
+    let meta: Uuid = sqlx::query_scalar(
+        "SELECT id FROM ad_deliveries WHERE order_id = $1 AND platform = 'meta'",
+    )
+    .bind(order2)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        adtracking::deliver(&runtime, &a, s.tenant, meta, 1, false)
+            .await
+            .unwrap(),
+        Outcome::Skipped
+    );
+    assert!(v.got.lock().unwrap().is_empty());
+
+    // A delivery whose job gave up is closed, not left open.
+    let ga4 = {
+        let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+        let id: Uuid = sqlx::query_scalar(
+            "SELECT id FROM ad_deliveries WHERE order_id = $1 AND platform = 'ga4'",
+        )
+        .bind(order2)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        id
+    };
+    assert!(
+        adtracking::give_up(&runtime, s.tenant, ga4, "gave up")
+            .await
+            .unwrap()
+    );
+    let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
+    let (status, ua): (String, Option<String>) =
+        sqlx::query_as("SELECT status, user_agent FROM ad_deliveries WHERE id = $1")
+            .bind(ga4)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!((status.as_str(), ua), ("dead", None));
 }

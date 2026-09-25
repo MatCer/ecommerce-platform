@@ -40,7 +40,7 @@ CREATE TABLE ad_deliveries (
     user_agent    text CHECK (length(user_agent) <= 512),
     occurred_at   timestamptz NOT NULL,
     status        text NOT NULL DEFAULT 'pending'
-                  CHECK (status IN ('pending', 'retrying', 'paused', 'succeeded', 'dead',
+                  CHECK (status IN ('pending', 'retrying', 'paused', 'sending', 'succeeded', 'dead',
                                     'cancelled', 'skipped')),
     attempts      integer NOT NULL DEFAULT 0,
     response_code integer,
@@ -82,11 +82,13 @@ END
 $$;
 
 -- Retention (hourly cleanup): finished deliveries are kept 90 days for the log; a finished
--- delivery's user agent is not needed any more. The owner may touch only finished rows
--- (same pattern as platform.purge_search_zero_results).
+-- delivery's user agent is not needed any more; a delivery still open after 30 days (held by
+-- a long pause, or stranded) expires as `dead` and loses its user agent. The owner may touch
+-- only those rows (same pattern as platform.purge_search_zero_results).
 CREATE POLICY retention_read ON ad_deliveries FOR SELECT TO app_owner USING (true);
 CREATE POLICY retention_scrub ON ad_deliveries FOR UPDATE TO app_owner
-    USING (finished_at IS NOT NULL) WITH CHECK (finished_at IS NOT NULL AND user_agent IS NULL);
+    USING (finished_at IS NOT NULL OR created_at < now() - interval '30 days')
+    WITH CHECK (finished_at IS NOT NULL AND user_agent IS NULL);
 CREATE POLICY retention_purge ON ad_deliveries FOR DELETE TO app_owner
     USING (finished_at < now() - interval '90 days');
 
@@ -98,11 +100,17 @@ AS $$
         UPDATE public.ad_deliveries SET user_agent = NULL
         WHERE finished_at IS NOT NULL AND user_agent IS NOT NULL
         RETURNING 1
+    ), expired AS (
+        UPDATE public.ad_deliveries
+        SET status = 'dead', last_error = 'expired before it could be sent', user_agent = NULL,
+            finished_at = now(), updated_at = now()
+        WHERE finished_at IS NULL AND created_at < now() - interval '30 days'
+        RETURNING 1
     ), d AS (
         DELETE FROM public.ad_deliveries WHERE finished_at < now() - interval '90 days'
         RETURNING 1
     )
-    SELECT (SELECT count(*) FROM d)
+    SELECT (SELECT count(*) FROM expired) + (SELECT count(*) FROM d)
 $$;
 REVOKE ALL ON FUNCTION platform.purge_ad_deliveries() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION platform.purge_ad_deliveries() TO app_runtime;

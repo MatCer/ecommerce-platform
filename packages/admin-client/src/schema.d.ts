@@ -2585,7 +2585,7 @@ export interface components {
             platform: components["schemas"]["AdPlatform"];
             /** Format: int32 */
             response_code?: number | null;
-            /** @description `pending`, `retrying`, `paused`, `succeeded`, `dead`, `cancelled` or `skipped`. */
+            /** @description `pending`, `retrying`, `paused`, `sending`, `succeeded`, `dead`, `cancelled` or `skipped`. */
             status: string;
         };
         AdDeliveryPage: {

@@ -93,6 +93,8 @@ pub struct Line {
     pub name: String,
     pub quantity: i32,
     pub unit_gross_minor: i64,
+    /// The line after discounts, without VAT.
+    pub net_minor: i64,
 }
 
 /// The order behind a purchase or refund, read when sending.
@@ -296,22 +298,26 @@ fn ga4(
         Some(o) => {
             params["transaction_id"] = json!(o.number.to_string());
             params["currency"] = json!(o.currency);
-            let value = match e.event_name.as_str() {
-                "refund" => e.props["amount_minor"].as_i64().unwrap_or(o.total_minor),
-                _ => o.total_minor,
-            };
-            params["value"] = json!(major(value, &o.currency));
             if e.event_name == "purchase" {
+                // GA4: `value` is the merchandise (items after discounts, without VAT and
+                // shipping); tax and shipping go separately, item prices match the value.
+                let merchandise: i64 = o.lines.iter().map(|l| l.net_minor).sum();
+                params["value"] = json!(major(merchandise, &o.currency));
                 params["tax"] = json!(major(o.tax_minor, &o.currency));
                 params["shipping"] = json!(major(o.shipping_minor, &o.currency));
                 params["items"] = json!(
                     o.lines
                         .iter()
                         .map(|l| json!({ "item_id": l.sku, "item_name": l.name,
-                                         "price": major(l.unit_gross_minor, &o.currency),
+                                         "price": major(l.net_minor, &o.currency)
+                                             / f64::from(l.quantity.max(1)),
                                          "quantity": l.quantity }))
                         .collect::<Vec<_>>()
                 );
+            } else {
+                // A refund: the refunded amount (the whole order when not given).
+                let value = e.props["amount_minor"].as_i64().unwrap_or(o.total_minor);
+                params["value"] = json!(major(value, &o.currency));
             }
         }
         None => {
@@ -472,6 +478,7 @@ mod tests {
                 name: "Tričko".into(),
                 quantity: 2,
                 unit_gross_minor: 12_900,
+                net_minor: 21_322,
             }],
         }
     }
@@ -584,6 +591,10 @@ mod tests {
         assert_eq!(ev["name"], "purchase");
         assert_eq!(ev["params"]["transaction_id"], "1001");
         assert_eq!(ev["params"]["items"][0]["item_id"], "TEE-M");
+        // Merchandise without VAT and shipping; item prices add up to it.
+        assert_eq!(ev["params"]["value"], 213.22);
+        assert_eq!(ev["params"]["items"][0]["price"], 106.61);
+        assert_eq!(ev["params"]["tax"], 44.78);
         let raw = r.body.to_string();
         assert!(!raw.contains('@') && !raw.contains("Mozilla"), "{raw}");
 

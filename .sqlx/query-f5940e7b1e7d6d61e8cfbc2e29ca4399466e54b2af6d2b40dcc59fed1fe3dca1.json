@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT d.status, d.subject, d.customer_id, d.market_id, p.enabled, p.paused, p.market_ids\n         FROM ad_deliveries d\n         JOIN ad_platforms p ON p.tenant_id = d.tenant_id AND p.platform = d.platform\n         WHERE d.id = $1\n         FOR SHARE OF p",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "customer_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "customer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "market_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "ad_deliveries",
+            "name": "market_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "enabled",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "enabled"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "market_ids",
+        "type_info": "UuidArray",
+        "origin": {
+          "Table": {
+            "table": "ad_platforms",
+            "name": "market_ids"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f5940e7b1e7d6d61e8cfbc2e29ca4399466e54b2af6d2b40dcc59fed1fe3dca1"
+}

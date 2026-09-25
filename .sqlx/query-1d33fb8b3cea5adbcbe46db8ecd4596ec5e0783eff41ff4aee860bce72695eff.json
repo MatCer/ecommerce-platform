@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT sku, name, quantity, unit_gross_minor FROM order_lines\n         WHERE order_id = $1 ORDER BY position",
+  "query": "SELECT sku, name, quantity, unit_gross_minor, net_minor FROM order_lines\n         WHERE order_id = $1 ORDER BY position",
   "describe": {
     "columns": [
       {
@@ -46,6 +46,17 @@
             "name": "unit_gross_minor"
           }
         }
+      },
+      {
+        "ordinal": 4,
+        "name": "net_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "net_minor"
+          }
+        }
       }
     ],
     "parameters": {
@@ -57,8 +68,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "e0bbe928e4a39e302a023e317ee0c04c53e76b646979e68d862ffba7e32cb907"
+  "hash": "1d33fb8b3cea5adbcbe46db8ecd4596ec5e0783eff41ff4aee860bce72695eff"
 }

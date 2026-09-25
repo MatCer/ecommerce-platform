@@ -87,6 +87,16 @@ fn calling_code(country: &str) -> Option<&'static str> {
     })
 }
 
+/// A national number without its trunk prefix: one leading `0` in most of Europe, `06` in
+/// Hungary; Italian (and San Marino/Vatican) numbers keep their `0` in international form.
+fn national<'a>(digits: &'a str, country: &str) -> &'a str {
+    match country {
+        "IT" => digits,
+        "HU" => digits.strip_prefix("06").unwrap_or(digits),
+        _ => digits.strip_prefix('0').unwrap_or(digits),
+    }
+}
+
 /// E.164 with `+` (Google, Seznam). A number without an international prefix (`+` or `00`)
 /// is read as national in `country` (the shipping country): its trunk `0` is dropped and the
 /// calling code added. `None` when it cannot be a valid E.164 number (8-15 digits).
@@ -98,8 +108,7 @@ pub fn phone_e164(phone: &str, country: &str) -> Option<String> {
     } else if let Some(rest) = digits.strip_prefix("00") {
         rest.to_owned()
     } else {
-        let national = digits.trim_start_matches('0');
-        format!("{}{national}", calling_code(country)?)
+        format!("{}{}", calling_code(country)?, national(&digits, country))
     };
     ((8..=15).contains(&full.len()) && !full.starts_with('0')).then(|| format!("+{full}"))
 }
@@ -179,6 +188,27 @@ mod tests {
         assert_eq!(
             email_basic(" Jan.Novak@Email.cz").as_deref(),
             Some("jan.novak@email.cz")
+        );
+    }
+
+    #[test]
+    fn trunk_prefixes_follow_the_country() {
+        // Italy keeps the leading 0 of landlines in international form.
+        assert_eq!(
+            phone_e164("06 1234 5678", "IT").as_deref(),
+            Some("+390612345678")
+        );
+        assert_eq!(
+            phone_e164("06 30 123 4567", "HU").as_deref(),
+            Some("+36301234567")
+        );
+        assert_eq!(
+            phone_e164("030 1234567", "DE").as_deref(),
+            Some("+49301234567")
+        );
+        assert_eq!(
+            phone_meta("+39 06 1234 5678", "CZ").as_deref(),
+            Some("390612345678")
         );
     }
 

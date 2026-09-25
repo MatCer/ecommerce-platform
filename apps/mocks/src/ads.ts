@@ -200,7 +200,8 @@ export function validateGoogle(body: unknown): string[] {
     if (typeof e?.eventTimestamp !== "string" || Number.isNaN(Date.parse(e.eventTimestamp)))
       errors.push(`${at}.eventTimestamp must be RFC 3339`);
     const ids = obj(e?.userData)?.userIdentifiers;
-    if (!Array.isArray(ids) || ids.length === 0) errors.push(`${at}.userData.userIdentifiers missing`);
+    if (!Array.isArray(ids) || ids.length === 0)
+      errors.push(`${at}.userData.userIdentifiers missing`);
     else
       for (const id of ids) {
         const o = obj(id);
@@ -246,9 +247,15 @@ export function adRoutes(app: Hono) {
 
   app.post("/ads/meta/:version/:pixel/events", async (c) => {
     const body = await jsonBody(c);
-    const errors = /^v\d+\.\d+$/.test(c.req.param("version")) ? validateMeta(body) : ["bad version"];
+    const errors = /^v\d+\.\d+$/.test(c.req.param("version"))
+      ? validateMeta(body)
+      : ["bad version"];
     return answer("meta", c, body, errors, () =>
-      c.json({ events_received: (obj(body)?.data as unknown[]).length, messages: [], fbtrace_id: "mock" }),
+      c.json({
+        events_received: ((obj(body)?.data as unknown[] | undefined) ?? []).length,
+        messages: [],
+        fbtrace_id: "mock",
+      }),
     );
   });
   app.get("/ads/meta/:version/:pixel", (c) => {
@@ -287,7 +294,13 @@ export function adRoutes(app: Hono) {
       form.get("refresh_token") !== "invalid"
         ? []
         : ["invalid_grant"];
-    record("google", c, Object.fromEntries([...form.keys()].map((k) => [k, "***"])), errors.length ? 400 : 200, errors);
+    record(
+      "google",
+      c,
+      Object.fromEntries([...form.keys()].map((k) => [k, "***"])),
+      errors.length ? 400 : 200,
+      errors,
+    );
     if (errors.length) return c.json({ error: "invalid_grant" }, 400);
     const token = `ya29.mock-${crypto.randomUUID()}`;
     tokens.add(token);
@@ -335,7 +348,10 @@ export function adRoutes(app: Hono) {
       s.status = input.status;
     }
     if (input.fail_times !== undefined) {
-      if (input.fail_times !== null && (!Number.isInteger(input.fail_times) || (input.fail_times as number) < 0))
+      if (
+        input.fail_times !== null &&
+        (!Number.isInteger(input.fail_times) || (input.fail_times as number) < 0)
+      )
         return c.json({ error: "fail_times must be a non-negative integer or null" }, 400);
       s.fail_times = input.fail_times as number | null;
     }

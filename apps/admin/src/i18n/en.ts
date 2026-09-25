@@ -1261,7 +1261,7 @@ export const en = {
     },
     notices: {
       sklik_no_browser_ids:
-        "The shop loads no Seznam script, so Seznam matches purchases by the hashed email and phone only.",
+        "Seznam expects the cookies of its own script (sul.js) with server events. The shop loads no third-party scripts, so Seznam can match purchases only by the hashed email and phone and may attribute fewer of them.",
       sklik_czk_only: "Seznam accepts orders in Czech crowns only; other currencies are not sent.",
       sklik_no_test_channel: "Seznam has no test mode: in test mode nothing is sent.",
       google_ads_purchases_only: "Google Ads receives purchases only, as offline conversions.",
@@ -1272,7 +1272,8 @@ export const en = {
     testModeHint:
       "Events go to the platform's test channel (Meta test events, GA4 validation, Google Ads validation) and are not counted.",
     enabled: "Send events",
-    enabledHint: "Needs every required field. Nothing is sent without the visitor's advertising consent.",
+    enabledHint:
+      "Needs every required field. Nothing is sent without the visitor's advertising consent.",
     saved: "Settings saved",
     test: "Test connection",
     testOk: "{{platform}} accepted the connection",
@@ -1301,6 +1302,7 @@ export const en = {
       pending: "Waiting",
       retrying: "Retrying",
       paused: "Paused",
+      sending: "Being sent",
       succeeded: "Sent",
       dead: "Failed",
       cancelled: "Cancelled",

@@ -683,11 +683,26 @@ async fn ad_deliver(
 ) -> Result<(), JobError> {
     use commerce::adtracking::{self, Outcome};
     let (tenant, delivery) = tenant_and(&job, "delivery_id")?;
-    let ads = ads.ok_or_else(|| JobError::Retry("SECRETS_KEY is not configured".into()))?;
     let last = job.attempts >= job.max_attempts;
-    let outcome = adtracking::deliver(&ctx.db, &ads, tenant, delivery, job.attempts, last)
-        .await
-        .map_err(|e| JobError::Retry(e.to_string()))?;
+    let result = match ads {
+        Some(ads) => adtracking::deliver(&ctx.db, &ads, tenant, delivery, job.attempts, last)
+            .await
+            .map_err(|e| e.to_string()),
+        None => Err("SECRETS_KEY is not configured".to_owned()),
+    };
+    let outcome = match result {
+        Ok(outcome) => outcome,
+        Err(why) => {
+            // The queue gives up after this attempt: the delivery must not stay open.
+            if last
+                && let Err(e) =
+                    adtracking::give_up(&ctx.db, tenant, delivery, "the delivery job gave up").await
+            {
+                tracing::warn!(%delivery, error = %e, "recording a dead ad delivery failed");
+            }
+            return Err(JobError::Retry(why));
+        }
+    };
     tracing::info!(%tenant, %delivery, attempt = job.attempts, ?outcome, "ad delivery");
     match outcome {
         Outcome::Retry(why) => Err(JobError::Retry(why)),

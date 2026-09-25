@@ -1266,7 +1266,7 @@ export const sk: Dictionary = {
     },
     notices: {
       sklik_no_browser_ids:
-        "Obchod nenačítava skript Seznamu, Seznam preto páruje nákupy len podľa zahašovaného e-mailu a telefónu.",
+        "Seznam pri serverových udalostiach očakáva cookies svojho skriptu (sul.js). Obchod nenačítava skripty tretích strán, Seznam preto páruje nákupy len podľa zahašovaného e-mailu a telefónu a môže ich priradiť menej.",
       sklik_czk_only: "Seznam prijíma len objednávky v českých korunách; iné meny sa neodosielajú.",
       sklik_no_test_channel: "Seznam nemá testovací režim: v testovacom režime sa nič neodosiela.",
       google_ads_purchases_only: "Google Ads dostáva len nákupy, ako offline konverzie.",
@@ -1277,7 +1277,8 @@ export const sk: Dictionary = {
     testModeHint:
       "Udalosti idú do testovacieho kanála platformy (testovacie udalosti Mety, validácia GA4 a Google Ads) a nezapočítavajú sa.",
     enabled: "Odosielať udalosti",
-    enabledHint: "Vyžaduje všetky povinné polia. Bez súhlasu návštevníka s reklamou sa nič neodošle.",
+    enabledHint:
+      "Vyžaduje všetky povinné polia. Bez súhlasu návštevníka s reklamou sa nič neodošle.",
     saved: "Nastavenie uložené",
     test: "Otestovať pripojenie",
     testOk: "{{platform}}: pripojenie funguje",
@@ -1306,13 +1307,15 @@ export const sk: Dictionary = {
       pending: "Čaká",
       retrying: "Opakuje sa",
       paused: "Pozastavené",
+      sending: "Odosiela sa",
       succeeded: "Odoslané",
       dead: "Zlyhalo",
       cancelled: "Zrušené",
       skipped: "Preskočené",
     },
     noDeliveries: "Zatiaľ nič neodoslané",
-    noDeliveriesDesc: "Udalosti sa tu zobrazia, keď je platforma zapnutá a nakúpi návštevník so súhlasom.",
+    noDeliveriesDesc:
+      "Udalosti sa tu zobrazia, keď je platforma zapnutá a nakúpi návštevník so súhlasom.",
   },
   jobs: {
     title: "Úlohy na pozadí",

@@ -56,7 +56,9 @@ async function shopper(browser: Browser, ads: boolean): Promise<Page> {
   const banner = p.getByRole("region", { name: "Souhlas s cookies" });
   await expect(banner).toBeVisible();
   if (ads) {
-    await banner.getByRole("checkbox", { name: "Reklama" }).check();
+    const box = banner.getByRole("checkbox", { name: "Reklama" });
+    if (!(await box.isVisible())) await banner.getByRole("button", { name: "Nastavení" }).click();
+    await box.check();
     await banner.getByRole("button", { name: "Uložit výběr" }).click();
   } else {
     await banner.getByRole("button", { name: "Odmítnout" }).click();
@@ -124,6 +126,9 @@ async function placeOrder(p: Page, email: string): Promise<void> {
   await p.waitForURL(/\/o\/[0-9a-f]{64}$/);
 }
 
+const platformRow = (name: RegExp) =>
+  page.getByRole("table", { name: "Ad platforms" }).getByRole("row", { name });
+
 async function openAdTracking() {
   await page
     .getByRole("navigation", { name: "Main navigation" })
@@ -150,6 +155,9 @@ async function configure(name: string, fields: Record<string, string>) {
   await tick("Send events");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
+  // A rerun may find it paused by the pause test of an earlier run.
+  const resume = row.getByRole("button", { name: /^Resume/ });
+  if (await resume.isVisible()) await resume.click();
   await expect(row).toContainText("Sending");
 }
 
@@ -182,7 +190,7 @@ test.afterAll(async () => {
 
 test("the owner configures the four platforms and tests a connection", async () => {
   await openAdTracking();
-  await expect(page.getByRole("row", { name: /Sklik \(Seznam\)/ })).toContainText("Not needed");
+  await expect(platformRow(/Sklik \(Seznam\)/)).toContainText("Not needed");
   await expectAccessible(page, "ad tracking");
 
   await configure("Meta (Facebook, Instagram)", {
@@ -202,7 +210,7 @@ test("the owner configures the four platforms and tests a connection", async () 
   });
   await configure("Sklik (Seznam)", { "Server-to-server SEM ID": "sem-e2e" });
 
-  const meta = page.getByRole("row", { name: /Meta \(Facebook/ });
+  const meta = platformRow(/Meta \(Facebook/);
   await expect(meta).toContainText(`ends in ${`EAA-e2e-${run}`.slice(-4)}`);
   // Credentials are write-only: reopening the form shows them empty.
   await meta.getByRole("button", { name: /^Configure/ }).click();
@@ -269,9 +277,8 @@ test("only a visitor who allowed ads reaches the platforms, with hashed identifi
   expect(user.client_user_agent).toBeTruthy();
   expect(meta.some((r) => JSON.stringify(r.body).includes('"PageView"'))).toBe(true);
   const sklik = (await recorded(request, "sklik")).find((r) => r.status < 300);
-  expect((sklik?.body.user_ids as { user_data: { ph: string } }).user_data.ph).toBe(
-    sha("+420606666666"), // Seznam: E.164 with +
-  );
+  // Seznam: E.164 with +.
+  expect(JSON.stringify(sklik?.body)).toContain(`"ph":"${sha("+420606666666")}"`);
   const ga4 = await accepted(request, "ga4");
   expect(ga4).toContain('"purchase"');
   expect(ga4).not.toContain("@"); // no PII to GA4
@@ -293,14 +300,16 @@ test("withdrawing consent cancels what a paused platform still holds", async ({
   request,
 }) => {
   await openAdTracking();
-  const meta = page.getByRole("row", { name: /Meta \(Facebook/ });
+  const meta = platformRow(/Meta \(Facebook/);
   await meta.getByRole("button", { name: /^Pause/ }).click();
   await expect(meta).toContainText("Paused");
 
   const email = `ads-withdraw-${run}@example.test`;
   const p = await shopper(browser, true);
   await placeOrder(p, email);
-  await page.getByLabel("Platform").selectOption({ label: "Meta (Facebook, Instagram)" });
+  await page
+    .getByRole("combobox", { name: "Platform" })
+    .selectOption({ label: "Meta (Facebook, Instagram)" });
   await expectDelivery(/purchases.*Paused/);
 
   await withdrawAds(p);
@@ -323,7 +332,7 @@ test("a failing platform is retried and ends as a failed delivery", async ({
   await p.context().close();
 
   await openAdTracking();
-  await page.getByLabel("Platform").selectOption({ label: "Sklik (Seznam)" });
+  await page.getByRole("combobox", { name: "Platform" }).selectOption({ label: "Sklik (Seznam)" });
   await expectDelivery(/purchases.*Retrying.*503/);
   // A rejected payload is not retried: the next attempt fails for good.
   await request.put(`${MOCKS}/ads/sklik/config`, { data: { status: 400, fail_times: null } });

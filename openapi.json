@@ -12981,7 +12981,7 @@
           },
           "status": {
             "type": "string",
-            "description": "`pending`, `retrying`, `paused`, `succeeded`, `dead`, `cancelled` or `skipped`."
+            "description": "`pending`, `retrying`, `paused`, `sending`, `succeeded`, `dead`, `cancelled` or `skipped`."
           }
         }
       },

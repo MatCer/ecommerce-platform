@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT platform, paused FROM ad_platforms WHERE enabled AND $1 = ANY (market_ids)",
+  "query": "SELECT platform, paused FROM ad_platforms WHERE enabled AND $1 = ANY (market_ids)\n         FOR SHARE",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "ffd8c0b47db382a7420f471200373e1039ac2e1d132578e3cc9b519c58766c67"
+  "hash": "09074931ea745163945f9abeae83ce13f9cb3720f61da27b1a703886d7e29c92"
 }

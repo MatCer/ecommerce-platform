@@ -366,7 +366,7 @@ pub struct Delivery {
     /// The dedupe key sent to the vendor.
     pub event_id: Uuid,
     pub order_id: Option<Uuid>,
-    /// `pending`, `retrying`, `paused`, `succeeded`, `dead`, `cancelled` or `skipped`.
+    /// `pending`, `retrying`, `paused`, `sending`, `succeeded`, `dead`, `cancelled` or `skipped`.
     pub status: String,
     pub attempts: i32,
     pub response_code: Option<i32>,
@@ -898,7 +898,10 @@ pub async fn cancel_for_subject(tx: &mut TenantTx, subject: &Subject) -> Result<
 /// Enabled platforms of a market: `(platform, paused)`.
 async fn active(tx: &mut TenantTx, market: Uuid) -> Result<Vec<(Platform, bool)>, Error> {
     Ok(sqlx::query!(
-        "SELECT platform, paused FROM ad_platforms WHERE enabled AND $1 = ANY (market_ids)",
+        // FOR SHARE: a concurrent pause/resume ([`update`]) waits, so a delivery inserted as
+        // `paused` is always seen by the resume that follows.
+        "SELECT platform, paused FROM ad_platforms WHERE enabled AND $1 = ANY (market_ids)
+         FOR SHARE",
         market
     )
     .fetch_all(&mut **tx)
@@ -966,11 +969,33 @@ async fn insert(
     Ok(n)
 }
 
-/// A page path from the beacon: an absolute path, no query or fragment, at most 512 bytes.
-fn clean_path(p: Option<&str>) -> Option<String> {
-    let p = p?.split(['?', '#']).next()?;
-    (p.starts_with('/') && !p.starts_with("//") && p.len() <= 512 && !p.contains(char::is_control))
-        .then(|| p.to_owned())
+/// A page path from the beacon, minimized: without query or fragment, and only if it looks
+/// like a catalog page (lowercase slug segments). Paths that can carry identifiers or
+/// capabilities (order pages, account, checkout, anything with `@`, `%`, tokens) become `/`.
+fn clean_path(p: Option<&str>) -> String {
+    const PRIVATE: [&str; 6] = ["o", "account", "checkout", "cart", "_p", "consent"];
+    let Some(p) = p.and_then(|p| p.split(['?', '#']).next()) else {
+        return "/".into();
+    };
+    let Some(rest) = p.strip_prefix('/') else {
+        return "/".into();
+    };
+    let segments: Vec<&str> = rest.split('/').collect();
+    let slug = |s: &str| {
+        (1..=100).contains(&s.len())
+            && s.bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            // Long hex runs are tokens, not slugs.
+            && !(s.len() >= 24 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+    };
+    let ok = p.len() <= 300
+        && segments.len() <= 6
+        && !PRIVATE.contains(&segments[0])
+        && segments
+            .iter()
+            .enumerate()
+            .all(|(i, s)| slug(s) || (s.is_empty() && i == segments.len() - 1));
+    if ok { p.to_owned() } else { "/".into() }
 }
 
 /// Browser-side events of a visitor (the beacon, and the cart steps the API records itself):
@@ -1147,10 +1172,11 @@ pub async fn capture_refund(
 
 // --- log ---------------------------------------------------------------------------------------
 
-const STATUSES: [&str; 7] = [
+const STATUSES: [&str; 8] = [
     "pending",
     "retrying",
     "paused",
+    "sending",
     "succeeded",
     "dead",
     "cancelled",
@@ -1227,7 +1253,37 @@ fn pseudonym(tenant: Uuid, subject: &str) -> String {
     hex::encode(Sha256::digest(format!("adtracking:{tenant}:{subject}")))
 }
 
-/// Records a terminal state (or `paused`) unless the delivery finished meanwhile.
+/// Records the delivery's next state unless it finished meanwhile: a terminal one (the user
+/// agent is dropped with it), `retrying`, `paused` or `sending`.
+async fn finish_in(
+    tx: &mut TenantTx,
+    id: Uuid,
+    status: &str,
+    attempts: Option<i32>,
+    code: Option<i32>,
+    error: Option<&str>,
+) -> Result<bool, Error> {
+    let terminal = !matches!(status, "paused" | "retrying" | "sending");
+    Ok(sqlx::query!(
+        "UPDATE ad_deliveries
+         SET status = $2, attempts = coalesce($3, attempts),
+             response_code = coalesce($4, response_code), last_error = $5, updated_at = now(),
+             finished_at = CASE WHEN $6 THEN now() END,
+             user_agent = CASE WHEN $6 THEN NULL ELSE user_agent END
+         WHERE id = $1 AND status IN ('pending', 'retrying', 'sending')",
+        id,
+        status,
+        attempts,
+        code,
+        error.map(|e| e.chars().take(300).collect::<String>()),
+        terminal
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected()
+        == 1)
+}
+
 async fn finish(
     db: &PgPool,
     tenant: Uuid,
@@ -1238,25 +1294,7 @@ async fn finish(
     error: Option<&str>,
 ) -> Result<bool, Error> {
     let mut tx = tenant_tx(db, tenant).await?;
-    let terminal = status != "paused" && status != "retrying";
-    let done = sqlx::query!(
-        "UPDATE ad_deliveries
-         SET status = $2, attempts = coalesce($3, attempts), response_code = coalesce($4, response_code),
-             last_error = $5, updated_at = now(),
-             finished_at = CASE WHEN $6 THEN now() END,
-             user_agent = CASE WHEN $6 THEN NULL ELSE user_agent END
-         WHERE id = $1 AND status IN ('pending', 'retrying')",
-        id,
-        status,
-        attempts,
-        code,
-        error.map(|e| e.chars().take(300).collect::<String>()),
-        terminal
-    )
-    .execute(&mut *tx)
-    .await?
-    .rows_affected()
-        == 1;
+    let done = finish_in(&mut tx, id, status, attempts, code, error).await?;
     tx.commit().await?;
     Ok(done)
 }
@@ -1396,18 +1434,26 @@ async fn google_token(ads: &AdTracking, creds: &Credentials) -> Result<String, F
     Ok(token)
 }
 
-/// Sends a built request (Google: with a fresh access token) and checks the answer.
-async fn send(
+/// The Google access token for the request (other platforms need none).
+async fn bearer(
     ads: &AdTracking,
     platform: Platform,
     creds: &Credentials,
+) -> Result<Option<String>, Failure> {
+    match platform {
+        Platform::GoogleAds => Ok(Some(google_token(ads, creds).await?)),
+        _ => Ok(None),
+    }
+}
+
+/// Sends a built request and checks the answer.
+async fn send(
+    ads: &AdTracking,
+    platform: Platform,
     req: &vendors::Request,
+    bearer: Option<&str>,
 ) -> Result<i32, Failure> {
-    let bearer = match platform {
-        Platform::GoogleAds => Some(google_token(ads, creds).await?),
-        _ => req.bearer.clone(),
-    };
-    let (code, body) = post_json(ads, &req.url, bearer.as_deref(), &req.headers, &req.body).await?;
+    let (code, body) = post_json(ads, &req.url, bearer, &req.headers, &req.body).await?;
     classify(code)?;
     // The GA4 validation server answers 200 with its findings.
     if platform == Platform::Ga4 && req.url.contains("/debug/mp/collect") {
@@ -1425,8 +1471,56 @@ async fn send(
     Ok(i32::from(code))
 }
 
+/// The last decision before a send, in one transaction: the platform row is locked (shared)
+/// against a concurrent pause/resume, the platform must still be on for the delivery's market,
+/// and consent is resolved now (A20). Only then the delivery becomes `sending`; a withdrawal
+/// committed before this point cancels it, one committed after it finds it already sending.
+async fn claim_send(
+    db: &PgPool,
+    tenant: Uuid,
+    id: Uuid,
+    attempt: i32,
+) -> Result<Option<Outcome>, Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
+    let Some(d) = sqlx::query!(
+        "SELECT d.status, d.subject, d.customer_id, d.market_id, p.enabled, p.paused, p.market_ids
+         FROM ad_deliveries d
+         JOIN ad_platforms p ON p.tenant_id = d.tenant_id AND p.platform = d.platform
+         WHERE d.id = $1
+         FOR SHARE OF p",
+        id
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        return Ok(Some(Outcome::Stale));
+    };
+    let outcome = if !matches!(d.status.as_str(), "pending" | "retrying" | "sending") {
+        Some(Outcome::Stale)
+    } else if !d.enabled || !d.market_ids.contains(&d.market_id) {
+        let why = "the platform is off for this market";
+        finish_in(&mut tx, id, "skipped", None, None, Some(why)).await?;
+        Some(Outcome::Skipped)
+    } else if d.paused {
+        finish_in(&mut tx, id, "paused", None, None, None).await?;
+        Some(Outcome::Paused)
+    } else if !ads_allowed(&mut tx, &d.subject, d.customer_id).await? {
+        let why = "ads consent not granted at send time";
+        finish_in(&mut tx, id, "cancelled", None, None, Some(why)).await?;
+        Some(Outcome::Cancelled)
+    } else {
+        finish_in(&mut tx, id, "sending", Some(attempt), None, None).await?;
+        None
+    };
+    tx.commit().await?;
+    Ok(outcome)
+}
+
 /// Worker step for [`DELIVER_JOB`]: one attempt. `attempt` is the job's attempt number;
-/// `last` says whether the queue will give up after this one.
+/// `last` says whether the queue will give up after this one. The request (with the order
+/// read and hashed now) and the Google token are prepared first; [`claim_send`] then decides
+/// right before sending. A crash while `sending` retries the send (at least once: vendors
+/// dedupe on the event id), re-checking consent first.
 pub async fn deliver(
     db: &PgPool,
     ads: &AdTracking,
@@ -1437,9 +1531,9 @@ pub async fn deliver(
 ) -> Result<Outcome, Error> {
     let mut tx = tenant_tx(db, tenant).await?;
     let Some(d) = sqlx::query!(
-        "SELECT d.platform, d.event_id, d.event_name, d.market_id, d.subject, d.customer_id,
-                d.order_id, d.props, d.user_agent, d.occurred_at, d.status,
-                p.enabled, p.paused, p.test_mode, p.settings, p.credentials_ciphertext,
+        "SELECT d.platform, d.event_id, d.event_name, d.subject, d.order_id, d.props,
+                d.user_agent, d.occurred_at, d.status, p.test_mode, p.settings,
+                p.credentials_ciphertext,
                 (SELECT h.hostname FROM platform.domains h
                  WHERE h.market_id = d.market_id AND h.verified_at IS NOT NULL
                  ORDER BY h.is_primary DESC, h.hostname LIMIT 1) AS host
@@ -1453,33 +1547,11 @@ pub async fn deliver(
     else {
         return Ok(Outcome::Stale);
     };
-    if !matches!(d.status.as_str(), "pending" | "retrying") {
+    if !matches!(d.status.as_str(), "pending" | "retrying" | "sending") {
         return Ok(Outcome::Stale);
     }
     let platform = Platform::parse(&d.platform)
         .ok_or_else(|| Error::Internal(format!("unknown platform {}", d.platform)))?;
-    if !d.enabled {
-        finish(
-            db,
-            tenant,
-            id,
-            "skipped",
-            None,
-            None,
-            Some("the platform is disabled"),
-        )
-        .await?;
-        return Ok(Outcome::Skipped);
-    }
-    if d.paused {
-        finish(db, tenant, id, "paused", None, None, None).await?;
-        return Ok(Outcome::Paused);
-    }
-    if !ads_allowed(&mut tx, &d.subject, d.customer_id).await? {
-        let why = "ads consent not granted at send time";
-        finish(db, tenant, id, "cancelled", None, None, Some(why)).await?;
-        return Ok(Outcome::Cancelled);
-    }
     if Utc::now() - d.occurred_at > platform.max_age() {
         let why = "the event is older than the platform accepts";
         finish(db, tenant, id, "dead", Some(attempt), None, Some(why)).await?;
@@ -1522,23 +1594,22 @@ pub async fn deliver(
             return Ok(Outcome::Skipped);
         }
         Err(e) => {
-            finish(
-                db,
-                tenant,
-                id,
-                "dead",
-                Some(attempt),
-                None,
-                Some(&e.to_string()),
-            )
-            .await?;
+            let why = e.to_string();
+            finish(db, tenant, id, "dead", Some(attempt), None, Some(&why)).await?;
             return Ok(Outcome::Dead);
         }
     };
     if let Some(l) = ads.limiters.get(&platform) {
         l.until_key_ready(&tenant).await;
     }
-    Ok(match send(ads, platform, &creds, &req).await {
+    let result = match bearer(ads, platform, &creds).await {
+        Ok(token) => match claim_send(db, tenant, id, attempt).await? {
+            Some(outcome) => return Ok(outcome),
+            None => send(ads, platform, &req, token.as_deref()).await,
+        },
+        Err(f) => Err(f),
+    };
+    Ok(match result {
         Ok(code) => {
             finish(db, tenant, id, "succeeded", Some(attempt), Some(code), None).await?;
             Outcome::Succeeded
@@ -1554,6 +1625,12 @@ pub async fn deliver(
     })
 }
 
+/// Marks an open delivery `dead` when its job gave up without recording an outcome (e.g. a
+/// database error or a missing `SECRETS_KEY` on the last attempt).
+pub async fn give_up(db: &PgPool, tenant: Uuid, id: Uuid, why: &str) -> Result<bool, Error> {
+    finish(db, tenant, id, "dead", None, None, Some(why)).await
+}
+
 async fn load_order(tx: &mut TenantTx, id: Uuid) -> Result<Option<vendors::Order>, Error> {
     let Some(o) = sqlx::query!(
         "SELECT number, email, phone, ship_to_country, currency, total_minor, tax_minor,
@@ -1567,7 +1644,7 @@ async fn load_order(tx: &mut TenantTx, id: Uuid) -> Result<Option<vendors::Order
         return Ok(None);
     };
     let lines = sqlx::query!(
-        "SELECT sku, name, quantity, unit_gross_minor FROM order_lines
+        "SELECT sku, name, quantity, unit_gross_minor, net_minor FROM order_lines
          WHERE order_id = $1 ORDER BY position",
         id
     )
@@ -1579,6 +1656,7 @@ async fn load_order(tx: &mut TenantTx, id: Uuid) -> Result<Option<vendors::Order
         name: l.name,
         quantity: l.quantity,
         unit_gross_minor: l.unit_gross_minor,
+        net_minor: l.net_minor,
     })
     .collect();
     Ok(Some(vendors::Order {
@@ -1676,7 +1754,10 @@ pub async fn test_connection(
         }
         Platform::Ga4 | Platform::GoogleAds => {
             match vendors::build(&ads.endpoints, platform, &settings, &creds, &sample) {
-                Ok(req) => send(ads, platform, &creds, &req).await,
+                Ok(req) => match bearer(ads, platform, &creds).await {
+                    Ok(token) => send(ads, platform, &req, token.as_deref()).await,
+                    Err(f) => Err(f),
+                },
                 Err(e) => Err(Failure::Permanent(None, e.to_string())),
             }
         }
@@ -1840,13 +1921,22 @@ mod tests {
 
     #[test]
     fn page_paths_are_minimized() {
-        assert_eq!(
-            clean_path(Some("/p/tee?utm=x#top")).as_deref(),
-            Some("/p/tee")
-        );
-        assert_eq!(clean_path(Some("//evil.example/x")), None);
-        assert_eq!(clean_path(Some("https://x/")), None);
-        assert_eq!(clean_path(None), None);
+        assert_eq!(clean_path(Some("/p/tee?utm=x#top")), "/p/tee");
+        assert_eq!(clean_path(Some("/sk/c/oblecenie/")), "/sk/c/oblecenie/");
+        assert_eq!(clean_path(Some("/")), "/");
+        for private in [
+            "//evil.example/x",
+            "https://x/",
+            "/alice@example.com",
+            "/p/alice%40example.com",
+            "/o/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "/account/orders",
+            "/p/0123456789abcdef0123456789abcdef",
+            "/P/Tee",
+        ] {
+            assert_eq!(clean_path(Some(private)), "/", "{private}");
+        }
+        assert_eq!(clean_path(None), "/");
     }
 
     #[test]

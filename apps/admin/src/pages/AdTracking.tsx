@@ -45,6 +45,7 @@ const STATUSES = [
   "pending",
   "retrying",
   "paused",
+  "sending",
   "succeeded",
   "dead",
   "cancelled",
@@ -54,6 +55,7 @@ const STATUS_TONE: Record<(typeof STATUSES)[number], Tone> = {
   pending: "neutral",
   retrying: "warning",
   paused: "warning",
+  sending: "info",
   succeeded: "success",
   dead: "error",
   cancelled: "neutral",
@@ -123,14 +125,8 @@ function StateBadge(props: { config: Config }) {
   const c = () => props.config;
   return (
     <span class="flex flex-wrap gap-1">
-      <Show
-        when={c().enabled}
-        fallback={<Badge tone="neutral">{t("adTracking.state.off")}</Badge>}
-      >
-        <Show
-          when={c().paused}
-          fallback={<Badge tone="success">{t("adTracking.state.on")}</Badge>}
-        >
+      <Show when={c().enabled} fallback={<Badge tone="neutral">{t("adTracking.state.off")}</Badge>}>
+        <Show when={c().paused} fallback={<Badge tone="success">{t("adTracking.state.on")}</Badge>}>
           <Badge tone="warning">{t("adTracking.state.paused")}</Badge>
         </Show>
       </Show>
@@ -282,9 +278,7 @@ export default function AdTracking() {
       market_ids: on ? [...f.market_ids, id] : f.market_ids.filter((m) => m !== id),
     }));
   const marketNames = (ids: string[]) =>
-    ids
-      .map((id) => markets.data?.items.find((m) => m.id === id)?.name ?? id)
-      .join(", ") || "—";
+    ids.map((id) => markets.data?.items.find((m) => m.id === id)?.name ?? id).join(", ") || "—";
 
   return (
     <Show
@@ -328,9 +322,7 @@ export default function AdTracking() {
                     <For each={data.items}>
                       {(c) => (
                         <tr class="align-top" data-platform={c.platform}>
-                          <td class={`${tdClass} py-2 font-medium`}>
-                            {platformName(c.platform)}
-                          </td>
+                          <td class={`${tdClass} py-2 font-medium`}>{platformName(c.platform)}</td>
                           <td class={`${tdClass} py-2`}>
                             <StateBadge config={c} />
                           </td>
@@ -367,7 +359,9 @@ export default function AdTracking() {
                             <Show when={c.enabled}>
                               <Button
                                 variant="ghost"
-                                loading={pause.isPending && pause.variables?.platform === c.platform}
+                                loading={
+                                  pause.isPending && pause.variables?.platform === c.platform
+                                }
                                 onClick={() => pause.mutate(c)}
                               >
                                 {c.paused ? t("adTracking.resume") : t("adTracking.pause")}
@@ -494,7 +488,9 @@ export default function AdTracking() {
       <Dialog
         open={editing() !== null}
         onOpenChange={(o) => !o && setEditing(null)}
-        title={t("adTracking.configureTitle", { platform: platformName(editing()?.platform ?? "") })}
+        title={t("adTracking.configureTitle", {
+          platform: platformName(editing()?.platform ?? ""),
+        })}
       >
         <Show when={editing()}>
           {(c) => (
@@ -559,7 +555,10 @@ export default function AdTracking() {
                   </div>
                 </FieldGroup>
               </Show>
-              <FieldGroup legend={t("adTracking.markets")} description={t("adTracking.marketsHint")}>
+              <FieldGroup
+                legend={t("adTracking.markets")}
+                description={t("adTracking.marketsHint")}
+              >
                 <div class="flex flex-col gap-1.5">
                   <For each={markets.data?.items ?? []}>
                     {(m) => (
