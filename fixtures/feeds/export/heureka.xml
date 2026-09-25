@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SHOP>
+<SHOPITEM>
+  <ITEM_ID>TB-M</ITEM_ID>
+  <PRODUCTNAME>Tričko Basic černá M</PRODUCTNAME>
+  <PRODUCT>Tričko Basic černá M</PRODUCT>
+  <DESCRIPTION>Klasické tričko ze 100% bavlny &amp; více.</DESCRIPTION>
+  <URL>https://demo.example/p/tricko-basic</URL>
+  <IMGURL>https://demo.example/media/t/a/1.jpg</IMGURL>
+  <IMGURL_ALTERNATIVE>https://demo.example/media/t/a/2.jpg</IMGURL_ALTERNATIVE>
+  <PRICE_VAT>269.10</PRICE_VAT>
+  <MANUFACTURER>Basic</MANUFACTURER>
+  <CATEGORYTEXT>Heureka.cz | Oblečení a móda | Trička</CATEGORYTEXT>
+  <EAN>8594001021499</EAN>
+  <DELIVERY_DATE>0</DELIVERY_DATE>
+  <ITEMGROUP_ID>0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b</ITEMGROUP_ID>
+  <PARAM><PARAM_NAME>Materiál</PARAM_NAME><VAL>bavlna</VAL></PARAM>
+  <PARAM><PARAM_NAME>Barva</PARAM_NAME><VAL>černá</VAL></PARAM>
+</SHOPITEM>
+<SHOPITEM>
+  <ITEM_ID>SV-1</ITEM_ID>
+  <PRODUCTNAME>Svíčka &lt;levandule&gt;</PRODUCTNAME>
+  <PRODUCT>Svíčka &lt;levandule&gt;</PRODUCT>
+  <URL>https://demo.example/p/svicka</URL>
+  <PRICE_VAT>299.90</PRICE_VAT>
+  <MANUFACTURER>Světlo</MANUFACTURER>
+  <CATEGORYTEXT>Domácnost</CATEGORYTEXT>
+  <DELIVERY_DATE>14</DELIVERY_DATE>
+</SHOPITEM>
+</SHOP>

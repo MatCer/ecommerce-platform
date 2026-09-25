@@ -18,6 +18,9 @@ const BATCH: i32 = 100;
 pub fn subscribers(event_type: &str) -> &'static [&'static str] {
     match event_type {
         commerce::staff::INVITED_EVENT => &[handlers::EVENTS_LOG, handlers::STAFF_INVITE_MAIL],
+        t if commerce::storefront::purge::EVENTS.contains(&t) => {
+            &[handlers::EVENTS_LOG, handlers::EDGE_PURGE]
+        }
         _ => &[handlers::EVENTS_LOG],
     }
 }
@@ -30,7 +33,14 @@ pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
     // It versions the search jobs (spec A27); one job per product and kind per batch.
     let version = commerce::search::next_version(&mut *tx).await?;
     let mut search_jobs = std::collections::HashSet::new();
+    let now = chrono::Utc::now();
     for event in &events {
+        // Export feeds: one debounced regeneration per tenant and window (idempotency key).
+        if let Some(job) =
+            commerce::feeds::export::job_for_event(event.tenant_id, &event.event_type, now)
+        {
+            queue::enqueue(&mut *tx, &job).await?;
+        }
         if let Some(job) = commerce::search::job_for_event(
             event.tenant_id,
             &event.event_type,

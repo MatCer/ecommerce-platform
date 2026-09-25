@@ -23,11 +23,18 @@ pub struct Schedule {
     pub every: Duration,
 }
 
-pub const SCHEDULES: &[Schedule] = &[Schedule {
-    name: "maintenance.cleanup",
-    kind: handlers::MAINTENANCE_CLEANUP,
-    every: Duration::from_secs(3600),
-}];
+pub const SCHEDULES: &[Schedule] = &[
+    Schedule {
+        name: "maintenance.cleanup",
+        kind: handlers::MAINTENANCE_CLEANUP,
+        every: Duration::from_secs(3600),
+    },
+    Schedule {
+        name: "feeds.export_all",
+        kind: commerce::feeds::export::ALL_JOB,
+        every: Duration::from_secs(3600),
+    },
+];
 
 /// A dedicated connection holding the leader lock, or `None` if another worker leads.
 pub async fn try_lead(db: &PgPool) -> Result<Option<PgConnection>, sqlx::Error> {

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+<channel>
+<title>Demo &amp; spol.</title>
+<link>https://demo.example</link>
+<description>Demo &amp; spol.</description>
+<item>
+  <g:id>TB-M</g:id>
+  <g:title>Tričko Basic černá M</g:title>
+  <g:description>Klasické tričko ze 100% bavlny &amp; více.</g:description>
+  <g:link>https://demo.example/p/tricko-basic</g:link>
+  <g:image_link>https://demo.example/media/t/a/1.jpg</g:image_link>
+  <g:additional_image_link>https://demo.example/media/t/a/2.jpg</g:additional_image_link>
+  <g:availability>in_stock</g:availability>
+  <g:price>299.00 CZK</g:price>
+  <g:sale_price>269.10 CZK</g:sale_price>
+  <g:condition>new</g:condition>
+  <g:brand>Basic</g:brand>
+  <g:gtin>8594001021499</g:gtin>
+  <g:item_group_id>0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b</g:item_group_id>
+  <g:product_type>Oblečení &gt; Trička</g:product_type>
+  <g:google_product_category>212</g:google_product_category>
+  <g:product_detail><g:attribute_name>Materiál</g:attribute_name><g:attribute_value>bavlna</g:attribute_value></g:product_detail>
+  <g:product_detail><g:attribute_name>Barva</g:attribute_name><g:attribute_value>černá</g:attribute_value></g:product_detail>
+</item>
+<item>
+  <g:id>SV-1</g:id>
+  <g:title>Svíčka &lt;levandule&gt;</g:title>
+  <g:link>https://demo.example/p/svicka</g:link>
+  <g:availability>backorder</g:availability>
+  <g:price>299.90 CZK</g:price>
+  <g:condition>new</g:condition>
+  <g:mpn>SV-1</g:mpn>
+  <g:identifier_exists>no</g:identifier_exists>
+  <g:product_type>Domácnost</g:product_type>
+  <g:unit_pricing_measure>0.2kg</g:unit_pricing_measure>
+  <g:unit_pricing_base_measure>1kg</g:unit_pricing_base_measure>
+</item>
+<item>
+  <g:id>GONE</g:id>
+  <g:title>Tričko Basic černá M</g:title>
+  <g:description>Klasické tričko ze 100% bavlny &amp; více.</g:description>
+  <g:link>https://demo.example/p/tricko-basic</g:link>
+  <g:image_link>https://demo.example/media/t/a/1.jpg</g:image_link>
+  <g:additional_image_link>https://demo.example/media/t/a/2.jpg</g:additional_image_link>
+  <g:availability>out_of_stock</g:availability>
+  <g:price>269.10 CZK</g:price>
+  <g:condition>new</g:condition>
+  <g:brand>Basic</g:brand>
+  <g:gtin>8594001021499</g:gtin>
+  <g:item_group_id>0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b</g:item_group_id>
+  <g:product_type>Oblečení &gt; Trička</g:product_type>
+  <g:google_product_category>212</g:google_product_category>
+  <g:product_detail><g:attribute_name>Materiál</g:attribute_name><g:attribute_value>bavlna</g:attribute_value></g:product_detail>
+  <g:product_detail><g:attribute_name>Barva</g:attribute_name><g:attribute_value>černá</g:attribute_value></g:product_detail>
+</item>
+</channel>
+</rss>

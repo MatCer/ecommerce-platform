@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use anyhow::anyhow;
-use platform::config::{AuthServiceConfig, DbConfig, MeiliConfig, S3Config, WorkerConfig};
+use platform::config::{
+    AuthServiceConfig, DbConfig, MeiliConfig, S3Config, StorefrontConfig, WorkerConfig,
+};
 use platform::mail::{MailConfig, Mailer};
 use platform::storage::Storage;
 use worker::runner::RunnerConfig;
@@ -32,6 +34,17 @@ async fn main() -> anyhow::Result<()> {
         .map(|c| platform::auth_service::AuthService::new(c.base_url, c.token))
         .transpose()?;
 
+    // Edge purges and public URLs (export feeds); the SSRF-safe client for imports (A21).
+    let sf = StorefrontConfig::from_env()?;
+    let extra = handlers::Extra {
+        edge: platform::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
+        fetch: platform::http::SafeClient::from_env()?,
+        urls: commerce::storefront::PublicUrls {
+            scheme: sf.scheme,
+            port: sf.port,
+        },
+    };
+
     let (stop, shutdown) = tokio::sync::watch::channel(false);
     tokio::spawn(async move {
         platform::shutdown::signal().await;
@@ -45,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     tokio::join!(
         runner::run(
             db.clone(),
-            handlers::all(storage, meili, mailer, auth),
+            handlers::all(storage, meili, mailer, auth, extra),
             RunnerConfig::new(owner, cfg.concurrency),
             shutdown.clone(),
         ),

@@ -58,8 +58,7 @@ pub fn settings(synonyms: &Value) -> Value {
         "rankingRules": ["words", "typo", "proximity", "attributeRank", "sort", "wordPosition", "exactness"],
         "distinctAttribute": "product_id",
         "typoTolerance": { "disableOnAttributes": ["skus", "eans"], "disableOnNumbers": true },
-        // Per-tenant synonyms (normalized form, e.g. {"mikin": ["hoodi"]}); a placeholder
-        // until tenants can edit them.
+        // Per-tenant synonyms in normalized form (`synonyms::for_locale`).
         "synonyms": synonyms,
         "stopWords": [],
         "pagination": { "maxTotalHits": 1000 },
@@ -85,8 +84,13 @@ async fn lock_tenant(tx: &mut TenantTx, exclusive: bool) -> Result<(), Error> {
     Ok(())
 }
 
-/// Creates the index if missing (a concurrent creator is fine) and applies the settings.
-async fn create_with_settings(meili: &Meili, uid: &str) -> Result<(), MeiliError> {
+/// Creates the index if missing (a concurrent creator is fine) and applies the settings with
+/// the locale's synonyms.
+async fn create_with_settings(
+    meili: &Meili,
+    uid: &str,
+    synonyms: &Value,
+) -> Result<(), MeiliError> {
     if !meili.index_exists(uid).await? {
         match meili
             .wait(meili.create_index(uid).await?, SETTINGS_WAIT)
@@ -96,7 +100,7 @@ async fn create_with_settings(meili: &Meili, uid: &str) -> Result<(), MeiliError
             other => other?,
         }
     }
-    let task = meili.update_settings(uid, &settings(&json!({}))).await?;
+    let task = meili.update_settings(uid, &settings(synonyms)).await?;
     meili.wait(task, SETTINGS_WAIT).await
 }
 
@@ -104,6 +108,7 @@ async fn create_with_settings(meili: &Meili, uid: &str) -> Result<(), MeiliError
 pub async fn ensure_indexes(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Result<(), Error> {
     let mut tx = tenant_tx(db, tenant_id).await?;
     let ctx = documents::load_context(&mut tx).await?;
+    let groups = super::synonyms::get(&mut tx).await?.groups;
     let current: BTreeMap<String, i32> =
         sqlx::query!("SELECT locale, settings_version FROM search_indexes")
             .fetch_all(&mut *tx)
@@ -116,7 +121,8 @@ pub async fn ensure_indexes(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Resu
         if current.get(&locale).is_some_and(|v| *v >= SETTINGS_VERSION) {
             continue;
         }
-        create_with_settings(meili, &index_uid(tenant_id, &locale)).await?;
+        let synonyms = super::synonyms::for_locale(&groups, &locale);
+        create_with_settings(meili, &index_uid(tenant_id, &locale), &synonyms).await?;
         let mut tx = tenant_tx(db, tenant_id).await?;
         sqlx::query!(
             "INSERT INTO search_indexes (tenant_id, locale, settings_version) VALUES ($1, $2, $3)
@@ -130,6 +136,30 @@ pub async fn ensure_indexes(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Resu
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
+    }
+    Ok(())
+}
+
+/// Writes the tenant's current synonyms to every index (live and rebuilding). Idempotent: the
+/// job reads the latest groups, so a burst of edits ends in the last state.
+pub async fn apply_synonyms(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Result<(), Error> {
+    ensure_indexes(db, meili, tenant_id).await?;
+    let mut tx = tenant_tx(db, tenant_id).await?;
+    let groups = super::synonyms::get(&mut tx).await?.groups;
+    let targets = targets(&mut tx).await?;
+    tx.commit().await?;
+    for (locale, uids) in targets {
+        let body = json!({ "synonyms": super::synonyms::for_locale(&groups, &locale) });
+        for uid in uids {
+            let task = meili
+                .update_settings(&uid, &body)
+                .await
+                .map_err(|e| Error::Unavailable(e.to_string()))?;
+            meili
+                .wait(task, SETTINGS_WAIT)
+                .await
+                .map_err(|e| Error::Unavailable(e.to_string()))?;
+        }
     }
     Ok(())
 }
@@ -413,6 +443,7 @@ async fn rebuild_locked(
         sqlx::query_scalar!("SELECT locale FROM search_indexes ORDER BY locale")
             .fetch_all(&mut *tx)
             .await?;
+    let groups = super::synonyms::get(&mut tx).await?.groups;
     tx.commit().await?;
     for uid in previous {
         drop_index(meili, &uid).await?;
@@ -422,7 +453,8 @@ async fn rebuild_locked(
         let uid = format!("{}__r{job_id}", index_uid(tenant_id, locale));
         // A retry of this job may find its own half-filled index: start from scratch.
         drop_index(meili, &uid).await?;
-        create_with_settings(meili, &uid).await?;
+        let synonyms = super::synonyms::for_locale(&groups, locale);
+        create_with_settings(meili, &uid, &synonyms).await?;
         building.insert(locale.clone(), uid);
     }
     let mut tx = tenant_tx(db, tenant_id).await?;

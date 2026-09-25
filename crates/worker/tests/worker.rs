@@ -305,7 +305,9 @@ async fn only_one_cron_leader_and_one_job_per_slot(db: PgPool) {
         keys,
         vec![
             format!("cron:maintenance.cleanup:{slot}"),
-            format!("cron:maintenance.cleanup:{}", slot + 1)
+            format!("cron:feeds.export_all:{slot}"),
+            format!("cron:maintenance.cleanup:{}", slot + 1),
+            format!("cron:feeds.export_all:{}", slot + 1),
         ]
     );
 
@@ -322,7 +324,13 @@ async fn cleanup_job_runs_end_to_end(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili(), None, None),
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "done").await;
@@ -382,7 +390,13 @@ async fn media_jobs_process_and_purge_assets(db: PgPool) {
     };
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(storage.clone(), testkit::dead_meili(), None, None),
+        worker::handlers::all(
+            storage.clone(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
         fast_config(),
     );
     wait_for_status(&db, job_id(media::PROCESS_JOB).await, "done").await;
@@ -456,7 +470,13 @@ async fn media_job_failing_every_attempt_marks_the_asset_failed(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(storage.clone(), testkit::dead_meili(), None, None),
+        worker::handlers::all(
+            storage.clone(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "dead").await;
@@ -501,7 +521,13 @@ async fn scheduled_sale_start_publishes_price_changed(db: PgPool) {
 
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili(), None, None),
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
         fast_config(),
     );
     let mut found = None;
@@ -582,6 +608,7 @@ async fn mail_jobs_deliver_and_retry_an_uncertain_transactional_send(db: PgPool)
             testkit::dead_meili(),
             Some(smtp.mailer()),
             None,
+            worker::handlers::Extra::disabled().unwrap(),
         ),
         fast_config(),
     );
@@ -647,6 +674,7 @@ async fn staff_invitation_email_leaves_through_the_outbox(db: PgPool) {
             testkit::dead_meili(),
             Some(smtp.mailer()),
             Some(auth),
+            worker::handlers::Extra::disabled().unwrap(),
         ),
         fast_config(),
     );
@@ -667,5 +695,99 @@ async fn staff_invitation_email_leaves_through_the_outbox(db: PgPool) {
         raw[0].contains("magic-link/verify?token=3Dabc"),
         "quoted-printable: {}",
         raw[0]
+    );
+}
+
+/// Catalog and content events purge the edge (tags for product changes, the tenant for
+/// structural ones) and queue one debounced export-feed regeneration (WP13a, A2).
+#[sqlx::test(migrations = "../../migrations")]
+async fn catalog_events_purge_the_edge_and_debounce_feed_exports(db: PgPool) {
+    use axum::routing::post;
+    use tokio::sync::Mutex;
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "alpha").await;
+    let product = testkit::catalog::product(&runtime, tenant, "TS", 1).await;
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    queue::publish(
+        &mut *tx,
+        "product.updated",
+        &json!({ "product_id": product.id }),
+    )
+    .await
+    .unwrap();
+    queue::publish(
+        &mut *tx,
+        "page.changed",
+        &json!({ "page_id": uuid::Uuid::now_v7() }),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let kinds: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT kind, count(*) FROM queue.jobs WHERE kind IN ('edge.purge', 'feeds.export')
+         GROUP BY kind ORDER BY kind",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    // product.created (from the fixture) + product.updated + page.changed purge; both product
+    // events share one export job.
+    assert_eq!(
+        kinds,
+        vec![("edge.purge".to_owned(), 3), ("feeds.export".to_owned(), 1)]
+    );
+
+    // The purge jobs reach the edge with the right selectors.
+    let seen: Arc<Mutex<Vec<serde_json::Value>>> = Arc::default();
+    let sink = seen.clone();
+    let app = axum::Router::new().route(
+        "/_edge/purge",
+        post(move |axum::Json(body): axum::Json<serde_json::Value>| {
+            let sink = sink.clone();
+            async move {
+                sink.lock().await.push(body);
+                "{}"
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/_edge/purge", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let mut extra = worker::handlers::Extra::disabled().unwrap();
+    extra.edge = platform::edge::EdgePurge::new(
+        Some(url.parse().unwrap()),
+        "edge-purge-token-0123456789".into(),
+    );
+    // Only the purge jobs run here (the export job waits for its debounce window).
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            extra,
+        ),
+        fast_config(),
+    );
+    for _ in 0..200 {
+        if seen.lock().await.len() >= 3 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let bodies = seen.lock().await.clone();
+    assert!(
+        bodies
+            .contains(&json!({ "tenant_id": tenant, "tags": [format!("product:{}", product.id)] })),
+        "{bodies:?}"
+    );
+    assert!(
+        bodies.contains(&json!({ "tenant_id": tenant })),
+        "{bodies:?}"
     );
 }
