@@ -99,6 +99,33 @@ export function t(
   return out;
 }
 
+const pluralRules = new Map<string, Intl.PluralRules>();
+
+/**
+ * A counted message by the locale's plural rules: `key.one` / `key.few` / `key.many` /
+ * `key.other` (cs: 1 produkt, 3 produkty, 5 produktů), falling back to `key.other`, then `key`.
+ * `{count}` is filled in.
+ */
+export function tn(
+  messages: Messages,
+  locale: string,
+  key: string,
+  count: number,
+  args: Record<string, string | number> = {},
+): string {
+  let rules = pluralRules.get(locale);
+  if (!rules) {
+    rules = new Intl.PluralRules(locale);
+    pluralRules.set(locale, rules);
+  }
+  const form = [`${key}.${rules.select(count)}`, `${key}.other`].find((k) => k in messages);
+  return t(messages, form ?? key, { count, ...args });
+}
+
+/** The plural forms of `key` the catalogs define, for `pick` (islands that call `tn`). */
+export const pluralKeys = (key: string) =>
+  ["one", "few", "many", "other"].map((form) => `${key}.${form}`);
+
 /** The messages an island needs: islands serialize their props into the page, so send few. */
 export function pick(messages: Messages, keys: readonly string[]): Messages {
   return Object.fromEntries(keys.map((k) => [k, messages[k] ?? k]));

@@ -1,6 +1,15 @@
 import { expect, test } from "vitest";
-import { readConsent } from "./client.ts";
-import { formatMoney, imageAttrs, imageUrl, lcpImage, pick, t, times } from "./format.ts";
+import {
+  formatMoney,
+  imageAttrs,
+  imageUrl,
+  lcpImage,
+  pick,
+  pluralKeys,
+  t,
+  times,
+  tn,
+} from "./format.ts";
 
 const img = {
   alt: "Tričko",
@@ -42,15 +51,29 @@ test("the LCP preload and the img share one sizes value", () => {
   expect(attrs).toMatchObject({ sizes: "50vw", srcset: img.srcset, loading: "eager" });
 });
 
-test("consent cookie parsing ignores unknown purposes", () => {
-  expect(readConsent("a=1; consent=analytics%2Cevil%2Cads")).toEqual(["analytics", "ads"]);
-  expect(readConsent("consent=")).toEqual([]);
-  expect(readConsent("x=1")).toBeNull();
-});
 
 test("platform messages: placeholders, missing keys, island subsets", () => {
   const m = { "listing.count": "{count} produktů", "cart.add": "Přidat do košíku" };
   expect(t(m, "listing.count", { count: 3 })).toBe("3 produktů");
   expect(t(m, "nope")).toBe("nope");
   expect(pick(m, ["cart.add", "x"])).toEqual({ "cart.add": "Přidat do košíku", x: "x" });
+});
+
+test("counted messages follow the locale's plural rules", () => {
+  const m = {
+    "n.one": "{count} produkt",
+    "n.few": "{count} produkty",
+    "n.many": "{count} produktu",
+    "n.other": "{count} produktů",
+    "only.other": "{count} items",
+  };
+  expect([1, 3, 5, 1.5].map((n) => tn(m, "cs", "n", n))).toEqual([
+    "1 produkt",
+    "3 produkty",
+    "5 produktů",
+    "1.5 produktu",
+  ]);
+  expect(tn(m, "en", "only", 1)).toBe("1 items"); // no `one` form: falls back to `other`
+  expect(tn(m, "cs", "missing", 2)).toBe("missing");
+  expect(pluralKeys("n")).toEqual(["n.one", "n.few", "n.many", "n.other"]);
 });
