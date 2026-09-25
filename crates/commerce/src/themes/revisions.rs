@@ -44,6 +44,9 @@ pub const MAINTENANCE_JOB: &str = "themes.maintenance";
 pub const MAX_PENDING_BUILDS: i64 = 3;
 /// A build that has not moved for this long is failed by the maintenance job.
 pub const STUCK_AFTER_MINUTES: i32 = 30;
+/// An AI run saves progress every turn and ends within 45 minutes: one silent for this long lost
+/// its worker.
+pub const AI_RUN_STUCK_AFTER_MINUTES: i32 = 60;
 /// Artifact GC: unreferenced artifacts older than this are deleted; failed revisions lose their
 /// artifact after it, and so do ready revisions beyond the newest [`KEEP_READY`].
 pub const GC_AFTER_DAYS: i32 = 7;
@@ -1005,11 +1008,13 @@ pub async fn store_screenshot(
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct Maintenance {
     pub expired_builds: u64,
+    pub expired_ai_runs: u64,
     pub released_revisions: u64,
     pub deleted_artifacts: Vec<String>,
 }
 
-/// Fails builds that have not moved for [`STUCK_AFTER_MINUTES`], releases artifacts of failed
+/// Fails builds that have not moved for [`STUCK_AFTER_MINUTES`] and AI runs whose worker died
+/// (no progress for [`AI_RUN_STUCK_AFTER_MINUTES`]; they would block new runs), releases artifacts of failed
 /// and surplus ready revisions after [`GC_AFTER_DAYS`], then deletes theme artifacts no
 /// revision or channel references any more (published and superseded revisions keep theirs:
 /// rollback targets and retained `/_astro/*` assets, A22).
@@ -1035,6 +1040,17 @@ pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, 
                AND status_changed_at < now() - make_interval(mins => $1)",
             STUCK_AFTER_MINUTES,
             stuck
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        out.expired_ai_runs += sqlx::query!(
+            "UPDATE ai_theme_runs
+             SET status = 'failed', finished_at = now(), updated_at = now(),
+                 error = 'interrupted: the run stopped making progress; start it again'
+             WHERE status IN ('queued', 'running')
+               AND updated_at < now() - make_interval(mins => $1)",
+            AI_RUN_STUCK_AFTER_MINUTES
         )
         .execute(&mut *tx)
         .await?

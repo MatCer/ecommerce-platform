@@ -748,3 +748,34 @@ async fn runs_are_tenant_isolated_and_discard_keeps_revisions_unpublishable(db: 
         "ai_run_not_accepted"
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn maintenance_fails_runs_whose_worker_died(db: PgPool) {
+    let (runtime, storage, shop) = setup(&db).await;
+    let ai = Ai::fake();
+    let run = start(&runtime, &ai, shop.tenant, "stuck").await.unwrap();
+    // A run that is still moving is left alone.
+    let report = themes::maintenance(&runtime, &storage).await.unwrap();
+    assert_eq!(report.expired_ai_runs, 0);
+    as_tenant(
+        &runtime,
+        shop.tenant,
+        "UPDATE ai_theme_runs SET status = 'running', updated_at = now() - interval '61 minutes' WHERE id = $1",
+        run.id,
+    )
+    .await;
+    // It blocks new runs until the sweep fails it.
+    assert_eq!(
+        start(&runtime, &ai, shop.tenant, "next")
+            .await
+            .unwrap_err()
+            .code(),
+        "ai_run_in_progress"
+    );
+    let report = themes::maintenance(&runtime, &storage).await.unwrap();
+    assert_eq!(report.expired_ai_runs, 1);
+    let d = detail(&runtime, shop.tenant, run.id).await;
+    assert_eq!(d.run.status, "failed");
+    assert!(d.run.error.unwrap().starts_with("interrupted"));
+    start(&runtime, &ai, shop.tenant, "next").await.unwrap();
+}
