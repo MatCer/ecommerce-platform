@@ -45,6 +45,10 @@ psql_su -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
 "${compose[@]}" exec -T postgres pg_restore -U postgres -d postgres \
   --create --clean --if-exists --exit-on-error /tmp/restore.dump
 psql_su -c 'ANALYZE' # planner statistics are not part of a dump
+# Meilisearch is not in the backup: forget the restored index state so the worker recreates
+# every index with its settings before the rebuild (otherwise the first incremental job would
+# create a bare index that the restored state already counts as configured).
+psql_su -c 'TRUNCATE search_indexes, search_product_state' >/dev/null
 
 log "mirror buckets back: ${BUCKETS[*]}"
 mc_run "$dir/minio" "
