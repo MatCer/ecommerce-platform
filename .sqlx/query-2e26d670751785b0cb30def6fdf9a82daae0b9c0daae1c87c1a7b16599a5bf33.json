@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT name, company, street, city, postal_code, country FROM order_addresses\n         WHERE order_id = $1 ORDER BY CASE kind WHEN 'billing' THEN 0 ELSE 1 END LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "company",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "company"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "street",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "street"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "city",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "postal_code",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "postal_code"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_addresses",
+            "name": "country"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2e26d670751785b0cb30def6fdf9a82daae0b9c0daae1c87c1a7b16599a5bf33"
+}

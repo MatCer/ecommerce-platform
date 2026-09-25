@@ -440,6 +440,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/customer/orders/{id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["my_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/orders/{id}/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["my_form"];
+        put?: never;
+        post: operations["my_declare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/customer/password": {
         parameters: {
             query?: never;
@@ -545,6 +577,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["get_order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/orders/{token}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["order_documents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -837,6 +885,46 @@ export interface paths {
         get: operations["shop"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Step 1 of the public form: order number + email. If they match an order that can be
+         *     withdrawn from, a single-use confirmation link (24 h) is emailed. Always `202`.
+         */
+        post: operations["request_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/withdrawals/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["form_by_token"];
+        put?: never;
+        /**
+         * The explicit confirmation (A19): records the withdrawal, consumes the link and emails the
+         *     receipt with the full declaration.
+         */
+        post: operations["declare_by_token"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1165,11 +1253,36 @@ export interface components {
              */
             recently_verified: boolean;
         };
+        DeclareInput: {
+            /** @description The explicit confirmation step (A19): must be `true`. */
+            confirm: boolean;
+            /** @description Required for bank transfer and cash on delivery orders. */
+            iban?: string | null;
+            lines: components["schemas"]["RefundLine"][];
+            /** @description Optional message to the shop (a reason is not required by law). */
+            note?: string | null;
+        };
         DeliveryEstimate: {
             /** Format: date */
             from: string;
             /** Format: date */
             to: string;
+        };
+        /** @enum {string} */
+        DocumentKind: "invoice" | "credit_note";
+        /** @description An invoice or credit note with a 5-minute download link. */
+        DocumentLink: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            issued_on: string;
+            kind: components["schemas"]["DocumentKind"];
+            number: string;
+            total: components["schemas"]["MoneyView"];
+            url: string;
+        };
+        DocumentLinks: {
+            items: components["schemas"]["DocumentLink"][];
         };
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
@@ -1291,6 +1404,10 @@ export interface components {
         Link: {
             href: string;
             label: string;
+        };
+        LinkRequest: {
+            email: string;
+            order_number: string;
         };
         /** @description A category page or search results. */
         ListingPage: {
@@ -1667,6 +1784,13 @@ export interface components {
             cache: components["schemas"]["CacheHints"];
             products: components["schemas"]["ProductCard"][];
         };
+        /** @description A goods line to refund: `quantity` more units of an order line. */
+        RefundLine: {
+            /** Format: uuid */
+            order_line_id: string;
+            /** Format: int32 */
+            quantity: number;
+        };
         /** @description What the edge needs to answer a redirect. */
         ResolvedRedirect: {
             /** Format: int32 */
@@ -1856,6 +1980,51 @@ export interface components {
             /** @description Percent (`"21"`). */
             rate: string;
             vat: components["schemas"]["MoneyView"];
+        };
+        WithdrawableLine: {
+            name: string;
+            options_label: string;
+            /** Format: uuid */
+            order_line_id: string;
+            /** Format: int32 */
+            quantity: number;
+            sku: string;
+            /**
+             * Format: int32
+             * @description Not yet withdrawn.
+             */
+            withdrawable: number;
+        };
+        WithdrawalForm: {
+            /**
+             * Format: date-time
+             * @description delivered + 14 days (the statutory period; later declarations are still recorded).
+             */
+            deadline?: string | null;
+            /** Format: date-time */
+            delivered_at?: string | null;
+            /** @description The order has left the warehouse (before that it is cancelled, not withdrawn). */
+            eligible: boolean;
+            lines: components["schemas"]["WithdrawableLine"][];
+            /** @description Bank transfer and cash on delivery are refunded to a bank account: the form asks for it. */
+            needs_iban: boolean;
+            order_number: string;
+            /** Format: date-time */
+            placed_at: string;
+            /** @description Earlier withdrawals of this order. */
+            withdrawals: components["schemas"]["WithdrawalReceipt"][];
+        };
+        WithdrawalReceipt: {
+            /** @description The declaration as confirmed (also emailed). */
+            declaration: string;
+            /** Format: date-time */
+            declared_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            refund_due_at: string;
+            /** @description `open` or `refunded`. */
+            status: string;
         };
     };
     responses: never;
@@ -3145,6 +3314,165 @@ export interface operations {
             };
         };
     };
+    my_documents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentLinks"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    my_form: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalForm"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    my_declare: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalReceipt"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_withdrawable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     set_password: {
         parameters: {
             query?: never;
@@ -3387,6 +3715,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    order_documents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentLinks"];
                 };
             };
             404: {
@@ -4103,6 +4468,141 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    request_link: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkRequest"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_email */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    form_by_token: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Emailed withdrawal link token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalForm"];
+                };
+            };
+            /** @description unknown, used or expired link */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    declare_by_token: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Emailed withdrawal link token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalReceipt"];
+                };
+            };
+            /** @description unknown, used or expired link */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_withdrawable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description confirmation_required | invalid_withdrawal | iban_required | invalid_iban */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

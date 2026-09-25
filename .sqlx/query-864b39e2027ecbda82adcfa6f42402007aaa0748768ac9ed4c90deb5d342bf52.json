@@ -1,0 +1,196 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT w.id, w.order_id, o.number, w.email, w.channel, w.status, w.declaration, w.iban,\n                w.note, w.delivered_at, w.declared_at, w.goods_received_at, w.return_proof_at,\n                w.refund_due_at, w.refunded_at\n         FROM withdrawals w JOIN orders o ON o.id = w.order_id WHERE w.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "order_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "number",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "channel",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "channel"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "declaration",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "declaration"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "iban",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "iban"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "delivered_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "delivered_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "declared_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "declared_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "goods_received_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "goods_received_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "return_proof_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "return_proof_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "refund_due_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "refund_due_at"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "refunded_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "withdrawals",
+            "name": "refunded_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "864b39e2027ecbda82adcfa6f42402007aaa0748768ac9ed4c90deb5d342bf52"
+}

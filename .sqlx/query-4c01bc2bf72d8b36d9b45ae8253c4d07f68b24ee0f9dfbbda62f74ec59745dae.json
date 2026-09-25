@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT pickup_point FROM orders WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "pickup_point",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "pickup_point"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "4c01bc2bf72d8b36d9b45ae8253c4d07f68b24ee0f9dfbbda62f74ec59745dae"
+}

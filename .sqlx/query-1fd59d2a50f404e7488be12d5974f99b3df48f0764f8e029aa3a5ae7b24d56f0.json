@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shipments SET carrier_status = $2, tracked_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1fd59d2a50f404e7488be12d5974f99b3df48f0764f8e029aa3a5ae7b24d56f0"
+}

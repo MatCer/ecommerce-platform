@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT order_id, carrier, carrier_ref, status FROM shipments WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "order_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "carrier",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "carrier"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "carrier_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "carrier_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "status"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "54b1651043a7867a306f8316cd44e22dd0500ece746d96aa98428ca72ddde3ad"
+}

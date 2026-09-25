@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shipments SET status = $2,\n             shipped_at = CASE WHEN $2 = 'shipped' THEN coalesce(shipped_at, now()) ELSE shipped_at END,\n             delivered_at = CASE WHEN $2 = 'delivered' THEN coalesce(delivered_at, now())\n                                 ELSE delivered_at END,\n             updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8e4253f1e2c92aefb5d197319a2f496f00ea7f80e42de3f6c9a70ae529e0a314"
+}

@@ -196,6 +196,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/carriers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_carriers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/carriers/{carrier}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Stores a carrier's API credentials (sealed; never returned). Admin with a fresh login.
+         *     Packeta: `api_password`; PPL: `client_id` + `client_secret`.
+         */
+        put: operations["put_carrier"];
+        post?: never;
+        delete: operations["delete_carrier"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/categories": {
         parameters: {
             query?: never;
@@ -306,6 +342,42 @@ export interface paths {
         post?: never;
         /** Deletes an unused coupon (`409 coupon_in_use` once redeemed or advertised). */
         delete: operations["delete_coupon"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queues a packing slip or label sheet PDF for up to 100 orders (poll `GET
+         *     /admin/v1/documents/{id}`). Label sheets first create the missing labels.
+         */
+        post: operations["create_document"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/documents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -507,6 +579,23 @@ export interface paths {
         };
         /** The variant's stock movements, newest first. */
         get: operations["list_movements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/invoices/{id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An invoice or credit note PDF (404 until rendered). */
+        get: operations["invoice_url"];
         put?: never;
         post?: never;
         delete?: never;
@@ -722,6 +811,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancels an order that has not left: stock and coupon released, the customer told; a paid
+         *     order is refunded in full with a credit note. Admin.
+         */
+        post: operations["cancel_order"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/orders/{id}/cod/collect": {
         parameters: {
             query?: never;
@@ -776,6 +885,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/orders/{id}/deliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The parcel was delivered (manual; tracking does it automatically). */
+        post: operations["deliver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/exception/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Returns a late or duplicate payment (A10) and resolves the order's exception. Admin. */
+        post: operations["refund_exception"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/orders/{id}/exception/resolve": {
         parameters: {
             query?: never;
@@ -790,6 +933,165 @@ export interface paths {
          *     queue. `409 no_open_exception` otherwise.
          */
         post: operations["resolve_order_exception"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["add_note"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/processing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** `confirmed → processing` (packing started). */
+        post: operations["start_processing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refunds lines/quantities and charges of a paid order through its payment method, with a
+         *     credit note and the refund email. Admin.
+         */
+        post: operations["create_refund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/refunds/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a refund would return (A15), without refunding. */
+        post: operations["preview_refund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/returned-to-sender": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The undelivered parcel is back (merchant-confirmed): restock, order `returned`. */
+        post: operations["returned_to_sender"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/ship": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The carrier took the parcel: stock commit, `order.shipped`, shipped email. */
+        post: operations["ship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/shipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates the shipment and its label at the carrier (the order becomes `processing`). */
+        post: operations["create_label"];
+        /** Voids the shipment before dispatch. */
+        delete: operations["cancel_label"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/shipment/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The live shipment's label PDF. */
+        get: operations["label_url"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/orders/{id}/shipping-address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Changes the shipping address before a label exists (same country: M1 has no financial
+         *     edits, A13).
+         */
+        put: operations["update_address"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1166,6 +1468,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/refunds/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Repeats a pending Stripe refund with the same idempotency key. */
+        post: operations["retry_refund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/sales": {
         parameters: {
             query?: never;
@@ -1511,6 +1830,90 @@ export interface paths {
          *     this response only.
          */
         post: operations["rotate_webhook_secret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Withdrawals, soonest refund deadline first. */
+        get: operations["list_withdrawals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/withdrawals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_withdrawal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/withdrawals/{id}/proof": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The customer proved they sent the goods back (the refund may go out before they arrive). */
+        post: operations["withdrawal_proof"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/withdrawals/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The returned goods arrived: restocked (A13). */
+        post: operations["receive_withdrawal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/withdrawals/{id}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refunds the withdrawn goods (+ shipping when everything was withdrawn). Admin. */
+        post: operations["refund_withdrawal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2024,6 +2427,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/customer/orders/{id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["my_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/customer/orders/{id}/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["my_form"];
+        put?: never;
+        post: operations["my_declare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/customer/password": {
         parameters: {
             query?: never;
@@ -2129,6 +2564,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["get_order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/orders/{token}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["order_documents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2427,6 +2878,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/withdrawals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Step 1 of the public form: order number + email. If they match an order that can be
+         *     withdrawn from, a single-use confirmation link (24 h) is emailed. Always `202`.
+         */
+        post: operations["request_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/storefront/v1/withdrawals/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["form_by_token"];
+        put?: never;
+        /**
+         * The explicit confirmation (A19): records the withdrawal, consumes the link and emails the
+         *     receipt with the full declaration.
+         */
+        post: operations["declare_by_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/fake": {
         parameters: {
             query?: never;
@@ -2523,8 +3014,9 @@ export interface components {
             applied: boolean;
             level: components["schemas"]["Level"];
         };
-        /** @description The admin's read-only order detail (full management is WP12). */
+        /** @description The admin's order detail. */
         AdminOrder: {
+            actions: components["schemas"]["OrderActions"];
             attempts: components["schemas"]["Attempt"][];
             /** Format: uuid */
             customer_id?: string | null;
@@ -2535,10 +3027,18 @@ export interface components {
              * @description When a person settled the exception (it then leaves the work list), and how.
              */
             exception_resolved_at?: string | null;
+            invoices: components["schemas"]["InvoiceSummary"][];
             /** Format: uuid */
             market_id: string;
             order: components["schemas"]["OrderView"];
+            refunds: components["schemas"]["RefundView"][];
             ship_to_country: string;
+            /**
+             * @description WP12: shipments (labels, tracking), invoices and credit notes, refunds, withdrawals and
+             *     what an admin can do now.
+             */
+            shipments: components["schemas"]["ShipmentView"][];
+            withdrawals: components["schemas"]["Withdrawal"][];
         };
         Alternate: {
             href: string;
@@ -2830,8 +3330,38 @@ export interface components {
             /** @description Purge tags (`product:<id>`, `category:<id>`, `shop`, ...). */
             tags: string[];
         };
+        CancelInput: {
+            /** @description Bank transfer / COD: where the refund of a paid order goes. */
+            iban?: string | null;
+            reason?: string | null;
+        };
+        CancelOutcome: {
+            refund?: components["schemas"]["RefundOutcome"] | null;
+        };
         /** @enum {string} */
         Carrier: "packeta_pickup" | "packeta_home" | "ppl" | "personal_pickup";
+        CarrierAccount: {
+            carrier: components["schemas"]["CarrierKind"];
+            configured: boolean;
+            /** @description Packeta: the public widget/API key (first 16 characters of the API password). */
+            public_key?: string | null;
+            /** @description The sender name on labels (Packeta `eshop`). */
+            sender_label?: string | null;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        /** @description Credentials to store. Packeta: `api_password`; PPL: `client_id` + `client_secret`. */
+        CarrierAccountInput: {
+            api_password?: string | null;
+            client_id?: string | null;
+            client_secret?: string | null;
+            sender_label: string;
+        };
+        CarrierAccountList: {
+            items: components["schemas"]["CarrierAccount"][];
+        };
+        /** @enum {string} */
+        CarrierKind: "packeta" | "ppl";
         CartCoupon: {
             /** @description Whether it applies to the cart right now. */
             applied: boolean;
@@ -3246,6 +3776,15 @@ export interface components {
             /** @description Searches without results (the search log, minimized; filtered by the market's locales). */
             zero_result_searches: components["schemas"]["QueryCount"][];
         };
+        DeclareInput: {
+            /** @description The explicit confirmation step (A19): must be `true`. */
+            confirm: boolean;
+            /** @description Required for bank transfer and cash on delivery orders. */
+            iban?: string | null;
+            lines: components["schemas"]["RefundLine"][];
+            /** @description Optional message to the shop (a reason is not required by law). */
+            note?: string | null;
+        };
         Delivery: {
             /** Format: int32 */
             attempts: number;
@@ -3288,6 +3827,40 @@ export interface components {
         };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
+        DocumentInput: {
+            kind: components["schemas"]["DocumentKind"];
+            /** @description Packing slip language: `cs`, `sk` or `en` (default `cs`). */
+            locale?: string | null;
+            /** @description 1-100 orders. */
+            order_ids: string[];
+        };
+        /** @enum {string} */
+        DocumentKind: "invoice" | "credit_note";
+        /** @description An invoice or credit note with a 5-minute download link. */
+        DocumentLink: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            issued_on: string;
+            kind: components["schemas"]["DocumentKind"];
+            number: string;
+            total: components["schemas"]["MoneyView"];
+            url: string;
+        };
+        DocumentLinks: {
+            items: components["schemas"]["DocumentLink"][];
+        };
+        DocumentRequested: {
+            document: components["schemas"]["GeneratedDocument"];
+            /** @description Orders whose label could not be created (label sheets): `{order_id, error}`. */
+            failures: components["schemas"]["LabelFailure"][];
+        };
+        /** @enum {string} */
+        DocumentStatus: "pending" | "ready" | "failed";
+        /** @description A 5-minute download link (A21). */
+        DownloadLink: {
+            url: string;
+        };
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
             key: string;
@@ -3377,6 +3950,18 @@ export interface components {
             sessions: number;
             /** @description `sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`. */
             step: string;
+        };
+        GeneratedDocument: {
+            /** Format: date-time */
+            created_at: string;
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["DocumentKind"];
+            order_ids: string[];
+            status: components["schemas"]["DocumentStatus"];
+            /** @description A 5-minute download link once `ready`. */
+            url?: string | null;
         };
         GoLiveCheck: {
             code: components["schemas"]["CheckCode"];
@@ -3586,6 +4171,19 @@ export interface components {
             email: string;
             role: components["schemas"]["Role"];
         };
+        InvoiceSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            issued_on: string;
+            kind: components["schemas"]["DocumentKind"];
+            number: string;
+            /** @description The PDF is rendered (downloadable). */
+            pdf_ready: boolean;
+            /** Format: date */
+            taxable_supply_date: string;
+            total: components["schemas"]["MoneyView"];
+        };
         ItemProblem: {
             /**
              * @description `invalid_item_id`, `missing_name`, `invalid_ean`, `currency_mismatch`, `sku_conflict`,
@@ -3621,6 +4219,18 @@ export interface components {
             items: components["schemas"]["JobInfo"][];
             /** Format: int64 */
             next_cursor?: number | null;
+        };
+        LabelFailure: {
+            error: string;
+            /** Format: uuid */
+            order_id: string;
+        };
+        LabelInput: {
+            /**
+             * Format: int64
+             * @description Parcel weight in grams; default: the variants' weights (at least 100 g).
+             */
+            weight_g?: number | null;
         };
         Legal: {
             privacy_url: string;
@@ -3728,6 +4338,10 @@ export interface components {
         Link: {
             href: string;
             label: string;
+        };
+        LinkRequest: {
+            email: string;
+            order_number: string;
         };
         /** @description A category page or search results. */
         ListingPage: {
@@ -4068,6 +4682,17 @@ export interface components {
             name: string;
             values: components["schemas"]["OptionValueView"][];
         };
+        OrderActions: {
+            cancel: boolean;
+            cancel_label: boolean;
+            create_label: boolean;
+            deliver: boolean;
+            edit_address: boolean;
+            refund: boolean;
+            returned_to_sender: boolean;
+            ship: boolean;
+            start_processing: boolean;
+        };
         OrderAddress: {
             city: string;
             company?: string | null;
@@ -4104,6 +4729,10 @@ export interface components {
             unit_price: components["schemas"]["MoneyView"];
             /** Format: uuid */
             variant_id?: string | null;
+        };
+        OrderNoteInput: {
+            /** @description 1-2000 characters, shown on the timeline. */
+            note: string;
         };
         OrderPage: {
             items: components["schemas"]["OrderSummary"][];
@@ -4444,6 +5073,16 @@ export interface components {
             order_id: string;
             payment: components["schemas"]["PaymentStart"];
         };
+        PlannedLine: {
+            amount: components["schemas"]["MoneyView"];
+            /** @description `goods`, `shipping`, `payment_fee`, `rounding`. */
+            kind: string;
+            name: string;
+            /** Format: uuid */
+            order_line_id?: string | null;
+            /** Format: int32 */
+            quantity: number;
+        };
         /**
          * @description Why the base prices change (recorded on the price intervals).
          * @enum {string}
@@ -4751,6 +5390,70 @@ export interface components {
             /** Format: uuid */
             next_cursor?: string | null;
         };
+        Refund: {
+            /** Format: int64 */
+            amount_minor: number;
+            /** Format: uuid */
+            attempt_id: string;
+            currency: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            order_id: string;
+            provider_ref?: string | null;
+            reason?: string | null;
+            status: components["schemas"]["RefundStatus"];
+        };
+        RefundInput: {
+            /** @description Where a bank refund goes (bank transfer, cash on delivery), shown to the person paying it. */
+            iban?: string | null;
+            /** @description Goods to refund: more units of order lines. */
+            lines?: components["schemas"]["RefundLine"][];
+            /** @description Refund the whole payment fee. */
+            payment_fee?: boolean;
+            reason?: string | null;
+            /** @description Refund the whole shipping charge. */
+            shipping?: boolean;
+        };
+        /** @description A goods line to refund: `quantity` more units of an order line. */
+        RefundLine: {
+            /** Format: uuid */
+            order_line_id: string;
+            /** Format: int32 */
+            quantity: number;
+        };
+        RefundOutcome: {
+            /** Format: uuid */
+            credit_note_id?: string | null;
+            plan: components["schemas"]["RefundPlan"];
+            refund: components["schemas"]["Refund"];
+        };
+        /** @description What a refund would return (also the admin preview). */
+        RefundPlan: {
+            amount: components["schemas"]["MoneyView"];
+            /** @description Everything the customer paid is refunded after this. */
+            full: boolean;
+            lines: components["schemas"]["PlannedLine"][];
+        };
+        /** @enum {string} */
+        RefundStatus: "pending" | "succeeded" | "failed";
+        RefundView: {
+            amount: components["schemas"]["MoneyView"];
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            /** Format: uuid */
+            credit_note_id?: string | null;
+            /** @description Bank refunds: the account to pay. */
+            iban?: string | null;
+            /** Format: uuid */
+            id: string;
+            reason?: string | null;
+            /** @description `pending`, `succeeded`, `failed`. */
+            status: string;
+            /** Format: uuid */
+            withdrawal_id?: string | null;
+        };
         RemitInput: {
             /** @description E.g. the carrier's payout reference, at most 500 characters. */
             note?: string | null;
@@ -4791,6 +5494,19 @@ export interface components {
             /** Format: int32 */
             code: number;
             to_path: string;
+        };
+        /** @enum {string} */
+        ReturnLineStatus: "requested" | "approved" | "received" | "refunded_awaiting_goods" | "refunded" | "rejected";
+        ReturnLineView: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            order_line_id: string;
+            /** Format: int32 */
+            quantity: number;
+            sku: string;
+            status: components["schemas"]["ReturnLineStatus"];
         };
         /**
          * @description Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
@@ -4923,6 +5639,27 @@ export interface components {
             /** @description `noindex,follow` on filtered listings (spec §9.5); absent otherwise. */
             robots?: string | null;
             title: string;
+        };
+        /** @enum {string} */
+        ShipmentStatus: "creating" | "label_created" | "shipped" | "delivered" | "returned" | "cancelled";
+        ShipmentView: {
+            carrier: components["schemas"]["Carrier"];
+            carrier_ref?: string | null;
+            /** @description The carrier's last reported state. */
+            carrier_status?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            delivered_at?: string | null;
+            /** @description A label PDF is stored (`GET …/label`). */
+            has_label: boolean;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            shipped_at?: string | null;
+            status: components["schemas"]["ShipmentStatus"];
+            tracking_number?: string | null;
+            tracking_url?: string | null;
         };
         ShippingInput: {
             /** Format: uuid */
@@ -5455,6 +6192,85 @@ export interface components {
              */
             up_to_g: number;
         };
+        WithdrawableLine: {
+            name: string;
+            options_label: string;
+            /** Format: uuid */
+            order_line_id: string;
+            /** Format: int32 */
+            quantity: number;
+            sku: string;
+            /**
+             * Format: int32
+             * @description Not yet withdrawn.
+             */
+            withdrawable: number;
+        };
+        Withdrawal: {
+            channel: string;
+            declaration: string;
+            /** Format: date-time */
+            declared_at: string;
+            /** Format: date-time */
+            delivered_at?: string | null;
+            email: string;
+            /** Format: date-time */
+            goods_received_at?: string | null;
+            iban?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** @description Declared after the 14-day period (the merchant decides). */
+            late: boolean;
+            lines: components["schemas"]["ReturnLineView"][];
+            note?: string | null;
+            /** Format: uuid */
+            order_id: string;
+            order_number: string;
+            /** @description The refund deadline has passed without a refund. */
+            overdue: boolean;
+            /** Format: date-time */
+            refund_due_at: string;
+            /** Format: date-time */
+            refunded_at?: string | null;
+            /** Format: date-time */
+            return_proof_at?: string | null;
+            /** @description `open` or `refunded`. */
+            status: string;
+        };
+        WithdrawalForm: {
+            /**
+             * Format: date-time
+             * @description delivered + 14 days (the statutory period; later declarations are still recorded).
+             */
+            deadline?: string | null;
+            /** Format: date-time */
+            delivered_at?: string | null;
+            /** @description The order has left the warehouse (before that it is cancelled, not withdrawn). */
+            eligible: boolean;
+            lines: components["schemas"]["WithdrawableLine"][];
+            /** @description Bank transfer and cash on delivery are refunded to a bank account: the form asks for it. */
+            needs_iban: boolean;
+            order_number: string;
+            /** Format: date-time */
+            placed_at: string;
+            /** @description Earlier withdrawals of this order. */
+            withdrawals: components["schemas"]["WithdrawalReceipt"][];
+        };
+        WithdrawalList: {
+            items: components["schemas"]["Withdrawal"][];
+        };
+        WithdrawalReceipt: {
+            /** @description The declaration as confirmed (also emailed). */
+            declaration: string;
+            /** Format: date-time */
+            declared_at: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            refund_due_at: string;
+            /** @description `open` or `refunded`. */
+            status: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -5913,6 +6729,118 @@ export interface operations {
             };
             /** @description invalid_resolution */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_carriers: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierAccountList"];
+                };
+            };
+        };
+    };
+    put_carrier: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                carrier: components["schemas"]["CarrierKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CarrierAccountInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarrierAccount"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_carrier: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                carrier: components["schemas"]["CarrierKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6393,6 +7321,80 @@ export interface operations {
             };
         };
     };
+    create_document: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentInput"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRequested"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_document: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratedDocument"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_feeds: {
         parameters: {
             query?: never;
@@ -6774,6 +7776,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MovementPage"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    invoice_url: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLink"];
                 };
             };
             404: {
@@ -7357,6 +8391,51 @@ export interface operations {
             };
         };
     };
+    cancel_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelOutcome"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition | already_shipped | invoice_pending | refund_rejected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     cod_collect: {
         parameters: {
             query?: never;
@@ -7521,6 +8600,70 @@ export interface operations {
             };
         };
     };
+    deliver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description no_shipment | invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    refund_exception: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refund"][];
+                };
+            };
+            /** @description no_open_exception */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     resolve_order_exception: {
         parameters: {
             query?: never;
@@ -7563,6 +8706,401 @@ export interface operations {
             };
             /** @description no_open_exception */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_note: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderNoteInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    start_processing: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_refund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundOutcome"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description nothing_to_refund | invoice_pending | refund_rejected */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_refund | invalid_iban */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    preview_refund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundPlan"];
+                };
+            };
+            /** @description invalid_refund */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    returned_to_sender: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description no_shipment | invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ship: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description no_shipment | invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_label: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description order_not_ready | label_exists | label_in_progress | carrier_not_configured */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description carrier_rejected */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description the carrier is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    cancel_label: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description no_shipment | already_shipped */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    label_url: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadLink"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_address: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutAddress"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description address_locked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8924,6 +10462,38 @@ export interface operations {
             };
         };
     };
+    retry_refund: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refund"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_sales: {
         parameters: {
             query?: {
@@ -10139,6 +11709,161 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_withdrawals: {
+        parameters: {
+            query?: {
+                /** @description Only withdrawals still to refund (default true). */
+                open?: boolean;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalList"];
+                };
+            };
+        };
+    };
+    get_withdrawal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Withdrawal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    withdrawal_proof: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Withdrawal"];
+                };
+            };
+        };
+    };
+    receive_withdrawal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Withdrawal"];
+                };
+            };
+            /** @description already_received | invalid_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    refund_withdrawal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundOutcome"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description goods_not_back | already_refunded | nothing_to_refund | invoice_pending */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11553,6 +13278,165 @@ export interface operations {
             };
         };
     };
+    my_documents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentLinks"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    my_form: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalForm"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    my_declare: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Session token from the checkout origin's `__Host-sid` cookie (set by the edge). */
+                "X-Customer-Session": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalReceipt"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_withdrawable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     set_password: {
         parameters: {
             query?: never;
@@ -11795,6 +13679,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderView"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    order_documents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Order capability token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentLinks"];
                 };
             };
             404: {
@@ -12511,6 +14432,141 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    request_link: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkRequest"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_email */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    form_by_token: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Emailed withdrawal link token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalForm"];
+                };
+            };
+            /** @description unknown, used or expired link */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    declare_by_token: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+            };
+            path: {
+                /** @description Emailed withdrawal link token */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeclareInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WithdrawalReceipt"];
+                };
+            };
+            /** @description unknown, used or expired link */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description not_withdrawable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description confirmation_required | invalid_withdrawal | iban_required | invalid_iban */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

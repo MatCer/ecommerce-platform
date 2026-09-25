@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT public_key FROM carrier_accounts WHERE carrier = 'packeta'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "public_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carrier_accounts",
+            "name": "public_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "2baaf6fccab8f55a4f2b040dd9e2888db274574f94b781df3ad8d5f85337bb68"
+}

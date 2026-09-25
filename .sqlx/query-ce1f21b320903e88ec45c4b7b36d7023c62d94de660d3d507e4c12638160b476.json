@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE withdrawals SET status = 'refunded', refunded_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce1f21b320903e88ec45c4b7b36d7023c62d94de660d3d507e4c12638160b476"
+}

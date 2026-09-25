@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE shipments SET status = 'cancelled', carrier_status = $2,\n                         updated_at = now()\n                     WHERE id = $1 AND status = 'creating'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "41b6280b5c09717a5b0bf5dcc2ab5ead5cdc23db6325bb95aa618746a7926ae6"
+}
