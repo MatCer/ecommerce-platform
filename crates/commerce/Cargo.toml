@@ -16,6 +16,7 @@ image.workspace = true
 infer.workspace = true
 object_store.workspace = true
 platform.workspace = true
+quick-xml.workspace = true
 rand.workspace = true
 ravif.workspace = true
 reqwest.workspace = true

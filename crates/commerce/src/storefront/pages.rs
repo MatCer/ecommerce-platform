@@ -95,7 +95,8 @@ pub struct ShopModel {
     /// The tenant's markets (other shops of the same merchant).
     pub markets: Vec<MarketLink>,
     pub menus: Menus,
-    /// Placeholders until CMS pages exist (WP13).
+    /// Published legal pages (terms, privacy, withdrawal, complaints, ...), except the cookies
+    /// page, which is `consent.policy_url`.
     pub legal_pages: Vec<Link>,
     pub consent: ConsentConfig,
     /// Free shipping from this order value; `None` until shipping methods exist (WP10).
@@ -151,35 +152,34 @@ async fn category_tree(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<CategoryR
 }
 
 pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> {
-    let tree = category_tree(tx, ctx).await?;
-    let main = tree
-        .iter()
-        .filter(|c| c.parent_id.is_none())
-        .map(|c| MenuItem {
-            label: c.name.clone(),
-            href: ctx.path(&format!("/c/{}", c.slug)),
-            children: tree
-                .iter()
-                .filter(|k| k.parent_id == Some(c.id))
-                .map(|k| Link {
-                    label: k.name.clone(),
-                    href: ctx.path(&format!("/c/{}", k.slug)),
+    use crate::content::menus;
+    // The merchant's `main` menu, else the top two levels of the category tree.
+    let main = match menus::entries(tx, "main").await? {
+        Some(entries) => super::content::resolve_menu(tx, ctx, &entries).await?,
+        None => {
+            let tree = category_tree(tx, ctx).await?;
+            tree.iter()
+                .filter(|c| c.parent_id.is_none())
+                .map(|c| MenuItem {
+                    label: c.name.clone(),
+                    href: ctx.path(&format!("/c/{}", c.slug)),
+                    children: tree
+                        .iter()
+                        .filter(|k| k.parent_id == Some(c.id))
+                        .map(|k| Link {
+                            label: k.name.clone(),
+                            href: ctx.path(&format!("/c/{}", k.slug)),
+                        })
+                        .collect(),
                 })
-                .collect(),
-        })
-        .collect();
-    let footer = [
-        ("menu.shipping", "/pages/doprava-a-platba"),
-        ("menu.returns", "/pages/reklamace-a-vraceni"),
-        ("menu.contact", "/pages/kontakt"),
-    ]
-    .iter()
-    .map(|(k, href)| MenuItem {
-        label: t(ctx, k),
-        href: ctx.path(href),
-        children: Vec::new(),
-    })
-    .collect();
+                .collect()
+        }
+    };
+    let footer = match menus::entries(tx, "footer").await? {
+        Some(entries) => super::content::resolve_menu(tx, ctx, &entries).await?,
+        None => Vec::new(),
+    };
+    let (legal_pages, cookies_page) = super::content::legal_links(tx, ctx).await?;
     let markets = ctx
         .markets
         .iter()
@@ -212,17 +212,14 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
         currencies: vec![ctx.market.currency.code().into()],
         markets,
         menus: Menus { main, footer },
-        legal_pages: vec![
-            link(ctx, "legal.terms", "/pages/obchodni-podminky"),
-            link(ctx, "legal.privacy", "/pages/ochrana-osobnich-udaju"),
-        ],
+        legal_pages,
         consent: ConsentConfig {
             purposes: vec![
                 ConsentPurpose::Analytics,
                 ConsentPurpose::Ads,
                 ConsentPurpose::Personalization,
             ],
-            policy_url: ctx.path("/pages/cookies"),
+            policy_url: cookies_page.unwrap_or_else(|| ctx.path("/pages/cookies")),
             text_version: crate::consent::TEXT_VERSION.into(),
             preferences_url: ctx.checkout_url("/consent"),
         },

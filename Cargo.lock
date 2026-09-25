@@ -606,6 +606,7 @@ dependencies = [
  "object_store",
  "platform",
  "proptest",
+ "quick-xml",
  "rand 0.10.3",
  "ravif",
  "reqwest",
