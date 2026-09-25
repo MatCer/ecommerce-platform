@@ -3828,7 +3828,7 @@ export interface components {
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
         DocumentInput: {
-            kind: components["schemas"]["DocumentKind"];
+            kind: components["schemas"]["GeneratedKind"];
             /** @description Packing slip language: `cs`, `sk` or `en` (default `cs`). */
             locale?: string | null;
             /** @description 1-100 orders. */
@@ -3957,12 +3957,14 @@ export interface components {
             error?: string | null;
             /** Format: uuid */
             id: string;
-            kind: components["schemas"]["DocumentKind"];
+            kind: components["schemas"]["GeneratedKind"];
             order_ids: string[];
             status: components["schemas"]["DocumentStatus"];
             /** @description A 5-minute download link once `ready`. */
             url?: string | null;
         };
+        /** @enum {string} */
+        GeneratedKind: "packing_slips" | "labels";
         GoLiveCheck: {
             code: components["schemas"]["CheckCode"];
             /** @description What is missing: field names, `<legal type>:<locale>` pairs, or product names. */
@@ -4718,6 +4720,11 @@ export interface components {
         OrderLineView: {
             /** @description This line's share of the coupon (A15). */
             discount: components["schemas"]["MoneyView"];
+            /**
+             * Format: uuid
+             * @description The order line (refunds and withdrawals name lines by it).
+             */
+            id: string;
             name: string;
             options_label: string;
             /** Format: int32 */
@@ -5588,7 +5595,8 @@ export interface components {
             orders: number;
             /**
              * Format: int64
-             * @description Sum of order totals (placed, not cancelled), minor units.
+             * @description Sum of order totals (placed, not cancelled) less what was refunded of them (WP12,
+             *     netted on the order's day), minor units.
              */
             revenue_minor: number;
         };

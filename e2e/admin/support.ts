@@ -175,3 +175,36 @@ export async function totp(secret: string): Promise<string> {
   const value = hmac.readUInt32BE(offset) & 0x7fffffff;
   return String(value % 1_000_000).padStart(6, "0");
 }
+
+/**
+ * A read (or a job enqueue) as the database superuser in the postgres container, for
+ * assertions the UI does not show (WP12: invoice dates, stock). Returns psql's unaligned output.
+ */
+export function sql(query: string): string {
+  return execFileSync(
+    "docker",
+    [
+      "compose",
+      "exec",
+      "-T",
+      "postgres",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "app",
+      "-At",
+      "-c",
+      query,
+    ],
+    { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
+  ).trim();
+}
+
+/** Runs a worker job now instead of waiting for its cron slot (e.g. `shipping.track`). */
+export function enqueueJob(kind: string): void {
+  if (!/^[a-z_.]+$/.test(kind)) throw new Error("bad job kind");
+  sql(
+    `SELECT queue.enqueue('${kind}', '{}'::jsonb, NULL, 'default', NULL, 3, 'e2e:${kind}:${Date.now()}')`,
+  );
+}

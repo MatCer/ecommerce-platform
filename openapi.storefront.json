@@ -7347,6 +7347,7 @@
       "OrderLineView": {
         "type": "object",
         "required": [
+          "id",
           "sku",
           "name",
           "options_label",
@@ -7361,6 +7362,11 @@
           "discount": {
             "$ref": "#/components/schemas/MoneyView",
             "description": "This line's share of the coupon (A15)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The order line (refunds and withdrawals name lines by it)."
           },
           "name": {
             "type": "string"

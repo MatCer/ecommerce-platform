@@ -667,7 +667,7 @@ async fn create_document(
         });
     }
     let mut failures = Vec::new();
-    if input.kind == documents::DocumentKind::Labels {
+    if input.kind == documents::GeneratedKind::Labels {
         let c = carriers_of(&s)?;
         for order in &input.order_ids {
             let needs = in_tx(&s, staff.tenant_id, async |tx| {

@@ -14,11 +14,7 @@
   "bank_account": null,
   "supplier": {
     "name": "Demo obchod s.r.o.",
-    "address": [
-      "Dlouhá 12",
-      "110 00 Praha 1",
-      "Česká republika"
-    ],
+    "address": ["Dlouhá 12", "110 00 Praha 1", "Česká republika"],
     "company_id": "12345678",
     "vat_id": "CZ12345678",
     "sk_ic_dph": null,
@@ -28,11 +24,7 @@
   },
   "customer": {
     "name": "Jana Nováková",
-    "address": [
-      "Krátká 8",
-      "602 00 Brno",
-      "Česká republika"
-    ],
+    "address": ["Krátká 8", "602 00 Brno", "Česká republika"],
     "email": "jana@example.cz"
   },
   "original": null,

@@ -17669,7 +17669,7 @@
         ],
         "properties": {
           "kind": {
-            "$ref": "#/components/schemas/DocumentKind"
+            "$ref": "#/components/schemas/GeneratedKind"
           },
           "locale": {
             "type": [
@@ -18099,7 +18099,7 @@
             "format": "uuid"
           },
           "kind": {
-            "$ref": "#/components/schemas/DocumentKind"
+            "$ref": "#/components/schemas/GeneratedKind"
           },
           "order_ids": {
             "type": "array",
@@ -18119,6 +18119,13 @@
             "description": "A 5-minute download link once `ready`."
           }
         }
+      },
+      "GeneratedKind": {
+        "type": "string",
+        "enum": [
+          "packing_slips",
+          "labels"
+        ]
       },
       "GoLiveCheck": {
         "type": "object",
@@ -20432,6 +20439,7 @@
       "OrderLineView": {
         "type": "object",
         "required": [
+          "id",
           "sku",
           "name",
           "options_label",
@@ -20446,6 +20454,11 @@
           "discount": {
             "$ref": "#/components/schemas/MoneyView",
             "description": "This line's share of the coupon (A15)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The order line (refunds and withdrawals name lines by it)."
           },
           "name": {
             "type": "string"
@@ -23287,7 +23300,7 @@
           "revenue_minor": {
             "type": "integer",
             "format": "int64",
-            "description": "Sum of order totals (placed, not cancelled), minor units."
+            "description": "Sum of order totals (placed, not cancelled) less what was refunded of them (WP12,\nnetted on the order's day), minor units."
           }
         }
       },

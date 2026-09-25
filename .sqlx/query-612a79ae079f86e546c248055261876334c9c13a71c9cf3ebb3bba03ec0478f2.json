@@ -1,10 +1,21 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT variant_id, sku, name, options_label, quantity, unit_gross_minor, discount_minor,\n                total_minor, tax_rate, tax_minor\n         FROM order_lines WHERE order_id = $1 ORDER BY position",
+  "query": "SELECT id, variant_id, sku, name, options_label, quantity, unit_gross_minor,\n                discount_minor, total_minor, tax_rate, tax_minor\n         FROM order_lines WHERE order_id = $1 ORDER BY position",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
         "name": "variant_id",
         "type_info": "Uuid",
         "origin": {
@@ -15,7 +26,7 @@
         }
       },
       {
-        "ordinal": 1,
+        "ordinal": 2,
         "name": "sku",
         "type_info": "Text",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "name",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "options_label",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "quantity",
         "type_info": "Int4",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "unit_gross_minor",
         "type_info": "Int8",
         "origin": {
@@ -70,7 +81,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "discount_minor",
         "type_info": "Int8",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "total_minor",
         "type_info": "Int8",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "tax_rate",
         "type_info": "Text",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "tax_minor",
         "type_info": "Int8",
         "origin": {
@@ -120,6 +131,7 @@
       ]
     },
     "nullable": [
+      false,
       true,
       false,
       false,
@@ -132,5 +144,5 @@
       false
     ]
   },
-  "hash": "5ed5301a3d8e15d6d78c11bf5ed3befe17beb84968b1465ee6dafed28037a8c7"
+  "hash": "612a79ae079f86e546c248055261876334c9c13a71c9cf3ebb3bba03ec0478f2"
 }

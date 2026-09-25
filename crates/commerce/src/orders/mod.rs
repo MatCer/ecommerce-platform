@@ -427,6 +427,8 @@ pub struct OrderAddress {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct OrderLineView {
+    /// The order line (refunds and withdrawals name lines by it).
+    pub id: Uuid,
     pub variant_id: Option<Uuid>,
     pub sku: String,
     pub name: String,
@@ -544,8 +546,8 @@ pub async fn view(tx: &mut TenantTx, id: Uuid) -> Result<OrderView, Error> {
     let bad = |e: serde_json::Error| Error::Internal(format!("stored order: {e}"));
 
     let lines = sqlx::query!(
-        "SELECT variant_id, sku, name, options_label, quantity, unit_gross_minor, discount_minor,
-                total_minor, tax_rate, tax_minor
+        "SELECT id, variant_id, sku, name, options_label, quantity, unit_gross_minor,
+                discount_minor, total_minor, tax_rate, tax_minor
          FROM order_lines WHERE order_id = $1 ORDER BY position",
         id
     )
@@ -553,6 +555,7 @@ pub async fn view(tx: &mut TenantTx, id: Uuid) -> Result<OrderView, Error> {
     .await?
     .into_iter()
     .map(|l| OrderLineView {
+        id: l.id,
         variant_id: l.variant_id,
         sku: l.sku,
         name: l.name,

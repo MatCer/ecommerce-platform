@@ -149,12 +149,12 @@ pub async fn download_url(storage: &Storage, key: &str, filename: &str) -> Resul
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum DocumentKind {
+pub enum GeneratedKind {
     PackingSlips,
     Labels,
 }
 
-impl DocumentKind {
+impl GeneratedKind {
     fn as_str(self) -> &'static str {
         match self {
             Self::PackingSlips => "packing_slips",
@@ -174,7 +174,7 @@ pub enum DocumentStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GeneratedDocument {
     pub id: Uuid,
-    pub kind: DocumentKind,
+    pub kind: GeneratedKind,
     pub order_ids: Vec<Uuid>,
     pub status: DocumentStatus,
     pub error: Option<String>,
@@ -186,7 +186,7 @@ pub struct GeneratedDocument {
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DocumentInput {
-    pub kind: DocumentKind,
+    pub kind: GeneratedKind,
     /// 1-100 orders.
     pub order_ids: Vec<Uuid>,
     /// Packing slip language: `cs`, `sk` or `en` (default `cs`).
@@ -263,9 +263,9 @@ pub async fn get(
     Ok(GeneratedDocument {
         id: r.id,
         kind: if r.kind == "labels" {
-            DocumentKind::Labels
+            GeneratedKind::Labels
         } else {
-            DocumentKind::PackingSlips
+            GeneratedKind::PackingSlips
         },
         order_ids: r.order_ids,
         status: match r.status.as_str() {

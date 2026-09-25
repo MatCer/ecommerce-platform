@@ -14,11 +14,7 @@
   "bank_account": null,
   "supplier": {
     "name": "Ukážkový obchod s.r.o.",
-    "address": [
-      "Obchodná 12",
-      "811 06 Bratislava",
-      "Slovenská republika"
-    ],
+    "address": ["Obchodná 12", "811 06 Bratislava", "Slovenská republika"],
     "company_id": "12345678",
     "vat_id": "2021234567",
     "sk_ic_dph": "SK2021234567",
@@ -28,11 +24,7 @@
   },
   "customer": {
     "name": "Ľubomír Šťastný",
-    "address": [
-      "Hlavná 7",
-      "040 01 Košice",
-      "Slovenská republika"
-    ],
+    "address": ["Hlavná 7", "040 01 Košice", "Slovenská republika"],
     "email": "lubomir@example.sk"
   },
   "original": null,
