@@ -116,6 +116,16 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
   }
   // End at the very bottom (a fixed consent banner then covers only the page's end padding).
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  // A sticky header covers whatever happens to scroll under it at this one position (the reader
+  // scrolls it back into view); axe would report that as a target-size failure depending on
+  // content height alone. Unstick sticky elements for the scan; fixed ones (the consent banner)
+  // stay and are checked.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll<HTMLElement>("body *")) {
+      if (getComputedStyle(el).position === "sticky") el.style.position = "static";
+    }
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  });
   await settle(ctx);
 
   const axe = opts.withRum
