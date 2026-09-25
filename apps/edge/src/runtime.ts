@@ -8,8 +8,11 @@ export type NodeBinding = (request: Request) => Promise<Response>;
 
 export interface PoolOptions {
   artifactRoot: string;
-  /** Bindings for an artifact (see bindings.ts for the policy). Nothing else is injected. */
-  bindings: (manifest: ArtifactManifest) => Record<string, NodeBinding>;
+  /**
+   * Bindings for an instance (see bindings.ts for the policy). Nothing else is injected.
+   * `scope` is the tenant for untrusted theme instances (see WorkerPool), else undefined.
+   */
+  bindings: (manifest: ArtifactManifest, scope: string | undefined) => Record<string, NodeBinding>;
   /** Called for every outbound `fetch()`/`connect()` a worker attempts. Always denied. */
   onOutbound?: (manifest: ArtifactManifest, url: string) => void;
 }
@@ -55,7 +58,11 @@ const DENY_WORKER = `export default {
   },
 };`;
 
-async function createInstance(opts: PoolOptions, id: string): Promise<Instance> {
+async function createInstance(
+  opts: PoolOptions,
+  id: string,
+  scope: string | undefined,
+): Promise<Instance> {
   const manifest = await readManifest(opts.artifactRoot, id);
   const serverDir = path.resolve(opts.artifactRoot, id, "server");
   // Explicit module map from the manifest: nothing outside it can be imported.
@@ -64,7 +71,7 @@ async function createInstance(opts: PoolOptions, id: string): Promise<Instance> 
     modules[p] = { type: "esm", contents: await readFile(path.join(serverDir, p), "utf8") };
   }
   const env = Object.fromEntries(
-    Object.entries(opts.bindings(manifest)).map(([name, fn]) => [
+    Object.entries(opts.bindings(manifest, scope)).map(([name, fn]) => [
       name,
       {
         type: "fetcher" as const,
@@ -136,24 +143,35 @@ export class WorkerPool {
     return this.#instances.size;
   }
 
-  has(id: string) {
-    return this.#instances.has(id);
+  /** Instance key: an artifact, optionally isolated per scope (tenant). */
+  static key(id: string, scope?: string) {
+    return scope ? `${id}@${scope}` : id;
   }
 
-  async #instance(id: string): Promise<Instance> {
-    let pending = this.#instances.get(id);
+  has(id: string, scope?: string) {
+    return this.#instances.has(WorkerPool.key(id, scope));
+  }
+
+  async #instance(id: string, scope: string | undefined): Promise<Instance> {
+    const key = WorkerPool.key(id, scope);
+    let pending = this.#instances.get(key);
     if (!pending) {
-      pending = createInstance(this.#opts, id);
-      this.#instances.set(id, pending);
-      pending.catch(() => this.#instances.delete(id));
+      pending = createInstance(this.#opts, id, scope);
+      this.#instances.set(key, pending);
+      pending.catch(() => this.#instances.delete(key));
     }
     const inst = await pending;
     inst.lastUsed = Date.now();
     return inst;
   }
 
-  async fetch(id: string, request: Request): Promise<Response> {
-    const { mf } = await this.#instance(id);
+  /**
+   * Dispatches to the instance of artifact `id`. With a `scope`, each scope gets its own isolate:
+   * module state is never shared between tenants, so a worker cannot keep one tenant's request
+   * context and replay it while serving another tenant (WP2 review finding).
+   */
+  async fetch(id: string, request: Request, scope?: string): Promise<Response> {
+    const { mf } = await this.#instance(id, scope);
     const res = await mf.dispatchFetch(request.url, {
       method: request.method,
       headers: [...request.headers],
@@ -167,10 +185,16 @@ export class WorkerPool {
     });
   }
 
+  /** Disposes every instance of artifact `id` (all scopes). */
   async evict(id: string) {
-    const pending = this.#instances.get(id);
+    const keys = [...this.#instances.keys()].filter((k) => k === id || k.startsWith(`${id}@`));
+    await Promise.all(keys.map((k) => this.#evictKey(k)));
+  }
+
+  async #evictKey(key: string) {
+    const pending = this.#instances.get(key);
     if (!pending) return;
-    this.#instances.delete(id);
+    this.#instances.delete(key);
     const inst = await pending.catch(() => undefined);
     await inst?.mf.dispose();
   }
@@ -179,11 +203,11 @@ export class WorkerPool {
   async evictIdle(idleMs: number, now = Date.now()) {
     for (const [id, pending] of this.#instances) {
       const inst = await pending.catch(() => undefined);
-      if (inst && now - inst.lastUsed >= idleMs) await this.evict(id);
+      if (inst && now - inst.lastUsed >= idleMs) await this.#evictKey(id);
     }
   }
 
   async dispose() {
-    await Promise.all([...this.#instances.keys()].map((id) => this.evict(id)));
+    await Promise.all([...this.#instances.keys()].map((k) => this.#evictKey(k)));
   }
 }

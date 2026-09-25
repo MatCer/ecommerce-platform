@@ -104,6 +104,7 @@ export class HtmlCache {
   readonly #entries = new Map<string, CacheEntry>();
   readonly #maxBytes: number;
   #bytes = 0;
+  #generation = 0;
 
   constructor(maxBytes = 64 * 1024 * 1024) {
     this.#maxBytes = maxBytes;
@@ -126,15 +127,27 @@ export class HtmlCache {
     return { entry, fresh: age < entry.ttlMs };
   }
 
-  set(key: string, entry: CacheEntry) {
+  /** Bumped by every purge; a render started before a purge must not write its result. */
+  get generation() {
+    return this.#generation;
+  }
+
+  /** Stores `entry` unless a purge happened since `generation` was read (then it is stale). */
+  set(key: string, entry: CacheEntry, generation = this.#generation) {
     this.#delete(key);
-    if (entry.body.byteLength > this.#maxBytes / 16) return; // do not let one page evict everything
+    if (generation !== this.#generation) return;
+    const size = sizeOf(key, entry);
+    if (size > this.#maxBytes / 16) return; // do not let one page evict everything
     this.#entries.set(key, entry);
-    this.#bytes += entry.body.byteLength;
+    this.#bytes += size;
     for (const k of this.#entries.keys()) {
-      if (this.#bytes <= this.#maxBytes) break;
+      if (this.#bytes <= this.#maxBytes && this.#entries.size <= MAX_ENTRIES) break;
       this.#delete(k);
     }
+  }
+
+  delete(key: string) {
+    this.#delete(key);
   }
 
   /**
@@ -143,6 +156,7 @@ export class HtmlCache {
    */
   purge(sel: { tags?: string[]; tenantId?: string; all?: boolean }): number {
     if (!sel.all && sel.tags === undefined && sel.tenantId === undefined) return 0;
+    this.#generation++;
     let n = 0;
     for (const [k, e] of this.#entries) {
       const hit =
@@ -161,6 +175,17 @@ export class HtmlCache {
     const e = this.#entries.get(key);
     if (!e) return;
     this.#entries.delete(key);
-    this.#bytes -= e.body.byteLength;
+    this.#bytes -= sizeOf(key, e);
   }
+}
+
+/** Entry count cap: empty or tiny pages must not grow the map without bound. */
+const MAX_ENTRIES = 20_000;
+
+/** Body plus key, headers and tags, so metadata counts against the byte budget too. */
+function sizeOf(key: string, e: CacheEntry) {
+  let n = 256 + key.length + e.body.byteLength;
+  for (const [k, v] of e.headers) n += k.length + v.length;
+  for (const t of e.tags) n += t.length;
+  return n;
 }

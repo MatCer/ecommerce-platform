@@ -31,6 +31,8 @@ export default {
       case "/p/theme-no-store": return html("x", { "cache-control": "no-store" });
       case "/p/sets-cookie": return html("x", { "set-cookie": "evil=1; Domain=.demo.localhost; Path=/" });
       case "/c/slow": { await new Promise((r) => setTimeout(r, 5000)); return html("slow"); }
+      case "/c/endless": return new Response(new ReadableStream({ pull: (c) => new Promise((r) => setTimeout(() => { c.enqueue(new TextEncoder().encode("<p>")); r(); }, 100)) }), { headers: { "content-type": "text/html" } });
+      case "/c/huge": { const chunk = new Uint8Array(1024 * 1024); let n = 0; return new Response(new ReadableStream({ pull(c) { if (n++ < 8) c.enqueue(chunk); else c.close(); } })); }
       case "/c/fanout": {
         const statuses = [];
         for (let i = 0; i < 52; i++) statuses.push((await sf("/shop")).status);

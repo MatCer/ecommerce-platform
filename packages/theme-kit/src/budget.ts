@@ -30,6 +30,16 @@ export interface PageResult {
 
 export function judge(r: PageResult): string[] {
   const fails: string[] = [];
+  // A metric that was not measured is a failure, never a pass (NaN fails no comparison).
+  for (const [name, v] of Object.entries({
+    LCP: r.lcpMs,
+    TBT: r.tbtMs,
+    CLS: r.cls,
+    JS: r.jsGzip,
+    calls: r.subrequests,
+  })) {
+    if (!Number.isFinite(v)) fails.push(`${name} not measured`);
+  }
   const js = r.kind === "home" ? BUDGET.jsGzip.home : BUDGET.jsGzip.default;
   if (r.lcpMs > BUDGET.lcpMs) fails.push(`LCP ${Math.round(r.lcpMs)} ms > ${BUDGET.lcpMs}`);
   if (r.tbtMs > BUDGET.tbtMs) fails.push(`TBT ${Math.round(r.tbtMs)} ms > ${BUDGET.tbtMs}`);
@@ -47,6 +57,7 @@ export function judge(r: PageResult): string[] {
 }
 
 export const median = (xs: number[]) => {
+  if (xs.length === 0) return Number.NaN; // not measured
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? (s[m] ?? 0) : ((s[m - 1] ?? 0) + (s[m] ?? 0)) / 2;

@@ -17,7 +17,7 @@ import {
   contentSecurityPolicy,
   securityHeaders,
   stripUntrusted,
-  themeRequestHeaders,
+  workerRequestHeaders,
   workerResponseHeaders,
 } from "./headers.ts";
 import { type NodeBinding, WorkerPool } from "./runtime.ts";
@@ -104,6 +104,14 @@ function readCookie(headers: Headers, name: string): string | undefined {
 }
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+const CLEAR_CART_COOKIE = `${SHOP_CART_COOKIE}=; Path=/_p; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+const EMPTY_CART = {
+  id: null,
+  lines: [],
+  item_count: 0,
+  subtotal: null,
+  free_shipping_remaining: null,
+};
 
 export function createGateway(opts: GatewayOptions) {
   const scheme = opts.scheme ?? "https";
@@ -130,8 +138,8 @@ export function createGateway(opts: GatewayOptions) {
 
   const pool = new WorkerPool({
     artifactRoot: opts.artifactRoot,
-    bindings: (m): Record<string, NodeBinding> => {
-      const common = { registry, artifactId: m.id, apiOrigin: opts.apiOrigin, upstream };
+    bindings: (m, scope): Record<string, NodeBinding> => {
+      const common = { registry, artifactId: m.id, scope, apiOrigin: opts.apiOrigin, upstream };
       const assets = assetsBinding(opts.artifactRoot, m);
       return m.kind === "theme"
         ? {
@@ -184,6 +192,9 @@ export function createGateway(opts: GatewayOptions) {
               ? "public, max-age=31536000, immutable"
               : "public, max-age=300",
             "x-content-type-options": "nosniff",
+            // Assets are never documents: an .html/.svg opened directly runs sandboxed (opaque
+            // origin, no script), so a theme cannot ship a page that bypasses the edge CSP.
+            "content-security-policy": ASSET_CSP,
           },
         });
       }
@@ -196,19 +207,28 @@ export function createGateway(opts: GatewayOptions) {
   async function render(
     artifactId: string,
     url: URL,
-    incoming: Headers,
     site: Site,
-    extra: { cartToken?: string } = {},
+    extra: { cartToken?: string; scope?: string } = {},
   ) {
-    const ctxId = registry.open(site, artifactId, extra);
+    const ctxId = registry.open(site, artifactId, { cartToken: extra.cartToken });
     try {
-      const headers = themeRequestHeaders(incoming);
+      const headers = workerRequestHeaders();
       headers.set(CTX_HEADER, ctxId);
-      const res = await withTimeout(
-        pool.fetch(artifactId, new Request(url, { method: "GET", headers })),
+      // One deadline and one byte cap for headers *and* body: a worker must not hold a request
+      // context (or Node memory) open with a never-ending stream.
+      const abort = new AbortController();
+      const { res, body } = await withTimeout(
+        (async () => {
+          const res = await pool.fetch(
+            artifactId,
+            new Request(url, { method: "GET", headers }),
+            extra.scope,
+          );
+          return { res, body: await readCapped(res.body, MAX_RENDER_BYTES, abort.signal) };
+        })(),
         opts.renderTimeoutMs ?? 10_000,
+        () => abort.abort(),
       );
-      const body = new Uint8Array(await res.arrayBuffer());
       const ctx = registry.get(ctxId, artifactId);
       return {
         status: res.status,
@@ -277,23 +297,30 @@ export function createGateway(opts: GatewayOptions) {
     };
 
     const store = async () => {
-      const r = await render(artifact, normalized, req.headers, site);
+      const gen = cache.generation;
+      const r = await render(artifact, normalized, site, { scope: site.tenant_id });
       const rv = responseVerdict({
         status: r.status,
         headers: r.rawHeaders,
         pageModels: r.pageModels,
       });
       const cacheable = verdict.cache && "ttl" in rv;
+      // A page that stopped being cacheable must not keep being served stale.
+      if (!cacheable) cache.delete(key);
       if (cacheable) {
-        cache.set(key, {
-          status: r.status,
-          headers: [...r.headers],
-          body: r.body,
-          storedAt: Date.now(),
-          ttlMs: rv.ttl * 1000,
-          tags: r.tags,
-          tenantId: site.tenant_id,
-        });
+        cache.set(
+          key,
+          {
+            status: r.status,
+            headers: [...r.headers],
+            body: r.body,
+            storedAt: Date.now(),
+            ttlMs: rv.ttl * 1000,
+            tags: r.tags,
+            tenantId: site.tenant_id,
+          },
+          gen,
+        ); // dropped if a purge happened while this render was in flight
       }
       return { r, cacheable };
     };
@@ -345,10 +372,8 @@ export function createGateway(opts: GatewayOptions) {
     if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) {
       return problem(415, "unsupported_media_type", "expected application/json");
     }
-    const body = await req.arrayBuffer();
-    return body.byteLength > max
-      ? problem(413, "payload_too_large", `body over ${max} bytes`)
-      : body;
+    const body = await readCapped(req.body, max).catch(() => null);
+    return body ? body.buffer : problem(413, "payload_too_large", `body over ${max} bytes`);
   }
 
   const cartCookie = (token: string) =>
@@ -378,10 +403,7 @@ export function createGateway(opts: GatewayOptions) {
 
     if (!token) {
       if (req.method === "GET")
-        return Response.json(
-          { id: null, lines: [], item_count: 0, subtotal: null, free_shipping_remaining: null },
-          { headers: { "cache-control": "no-store" } },
-        );
+        return Response.json(EMPTY_CART, { headers: { "cache-control": "no-store" } });
       // First write creates the cart; the API mints the 256-bit capability and stores its hash.
       const created = await upstream(
         new Request(`${opts.apiOrigin}/storefront/v1/cart`, {
@@ -412,11 +434,9 @@ export function createGateway(opts: GatewayOptions) {
     });
     if (setCookie) headers.append("set-cookie", setCookie);
     if (res.status === 404 && !setCookie) {
-      // Unknown/expired cart: forget the capability.
-      headers.append(
-        "set-cookie",
-        `${SHOP_CART_COOKIE}=; Path=/_p; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
-      );
+      // Unknown, expired or rotated (handed off) cart: forget the capability.
+      headers.append("set-cookie", CLEAR_CART_COOKIE);
+      if (req.method === "GET") return Response.json(EMPTY_CART, { headers });
     }
     return new Response(await res.arrayBuffer(), { status: res.status, headers });
   }
@@ -456,6 +476,8 @@ export function createGateway(opts: GatewayOptions) {
         location: `${scheme}://${checkoutHost}${port}/start?h=${h}`,
         "cache-control": "no-store",
         "referrer-policy": "no-referrer",
+        // The API rotated the capability (A4); the shop-side token is dead now.
+        "set-cookie": CLEAR_CART_COOKIE,
       },
     });
   }
@@ -482,9 +504,9 @@ export function createGateway(opts: GatewayOptions) {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
     // sendBeacon posts text/plain; accept both and let the API validate the payload.
-    const body = await req.arrayBuffer();
-    if (body.byteLength > MAX_EVENTS_BODY)
-      return problem(413, "payload_too_large", "events batch too large");
+    const capped = await readCapped(req.body, MAX_EVENTS_BODY).catch(() => null);
+    if (!capped) return problem(413, "payload_too_large", "events batch too large");
+    const body = capped.buffer;
     await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/events`, {
         method: "POST",
@@ -594,7 +616,13 @@ export function createGateway(opts: GatewayOptions) {
     const p = url.pathname;
     if (p === "/start") {
       const h = url.searchParams.get("h") ?? "";
-      const handoff = req.method === "GET" ? handoffs.consume(h, host) : null;
+      // Only the shop's own 303 (a same-site navigation) may redeem a handoff. A link planted by
+      // another site (cross-site) or pasted/opened from mail (none) is refused, so an attacker
+      // cannot push their cart into a victim's checkout.
+      const fetchSite = req.headers.get("sec-fetch-site");
+      const redeemable =
+        req.method === "GET" && (fetchSite === "same-site" || fetchSite === "same-origin");
+      const handoff = redeemable ? handoffs.consume(h, host) : null;
       if (!handoff || handoff.tenantId !== site.tenant_id) {
         return new Response(
           `<!doctype html><meta charset="utf-8"><title>Odkaz vypršel</title><p>Odkaz na pokladnu vypršel nebo už byl použit. <a href="${scheme}://${site.shop_host}${port}/">Zpět do obchodu</a></p>`,
@@ -637,9 +665,7 @@ export function createGateway(opts: GatewayOptions) {
     let cartToken = readCookie(req.headers, CHECKOUT_CART_COOKIE);
     if (cartToken && !TOKEN_RE.test(cartToken)) cartToken = undefined;
     const m = await manifest(opts.checkoutArtifact);
-    const r = await render(opts.checkoutArtifact, normalizeUrl(url), req.headers, site, {
-      cartToken,
-    });
+    const r = await render(opts.checkoutArtifact, normalizeUrl(url), site, { cartToken });
     const headers = r.headers;
     const csp = contentSecurityPolicy("checkout", {
       scriptHashes: m.csp.script_hashes,
@@ -729,12 +755,57 @@ function bearerMatches(header: string | null, expected: string) {
 
 class TimeoutError extends Error {}
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+const MAX_RENDER_BYTES = 5 * 1024 * 1024;
+
+const ASSET_CSP =
+  "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; sandbox";
+
+/** Reads a body stream, cancelling it as soon as it exceeds `max` bytes (then rejects). */
+async function readCapped(
+  stream: ReadableStream<Uint8Array> | null,
+  max: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const out = new Uint8Array(new ArrayBuffer(0));
+  if (!stream) return out;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = stream.getReader();
+  const cancel = () => void reader.cancel().catch(() => {});
+  signal?.addEventListener("abort", cancel, { once: true });
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        await reader.cancel();
+        throw new Error(`body over ${max} bytes`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    signal?.removeEventListener("abort", cancel);
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(new ArrayBuffer(total));
+  let offset = 0;
+  for (const c of chunks) {
+    body.set(c, offset);
+    offset += c.byteLength;
+  }
+  return body;
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   return Promise.race([
     p,
     new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new TimeoutError(`timed out after ${ms} ms`)), ms);
+      timer = setTimeout(() => {
+        onTimeout?.();
+        reject(new TimeoutError(`timed out after ${ms} ms`));
+      }, ms);
     }),
   ]).finally(() => clearTimeout(timer));
 }

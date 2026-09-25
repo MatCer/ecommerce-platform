@@ -122,13 +122,23 @@ describe("HtmlCache", () => {
     expect(c.purge({ all: true })).toBe(1);
   });
 
-  test("evicts least recently used entries beyond the byte budget", () => {
-    const c = new HtmlCache(160);
+  test("evicts least recently used entries beyond the byte budget (metadata counts)", () => {
+    const c = new HtmlCache(16 * 400); // each entry costs ≥ 256 B of overhead + body
     c.set("a", entry());
     c.set("b", entry());
     c.get("a", 1);
-    for (let i = 0; i < 15; i++) c.set(`x${i}`, entry());
+    for (let i = 0; i < 30; i++) c.set(`x${i}`, entry());
     expect(c.get("b", 1)).toBeNull();
-    expect(c.size).toBeLessThanOrEqual(16);
+    expect(c.size).toBeLessThan(24);
+  });
+
+  test("a render started before a purge cannot write its stale result", () => {
+    const c = new HtmlCache();
+    const gen = c.generation;
+    c.purge({ tags: ["product:1"] });
+    c.set("k", entry(), gen);
+    expect(c.get("k", 1)).toBeNull();
+    c.set("k", entry(), c.generation);
+    expect(c.get("k", 1)).not.toBeNull();
   });
 });

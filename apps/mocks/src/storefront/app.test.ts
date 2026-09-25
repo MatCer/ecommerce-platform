@@ -53,6 +53,14 @@ test("cart: capability token, tenant-bound, checkout token for the same cart", a
   ).json()) as { token: string };
   const viaCheckout = await req("/cart", { headers: { "x-cart-token": ct } });
   expect(((await viaCheckout.json()) as { item_count: number }).item_count).toBe(2);
+  // Rotated (A4): the pre-handoff shop capability is dead; the checkout one cannot edit lines.
+  expect((await req("/cart", { headers: { "x-cart-token": token } })).status).toBe(404);
+  const edit = await req("/cart/lines", {
+    method: "POST",
+    headers: { "x-cart-token": ct, "content-type": "application/json" },
+    body: JSON.stringify({ variant_id: "prod-001-01" }),
+  });
+  expect(edit.status).toBe(404);
 });
 
 test("media is served only for safe avif paths", async () => {

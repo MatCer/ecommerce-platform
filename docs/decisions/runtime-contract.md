@@ -79,7 +79,14 @@ Findings that shaped it:
 
 ## 3. Edge runtime behaviour (tested in `apps/edge/test/gateway.test.ts`)
 
-- **One Miniflare (workerd) instance per distinct artifact** (A30), created on first use. Cold start
+- **One Miniflare (workerd) instance per distinct artifact and tenant**, created on first use.
+  A30 says "per distinct artifact". WP2's review showed that a shared isolate lets theme code keep
+  one request's context id in module state and replay it while serving another tenant. So
+  untrusted theme artifacts get one isolate per tenant (still one instance per artifact when a
+  single tenant uses it), and the binding refuses contexts of other tenants. The platform-owned
+  checkout artifact stays shared across tenants. Within one tenant, a worker can still borrow a
+  concurrent request's context; that exposes only the same tenant's public data and its own
+  cache hints, which is accepted. Cold start
   is about 0.25 s (first render after restart, measured through Caddy); warm uncached render is
   about 9 ms, cache hit about 1.4 ms. The edge container uses 133 MiB with the theme and checkout
   instances running.
@@ -91,7 +98,8 @@ Findings that shaped it:
   resolver cache and the HTML cache are purged). Running instances are never mutated.
 - **Rollback:** the same, pointing back to an older artifact. The old artifact's assets are still on disk.
 - Worker responses are fully buffered (needed for the cache and for closing the request context).
-  Streaming SSR is a later optimisation. Renders time out after 10 s (504).
+  Streaming SSR is a later optimisation. One deadline (10 s, 504) covers headers **and** body, and
+  a body over 5 MB is cancelled (502). A never-ending stream cannot keep a context open.
 
 ## 4. Trust boundary (A7)
 
@@ -138,9 +146,10 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
 
 - Before resolving, the edge strips client `X-Tenant`, `X-Market`, `X-Locale`, `X-Storefront-*`,
   `X-Forwarded-*`, `Forwarded`, `X-Real-IP`, `X-Platform-*`, `X-Cart-Token`, `CF-Connecting-IP`.
-  The theme worker receives only `accept` + the context id: **no cookies, no Authorization, no
-  Accept-Language/User-Agent** (HTML is cached per tenant/market/locale/path, so any header the
-  output could vary on would poison the cache; locale comes from the market). Worker responses lose
+  The worker receives a fixed `Accept: text/html` + the context id and **nothing from the
+  client**: no cookies, no Authorization, no Accept/Accept-Language/User-Agent. HTML is cached
+  per tenant/market/locale/path, so any client header the output could vary on would poison the
+  cache; the locale comes from the market. Worker responses lose
   `set-cookie`, any worker CSP, hop-by-hop and `mf-*` headers. The worker URL is rebuilt from the
   configured scheme + validated Host.
 - **Theme CSP:** `default-src 'self'; script-src 'self' <hashes>; style-src 'self' <hash>;
@@ -156,6 +165,10 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
   `connect-src 'self' https://api.stripe.com`, `form-action 'self'`.
 - `Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`,
   `Cross-Origin-Opener-Policy: same-origin`, `Permissions-Policy` (payment only on checkout).
+- Static assets carry `Content-Security-Policy: default-src 'none'; …; sandbox`. A theme could
+  otherwise ship `public/x.html` (or an SVG) with inline script on the shop origin, outside the page
+  CSP. Opened directly, such a document now runs in an opaque origin without script. Subresource
+  use (JS, CSS, `<img>`) is unaffected.
 - `Speculation-Rules: "/_p/speculation-rules.json"` on theme responses: prerender `/*` except `/_p/*`
   and `[rel~=nofollow], [data-no-prerender]`, eagerness `moderate` (A26, no inline script).
   Cross-document view transitions via CSS `@view-transition`.
@@ -181,7 +194,8 @@ cart capability is injected from the `__Host-cart` cookie by the edge, never exp
 | internal port 8788: `/_edge/purge`, `/_edge/healthz` | bearer `EDGE_PURGE_TOKEN` (constant-time compare, ≥ 16 chars); not routed by Caddy |
 
 State-changing `/_p/*` requests must be same-origin (`Origin` equal to the shop origin, else
-`Sec-Fetch-Site: same-origin`). JSON bodies are limited to 16 kB and events to 64 kB.
+`Sec-Fetch-Site: same-origin`). JSON bodies are limited to 16 kB and events to 64 kB. Bodies are
+read as a stream and cancelled at the limit; they are never fully buffered first.
 
 **Cache (A2):** only GET/HEAD on `/`, `/c/*`, `/p/<slug>`, `/pages/<slug>`, `/blog[/<slug>]`,
 `/search` (optional `/xx` locale prefix). Never cached (one test each, `cache.test.ts` +
@@ -191,8 +205,10 @@ a private page model, non-200 responses. TTL = min(60 s, theme `s-maxage`/`max-a
 `max_age`), so themes can only lower it, plus 300 s stale-while-revalidate. The key covers
 (tenant, market, locale, artifact, host, path + sorted query without `utm_*`/`gclid`/`fbclid`/…).
 Browsers get `max-age=0, must-revalidate`, so a purge is visible immediately. Purge works by
-tenant, by tags (scoped to a tenant when both are given), or everything. It is an in-memory LRU of
-64 MB.
+tenant, by tags (scoped to a tenant when both are given), or everything. Every purge bumps a
+generation, and a render (or SWR refresh) that started before a purge cannot write its now-stale
+result. A revalidation that finds the page no longer cacheable deletes the old entry. It is an
+in-memory LRU of 64 MB with a 20k entry cap; key, headers and tags count against the byte budget.
 
 ## 7. Origin split and checkout handoff (A1, A4)
 
@@ -200,9 +216,14 @@ tenant, by tags (scoped to a tenant when both are given), or everything. It is a
   **Deviation:** A1 says `Path=/_p/cart`, but then the cookie never reaches
   `POST /_p/checkout/start`. `/_p` still keeps it away from every theme request.
 - `POST /_p/checkout/start` asks the API for a **checkout-scoped** cart token
-  (`POST /storefront/v1/cart/checkout-token`), mints a 43-char handoff token (single use, 60 s,
+  (`POST /storefront/v1/cart/checkout-token`; the API **rotates**: the shop capability is revoked,
+  the new token is checkout-scoped and read-only until WP10, and the edge clears the shop cookie in
+  the same response), mints a 43-char handoff token (single use, 60 s,
   stored as SHA-256, bound to `checkout.<shop>`) and 303s to `checkout.<shop>/start?h=…`
-  (`Referrer-Policy: no-referrer`). The exchange consumes it atomically, sets
+  (`Referrer-Policy: no-referrer`). Only a same-site navigation can redeem it
+  (`Sec-Fetch-Site: same-site|same-origin`, i.e. the shop's own 303). A link planted by another
+  site or opened from mail is refused without burning the token, so an attacker cannot push their
+  cart into a victim's checkout. The exchange consumes it atomically, sets
   `__Host-cart=…; Path=/; HttpOnly; Secure; SameSite=Lax` and 303s to `/`. Replaying the token, an
   expired token, or the same token on another checkout host all return 400.
   `__Host-` cookies cannot be tossed in from the shop origin via `Domain=`.
@@ -266,7 +287,8 @@ over http.
   `StaticResolver` + `ChannelResolver`. Service token for edge → API.
 - The real Storefront API behind the same paths the stub serves (`apps/mocks/src/storefront`): page
   models with `seo` + `cache {public, max_age, tags}`, cart with API-minted capability tokens
-  (hashed at rest), `POST /cart/checkout-token`, `/events`, `/newsletter/subscribe`,
+  (hashed at rest, scoped shop/checkout), `POST /cart/checkout-token` (rotates: revokes the shop
+  capability), `/events`, `/newsletter/subscribe`,
   `/files/{robots.txt,llms.txt,sitemap*.xml,feeds/*}`.
 - Generated SDK types replacing `packages/storefront-sdk/src/types.ts` (same shapes), plus the
   additions from `ai-edit-prompts.md` (card images, batch cards, size guide, dispatch cutoff,

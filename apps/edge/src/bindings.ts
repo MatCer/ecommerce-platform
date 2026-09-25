@@ -117,6 +117,8 @@ export function restrictedBinding(opts: {
   operations: Operation[];
   registry: ContextRegistry;
   artifactId: string;
+  /** Tenant this instance is isolated to (theme workers); contexts of other tenants are refused. */
+  scope?: string | undefined;
   apiOrigin: string;
   upstream: Upstream;
 }) {
@@ -125,7 +127,8 @@ export function restrictedBinding(opts: {
       if (request.headers.has(h))
         return problem(400, "credentials_not_allowed", `${opts.name}: header ${h} is not allowed`);
     }
-    const ctx = opts.registry.get(request.headers.get(CTX_HEADER), opts.artifactId);
+    const found = opts.registry.get(request.headers.get(CTX_HEADER), opts.artifactId);
+    const ctx = found && (!opts.scope || found.site.tenant_id === opts.scope) ? found : null;
     if (!ctx)
       return problem(403, "no_request_context", `${opts.name}: missing or unknown request context`);
     // Workers cap subrequests per invocation; so do we, so N+1 page-model fan-out fails loudly.

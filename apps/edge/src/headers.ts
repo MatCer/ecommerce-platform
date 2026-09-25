@@ -13,16 +13,12 @@ export function stripUntrusted(headers: Headers): Headers {
 }
 
 /**
- * Request headers a theme worker may see. Everything else (cookies, auth, Accept-Language,
- * User-Agent, ...) is dropped: theme HTML is cached per (tenant, market, locale, path), so any
- * header the output could vary on would poison that cache. Locale comes from the market.
+ * The only request headers a worker sees (besides the platform context id). Nothing comes from
+ * the client: theme HTML is cached per (tenant, market, locale, path), so any client header the
+ * output could vary on (Accept, Accept-Language, User-Agent, cookies) would poison that cache.
  */
-const THEME_REQUEST_ALLOW = new Set(["accept"]);
-
-export function themeRequestHeaders(incoming: Headers): Headers {
-  const out = new Headers();
-  for (const [k, v] of incoming) if (THEME_REQUEST_ALLOW.has(k)) out.set(k, v);
-  return out;
+export function workerRequestHeaders(): Headers {
+  return new Headers({ accept: "text/html" });
 }
 
 // Hop-by-hop headers, Miniflare internals and anything that would let a worker set state.

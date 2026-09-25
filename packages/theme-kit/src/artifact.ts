@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -104,6 +104,13 @@ export async function packArtifact(opts: {
 }): Promise<ArtifactManifest> {
   const serverDir = path.join(opts.dist, "server");
   const clientDir = path.join(opts.dist, "client");
+  // listFiles() refuses symlinked entries; the roots must be real directories too, or a build
+  // could point dist/client at any readable directory and publish its files.
+  for (const dir of [opts.dist, serverDir, clientDir]) {
+    const st = await lstat(dir);
+    if (!st.isDirectory())
+      throw new Error(`artifact: ${dir} must be a real directory (no symlinks)`);
+  }
 
   const serverFiles = (await listFiles(serverDir)).filter((f) => /\.(m?js)$/.test(f));
   if (!serverFiles.includes("entry.mjs"))
@@ -112,10 +119,13 @@ export async function packArtifact(opts: {
 
   let total = 0;
   const digest = createHash("sha256");
+  // Read each file once and publish exactly the bytes that were hashed (no re-read races).
+  const contents = new Map<string, Buffer>();
   const hashFile = async (abs: string, label: string) => {
     const buf = await readFile(abs);
     total += buf.byteLength;
     if (total > MAX_ARTIFACT_BYTES) throw new Error("artifact: larger than 50 MB");
+    contents.set(label, buf);
     const h = sha256(buf);
     digest.update(`${label}\0${h}\n`);
     return { sha256: h, size: buf.byteLength };
@@ -153,10 +163,10 @@ export async function packArtifact(opts: {
   if (await exists(finalDir)) return manifest; // content-addressed: identical build, nothing to do
   const tmp = path.join(opts.outRoot, `.tmp-${id}-${process.pid}`);
   await rm(tmp, { recursive: true, force: true });
-  await mkdir(path.join(tmp, "server"), { recursive: true });
-  await mkdir(path.join(tmp, "client"), { recursive: true });
-  for (const f of serverFiles) await cp(path.join(serverDir, f), path.join(tmp, "server", f));
-  for (const f of clientFiles) await cp(path.join(clientDir, f), path.join(tmp, "client", f));
+  for (const [label, buf] of contents) {
+    await mkdir(path.dirname(path.join(tmp, label)), { recursive: true });
+    await writeFile(path.join(tmp, label), buf);
+  }
   await writeFile(path.join(tmp, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   await rename(tmp, finalDir); // atomic publish of the directory
   return manifest;

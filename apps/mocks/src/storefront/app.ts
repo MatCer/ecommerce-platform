@@ -388,14 +388,21 @@ interface CartState {
   tenant: string;
   lines: { id: string; variant_id: string; quantity: number }[];
 }
-const carts = new Map<string, CartState>();
+/**
+ * Capabilities (token hash → cart + scope). A4: the shop capability may edit lines; the
+ * checkout capability minted at handoff only reads here (checkout mutations arrive in WP10),
+ * and minting it revokes the shop capability, so pre-handoff tokens stop working.
+ */
+type Scope = "shop" | "checkout";
+const carts = new Map<string, { cart: CartState; scope: Scope }>();
 const hash = (t: string) => createHash("sha256").update(t).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
 
-function cartOf(c: Context): CartState | null {
+function cartOf(c: Context, scope?: Scope): CartState | null {
   const token = c.req.header("x-cart-token");
-  const cart = token ? carts.get(hash(token)) : undefined;
-  return cart && cart.tenant === c.req.header("x-tenant") ? cart : null;
+  const cap = token ? carts.get(hash(token)) : undefined;
+  if (!cap || cap.cart.tenant !== c.req.header("x-tenant")) return null;
+  return scope && cap.scope !== scope ? null : cap.cart;
 }
 
 function cartJson(c: Context, cart: CartState) {
@@ -436,9 +443,12 @@ function cartJson(c: Context, cart: CartState) {
 storefront.post("/cart", (c) => {
   const token = newToken();
   carts.set(hash(token), {
-    id: `cart-${randomBytes(6).toString("hex")}`,
-    tenant: c.req.header("x-tenant") ?? "",
-    lines: [],
+    cart: {
+      id: `cart-${randomBytes(6).toString("hex")}`,
+      tenant: c.req.header("x-tenant") ?? "",
+      lines: [],
+    },
+    scope: "shop",
   });
   return c.body(null, 201, { "x-cart-token": token });
 });
@@ -449,7 +459,7 @@ storefront.get("/cart", (c) => {
 });
 
 storefront.post("/cart/lines", async (c) => {
-  const cart = cartOf(c);
+  const cart = cartOf(c, "shop");
   if (!cart) return c.json({ code: "cart_not_found" }, 404);
   const body = (await c.req.json().catch(() => null)) as {
     variant_id?: unknown;
@@ -472,7 +482,7 @@ storefront.post("/cart/lines", async (c) => {
 });
 
 storefront.patch("/cart/lines/:id", async (c) => {
-  const cart = cartOf(c);
+  const cart = cartOf(c, "shop");
   if (!cart) return c.json({ code: "cart_not_found" }, 404);
   const qty = Number(
     ((await c.req.json().catch(() => null)) as { quantity?: unknown } | null)?.quantity,
@@ -486,7 +496,7 @@ storefront.patch("/cart/lines/:id", async (c) => {
 });
 
 storefront.delete("/cart/lines/:id", (c) => {
-  const cart = cartOf(c);
+  const cart = cartOf(c, "shop");
   if (!cart) return c.json({ code: "cart_not_found" }, 404);
   cart.lines = cart.lines.filter((l) => l.id !== c.req.param("id"));
   return cartJson(c, cart);
@@ -494,10 +504,11 @@ storefront.delete("/cart/lines/:id", (c) => {
 
 /** Handoff (A1): a new checkout-scoped capability for the same cart. */
 storefront.post("/cart/checkout-token", (c) => {
-  const cart = cartOf(c);
+  const cart = cartOf(c, "shop");
   if (!cart) return c.json({ code: "cart_not_found" }, 404);
   const token = newToken();
-  carts.set(hash(token), cart);
+  carts.delete(hash(c.req.header("x-cart-token") ?? "")); // rotate: the shop capability dies
+  carts.set(hash(token), { cart, scope: "checkout" });
   return c.json({ token });
 });
 
