@@ -400,15 +400,17 @@ separate cache namespace, never cached (already bypassed by the policy).
 
   | Page | LCP | TBT | CLS | JS gz (A26) | + RUM sampled | calls |
   |---|---|---|---|---|---|---|
-  | `/` | 1276 ms | 0 | 0.000 | 21.9 kB | 24.9 kB | 2 |
-  | `/c/trika` | 1276 ms | 0 | 0.000 | 22.4 kB | 25.4 kB | 2 |
-  | `/p/tricko-basic` | 1428 ms | 0 | 0.000 | 27.6 kB | 30.6 kB | 3 |
-  | `/search?q=mikina` | 1127 ms | 0 | 0.000 | 22.4 kB | 25.4 kB | 2 |
+  | `/` | 1277 ms | 0 | 0.000 | 22.5 kB | 24.5 kB | 2 |
+  | `/c/trika` | 1277 ms | 0 | 0.000 | 23.0 kB | 25.0 kB | 2 |
+  | `/p/tricko-basic` | 1427 ms | 0 | 0.000 | 27.5 kB | 29.5 kB | 3 |
+  | `/search?q=mikina` | 1126 ms | 0 | 0.000 | 23.0 kB | 25.0 kB | 2 |
 
+  The gate now also judges the RUM-sampled visit (A26 counts every script a visit downloads).
   axe (WCAG 2.2 AA tags): 0 serious/critical, no CSP violations, no third-party origins. What
   it took: the cart drawer is a dynamic import on first open (not counted, never downloaded by
   most visitors; Solid's `lazy()` was avoided because it adds ~1 kB of Suspense runtime to every
-  page), the newsletter is a plain form (no island), extra gallery photos wait for the load
+  page), likewise the consent panel (only without a choice) and the recently-viewed list (only
+  with `personalization`), the newsletter is a plain form (no island), extra gallery photos wait for the load
   event, card srcsets are capped at 720 w (HTML weight), `web-vitals` standard build instead of
   `/attribution` (−2.5 kB when sampled), and the listing's no-JS submit button lives in
   `<noscript>` (hiding it on hydration shifted the toolbar, CLS 0.03).

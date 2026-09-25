@@ -184,6 +184,7 @@ export function fakeApi() {
     if (p === "/redirects/resolve") {
       const path = url.searchParams.get("path");
       if (path === "/stary-produkt") return Response.json({ to_path: "/p/novy", code: 301 });
+      if (path === "/cs/stary") return Response.json({ to_path: "/cs/c/novy", code: 301 });
       if (path === "/docasne") return Response.json({ to_path: "/c/akce?x=1", code: 302 });
       if (path === "/podvrh") return Response.json({ to_path: "//evil.example/", code: 301 });
     }

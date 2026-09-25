@@ -51,13 +51,26 @@ test("nothing is stored before a choice; storage follows the personalization pur
   expect(events).toEqual(["platform:consent"]);
   recent.set("recent", ["a"]);
   expect(recent.get("recent")).toEqual(["a"]);
-  expect(store.get("sf:recent")).toBe('["a"]');
+  expect(store.get("sf:personalization:recent")).toBe('["a"]');
 
   // Withdrawing personalization removes what it allowed to store.
   store.set("other-app", "kept");
   await saveConsent(["analytics"], post);
   expect([...store.keys()]).toEqual(["other-app"]);
   expect(recent.get("recent")).toBeNull();
+});
+
+test("each purpose has its own storage; only withdrawn purposes lose theirs", async () => {
+  const post = vi.fn(async () => new Response(null, { status: 202 }));
+  await saveConsent(["analytics", "personalization"], post);
+  consentStorage("analytics").set("id", "anon-1");
+  consentStorage("personalization").set("recent", ["a"]);
+  expect([...store.keys()].sort()).toEqual(["sf:analytics:id", "sf:personalization:recent"]);
+
+  await saveConsent(["personalization"], post);
+  expect([...store.keys()]).toEqual(["sf:personalization:recent"]);
+  expect(consentStorage("personalization").get("recent")).toEqual(["a"]);
+  expect(consentStorage("analytics").get("id")).toBeNull();
 });
 
 test("the choice goes out as a JSON beacon when the browser has sendBeacon", async () => {

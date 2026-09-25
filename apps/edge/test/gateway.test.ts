@@ -520,6 +520,16 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
       { method: "POST", body: "email=a%40b.cz" },
     );
     expect(foreign.headers.get("location")).toBe("/?newsletter=ok#newsletter");
+    // Nor does a same-host Referer whose path is a network-path reference.
+    for (const referer of [`${shop}//evil.example/path`, `${shop}/\\evil.example`]) {
+      const sneaky = await get(
+        `${shop}/_p/newsletter`,
+        { ...form, referer },
+        { method: "POST", body: "email=a%40b.cz" },
+      );
+      expect(sneaky.headers.get("location")).toMatch(/^\/(?![/\\])/);
+      expect(sneaky.headers.get("location")).not.toContain("evil.example/");
+    }
     // Still same-origin only.
     const cross = await get(
       `${shop}/_p/newsletter`,
@@ -616,6 +626,11 @@ describe("platform routes backed by the real API (WP6)", () => {
       headers: { "x-locale": "cs", "x-market": "m-sk" },
     });
     expect((await get("http://demo-sk.localhost/cs/_p/cart")).status).toBe(404);
+    // Redirects: as typed first, else the unprefixed rule with the target kept in the locale.
+    const typed = await get("http://demo-sk.localhost/cs/stary");
+    expect([typed.status, typed.headers.get("location")]).toEqual([301, "/cs/c/novy"]);
+    const inherited = await get("http://demo-sk.localhost/cs/stary-produkt");
+    expect([inherited.status, inherited.headers.get("location")]).toEqual([301, "/cs/p/novy"]);
     // Neither the default locale nor a locale of another market is a prefix.
     expect((await get("http://demo-sk.localhost/sk/")).status).toBe(404);
     expect((await get("http://demo-sk.localhost/en/")).status).toBe(404);

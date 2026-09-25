@@ -28,7 +28,6 @@
 | WP8 | The edge forwards `POST /_p/consent` to `/storefront/v1/consent` and answers 202 `{recorded:false}` while the API has no such route; the consent record's subject (anon id / customer) is not passed yet | WP9 |
 | WP8 | The theme links `checkout.<host>/account` and `/withdraw` (A19); the checkout app must serve both | WP9 / WP13 |
 | WP8 | A market locale without product translations gets an empty search index (documents need a translation); a default-locale fallback would keep listings full. The demo uses `cs` on the SK market, which is fully translated | WP13 |
-| WP8 | Sitemaps list default-locale URLs only (the hreflang alternates inside them do include prefixed locales) | WP14 |
 | WP8 | Legal/CMS page slugs in `/shop` are Czech placeholders for every locale; payment/carrier marks are generic catalog text until payment and shipping methods exist; `free_shipping_threshold` stays null | WP13 / WP10 / WP11 |
 | WP8 | No cart cross-sell in the drawer yet (the PDP slot renders `/recommendations`; the drawer would need a client fetch) | WP17 |
-| WP8 | PDP JS is 27.4 kB gz, 30.4 kB when the 10 % RUM sample loads `web-vitals` (standard build); the budget is judged without RUM | WP14 (RUM) |
+| WP8 | PDP JS headroom: 27.5 kB gz, 29.5 kB with the RUM sample (`web-vitals` standard build, now gated too); a ~1 kB PerformanceObserver reporter would buy 2 kB if needed | WP14 (RUM) |

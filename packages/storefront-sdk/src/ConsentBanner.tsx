@@ -1,6 +1,9 @@
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { CONSENT_OPEN, readConsent, saveConsent } from "./consent.ts";
+import { type Component, createSignal, onCleanup, onMount, Show } from "solid-js";
+import type { ConsentPanelProps } from "./ConsentPanel.tsx";
+import { CONSENT_OPEN, readConsent } from "./consent.ts";
 import type { ConsentPurpose } from "./types.ts";
+// Static here, not in the lazy panel: a CSS dependency of a dynamic import needs Vite's
+// preload runtime (~0.8 kB) on every page; the stylesheet itself is ~0.7 kB.
 import "./consent-banner.css";
 
 export interface ConsentBannerProps {
@@ -15,48 +18,43 @@ export interface ConsentBannerProps {
 /**
  * The platform consent banner (spec §11.3, A20). A platform component rather than theme code:
  * themes place it (`client:idle`) and it follows their tokens, but they cannot turn it into a
- * dark pattern. Accept and reject are equally prominent; nothing is preselected.
+ * dark pattern.
  *
- * It renders nothing on the server (cached HTML is the same for everyone) and appears after
- * hydration only while no choice exists. Any `[data-consent-settings]` element, or
- * `openConsentSettings()`, reopens it with the current choice. Fixed position: no layout shift.
+ * It renders nothing on the server (cached HTML is the same for everyone). After hydration it
+ * loads its UI (`ConsentPanel`) only while no choice exists, or when reopened by any
+ * `[data-consent-settings]` element or `openConsentSettings()`, so returning visitors never
+ * download it. Fixed position: no layout shift.
  */
 export default function ConsentBanner(props: ConsentBannerProps) {
-  const l = (key: string) => props.labels[key] ?? key;
-  const [open, setOpen] = createSignal(false);
-  const [custom, setCustom] = createSignal(false);
-  const [chosen, setChosen] = createSignal<ConsentPurpose[]>([]);
-  let heading: HTMLHeadingElement | undefined;
+  const [Panel, setPanel] = createSignal<Component<ConsentPanelProps>>();
+  const [mode, setMode] = createSignal<"first" | "settings" | null>(null);
   let returnTo: HTMLElement | null = null;
 
-  const reopen = () => {
-    returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setChosen(readConsent() ?? []);
-    setCustom(true);
-    setOpen(true);
-    setTimeout(() => heading?.focus());
+  const show = (m: "first" | "settings") => {
+    if (m === "settings")
+      returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    void import("./ConsentPanel.tsx").then((mod) => {
+      setPanel(() => mod.default);
+      setMode(m);
+    });
   };
   const close = () => {
-    setOpen(false);
-    setCustom(false);
+    setMode(null);
     returnTo?.focus();
     returnTo = null;
-  };
-  const save = (purposes: ConsentPurpose[]) => {
-    void saveConsent(purposes);
-    close();
-  };
-  const onClick = (e: MouseEvent) => {
-    if (e.target instanceof Element && e.target.closest("[data-consent-settings]")) {
-      e.preventDefault();
-      reopen();
-    }
   };
 
   // Browser-only setup and teardown both live in onMount: a top-level onCleanup also runs when
   // the server render is disposed, where `document` does not exist (it hangs the SSR stream).
   onMount(() => {
-    setOpen(readConsent() === null);
+    if (readConsent() === null) show("first");
+    const reopen = () => show("settings");
+    const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest("[data-consent-settings]")) {
+        e.preventDefault();
+        reopen();
+      }
+    };
     addEventListener(CONSENT_OPEN, reopen);
     document.addEventListener("click", onClick);
     onCleanup(() => {
@@ -66,64 +64,11 @@ export default function ConsentBanner(props: ConsentBannerProps) {
   });
 
   return (
-    <Show when={open()}>
-      <section
-        class="pf-consent"
-        aria-labelledby="pf-consent-title"
-        onKeyDown={(e) => {
-          // Escape only dismisses a reopened banner; a first visit still needs a choice.
-          if (e.key === "Escape" && readConsent() !== null) close();
-        }}
-      >
-        <h2 id="pf-consent-title" ref={heading} tabIndex={-1} class="pf-consent__title">
-          {l("consent.title")}
-        </h2>
-        <p class="pf-consent__text">
-          {l("consent.text")} <a href={props.policyUrl}>{l("legal.cookies")}</a>
-        </p>
-        <Show when={custom()}>
-          <fieldset class="pf-consent__purposes">
-            <legend class="pf-consent__sr">{l("consent.settings")}</legend>
-            <label>
-              <input type="checkbox" checked disabled />
-              {l("consent.necessary")}
-            </label>
-            <For each={props.purposes}>
-              {(p) => (
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={chosen().includes(p)}
-                    onChange={(e) =>
-                      setChosen(
-                        e.currentTarget.checked
-                          ? [...chosen(), p]
-                          : chosen().filter((x) => x !== p),
-                      )
-                    }
-                  />
-                  {l(`consent.${p}`)}
-                </label>
-              )}
-            </For>
-          </fieldset>
-        </Show>
-        <div class="pf-consent__actions">
-          <button type="button" class="pf-consent__btn" onClick={() => save([])}>
-            {l("consent.reject")}
-          </button>
-          <button type="button" class="pf-consent__btn" onClick={() => save(props.purposes)}>
-            {l("consent.accept")}
-          </button>
-          <button
-            type="button"
-            class="pf-consent__link"
-            onClick={() => (custom() ? save(chosen()) : setCustom(true))}
-          >
-            {custom() ? l("consent.save") : l("consent.settings")}
-          </button>
-        </div>
-      </section>
+    <Show when={mode() && Panel()}>
+      {(P) => {
+        const Loaded = P();
+        return <Loaded {...props} settings={mode() === "settings"} onClose={close} />;
+      }}
     </Show>
   );
 }

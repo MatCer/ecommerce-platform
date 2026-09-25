@@ -19,6 +19,8 @@ const ok: PageResult = {
 test("within budget passes; each breach is reported", () => {
   expect(judge(ok)).toEqual([]);
   expect(judge({ ...ok, lcpMs: 1600, jsGzip: 31 * 1024, subrequests: 26 })).toHaveLength(3);
+  // The RUM-sampled visit counts too (A26).
+  expect(judge({ ...ok, jsGzipWithRum: 30.5 * 1024 })).toEqual(["JS with RUM 30.5 kB gz > 30"]);
 });
 
 test("missing measurements fail instead of passing", () => {

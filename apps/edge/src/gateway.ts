@@ -273,7 +273,18 @@ export function createGateway(opts: GatewayOptions) {
     };
   }
 
-  async function renderTheme(site: Site, url: URL, req: Request, port: string): Promise<Response> {
+  /**
+   * `prefix` is the locale prefix the visitor used (`/cs`) when `url` is the unprefixed page:
+   * a 404 looks up redirects as the visitor typed the URL first, then unprefixed with the
+   * target kept in the visitor's locale.
+   */
+  async function renderTheme(
+    site: Site,
+    url: URL,
+    req: Request,
+    port: string,
+    prefix = "",
+  ): Promise<Response> {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     const artifact = site.theme_artifact;
@@ -366,7 +377,9 @@ export function createGateway(opts: GatewayOptions) {
     }
     const { r, cacheable } = await store();
     if (r.status === 404) {
-      const redirect = await redirectFor(site, url);
+      const redirect =
+        (prefix ? await redirectFor(site, `${prefix}${url.pathname}`) : null) ??
+        (await redirectFor(site, url.pathname, prefix));
       if (redirect) return redirect;
     }
     return respond(
@@ -380,8 +393,8 @@ export function createGateway(opts: GatewayOptions) {
   }
 
   /** Spec §9.5: a page the theme does not know may have a merchant-defined redirect. */
-  async function redirectFor(site: Site, url: URL): Promise<Response | null> {
-    const query = new URLSearchParams({ path: url.pathname });
+  async function redirectFor(site: Site, path: string, prefix = ""): Promise<Response | null> {
+    const query = new URLSearchParams({ path });
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/redirects/resolve?${query}`, {
         headers: apiHeaders(site, { accept: "application/json" }),
@@ -394,7 +407,10 @@ export function createGateway(opts: GatewayOptions) {
     if (typeof to !== "string" || !SAME_SHOP_PATH.test(to)) return null;
     return new Response(null, {
       status: r?.code === 302 ? 302 : 301,
-      headers: { location: to, "cache-control": "no-store" },
+      headers: {
+        location: prefix ? `${prefix}${to === "/" ? "" : to}` : to,
+        "cache-control": "no-store",
+      },
     });
   }
 
@@ -634,10 +650,12 @@ export function createGateway(opts: GatewayOptions) {
       // Same shop only (never an open redirect); the query keeps its other parameters.
       if (referer && referer.host === `${host}${port}`) back = referer;
       back.searchParams.set("newsletter", res.ok ? "ok" : "invalid");
+      // `//evil.example/x` is a same-host path but a network-path reference as a Location.
+      const path = /^\/(?![/\\])/.test(back.pathname) ? back.pathname : "/";
       return new Response(null, {
         status: 303,
         headers: {
-          location: `${back.pathname}${back.search}#newsletter`,
+          location: `${path}${back.search}#newsletter`,
           "cache-control": "no-store",
         },
       });
@@ -680,7 +698,7 @@ export function createGateway(opts: GatewayOptions) {
       if (split.path.startsWith("/_p/public/"))
         return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
       if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))
-        return renderTheme(localized, inner, req, port);
+        return renderTheme(localized, inner, req, port, `/${split.locale}`);
       return text(404, "Not found");
     }
     if (p === "/_p/cart" || p.startsWith("/_p/cart/"))

@@ -284,6 +284,21 @@ async fn a_second_market_locale_gets_prefixed_hrefs_and_alternates(db: PgPool) {
         listing["sort"]
     );
 
+    // The SK sitemap lists the product in the locale it exists in (Czech only here).
+    let (_, chunk, _) = sf(
+        Call::get("/storefront/v1/files/sitemap-1.xml"),
+        &c.shop,
+        c.shop.sk,
+    )
+    .send_text(&c.s)
+    .await;
+    assert!(
+        chunk.contains("<loc>http://shop-sk.localhost:8080/cs/p/tee-cs</loc>"),
+        "{chunk}"
+    );
+    assert!(!chunk.contains("<loc>http://shop-sk.localhost:8080/p/tee-cs</loc>"));
+    assert!(chunk.contains("<loc>http://shop-sk.localhost:8080/cs</loc>"));
+
     // (No sk-SK alternate: the product has no Slovak translation.) The default locale stays
     // unprefixed.
     let sk = get("/storefront/v1/shop", "sk").await;

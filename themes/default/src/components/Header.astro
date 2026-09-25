@@ -2,6 +2,7 @@
 import type { ShopModel } from "@platform/storefront-sdk/types";
 import MiniCart from "../islands/MiniCart";
 import SearchBox from "../islands/SearchBox";
+import Sheets from "../islands/Sheets";
 import { i18n } from "../lib/i18n";
 import Icon from "./Icon.astro";
 
@@ -92,6 +93,7 @@ const CART_KEYS = [
   </nav>
 </header>
 
+<Sheets client:idle />
 <nav id="nav-drawer" popover aria-label={t("nav.main")} class="sheet">
   <div class="flex h-16 items-center justify-between border-b border-border px-4">
     <a href={href("/")} class="font-display text-lg font-extrabold tracking-tight">{shop.name}</a>

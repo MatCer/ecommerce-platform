@@ -30,11 +30,13 @@ src/
     ProductDetails, TrustRow, Breadcrumbs, RecommendationSlot, Prose, Icon
   islands/               Solid islands (the only JavaScript on the page)
     SearchBox              typeahead (ARIA combobox) over a plain GET form
-    MiniCart               cart button + drawer (<dialog>), free-delivery progress, checkout
+    MiniCart               cart button with count; loads CartDrawer (<dialog>: lines, free-delivery
+                           progress, checkout) on first open
     BuyBox                 price, variant picker, add to cart, sticky phone buy bar
     Gallery                scroll-snap gallery, thumbnails, arrows/keys
     FacetForm              behaviour only: submit on change (desktop), close dropdowns
-    RecentlyViewed         needs `personalization` consent
+    RecentlyViewed         gate: loads RecentlyViewedList only with `personalization` consent
+    Sheets                 behaviour only: a popover sheet closes when focus leaves it
     Rum                    Web Vitals for consented, sampled visits (loads web-vitals lazily)
   lib/
     storefront.ts          page-model access (SDK) + JSON-LD serializer
@@ -83,6 +85,9 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
   - one web font (Archivo, headings + prices); body text uses the system stack;
   - prefer HTML/CSS (`<details>`, `popover`, `<dialog>`, `:has()`) over an island; an island
     that renders nothing on the server must use `client:idle`, never `client:visible`;
+  - UI most visitors never open loads on demand with a plain `import()` (see `MiniCart` →
+    `CartDrawer`); not Solid's `lazy()`, which adds ~1 kB of runtime to every page, and no
+    CSS import inside the lazy module (it would pull in Vite's preload runtime);
   - do not fetch page models per card (no N+1): what a card needs must be in the card model.
 - **Accessibility** (WCAG 2.2 AA): one `h1` per page, landmarks (`header`, `nav` with labels,
   `main#main`, `footer`), visible focus (global `:focus-visible`), 44 px touch targets,

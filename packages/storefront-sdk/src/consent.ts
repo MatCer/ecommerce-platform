@@ -54,7 +54,7 @@ export async function saveConsent(
   const granted = PURPOSES.filter((p) => purposes.includes(p));
   // biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API is not available in Safari/Firefox
   document.cookie = `${COOKIE}=${encodeURIComponent(granted.join(","))}; Path=/; Max-Age=15552000; SameSite=Lax; Secure`;
-  if (!granted.includes("personalization")) clearStorage();
+  clearWithdrawn(granted);
   dispatchEvent(new CustomEvent(CONSENT_CHANGED, { detail: granted }));
   // A beacon survives navigation and its answer is not ours to handle (a 404 before the
   // endpoint exists stays silent); fetch only where beacons are unavailable.
@@ -82,11 +82,15 @@ export async function saveConsent(
 /** Reopens the consent banner with the current choice (e.g. a footer button). */
 export const openConsentSettings = () => dispatchEvent(new Event(CONSENT_OPEN));
 
-function clearStorage() {
+/** Removes the device storage of every purpose that is not granted. */
+function clearWithdrawn(granted: readonly ConsentPurpose[]) {
+  const withdrawn = PURPOSES.filter((p) => !granted.includes(p)).map(
+    (p) => `${STORAGE_PREFIX}${p}:`,
+  );
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i);
-      if (key?.startsWith(STORAGE_PREFIX)) localStorage.removeItem(key);
+      if (key && withdrawn.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
     }
   } catch {
     /* storage disabled */
@@ -95,10 +99,11 @@ function clearStorage() {
 
 /**
  * Device storage that exists only while `purpose` is granted (A20: "recently viewed" needs
- * `personalization`). Without consent reads return `null` and writes are dropped.
+ * `personalization`). Keys live under `sf:<purpose>:`; without consent reads return `null`,
+ * writes are dropped, and withdrawing the purpose deletes them.
  */
 export function consentStorage(purpose: ConsentPurpose) {
-  const key = (k: string) => `${STORAGE_PREFIX}${k}`;
+  const key = (k: string) => `${STORAGE_PREFIX}${purpose}:${k}`;
   return {
     get<T>(k: string): T | null {
       if (!hasConsent(purpose)) return null;

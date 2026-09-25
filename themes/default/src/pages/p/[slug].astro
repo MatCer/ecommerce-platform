@@ -48,7 +48,7 @@ const BUY_KEYS = [
   <div class="container-shop">
     <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
     <div class="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10 lg:gap-14">
-      <Gallery client:visible images={p.images} labels={pick(["product.gallery", "product.image", "product.prev_image", "product.next_image"])} />
+      <Gallery client:idle images={p.images} labels={pick(["product.gallery", "product.image", "product.prev_image", "product.next_image"])} />
       <div class="flex flex-col gap-6 md:sticky md:top-36 md:self-start">
         <div>
           {p.brand && <p class="eyebrow mb-2 text-identity-ink">{p.brand}</p>}

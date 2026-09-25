@@ -19,6 +19,11 @@ test("splitLocale strips only a non-default locale of the market (spec §9.1)", 
   expect(splitLocale(s, "/en/c/x")).toBeNull(); // not a locale of this market
   expect(splitLocale(s, "/csx/c")).toBeNull();
   expect(splitLocale(s, "/c/trika")).toBeNull();
+  // Regional tags as markets store them (`en-GB`), exact match only.
+  const gb = { locale: "cs", locales: ["cs", "en-GB"] };
+  expect(splitLocale(gb, "/en-GB/p/x")).toEqual({ locale: "en-GB", path: "/p/x" });
+  expect(splitLocale(gb, "/en-gb/p/x")).toBeNull();
+  expect(splitLocale(gb, "/en/p/x")).toBeNull();
 });
 
 test("the API resolver maps the resolve response and caches nothing on errors", async () => {

@@ -3,7 +3,15 @@ import type { CartLine, Money } from "@platform/storefront-sdk/types";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { cart, open, setOpen, updateLine } from "../lib/cart-store";
 import Icon from "../lib/Icon";
-import { close, minus, plus, trash, truck } from "../lib/icons";
+
+// Local copies of lib/icons.ts paths: importing them would pull these drawer-only icons into
+// the icon chunk every page loads, while this module is fetched only when the cart opens.
+const close = "M6 6l12 12M18 6 6 18";
+const minus = "M5 12h14";
+const plus = "M12 5v14M5 12h14";
+const trash = "M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12";
+const truck =
+  "M2.5 6h11v9.5h-11zM13.5 9h4l3 3.2v3.3h-7M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Zm11 0a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z";
 
 /**
  * The cart drawer (native modal <dialog>: focus trap, Escape, focus return to the opener).

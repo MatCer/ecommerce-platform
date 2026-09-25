@@ -213,6 +213,33 @@ test("keyboard only: skip link, header, product page, cart", async ({ page, cont
   await expect(page.getByRole("heading", { level: 1 })).toContainText("mikina");
 });
 
+test("phone sheets (menu, filters): Escape closes, focus never stays behind an open sheet", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await decideConsent(ctx);
+  const page = await ctx.newPage();
+  await page.goto(`${CZ}/c/obleceni`);
+  await hydrated(page);
+  for (const [trigger, id] of [
+    ["Menu", "#nav-drawer"],
+    ["Filtry", "#filter-sheet"],
+  ] as const) {
+    const button = page.getByRole("button", { name: trigger, exact: true });
+    const sheet = page.locator(id);
+    await button.click();
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(button).toBeFocused();
+    await button.click();
+    await expect(sheet).toBeVisible();
+    for (let i = 0; i < 60 && (await sheet.isVisible()); i++) await page.keyboard.press("Tab");
+    await expect(sheet).toBeHidden();
+  }
+  await ctx.close();
+});
+
 test.describe("consent (A20)", () => {
   test("nothing is stored before a choice; reject and reopen from the footer", async ({
     page,
@@ -240,7 +267,7 @@ test.describe("consent (A20)", () => {
     await page.reload();
     // Personalization granted: this visit is remembered for "recently viewed".
     await expect
-      .poll(() => page.evaluate(() => localStorage.getItem("sf:recent")))
+      .poll(() => page.evaluate(() => localStorage.getItem("sf:personalization:recent")))
       .toContain("mikina-fleece");
   });
 
@@ -248,7 +275,9 @@ test.describe("consent (A20)", () => {
     await decideConsent(context, CZ, "personalization");
     await page.goto(`${CZ}/p/mikina-fleece`);
     await hydrated(page);
-    await expect.poll(() => page.evaluate(() => localStorage.getItem("sf:recent"))).toBeTruthy();
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("sf:personalization:recent")))
+      .toBeTruthy();
     await page.goto(`${CZ}/p/cepice-merino`);
     const recent = page.getByRole("region", { name: "Naposledy prohlížené" });
     await expect(recent.getByRole("link", { name: "Mikina Fleece" })).toBeVisible();

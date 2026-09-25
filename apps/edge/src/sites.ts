@@ -59,7 +59,8 @@ export function splitLocale(
   site: Pick<Site, "locale" | "locales">,
   path: string,
 ): { locale: string; path: string } | null {
-  const m = /^\/([a-z]{2}(?:-[a-z]{2,4})?)(\/.*)?$/.exec(path);
+  // The first segment must be exactly one of the market's configured tags (`cs`, `en-GB`).
+  const m = /^\/([^/]+)(\/.*)?$/.exec(path);
   const locale = m?.[1];
   if (!m || !locale || locale === site.locale || !site.locales.includes(locale)) return null;
   return { locale, path: m[2] && m[2] !== "/" ? m[2] : "/" };
