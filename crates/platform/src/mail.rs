@@ -50,6 +50,13 @@ pub struct StreamConfig {
     pub from: String,
 }
 
+const VARS: [&str; 4] = [
+    "MAIL_TRANSACTIONAL_SMTP_URL",
+    "MAIL_TRANSACTIONAL_FROM",
+    "MAIL_MARKETING_SMTP_URL",
+    "MAIL_MARKETING_FROM",
+];
+
 #[derive(Debug, Clone)]
 pub struct MailConfig {
     pub transactional: StreamConfig,
@@ -59,6 +66,23 @@ pub struct MailConfig {
 impl MailConfig {
     pub fn from_env() -> Result<Self, ConfigError> {
         Self::from_lookup(&|k| std::env::var(k).ok())
+    }
+
+    pub fn optional_from_env() -> Result<Option<Self>, ConfigError> {
+        Self::optional_from_lookup(&|k| std::env::var(k).ok())
+    }
+
+    /// `None` when no `MAIL_*` variable is set (the worker runs without sending mail); an
+    /// error when only some are, so a half-configured deployment refuses to start.
+    pub fn optional_from_lookup(lookup: Lookup) -> Result<Option<Self>, ConfigError> {
+        let any = VARS
+            .iter()
+            .any(|v| lookup(v).is_some_and(|x| !x.trim().is_empty()));
+        if any {
+            Self::from_lookup(lookup).map(Some)
+        } else {
+            Ok(None)
+        }
     }
 
     /// `MAIL_TRANSACTIONAL_SMTP_URL`, `MAIL_TRANSACTIONAL_FROM`, `MAIL_MARKETING_SMTP_URL`,
@@ -250,6 +274,21 @@ mod tests {
         assert_eq!(
             MailConfig::from_lookup(&lookup(&ok[..2])).err(),
             Some(ConfigError::Missing("MAIL_MARKETING_SMTP_URL"))
+        );
+        // Optional: nothing set is fine, a partial setup is not.
+        assert!(
+            MailConfig::optional_from_lookup(&lookup(&[]))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            MailConfig::optional_from_lookup(&lookup(&ok))
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            MailConfig::optional_from_lookup(&lookup(&ok[..1])).err(),
+            Some(ConfigError::Missing("MAIL_TRANSACTIONAL_FROM"))
         );
         let mut bad = ok;
         bad[1] = ("MAIL_TRANSACTIONAL_FROM", "not an address");

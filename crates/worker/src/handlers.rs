@@ -33,7 +33,12 @@ const MEDIA_CONCURRENCY: usize = 1;
 /// Staff invitation email for a `staff.invited` event (spec §11.4, WP9).
 pub const STAFF_INVITE_MAIL: &str = "staff.invite_mail";
 
-pub fn all(storage: Storage, meili: Meili, mailer: Mailer, auth: Option<AuthService>) -> Handlers {
+pub fn all(
+    storage: Storage,
+    meili: Meili,
+    mailer: Option<Mailer>,
+    auth: Option<AuthService>,
+) -> Handlers {
     let encode_slots = Arc::new(Semaphore::new(MEDIA_CONCURRENCY));
     let purge_storage = storage.clone();
     let (m1, m3) = (meili.clone(), meili);
@@ -64,8 +69,13 @@ pub fn all(storage: Storage, meili: Meili, mailer: Mailer, auth: Option<AuthServ
 
 /// Delivers one email (A14). A message that could not be handed over is retried with backoff
 /// until the message itself gives up (`failed`, see `notifications::deliver`).
-async fn mail_send(ctx: Ctx, job: Job, mailer: Mailer) -> Result<(), JobError> {
+async fn mail_send(ctx: Ctx, job: Job, mailer: Option<Mailer>) -> Result<(), JobError> {
     let (tenant, message) = tenant_and(&job, "message_id")?;
+    // Retried with backoff (the message stays `pending`); the hourly reconciliation requeues
+    // it if the job gives up before mail is configured.
+    let mailer = mailer.ok_or_else(|| {
+        JobError::Retry("mail is not configured (MAIL_TRANSACTIONAL_SMTP_URL, ...)".into())
+    })?;
     match notifications::deliver(&ctx.db, &mailer, tenant, message).await {
         Ok(Step::Done) => Ok(()),
         Ok(Step::Retry(reason)) => Err(JobError::Retry(reason)),

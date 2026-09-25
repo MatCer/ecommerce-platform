@@ -322,12 +322,7 @@ async fn cleanup_job_runs_end_to_end(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(
-            testkit::memory_storage(),
-            testkit::dead_meili(),
-            testkit::smtp::mailer_for("smtp://127.0.0.1:1"),
-            None,
-        ),
+        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "done").await;
@@ -387,12 +382,7 @@ async fn media_jobs_process_and_purge_assets(db: PgPool) {
     };
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(
-            storage.clone(),
-            testkit::dead_meili(),
-            testkit::smtp::mailer_for("smtp://127.0.0.1:1"),
-            None,
-        ),
+        worker::handlers::all(storage.clone(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     wait_for_status(&db, job_id(media::PROCESS_JOB).await, "done").await;
@@ -466,12 +456,7 @@ async fn media_job_failing_every_attempt_marks_the_asset_failed(db: PgPool) {
         .unwrap();
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(
-            storage.clone(),
-            testkit::dead_meili(),
-            testkit::smtp::mailer_for("smtp://127.0.0.1:1"),
-            None,
-        ),
+        worker::handlers::all(storage.clone(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     let (attempts, _) = wait_for_status(&db, id, "dead").await;
@@ -516,12 +501,7 @@ async fn scheduled_sale_start_publishes_price_changed(db: PgPool) {
 
     let (stop, task) = start(
         &runtime,
-        worker::handlers::all(
-            testkit::memory_storage(),
-            testkit::dead_meili(),
-            testkit::smtp::mailer_for("smtp://127.0.0.1:1"),
-            None,
-        ),
+        worker::handlers::all(testkit::memory_storage(), testkit::dead_meili(), None, None),
         fast_config(),
     );
     let mut found = None;
@@ -600,7 +580,7 @@ async fn mail_jobs_deliver_and_retry_an_uncertain_transactional_send(db: PgPool)
         worker::handlers::all(
             testkit::memory_storage(),
             testkit::dead_meili(),
-            smtp.mailer(),
+            Some(smtp.mailer()),
             None,
         ),
         fast_config(),
@@ -665,7 +645,7 @@ async fn staff_invitation_email_leaves_through_the_outbox(db: PgPool) {
         worker::handlers::all(
             testkit::memory_storage(),
             testkit::dead_meili(),
-            smtp.mailer(),
+            Some(smtp.mailer()),
             Some(auth),
         ),
         fast_config(),

@@ -19,7 +19,14 @@ async fn main() -> anyhow::Result<()> {
         commerce::search::Meili::new(http, m.url, m.key, Duration::from_secs(30))
     };
 
-    let mailer = Mailer::new(&MailConfig::from_env()?)?;
+    // Without MAIL_* the worker still runs every other job; mail jobs wait (retry) until it is
+    // configured. A partial MAIL_* setup refuses to start.
+    let mailer = MailConfig::optional_from_env()?
+        .map(|c| Mailer::new(&c))
+        .transpose()?;
+    if mailer.is_none() {
+        tracing::warn!("MAIL_* is not configured: emails stay queued until it is");
+    }
     // Staff invitations need the auth service (sign-in links); other jobs run without it.
     let auth = AuthServiceConfig::optional_from_env()?
         .map(|c| platform::auth_service::AuthService::new(c.base_url, c.token))
