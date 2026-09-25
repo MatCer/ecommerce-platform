@@ -77,11 +77,11 @@
     },
     "nullable": [
       false,
-      false,
-      false,
-      false,
-      false,
-      false
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
   "hash": "6344af5c2751ed968b213e392fd65f885ea5c0aa4816c3957feb5c93de7c906f"

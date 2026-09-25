@@ -7,7 +7,9 @@ pub mod admin_inventory;
 pub mod admin_media;
 pub mod admin_pricing;
 pub mod admin_promotions;
+pub mod admin_staff;
 pub mod auth;
+pub mod auth_service;
 pub mod cli;
 pub mod internal;
 
@@ -49,6 +51,8 @@ const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
+    /// The auth service's internal API (staff invitations); `None` when not configured.
+    pub auth_service: Option<auth_service::AuthService>,
     pub http: reqwest::Client,
     pub meili_url: Url,
     pub storage: Storage,
@@ -64,6 +68,7 @@ pub struct AppState {
     components(schemas(platform::Problem)),
     modifiers(&SecuritySchemes),
     tags(
+        (name = "staff", description = "Admin API: tenant staff management"),
         (name = "health", description = "Liveness and readiness"),
         (name = "admin", description = "Admin API: staff JWT from the auth service + X-Tenant-Id"),
         (name = "catalog", description = "Admin API: products, categories, parameters, tax categories"),
@@ -105,6 +110,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .routes(routes!(healthz))
         .routes(routes!(readyz))
         .merge(admin::routes())
+        .merge(admin_staff::routes())
         .merge(admin_catalog::routes())
         .merge(admin_media::routes())
         .merge(admin_pricing::routes())

@@ -149,6 +149,49 @@ impl WorkerConfig {
     }
 }
 
+/// Not Debug: contains the internal auth service secret.
+#[derive(Clone)]
+pub struct AuthServiceConfig {
+    pub base_url: Url,
+    pub token: String,
+}
+impl AuthServiceConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env)
+    }
+
+    /// For the API server: `None` when neither variable is set (the API still boots; staff
+    /// invitations answer `503`), a validated config when both are, an error when only one is
+    /// or the values are invalid (misconfiguration still fails fast).
+    pub fn optional_from_env() -> Result<Option<Self>, ConfigError> {
+        Self::optional_from_lookup(&process_env)
+    }
+
+    pub fn optional_from_lookup(lookup: Lookup) -> Result<Option<Self>, ConfigError> {
+        if get(lookup, "AUTH_INTERNAL_URL").is_none()
+            && get(lookup, "AUTH_INTERNAL_TOKEN").is_none()
+        {
+            return Ok(None);
+        }
+        Self::from_lookup(lookup).map(Some)
+    }
+
+    pub fn from_lookup(lookup: Lookup) -> Result<Self, ConfigError> {
+        let token = required(lookup, "AUTH_INTERNAL_TOKEN")?;
+        if token.chars().count() < 32 {
+            return Err(ConfigError::Invalid {
+                name: "AUTH_INTERNAL_TOKEN",
+                reason: "must be at least 32 characters".into(),
+            });
+        }
+        let mut base_url = url(lookup, "AUTH_INTERNAL_URL")?;
+        if !base_url.path().ends_with('/') {
+            base_url.set_path(&format!("{}/", base_url.path()));
+        }
+        Ok(Self { base_url, token })
+    }
+}
+
 /// Staff authentication (spec A9): JWTs issued by the Better Auth service.
 #[derive(Debug, Clone)]
 pub struct StaffAuthConfig {
@@ -403,5 +446,66 @@ mod tests {
             cfg.media_base_url.as_str(),
             "http://s3.localhost:8080/public/"
         );
+    }
+}
+
+#[cfg(test)]
+mod auth_service_config_tests {
+    use super::*;
+    #[test]
+    fn internal_auth_configuration_is_required_and_secret_is_validated() {
+        assert!(matches!(
+            AuthServiceConfig::from_lookup(&|_| None),
+            Err(ConfigError::Missing("AUTH_INTERNAL_TOKEN"))
+        ));
+        let lookup = |key: &str| match key {
+            "AUTH_INTERNAL_URL" => Some("http://auth:3000/base".into()),
+            "AUTH_INTERNAL_TOKEN" => Some("x".repeat(32)),
+            _ => None,
+        };
+        let cfg = AuthServiceConfig::from_lookup(&lookup).expect("valid configuration");
+        assert_eq!(cfg.base_url.as_str(), "http://auth:3000/base/");
+        assert!(matches!(
+            AuthServiceConfig::from_lookup(&|key| if key == "AUTH_INTERNAL_TOKEN" {
+                Some("short".into())
+            } else {
+                lookup(key)
+            }),
+            Err(ConfigError::Invalid {
+                name: "AUTH_INTERNAL_TOKEN",
+                ..
+            })
+        ));
+        assert!(matches!(
+            AuthServiceConfig::from_lookup(&|key| if key == "AUTH_INTERNAL_URL" {
+                None
+            } else {
+                lookup(key)
+            }),
+            Err(ConfigError::Missing("AUTH_INTERNAL_URL"))
+        ));
+    }
+
+    #[test]
+    fn internal_auth_is_optional_for_the_server_but_never_half_configured() {
+        assert!(matches!(
+            AuthServiceConfig::optional_from_lookup(&|_| None),
+            Ok(None)
+        ));
+        assert!(matches!(
+            AuthServiceConfig::optional_from_lookup(
+                &|key| (key == "AUTH_INTERNAL_URL").then(|| "http://auth:3000/".into())
+            ),
+            Err(ConfigError::Missing("AUTH_INTERNAL_TOKEN"))
+        ));
+        let full = |key: &str| match key {
+            "AUTH_INTERNAL_URL" => Some("http://auth:3000/".into()),
+            "AUTH_INTERNAL_TOKEN" => Some("x".repeat(32)),
+            _ => None,
+        };
+        assert!(matches!(
+            AuthServiceConfig::optional_from_lookup(&full),
+            Ok(Some(_))
+        ));
     }
 }

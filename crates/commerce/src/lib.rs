@@ -14,6 +14,7 @@ pub mod media;
 pub mod money;
 pub mod pricing;
 pub mod promotions;
+pub mod staff;
 pub mod tax;
 pub mod tenancy;
 

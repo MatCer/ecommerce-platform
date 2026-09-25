@@ -49,8 +49,7 @@ pub enum AdminCommand {
 
 /// Settings only the CLI needs (read when a command runs).
 struct CliEnv {
-    auth_url: Url,
-    auth_token: String,
+    auth: platform::config::AuthServiceConfig,
     dns_txt_url: Url,
     admin_url: String,
 }
@@ -63,9 +62,7 @@ fn env_url(name: &str) -> anyhow::Result<Url> {
 impl CliEnv {
     fn load() -> anyhow::Result<Self> {
         Ok(Self {
-            auth_url: env_url("AUTH_INTERNAL_URL")?,
-            auth_token: std::env::var("AUTH_INTERNAL_TOKEN")
-                .context("AUTH_INTERNAL_TOKEN is not set")?,
+            auth: platform::config::AuthServiceConfig::from_env()?,
             dns_txt_url: env_url("DNS_TXT_URL")?,
             admin_url: std::env::var("ADMIN_ORIGIN").context("ADMIN_ORIGIN is not set")?,
         })
@@ -82,7 +79,7 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
             slug,
             name,
             owner_email,
-        } => create_tenant(db, &http, &env, &slug, &name, &owner_email).await,
+        } => create_tenant(db, &env, &slug, &name, &owner_email).await,
         AdminCommand::AddDomain {
             tenant,
             host,
@@ -113,14 +110,8 @@ pub async fn run(db: &PgPool, cmd: AdminCommand) -> anyhow::Result<()> {
     }
 }
 
-#[derive(Deserialize)]
-struct AuthUser {
-    id: String,
-}
-
 async fn create_tenant(
     db: &PgPool,
-    http: &reqwest::Client,
     env: &CliEnv,
     slug: &str,
     name: &str,
@@ -129,40 +120,29 @@ async fn create_tenant(
     // Fail on a bad slug before touching the auth service.
     tenancy::validate_slug(slug)?;
     // 1. Find or create the owner in the auth service (idempotent), without emailing yet.
-    let user: AuthUser = http
-        .post(env.auth_url.join("internal/users")?)
-        .bearer_auth(&env.auth_token)
-        .json(&json!({ "email": owner_email, "name": name }))
-        .send()
-        .await?
-        .error_for_status()
-        .context("auth service refused to create the owner")?
-        .json()
-        .await?;
+    let auth =
+        crate::auth_service::AuthService::new(env.auth.base_url.clone(), env.auth.token.clone())?;
+    let user_id = auth.ensure_user(owner_email, name).await?;
     // 2. Tenant, market, domain, membership, audit entry and event in one transaction.
     let created = tenancy::create_tenant(
         db,
         &NewTenant {
             slug,
             name,
-            owner_user_id: &user.id,
+            owner_user_id: &user_id,
             owner_email,
         },
     )
     .await?;
     // 3. Only now send the magic link invitation.
-    http.post(env.auth_url.join("internal/users/invite")?)
-        .bearer_auth(&env.auth_token)
-        .json(&json!({ "email": owner_email, "callback_url": env.admin_url }))
-        .send()
-        .await?
-        .error_for_status()
+    auth.invite(owner_email, &env.admin_url)
+        .await
         .context("tenant created, but sending the invitation failed; rerun the invite")?;
     print_json(&json!({
         "tenant_id": created.tenant_id,
         "market_id": created.market_id,
         "hostname": created.hostname,
-        "owner_user_id": user.id,
+        "owner_user_id": user_id,
         "invited": owner_email,
     }))
 }

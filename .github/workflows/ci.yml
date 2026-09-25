@@ -92,6 +92,14 @@ jobs:
           tags: ecommerce-auth:ci
           cache-from: type=gha,scope=auth
           cache-to: type=gha,scope=auth,mode=max
+      - name: Build admin image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/admin/Dockerfile
+          tags: ecommerce-admin:ci
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,scope=admin,mode=max
       - run: scripts/smoke-images.sh ecommerce-rust:ci ecommerce-mocks:ci
 
   ts:
