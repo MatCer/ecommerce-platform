@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT customer_id, market_id, ship_to_country FROM orders WHERE id = $1",
+  "query": "SELECT customer_id, market_id, ship_to_country, exception_resolved_at, exception_note\n         FROM orders WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -35,6 +35,28 @@
             "name": "ship_to_country"
           }
         }
+      },
+      {
+        "ordinal": 3,
+        "name": "exception_resolved_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "exception_resolved_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "exception_note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "exception_note"
+          }
+        }
       }
     ],
     "parameters": {
@@ -45,8 +67,10 @@
     "nullable": [
       true,
       false,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "d62cc0d6ab734b73fe194e25767ff20ead77d8eb1a59b39cfcaf882598050b84"
+  "hash": "571969c698621ff3780264215313346eba976d816a92378a0da6b7b8258fd004"
 }

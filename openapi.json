@@ -507,6 +507,314 @@
         ]
       }
     },
+    "/admin/v1/bank-accounts": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Every receiving account, active ones first (retired accounts still import statements).",
+        "operationId": "list_bank_accounts",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccountList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/bank-accounts/{id}/statements": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Imports a bank statement (the raw file as the body, at most 1 MB) into the account and\nmatches the new credits (A25): lines already imported (same bank transaction id) are\nignored; exact VS + amount + currency matches pay their order; the rest waits in the\nexceptions queue. `422 statement_account_mismatch` when the file names another account.",
+        "operationId": "upload_statement",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "`camt053` (ISO 20022 XML), `fio_csv` or `gpc` (ABO).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "camt053",
+                "fio_csv",
+                "gpc"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatementImport"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_statement | statement_account_mismatch",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/bank-transactions": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Imported bank transactions, newest first, with their match status.",
+        "operationId": "list_bank_transactions",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TxStatus"
+            }
+          },
+          {
+            "name": "bank_account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankTransactionPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/bank-transactions/{id}/resolve": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Resolves an open bank transaction (audited): `accept` a partial/over payment as the\norder's payment, `assign` it to an order by number, or `dismiss` it with a note.",
+        "operationId": "resolve_bank_transaction",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankTransaction"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "transaction_resolved",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_resolution",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/categories": {
       "get": {
         "tags": [
@@ -867,6 +1175,77 @@
             }
           },
           "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/cod-reports": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Imports a carrier COD report (CSV body `order_number;amount;tender;event`, `event` =\n`collected` or `remitted`). Each row applies on its own; mismatched amounts are reported,\nnever applied.",
+        "operationId": "cod_report",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodReport"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_cod_report",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2213,6 +2592,162 @@
         ]
       }
     },
+    "/admin/v1/markets/{id}/bank-account": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The market's receiving bank account (`404` when none is set).",
+        "operationId": "get_bank_account",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccount"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Sets the market's receiving account for bank transfers (IBAN check digits verified). The\noptional Fio API token is stored encrypted and never returned. Payment settings: admin\nrole and a login within the last 15 minutes (`401 reauth_required`, A9).",
+        "operationId": "put_bank_account",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankAccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_bank_account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SECRETS_KEY missing for a Fio token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/markets/{id}/payment-methods": {
       "get": {
         "tags": [
@@ -2661,6 +3196,334 @@
             }
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/cod/collect": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The money was collected: tender (`cash` is rounded as a separate charge, A16) and\ncollector are recorded, the order becomes paid (audited).",
+        "operationId": "cod_collect",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempt"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition | not_cash_on_delivery | order_cancelled",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_collection",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/cod/deliver": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The parcel was delivered (COD `pending → delivered`, audited).",
+        "operationId": "cod_deliver",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempt"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition | not_cash_on_delivery | order_cancelled",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/cod/remit": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The carrier paid the collected money out (COD `collected → remitted`, audited).",
+        "operationId": "cod_remit",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemitInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Attempt"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/exception/resolve": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Marks an order's exception (late or duplicate payment) as settled (audited); it leaves the\nqueue. `409 no_open_exception` otherwise.",
+        "operationId": "resolve_order_exception",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "no_open_exception",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3302,6 +4165,255 @@
         "responses": {
           "204": {
             "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payment-exceptions": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "operationId": "list_exceptions",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentExceptions"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "The platform's Stripe mode and the shop's connected account (capabilities, A11).",
+        "operationId": "stripe_status",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe/onboarding": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Starts or continues Stripe-hosted onboarding of the shop's connected account (created on\nfirst use). Payment settings: admin role and a fresh login (A9).",
+        "operationId": "stripe_onboarding",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe/refresh": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Re-reads the connected account from Stripe (after returning from onboarding).",
+        "operationId": "stripe_refresh",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StripeStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/payments/stripe/simulate": {
+      "post": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Simulator only (`404` otherwise): emits a signed `account.updated` for the shop's account.",
+        "operationId": "stripe_simulate",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateAccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {},
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -10190,6 +11302,140 @@
         }
       }
     },
+    "/storefront/v1/orders/{token}/payment-attempts/{attempt}/simulate": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The \"Stripe test simulator\" (local mode without a real Stripe key; `404` otherwise): makes\nthe API sign a Stripe-shaped `payment_intent.succeeded` / `payment_intent.payment_failed`\nevent with the webhook secret and receive it like Stripe's, so verification, storage and\nasynchronous processing run for real. Needs the right to pay. Answers `202` with the\npayment as it is now; the order page polls until the event is processed.",
+        "operationId": "simulate_attempt",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "The checkout cart capability the order was placed with (`__Host-cart`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "The session of the order's customer (`__Host-sid`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "payment_not_allowed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "attempt_not_initialized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/pages/blog": {
       "get": {
         "tags": [
@@ -11239,6 +12485,76 @@
           }
         }
       }
+    },
+    "/webhooks/stripe": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Stripe Connect webhook endpoint (A11). `Stripe-Signature` (HMAC-SHA256 over\n`\"<t>.<raw body>\"` with the endpoint secret, 5 minutes tolerance) is verified before\nanything else; the event is stored (deduplicated by id) and its processing enqueued before\nthe 200, so a crash afterwards loses nothing and a redelivery changes nothing. `404` when\nStripe is not configured.",
+        "operationId": "stripe_webhook",
+        "parameters": [
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "A Stripe event",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Received"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_signature",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_event",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11446,6 +12762,20 @@
               "$ref": "#/components/schemas/OrderEventView"
             }
           },
+          "exception_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exception_resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a person settled the exception (it then leaves the work list), and how."
+          },
           "market_id": {
             "type": "string",
             "format": "uuid"
@@ -11635,6 +12965,27 @@
             "type": "integer",
             "format": "int64"
           },
+          "cod_status": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CodStatus",
+                "description": "Cash on delivery (A16): where the money is."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "collector": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Collector"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "completed_at": {
             "type": [
               "string",
@@ -11676,6 +13027,23 @@
           },
           "status": {
             "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "tender": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Tender"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variable_symbol": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bank transfer: the variable symbol (A25)."
           }
         }
       },
@@ -11784,6 +13152,304 @@
           "sale",
           "new"
         ]
+      },
+      "BankAccount": {
+        "type": "object",
+        "required": [
+          "id",
+          "market_id",
+          "currency",
+          "iban",
+          "account_name",
+          "active",
+          "fio_connected"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "The market's current account; retired ones still import and match statements."
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "fio_connected": {
+            "type": "boolean",
+            "description": "A Fio API token is stored (encrypted; never returned)."
+          },
+          "fio_synced_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "iban": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BankAccountInput": {
+        "type": "object",
+        "required": [
+          "iban",
+          "account_name"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string",
+            "description": "The account holder (shown to customers, PAY by square beneficiary), 1-70 characters."
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clear_fio_token": {
+            "type": "boolean",
+            "description": "Removes the stored Fio API token."
+          },
+          "fio_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sets the Fio API token (write-only, stored encrypted); omit to keep the current one."
+          },
+          "iban": {
+            "type": "string",
+            "description": "Spaces are ignored; the check digits are verified."
+          }
+        },
+        "additionalProperties": false
+      },
+      "BankAccountList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankAccount"
+            }
+          }
+        }
+      },
+      "BankTransaction": {
+        "type": "object",
+        "required": [
+          "id",
+          "bank_account_id",
+          "bank_tx_id",
+          "booked_on",
+          "amount_minor",
+          "currency",
+          "source",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bank_account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bank_tx_id": {
+            "type": "string"
+          },
+          "booked_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "counterparty": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "counterparty_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "expected_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "What the order expected (for partial and over payments)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The order the money went to (matched, or the candidate of a partial/over payment)."
+          },
+          "order_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TxReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "resolved_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TxStatus"
+          },
+          "variable_symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BankTransactionPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankTransaction"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next page; `null` on the last page."
+          }
+        }
+      },
+      "BankTransferView": {
+        "type": "object",
+        "description": "The payment instructions of a bank-transfer order, as the customer sees them.",
+        "required": [
+          "iban",
+          "account_name",
+          "variable_symbol",
+          "amount",
+          "message"
+        ],
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "bic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "iban": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "qr_kind": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QrKind",
+                "description": "`spayd` (CZK) or `pay_by_square` (EUR); `null` when the currency has no QR standard."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qr_svg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The QR code as an inline SVG element (server-generated; contains no script)."
+          },
+          "variable_symbol": {
+            "type": "string"
+          }
+        }
       },
       "Block": {
         "oneOf": [
@@ -12910,6 +14576,100 @@
             "type": "string"
           }
         }
+      },
+      "CodReport": {
+        "type": "object",
+        "required": [
+          "applied",
+          "skipped",
+          "errors",
+          "rows"
+        ],
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "errors": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodReportRow"
+            }
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "CodReportRow": {
+        "type": "object",
+        "required": [
+          "line",
+          "order_number",
+          "result"
+        ],
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "line": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-based line number in the file.",
+            "minimum": 0
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string",
+            "description": "`applied`, `skipped` (already in that state) or `error`."
+          }
+        }
+      },
+      "CodStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "delivered",
+          "collected",
+          "remitted"
+        ]
+      },
+      "CollectInput": {
+        "type": "object",
+        "required": [
+          "tender",
+          "collector"
+        ],
+        "properties": {
+          "collector": {
+            "$ref": "#/components/schemas/Collector"
+          },
+          "tender": {
+            "$ref": "#/components/schemas/Tender",
+            "description": "`cash` (rounded, A16) or `card`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Collector": {
+        "type": "string",
+        "enum": [
+          "carrier",
+          "merchant"
+        ]
       },
       "Collision": {
         "type": "object",
@@ -15847,7 +17607,7 @@
           },
           {
             "type": "object",
-            "description": "Nothing to pay now (cash on delivery).",
+            "description": "Nothing to pay online now: cash on delivery, or a bank transfer (the order page shows\nthe instructions and the QR code).",
             "required": [
               "type"
             ],
@@ -15859,9 +17619,64 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "description": "Stripe's Payment Element on the order page (loaded only for this action): the intent\nlives on the shop's connected account.",
+            "required": [
+              "publishable_key",
+              "account_id",
+              "client_secret",
+              "type"
+            ],
+            "properties": {
+              "account_id": {
+                "type": "string"
+              },
+              "client_secret": {
+                "type": "string"
+              },
+              "publishable_key": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stripe"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Local mode: no real Stripe key. The order page offers the \"Stripe test simulator\",\nwhose buttons make the API emit signed webhook events.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "stripe_simulator"
+                ]
+              }
+            }
           }
         ],
         "description": "What the customer does next."
+      },
+      "NoteInput": {
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "What was done (e.g. \"refunded to the customer's account\"), 1-500 characters."
+          }
+        },
+        "additionalProperties": false
       },
       "Omnibus": {
         "type": "object",
@@ -15910,6 +17725,18 @@
             ],
             "format": "int64",
             "description": "Lowest price in the 30 days before `reduction_started_at`."
+          }
+        }
+      },
+      "OnboardingLink": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Stripe-hosted onboarding (single use, expires in minutes); in simulator mode the admin\npage itself (the account becomes ready through a simulated `account.updated`)."
           }
         }
       },
@@ -16854,6 +18681,28 @@
         },
         "additionalProperties": false
       },
+      "PaymentExceptions": {
+        "type": "object",
+        "description": "The payment exceptions queue: bank transactions waiting for a person (unmatched, partial,\nover) and orders holding money they cannot keep (late or duplicate payments, A10).",
+        "required": [
+          "bank_transactions",
+          "orders"
+        ],
+        "properties": {
+          "bank_transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BankTransaction"
+            }
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderSummary"
+            }
+          }
+        }
+      },
       "PaymentInput": {
         "type": "object",
         "required": [
@@ -16879,7 +18728,7 @@
         "properties": {
           "available": {
             "type": "boolean",
-            "description": "Whether the platform can take payments with it yet (adapter present and configured)."
+            "description": "Whether the shop can take payments with it now (adapter present and configured)."
           },
           "enabled": {
             "type": "boolean"
@@ -16906,6 +18755,13 @@
             ],
             "format": "int32",
             "description": "Payment window for unpaid orders; `null` = the method's default."
+          },
+          "unavailable_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why not: `not_configured` (no platform adapter), `no_bank_account` (bank transfer\nneeds the market's receiving account), `stripe_onboarding` (the connected account\ncannot take card payments yet or lost the capability, A11)."
           }
         }
       },
@@ -17025,6 +18881,17 @@
               {
                 "$ref": "#/components/schemas/AttemptView",
                 "description": "The latest attempt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bank_transfer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BankTransferView",
+                "description": "Bank transfer: account, variable symbol, amount and the QR code (A25)."
               },
               {
                 "type": "null"
@@ -18018,6 +19885,13 @@
         },
         "additionalProperties": false
       },
+      "QrKind": {
+        "type": "string",
+        "enum": [
+          "spayd",
+          "pay_by_square"
+        ]
+      },
       "QueryCount": {
         "type": "object",
         "required": [
@@ -18059,6 +19933,22 @@
           "job_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "Received": {
+        "type": "object",
+        "required": [
+          "received",
+          "new"
+        ],
+        "properties": {
+          "new": {
+            "type": "boolean",
+            "description": "`false` for a redelivery of an event already stored (a no-op)."
+          },
+          "received": {
+            "type": "boolean"
           }
         }
       },
@@ -18162,6 +20052,53 @@
             "format": "uuid"
           }
         }
+      },
+      "RemitInput": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "E.g. the carrier's payout reference, at most 500 characters."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResolveAction": {
+        "type": "string",
+        "enum": [
+          "accept",
+          "assign",
+          "dismiss"
+        ]
+      },
+      "ResolveInput": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ResolveAction"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why (required for `dismiss`), at most 500 characters."
+          },
+          "order_number": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The order number, for `assign`."
+          }
+        },
+        "additionalProperties": false
       },
       "Resolved": {
         "type": "object",
@@ -19036,6 +20973,31 @@
           }
         }
       },
+      "SimulateAccountInput": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "`true`: onboarding completed (charges enabled, card payments active); `false`: the\ncard_payments capability is lost (Stripe disappears from checkout, A11)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SimulateInput": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "Sort": {
         "type": "string",
         "enum": [
@@ -19119,6 +21081,48 @@
           }
         }
       },
+      "StatementImport": {
+        "type": "object",
+        "required": [
+          "imported",
+          "duplicates",
+          "debits",
+          "matched",
+          "exceptions"
+        ],
+        "properties": {
+          "debits": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Debits (outgoing payments) are not stored.",
+            "minimum": 0
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines already imported earlier (same bank transaction id): ignored.",
+            "minimum": 0
+          },
+          "exceptions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New lines waiting in the exceptions queue.",
+            "minimum": 0
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New credit lines stored.",
+            "minimum": 0
+          },
+          "matched": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New lines that paid an order.",
+            "minimum": 0
+          }
+        }
+      },
       "StockState": {
         "type": "string",
         "enum": [
@@ -19137,6 +21141,85 @@
           "token": {
             "type": "string",
             "description": "Public storefront token of the tenant (the edge sends it; it grants only public reads\nand cart operations of this tenant)."
+          }
+        }
+      },
+      "StripeAccount": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "livemode",
+          "charges_enabled",
+          "details_submitted",
+          "card_payments",
+          "ready",
+          "updated_at"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string"
+          },
+          "card_payments": {
+            "type": "string",
+            "description": "`active`, `inactive` or `pending`."
+          },
+          "charges_enabled": {
+            "type": "boolean"
+          },
+          "details_submitted": {
+            "type": "boolean"
+          },
+          "disabled_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "livemode": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean",
+            "description": "Stripe is offered at checkout (charges enabled and card payments active)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StripePlatformMode": {
+        "type": "string",
+        "enum": [
+          "live",
+          "test",
+          "simulator"
+        ]
+      },
+      "StripeStatus": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StripeAccount",
+                "description": "The shop's connected account, once onboarding started."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StripePlatformMode",
+                "description": "`null`: the platform has no Stripe configuration (Stripe cannot be offered)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -19491,6 +21574,14 @@
           }
         }
       },
+      "Tender": {
+        "type": "string",
+        "enum": [
+          "cash",
+          "card",
+          "unknown"
+        ]
+      },
       "TopProduct": {
         "type": "object",
         "required": [
@@ -19640,6 +21731,28 @@
             "type": "string"
           }
         }
+      },
+      "TxReason": {
+        "type": "string",
+        "enum": [
+          "no_variable_symbol",
+          "unknown_variable_symbol",
+          "currency_mismatch",
+          "already_paid",
+          "amount_short",
+          "amount_over",
+          "manual"
+        ]
+      },
+      "TxStatus": {
+        "type": "string",
+        "enum": [
+          "matched",
+          "unmatched",
+          "partial",
+          "overpaid",
+          "dismissed"
+        ]
       },
       "UnitMeasure": {
         "type": "string",
@@ -20116,6 +22229,10 @@
     {
       "name": "checkout",
       "description": "Admin API: shipping and payment methods, orders"
+    },
+    {
+      "name": "payments",
+      "description": "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"
     },
     {
       "name": "analytics",

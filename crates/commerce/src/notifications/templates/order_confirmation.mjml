@@ -15,7 +15,9 @@
         <mj-text padding="0 0 6px">{{ shipping.method }}{% if shipping.pickup_point %}<br />{{ t("order_confirmation.pickup_point") }}: {{ shipping.pickup_point }}{% endif %}{% if shipping.address %}<br />{{ shipping.address }}{% endif %}</mj-text>
         <mj-text font-weight="700" padding="12px 0 0">{{ t("order_confirmation.payment") }}</mj-text>
         <mj-text padding="0 0 6px">{{ payment.method }}</mj-text>
-{%- if payment.bank_transfer %}
+{%- if payment.bank_transfer and bank %}
+{% include "bank_transfer.mjml" %}
+{%- elif payment.bank_transfer %}
         <mj-text>{{ t("order_confirmation.bank_transfer") }}</mj-text>
 {%- elif payment.cod %}
         <mj-text>{{ t("order_confirmation.cod") }}</mj-text>

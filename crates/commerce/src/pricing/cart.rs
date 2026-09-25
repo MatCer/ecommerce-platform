@@ -321,6 +321,39 @@ fn round_to(total: i64, increment: i64) -> i64 {
     (total + increment / 2) / increment * increment
 }
 
+/// The cash rounding charge for a payable `subtotal` (A15 step 6, A16), or `None` when it is
+/// already a multiple of the increment. Also used at COD collection, when the tender becomes
+/// known after the order was priced: `goods_by_rate` are the goods' discounted gross per rate.
+pub fn rounding_charge(
+    subtotal: i64,
+    rule: CashRounding,
+    goods_by_rate: &BTreeMap<TaxRate, i64>,
+    fallback: TaxRate,
+) -> Result<Option<PricedCharge>, Error> {
+    if !(1..=10_000).contains(&rule.increment_minor) || !(0..=MAX_AMOUNT * 10).contains(&subtotal) {
+        return Err(overflow());
+    }
+    // A positive payment never rounds to zero: it is at least one increment (SK: €0.05 for
+    // €0.01-0.02, MF SR guidance on rounding from 2022-07-01).
+    let rounded = match round_to(subtotal, rule.increment_minor) {
+        0 if subtotal > 0 => rule.increment_minor,
+        rounded => rounded,
+    };
+    let diff = rounded - subtotal;
+    if diff == 0 {
+        return Ok(None);
+    }
+    charge(
+        ChargeKind::Rounding,
+        diff,
+        0,
+        rule.in_vat_base,
+        goods_by_rate,
+        fallback,
+    )
+    .map(Some)
+}
+
 /// Prices a cart per A15. Pure and deterministic: the same input always gives the same
 /// allocation. Errors: `422 invalid_cart` for out-of-range input.
 pub fn price_cart(input: &CartInput) -> Result<PricedCart, Error> {
@@ -408,24 +441,10 @@ pub fn price_cart(input: &CartInput) -> Result<PricedCart, Error> {
 
     // 5. Cash rounding, last.
     let subtotal = goods + charges.iter().map(|c| c.gross_minor).sum::<i64>();
-    if let Some(r) = input.cash_rounding {
-        // A positive payment never rounds to zero: it is at least one increment (SK: €0.05
-        // for €0.01-0.02, MF SR guidance on rounding from 2022-07-01).
-        let rounded = match round_to(subtotal, r.increment_minor) {
-            0 if subtotal > 0 => r.increment_minor,
-            rounded => rounded,
-        };
-        let diff = rounded - subtotal;
-        if diff != 0 {
-            charges.push(charge(
-                ChargeKind::Rounding,
-                diff,
-                0,
-                r.in_vat_base,
-                &goods_by_rate,
-                fallback,
-            )?);
-        }
+    if let Some(r) = input.cash_rounding
+        && let Some(c) = rounding_charge(subtotal, r, &goods_by_rate, fallback)?
+    {
+        charges.push(c);
     }
 
     // A non-payer shows no recap; a payer's recap covers goods and taxed charge portions.

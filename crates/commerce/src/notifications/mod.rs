@@ -157,6 +157,22 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
             "order_confirmation.txt",
             include_str!("templates/order_confirmation.txt"),
         ),
+        (
+            "bank_transfer.mjml",
+            include_str!("templates/bank_transfer.mjml"),
+        ),
+        (
+            "bank_transfer.txt",
+            include_str!("templates/bank_transfer.txt"),
+        ),
+        (
+            "payment_reminder.mjml",
+            include_str!("templates/payment_reminder.mjml"),
+        ),
+        (
+            "payment_reminder.txt",
+            include_str!("templates/payment_reminder.txt"),
+        ),
     ] {
         // Templates are compiled into the binary and covered by tests.
         if let Err(e) = env.add_template(name, source) {
@@ -176,6 +192,8 @@ pub enum Template {
     Order,
     /// Order placed (WP10): summary, VAT recap, delivery and payment.
     OrderConfirmation,
+    /// A bank transfer is still unpaid (WP11): the instructions and QR code again.
+    PaymentReminder,
 }
 
 impl Template {
@@ -186,6 +204,7 @@ impl Template {
             Self::StaffInvite => "staff_invite",
             Self::Order => "order",
             Self::OrderConfirmation => "order_confirmation",
+            Self::PaymentReminder => "payment_reminder",
         }
     }
 }

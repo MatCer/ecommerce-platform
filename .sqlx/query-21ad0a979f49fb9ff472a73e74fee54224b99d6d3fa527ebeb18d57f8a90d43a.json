@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, number, placed_at, email, status, payment_status, fulfillment_status,\n                exception, payment_method, total_minor, currency, locale\n         FROM orders\n         WHERE ($1::uuid IS NULL OR customer_id = $1)\n           AND ($2::text IS NULL OR status = $2)\n           AND ($3::uuid IS NULL OR id < $3)\n           AND (NOT $5 OR exception IS NOT NULL)\n         ORDER BY id DESC\n         LIMIT $4",
+  "query": "SELECT id, number, placed_at, email, status, payment_status, fulfillment_status,\n                exception, payment_method, total_minor, currency, locale\n         FROM orders\n         WHERE ($1::uuid IS NULL OR customer_id = $1)\n           AND ($2::text IS NULL OR status = $2)\n           AND ($3::uuid IS NULL OR id < $3)\n           AND (NOT $5 OR (exception IS NOT NULL AND exception_resolved_at IS NULL))\n         ORDER BY id DESC\n         LIMIT $4",
   "describe": {
     "columns": [
       {
@@ -160,5 +160,5 @@
       false
     ]
   },
-  "hash": "9e83a3de634bc1cd57113c549f1ad9fbfe3cbedcb890762a975c9243f236a3df"
+  "hash": "21ad0a979f49fb9ff472a73e74fee54224b99d6d3fa527ebeb18d57f8a90d43a"
 }

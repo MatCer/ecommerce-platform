@@ -73,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
             port: sf.port,
         },
         webhooks,
+        fio: fio_poller(env, &ops)?,
     };
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
@@ -109,4 +110,23 @@ async fn main() -> anyhow::Result<()> {
     db.close().await;
     tracing::info!("worker stopped");
     Ok(())
+}
+
+/// The Fio API poller when `SECRETS_KEY` is set (stored tokens are encrypted with it).
+fn fio_poller(
+    env: platform::config::AppEnv,
+    ops: &platform::config::OpsConfig,
+) -> anyhow::Result<Option<handlers::Fio>> {
+    let p = platform::config::PaymentsConfig::from_env(env)?;
+    let Some(key) = ops.secrets_key else {
+        tracing::warn!("SECRETS_KEY not set: Fio API polling is off");
+        return Ok(None);
+    };
+    Ok(Some(handlers::Fio {
+        secrets: std::sync::Arc::new(platform::crypto::SecretBox::new(&key)),
+        base_url: p.fio_api_url.to_string(),
+        http: reqwest::Client::builder()
+            .timeout(Duration::from_secs(20))
+            .build()?,
+    }))
 }

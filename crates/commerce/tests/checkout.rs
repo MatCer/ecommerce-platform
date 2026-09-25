@@ -27,6 +27,7 @@ fn settings() -> Settings {
     Settings {
         payments: Payments {
             fake: Some(FakeGateway::new(b"test-secret".to_vec())),
+            ..Payments::default()
         },
         packeta: None,
     }

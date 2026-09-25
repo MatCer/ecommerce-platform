@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ship_to_country, vat_payer, vat_recap,\n                EXISTS (SELECT 1 FROM order_charges c WHERE c.order_id = o.id AND c.kind = 'rounding')\n                    AS \"rounded!\"\n         FROM orders o WHERE o.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ship_to_country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "ship_to_country"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "vat_payer",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "vat_payer"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "vat_recap",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "vat_recap"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "rounded!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "70274cda000d86e2c238cc7765136aff1b332258e9be651e142f215fb39c5f28"
+}

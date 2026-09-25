@@ -112,6 +112,8 @@ const ORDER_OPS: { method: string; path: RegExp }[] = [
   { method: "GET", path: /^\/[0-9a-f]{64}\/payment$/ },
   { method: "POST", path: /^\/[0-9a-f]{64}\/payment-attempts$/ },
   { method: "POST", path: /^\/[0-9a-f]{64}\/payment-attempts\/[0-9a-f-]{36}\/init$/ },
+  // WP11: the Stripe test simulator (the API answers 404 unless it runs without a real key).
+  { method: "POST", path: /^\/[0-9a-f]{64}\/payment-attempts\/[0-9a-f-]{36}\/simulate$/ },
 ];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -1189,6 +1191,8 @@ ${
       scriptHashes: m.csp.script_hashes,
       styleHashes: m.csp.style_hashes,
       widgetOrigin,
+      // Stripe.js only where a payment can happen: the checkout and the order page.
+      stripe: url.pathname === "/" || ORDER_PAGE_RE.test(url.pathname),
     });
     for (const [k, v] of Object.entries(securityHeaders("checkout", csp))) headers.set(k, v);
     headers.set("cache-control", "no-store");

@@ -286,11 +286,19 @@ services:
       PAYMENTS_FAKE_SECRET: ${PAYMENTS_FAKE_SECRET:-local-fake-gateway-secret-0123456789}
       PACKETA_WIDGET_URL: ${PACKETA_WIDGET_URL:-http://mocks.localhost:${HTTP_PORT:-8080}/packeta/library.js}
       PACKETA_API_KEY: ${PACKETA_API_KEY:-mock-packeta-api-key}
+      # WP11 Stripe Connect. Without STRIPE_SECRET_KEY the API talks to stripe-mock and the
+      # order page offers the signed-event test simulator; with a real test key (+ publishable
+      # key and the Connect webhook secret) the real Payment Element is used.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_local_simulator_0123456789}
+      STRIPE_MOCK_URL: ${STRIPE_MOCK_URL:-http://stripe-mock:12111}
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
       meilisearch: { condition: service_started }
       auth: { condition: service_healthy }
+      stripe-mock: { condition: service_started }
     healthcheck:
       test: ["CMD", "/usr/local/bin/api", "healthcheck"]
       interval: 5s
@@ -328,6 +336,8 @@ services:
       # Dev only: the SSRF-safe fetcher (A21) may reach the mocks service, which serves the
       # demo feeds and images on the private Docker network. Ignored unless APP_ENV=dev.
       SAFE_FETCH_ALLOW_HOSTS: mocks
+      # WP11: Fio API polling (the local mock); tokens are encrypted with SECRETS_KEY.
+      FIO_API_URL: ${FIO_API_URL:-http://mocks:4010/fio}
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }

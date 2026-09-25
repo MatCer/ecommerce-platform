@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT country_codes[1] AS \"country!\" FROM markets ORDER BY is_default DESC, created_at LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "country!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e36565f6148dabef94c0a08f5dc7e4891cd72a17d71f7bf3845119f916cdcea8"
+}

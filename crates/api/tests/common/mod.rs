@@ -27,6 +27,7 @@ pub const ISSUER: &str = "http://auth.localhost";
 pub const ADMIN_ORIGIN: &str = "http://admin.localhost:8180";
 pub const SERVICE_TOKEN: &str = "internal-test-token-0123456789abcdef";
 pub const FAKE_SECRET: &str = "fake-gateway-test-secret";
+pub const STRIPE_WEBHOOK_SECRET: &str = "whsec_api_test_0123456789";
 
 pub fn jwk(kid: &str, x: &str) -> Value {
     json!({ "kty": "OKP", "crv": "Ed25519", "alg": "EdDSA", "kid": kid, "x": x })
@@ -141,6 +142,20 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
                 fake: Some(commerce::payments::FakeGateway::new(
                     FAKE_SECRET.as_bytes().to_vec(),
                 )),
+                stripe: Some(commerce::payments::stripe::Stripe::new(
+                    &platform::config::StripeConfig {
+                        mode: platform::config::StripeMode::Simulator,
+                        api_url: std::env::var("STRIPE_MOCK_URL")
+                            .unwrap_or_else(|_| "http://localhost:12111".into())
+                            .parse()
+                            .unwrap(),
+                        secret_key: "sk_test_x".into(),
+                        publishable_key: None,
+                        webhook_secret: STRIPE_WEBHOOK_SECRET.into(),
+                    },
+                    reqwest::Client::new(),
+                )),
+                secrets: None,
             },
             packeta: None,
         }),
@@ -188,6 +203,8 @@ pub struct Call<'a> {
     body: Option<Value>,
     idempotency_key: Option<&'a str>,
     headers: Vec<(&'a str, String)>,
+    /// A raw body (uploads) instead of JSON.
+    raw: Option<Vec<u8>>,
 }
 
 impl<'a> Call<'a> {
@@ -200,7 +217,18 @@ impl<'a> Call<'a> {
             body: None,
             idempotency_key: None,
             headers: Vec::new(),
+            raw: None,
         }
+    }
+
+    /// A POST with a raw body and content type (file uploads, signed webhooks).
+    pub fn post_raw(uri: &'a str, body: impl Into<Vec<u8>>, content_type: &str) -> Self {
+        Self {
+            method: "POST",
+            raw: Some(body.into()),
+            ..Self::get(uri)
+        }
+        .header("content-type", content_type.to_owned())
     }
 
     pub fn header(mut self, name: &'a str, value: impl Into<String>) -> Self {
@@ -281,12 +309,13 @@ impl<'a> Call<'a> {
         for (name, value) in &self.headers {
             req = req.header(*name, value.as_str());
         }
-        let body = match self.body {
-            Some(b) => {
+        let body = match (self.body, self.raw) {
+            (Some(b), _) => {
                 req = req.header(header::CONTENT_TYPE, "application/json");
                 Body::from(b.to_string())
             }
-            None => Body::empty(),
+            (None, Some(raw)) => Body::from(raw),
+            (None, None) => Body::empty(),
         };
         let res = app(state.clone(), false)
             .oneshot(req.body(body).unwrap())

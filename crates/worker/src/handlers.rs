@@ -6,11 +6,13 @@ use std::time::Duration;
 use commerce::feeds::{export, import};
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
+use commerce::payments::{bank, stripe};
 use commerce::pricing::intervals;
 use commerce::search::{self, Meili, index::Rebuilt};
 use commerce::storefront::PublicUrls;
 use commerce::storefront::purge::{self, Purge};
 use platform::auth_service::AuthService;
+use platform::crypto::SecretBox;
 use platform::edge::EdgePurge;
 use platform::http::SafeClient;
 use platform::mail::Mailer;
@@ -48,16 +50,27 @@ pub struct Extra {
     pub fetch: SafeClient,
     pub urls: PublicUrls,
     pub webhooks: Option<commerce::webhooks::Webhooks>,
+    /// WP11: the Fio API poller (token key, API base URL).
+    pub fio: Option<Fio>,
+}
+
+/// Fio API polling (WP11). Not `Debug`: it holds the key for stored tokens.
+#[derive(Clone)]
+pub struct Fio {
+    pub secrets: Arc<SecretBox>,
+    pub base_url: String,
+    pub http: reqwest::Client,
 }
 
 impl Extra {
-    /// No edge, no allowlisted hosts, default URLs (tests, tools).
+    /// No edge, no allowlisted hosts, default URLs, no Fio polling (tests, tools).
     pub fn disabled() -> Result<Self, platform::http::FetchError> {
         Ok(Self {
             edge: EdgePurge::disabled(),
             fetch: SafeClient::new(Vec::<String>::new())?,
             urls: PublicUrls::default(),
             webhooks: None,
+            fio: None,
         })
     }
 }
@@ -66,6 +79,10 @@ impl Extra {
 pub const LINK_GUEST_ORDERS: &str = "orders.link_guest";
 /// Payment timeouts (A10): cancel unpaid orders whose payment window closed. Every minute.
 pub const PAYMENTS_EXPIRE: &str = "payments.expire";
+/// Bank-transfer reminders on day 3 and 6 (spec §10.3). Hourly.
+pub const PAYMENTS_REMIND: &str = "payments.remind";
+/// Downloads new transactions of accounts with a Fio API token and matches them (A25).
+pub const PAYMENTS_FIO_POLL: &str = "payments.fio_poll";
 pub use commerce::analytics::{PARTITIONS_JOB, ROLLUP_JOB};
 pub use commerce::ops::SWEEP_JOB;
 pub use commerce::webhooks::{DELIVER_JOB, FANOUT_JOB};
@@ -83,7 +100,8 @@ pub fn all(
     let sweep_storage = storage.clone();
     let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
     let webhooks = extra.webhooks.clone();
-    let (e1, e2, e3) = (extra.clone(), extra.clone(), extra);
+    let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
+    let urls = e4.urls.clone();
     Handlers::default()
         .register(EDGE_PURGE, move |_ctx, job| {
             edge_purge(job, e1.edge.clone())
@@ -122,6 +140,13 @@ pub fn all(
         .register(intervals::TRANSITION_JOB, price_transition)
         .register(LINK_GUEST_ORDERS, link_guest_orders)
         .register(PAYMENTS_EXPIRE, payments_expire)
+        .register(stripe::EVENT_JOB, provider_event)
+        .register(PAYMENTS_REMIND, move |ctx, job| {
+            payments_remind(ctx, job, urls.clone())
+        })
+        .register(PAYMENTS_FIO_POLL, move |ctx, job| {
+            payments_fio_poll(ctx, job, e4.fio.clone())
+        })
         .register(ROLLUP_JOB, analytics_rollup)
         .register(PARTITIONS_JOB, analytics_partitions)
         .register(FANOUT_JOB, webhooks_fanout)
@@ -131,6 +156,66 @@ pub fn all(
         .register(SWEEP_JOB, move |ctx, job| {
             ops_sweep(ctx, job, sweep_storage.clone(), m5.clone())
         })
+}
+
+/// A11: processes one stored provider event. Mismatches are recorded on the event (never
+/// retried); database errors retry.
+async fn provider_event(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let id = job
+        .payload
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .and_then(|s| s.parse::<Uuid>().ok())
+        .ok_or_else(|| JobError::Permanent("provider event job without id".into()))?;
+    match stripe::process_event(&ctx.db, id).await {
+        Ok(outcome) => {
+            tracing::info!(event = %id, ?outcome, "provider event processed");
+            Ok(())
+        }
+        Err(platform::Error::NotFound) => Err(JobError::Permanent("unknown event".into())),
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+async fn payments_remind(ctx: Ctx, _job: Job, urls: PublicUrls) -> Result<(), JobError> {
+    let sent = commerce::checkout::send_payment_reminders(&ctx.db, &urls, 500)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    if sent > 0 {
+        tracing::info!(sent, "payment reminders sent");
+    }
+    Ok(())
+}
+
+/// Polls every account with a Fio token; one failing account does not stop the others.
+async fn payments_fio_poll(ctx: Ctx, _job: Job, fio: Option<Fio>) -> Result<(), JobError> {
+    let accounts = bank::fio_accounts(&ctx.db)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    let Some(fio) = fio else {
+        if !accounts.is_empty() {
+            tracing::warn!("Fio tokens are stored but SECRETS_KEY is not set: no polling");
+        }
+        return Ok(());
+    };
+    for acc in accounts {
+        match bank::poll_fio(
+            &ctx.db,
+            &fio.http,
+            &fio.secrets,
+            &fio.base_url,
+            &acc,
+            chrono::Utc::now(),
+        )
+        .await
+        {
+            Ok(r) => tracing::info!(tenant = %acc.tenant_id, account = %acc.bank_account_id,
+                imported = r.imported, matched = r.matched, "fio statement polled"),
+            Err(e) => tracing::warn!(tenant = %acc.tenant_id, account = %acc.bank_account_id,
+                error = %e, "fio polling failed"),
+        }
+    }
+    Ok(())
 }
 
 /// Delivers one email (A14). A message that could not be handed over is retried with backoff
