@@ -50,3 +50,8 @@
 | WP11 | `platform.provider_events` keeps payloads indefinitely (PaymentIntent objects may hold billing details); add a retention rule to WP14's `ops.sweep` (e.g. drop payloads of processed events after 90 days) | later (ops) |
 | WP11 | Fio tokens share WP14's single `SECRETS_KEY` (no key id in the ciphertext); no rotation tooling | later |
 | WP11 | Payment reminder and email due dates are the UTC date of the deadline | later |
+| WP20 | Seznam SEM S2S attribution normally needs the `sid`/`udid` cookies of its `sul.js` browser script, which the platform does not load (no third-party scripts); matching relies on hashed email/phone. Capturing the `sznaiid` click id at the edge would help | later |
+| WP20 | Google Ads gets purchases only (Data Manager API offline conversions / enhanced conversions for leads by hashed email/phone); no gclid capture, no refund retractions | later |
+| WP20 | Meta receives no `client_ip_address` (IPs are only stored hashed, §14) and no `fbp`/`fbc` (no Meta pixel); match quality relies on hashed email/phone/external_id + user agent | accepted |
+| WP20 | Ad-platform rate limits and Google access-token caches are per worker process | later (scale-out) |
+| WP20 | Refund forwarding (GA4 `refund`) waits for WP11/WP12 to publish `order.refunded` with `order_id` (and `amount_minor` for partial refunds) | WP11 / WP12 |
