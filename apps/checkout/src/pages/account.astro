@@ -1,10 +1,69 @@
 ---
+import { t } from "@platform/storefront-sdk/format";
+import SignIn from "../islands/SignIn";
+import SignOut from "../islands/SignOut";
 import Checkout from "../layouts/Checkout.astro";
+import { checkoutApi, messages, shopUrl } from "../lib/api";
 
-const shopUrl = `${Astro.url.protocol}//${Astro.url.host.replace(/^checkout\./, "")}/`;
+// Customer accounts live on the checkout origin only (A1, A5).
+const api = checkoutApi(Astro.request);
+const [shop, me] = await Promise.all([api.shop(), api.me()]);
+const m = shop?.messages ?? {};
+const next = Astro.url.searchParams.get("next") ?? undefined;
+const links = [
+  { href: "/account/addresses", label: t(m, "account.addresses"), hint: t(m, "account.addresses_intro") },
+  { href: "/account/security", label: t(m, "account.security"), hint: t(m, "password.set_intro") },
+  { href: "/consent", label: t(m, "account.privacy"), hint: t(m, "consent.preferences_intro") },
+];
 ---
 
-<Checkout title="Můj účet" shopName="Obchod" shopUrl={shopUrl}>
-  <h1 class="font-display text-2xl font-bold">Můj účet</h1>
-  <p class="mt-2 text-muted-foreground">Přihlášení, objednávky a adresy přibudou ve WP9.</p>
+<Checkout
+  title={me ? t(m, "account.title") : t(m, "account.sign_in")}
+  shopName={shop?.name ?? ""}
+  shopUrl={shopUrl(Astro.url)}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+>
+  {
+    me ? (
+      <div class="grid gap-6">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 class="font-display text-2xl font-bold">{t(m, "account.title")}</h1>
+            <p class="mt-1 text-sm text-muted-foreground" data-testid="signed-in-as">
+              {t(m, "account.signed_in_as", { email: me.email })}
+            </p>
+          </div>
+          <SignOut client:load label={t(m, "account.sign_out")} />
+        </div>
+        <nav aria-label={t(m, "account.title")}>
+          <ul class="grid gap-3 sm:grid-cols-3">
+            {links.map((l) => (
+              <li>
+                <a
+                  href={l.href}
+                  class="block h-full rounded-lg border border-border bg-card p-4 hover:border-identity"
+                >
+                  <span class="font-semibold text-identity-ink">{l.label}</span>
+                  <span class="mt-1 block text-sm text-muted-foreground">{l.hint}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <section aria-labelledby="orders" class="rounded-lg border border-border bg-card p-4">
+          <h2 id="orders" class="mb-2 font-display text-lg font-bold">{t(m, "account.orders")}</h2>
+          <p class="text-sm text-muted-foreground">{t(m, "account.orders_empty")}</p>
+        </section>
+      </div>
+    ) : (
+      <div class="mx-auto grid max-w-md gap-4">
+        <h1 class="font-display text-2xl font-bold">{t(m, "account.sign_in")}</h1>
+        <p class="text-sm text-muted-foreground">{t(m, "account.sign_in_intro")}</p>
+        <div class="rounded-lg border border-border bg-card p-4">
+          <SignIn client:load m={messages(m, "account.")} redirect={next} />
+        </div>
+      </div>
+    )
+  }
 </Checkout>

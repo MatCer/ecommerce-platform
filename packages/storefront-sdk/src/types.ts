@@ -52,3 +52,17 @@ export interface EmptyCart {
 }
 
 export type CartState = Cart | EmptyCart;
+
+/** Checkout origin only (WP9): the signed-in customer, addresses, sign-in result. */
+export type Customer = S["CustomerView"];
+export type Address = S["Address"];
+export type AddressInput = S["AddressInput"];
+export type SignInResult = S["SignInResult"];
+
+/**
+ * Consent (A20). Themes post `ConsentChoice` to `/_p/consent` (see
+ * `docs/decisions/consent-contract.md`); `null` purposes were never asked.
+ */
+export type ConsentChoice = S["ConsentChoice"];
+export type ConsentState = S["ConsentState"];
+export type ConsentPurposes = S["Purposes"];
