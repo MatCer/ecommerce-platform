@@ -163,6 +163,118 @@ pub fn user_content(task: &str, data: &Value) -> String {
 }
 
 // ---------------------------------------------------------------------------------------
+// Tool use (agent loops, WP24)
+
+/// One turn of a tool-using conversation. The caller owns the loop and the history, which it
+/// only ever appends to: assistant turns go back unchanged (thinking blocks included), and
+/// every `tool_use` gets its `tool_result` in the next user message.
+#[derive(Debug, Clone, Copy)]
+pub struct Conversation<'a> {
+    pub feature: &'a str,
+    pub model: &'a str,
+    /// Stable instructions (cached).
+    pub system: &'a str,
+    /// Tool definitions (`[{name, description, input_schema}]`), identical on every turn.
+    pub tools: &'a Value,
+    /// The history in Messages API shape (`[{role, content}]`).
+    pub messages: &'a [Value],
+    pub max_tokens: u32,
+    /// `low` … `max`.
+    pub effort: &'a str,
+}
+
+/// The assistant's turn: raw content blocks (untrusted) and why it stopped.
+#[derive(Debug, Clone)]
+pub struct Turn {
+    pub content: Vec<Value>,
+    /// `end_turn`, `tool_use`, `stop_sequence` or `pause_turn`.
+    pub stop_reason: String,
+    pub usage: Usage,
+    pub model: String,
+}
+
+impl Turn {
+    /// The `tool_use` blocks, in order.
+    pub fn tool_uses(&self) -> impl Iterator<Item = &Value> {
+        self.content.iter().filter(|b| b["type"] == "tool_use")
+    }
+
+    /// The concatenated text blocks.
+    pub fn text(&self) -> String {
+        self.content
+            .iter()
+            .filter(|b| b["type"] == "text")
+            .filter_map(|b| b["text"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+/// A scripted agent of the fake provider: the history so far → a raw Messages API response
+/// (`{content, stop_reason}`; usage is estimated when missing).
+pub type FakeAgent = Arc<dyn Fn(&[Value]) -> Value + Send + Sync>;
+
+/// Agent turns can write whole files: each attempt may take minutes.
+const CONVERSE_TIMEOUT: Duration = Duration::from_secs(600);
+
+impl Client {
+    pub async fn converse(&self, c: &Conversation<'_>) -> Result<Turn, Failure> {
+        let started = Instant::now();
+        let out = match self {
+            Self::Anthropic(a) => a.converse(c).await,
+            Self::Fake(f) => f.converse(c),
+        };
+        match &out {
+            Ok(t) => tracing::info!(
+                feature = c.feature,
+                model = %t.model,
+                stop_reason = %t.stop_reason,
+                input_tokens = t.usage.input_tokens,
+                output_tokens = t.usage.output_tokens,
+                cache_read = t.usage.cache_read_input_tokens,
+                ms = started.elapsed().as_millis() as u64,
+                "ai turn"
+            ),
+            Err(f) => tracing::warn!(
+                feature = c.feature,
+                model = c.model,
+                error = %f.error,
+                ms = started.elapsed().as_millis() as u64,
+                "ai turn failed"
+            ),
+        }
+        out
+    }
+}
+
+/// A Messages API response to a [`Turn`]: `refusal` and `max_tokens` stops are errors (a cut
+/// tool input must never run), the content must be an array.
+pub fn parse_turn(raw: &Value) -> Result<Turn, Failure> {
+    let usage: Usage = serde_json::from_value(raw["usage"].clone()).unwrap_or_default();
+    let model = raw["model"].as_str().unwrap_or_default().to_owned();
+    let fail = |error| Failure {
+        error,
+        usage,
+        model: model.clone(),
+    };
+    match raw["stop_reason"].as_str() {
+        Some("refusal") => return Err(fail(AiError::Refused)),
+        Some("max_tokens") => return Err(fail(AiError::Truncated)),
+        _ => {}
+    }
+    let content = raw["content"]
+        .as_array()
+        .cloned()
+        .ok_or_else(|| fail(AiError::InvalidOutput("no content".into())))?;
+    Ok(Turn {
+        content,
+        stop_reason: raw["stop_reason"].as_str().unwrap_or("end_turn").to_owned(),
+        usage,
+        model,
+    })
+}
+
+// ---------------------------------------------------------------------------------------
 // Anthropic
 
 pub struct Anthropic {
@@ -208,19 +320,66 @@ impl Anthropic {
         })
     }
 
+    /// Tool use: the stable prefix (tools, system) is cached explicitly, the growing history by
+    /// the top-level automatic breakpoint. Thinking stays at the model default (adaptive on
+    /// the current models); no forced `tool_choice` (rejected by Opus 5.5).
+    fn converse_body(c: &Conversation<'_>) -> Value {
+        json!({
+            "model": c.model,
+            "max_tokens": c.max_tokens,
+            "cache_control": { "type": "ephemeral" },
+            "system": [{
+                "type": "text",
+                "text": c.system,
+                "cache_control": { "type": "ephemeral" },
+            }],
+            "tools": c.tools,
+            "messages": c.messages,
+            "output_config": { "effort": c.effort },
+        })
+    }
+
+    async fn converse(&self, c: &Conversation<'_>) -> Result<Turn, Failure> {
+        let raw = self
+            .send(c.feature, &Self::converse_body(c), Some(CONVERSE_TIMEOUT))
+            .await?;
+        parse_turn(&raw).map_err(|mut f| {
+            if f.model.is_empty() {
+                c.model.clone_into(&mut f.model);
+            }
+            f
+        })
+    }
+
     async fn complete(&self, req: &Request<'_>) -> Result<Completion, Failure> {
-        let body = Self::body(req);
+        let raw = self.send(req.feature, &Self::body(req), None).await?;
+        parse_response(&raw).map_err(|mut f| {
+            if f.model.is_empty() {
+                req.model.clone_into(&mut f.model);
+            }
+            f
+        })
+    }
+
+    /// POSTs the body with retries; the successful response's JSON.
+    async fn send(
+        &self,
+        feature: &str,
+        body: &Value,
+        timeout: Option<Duration>,
+    ) -> Result<Value, Failure> {
         let mut attempt = 0;
         loop {
-            let (err, retry_after) = match self
+            let mut builder = self
                 .http
                 .post(self.url.clone())
                 .header("x-api-key", &self.key)
                 .header("anthropic-version", API_VERSION)
-                .json(&body)
-                .send()
-                .await
-            {
+                .json(body);
+            if let Some(t) = timeout {
+                builder = builder.timeout(t);
+            }
+            let (err, retry_after) = match builder.send().await {
                 Ok(res) => {
                     let status = res.status();
                     let request_id = res
@@ -229,18 +388,12 @@ impl Anthropic {
                         .and_then(|v| v.to_str().ok())
                         .unwrap_or_default()
                         .to_owned();
-                    tracing::debug!(feature = req.feature, %status, request_id, attempt, "anthropic response");
+                    tracing::debug!(feature, %status, request_id, attempt, "anthropic response");
                     if status.is_success() {
-                        let raw: Value = res
+                        return Ok(res
                             .json()
                             .await
-                            .map_err(|e| AiError::InvalidOutput(e.to_string()))?;
-                        return parse_response(&raw).map_err(|mut f| {
-                            if f.model.is_empty() {
-                                req.model.clone_into(&mut f.model);
-                            }
-                            f
-                        });
+                            .map_err(|e| AiError::InvalidOutput(e.to_string()))?);
                     }
                     let retry_after = res
                         .headers()
@@ -255,14 +408,14 @@ impl Anthropic {
                         .ok()
                         .and_then(|b| b["error"]["type"].as_str().map(str::to_owned))
                         .unwrap_or_default();
-                    tracing::warn!(feature = req.feature, %status, request_id, kind, attempt, "anthropic error");
+                    tracing::warn!(feature, %status, request_id, kind, attempt, "anthropic error");
                     if !retryable(status) {
                         return Err(AiError::Rejected(format!("{status} {kind}")).into());
                     }
                     (format!("{status} {kind}"), retry_after)
                 }
                 Err(e) if e.is_timeout() || e.is_connect() || e.is_request() => {
-                    tracing::warn!(feature = req.feature, attempt, error = %e, "anthropic unreachable");
+                    tracing::warn!(feature, attempt, error = %e, "anthropic unreachable");
                     (e.to_string(), None)
                 }
                 Err(e) => return Err(AiError::Unavailable(e.to_string()).into()),
@@ -341,6 +494,7 @@ pub fn parse_response(raw: &Value) -> Result<Completion, Failure> {
 /// JSON. Token counts are estimated from the text lengths (about 4 characters per token).
 pub struct Fake {
     env: minijinja::Environment<'static>,
+    agents: HashMap<String, FakeAgent>,
 }
 
 impl Fake {
@@ -353,7 +507,37 @@ impl Fake {
             env.add_template(feature, source)
                 .map_err(|e| AiError::InvalidOutput(format!("fixture {feature}: {e}")))?;
         }
-        Ok(Self { env })
+        Ok(Self {
+            env,
+            agents: HashMap::new(),
+        })
+    }
+
+    /// Registers a scripted agent for a tool-use feature.
+    #[must_use]
+    pub fn with_agent(mut self, feature: &str, agent: FakeAgent) -> Self {
+        self.agents.insert(feature.to_owned(), agent);
+        self
+    }
+
+    fn converse(&self, c: &Conversation<'_>) -> Result<Turn, Failure> {
+        let agent = self.agents.get(c.feature).ok_or_else(|| {
+            Failure::from(AiError::InvalidOutput(format!(
+                "no fake agent for {}",
+                c.feature
+            )))
+        })?;
+        let mut raw = agent(c.messages);
+        if raw.get("usage").is_none() {
+            let estimate = |chars: usize| (chars as u64).div_ceil(4).max(1);
+            let history: usize = c.messages.iter().map(|m| m.to_string().len()).sum();
+            raw["usage"] = json!({
+                "input_tokens": estimate(c.system.len() + c.tools.to_string().len() + history),
+                "output_tokens": estimate(raw["content"].to_string().len()),
+            });
+        }
+        raw["model"] = json!(FAKE_MODEL);
+        parse_turn(&raw)
     }
 
     fn complete(&self, req: &Request<'_>) -> Result<Completion, Failure> {
@@ -559,6 +743,93 @@ mod tests {
             parse_response(&prose).unwrap_err().error,
             AiError::InvalidOutput(_)
         ));
+    }
+
+    #[test]
+    fn converse_body_caches_prefix_and_history() {
+        let tools = json!([{"name": "read_file", "input_schema": {"type": "object"}}]);
+        let messages = [json!({"role": "user", "content": "hi"})];
+        let body = Anthropic::converse_body(&Conversation {
+            feature: "theme_edit",
+            model: "claude-opus-5-5",
+            system: "sys",
+            tools: &tools,
+            messages: &messages,
+            max_tokens: 1000,
+            effort: "high",
+        });
+        assert_eq!(body["cache_control"]["type"], "ephemeral");
+        assert_eq!(body["system"][0]["cache_control"]["type"], "ephemeral");
+        assert_eq!(body["tools"], tools);
+        assert_eq!(body["messages"][0]["content"], "hi");
+        assert_eq!(body["output_config"]["effort"], "high");
+        assert!(body.get("tool_choice").is_none() && body.get("thinking").is_none());
+    }
+
+    #[test]
+    fn parses_tool_turns_and_stops() {
+        let raw = json!({
+            "model": "claude-opus-5-5", "stop_reason": "tool_use",
+            "content": [
+                {"type": "thinking", "thinking": "", "signature": "s"},
+                {"type": "text", "text": "Reading."},
+                {"type": "tool_use", "id": "t1", "name": "read_file", "input": {"path": "src/a.astro"}}
+            ],
+            "usage": {"input_tokens": 10, "output_tokens": 5}
+        });
+        let t = parse_turn(&raw).unwrap();
+        assert_eq!(t.stop_reason, "tool_use");
+        assert_eq!(t.content.len(), 3);
+        assert_eq!(t.tool_uses().count(), 1);
+        assert_eq!(t.text(), "Reading.");
+        let cut = json!({"stop_reason": "max_tokens", "content": [], "usage": {"input_tokens": 3, "output_tokens": 9}});
+        let f = parse_turn(&cut).unwrap_err();
+        assert!(matches!(f.error, AiError::Truncated));
+        assert_eq!(f.usage.output_tokens, 9);
+        let refused = json!({"stop_reason": "refusal", "content": []});
+        assert!(matches!(
+            parse_turn(&refused).unwrap_err().error,
+            AiError::Refused
+        ));
+        assert!(matches!(
+            parse_turn(&json!({"stop_reason": "end_turn"})).unwrap_err().error,
+            AiError::InvalidOutput(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn fake_agents_answer_from_the_history() {
+        let fake = Fake::new([])
+            .unwrap()
+            .with_agent(
+                "echo",
+                Arc::new(|messages: &[Value]| {
+                    json!({
+                        "stop_reason": "end_turn",
+                        "content": [{"type": "text", "text": format!("{} messages", messages.len())}]
+                    })
+                }),
+            );
+        let client = Client::Fake(Arc::new(fake));
+        let messages = [json!({"role": "user", "content": "hi"})];
+        let c = Conversation {
+            feature: "echo",
+            model: "claude-opus-5-5",
+            system: "sys",
+            tools: &json!([]),
+            messages: &messages,
+            max_tokens: 100,
+            effort: "high",
+        };
+        let t = client.converse(&c).await.unwrap();
+        assert_eq!(t.text(), "1 messages");
+        assert_eq!(t.model, FAKE_MODEL);
+        assert!(t.usage.input_tokens > 0);
+        let missing = Conversation {
+            feature: "nope",
+            ..c
+        };
+        assert!(client.converse(&missing).await.is_err());
     }
 
     #[test]
