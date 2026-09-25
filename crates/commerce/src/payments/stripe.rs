@@ -301,6 +301,44 @@ impl Stripe {
         Ok((Self::str_field(&v, "id")?, Self::str_field(&v, "status")?))
     }
 
+    /// Our refund (by `metadata.refund_id`) among the PaymentIntent's refunds, if Stripe has it.
+    pub async fn find_refund(
+        &self,
+        account: &str,
+        payment_intent: &str,
+        refund_id: Uuid,
+    ) -> Result<Option<(String, String)>, Error> {
+        if !payment_intent.starts_with("pi_")
+            || !payment_intent
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        {
+            return Err(Error::Internal("stored PaymentIntent id".into()));
+        }
+        let list = self
+            .call(
+                reqwest::Method::GET,
+                &format!("/v1/refunds?payment_intent={payment_intent}&limit=100"),
+                Some(account),
+                None,
+                &[],
+            )
+            .await?;
+        let ours = refund_id.to_string();
+        Ok(list
+            .get("data")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .find(|r| r.pointer("/metadata/refund_id").and_then(Value::as_str) == Some(&ours))
+            .and_then(|r| {
+                Some((
+                    r.get("id")?.as_str()?.to_owned(),
+                    r.get("status")?.as_str()?.to_owned(),
+                ))
+            }))
+    }
+
     // -----------------------------------------------------------------------------------
     // Webhook signatures (`Stripe-Signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "t.body")>`)
 
@@ -806,9 +844,10 @@ async fn apply_refund(tx: &mut TenantTx, charge: &Value) -> Result<Processed, Er
     .fetch_optional(&mut **tx)
     .await?
     else {
-        return Ok(Processed::Rejected(
-            "no succeeded attempt for the charge".into(),
-        ));
+        return Err(Error::Conflict {
+            code: "payment_pending",
+            detail: "no succeeded attempt for the charge yet".into(),
+        });
     };
     if !text(charge, "currency").is_some_and(|c| c.eq_ignore_ascii_case(&a.currency)) {
         return Ok(Processed::Rejected("currency mismatch".into()));
@@ -871,9 +910,11 @@ async fn apply_refund_object(tx: &mut TenantTx, re: &Value) -> Result<Processed,
     .fetch_optional(&mut **tx)
     .await?
     else {
-        return Ok(Processed::Rejected(
-            "no succeeded attempt for the refund".into(),
-        ));
+        // The payment's success may not be processed yet (events arrive in any order): retry.
+        return Err(Error::Conflict {
+            code: "payment_pending",
+            detail: "no succeeded attempt for the refund yet".into(),
+        });
     };
     if !text(re, "currency").is_some_and(|c| c.eq_ignore_ascii_case(&a.currency)) {
         return Ok(Processed::Rejected("currency mismatch".into()));
@@ -893,9 +934,12 @@ async fn apply_refund_object(tx: &mut TenantTx, re: &Value) -> Result<Processed,
     .await?;
     let detail = match existing {
         Some(id) => {
+            // Events arrive in any order: a terminal state never goes back to pending, and the
+            // only terminal change Stripe makes is succeeded → failed.
             sqlx::query!(
                 "UPDATE refunds SET status = $2, provider_ref = $3, updated_at = now()
-                 WHERE id = $1",
+                 WHERE id = $1
+                   AND (status = 'pending' OR (status = 'succeeded' AND $2 = 'failed'))",
                 id,
                 match status {
                     super::RefundStatus::Pending => "pending",

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE refunds SET status = $2, provider_ref = $3, updated_at = now()\n                 WHERE id = $1\n                   AND (status = 'pending' OR (status = 'succeeded' AND $2 = 'failed'))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c1e25f2e75059ec91142ac31d32a7ac8ccc4ee5eb367d6bdb2c1ff5e674a1853"
+}

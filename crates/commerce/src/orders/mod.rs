@@ -194,8 +194,17 @@ pub(crate) async fn apply_payment(
 pub(crate) async fn payment_succeeded(
     tx: &mut TenantTx,
     o: &mut OrderRow,
+    attempt_id: Uuid,
     actor: &str,
 ) -> Result<(), Error> {
+    // The payment the order keeps; refunds of any other attempt return extra money (A10).
+    sqlx::query!(
+        "UPDATE orders SET paid_attempt_id = $2 WHERE id = $1 AND paid_attempt_id IS NULL",
+        o.id,
+        attempt_id
+    )
+    .execute(&mut **tx)
+    .await?;
     let events = apply_payment(tx, o, PaymentCommand::Succeed, actor).await?;
     if events.contains(&PaymentEvent::LatePayment) {
         return flag_exception(tx, o, "late_payment", actor).await;

@@ -168,9 +168,24 @@ CREATE TABLE refunds (
 CREATE INDEX refunds_order ON refunds (tenant_id, order_id, created_at);
 
 -- A10 exceptions (late or duplicate payments) leave the queue once someone resolved them.
+-- `paid_attempt_id`: the payment the order keeps (set once, under the order lock, when it
+-- becomes paid); any other successful attempt is money to return.
 ALTER TABLE orders
     ADD COLUMN exception_resolved_at timestamptz,
-    ADD COLUMN exception_note        text CHECK (length(exception_note) <= 500);
+    ADD COLUMN exception_note        text CHECK (length(exception_note) <= 500),
+    ADD COLUMN paid_attempt_id       uuid,
+    ADD CONSTRAINT orders_paid_attempt_fk FOREIGN KEY (tenant_id, paid_attempt_id)
+        REFERENCES payment_attempts (tenant_id, id);
+
+CREATE POLICY wp11_backfill ON orders TO app_owner USING (true) WITH CHECK (true);
+CREATE POLICY wp11_backfill_read ON payment_attempts FOR SELECT TO app_owner USING (true);
+UPDATE orders o SET paid_attempt_id = (
+    SELECT a.id FROM payment_attempts a
+    WHERE a.order_id = o.id AND a.status = 'succeeded'
+    ORDER BY a.completed_at, a.id LIMIT 1)
+WHERE o.payment_status IN ('paid', 'partially_refunded', 'refunded');
+DROP POLICY wp11_backfill ON orders;
+DROP POLICY wp11_backfill_read ON payment_attempts;
 
 -- ---------------------------------------------------------------------------------------
 -- Row-level security and grants.

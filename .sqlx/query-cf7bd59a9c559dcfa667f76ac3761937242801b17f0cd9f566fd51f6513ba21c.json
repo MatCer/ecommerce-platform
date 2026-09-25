@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, amount_minor FROM payment_attempts\n         WHERE order_id = $1 AND status = 'succeeded'\n         ORDER BY completed_at, id LIMIT 1",
+  "query": "SELECT a.id, a.amount_minor FROM orders o\n         JOIN payment_attempts a ON a.id = o.paid_attempt_id\n         WHERE o.id = $1",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "bddecdf9e8287b8879dd8d5664e81c211c61677507bcfb8e8493532224b543d3"
+  "hash": "cf7bd59a9c559dcfa667f76ac3761937242801b17f0cd9f566fd51f6513ba21c"
 }

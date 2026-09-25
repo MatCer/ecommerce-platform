@@ -1943,3 +1943,85 @@ async fn a_new_iban_retires_the_account_which_still_matches_its_orders(db: PgPoo
         .unwrap();
     assert_eq!(bt.iban, "CZ5855000000001265098001");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn refund_events_are_order_independent(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let s = setup(&runtime, "refund-order").await;
+    let t = s.shop.tenant;
+    let acct = s.account.as_str();
+    let a = place(&runtime, &s, M::Cz, MethodKind::Stripe).await;
+    let amount = total(&runtime, t, a.order_id).await;
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    sqlx::query("UPDATE payment_attempts SET provider_ref = 'pi_r' WHERE id = $1")
+        .bind(a.attempt_id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let refund = |status: &str| {
+        json!({ "id": "re_x", "object": "refund", "payment_intent": "pi_r", "amount": 100,
+                "currency": "czk", "status": status, "metadata": {} })
+    };
+    // A dashboard refund processed before the payment's success is retried, not dropped.
+    let early = event(
+        "evt_re_early",
+        "refund.created",
+        acct,
+        false,
+        refund("succeeded"),
+    );
+    let client = stripe_client();
+    let sig = client.sign(&early, Utc::now()).unwrap();
+    assert!(
+        stripe::receive(&runtime, &client, &sig, &early)
+            .await
+            .unwrap()
+    );
+    let early_id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM platform.provider_events WHERE event_id = 'evt_re_early'",
+    )
+    .fetch_one(&runtime)
+    .await
+    .unwrap();
+    let err = stripe::process_event(&runtime, early_id).await.unwrap_err();
+    assert_eq!(err.code(), "payment_pending");
+    deliver(
+        &runtime,
+        &event(
+            "evt_paid_r",
+            "payment_intent.succeeded",
+            acct,
+            false,
+            intent("pi_r", a.attempt_id, amount, "czk"),
+        ),
+    )
+    .await;
+    assert!(matches!(
+        stripe::process_event(&runtime, early_id).await.unwrap(),
+        Processed::Applied(_)
+    ));
+    assert_eq!(
+        view(&runtime, t, a.order_id).await.payment.status,
+        orders::status::PaymentStatus::PartiallyRefunded
+    );
+    // An older `pending` event delivered late never regresses the settled refund.
+    deliver(
+        &runtime,
+        &event(
+            "evt_re_stale",
+            "refund.updated",
+            acct,
+            false,
+            refund("pending"),
+        ),
+    )
+    .await;
+    let mut tx = tenant_tx(&runtime, t).await.unwrap();
+    let status: String =
+        sqlx::query_scalar("SELECT status FROM refunds WHERE provider_ref = 're_x'")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(status, "succeeded");
+}
