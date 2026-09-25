@@ -941,3 +941,70 @@ async fn search_tables_are_tenant_isolated(db: PgPool) {
         );
     }
 }
+
+/// WP13a: a locale without a translation is indexed with the market's default-locale text,
+/// and tenant synonyms reach the indexes through the worker step.
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "needs Meilisearch: make test-search"]
+async fn untranslated_locales_and_synonyms(db: PgPool) {
+    let s = shop(&db).await;
+    index::ensure_indexes(&s.runtime, &s.meili, s.tenant)
+        .await
+        .unwrap();
+    let hoodie = s
+        .product(
+            "MK1",
+            "Mikina Klasik",
+            "Mikina Klasik SK",
+            &[V {
+                options: &[("size", "m")],
+                cz: Some(59_900),
+                sk: Some(2_490),
+                stock: 3,
+            }],
+        )
+        .await;
+    // Drop the Slovak translation: the sk index must still list the product (cs text).
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    sqlx::query("DELETE FROM product_translations WHERE product_id = $1 AND locale = 'sk'")
+        .bind(hoodie)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    s.index(hoodie).await;
+    s.settle().await;
+    let q = |q: &str| SearchRequest {
+        q: q.into(),
+        ..req(&[])
+    };
+    assert_eq!(
+        ids(&s.search(s.sk, "sk", q("mikina")).await),
+        BTreeSet::from([hoodie])
+    );
+    assert!(ids(&s.search(s.cz, "cs", q("hoodie")).await).is_empty());
+
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    commerce::search::synonyms::put(
+        &mut tx,
+        ACTOR,
+        &commerce::search::synonyms::Synonyms {
+            groups: vec![vec!["mikina".into(), "hoodie".into()]],
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    index::apply_synonyms(&s.runtime, &s.meili, s.tenant)
+        .await
+        .unwrap();
+    s.settle().await;
+    assert_eq!(
+        ids(&s.search(s.cz, "cs", q("hoodie")).await),
+        BTreeSet::from([hoodie])
+    );
+    assert_eq!(
+        ids(&s.search(s.sk, "sk", q("hoodie")).await),
+        BTreeSet::from([hoodie])
+    );
+}

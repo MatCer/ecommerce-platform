@@ -55,6 +55,8 @@ pub struct Scope {
     pub price_list_id: Option<Uuid>,
     pub currency: Currency,
     pub locale: String,
+    /// The market's default locale: its text stands in for missing translations (WP13a).
+    pub default_locale: String,
 }
 
 /// The storefront scope for a request context (tenant, market, locale from the edge), or
@@ -94,7 +96,7 @@ pub async fn scope(
     locale: &str,
 ) -> Result<Option<Scope>, Error> {
     let Some(r) = sqlx::query!(
-        "SELECT code, currency, price_list_id, locales FROM markets WHERE id = $1",
+        "SELECT code, currency, price_list_id, locales, default_locale FROM markets WHERE id = $1",
         market_id
     )
     .fetch_optional(&mut **tx)
@@ -113,6 +115,7 @@ pub async fn scope(
         price_list_id: r.price_list_id,
         currency,
         locale: locale.to_owned(),
+        default_locale: r.default_locale,
     }))
 }
 
@@ -624,11 +627,16 @@ async fn rehydrate(
     let products: Vec<Uuid> = ids.iter().map(|(_, p)| *p).collect();
     let reps: Vec<Uuid> = ids.iter().map(|(v, _)| *v).collect();
     let rows: HashMap<Uuid, (String, String, Option<String>)> = sqlx::query!(
-        "SELECT p.id, t.name, t.slug, p.brand
-         FROM products p JOIN product_translations t ON t.product_id = p.id AND t.locale = $2
-         WHERE p.id = ANY($1) AND p.status = 'active'",
+        r#"SELECT p.id, t.name AS "name!", t.slug AS "slug!", p.brand
+           FROM products p
+           CROSS JOIN LATERAL (
+               SELECT name, slug FROM product_translations pt WHERE pt.product_id = p.id
+               ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1
+           ) t
+           WHERE p.id = ANY($1) AND p.status = 'active'"#,
         &products,
-        scope.locale
+        scope.locale,
+        scope.default_locale
     )
     .fetch_all(&mut **tx)
     .await?
@@ -934,6 +942,7 @@ mod tests {
             price_list_id: Some(Uuid::from_u128(8)),
             currency: Currency::Czk,
             locale: "cs".into(),
+            default_locale: "cs".into(),
         }
     }
 
