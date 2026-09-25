@@ -53,6 +53,7 @@ const groups: { label: () => string; items: NavItem[] }[] = [
       { href: "/marketing/segments", label: () => t("nav.segments"), min: "staff" },
       { href: "/marketing/subscribers", label: () => t("nav.subscribers"), min: "staff" },
       { href: "/marketing/reviews", label: () => t("nav.reviews"), min: "staff" },
+      { href: "/marketing/flows", label: () => t("nav.flows"), min: "staff" },
     ],
   },
   {
