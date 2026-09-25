@@ -139,9 +139,9 @@ pub fn all(
     let webhooks = extra.webhooks.clone();
     let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
-    let (ai1, ai2) = (extra.ai.clone(), extra.ai.clone());
+    let (ai1, ai2, ai3) = (extra.ai.clone(), extra.ai.clone(), extra.ai.clone());
     let theme_builder = extra.theme_builder.clone();
-    let theme_storage = storage.clone();
+    let (theme_storage, ai_storage) = (storage.clone(), storage.clone());
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
     let (urls2, urls3, urls4, urls5) = (urls.clone(), urls.clone(), urls.clone(), urls.clone());
@@ -246,6 +246,9 @@ pub fn all(
         .register(themes::MAINTENANCE_JOB, move |ctx, job| {
             theme_maintenance(ctx, job, theme_storage.clone())
         })
+        .register(themes::ai_edit::JOB, move |ctx, job| {
+            theme_ai_edit(ctx, job, ai_storage.clone(), ai3.clone())
+        })
 }
 
 /// WP23: asks the theme builder to build a revision. The builder answers 202 at once and
@@ -286,6 +289,19 @@ async fn theme_build(job: Job, builder: Option<ThemeBuilder>) -> Result<(), JobE
         )))
     } else {
         Err(JobError::Retry(format!("theme builder answered {status}")))
+    }
+}
+
+/// WP24: the agent loop of one AI theme edit (up to the run's wall-clock limit; the runner
+/// heartbeats the lease meanwhile). A retry of a started run only marks it interrupted.
+/// ponytail: one job loop is busy for the whole run (one active run per tenant); move the loop
+/// to a dedicated queue if many shops edit at once.
+async fn theme_ai_edit(ctx: Ctx, job: Job, storage: Storage, ai: Ai) -> Result<(), JobError> {
+    let (tenant, run) = tenant_and(&job, "run_id")?;
+    match themes::ai_edit::run(&ctx.db, &storage, &ai, tenant, run, Default::default()).await {
+        Ok(()) => Ok(()),
+        Err(platform::Error::NotFound) => Err(JobError::Permanent("AI run not found".into())),
+        Err(e) => Err(JobError::Retry(e.to_string())),
     }
 }
 
