@@ -8,6 +8,7 @@ use axum::extract::rejection::{PathRejection, QueryRejection};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
+use commerce::customers;
 use commerce::orders::{self, AdminOrder, OrderPage, status::OrderStatus};
 use commerce::payments::{self, MethodKind, PaymentMethod, PaymentMethodInput};
 use commerce::shipping::{self, ShippingMethod, ShippingMethodInput};
@@ -33,6 +34,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(list_payment_methods))
         .routes(routes!(configure_payment_method))
         .routes(routes!(list_orders))
+        .routes(routes!(list_customers))
         .routes(routes!(get_order))
 }
 
@@ -295,6 +297,30 @@ async fn list_orders(
                 exception: q.exception.unwrap_or(false),
             };
             orders::list(tx, &filter, q.cursor, q.limit.unwrap_or(50)).await
+        })
+        .await?,
+    ))
+}
+
+/// Customer accounts, newest first, searchable by email or name (read-only; the orders list
+/// filters by `customer_id` for a customer's orders).
+#[utoipa::path(
+    get,
+    path = "/admin/v1/customers",
+    tag = "checkout",
+    security(("staff_jwt" = [])),
+    params(TenantHeader, customers::CustomerFilter),
+    responses((status = 200, body = customers::CustomerPage))
+)]
+async fn list_customers(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    query: Result<Query<customers::CustomerFilter>, QueryRejection>,
+) -> Result<Json<customers::CustomerPage>, Error> {
+    let f = query_params(query)?;
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            customers::list(tx, &f).await
         })
         .await?,
     ))

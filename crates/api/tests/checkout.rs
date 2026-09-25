@@ -764,3 +764,87 @@ async fn purchases_reach_ad_platforms_only_with_ads_consent(db: PgPool) {
         )]
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn staff_list_and_search_their_own_customers(db: PgPool) {
+    let c = setup(db).await;
+    let employee = sign(&claims("employee"));
+    let insert = async |tenant: Uuid, email: &str, name: &str| -> Uuid {
+        let mut tx = platform::db::tenant_tx(&c.runtime, tenant).await.unwrap();
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO customers (tenant_id, email, name, locale) VALUES ($1, $2, $3, 'cs')
+             RETURNING id",
+        )
+        .bind(tenant)
+        .bind(email)
+        .bind(name)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        id
+    };
+    let anna = insert(c.shop.tenant, "anna@example.test", "Anna Nováková").await;
+    insert(c.shop.tenant, "bob@example.test", "Bob").await;
+    insert(c.shop.tenant, "cyril@example.test", "Cyril").await;
+    insert(c.other.tenant, "anna@other.test", "Anna Jiná").await;
+    let order =
+        testkit::storefront::raw_order(&c.runtime, &c.shop, c.shop.cz, "CZK", 100, 1, "confirmed")
+            .await;
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE orders SET customer_id = $1 WHERE id = $2")
+        .bind(anna)
+        .bind(order)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let get = async |uri: &str| {
+        let (status, body, _) = Call::get(uri)
+            .tenant(c.shop.tenant)
+            .token(&employee)
+            .send(&c.s)
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        body
+    };
+
+    // Newest first, own tenant only, paginated by cursor.
+    let page = get("/admin/v1/customers?limit=2").await;
+    assert_eq!(page["total"], 3);
+    let emails: Vec<_> = page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["email"].clone())
+        .collect();
+    assert_eq!(emails, ["cyril@example.test", "bob@example.test"]);
+    let next = page["next_cursor"].as_str().unwrap();
+    let rest = get(&format!("/admin/v1/customers?limit=2&cursor={next}")).await;
+    assert_eq!(rest["items"][0]["email"], "anna@example.test");
+    assert_eq!(rest["items"][0]["orders"], 1);
+    assert_eq!(rest["items"][0]["has_password"], false);
+    assert_eq!(rest["next_cursor"], Value::Null);
+
+    // Case-insensitive search by name or email; LIKE wildcards are literal.
+    let found = get("/admin/v1/customers?q=NOVÁK").await;
+    assert_eq!(found["total"], 1);
+    assert_eq!(found["items"][0]["id"], anna.to_string());
+    assert_eq!(get("/admin/v1/customers?q=%25").await["total"], 0);
+
+    let (status, _, _) = Call::get("/admin/v1/customers?limit=0")
+        .tenant(c.shop.tenant)
+        .token(&employee)
+        .send(&c.s)
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    // Membership of the requested tenant is required.
+    let (status, _, _) = Call::get("/admin/v1/customers")
+        .tenant(c.other.tenant)
+        .token(&employee)
+        .send(&c.s)
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

@@ -3651,6 +3651,72 @@
         ]
       }
     },
+    "/admin/v1/customers": {
+      "get": {
+        "tags": [
+          "checkout"
+        ],
+        "summary": "Customer accounts, newest first, searchable by email or name (read-only; the orders list\nfilters by `customer_id` for a customer's orders).",
+        "operationId": "list_customers",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Part of the email address or name (case-insensitive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/data-exports": {
       "get": {
         "tags": [
@@ -25891,6 +25957,85 @@
           "SEK"
         ]
       },
+      "CustomerPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomerSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching customers in total (all pages)."
+          }
+        }
+      },
+      "CustomerSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "locale",
+          "has_password",
+          "email_verified",
+          "orders",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "email_verified": {
+            "type": "boolean"
+          },
+          "has_password": {
+            "type": "boolean",
+            "description": "The customer has set a password (a full account, not only verified by email links)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "orders": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Orders placed by this customer account (guest orders of the same address excluded)."
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "CustomerView": {
         "type": "object",
         "required": [
@@ -37030,7 +37175,7 @@
     },
     {
       "name": "checkout",
-      "description": "Admin API: shipping and payment methods, orders"
+      "description": "Admin API: shipping and payment methods, orders, customers"
     },
     {
       "name": "ai",

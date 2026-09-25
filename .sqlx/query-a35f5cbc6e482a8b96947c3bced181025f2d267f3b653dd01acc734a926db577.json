@@ -1,0 +1,111 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id, c.email, c.name, c.phone, c.locale,\n                  c.password_hash IS NOT NULL AS \"has_password!\",\n                  c.email_verified_at IS NOT NULL AS \"email_verified!\",\n                  (SELECT count(*) FROM orders o WHERE o.customer_id = c.id) AS \"orders!\",\n                  c.created_at\n           FROM customers c\n           WHERE ($1::text IS NULL OR c.email LIKE $1 OR lower(c.name) LIKE $1)\n             AND ($2::uuid IS NULL OR c.id < $2)\n           ORDER BY c.id DESC LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "customers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customers",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customers",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "phone",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customers",
+            "name": "phone"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customers",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "has_password!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "email_verified!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "orders!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "customers",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      null,
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "a35f5cbc6e482a8b96947c3bced181025f2d267f3b653dd01acc734a926db577"
+}

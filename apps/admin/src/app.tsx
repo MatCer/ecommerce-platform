@@ -60,6 +60,7 @@ const CampaignEditor = lazy(() => import("./pages/CampaignEditor.tsx"));
 const Emails = lazy(() => import("./pages/Emails.tsx"));
 const EmailBranding = lazy(() => import("./pages/EmailBranding.tsx"));
 const Themes = lazy(() => import("./pages/Themes.tsx"));
+const Customers = lazy(() => import("./pages/Customers.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 function Root(props: RouteSectionProps) {
@@ -133,6 +134,7 @@ export function App() {
           <Route path="/settings/recommendations" component={Recommendations} />
           <Route path="/settings/ai" component={AiSettings} />
           <Route path="/orders" component={Orders} />
+          <Route path="/customers" component={Customers} />
           <Route path="/withdrawals" component={Withdrawals} />
           <Route path="/settings/carriers" component={Carriers} />
           <Route path="/orders/:id" component={OrderDetail} />

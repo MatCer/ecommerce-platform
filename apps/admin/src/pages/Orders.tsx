@@ -1,5 +1,5 @@
 import { Badge, Button, Checkbox, EmptyState, SelectField } from "@platform/ui";
-import { A } from "@solidjs/router";
+import { A, useSearchParams } from "@solidjs/router";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { BulkDocuments } from "../components/order/BulkDocuments.tsx";
@@ -18,6 +18,8 @@ const statuses: Schemas["OrderStatus"][] = [
   "returned",
 ];
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function OrderException(props: { exception?: string | null }) {
   return (
     <Show when={props.exception}>
@@ -32,8 +34,14 @@ export default function Orders() {
   const [exception, setException] = createSignal(false);
   const [selected, setSelected] = createSignal<Set<string>>(new Set());
   const [status, setStatus] = createSignal<Schemas["OrderStatus"]>();
+  // `?customer_id=` from the customers list; anything but a UUID is ignored.
+  const [params] = useSearchParams();
+  const customer = () => {
+    const id = params.customer_id;
+    return typeof id === "string" && UUID.test(id) ? id : undefined;
+  };
   const orders = createInfiniteQuery(() => ({
-    queryKey: tenantKey("orders", status() ?? "", exception()),
+    queryKey: tenantKey("orders", status() ?? "", exception(), customer() ?? ""),
     queryFn: ({ pageParam }) =>
       unwrap(
         api.GET("/admin/v1/orders", {
@@ -41,6 +49,7 @@ export default function Orders() {
             header: tenantHeader(),
             query: {
               status: status(),
+              customer_id: customer(),
               exception: exception() || undefined,
               cursor: pageParam,
               limit: 50,
@@ -56,6 +65,7 @@ export default function Orders() {
     tenantKey("orders");
     status();
     exception();
+    customer();
     setSelected(new Set<string>());
   });
   const select = (id: string, checked: boolean) =>
@@ -68,6 +78,14 @@ export default function Orders() {
   return (
     <>
       <PageHeader title={t("orders.title")} />
+      <Show when={customer()}>
+        <p class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span>{t("customers.filtered")}</span>
+          <A class="font-medium text-accent-700 hover:underline" href="/orders">
+            {t("customers.allOrders")}
+          </A>
+        </p>
+      </Show>
       <div class="mb-4 max-w-xs">
         <SelectField
           label={t("orders.status")}

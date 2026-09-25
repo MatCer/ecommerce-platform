@@ -75,6 +75,15 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
   await expectAccessible(page, "import report");
   await apply(page);
 
+  // The imported account is listed and found by name under Customers.
+  await nav(page, "Customers").click();
+  await expect(page.getByRole("heading", { name: "Customers", level: 1 })).toBeVisible();
+  await page.getByLabel("Search by email or name").fill("Anna Nová");
+  await expect(page.getByRole("row", { name: new RegExp(anna) })).toBeVisible();
+  await page.getByLabel("Search by email or name").fill(anna);
+  await expect(page.getByRole("status").getByText("Customers: 1")).toBeVisible();
+  await expectAccessible(page, "customers");
+
   // Historical orders land in the archive, nowhere else.
   await importCsv(
     page,
