@@ -697,7 +697,9 @@ ${
       headers: {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-store",
-        "referrer-policy": "no-referrer",
+        // `same-origin`, not `no-referrer`: with the latter the form post carries `Origin: null`
+        // and fails the CSRF check; the URL (order token) still never leaves the origin.
+        "referrer-policy": "same-origin",
         "content-security-policy":
           "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         "x-content-type-options": "nosniff",

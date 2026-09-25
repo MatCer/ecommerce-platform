@@ -488,42 +488,36 @@ export default function CheckoutForm(props: {
             5. {t(m, "checkout.review")}
           </h2>
           <div class="grid gap-3">
-            <Checkbox
-              label={
-                <>
-                  {t(m, "checkout.accept_terms")} (
-                  <a
-                    href={view().legal.terms_url}
-                    target="_blank"
-                    rel="noopener"
-                    class="text-identity-ink underline"
-                  >
-                    {t(m, "legal.terms")}
-                  </a>
-                  )
-                </>
-              }
-              checked={terms()}
-              onChange={setTerms}
-            />
-            <Checkbox
-              label={
-                <>
-                  {t(m, "checkout.accept_withdrawal")} (
-                  <a
-                    href={view().legal.withdrawal_url}
-                    target="_blank"
-                    rel="noopener"
-                    class="text-identity-ink underline"
-                  >
-                    {t(m, "checkout.withdrawal_info")}
-                  </a>
-                  )
-                </>
-              }
-              checked={withdrawal()}
-              onChange={setWithdrawal}
-            />
+            <div class="flex flex-wrap items-start gap-x-2">
+              <Checkbox
+                label={t(m, "checkout.accept_terms")}
+                checked={terms()}
+                onChange={setTerms}
+              />
+              <a
+                href={view().legal.terms_url}
+                target="_blank"
+                rel="noopener"
+                class="text-sm text-identity-ink underline"
+              >
+                {t(m, "legal.terms")}
+              </a>
+            </div>
+            <div class="flex flex-wrap items-start gap-x-2">
+              <Checkbox
+                label={t(m, "checkout.accept_withdrawal")}
+                checked={withdrawal()}
+                onChange={setWithdrawal}
+              />
+              <a
+                href={view().legal.withdrawal_url}
+                target="_blank"
+                rel="noopener"
+                class="text-sm text-identity-ink underline"
+              >
+                {t(m, "checkout.withdrawal_info")}
+              </a>
+            </div>
             <fieldset class="grid gap-3 border-t border-border pt-3">
               <legend class="mb-1 text-sm text-muted-foreground">{t(m, "checkout.optional")}</legend>
               <Checkbox
