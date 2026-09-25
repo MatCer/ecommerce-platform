@@ -1113,6 +1113,387 @@
         ]
       }
     },
+    "/admin/v1/feeds": {
+      "get": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "Export feeds per market and channel (Google, Heureka, Zboží) with their public URLs.",
+        "operationId": "list_feeds",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedFileList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/feeds/regenerate": {
+      "post": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "Regenerates the export feeds now (they also refresh hourly and after catalog changes).",
+        "operationId": "regenerate_feeds",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued"
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/go-live": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Go-live checklist (A29): legal entity fields, tax profile, published legal pages in every\nmarket's default locale, GPSR manufacturer on active products.",
+        "operationId": "go_live",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoLiveReport"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/imports": {
+      "get": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "The 50 most recent imports.",
+        "operationId": "list_imports",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRunList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "Starts a feed import (owner/admin): from a URL (downloaded through the SSRF-safe client and\nanalyzed right away) or an upload (PUT the file to `upload`, then call `analyze`). Nothing\nis written to the catalog until `apply`. Honors `Idempotency-Key`.",
+        "operationId": "create_import",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedImport"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/imports/{id}": {
+      "get": {
+        "tags": [
+          "feeds"
+        ],
+        "operationId": "get_import",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/imports/{id}/analyze": {
+      "post": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "Runs (or re-runs) the dry run: counts, missing fields, collisions. Writes nothing.",
+        "operationId": "analyze_import",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/imports/{id}/apply": {
+      "post": {
+        "tags": [
+          "feeds"
+        ],
+        "summary": "Applies an analyzed import in the background (products as drafts, prices without\nreduction claims, images through the media pipeline, redirects from old URLs).",
+        "operationId": "apply_import",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRun"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/inventory": {
       "get": {
         "tags": [
@@ -1426,6 +1807,171 @@
         ]
       }
     },
+    "/admin/v1/legal-entity": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "The seller's legal identity (fills the legal templates; checked before go-live).",
+        "operationId": "get_legal_entity",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalEntityView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Saves the legal entity (owner/admin). Fields may be incomplete; go-live lists the gaps.",
+        "operationId": "put_legal_entity",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegalEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalEntityView"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/legal/templates/install": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Installs the platform legal templates (cs/sk/en) as draft legal pages filled from the legal\nentity and tax profile (owner/admin). Existing legal pages are kept. The templates are not\nlegal advice: review them with a lawyer before publishing.",
+        "operationId": "install_legal_templates",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstallResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/markets": {
       "get": {
         "tags": [
@@ -1591,6 +2137,473 @@
             }
           },
           "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/menus": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "operationId": "list_menus",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/menus/{handle}": {
+      "put": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Creates or replaces a menu. The default theme shows `main` (header) and `footer`.",
+        "operationId": "put_menu",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "main"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenuInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Menu"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "content"
+        ],
+        "operationId": "delete_menu",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "handle",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/pages": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Pages, legal pages and blog posts, newest first.",
+        "operationId": "list_pages",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/PageKind"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Creates a page or blog post (rich text is sanitized, links validated). Honors\n`Idempotency-Key`.",
+        "operationId": "create_page",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/pages/{id}": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "operationId": "get_page",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Replaces the whole page document.",
+        "operationId": "update_page",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "content"
+        ],
+        "operationId": "delete_page",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3530,6 +4543,97 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SearchStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/search/synonyms": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "The tenant's search synonyms as entered.",
+        "operationId": "get_synonyms",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SynonymsView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Replaces the synonyms (owner/admin); the worker applies them to every search index within\nseconds.",
+        "operationId": "put_synonyms",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Synonyms"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SynonymsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -6182,6 +7286,83 @@
         }
       }
     },
+    "/storefront/v1/files/feeds/{market}/{file}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "An export feed of the tenant (`/feeds/<market code>/<google|heureka|zbozi>.xml`), as last\ngenerated by the worker; 404 until the first generation.",
+        "operationId": "feed",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "market",
+            "in": "path",
+            "description": "Market code, e.g. cz",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "description": "google.xml, heureka.xml or zbozi.xml",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The feed",
+            "content": {
+              "application/xml": {}
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/files/{name}": {
       "get": {
         "tags": [
@@ -6322,6 +7503,129 @@
         }
       }
     },
+    "/storefront/v1/pages/blog": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Published blog posts, newest first.",
+        "operationId": "blog_index",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlogIndex"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/pages/blog/{slug}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "One published blog post (`/blog/<slug>` in themes).",
+        "operationId": "blog_post",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlogPost"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/pages/category/{slug}": {
       "get": {
         "tags": [
@@ -6396,6 +7700,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListingPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/pages/cms/{slug}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "A published CMS or legal page (`/pages/<slug>` in themes).",
+        "operationId": "cms_page",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CmsPage"
                 }
               }
             }
@@ -7496,6 +8870,400 @@
           "new"
         ]
       },
+      "Block": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "A section heading; `level` 2 or 3 (the page title is the only h1).",
+            "required": [
+              "text",
+              "type"
+            ],
+            "properties": {
+              "level": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "heading"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Rich text (HTML), sanitized on write.",
+            "required": [
+              "html",
+              "type"
+            ],
+            "properties": {
+              "html": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "rich_text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "An image asset of the tenant.",
+            "required": [
+              "asset_id",
+              "type"
+            ],
+            "properties": {
+              "alt": {
+                "type": "string"
+              },
+              "asset_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "caption": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A call-to-action link: a shop path (`/c/tricka`) or an `https:`/`mailto:`/`tel:` URL.",
+            "required": [
+              "label",
+              "href",
+              "type"
+            ],
+            "properties": {
+              "href": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "button"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Up to 24 products, in the given order (hidden if not purchasable).",
+            "required": [
+              "product_ids",
+              "type"
+            ],
+            "properties": {
+              "product_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "product_grid"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Questions and answers.",
+            "required": [
+              "items",
+              "type"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FaqItem"
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "faq"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "One block of a page. `type` selects the variant."
+      },
+      "BlockView": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "level",
+              "text",
+              "type"
+            ],
+            "properties": {
+              "level": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "heading"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Sanitized HTML: the only block themes may render unescaped.",
+            "required": [
+              "html",
+              "type"
+            ],
+            "properties": {
+              "html": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "rich_text"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "image",
+              "caption",
+              "type"
+            ],
+            "properties": {
+              "caption": {
+                "type": "string"
+              },
+              "image": {
+                "$ref": "#/components/schemas/Image"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "image"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "label",
+              "href",
+              "type"
+            ],
+            "properties": {
+              "href": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "button"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Purchasable products of the grid in the merchant's order (may be empty).",
+            "required": [
+              "title",
+              "products",
+              "type"
+            ],
+            "properties": {
+              "products": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ProductCard"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "product_grid"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "`answer_html` is sanitized HTML.",
+            "required": [
+              "items",
+              "type"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FaqItem"
+                }
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "faq"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "A block ready to render (images and products resolved, links localized)."
+      },
+      "BlogIndex": {
+        "type": "object",
+        "required": [
+          "title",
+          "posts",
+          "seo",
+          "cache"
+        ],
+        "properties": {
+          "cache": {
+            "$ref": "#/components/schemas/CacheHints"
+          },
+          "posts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlogPostSummary"
+            },
+            "description": "Newest first (at most 50)."
+          },
+          "seo": {
+            "$ref": "#/components/schemas/Seo"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "BlogPost": {
+        "type": "object",
+        "required": [
+          "title",
+          "blocks",
+          "published_at",
+          "breadcrumbs",
+          "seo",
+          "cache"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockView"
+            }
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          },
+          "cache": {
+            "$ref": "#/components/schemas/CacheHints"
+          },
+          "image": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Image"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "seo": {
+            "$ref": "#/components/schemas/Seo"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "BlogPostSummary": {
+        "type": "object",
+        "required": [
+          "title",
+          "href",
+          "excerpt",
+          "published_at"
+        ],
+        "properties": {
+          "excerpt": {
+            "type": "string"
+          },
+          "href": {
+            "type": "string"
+          },
+          "image": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Image"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "CacheHints": {
         "type": "object",
         "description": "Cache hints the edge reads from every page model (spec §8.2, A2).",
@@ -7962,6 +9730,23 @@
           "tax"
         ]
       },
+      "Channel": {
+        "type": "string",
+        "enum": [
+          "google",
+          "heureka",
+          "zbozi"
+        ]
+      },
+      "CheckCode": {
+        "type": "string",
+        "enum": [
+          "legal_entity",
+          "tax_profile",
+          "legal_pages",
+          "gpsr"
+        ]
+      },
       "CheckStatus": {
         "type": "string",
         "enum": [
@@ -7998,6 +9783,59 @@
           },
           "storage": {
             "$ref": "#/components/schemas/CheckStatus"
+          }
+        }
+      },
+      "CmsPage": {
+        "type": "object",
+        "required": [
+          "title",
+          "blocks",
+          "breadcrumbs",
+          "seo",
+          "cache"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockView"
+            }
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            }
+          },
+          "cache": {
+            "$ref": "#/components/schemas/CacheHints"
+          },
+          "seo": {
+            "$ref": "#/components/schemas/Seo"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
+      "Collision": {
+        "type": "object",
+        "required": [
+          "kind",
+          "item_id",
+          "value"
+        ],
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`item_id` (repeated id, later items skipped), `redirect` (the old path already redirects:\nthe first redirect wins), `slug` (a new slug got a suffix)."
+          },
+          "value": {
+            "type": "string"
           }
         }
       },
@@ -8329,6 +10167,28 @@
           }
         }
       },
+      "CreatedImport": {
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/ImportRun"
+          },
+          "upload": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UploadTarget",
+                "description": "For uploads: PUT the file here, then call `analyze`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "Currency": {
         "type": "string",
         "description": "Currencies used by EU markets: the euro and the member states' own currencies.\n`BGN` is historic (Bulgaria adopted the euro on 2026-01-01) and kept for old documents.",
@@ -8520,6 +10380,136 @@
             "items": {
               "$ref": "#/components/schemas/FacetValueView"
             }
+          }
+        }
+      },
+      "FaqItem": {
+        "type": "object",
+        "required": [
+          "question",
+          "answer_html"
+        ],
+        "properties": {
+          "answer_html": {
+            "type": "string",
+            "description": "Sanitized on write."
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FeedFile": {
+        "type": "object",
+        "required": [
+          "market_id",
+          "market_code",
+          "channel"
+        ],
+        "properties": {
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel"
+          },
+          "generated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "items": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "market_code": {
+            "type": "string"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Public URL (`https://<shop>/feeds/<market>/<channel>.xml`); `None` without a domain."
+          }
+        }
+      },
+      "FeedFileList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedFile"
+            }
+          }
+        }
+      },
+      "GoLiveCheck": {
+        "type": "object",
+        "required": [
+          "code",
+          "ok",
+          "missing",
+          "missing_count"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/CheckCode"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What is missing: field names, `<legal type>:<locale>` pairs, or product names."
+          },
+          "missing_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total count of missing items (lists are capped at 50)."
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GoLiveReport": {
+        "type": "object",
+        "required": [
+          "ready",
+          "checks",
+          "notice"
+        ],
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GoLiveCheck"
+            }
+          },
+          "notice": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
           }
         }
       },
@@ -8795,6 +10785,211 @@
           }
         }
       },
+      "ImportReport": {
+        "type": "object",
+        "description": "Dry-run report, completed by the apply step.",
+        "required": [
+          "items",
+          "skipped_items",
+          "products",
+          "variants",
+          "new_products",
+          "updated_products",
+          "categories",
+          "new_categories",
+          "parameters",
+          "new_parameters",
+          "images",
+          "new_images",
+          "redirects",
+          "missing",
+          "problems",
+          "collisions",
+          "truncated"
+        ],
+        "properties": {
+          "categories": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "collisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Collision"
+            }
+          },
+          "images": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "items": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "missing": {
+            "type": "object",
+            "description": "Field -> number of items without it (`price`, `url`, `image`, `ean`, `category`, ...).",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "new_categories": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "new_images": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "new_parameters": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "new_products": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "parameters": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemProblem"
+            }
+          },
+          "products": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "redirects": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "skipped_items": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Items that will not be imported (see `problems`).",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More problems or collisions than listed (200 each)."
+          },
+          "updated_products": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "variants": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "ImportRun": {
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "market_id",
+          "status",
+          "progress",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "applied_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "market_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          },
+          "report": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ImportReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ImportRunList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRun"
+            }
+          }
+        }
+      },
       "IndexStatus": {
         "type": "object",
         "description": "Current state of a tenant's search indexes (admin status endpoint).",
@@ -8834,6 +11029,56 @@
           "settings_version": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "InstallInput": {
+        "type": "object",
+        "properties": {
+          "locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Template locales (cs, sk, en); default: those the tenant's markets use.",
+            "default": []
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LegalType"
+            },
+            "description": "Types to install; default: all. Existing legal pages are never overwritten.",
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
+      "InstallResult": {
+        "type": "object",
+        "required": [
+          "created",
+          "skipped",
+          "notice"
+        ],
+        "properties": {
+          "created": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Created draft pages (review, edit and publish them)."
+          },
+          "notice": {
+            "type": "string"
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LegalType"
+            },
+            "description": "Types that already had a page."
           }
         }
       },
@@ -8898,6 +11143,113 @@
           }
         },
         "additionalProperties": false
+      },
+      "ItemProblem": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "`invalid_item_id`, `missing_name`, `invalid_ean`, `currency_mismatch`, `sku_conflict`,\n`image_failed`, `product_failed`, ..."
+          },
+          "detail": {
+            "type": "string"
+          },
+          "item_id": {
+            "type": "string"
+          }
+        }
+      },
+      "LegalEntity": {
+        "type": "object",
+        "description": "The seller as it must be identified to consumers (CZ Civil Code §435, §1811/§1820;\nSK Act 108/2024 §3; GDPR art. 13). Fields may be saved incomplete; go-live lists the gaps.",
+        "properties": {
+          "city": {
+            "type": "string",
+            "default": ""
+          },
+          "company_id": {
+            "type": "string",
+            "description": "IČO.",
+            "default": "",
+            "example": "12345678"
+          },
+          "company_name": {
+            "type": "string",
+            "description": "Registered business name (obchodní firma) or the trader's full name.",
+            "default": "",
+            "example": "Demo s.r.o."
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2.",
+            "default": "",
+            "example": "CZ"
+          },
+          "email": {
+            "type": "string",
+            "description": "Customer contact email.",
+            "default": ""
+          },
+          "phone": {
+            "type": "string",
+            "default": ""
+          },
+          "postal_code": {
+            "type": "string",
+            "default": ""
+          },
+          "registry": {
+            "type": "string",
+            "description": "Register entry (\"zapsaná v OR vedeném Městským soudem v Praze, oddíl C, vložka 1\").",
+            "default": ""
+          },
+          "returns_address": {
+            "type": "string",
+            "description": "Where returns and complaints are sent, if not the registered address.",
+            "default": ""
+          },
+          "street": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false
+      },
+      "LegalEntityView": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/LegalEntity"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "updated_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            }
+          }
+        ]
+      },
+      "LegalType": {
+        "type": "string",
+        "description": "Legal page types (spec §14): each has a platform template (not legal advice).",
+        "enum": [
+          "terms",
+          "privacy",
+          "cookies",
+          "withdrawal",
+          "complaints",
+          "reviews"
+        ]
       },
       "Level": {
         "type": "object",
@@ -9296,6 +11648,73 @@
           }
         }
       },
+      "Menu": {
+        "type": "object",
+        "required": [
+          "id",
+          "handle",
+          "items",
+          "updated_at"
+        ],
+        "properties": {
+          "handle": {
+            "type": "string",
+            "example": "main"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuEntry"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MenuEntry": {
+        "type": "object",
+        "required": [
+          "link"
+        ],
+        "properties": {
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuEntry"
+            },
+            "description": "Second level (entries here cannot have children)."
+          },
+          "label_i18n": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "Label per locale; empty = the target's own name (required for URLs)."
+          },
+          "link": {
+            "$ref": "#/components/schemas/MenuLink"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MenuInput": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MenuEntry"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "MenuItem": {
         "type": "object",
         "required": [
@@ -9315,6 +11734,101 @@
           },
           "label": {
             "type": "string"
+          }
+        }
+      },
+      "MenuLink": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "type"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "type"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "product"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A CMS page, legal page or blog post.",
+            "required": [
+              "id",
+              "type"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "page"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A shop path (`/search?q=x`) or an `https:`/`mailto:`/`tel:` URL.",
+            "required": [
+              "url",
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "url"
+                ]
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "MenuList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Menu"
+            }
           }
         }
       },
@@ -9478,6 +11992,40 @@
             "items": {
               "$ref": "#/components/schemas/CategoryTranslation"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewImport": {
+        "type": "object",
+        "required": [
+          "source",
+          "market_id"
+        ],
+        "properties": {
+          "market_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prices go into this market's price list; names into its default locale."
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
+          },
+          "upload_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Or upload a file of this many bytes (at most 100 MB) with the returned presigned PUT.",
+            "minimum": 0
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Download the feed from this `http(s)` URL (public addresses only)."
           }
         },
         "additionalProperties": false
@@ -9747,6 +12295,251 @@
             }
           }
         }
+      },
+      "Page": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "translations",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "image_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind"
+          },
+          "legal_type": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LegalType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PageStatus"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageTranslation"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PageInput": {
+        "type": "object",
+        "description": "A page document as written by `POST /pages` and `PUT /pages/{id}`.",
+        "required": [
+          "kind",
+          "translations"
+        ],
+        "properties": {
+          "image_asset_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Cover image (blog cards, social previews)."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind"
+          },
+          "legal_type": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LegalType",
+                "description": "Required for (and only for) `legal` pages; one page per type."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a published page becomes visible; defaults to the first publication time."
+          },
+          "status": {
+            "$ref": "#/components/schemas/PageStatus"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageTranslation"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PageKind": {
+        "type": "string",
+        "enum": [
+          "page",
+          "legal",
+          "blog_post"
+        ]
+      },
+      "PageList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "PageStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published"
+        ]
+      },
+      "PageSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "title",
+          "slug",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PageKind"
+          },
+          "legal_type": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LegalType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "slug": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "locale -> slug"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PageStatus"
+          },
+          "title": {
+            "$ref": "#/components/schemas/BTreeMap",
+            "description": "locale -> title"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PageTranslation": {
+        "type": "object",
+        "required": [
+          "locale",
+          "title",
+          "slug"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Block"
+            }
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Blog cards and meta description fallback."
+          },
+          "locale": {
+            "type": "string",
+            "example": "cs"
+          },
+          "seo_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seo_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "type": "string",
+            "description": "Unique per tenant and locale across pages and posts.",
+            "example": "doprava-a-platba"
+          },
+          "title": {
+            "type": "string",
+            "example": "Doprava a platba"
+          }
+        },
+        "additionalProperties": false
       },
       "Pagination": {
         "type": "object",
@@ -10729,6 +13522,68 @@
         },
         "additionalProperties": false
       },
+      "Progress": {
+        "type": "object",
+        "description": "Apply progress and outcome.",
+        "required": [
+          "total",
+          "done",
+          "created",
+          "updated",
+          "failed",
+          "images_downloaded",
+          "images_failed",
+          "redirects_created",
+          "redirects_skipped"
+        ],
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "images_downloaded": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "images_failed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "redirects_created": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "redirects_skipped": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "Purposes": {
         "type": "object",
         "description": "Per-purpose choices: `None` = not asked (or not part of this choice).",
@@ -11012,6 +13867,17 @@
           }
         },
         "additionalProperties": false
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "analyzing",
+          "analyzed",
+          "applying",
+          "applied",
+          "failed"
+        ]
       },
       "Sale": {
         "type": "object",
@@ -11413,7 +14279,7 @@
             "items": {
               "$ref": "#/components/schemas/Link"
             },
-            "description": "Placeholders until CMS pages exist (WP13)."
+            "description": "Published legal pages (terms, privacy, withdrawal, complaints, ...), except the cookies\npage, which is `consent.policy_url`."
           },
           "locale": {
             "type": "string",
@@ -11513,12 +14379,10 @@
       },
       "Source": {
         "type": "string",
-        "description": "Where a choice was made.",
+        "description": "Where a feed comes from (also the `import_mappings.source`).",
         "enum": [
-          "banner",
-          "preferences",
-          "checkout",
-          "linked"
+          "heureka",
+          "google"
         ]
       },
       "StaffList": {
@@ -11603,6 +14467,60 @@
             "items": {
               "$ref": "#/components/schemas/SearchHit"
             }
+          }
+        }
+      },
+      "Synonyms": {
+        "type": "object",
+        "required": [
+          "groups"
+        ],
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Each group lists 2-20 equivalent words or phrases.",
+            "example": [
+              [
+                "mikina",
+                "hoodie"
+              ],
+              [
+                "tričko",
+                "triko",
+                "tílko"
+              ]
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SynonymsView": {
+        "type": "object",
+        "required": [
+          "groups"
+        ],
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -12202,6 +15120,14 @@
     {
       "name": "storefront-admin",
       "description": "Admin API: redirects and the storefront token"
+    },
+    {
+      "name": "feeds",
+      "description": "Admin API: feed imports (Heureka, Google) and export feeds"
+    },
+    {
+      "name": "content",
+      "description": "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"
     },
     {
       "name": "storefront",

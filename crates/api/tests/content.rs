@@ -174,6 +174,17 @@ async fn published_pages_render_sanitized_blocks(db: PgPool) {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(post["breadcrumbs"][1]["href"], "/blog");
 
+    // Published pages and posts are in the sitemap.
+    let (_, sitemap, _) = Call::get("/storefront/v1/files/sitemap-1.xml")
+        .header("x-storefront-token", c.shop.token.clone())
+        .header("x-market", c.shop.cz.to_string())
+        .send_text(&c.s)
+        .await;
+    for path in ["/pages/doprava", "/blog/novinky", "/blog<"] {
+        assert!(sitemap.contains(path), "{path} in {sitemap}");
+    }
+    assert!(!sitemap.contains("koncept") && !sitemap.contains("brzy"));
+
     // Validation: bad links, unknown products, slug collisions.
     let bad = page(
         "page",
