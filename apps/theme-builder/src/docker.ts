@@ -65,7 +65,7 @@ export class Docker {
   }
 
   async #call(method: string, path: string, body?: unknown, signal?: AbortSignal) {
-    const res = await fetch(`${this.#o.url}/v1.44${path}`, {
+    const res = await fetch(`${this.#o.url}/v1.47${path}`, {
       method,
       headers: body ? { "content-type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined,

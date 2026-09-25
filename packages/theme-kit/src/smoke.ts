@@ -40,10 +40,15 @@ const context = await browser.newContext({
 await addCookie(context, base, cookie);
 const page = await context.newPage();
 const errors: string[] = [];
+// On a preview the checkout handoff lands on the edge's plain notice page (same origin, no
+// view-transition opt-in), and Chromium reports the skipped cross-document transition.
+const BENIGN = values.preview ? /^Transition was aborted because of invalid state/ : null;
 page.on("console", (m) => {
-  if (m.type() === "error") errors.push(m.text());
+  if (m.type() === "error" && !BENIGN?.test(m.text())) errors.push(m.text());
 });
-page.on("pageerror", (e) => errors.push(e.message));
+page.on("pageerror", (e) => {
+  if (!BENIGN?.test(e.message)) errors.push(e.message);
+});
 
 /** Page-model calls of a fresh render of the current URL (Authorization bypasses the cache). */
 const calls: string[] = [];

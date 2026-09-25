@@ -879,19 +879,27 @@ pub async fn attach_artifact(
     })
 }
 
-/// Home, the first top-level category with an active product, and that product (in the
-/// primary market's default locale).
+/// Home, the category with the most active products (a real listing page) and its first
+/// product, in the primary market's default locale.
 async fn check_pages(tx: &mut TenantTx) -> Result<Vec<String>, Error> {
     let r = sqlx::query!(
-        r#"SELECT ct.slug AS category, pt.slug AS product
-           FROM markets m
-           JOIN categories c ON c.parent_id IS NULL
-           JOIN category_translations ct ON ct.category_id = c.id AND ct.locale = m.default_locale
-           JOIN product_categories pc ON pc.category_id = c.id
+        r#"WITH m AS (SELECT default_locale FROM markets ORDER BY created_at LIMIT 1),
+           cat AS (
+               SELECT c.id, ct.slug, count(*) AS n, c.position
+               FROM categories c
+               JOIN m ON true
+               JOIN category_translations ct ON ct.category_id = c.id AND ct.locale = m.default_locale
+               JOIN product_categories pc ON pc.category_id = c.id
+               JOIN products p ON p.id = pc.product_id AND p.status = 'active'
+               GROUP BY c.id, ct.slug, c.position
+               ORDER BY n DESC, c.position, ct.slug LIMIT 1)
+           SELECT cat.slug AS "category!", pt.slug AS "product!"
+           FROM cat
+           JOIN m ON true
+           JOIN product_categories pc ON pc.category_id = cat.id
            JOIN products p ON p.id = pc.product_id AND p.status = 'active'
            JOIN product_translations pt ON pt.product_id = p.id AND pt.locale = m.default_locale
-           ORDER BY m.created_at, c.position, pc.position, p.created_at
-           LIMIT 1"#
+           ORDER BY pc.position, p.created_at LIMIT 1"#
     )
     .fetch_optional(&mut **tx)
     .await?;
