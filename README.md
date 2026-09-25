@@ -57,7 +57,12 @@ make down
 | http://localhost:57700 | Meilisearch |
 | http://localhost:12111 | stripe-mock |
 | http://demo.localhost:8080, http://demo-sk.localhost:8080 | Demo shop (CZ / SK market) via the edge, after `make seed theme-build` |
-| http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "K pokladně") |
+| http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "K pokladně"): one-page checkout, order pages `/o/<token>`, account |
+| http://mocks.localhost:8080/packeta/ | Packeta pickup-point widget mock (`PACKETA_WIDGET_URL`) |
+
+Local checkout (WP10) pays through the fake gateway (`PAYMENTS_FAKE=1`, refused with
+`APP_ENV=prod`): its page `/_p/fake-pay/<attempt>` has Pay / Fail buttons. Unpaid orders expire
+after the method's payment window (fake: 60 min) and release their stock.
 | https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
 First run of the demo shop: `make up && make seed && make theme-build`. The seed owner
