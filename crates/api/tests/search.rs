@@ -157,7 +157,7 @@ async fn rebuild_needs_an_admin_and_is_queued_and_audited(db: PgPool) {
     assert_eq!(status, StatusCode::ACCEPTED, "{body}");
     let job_id = body["job_id"].as_i64().unwrap();
     let (kind, tenant, versioned, due): (String, Option<Uuid>, bool, bool) = sqlx::query_as(
-        "SELECT kind, tenant_id, payload ? 'dispatched_at', run_at <= now()
+        "SELECT kind, tenant_id, payload ? 'version', run_at <= now()
          FROM queue.jobs WHERE id = $1",
     )
     .bind(job_id)

@@ -266,7 +266,7 @@ async fn outbox_versions_search_indexing_per_product(db: PgPool) {
     .unwrap();
     assert_eq!(jobs.len(), 1, "{jobs:?}");
     assert_eq!(jobs[0].0["product_id"], json!(product.id));
-    assert!(commerce::search::dispatched_at(&jobs[0].0).is_some());
+    assert!(commerce::search::job_version(&jobs[0].0).is_some());
     assert_eq!(jobs[0].1, Some(tenant));
     assert!(jobs[0].2, "runs after the delay");
 }

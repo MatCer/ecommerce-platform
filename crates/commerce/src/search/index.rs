@@ -4,10 +4,10 @@
 //! - Every write for a product happens while its `search_product_state` row is locked, and the
 //!   lock is held until Meilisearch applied the writes (tasks of an index apply in enqueue
 //!   order). Documents therefore land in the order their Postgres state was read.
-//! - Jobs are versioned by `dispatched_at`, a database-clock instant taken after the
-//!   triggering change committed. A run records when it read the catalog (`read_at`); a job
-//!   dispatched before the last `read_at` is stale and dropped, because that read already saw
-//!   its change.
+//! - Jobs carry a version from the `search_versions` sequence, drawn after the triggering
+//!   change committed. A run draws a read version before reading the catalog and records it
+//!   when done; a job whose version is lower than the recorded one is stale and dropped,
+//!   because that read already saw its change.
 //! - During a rebuild, incremental jobs also write to the index being built. They hold a
 //!   per-tenant advisory lock in shared mode while choosing their targets and writing; the
 //!   swap takes it exclusively, so no write goes to an index that was just swapped out.
@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
 use serde_json::{Value, json};
@@ -30,6 +30,8 @@ use super::{SETTINGS_VERSION, index_uid};
 const REBUILD_BATCH: i64 = 200;
 const SETTINGS_WAIT: Duration = Duration::from_secs(300);
 const REBUILD_WAIT: Duration = Duration::from_secs(1800);
+/// Values returned per facet (the storefront shows at most this many per facet).
+pub const MAX_FACET_VALUES: usize = 300;
 /// Incremental writes are small; a slower engine fails the job, which retries.
 const WRITE_WAIT: Duration = Duration::from_secs(60);
 
@@ -61,7 +63,7 @@ pub fn settings(synonyms: &Value) -> Value {
         "synonyms": synonyms,
         "stopWords": [],
         "pagination": { "maxTotalHits": 1000 },
-        "faceting": { "maxValuesPerFacet": 100 },
+        "faceting": { "maxValuesPerFacet": MAX_FACET_VALUES },
     })
 }
 
@@ -133,11 +135,11 @@ pub async fn ensure_indexes(db: &PgPool, meili: &Meili, tenant_id: Uuid) -> Resu
 }
 
 /// Locks the state rows of `products` (in id order, so concurrent lockers cannot deadlock)
-/// and returns when each was last read for indexing.
+/// and returns the read version each was last indexed at.
 async fn lock_products(
     tx: &mut TenantTx,
     products: &[Uuid],
-) -> Result<BTreeMap<Uuid, Option<DateTime<Utc>>>, Error> {
+) -> Result<BTreeMap<Uuid, Option<i64>>, Error> {
     let tenant_id = tx.tenant_id();
     sqlx::query!(
         "INSERT INTO search_product_state (tenant_id, product_id)
@@ -148,14 +150,14 @@ async fn lock_products(
     .execute(&mut **tx)
     .await?;
     Ok(sqlx::query!(
-        "SELECT product_id, read_at FROM search_product_state
+        "SELECT product_id, read_version FROM search_product_state
          WHERE product_id = ANY($1) ORDER BY product_id FOR UPDATE",
         products
     )
     .fetch_all(&mut **tx)
     .await?
     .into_iter()
-    .map(|r| (r.product_id, r.read_at))
+    .map(|r| (r.product_id, r.read_version))
     .collect())
 }
 
@@ -217,33 +219,34 @@ async fn wait_all(meili: &Meili, tasks: &[Task], limit: Duration) -> Result<(), 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Indexed {
     Done,
-    /// A run that read the catalog after `dispatched_at` already indexed the product.
+    /// A run that read the catalog after this job's version already indexed the product.
     Stale,
 }
 
-/// (Re)indexes one product. `dispatched_at` is the job's version (a database-clock instant
-/// after the triggering change committed; `None`: always index). The product's state row
-/// stays locked until Meilisearch applied every write, and `read_at` (when this run read the
-/// catalog) is recorded only then, so a failed write is retried and never hides a change.
+/// (Re)indexes one product. `version`: the job's version (drawn after the triggering change
+/// committed; `None`: always index). The product's state row stays locked until Meilisearch
+/// applied every write, and this run's read version is recorded only then, so a failed write
+/// is retried and never hides a change.
 pub async fn index_product(
     db: &PgPool,
     meili: &Meili,
     tenant_id: Uuid,
     product_id: Uuid,
-    dispatched_at: Option<DateTime<Utc>>,
+    version: Option<i64>,
 ) -> Result<Indexed, Error> {
     ensure_indexes(db, meili, tenant_id).await?;
     let mut tx = tenant_tx(db, tenant_id).await?;
     lock_tenant(&mut tx, false).await?;
     let read = lock_products(&mut tx, &[product_id]).await?;
     let last_read = read.get(&product_id).copied().flatten();
-    if let (Some(last), Some(version)) = (last_read, dispatched_at)
+    if let (Some(last), Some(version)) = (last_read, version)
         && last > version
     {
         return Ok(Indexed::Stale);
     }
-    // Everything committed before this instant is visible to the reads below.
-    let read_at = super::db_clock(&mut *tx).await?;
+    // Drawn before the reads below: every change whose job has a lower version committed
+    // before it and is visible to them.
+    let read_version = super::next_version(&mut *tx).await?;
     let ctx = documents::load_context(&mut tx).await?;
     let docs = build(&mut tx, &ctx, &[product_id]).await?;
     let mut tasks = vec![];
@@ -255,9 +258,10 @@ pub async fn index_product(
     }
     wait_all(meili, &tasks, WRITE_WAIT).await?;
     sqlx::query!(
-        "UPDATE search_product_state SET read_at = $2, indexed_at = now() WHERE product_id = $1",
+        "UPDATE search_product_state SET read_version = $2, indexed_at = now()
+         WHERE product_id = $1",
         product_id,
-        read_at
+        read_version
     )
     .execute(&mut *tx)
     .await?;
@@ -305,7 +309,7 @@ pub struct IndexStatus {
     pub settings_version: i32,
     /// A rebuild is filling a new index.
     pub rebuilding: bool,
-    pub rebuilt_at: Option<DateTime<Utc>>,
+    pub rebuilt_at: Option<chrono::DateTime<Utc>>,
     /// Documents (sellable variants) written by the last rebuild.
     pub documents: Option<i64>,
 }
@@ -333,7 +337,7 @@ pub async fn status(tx: &mut TenantTx) -> Result<Vec<IndexStatus>, Error> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rebuilt {
     Done,
-    /// A completed rebuild started after `dispatched_at`: nothing to do.
+    /// Every index was rebuilt from a read after this job's version: nothing to do.
     Stale,
     /// Another rebuild of this tenant is running; try again later.
     Busy,
@@ -346,7 +350,7 @@ pub async fn rebuild(
     meili: &Meili,
     tenant_id: Uuid,
     job_id: i64,
-    dispatched_at: Option<DateTime<Utc>>,
+    version: Option<i64>,
 ) -> Result<Rebuilt, Error> {
     // One rebuild per tenant at a time, via a session lock on a connection taken out of the
     // pool: if this future is dropped (lease lost, shutdown) the connection closes and the
@@ -362,7 +366,7 @@ pub async fn rebuild(
     if !locked {
         return Ok(Rebuilt::Busy);
     }
-    let result = rebuild_locked(db, meili, tenant_id, job_id, dispatched_at).await;
+    let result = rebuild_locked(db, meili, tenant_id, job_id, version).await;
     // Closing the session releases the lock.
     let _ = sqlx::Connection::close(conn).await;
     result
@@ -373,7 +377,7 @@ async fn rebuild_locked(
     meili: &Meili,
     tenant_id: Uuid,
     job_id: i64,
-    dispatched_at: Option<DateTime<Utc>>,
+    version: Option<i64>,
 ) -> Result<Rebuilt, Error> {
     ensure_indexes(db, meili, tenant_id).await?;
 
@@ -381,14 +385,20 @@ async fn rebuild_locked(
     //    An index left over by an interrupted rebuild is unregistered first (under the
     //    exclusive lock, so no job still targets it) and then deleted.
     let mut tx = tenant_tx(db, tenant_id).await?;
-    let last_start: Option<DateTime<Utc>> =
-        sqlx::query_scalar!("SELECT min(rebuild_started_at) FROM search_indexes")
-            .fetch_one(&mut *tx)
-            .await?;
-    if let (Some(last), Some(version)) = (last_start, dispatched_at)
-        && last > version
-    {
-        return Ok(Rebuilt::Stale);
+    // Stale only if every current locale (ensure_indexes registered them all) was rebuilt from
+    // a read after this job's version; a locale never rebuilt (NULL) is not covered.
+    if let Some(version) = version {
+        let covered = sqlx::query_scalar!(
+            r#"SELECT COALESCE(bool_and(rebuild_version IS NOT NULL AND rebuild_version > $1), false)
+                   AS "covered!"
+               FROM search_indexes"#,
+            version
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if covered {
+            return Ok(Rebuilt::Stale);
+        }
     }
     lock_tenant(&mut tx, true).await?;
     let previous: Vec<String> = sqlx::query_scalar!(
@@ -425,8 +435,8 @@ async fn rebuild_locked(
         .execute(&mut *tx)
         .await?;
     }
-    // Catalog reads below start after this instant (and after the targets are registered).
-    let started_at = super::db_clock(&mut *tx).await?;
+    // Drawn before the catalog reads below (and after the targets are registered).
+    let read_version = super::next_version(&mut *tx).await?;
     tx.commit().await?;
 
     // 2. Fill them, a batch of products at a time, under the products' row locks.
@@ -474,11 +484,11 @@ async fn rebuild_locked(
     }
     for locale in building.keys() {
         sqlx::query!(
-            "UPDATE search_indexes SET building_uid = NULL, rebuild_started_at = $2,
+            "UPDATE search_indexes SET building_uid = NULL, rebuild_version = $2,
                     rebuilt_at = now(), documents = $3, updated_at = now()
              WHERE locale = $1",
             locale,
-            started_at,
+            read_version,
             counts.get(locale).copied().unwrap_or(0)
         )
         .execute(&mut *tx)

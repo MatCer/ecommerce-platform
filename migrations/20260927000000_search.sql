@@ -2,6 +2,13 @@
 -- Meilisearch; these tables track index lifecycle, per-product indexing versions and the
 -- zero-result query log.
 
+-- Search versions (A27): one monotonic sequence orders job dispatch and catalog reads.
+-- A job's version is drawn after its triggering change committed; an indexing run draws one
+-- before reading the catalog. A job is stale when a completed run's read version is higher.
+-- (A sequence, not a clock: clocks can step backwards.)
+CREATE SEQUENCE search_versions;
+GRANT USAGE ON SEQUENCE search_versions TO app_runtime;
+
 -- One row per tenant + locale index (`t_<tenant uuid>_<locale>`).
 CREATE TABLE search_indexes (
     tenant_id        uuid NOT NULL REFERENCES platform.tenants (id),
@@ -10,23 +17,24 @@ CREATE TABLE search_indexes (
     settings_version integer NOT NULL,
     -- Index being filled by a running rebuild; incremental jobs write to it as well.
     building_uid     text,
-    -- The last completed rebuild: when it started reading the catalog, and when it finished.
-    rebuild_started_at timestamptz,
+    -- The last completed rebuild: its read version (drawn before it read the catalog) and
+    -- when it finished.
+    rebuild_version  bigint,
     rebuilt_at       timestamptz,
     documents        bigint,
     updated_at       timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, locale)
 );
 
--- Per-product indexing state. The row lock serializes indexing of one product; `read_at` is
--- when the last successful run read the catalog (database clock), so jobs dispatched before
--- it are stale and dropped (A27). No FK to products: a deleted product still needs its
--- documents removed.
+-- Per-product indexing state. The row lock serializes indexing of one product;
+-- `read_version` is the read version of the last successful run, so jobs with a lower version
+-- are stale and dropped (A27). No FK to products: a deleted product still needs its documents
+-- removed.
 CREATE TABLE search_product_state (
     tenant_id  uuid NOT NULL REFERENCES platform.tenants (id),
     product_id uuid NOT NULL,
-    read_at    timestamptz,
-    indexed_at timestamptz,
+    read_version bigint,
+    indexed_at   timestamptz,
     PRIMARY KEY (tenant_id, product_id)
 );
 

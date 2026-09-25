@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(bool_and(rebuild_version IS NOT NULL AND rebuild_version > $1), false)\n                   AS \"covered!\"\n               FROM search_indexes",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "covered!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f04642bf7baff59d759691379346dd86a63191c1ed541c859358a26a5dbb2030"
+}

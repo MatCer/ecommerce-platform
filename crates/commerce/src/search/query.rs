@@ -42,6 +42,8 @@ const MAX_QUERY_CHARS: usize = 200;
 /// Typeahead: at most this many results in total, categories first (up to 3).
 pub const SUGGEST_LIMIT: usize = 8;
 const SUGGEST_CATEGORIES: usize = 3;
+/// Exact SKU/EAN matches placed before the text matches.
+const EXACT_LIMIT: u32 = 5;
 /// Image variants small enough for result lists.
 const THUMB_MAX_WIDTH: u32 = 640;
 
@@ -317,17 +319,12 @@ fn exact_clause(q: &str) -> Option<String> {
         .then(|| format!("skus = {0} OR eans = {0}", quote(raw)))
 }
 
-/// The multi-search for `req`. With `exact` (the query is a known SKU/EAN) the results are
-/// exactly the matching products: the clause replaces the text query.
-fn plan(scope: &Scope, req: &SearchRequest, facets: bool, exact: Option<&str>) -> Plan {
+/// The multi-search for `req`. `exclude`: products already placed first (exact SKU/EAN
+/// matches), left out of the text hits so the combined list has no duplicates.
+fn plan(scope: &Scope, req: &SearchRequest, facets: bool, exclude: &[Uuid]) -> Plan {
     let uid = index_uid(scope.tenant_id, &scope.locale);
-    let q = if exact.is_some() {
-        String::new()
-    } else {
-        lang::analyze(&req.q, &scope.locale)
-    };
-    let mut base = base_clauses(scope, req);
-    base.extend(exact.map(str::to_owned));
+    let q = lang::analyze(&req.q, &scope.locale);
+    let base = base_clauses(scope, req);
     let refinements = refinement_clauses(scope, req);
     let all = and(base
         .iter()
@@ -343,9 +340,15 @@ fn plan(scope: &Scope, req: &SearchRequest, facets: bool, exact: Option<&str>) -
         }
         Sort::Relevance => vec![],
     };
+    let hits_filter = if exclude.is_empty() {
+        all.clone()
+    } else {
+        let ids: Vec<String> = exclude.iter().map(|id| quote(&id.to_string())).collect();
+        format!("{all} AND (NOT product_id IN [{}])", ids.join(", "))
+    };
     let mut p = Plan::default();
     p.queries.push(json!({
-        "indexUid": uid, "q": q, "filter": all, "sort": sort,
+        "indexUid": uid, "q": q, "filter": hits_filter, "sort": sort,
         "page": req.page, "hitsPerPage": req.per_page,
         "attributesToRetrieve": ["id", "product_id"],
     }));
@@ -410,7 +413,7 @@ fn distribution(result: Option<&Value>) -> BTreeMap<String, BTreeSet<String>> {
 fn facets_from(plan: &Plan, results: &[Value], req: &SearchRequest) -> RawFacets {
     let mut universe = distribution(plan.universe.and_then(|i| results.get(i)));
     // Selected values are always listed, even past the engine's per-facet value cap.
-    // ponytail: facets over `maxValuesPerFacet` (100) values are cut there; add facet search
+    // ponytail: facets over `MAX_FACET_VALUES` (300) values are cut there; add facet search
     // when a catalog needs more.
     for (key, values) in &req.filters {
         let listed = universe.entry(key.clone()).or_default();
@@ -434,7 +437,10 @@ fn facets_from(plan: &Plan, results: &[Value], req: &SearchRequest) -> RawFacets
             .into_iter()
             .map(|v| {
                 let sel = selected.contains(v.as_str());
-                let avail = reachable.contains(&v);
+                // A selection missing from a distribution cut at the cap is unknown, not
+                // unavailable: never disable what the shopper selected on that guess.
+                let capped = reachable.len() >= super::index::MAX_FACET_VALUES;
+                let avail = reachable.contains(&v) || (sel && capped);
                 (v, sel, avail)
             })
             .collect();
@@ -454,6 +460,29 @@ fn price_range(plan: &Plan, results: &[Value], scope: &Scope) -> Option<PriceRan
         min_minor: stats.get("min")?.as_f64()? as i64,
         max_minor: stats.get("max")?.as_f64()? as i64,
     })
+}
+
+/// Page `page` of the list `exact ++ text` (text hits exclude the exact products), from
+/// text page `page - 1` (`previous`, only needed past page 1 when there are exact hits) and
+/// text page `page` (`current`). Requires `exact.len() <= per_page`.
+fn page_of<T: Clone>(
+    exact: &[T],
+    previous: Option<Vec<T>>,
+    current: Vec<T>,
+    page: u32,
+    per_page: u32,
+) -> Vec<T> {
+    let (k, n) = (exact.len(), per_page as usize);
+    let head: Vec<T> = match (k, page) {
+        (0, _) => vec![],
+        (_, 1) => exact.to_vec(),
+        _ => previous
+            .unwrap_or_default()
+            .into_iter()
+            .skip(n - k.min(n))
+            .collect(),
+    };
+    head.into_iter().chain(current).take(n).collect()
 }
 
 /// `(variant id, product id)` of the hits, in order.
@@ -485,34 +514,53 @@ pub async fn search(
     req: &SearchRequest,
 ) -> Result<SearchResult, Error> {
     req.validate()?;
-    // Exact SKU/EAN first (spec §11.1): a query that is a SKU or EAN of a sellable variant
-    // returns exactly those products; anything else is a text search.
-    let exact = match exact_clause(&req.q) {
+    // Exact SKU/EAN first (spec §11.1): products with a variant whose SKU or EAN equals the
+    // query (and that pass the refinements) lead the list, then the text matches without them.
+    let per_page = req.per_page;
+    let exact: Vec<(Uuid, Uuid)> = match exact_clause(&req.q) {
         Some(clause) => {
+            let filter = and(base_clauses(scope, req)
+                .into_iter()
+                .chain(refinement_clauses(scope, req).into_iter().map(|(_, c)| c))
+                .chain([clause]));
             let probe = json!({
-                "indexUid": index_uid(scope.tenant_id, &scope.locale), "q": "", "limit": 1,
-                "filter": and(base_clauses(scope, req).into_iter().chain([clause.clone()])),
+                "indexUid": index_uid(scope.tenant_id, &scope.locale), "q": "", "filter": filter,
+                // At most one page, so the text hits of any page come from two adjacent pages.
+                "limit": EXACT_LIMIT.min(per_page),
                 "attributesToRetrieve": ["id", "product_id"],
             });
-            let found = meili.multi_search(&[probe]).await?;
-            (!hit_ids(found.first()).is_empty()).then_some(clause)
+            hit_ids(meili.multi_search(&[probe]).await?.first())
         }
-        None => None,
+        None => vec![],
     };
-    let plan = plan(scope, req, true, exact.as_deref());
+    let exact_products: Vec<Uuid> = exact.iter().map(|(_, p)| *p).collect();
+    let k = u32::try_from(exact.len()).unwrap_or(per_page);
+    let mut plan = plan(scope, req, true, &exact_products);
+    // Page p of [exact.., text..] holds text items [(p-1)·n - k, p·n - k): the tail of text
+    // page p-1 and the head of text page p.
+    let previous = (k > 0 && req.page > 1).then(|| {
+        let mut q = plan.queries[0].clone();
+        q["page"] = json!(req.page - 1);
+        plan.queries.push(q);
+        plan.queries.len() - 1
+    });
     let results = meili.multi_search(&plan.queries).await?;
     let hits = results.first();
-    let total = hits
+    let text_total = hits
         .and_then(|h| h.get("totalHits"))
         .and_then(Value::as_u64)
         .unwrap_or(0);
-    let total_pages = hits
-        .and_then(|h| h.get("totalPages"))
-        .and_then(Value::as_u64)
-        .and_then(|n| u32::try_from(n).ok())
-        .unwrap_or(0);
+    let total = text_total + u64::from(k);
+    let total_pages = u32::try_from(total.div_ceil(u64::from(per_page))).unwrap_or(u32::MAX);
+    let ids = page_of(
+        &exact,
+        previous.map(|i| hit_ids(results.get(i))),
+        hit_ids(hits),
+        req.page,
+        per_page,
+    );
 
-    let items = rehydrate(tx, storage, scope, req, &hit_ids(hits)).await?;
+    let items = rehydrate(tx, storage, scope, req, &ids).await?;
 
     let raw_facets = facets_from(&plan, &results, req);
     let facets = label_facets(tx, &scope.locale, raw_facets).await?;
@@ -850,7 +898,7 @@ pub async fn suggest(
     };
     // Exact SKU/EAN matches, then stemmed matches, then the word being typed as a prefix of
     // the folded names (unstemmed). One list, no pagination: merging is safe here.
-    let mut queries = plan(scope, &req, false, None).queries;
+    let mut queries = plan(scope, &req, false, &[]).queries;
     let mut prefix = queries[0].clone();
     prefix["q"] = json!(lang::analyze_prefix(q, &scope.locale));
     queries.push(prefix);
@@ -962,7 +1010,7 @@ mod tests {
             price_min: Some(100),
             ..req()
         };
-        let p = plan(&scope(), &r, true, None);
+        let p = plan(&scope(), &r, true, &[]);
         let hits = &p.queries[0];
         assert_eq!(hits["indexUid"], format!("t_{}_cs", Uuid::from_u128(7)));
         assert_eq!(hits["q"], "pansk trick");
@@ -993,27 +1041,30 @@ mod tests {
     }
 
     #[test]
-    fn an_exact_sku_replaces_the_text_query() {
+    fn exact_matches_are_excluded_from_the_text_hits_only() {
         let r = SearchRequest {
             q: "TS-RED-M".into(),
-            category_id: Some(Uuid::from_u128(9)),
             ..req()
         };
-        let exact = exact_clause(&r.q);
         assert_eq!(
-            exact.as_deref(),
+            exact_clause(&r.q).as_deref(),
             Some(r#"skus = "TS-RED-M" OR eans = "TS-RED-M""#)
         );
-        let p = plan(&scope(), &r, true, exact.as_deref());
-        let expected = format!(
-            r#"(active_in_markets = "cz") AND (category_ids = "{}") AND (skus = "TS-RED-M" OR eans = "TS-RED-M")"#,
-            Uuid::from_u128(9)
-        );
-        for q in &p.queries {
-            assert_eq!(q["filter"], expected.as_str(), "facets see the same set");
-            assert_eq!(q["q"], "");
-        }
         assert!(exact_clause(&"x".repeat(65)).is_none());
+        let p = plan(&scope(), &r, true, &[Uuid::from_u128(5)]);
+        assert_eq!(
+            p.queries[0]["filter"],
+            format!(
+                r#"(active_in_markets = "cz") AND (NOT product_id IN ["{}"])"#,
+                Uuid::from_u128(5)
+            )
+        );
+        for q in &p.queries[1..] {
+            assert_eq!(
+                q["filter"], r#"(active_in_markets = "cz")"#,
+                "facets see everything"
+            );
+        }
     }
 
     #[test]
@@ -1026,7 +1077,7 @@ mod tests {
             )]),
             ..req()
         };
-        let p = plan(&scope(), &r, true, None);
+        let p = plan(&scope(), &r, true, &[]);
         assert_eq!(
             p.queries[0]["filter"],
             r#"(active_in_markets = "cz") AND (brand IN ["a\" OR active_in_markets EXISTS OR brand = \"b"])"#
@@ -1050,10 +1101,10 @@ mod tests {
                 ..req()
             },
             false,
-            None,
+            &[],
         );
         assert_eq!(p.queries[0]["sort"], json!(["price.sk_eu:desc"]));
-        let p = plan(&s, &req(), false, None);
+        let p = plan(&s, &req(), false, &[]);
         assert_eq!(
             p.queries[0]["sort"],
             json!(["popularity:desc", "created_at:desc"])
@@ -1065,7 +1116,7 @@ mod tests {
                 ..req()
             },
             false,
-            None,
+            &[],
         );
         assert_eq!(p.queries[0]["sort"], json!([]));
     }
@@ -1076,7 +1127,7 @@ mod tests {
             filters: filters(&[("opt.color", &["red"])]),
             ..req()
         };
-        let p = plan(&scope(), &r, true, None);
+        let p = plan(&scope(), &r, true, &[]);
         let mut results = vec![json!({}); p.queries.len()];
         results[p.universe.unwrap_or_default()] = json!({ "facetDistribution": {
             "opt.color": { "blue": 3, "green": 1, "red": 2 },
@@ -1125,7 +1176,7 @@ mod tests {
             filters: filters(&[("brand", &["Zeta"])]),
             ..req()
         };
-        let p = plan(&scope(), &r, true, None);
+        let p = plan(&scope(), &r, true, &[]);
         let mut results = vec![json!({}); p.queries.len()];
         // The universe was cut before "Zeta"; the facet's own query still reaches it.
         results[p.universe.unwrap_or_default()] =
@@ -1143,6 +1194,28 @@ mod tests {
                 ]
             )]
         );
+    }
+
+    #[test]
+    fn exact_matches_lead_and_pages_neither_skip_nor_repeat() {
+        // Exact [X, Y]; text (without X, Y) [a..g]; 3 per page.
+        let text: Vec<char> = "abcdefg".chars().collect();
+        let page = |p: u32| {
+            let at = |q: u32| {
+                text.iter()
+                    .copied()
+                    .skip(((q - 1) * 3) as usize)
+                    .take(3)
+                    .collect()
+            };
+            page_of(&['X', 'Y'], (p > 1).then(|| at(p - 1)), at(p), p, 3)
+        };
+        let all: Vec<char> = (1..=4).flat_map(page).collect();
+        assert_eq!(all.iter().collect::<String>(), "XYabcdefg");
+        assert_eq!(page(1), ['X', 'Y', 'a']);
+        assert_eq!(page(2), ['b', 'c', 'd']);
+        // Without exact matches it is just the text page.
+        assert_eq!(page_of::<char>(&[], None, vec!['a', 'b'], 2, 3), ['a', 'b']);
     }
 
     #[test]

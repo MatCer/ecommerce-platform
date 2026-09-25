@@ -160,10 +160,16 @@ impl Shop {
 
     /// Indexes as a job dispatched now would.
     async fn index(&self, product: Uuid) -> Indexed {
-        let now = commerce::search::db_clock(&self.runtime).await.unwrap();
-        index::index_product(&self.runtime, &self.meili, self.tenant, product, Some(now))
-            .await
-            .unwrap()
+        let version = commerce::search::next_version(&self.runtime).await.unwrap();
+        index::index_product(
+            &self.runtime,
+            &self.meili,
+            self.tenant,
+            product,
+            Some(version),
+        )
+        .await
+        .unwrap()
     }
 
     async fn settle(&self) {
@@ -527,7 +533,7 @@ async fn stale_versions_changes_and_rehydration(db: PgPool) {
         .await;
     // A job dispatched before an indexing run read the catalog is stale and dropped; one
     // dispatched after it is not.
-    let dispatched_before = commerce::search::db_clock(&s.runtime).await.unwrap();
+    let dispatched_before = commerce::search::next_version(&s.runtime).await.unwrap();
     assert_eq!(s.index(p).await, Indexed::Done);
     let late = index::index_product(&s.runtime, &s.meili, s.tenant, p, Some(dispatched_before))
         .await
@@ -676,12 +682,28 @@ async fn rebuild_swaps_in_a_complete_index(db: PgPool) {
     assert!(!s.meili.index_exists(&tmp).await.unwrap());
 
     // A request dispatched before that rebuild started is already served.
-    let old = chrono::Utc::now() - chrono::Duration::hours(1);
     assert_eq!(
-        index::rebuild(&s.runtime, &s.meili, s.tenant, 1001, Some(old))
+        index::rebuild(&s.runtime, &s.meili, s.tenant, 1001, Some(1))
             .await
             .unwrap(),
         Rebuilt::Stale
+    );
+    // ...unless a locale appeared since: it was never rebuilt, so the request is not covered.
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO markets (tenant_id, code, name, country_codes, currency, default_locale, locales)
+         VALUES ($1, 'at', 'Österreich', '{AT}', 'EUR', 'de', '{de}')",
+    )
+    .bind(s.tenant)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        index::rebuild(&s.runtime, &s.meili, s.tenant, 1003, Some(1))
+            .await
+            .unwrap(),
+        Rebuilt::Done
     );
 
     // An interrupted rebuild left a registered, half-filled index behind: the next one
@@ -890,5 +912,32 @@ async fn search_tables_are_tenant_isolated(db: PgPool) {
         .unwrap()
         .rows_affected();
         assert_eq!(updated, 0, "{table}");
+        let deleted = sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
+            .execute(&mut *tx)
+            .await
+            .unwrap()
+            .rows_affected();
+        assert_eq!(deleted, 0, "{table}");
+    }
+    tx.commit().await.unwrap();
+    // An own row cannot be handed to another tenant.
+    for (sql, table) in inserts.iter().zip([
+        "search_indexes",
+        "search_product_state",
+        "search_zero_results",
+    ]) {
+        let mut tx = tenant_tx(&runtime, a).await.unwrap();
+        sqlx::query(*sql).bind(a).execute(&mut *tx).await.unwrap();
+        let err = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {table} SET tenant_id = $1"
+        )))
+        .bind(b)
+        .execute(&mut *tx)
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("row-level security"),
+            "{table}: {err}"
+        );
     }
 }

@@ -86,7 +86,7 @@ fn tenant_and(job: &Job, field: &str) -> Result<(Uuid, Uuid), JobError> {
 /// (Re)indexes one product; stale versions are dropped (spec A27).
 async fn search_index_product(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError> {
     let (tenant, product) = tenant_and(&job, "product_id")?;
-    let version = search::dispatched_at(&job.payload);
+    let version = search::job_version(&job.payload);
     let outcome = search::index::index_product(&ctx.db, &meili, tenant, product, version)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
@@ -101,9 +101,13 @@ async fn search_reindex_category(ctx: Ctx, job: Job) -> Result<(), JobError> {
     let products = search::index::category_products(&mut tx, category)
         .await
         .map_err(|e| JobError::Retry(e.to_string()))?;
-    let now = search::db_clock(&mut *tx).await?;
+    let version = search::next_version(&mut *tx).await?;
     for product in &products {
-        queue::enqueue(&mut *tx, &search::index_product_job(tenant, *product, now)).await?;
+        queue::enqueue(
+            &mut *tx,
+            &search::index_product_job(tenant, *product, version),
+        )
+        .await?;
     }
     tx.commit().await?;
     tracing::info!(%tenant, %category, products = products.len(), "category reindex queued");
@@ -114,7 +118,7 @@ async fn search_rebuild(ctx: Ctx, job: Job, meili: Meili) -> Result<(), JobError
     let tenant = job
         .tenant_id
         .ok_or_else(|| JobError::Permanent("search rebuild without tenant".into()))?;
-    let version = search::dispatched_at(&job.payload);
+    let version = search::job_version(&job.payload);
     match search::index::rebuild(&ctx.db, &meili, tenant, job.id, version).await {
         Ok(Rebuilt::Done | Rebuilt::Stale) => Ok(()),
         // Runs again after the current rebuild (backoff), so late changes are not lost.

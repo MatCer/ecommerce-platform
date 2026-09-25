@@ -75,8 +75,8 @@ async fn rebuild(
 ) -> Result<(StatusCode, Json<RebuildQueued>), Error> {
     staff.require(Role::Admin)?;
     let job_id = in_tx(&s, staff.tenant_id, async |tx| {
-        let now = search::db_clock(&mut **tx).await?;
-        let job = search::manual_rebuild_job(tx.tenant_id(), now);
+        let version = search::next_version(&mut **tx).await?;
+        let job = search::manual_rebuild_job(tx.tenant_id(), version);
         let id = platform::queue::enqueue(&mut **tx, &job).await?;
         audit::record(
             tx,

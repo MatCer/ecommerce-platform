@@ -23,14 +23,17 @@ pub fn subscribers(_event_type: &str) -> &'static [&'static str] {
 pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
     let mut tx = db.begin().await?;
     let events = queue::claim_outbox(&mut *tx, BATCH).await?;
-    // Database clock after the claim: every claimed event's transaction committed before it.
+    // Drawn after the claim: every claimed event's transaction committed before it.
     // It versions the search jobs (spec A27); one job per product and kind per batch.
-    let now = commerce::search::db_clock(&mut *tx).await?;
+    let version = commerce::search::next_version(&mut *tx).await?;
     let mut search_jobs = std::collections::HashSet::new();
     for event in &events {
-        if let Some(job) =
-            commerce::search::job_for_event(event.tenant_id, &event.event_type, &event.payload, now)
-            && search_jobs.insert((job.tenant_id, job.kind, job.payload.to_string()))
+        if let Some(job) = commerce::search::job_for_event(
+            event.tenant_id,
+            &event.event_type,
+            &event.payload,
+            version,
+        ) && search_jobs.insert((job.tenant_id, job.kind, job.payload.to_string()))
         {
             queue::enqueue(&mut *tx, &job).await?;
         }
