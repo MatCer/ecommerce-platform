@@ -29,10 +29,11 @@ export default function PaymentMethods() {
 /** Stripe Connect (WP11): the shop's connected account, onboarding and capabilities. */
 function StripeCard() {
   const qc = useQueryClient();
-  const key = tenantKey("stripe");
+  // A function: the tenant may be chosen after the first render (keys must follow it).
+  const key = () => tenantKey("stripe");
   const [params, setParams] = useSearchParams();
   const status = createQuery(() => ({
-    queryKey: key,
+    queryKey: key(),
     queryFn: () =>
       unwrap(api.GET("/admin/v1/payments/stripe", { params: { header: tenantHeader() } })),
   }));
@@ -44,7 +45,7 @@ function StripeCard() {
     onSuccess: (link) => {
       // Stripe-hosted onboarding (or, in simulator mode, this page again).
       if (new URL(link.url, location.href).origin === location.origin) {
-        void qc.invalidateQueries({ queryKey: key });
+        void qc.invalidateQueries({ queryKey: key() });
         showToast({ title: t("pay.simulated"), closeLabel: t("common.close") });
       } else location.assign(link.url);
     },
@@ -52,7 +53,7 @@ function StripeCard() {
   const refresh = createMutation(() => ({
     mutationFn: () =>
       unwrap(api.POST("/admin/v1/payments/stripe/refresh", { params: { header: tenantHeader() } })),
-    onSuccess: (data) => qc.setQueryData(key, data),
+    onSuccess: (data) => qc.setQueryData(key(), data),
   }));
   const simulate = createMutation(() => ({
     mutationFn: (enabled: boolean) =>
@@ -64,7 +65,7 @@ function StripeCard() {
       ),
     onSuccess: () => {
       showToast({ title: t("pay.simulated"), closeLabel: t("common.close") });
-      setTimeout(() => void qc.invalidateQueries({ queryKey: key }), 3000);
+      setTimeout(() => void qc.invalidateQueries({ queryKey: key() }), 3000);
     },
   }));
   // Back from Stripe-hosted onboarding: read the account state once.
@@ -155,9 +156,9 @@ function StripeCard() {
 /** The market's receiving account for bank transfers (A25). */
 function BankAccountForm(props: { market: Schemas["Market"] }) {
   const qc = useQueryClient();
-  const key = tenantKey("bank-account", props.market.id);
+  const key = () => tenantKey("bank-account", props.market.id);
   const account = createQuery(() => ({
-    queryKey: key,
+    queryKey: key(),
     queryFn: async () => {
       try {
         return await unwrap(
@@ -178,7 +179,7 @@ function BankAccountForm(props: { market: Schemas["Market"] }) {
           market={props.market}
           current={current}
           onSaved={(saved) => {
-            qc.setQueryData(key, saved);
+            qc.setQueryData(key(), saved);
             void qc.invalidateQueries({ queryKey: tenantKey("payment-methods", props.market.id) });
           }}
         />
