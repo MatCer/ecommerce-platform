@@ -428,7 +428,7 @@ impl PriceTable {
                     .trim()
                     .parse()
                     .map_err(|_| format!("{entry:?}: bad price"))?;
-                if !v.is_finite() || v < 0.0 || v > 10_000.0 {
+                if !v.is_finite() || !(0.0..=10_000.0).contains(&v) {
                     return Err(format!("{entry:?}: price out of range"));
                 }
                 Ok((v * 1_000_000.0).round() as u64)

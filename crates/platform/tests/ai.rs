@@ -13,10 +13,13 @@ use axum::routing::post;
 use platform::ai::{AiError, Anthropic, Client, Request};
 use serde_json::{Value, json};
 
+/// A scripted response: status, body, `retry-after`.
+type Scripted = (u16, Value, Option<&'static str>);
+
 #[derive(Clone, Default)]
 struct Stub {
-    /// Responses to hand out in order (status, body, retry-after).
-    script: Arc<Mutex<Vec<(u16, Value, Option<&'static str>)>>>,
+    /// Responses to hand out in order.
+    script: Arc<Mutex<Vec<Scripted>>>,
     seen: Arc<Mutex<Vec<(HeaderMap, Value)>>>,
 }
 
@@ -32,7 +35,7 @@ async fn messages(State(s): State<Stub>, headers: HeaderMap, Json(body): Json<Va
     res
 }
 
-async fn serve(script: Vec<(u16, Value, Option<&'static str>)>) -> (Client, Stub) {
+async fn serve(script: Vec<Scripted>) -> (Client, Stub) {
     let stub = Stub {
         script: Arc::new(Mutex::new(script)),
         ..Stub::default()

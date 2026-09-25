@@ -626,8 +626,7 @@ fn urls(html: &str) -> HashSet<String> {
             Some(value.into())
         })
         .clean(html);
-    let out = found.lock().map(|s| s.clone()).unwrap_or_default();
-    out
+    found.lock().map(|s| s.clone()).unwrap_or_default()
 }
 
 /// Translated HTML: the usual sanitizing, and links/images only to URLs of the source.

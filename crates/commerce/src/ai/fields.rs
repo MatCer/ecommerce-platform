@@ -235,7 +235,7 @@ impl Doc {
                     .filter(|(_, l)| !l.is_empty())
                     .map(|(path, label)| json!({ "path": path, "label": label }))
                     .collect();
-                (!list.is_empty()).then(|| Value::Array(list))
+                (!list.is_empty()).then_some(Value::Array(list))
             }
         }
     }
