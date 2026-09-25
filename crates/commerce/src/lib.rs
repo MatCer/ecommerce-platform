@@ -14,8 +14,8 @@ pub mod media;
 pub mod money;
 pub mod pricing;
 pub mod promotions;
-pub mod tax;
 pub mod staff;
+pub mod tax;
 pub mod tenancy;
 
 /// Postgres `unique_violation` (23505).

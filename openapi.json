@@ -789,6 +789,643 @@
         ]
       }
     },
+    "/admin/v1/coupons": {
+      "get": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Coupons, newest first.",
+        "operationId": "list_coupons",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CouponPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Creates a coupon. `published` coupons count as price reductions for the Omnibus\nreference. Honors `Idempotency-Key`.",
+        "operationId": "create_coupon",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coupon"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`code_taken`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/coupons/{id}": {
+      "get": {
+        "tags": [
+          "promotions"
+        ],
+        "operationId": "get_coupon",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coupon"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Replaces a coupon. A started published coupon only accepts a new end and limits\n(`409 coupon_started`).",
+        "operationId": "update_coupon",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CouponInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coupon"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Deletes an unused coupon (`409 coupon_in_use` once redeemed or advertised).",
+        "operationId": "delete_coupon",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/inventory": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Stock of every variant (defaults where nothing was recorded yet), by variant id.",
+        "operationId": "list_levels",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "Only this product's variants.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LevelPage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/inventory/{variant_id}": {
+      "put": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "Whether the variant's stock is tracked and may be sold below zero.",
+        "operationId": "update_settings",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LevelSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Level"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`below_reserved`: stock is oversold",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/inventory/{variant_id}/adjustments": {
+      "post": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "A manual stock correction: `delta` units, or the counted `on_hand`. Honors\n`Idempotency-Key` (A12): a retry replays the first response and the key is also the\nmovement's identity, so a correction is never applied twice.",
+        "operationId": "adjust",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Adjustment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjustmentResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`below_reserved`, `idempotency_conflict`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/inventory/{variant_id}/movements": {
+      "get": {
+        "tags": [
+          "inventory"
+        ],
+        "summary": "The variant's stock movements, newest first.",
+        "operationId": "list_movements",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovementPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/markets": {
       "get": {
         "tags": [
@@ -1292,6 +1929,458 @@
         ]
       }
     },
+    "/admin/v1/price-lists": {
+      "get": {
+        "tags": [
+          "pricing"
+        ],
+        "operationId": "list_price_lists",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceListList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Creates a price list (owner/admin) and optionally assigns markets of the same currency.\nHonors `Idempotency-Key`.",
+        "operationId": "create_price_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPriceList"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceList"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`currency_mismatch`, `unknown_market`, validation",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/price-lists/{id}": {
+      "get": {
+        "tags": [
+          "pricing"
+        ],
+        "operationId": "get_price_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Renames the list and sets the complete set of markets using it (owner/admin).",
+        "operationId": "update_price_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceListUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/price-lists/{id}/prices": {
+      "get": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Gross base prices of a list, by variant id.",
+        "operationId": "list_prices",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-1000 (default 100).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantPricePage"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Bulk upsert of up to 1000 gross base prices. The effective-price timeline (incl. running\nand scheduled sales) is recomputed and `price.changed` published for changed prices.\n`reason: tax` marks a VAT-driven repricing; `imported: true` marks prices whose history is\nunknown (no Omnibus reduction claims for 30 days).",
+        "operationId": "upsert_prices",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantPriceList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/price-lists/{id}/prices/{variant_id}": {
+      "delete": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Stops selling a variant from this list (from now on; history stays).",
+        "operationId": "delete_price",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "variant_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/products": {
       "get": {
         "tags": [
@@ -1645,6 +2734,377 @@
           "catalog"
         ],
         "operationId": "delete_product",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/products/{id}/price-history": {
+      "get": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Effective-price intervals (base, sale, tax; including scheduled future changes) per\nvariant and price list, with the Omnibus reference price (A18).",
+        "operationId": "price_history",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "price_list_id",
+            "in": "query",
+            "description": "Only this price list.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "description": "Evaluate the current price and Omnibus reference at this time (default now), e.g. the\nstart of a scheduled sale.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/sales": {
+      "get": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Sales, newest first.",
+        "operationId": "list_sales",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1-100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalePage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Creates a sale, optionally scheduled in the future. The price timelines of the targeted\nvariants get the scheduled start and end. Honors `Idempotency-Key`.",
+        "operationId": "create_sale",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sale"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/sales/{id}": {
+      "get": {
+        "tags": [
+          "promotions"
+        ],
+        "operationId": "get_sale",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sale"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Replaces a sale. A running sale keeps its start and discount (`422 sale_started`).",
+        "operationId": "update_sale",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sale"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "promotions"
+        ],
+        "summary": "Deletes a sale; a running one ends now (its past price intervals remain as history).",
+        "operationId": "delete_sale",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -2142,6 +3602,124 @@
         ]
       }
     },
+    "/admin/v1/tax-profile": {
+      "get": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "The tenant's VAT setup (A3). `404` until it has been set.",
+        "operationId": "get_tax_profile",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxProfile"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "pricing"
+        ],
+        "summary": "Creates or replaces the VAT setup (owner/admin, login at most 15 minutes old, else\n`401 reauth_required`). Switching to `origin_threshold` needs `confirm_origin_threshold`.\nThe configuration must be confirmed by the merchant's accountant.",
+        "operationId": "put_tax_profile",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -2251,6 +3829,50 @@
   },
   "components": {
     "schemas": {
+      "Adjustment": {
+        "type": "object",
+        "properties": {
+          "delta": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Units to add (negative: remove). Exactly one of `delta` and `on_hand`."
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "on_hand": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Set the counted stock; the difference is recorded as the delta."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdjustmentResult": {
+        "type": "object",
+        "required": [
+          "level",
+          "applied"
+        ],
+        "properties": {
+          "applied": {
+            "type": "boolean",
+            "description": "False when this `Idempotency-Key` was already applied (or the change was zero)."
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level"
+          }
+        }
+      },
       "Asset": {
         "type": "object",
         "required": [
@@ -2633,6 +4255,15 @@
         },
         "additionalProperties": false
       },
+      "Cause": {
+        "type": "string",
+        "description": "Why an interval has its price.",
+        "enum": [
+          "base",
+          "sale",
+          "tax"
+        ]
+      },
       "CheckStatus": {
         "type": "string",
         "enum": [
@@ -2658,6 +4289,263 @@
             "$ref": "#/components/schemas/CheckStatus"
           }
         }
+      },
+      "Coupon": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "discount",
+          "used_count",
+          "published",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "PODZIM10"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Currency",
+                "description": "Currency of a fixed amount and of `min_subtotal_minor`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discount": {
+            "$ref": "#/components/schemas/CouponDiscount"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "min_subtotal_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "per_customer_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usage_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "used_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CouponDiscount": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Percent of the goods, in basis points (1500 = 15 %).",
+            "required": [
+              "basis_points",
+              "type"
+            ],
+            "properties": {
+              "basis_points": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "percent"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A fixed amount off the goods (capped at the goods total).",
+            "required": [
+              "amount_minor",
+              "type"
+            ],
+            "properties": {
+              "amount_minor": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "fixed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Zeroes the shipping charge.",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "free_shipping"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "CouponInput": {
+        "type": "object",
+        "required": [
+          "code",
+          "discount"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "3-32 characters `A-Z 0-9 _ -`; lowercase input is uppercased.",
+            "example": "PODZIM10"
+          },
+          "currency": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Currency",
+                "description": "Required for a fixed discount or a minimum subtotal."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discount": {
+            "$ref": "#/components/schemas/CouponDiscount"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "min_subtotal_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "per_customer_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Available to all customers (advertised). Counts for the Omnibus reference."
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "usage_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CouponPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Coupon"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next (older) page; absent on the last page."
+          }
+        }
+      },
+      "Currency": {
+        "type": "string",
+        "description": "Currencies used by EU markets: the euro and the member states' own currencies.\n`BGN` is historic (Bulgaria adopted the euro on 2026-01-01) and kept for old documents.",
+        "enum": [
+          "BGN",
+          "CZK",
+          "DKK",
+          "EUR",
+          "HUF",
+          "PLN",
+          "RON",
+          "SEK"
+        ]
+      },
+      "DistanceSalesMode": {
+        "type": "string",
+        "enum": [
+          "origin_threshold",
+          "destination"
+        ]
       },
       "Gpsr": {
         "type": "object",
@@ -2741,6 +4629,52 @@
           }
         }
       },
+      "Interval": {
+        "type": "object",
+        "description": "A stored interval.",
+        "required": [
+          "id",
+          "amount_minor",
+          "valid_from",
+          "cause",
+          "imported"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cause": {
+            "$ref": "#/components/schemas/Cause"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "imported": {
+            "type": "boolean",
+            "description": "The price arrived by import; nothing is known about the price before it."
+          },
+          "sale_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "Invitation": {
         "type": "object",
         "required": [
@@ -2753,6 +4687,111 @@
           },
           "role": {
             "$ref": "#/components/schemas/Role"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Level": {
+        "type": "object",
+        "required": [
+          "variant_id",
+          "on_hand",
+          "reserved",
+          "available",
+          "track",
+          "allow_backorder"
+        ],
+        "properties": {
+          "allow_backorder": {
+            "type": "boolean",
+            "description": "Sell below zero."
+          },
+          "available": {
+            "type": "integer",
+            "format": "int32",
+            "description": "on_hand − reserved."
+          },
+          "on_hand": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reserved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "track": {
+            "type": "boolean",
+            "description": "Untracked stock is never checked (services, dropshipping)."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "LevelPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LevelRow"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "LevelRow": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Level"
+          },
+          {
+            "type": "object",
+            "required": [
+              "product_id",
+              "sku"
+            ],
+            "properties": {
+              "product_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sku": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "LevelSettings": {
+        "type": "object",
+        "required": [
+          "track",
+          "allow_backorder"
+        ],
+        "properties": {
+          "allow_backorder": {
+            "type": "boolean"
+          },
+          "track": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -2873,6 +4912,97 @@
           }
         }
       },
+      "Movement": {
+        "type": "object",
+        "required": [
+          "id",
+          "variant_id",
+          "kind",
+          "quantity",
+          "ref_type",
+          "ref_id",
+          "on_hand_after",
+          "reserved_after",
+          "actor",
+          "created_at"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MovementKind"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "on_hand_after": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Units; a signed delta for `adjust`."
+          },
+          "ref_id": {
+            "type": "string"
+          },
+          "ref_type": {
+            "type": "string"
+          },
+          "reserved_after": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "MovementKind": {
+        "type": "string",
+        "enum": [
+          "reserve",
+          "release",
+          "commit",
+          "restock",
+          "adjust"
+        ]
+      },
+      "MovementPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movement"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "NewCategory": {
         "type": "object",
         "required": [
@@ -2962,6 +5092,38 @@
         },
         "additionalProperties": false
       },
+      "NewPriceList": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "currency"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Lowercase identifier, unique per tenant.",
+            "example": "cz-retail"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency",
+            "description": "Fixed after creation. Prices are gross (VAT included)."
+          },
+          "market_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Markets that sell from this list (their currency must match)."
+          },
+          "name": {
+            "type": "string",
+            "example": "Česko – maloobchod"
+          }
+        },
+        "additionalProperties": false
+      },
       "NewUpload": {
         "type": "object",
         "required": [
@@ -2991,6 +5153,56 @@
           }
         },
         "additionalProperties": false
+      },
+      "Omnibus": {
+        "type": "object",
+        "required": [
+          "on_sale",
+          "claim"
+        ],
+        "properties": {
+          "claim": {
+            "type": "boolean",
+            "description": "Whether the storefront may show a reduction (strikethrough + percent) at all."
+          },
+          "current_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The price in force at the evaluation time."
+          },
+          "discount_percent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Whole percent off the reference, rounded down (never overstated).",
+            "minimum": 0
+          },
+          "on_sale": {
+            "type": "boolean",
+            "description": "A sale sets the current price (a reduction is being announced)."
+          },
+          "reduction_started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Start of the current reduction chain."
+          },
+          "reference_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Lowest price in the 30 days before `reduction_started_at`."
+          }
+        }
       },
       "OptionValue": {
         "type": "object",
@@ -3135,6 +5347,155 @@
               "null"
             ],
             "description": "Variant-level value (by SKU); omit for a product-level value."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PriceChangeReason": {
+        "type": "string",
+        "description": "Why the base prices change (recorded on the price intervals).",
+        "enum": [
+          "base",
+          "tax"
+        ]
+      },
+      "PriceHistory": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantPriceHistory"
+            }
+          }
+        }
+      },
+      "PriceItem": {
+        "type": "object",
+        "required": [
+          "variant_id",
+          "amount_minor"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "compare_at_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PriceList": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "name",
+          "currency",
+          "market_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "cz-retail"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "market_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Markets selling from this list."
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PriceListList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceList"
+            }
+          }
+        }
+      },
+      "PriceListUpdate": {
+        "type": "object",
+        "required": [
+          "name",
+          "market_ids"
+        ],
+        "properties": {
+          "market_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The complete set of markets using this list; markets removed from it lose their list."
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PriceUpsert": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "imported": {
+            "type": "boolean",
+            "description": "The prices come from an import: for new prices the history before now is unknown, so\nno reduction may be claimed for 30 days (A18)."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceItem"
+            },
+            "description": "1-1000 items, one per variant."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PriceChangeReason"
           }
         },
         "additionalProperties": false
@@ -3650,6 +6011,185 @@
         },
         "additionalProperties": false
       },
+      "Sale": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "discount",
+          "starts_at",
+          "targets",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "discount": {
+            "$ref": "#/components/schemas/SaleDiscount"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Open-ended when absent."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targets": {
+            "$ref": "#/components/schemas/SaleTargets"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SaleDiscount": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Percent off in basis points (1500 = 15 %), rounded half up to the minor unit.",
+            "required": [
+              "basis_points",
+              "type"
+            ],
+            "properties": {
+              "basis_points": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 0
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "percent"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A fixed amount off each unit; applies only to price lists in `currency`.",
+            "required": [
+              "amount_minor",
+              "currency",
+              "type"
+            ],
+            "properties": {
+              "amount_minor": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "currency": {
+                "$ref": "#/components/schemas/Currency"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "fixed"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "SaleInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "discount",
+          "targets"
+        ],
+        "properties": {
+          "discount": {
+            "$ref": "#/components/schemas/SaleDiscount"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": "string",
+            "example": "Podzimní výprodej"
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Default: now. A start in the past means now; a started sale keeps its start."
+          },
+          "targets": {
+            "$ref": "#/components/schemas/SaleTargets"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SalePage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sale"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next (older) page; absent on the last page."
+          }
+        }
+      },
+      "SaleTargets": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "boolean",
+            "description": "Every product."
+          },
+          "category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Products in these categories or any of their subcategories."
+          },
+          "product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "StaffList": {
         "type": "object",
         "required": [
@@ -3742,6 +6282,99 @@
           "gross",
           "net"
         ]
+      },
+      "TaxProfile": {
+        "type": "object",
+        "required": [
+          "establishment_country",
+          "vat_payer",
+          "distance_sales_mode",
+          "cash_rounding_in_vat_base",
+          "updated_at"
+        ],
+        "properties": {
+          "cash_rounding_in_vat_base": {
+            "type": "boolean",
+            "description": "Whether the cash rounding line is taxed (A16). Default false: outside the VAT base.\nConfirm with an accountant before enabling."
+          },
+          "distance_sales_mode": {
+            "$ref": "#/components/schemas/DistanceSalesMode"
+          },
+          "establishment_country": {
+            "type": "string",
+            "example": "CZ"
+          },
+          "origin_threshold_confirmed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the merchant confirmed eligibility for the origin-country threshold regime."
+          },
+          "sk_ic_dph": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SK IČ DPH (Slovak establishments only)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "vat_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "DIČ.",
+            "example": "CZ12345678"
+          },
+          "vat_payer": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TaxProfileInput": {
+        "type": "object",
+        "required": [
+          "establishment_country",
+          "vat_payer",
+          "distance_sales_mode"
+        ],
+        "properties": {
+          "cash_rounding_in_vat_base": {
+            "type": "boolean"
+          },
+          "confirm_origin_threshold": {
+            "type": "boolean",
+            "description": "Required (true) when switching to `origin_threshold`: the merchant confirms their EU\ndistance sales stay under EUR 10 000 per year. The time of confirmation is stored."
+          },
+          "distance_sales_mode": {
+            "$ref": "#/components/schemas/DistanceSalesMode"
+          },
+          "establishment_country": {
+            "type": "string",
+            "example": "CZ"
+          },
+          "sk_ic_dph": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vat_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vat_payer": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "UnitMeasure": {
         "type": "string",
@@ -3894,6 +6527,126 @@
           }
         },
         "additionalProperties": false
+      },
+      "VariantPrice": {
+        "type": "object",
+        "required": [
+          "variant_id",
+          "amount_minor",
+          "updated_at"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gross base price in minor units."
+          },
+          "compare_at_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Display-only \"was\"/recommended price, never a reduction basis (A18)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VariantPriceHistory": {
+        "type": "object",
+        "required": [
+          "variant_id",
+          "sku",
+          "price_list_id",
+          "currency",
+          "omnibus",
+          "intervals"
+        ],
+        "properties": {
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "intervals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Interval"
+            },
+            "description": "The full effective-price timeline, oldest first, including scheduled future changes."
+          },
+          "omnibus": {
+            "$ref": "#/components/schemas/Omnibus",
+            "description": "The Omnibus figures right now."
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VariantPrice",
+                "description": "The current base price entry (absent when the variant is not priced in this list)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price_list_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "VariantPriceList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantPrice"
+            }
+          }
+        }
+      },
+      "VariantPricePage": {
+        "type": "object",
+        "required": [
+          "currency",
+          "items"
+        ],
+        "properties": {
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VariantPrice"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next page; absent on the last page."
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -3929,6 +6682,18 @@
     {
       "name": "media",
       "description": "Admin API: image assets (presigned uploads, variants)"
+    },
+    {
+      "name": "pricing",
+      "description": "Admin API: tax profile, price lists, variant prices, price history"
+    },
+    {
+      "name": "promotions",
+      "description": "Admin API: sales and coupons"
+    },
+    {
+      "name": "inventory",
+      "description": "Admin API: stock levels and movements"
     },
     {
       "name": "internal",
