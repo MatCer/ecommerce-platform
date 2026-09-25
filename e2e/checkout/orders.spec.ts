@@ -251,12 +251,12 @@ test("a lost placement response is replayed with the same key: one order (A12)",
   await choosePickupPoint(page, /Z-BOX Praha 1/);
   await page.getByRole("radio", { name: /Testovací platba/ }).check();
   // The first response is lost after the server committed the order.
-  let first: { number?: string } | null = null;
+  const lost: { number?: string; done?: boolean } = {};
   const keys: string[] = [];
   await page.route("**/_p/checkout/place-order", async (route) => {
     keys.push(route.request().headers()["idempotency-key"] ?? "");
-    if (first) return route.continue();
-    first = (await (await route.fetch()).json()) as { number?: string };
+    if (lost.done) return route.continue();
+    Object.assign(lost, await (await route.fetch()).json(), { done: true });
     await route.abort("failed");
   });
   await acceptAndPlace(page);
@@ -265,7 +265,7 @@ test("a lost placement response is replayed with the same key: one order (A12)",
   const token = await fakePay(page, "Pay");
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
-  expect((await order(page, CZ, token)).number).toBe(first?.number);
+  expect((await order(page, CZ, token)).number).toBe(lost.number);
   await page.context().close();
 });
 
