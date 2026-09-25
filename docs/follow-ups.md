@@ -50,3 +50,7 @@
 | WP11 | `platform.provider_events` keeps payloads indefinitely (PaymentIntent objects may hold billing details); add a retention rule to WP14's `ops.sweep` (e.g. drop payloads of processed events after 90 days) | later (ops) |
 | WP11 | Fio tokens share WP14's single `SECRETS_KEY` (no key id in the ciphertext); no rotation tooling | later |
 | WP11 | Payment reminder and email due dates are the UTC date of the deadline | later |
+| WP22 | Translations cover names, descriptions, SEO, page blocks and menu labels; option/value names, parameter texts and image alt texts are not translated by AI yet | later |
+| WP22 | One entity per proposal: no "translate every product missing sk" batch job (bulk plans cover non-text fields) | later |
+| WP22 | The AI quota is a soft limit (concurrent calls may overshoot by one call); no superadmin UI for quotas (CLI `set-ai-quota`) | later (only if it matters) |
+| WP22 | Old `ai_proposals` / `ai_bulk_plans` rows are never purged | later (ops) |

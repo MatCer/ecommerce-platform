@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use commerce::ai::{Ai, Outcome, plan, proposals};
 use commerce::feeds::{export, import};
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
@@ -43,12 +44,14 @@ pub const STAFF_INVITE_MAIL: &str = "staff.invite_mail";
 pub const EDGE_PURGE: &str = "edge.purge";
 
 /// Services of the WP13a/WP14 jobs: edge purges, the SSRF-safe fetcher (imports), the public
-/// storefront URLs (export feeds) and webhook delivery (`None` without `SECRETS_KEY`).
+/// storefront URLs (export feeds) and webhook delivery (`None` without `SECRETS_KEY`); the
+/// AI helpers (WP22).
 #[derive(Clone)]
 pub struct Extra {
     pub edge: EdgePurge,
     pub fetch: SafeClient,
     pub urls: PublicUrls,
+    pub ai: Ai,
     pub webhooks: Option<commerce::webhooks::Webhooks>,
     /// WP11: the Fio API poller (token key, API base URL).
     pub fio: Option<Fio>,
@@ -63,12 +66,14 @@ pub struct Fio {
 }
 
 impl Extra {
-    /// No edge, no allowlisted hosts, default URLs, no Fio polling (tests, tools).
+    /// No edge, no allowlisted hosts, default URLs, no Fio polling, the fake AI provider
+    /// (tests, tools).
     pub fn disabled() -> Result<Self, platform::http::FetchError> {
         Ok(Self {
             edge: EdgePurge::disabled(),
             fetch: SafeClient::new(Vec::<String>::new())?,
             urls: PublicUrls::default(),
+            ai: Ai::fake(),
             webhooks: None,
             fio: None,
         })
@@ -100,6 +105,7 @@ pub fn all(
     let sweep_storage = storage.clone();
     let (m1, m3, m4, m5) = (meili.clone(), meili.clone(), meili.clone(), meili);
     let webhooks = extra.webhooks.clone();
+    let (ai1, ai2) = (extra.ai.clone(), extra.ai.clone());
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
     Handlers::default()
@@ -156,6 +162,13 @@ pub fn all(
         .register(SWEEP_JOB, move |ctx, job| {
             ops_sweep(ctx, job, sweep_storage.clone(), m5.clone())
         })
+        .register(proposals::JOB, move |ctx, job| {
+            ai_proposal(ctx, job, ai1.clone())
+        })
+        .register(plan::PLAN_JOB, move |ctx, job| {
+            ai_plan(ctx, job, ai2.clone())
+        })
+        .register(plan::APPLY_JOB, ai_apply)
 }
 
 /// A11: processes one stored provider event. Mismatches are recorded on the event (never
@@ -175,6 +188,36 @@ async fn provider_event(ctx: Ctx, job: Job) -> Result<(), JobError> {
         Err(platform::Error::NotFound) => Err(JobError::Permanent("unknown event".into())),
         Err(e) => Err(JobError::Retry(e.to_string())),
     }
+}
+
+fn ai_outcome(r: Result<Outcome, platform::Error>) -> Result<(), JobError> {
+    match r {
+        Ok(Outcome::Done) => Ok(()),
+        Ok(Outcome::Retry(reason)) => Err(JobError::Retry(reason)),
+        Err(platform::Error::NotFound) => Err(JobError::Permanent("record not found".into())),
+        Err(e) => Err(JobError::Retry(e.to_string())),
+    }
+}
+
+/// Generates an AI proposal (WP22); provider outages are retried, then the proposal fails.
+async fn ai_proposal(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
+    let (tenant, id) = tenant_and(&job, "proposal_id")?;
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(proposals::run(&ctx.db, &ai, tenant, id, last).await)
+}
+
+/// Plans a bulk edit: model output -> validation -> targets -> preview.
+async fn ai_plan(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
+    let (tenant, id) = tenant_and(&job, "plan_id")?;
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(plan::run_plan(&ctx.db, &ai, tenant, id, last).await)
+}
+
+/// Applies a confirmed bulk plan, one product per transaction (resumable).
+async fn ai_apply(ctx: Ctx, job: Job) -> Result<(), JobError> {
+    let (tenant, id) = tenant_and(&job, "plan_id")?;
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(plan::run_apply(&ctx.db, tenant, id, last).await)
 }
 
 async fn payments_remind(ctx: Ctx, _job: Job, urls: PublicUrls) -> Result<(), JobError> {

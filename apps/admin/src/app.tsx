@@ -38,6 +38,8 @@ const PaymentExceptions = lazy(() => import("./pages/PaymentExceptions.tsx"));
 const BankTransactions = lazy(() => import("./pages/BankTransactions.tsx"));
 const Orders = lazy(() => import("./pages/Orders.tsx"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
+const AiBulkEdit = lazy(() => import("./pages/AiBulkEdit.tsx"));
+const AiSettings = lazy(() => import("./pages/AiSettings.tsx"));
 const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -86,6 +88,7 @@ export function App() {
           <Route path="/categories" component={Categories} />
           <Route path="/parameters" component={Parameters} />
           <Route path="/inventory" component={Inventory} />
+          <Route path="/ai/bulk-edit" component={AiBulkEdit} />
           <Route path="/price-lists" component={PriceLists} />
           <Route path="/sales" component={Sales} />
           <Route path="/coupons" component={Coupons} />
@@ -103,6 +106,7 @@ export function App() {
           <Route path="/imports/:id" component={Imports} />
           <Route path="/feeds" component={ExportFeeds} />
           <Route path="/settings/search" component={SearchSynonyms} />
+          <Route path="/settings/ai" component={AiSettings} />
           <Route path="/orders" component={Orders} />
           <Route path="/orders/:id" component={OrderDetail} />
           <Route path="/payments/exceptions" component={PaymentExceptions} />

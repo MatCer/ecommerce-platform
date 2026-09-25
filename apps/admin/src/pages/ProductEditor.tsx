@@ -13,6 +13,7 @@ import { A, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, type JSX, onCleanup, Show } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
+import { AiPanel } from "../components/AiPanel.tsx";
 import { MediaManager } from "../components/MediaManager.tsx";
 import { PageHeader, QueryState } from "../components/Page.tsx";
 import { ParameterValues } from "../components/ParameterValues.tsx";
@@ -163,6 +164,15 @@ export default function ProductEditor() {
     }
   });
 
+  /** After AI fields were saved: the stored product replaces the working copy. */
+  const reloadProduct = async () => {
+    const r = await product.refetch();
+    if (r.data && alive) {
+      setDraft(reconcile(draftFromProduct(r.data)));
+      setLoaded(r.data.id);
+    }
+  };
+
   const skus = () => draft.variants.map((v) => v.sku).filter((s) => s.trim() !== "");
   const skuBase = () =>
     slugify(draft.translations.cs.name || draft.translations.sk.name || draft.translations.en.name)
@@ -241,6 +251,7 @@ export default function ProductEditor() {
   const sections = () => [
     ["general", t("editor.general")],
     ["content", t("editor.content")],
+    ...(isNew() ? [] : [["ai", t("ai.panel")]]),
     ["media", t("editor.media")],
     ["variants", t("editor.variants")],
     ["prices", t("prices.title")],
@@ -373,6 +384,19 @@ export default function ProductEditor() {
             }))}
           />
         </Section>
+
+        <Show when={params.id}>
+          {(id) => (
+            <div id="ai" class="scroll-mt-16 border-b border-border py-5">
+              <AiPanel
+                entityType="product"
+                entityId={id()}
+                onAccepted={() => void reloadProduct()}
+                acceptHint={t("ai.unsavedHint")}
+              />
+            </div>
+          )}
+        </Show>
 
         <Section id="media" title={t("editor.media")}>
           <MediaManager

@@ -246,6 +246,32 @@ where
     I: Serialize,
     O: Serialize,
 {
+    idempotent(
+        s,
+        staff,
+        headers,
+        operation,
+        input,
+        StatusCode::CREATED,
+        create,
+    )
+    .await
+}
+
+/// Like [`create_idempotent`], answering `status` (e.g. `202` for a queued action).
+pub(crate) async fn idempotent<I, O>(
+    s: &AppState,
+    staff: &TenantStaff,
+    headers: &HeaderMap,
+    operation: &str,
+    input: &I,
+    status: StatusCode,
+    create: impl AsyncFnOnce(&mut TenantTx) -> Result<O, Error>,
+) -> Result<Response, Error>
+where
+    I: Serialize,
+    O: Serialize,
+{
     let key = idempotency_key(headers)?;
     let mut tx = tenant_tx(&s.db, staff.tenant_id).await?;
     if let Some(key) = &key {
@@ -257,10 +283,10 @@ where
     let created = create(&mut tx).await?;
     let body = serde_json::to_value(&created).map_err(internal)?;
     if let Some(key) = &key {
-        idempotency::finish(&mut tx, operation, key, StatusCode::CREATED.as_u16(), &body).await?;
+        idempotency::finish(&mut tx, operation, key, status.as_u16(), &body).await?;
     }
     tx.commit().await?;
-    Ok((StatusCode::CREATED, Json(body)).into_response())
+    Ok((status, Json(body)).into_response())
 }
 
 /// Query string, or `400 invalid_query` as problem+json.

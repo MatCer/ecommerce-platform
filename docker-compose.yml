@@ -23,6 +23,14 @@ x-runtime-db: &runtime-db
   # WP14: key for stored integration secrets (webhook signing secrets, AES-256-GCM).
   SECRETS_KEY: ${SECRETS_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
 
+# AI helpers (WP22). Without ANTHROPIC_API_KEY the fake provider answers from fixtures (dev);
+# with APP_ENV=prod and no key the helpers are off.
+x-ai: &ai
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_HELPER_MODEL: ${AI_HELPER_MODEL:-claude-sonnet-5}
+  AI_THEME_MODEL: ${AI_THEME_MODEL:-claude-opus-5-5}
+  AI_PLAN_QUOTAS: ${AI_PLAN_QUOTAS:-standard=2000000}
+
 services:
   postgres:
     <<: *infra
@@ -252,7 +260,7 @@ services:
     <<: *rust-app
     command: ["/usr/local/bin/api"]
     environment:
-      <<: *runtime-db
+      <<: [*runtime-db, *ai]
       API_BIND: 0.0.0.0:8000
       METRICS_BIND: 0.0.0.0:9100
       # Storefront API rate limit per storefront token + client IP (spec §8.1).
@@ -309,7 +317,7 @@ services:
     <<: *rust-app
     command: ["/usr/local/bin/worker"]
     environment:
-      <<: *runtime-db
+      <<: [*runtime-db, *ai]
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       METRICS_BIND: 0.0.0.0:9101
       MEILI_URL: http://meilisearch:7700

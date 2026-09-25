@@ -123,6 +123,17 @@ fn checkout_settings(
     })
 }
 
+/// AI helpers from `AiConfig` (Anthropic with a key, else the fake provider; off in prod).
+fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
+    let ai = commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?;
+    match ai.provider() {
+        "fake" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers use the fake provider"),
+        "disabled" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers are disabled"),
+        _ => tracing::info!(model = %ai.helper_model, "AI helpers use the Anthropic API"),
+    }
+    Ok(ai)
+}
+
 fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
@@ -188,6 +199,7 @@ async fn serve() -> anyhow::Result<()> {
             ops.storefront_rate_per_second,
             ops.storefront_rate_burst,
         )),
+        ai: ai_helpers()?,
     };
     let limiter = state.rate_limit.clone();
     tokio::spawn(async move {

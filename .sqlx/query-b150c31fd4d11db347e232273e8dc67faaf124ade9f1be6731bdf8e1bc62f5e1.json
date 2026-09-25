@@ -1,0 +1,49 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT feature, count(*) AS \"calls!\",\n                  sum(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens)::bigint AS \"tokens!\",\n                  sum(cost_micros)::bigint AS \"cost_micros!\"\n           FROM ai_usage WHERE at >= $1 GROUP BY feature ORDER BY feature",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "feature",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_usage",
+            "name": "feature"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "calls!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "tokens!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "cost_micros!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "b150c31fd4d11db347e232273e8dc67faaf124ade9f1be6731bdf8e1bc62f5e1"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT entries FROM ai_glossaries",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entries",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_glossaries",
+            "name": "entries"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "22653e7044d3b385bd38d3dee14df48772a12ec32e9c5885420aafd00dcd504b"
+}

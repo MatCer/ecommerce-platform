@@ -1,0 +1,4 @@
+{#- Fake provider: SEO title and meta description from the entity name. -#}
+{%- set title = data.name ~ (" | " ~ data.brand if data.brand else "") -%}
+{%- set desc = ({"cs": "Ukázkový meta popis od demo AI: ", "sk": "Ukážkový meta popis od demo AI: "}[data.locale] | default("Sample meta description by the demo AI: ")) ~ data.name ~ "." -%}
+{"seo_title": {{ title[:60] | tojson }}, "seo_description": {{ desc[:155] | tojson }}}

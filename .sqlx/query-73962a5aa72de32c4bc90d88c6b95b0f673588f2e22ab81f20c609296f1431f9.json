@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT plan, ai_monthly_tokens FROM platform.tenants WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "plan",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.tenants",
+            "name": "plan"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "ai_monthly_tokens",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "platform.tenants",
+            "name": "ai_monthly_tokens"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "73962a5aa72de32c4bc90d88c6b95b0f673588f2e22ab81f20c609296f1431f9"
+}

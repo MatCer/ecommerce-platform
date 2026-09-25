@@ -10,6 +10,693 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/ai/bulk-plans": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Starts planning a bulk edit from the staff's request (a job): poll\n`GET /ai/bulk-plans/{id}`; a `ready` plan carries the target count and a preview (the dry\nrun). Nothing changes until the plan is applied.",
+        "operationId": "create_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPlan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans/{id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "get_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans/{id}/apply": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Confirms a `ready` plan and applies it in the background (progress on the plan). Plans that\nchange prices need a sign-in at most 15 minutes old (`401 reauth_required`, A9). Honors\n`Idempotency-Key`.",
+        "operationId": "apply_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/glossary": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Terms translations must keep (brand names) or translate one fixed way.",
+        "operationId": "get_glossary",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Glossary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Replaces the glossary (at most 500 terms). Audited.",
+        "operationId": "put_glossary",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Glossary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Glossary"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/marks": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Fields of an entity whose current text was written by AI (AI Act transparency labels).",
+        "operationId": "list_marks",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityType"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "description": "The entity's id (a menu's handle).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiMarkList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Starts generating a proposal (a job): poll `GET /ai/proposals/{id}` until it is `ready`\nor `failed`. `402 ai_quota_exceeded` when the monthly allowance is used up.",
+        "operationId": "create_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "get_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}/accept": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Writes the chosen fields through the entity's service (audited) and labels them as\nAI-generated. `409 proposal_stale` when a field changed since the proposal was made.",
+        "operationId": "accept_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}/discard": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "discard_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/usage": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "This month's AI usage of the shop, its token allowance and the provider in use.",
+        "operationId": "usage",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/analytics/dashboard": {
       "get": {
         "tags": [
@@ -12559,6 +13246,22 @@
   },
   "components": {
     "schemas": {
+      "AcceptProposal": {
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldRef"
+            },
+            "description": "The fields to write (a subset of `changes`). Creating a translation always includes\nits name/title and slug."
+          }
+        },
+        "additionalProperties": false
+      },
       "Address": {
         "type": "object",
         "required": [
@@ -12788,6 +13491,48 @@
           }
         }
       },
+      "AiMark": {
+        "type": "object",
+        "required": [
+          "locale",
+          "field",
+          "feature",
+          "model",
+          "ai_generated_at"
+        ],
+        "properties": {
+          "ai_generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        }
+      },
+      "AiMarkList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiMark"
+            }
+          }
+        }
+      },
       "Alternate": {
         "type": "object",
         "required": [
@@ -12801,6 +13546,24 @@
           "locale": {
             "type": "string",
             "description": "hreflang value (`cs-CZ`, `x-default`)."
+          }
+        }
+      },
+      "ApplyProgress": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Products deleted meanwhile or no longer valid for a change."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -13845,6 +14608,90 @@
           }
         }
       },
+      "BulkPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt",
+          "status",
+          "errors",
+          "target_count",
+          "sample",
+          "progress",
+          "needs_fresh_auth",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "applied_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why the plan was rejected (or failed)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "needs_fresh_auth": {
+            "type": "boolean",
+            "description": "Confirming needs a sign-in at most 15 minutes old (price changes, A9)."
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Plan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/ApplyProgress"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleRow"
+            },
+            "description": "Before/after of the first products."
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "target_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Matching products (frozen at preview; the apply changes exactly these)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "CacheHints": {
         "type": "object",
         "description": "Cache hints the edge reads from every page model (spec §8.2, A2).",
@@ -14319,6 +15166,30 @@
           "sale",
           "tax"
         ]
+      },
+      "Change": {
+        "type": "object",
+        "description": "One proposed field value.",
+        "required": [
+          "locale",
+          "field",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "description": "The proposed value: text, or the block/label list."
+          },
+          "before": {
+            "description": "The value when the proposal was generated (`null`: none yet)."
+          },
+          "field": {
+            "type": "string",
+            "description": "`name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`\nfor a menu's labels: `[{path, label}]`)."
+          },
+          "locale": {
+            "type": "string"
+          }
+        }
       },
       "Channel": {
         "type": "string",
@@ -15403,6 +16274,15 @@
           "destination"
         ]
       },
+      "EntityType": {
+        "type": "string",
+        "enum": [
+          "product",
+          "category",
+          "page",
+          "menu"
+        ]
+      },
       "Facet": {
         "type": "object",
         "required": [
@@ -15604,6 +16484,32 @@
         },
         "additionalProperties": false
       },
+      "FeatureUsage": {
+        "type": "object",
+        "required": [
+          "feature",
+          "calls",
+          "tokens",
+          "cost_micros"
+        ],
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "FeedFile": {
         "type": "object",
         "required": [
@@ -15666,6 +16572,22 @@
           }
         }
       },
+      "FieldRef": {
+        "type": "object",
+        "required": [
+          "locale",
+          "field"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "FulfillmentStatus": {
         "type": "string",
         "enum": [
@@ -15693,6 +16615,45 @@
             "description": "`sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`."
           }
         }
+      },
+      "Glossary": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlossaryEntry"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlossaryEntry": {
+        "type": "object",
+        "required": [
+          "term"
+        ],
+        "properties": {
+          "term": {
+            "type": "string",
+            "description": "The term as written in the source text, e.g. `Lnen & Co.`.",
+            "example": "Lnen & Co."
+          },
+          "translations": {
+            "type": "object",
+            "description": "Locale -> the fixed translation; locales not listed keep the term unchanged.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "GoLiveCheck": {
         "type": "object",
@@ -16600,6 +17561,14 @@
           "reviews"
         ]
       },
+      "Length": {
+        "type": "string",
+        "enum": [
+          "short",
+          "medium",
+          "long"
+        ]
+      },
       "Level": {
         "type": "object",
         "required": [
@@ -17474,6 +18443,20 @@
         },
         "additionalProperties": false
       },
+      "NewPlan": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "What to change, in the staff's words (1-2000 characters).",
+            "example": "Raise prices of T-shirts by 5 % in SK"
+          }
+        },
+        "additionalProperties": false
+      },
       "NewPriceList": {
         "type": "object",
         "required": [
@@ -17502,6 +18485,48 @@
           "name": {
             "type": "string",
             "example": "Česko – maloobchod"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewProposal": {
+        "type": "object",
+        "required": [
+          "kind",
+          "entity_type",
+          "entity_id",
+          "locale"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "The entity's id (a menu's handle)."
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "length": {
+            "$ref": "#/components/schemas/Length",
+            "description": "Descriptions only."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Language of the text to write; the source language for `translate`.",
+            "example": "cs"
+          },
+          "target_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`translate` only: 1-5 languages to translate into."
+          },
+          "tone": {
+            "$ref": "#/components/schemas/Tone",
+            "description": "Descriptions only."
           }
         },
         "additionalProperties": false
@@ -17739,6 +18764,158 @@
             "description": "Stripe-hosted onboarding (single use, expires in minutes); in simulator mode the admin\npage itself (the account becomes ready through a simulated `account.updated`)."
           }
         }
+      },
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "field",
+              "value",
+              "op"
+            ],
+            "properties": {
+              "field": {
+                "$ref": "#/components/schemas/PlanField"
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Required for translated fields, `null` for `brand`."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_field"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "market",
+              "op"
+            ],
+            "properties": {
+              "amount_minor": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "Fixed change in minor units; exclusive with `percent`."
+              },
+              "market": {
+                "type": "string",
+                "description": "Market code or price list code."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "adjust_price"
+                ]
+              },
+              "percent": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "format": "double",
+                "description": "Percent change (5 = +5 %); exclusive with `amount_minor`."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "category",
+              "op"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "add_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "category",
+              "op"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "remove_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "parameter",
+              "value",
+              "op"
+            ],
+            "properties": {
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Text parameters: one locale, or `null` for every shop locale."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_parameter"
+                ]
+              },
+              "parameter": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "status",
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_status"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/ProductStatus"
+              }
+            }
+          }
+        ],
+        "description": "The allowlisted operations; anything else fails to parse."
       },
       "OptionValue": {
         "type": "object",
@@ -18535,6 +19712,23 @@
           }
         }
       },
+      "ParameterFilter": {
+        "type": "object",
+        "required": [
+          "parameter",
+          "value"
+        ],
+        "properties": {
+          "parameter": {
+            "type": "string",
+            "description": "Parameter key."
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ParameterInput": {
         "type": "object",
         "required": [
@@ -19026,6 +20220,51 @@
           }
         }
       },
+      "Plan": {
+        "type": "object",
+        "required": [
+          "explanation",
+          "selector",
+          "operations"
+        ],
+        "properties": {
+          "explanation": {
+            "type": "string",
+            "description": "The model's summary for the staff (plain text)."
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          },
+          "selector": {
+            "$ref": "#/components/schemas/Selector"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlanField": {
+        "type": "string",
+        "description": "Text fields a plan may set.",
+        "enum": [
+          "brand",
+          "short_description",
+          "seo_title",
+          "seo_description"
+        ]
+      },
+      "PlanStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "rejected",
+          "applying",
+          "applied",
+          "failed"
+        ]
+      },
       "PriceChangeReason": {
         "type": "string",
         "description": "Why the base prices change (recorded on the price intervals).",
@@ -19033,6 +20272,33 @@
           "base",
           "tax"
         ]
+      },
+      "PriceFilter": {
+        "type": "object",
+        "required": [
+          "market"
+        ],
+        "properties": {
+          "market": {
+            "type": "string",
+            "description": "Market code or price list code."
+          },
+          "max_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "min_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
       },
       "PriceHistory": {
         "type": "object",
@@ -19848,6 +21114,115 @@
           }
         }
       },
+      "Proposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "entity_type",
+          "entity_id",
+          "locale",
+          "target_locales",
+          "tone",
+          "length",
+          "status",
+          "progress",
+          "changes",
+          "warnings",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Failure code: `ai_quota_exceeded`, `ai_unavailable`, `ai_refused`,\n`ai_invalid_output`, `entity_missing`, `nothing_to_translate`."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "length": {
+            "$ref": "#/components/schemas/Length"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model that wrote it (`fake` for the demo provider)."
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "target_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tone": {
+            "$ref": "#/components/schemas/Tone"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Things to check before accepting (e.g. a glossary term not kept)."
+          }
+        }
+      },
+      "ProposalKind": {
+        "type": "string",
+        "enum": [
+          "product_description",
+          "seo",
+          "category_description",
+          "translate"
+        ]
+      },
+      "ProposalStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed",
+          "accepted",
+          "discarded"
+        ]
+      },
       "Purposes": {
         "type": "object",
         "description": "Per-purpose choices: `None` = not asked (or not part of this choice).",
@@ -20436,6 +21811,49 @@
           }
         }
       },
+      "SampleChange": {
+        "type": "object",
+        "required": [
+          "what",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string",
+            "description": "`brand`, `seo_title (cs)`, `price TS-M (EUR)`, `category`, `parameter material`,\n`status`."
+          }
+        }
+      },
+      "SampleRow": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "name",
+          "changes"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleChange"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SearchHit": {
         "type": "object",
         "required": [
@@ -20557,6 +21975,49 @@
             "description": "One index per locale the tenant's markets sell in."
           }
         }
+      },
+      "Selector": {
+        "type": "object",
+        "description": "Which products change: every non-empty condition must hold.",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand names (case-insensitive)."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Category slugs (any locale); subcategories included."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterFilter"
+            }
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PriceFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStatus"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "Seo": {
         "type": "object",
@@ -21582,6 +23043,17 @@
           "unknown"
         ]
       },
+      "Tone": {
+        "type": "string",
+        "description": "Voice of generated descriptions.",
+        "enum": [
+          "neutral",
+          "friendly",
+          "premium",
+          "technical",
+          "playful"
+        ]
+      },
       "TopProduct": {
         "type": "object",
         "required": [
@@ -21827,6 +23299,53 @@
           },
           "url": {
             "type": "string"
+          }
+        }
+      },
+      "UsageSummary": {
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "month_start",
+          "tokens_used",
+          "tokens_quota",
+          "cost_micros",
+          "by_feature"
+        ],
+        "properties": {
+          "by_feature": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureUsage"
+            }
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64",
+            "description": "USD micros this month at the configured list prices."
+          },
+          "model": {
+            "type": "string"
+          },
+          "month_start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the metered calendar month (UTC)."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`anthropic`, `fake` (demo fixtures, no key configured) or `disabled`."
+          },
+          "tokens_quota": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monthly allowance: the plan default or a superadmin override."
+          },
+          "tokens_used": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Tokens used this month (input incl. cache reads/writes + output)."
           }
         }
       },
@@ -22229,6 +23748,10 @@
     {
       "name": "checkout",
       "description": "Admin API: shipping and payment methods, orders"
+    },
+    {
+      "name": "ai",
+      "description": "Admin API: AI helpers (proposals, glossary, bulk edit by prompt, usage)"
     },
     {
       "name": "payments",

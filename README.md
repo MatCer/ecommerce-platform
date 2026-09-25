@@ -64,6 +64,10 @@ Local checkout (WP10) pays through the fake gateway (`PAYMENTS_FAKE=1`, refused 
 `APP_ENV=prod`): its page `/_p/fake-pay/<attempt>` has Pay / Fail buttons. Unpaid orders expire
 after the method's payment window (fake: 60 min) and release their stock.
 
+AI helpers (WP22) use the Anthropic API when `ANTHROPIC_API_KEY` is set in `.env`; without it
+the admin runs them against a deterministic fake provider ("Demo AI"). Quotas, the threat model
+and a manual smoke test with a real key: [`docs/decisions/ai-helpers.md`](docs/decisions/ai-helpers.md).
+
 Payment adapters (WP11):
 - **Stripe**: without `STRIPE_SECRET_KEY` the API talks to stripe-mock and the order page shows
   a "Stripe – testovací simulátor" box whose buttons make the API sign a Stripe-shaped event with

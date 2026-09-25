@@ -1,0 +1,11 @@
+{#- Fake provider: "translates" by tagging the text with the target locale; glossary terms get
+    their fixed form, so the glossary check sees a well-behaved model. -#}
+{%- set tag = "[" ~ data.target_locale ~ "]" -%}
+{"fields": [
+{%- for f in data.fields -%}
+{%- set ns = namespace(text=f.text) -%}
+{%- for g in data.glossary %}{% set ns.text = ns.text | replace(g.term, g.use) %}{% endfor -%}
+{%- if f.html %}{% set ns.text = ns.text | replace("</p>", " " ~ tag ~ "</p>") %}{% else %}{% set ns.text = ns.text ~ " " ~ tag %}{% endif -%}
+{"key": {{ f.key | tojson }}, "text": {{ ns.text | tojson }}}{% if not loop.last %},{% endif %}
+{%- endfor -%}
+]}
