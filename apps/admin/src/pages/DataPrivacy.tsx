@@ -8,7 +8,7 @@ import {
   TextField,
   type Tone,
 } from "@platform/ui";
-import { createMutation, createQuery } from "@tanstack/solid-query";
+import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { formatDateTime, t } from "../i18n/index.ts";
@@ -120,6 +120,7 @@ function Exports() {
 }
 
 function PrivacyRequests() {
+  const qc = useQueryClient();
   const [email, setEmail] = createSignal(""),
     [confirmOpen, setConfirmOpen] = createSignal(false),
     [confirmEmail, setConfirmEmail] = createSignal(""),
@@ -148,6 +149,8 @@ function PrivacyRequests() {
         }),
       ),
     onSuccess: (r) => {
+      // Orders, subscribers, the archive and exports all changed.
+      void qc.invalidateQueries();
       setConfirmOpen(false);
       setConfirmEmail("");
       setEmail("");
