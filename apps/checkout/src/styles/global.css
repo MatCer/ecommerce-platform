@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Same token names as the themes; values come from the tenant's /_p/tokens.css at runtime. */
+@theme reference {
+  --color-background: #f5f7f9;
+  --color-foreground: #1b1f2a;
+  --color-card: #fff;
+  --color-muted: #eaedf1;
+  --color-border: #e1e4e8;
+  --color-muted-foreground: #5c6370;
+  --color-identity: #2b5aa8;
+  --color-identity-ink: #274c8a;
+  --color-identity-wash: #eef3fa;
+  --color-buy: #f0b14a;
+  --color-buy-hover: #e89b35;
+  --color-sale: #b3261e;
+  --font-display: system-ui, sans-serif;
+  --font-sans: system-ui, sans-serif;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+}
+
+@layer base {
+  html {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-identity);
+    outline-offset: 2px;
+  }
+}

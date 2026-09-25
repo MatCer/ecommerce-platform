@@ -1,0 +1,10 @@
+---
+import Checkout from "../../layouts/Checkout.astro";
+
+const shopUrl = `${Astro.url.protocol}//${Astro.url.host.replace(/^checkout\./, "")}/`;
+---
+
+<Checkout title="Stav objednávky" shopName="Obchod" shopUrl={shopUrl}>
+  <h1 class="font-display text-2xl font-bold">Stav objednávky</h1>
+  <p class="mt-2 text-muted-foreground">Stránka objednávky přes token (spec A4) přibude ve WP10.</p>
+</Checkout>

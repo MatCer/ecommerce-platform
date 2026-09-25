@@ -1,0 +1,10 @@
+---
+import Checkout from "../layouts/Checkout.astro";
+
+const shopUrl = `${Astro.url.protocol}//${Astro.url.host.replace(/^checkout\./, "")}/`;
+---
+
+<Checkout title="Odstoupení od smlouvy" shopName="Obchod" shopUrl={shopUrl}>
+  <h1 class="font-display text-2xl font-bold">Odstoupení od smlouvy</h1>
+  <p class="mt-2 text-muted-foreground">Formulář pro odstoupení (spec A19) přibude ve WP12.</p>
+</Checkout>

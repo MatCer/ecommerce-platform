@@ -1,0 +1,76 @@
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/layouts/Base.astro /tmp/wp2-scratch/theme/src/layouts/Base.astro
+--- themes/default/src/layouts/Base.astro	2026-09-25 01:13:56.894372923 +0200
++++ /tmp/wp2-scratch/theme/src/layouts/Base.astro	2026-09-25 01:43:07.467066895 +0200
+@@ -3,7 +3,6 @@
+ import type { Image, Seo, ShopModel } from "@platform/storefront-sdk/types";
+ import "virtual:theme-tokens.css";
+ import "../styles/global.css";
+-import archivo from "../fonts/archivo-latin-ext.woff2?url";
+ import ConsentBanner from "../islands/ConsentBanner";
+ import MiniCart from "../islands/MiniCart";
+ import Newsletter from "../islands/Newsletter";
+@@ -39,7 +38,6 @@
+         <link rel="preload" as="image" type="image/avif" imagesrcset={srcset(lcp.image)} imagesizes={lcp.sizes} fetchpriority="high" />
+       )
+     }
+-    <link rel="preload" href={archivo} as="font" type="font/woff2" crossorigin />
+     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+     {seo.json_ld.map((d) => <script type="application/ld+json" set:html={jsonLd(d)} />)}
+   </head>
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/styles/global.css /tmp/wp2-scratch/theme/src/styles/global.css
+--- themes/default/src/styles/global.css	2026-09-25 01:34:47.951273297 +0200
++++ /tmp/wp2-scratch/theme/src/styles/global.css	2026-09-25 01:43:07.467132905 +0200
+@@ -32,25 +32,7 @@
+   --radius-xl: 0.875rem;
+ }
+ 
+-@font-face {
+-  font-family: Archivo;
+-  src: url("../fonts/archivo-latin-ext.woff2") format("woff2");
+-  font-weight: 600 800;
+-  font-display: swap;
+-}
+-
+-/*
+- * One web font only (display + prices); body text uses the system stack. Measured in WP2: on
+- * the Lighthouse slow-4G profile every preloaded font (~23 kB) is bytes competing with the LCP
+- * image. A metric-matched fallback keeps the swap from shifting layout (CLS ≤ 0.05).
+- */
+-@font-face {
+-  font-family: "Archivo Fallback";
+-  src: local("Arial");
+-  size-adjust: 101%;
+-  ascent-override: 88%;
+-  descent-override: 21%;
+-}
++/* Serif display face from the system stack: no web font to download. */
+ 
+ @view-transition {
+   navigation: auto;
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/theme.tokens.json /tmp/wp2-scratch/theme/theme.tokens.json
+--- themes/default/theme.tokens.json	2026-09-25 01:13:47.849691263 +0200
++++ /tmp/wp2-scratch/theme/theme.tokens.json	2026-09-25 01:43:07.466963326 +0200
+@@ -7,10 +7,10 @@
+     "border": "oklch(0.905 0.006 250)",
+     "muted-foreground": "oklch(0.5 0.016 255)",
+     "subtle": "oklch(0.55 0.015 254)",
+-    "identity": "oklch(0.49 0.135 255)",
+-    "identity-ink": "oklch(0.425 0.115 256)",
+-    "identity-wash": "oklch(0.965 0.012 252)",
+-    "panel": "oklch(0.245 0.05 258)",
++    "identity": "oklch(0.42 0.085 158)",
++    "identity-ink": "oklch(0.36 0.075 158)",
++    "identity-wash": "oklch(0.96 0.02 158)",
++    "panel": "oklch(0.24 0.045 160)",
+     "buy": "oklch(0.81 0.155 72)",
+     "buy-hover": "oklch(0.77 0.16 66)",
+     "stock-in": "oklch(0.5 0.125 150)",
+@@ -19,7 +19,7 @@
+     "sale-wash": "oklch(0.96 0.02 27)"
+   },
+   "fonts": {
+-    "display": "Archivo, \"Archivo Fallback\", system-ui, sans-serif",
++    "display": "\"Iowan Old Style\", \"Palatino Linotype\", Georgia, serif",
+     "sans": "system-ui, -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif"
+   },
+   "radius": {

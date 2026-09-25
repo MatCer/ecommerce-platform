@@ -1,0 +1,64 @@
+---
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import BuyBox from "../../islands/BuyBox";
+import Gallery from "../../islands/Gallery";
+import Base from "../../layouts/Base.astro";
+import { storefront } from "../../lib/storefront";
+
+const sf = storefront(Astro.request);
+const [shop, page] = await Promise.all([sf.shop(), sf.product(Astro.params.slug ?? "")]);
+if (!page) return Astro.rewrite("/404");
+const { product: p } = page;
+const fmt = (d: string) =>
+  new Date(d).toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" });
+const firstImage = p.images[0];
+---
+
+<Base shop={shop} seo={page.seo} lcp={firstImage && { image: firstImage, sizes: "(min-width: 48rem) 50vw, calc(100vw - 2rem)" }}>
+  <Breadcrumbs items={page.breadcrumbs} base={page.seo.canonical} />
+  <div class="grid gap-6 md:grid-cols-2 md:gap-10">
+    <Gallery client:visible images={p.images} />
+    <div class="flex flex-col gap-5">
+      <div>
+        {p.brand && <p class="text-sm text-muted-foreground">{p.brand}</p>}
+        <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{p.name}</h1>
+      </div>
+      <BuyBox client:idle options={p.options} variants={p.variants} />
+      <ul class="grid gap-2 border-y border-border py-4 text-sm text-muted-foreground">
+        <li>🚚 Doručení {fmt(page.delivery_estimate.from)}–{fmt(page.delivery_estimate.to)}, zdarma od {shop.free_shipping_threshold?.formatted}</li>
+        <li>↩︎ {shop.trust.returns}</li>
+        <li>💳 {shop.trust.payments.join(" · ")}</li>
+      </ul>
+    </div>
+  </div>
+
+  <section class="mt-10 grid gap-8 md:grid-cols-2" aria-label="Detail produktu">
+    <div>
+      <h2 class="mb-3 font-display text-xl font-bold">Popis</h2>
+      <!-- description_html is sanitized by the platform (contract: the only unescaped HTML). -->
+      <div class="grid gap-3 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5" set:html={p.description_html} />
+    </div>
+    <div>
+      <h2 class="mb-3 font-display text-xl font-bold">Parametry</h2>
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        {
+          p.parameters.map((x) => (
+            <>
+              <dt class="text-muted-foreground">{x.name}</dt>
+              <dd>{x.value}</dd>
+            </>
+          ))
+        }
+      </dl>
+      {
+        p.gpsr && (
+          <details class="mt-6 text-sm">
+            <summary class="cursor-pointer font-semibold">Informace o bezpečnosti produktu</summary>
+            <p class="mt-2 text-muted-foreground">Výrobce: {p.gpsr.manufacturer}</p>
+            <p class="text-muted-foreground">Kontakt: {p.gpsr.contact}</p>
+          </details>
+        )
+      }
+    </div>
+  </section>
+</Base>

@@ -1,8 +1,11 @@
 import { Hono } from "hono";
+import { media, storefront } from "./storefront/app.ts";
 
 /**
  * Local stand-ins for third-party APIs (Packeta, PPL, ČNB, bank, ad platforms, DNS).
  * The real mock endpoints arrive with the work packages that call them.
+ *
+ * Also hosts the stub Storefront API + fixture media used by the edge until WP6 (spec WP2).
  */
 export const app = new Hono();
 
@@ -42,3 +45,6 @@ app.put("/dns/txt", async (c) => {
   txt.set(name, records as string[]);
   return c.json({ name, records });
 });
+
+app.route("/storefront/v1", storefront);
+app.route("/", media);

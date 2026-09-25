@@ -1,0 +1,43 @@
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/islands/Gallery.tsx /tmp/wp2-scratch/theme/src/islands/Gallery.tsx
+--- themes/default/src/islands/Gallery.tsx	2026-09-25 01:35:29.629740801 +0200
++++ /tmp/wp2-scratch/theme/src/islands/Gallery.tsx	2026-09-25 01:52:38.529400538 +0200
+@@ -46,7 +46,7 @@
+           {(img, i) => (
+             <img
+               {...imageAttrs(img, {
+-                sizes: "(min-width: 48rem) 50vw, calc(100vw - 2rem)",
++                sizes: "(min-width: 48rem) 60vw, calc(100vw - 2rem)",
+                 priority: i() === 0,
+                 width: 720,
+               })}
+@@ -64,7 +64,7 @@
+               onClick={() => go(i())}
+               aria-current={current() === i()}
+               aria-label={`Fotografie ${i() + 1} z ${props.images.length}`}
+-              class="w-16 shrink-0 overflow-hidden rounded-md border-2 border-transparent aria-[current=true]:border-identity"
++              class="w-16 shrink-0 md:w-20 overflow-hidden rounded-md border-2 border-transparent aria-[current=true]:border-identity"
+             >
+               <Show
+                 when={hydrated()}
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/pages/p/[slug].astro /tmp/wp2-scratch/theme/src/pages/p/[slug].astro
+--- themes/default/src/pages/p/[slug].astro	2026-09-25 01:34:12.093538957 +0200
++++ /tmp/wp2-scratch/theme/src/pages/p/[slug].astro	2026-09-25 01:52:38.526496936 +0200
+@@ -14,14 +14,14 @@
+ const firstImage = p.images[0];
+ ---
+ 
+-<Base shop={shop} seo={page.seo} lcp={firstImage && { image: firstImage, sizes: "(min-width: 48rem) 50vw, calc(100vw - 2rem)" }}>
++<Base shop={shop} seo={page.seo} lcp={firstImage && { image: firstImage, sizes: "(min-width: 48rem) 60vw, calc(100vw - 2rem)" }}>
+   <Breadcrumbs items={page.breadcrumbs} base={page.seo.canonical} />
+-  <div class="grid gap-6 md:grid-cols-2 md:gap-10">
++  <div class="grid gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:gap-10 lg:gap-14">
+     <Gallery client:visible images={p.images} />
+-    <div class="flex flex-col gap-5">
++    <div class="flex flex-col gap-5 md:sticky md:top-28 md:self-start md:rounded-xl md:border md:border-border md:bg-card md:p-6">
+       <div>
+         {p.brand && <p class="text-sm text-muted-foreground">{p.brand}</p>}
+-        <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{p.name}</h1>
++        <h1 class="font-display text-2xl font-bold tracking-tight md:text-4xl">{p.name}</h1>
+       </div>
+       <BuyBox client:idle options={p.options} variants={p.variants} />
+       <ul class="grid gap-2 border-y border-border py-4 text-sm text-muted-foreground">

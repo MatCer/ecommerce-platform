@@ -1,0 +1,44 @@
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/components/Badges.astro /tmp/wp2-scratch/theme/src/components/Badges.astro
+--- themes/default/src/components/Badges.astro	1970-01-01 01:00:00.000000000 +0100
++++ /tmp/wp2-scratch/theme/src/components/Badges.astro	2026-09-25 01:50:05.447293079 +0200
+@@ -0,0 +1,21 @@
++---
++// Payment and carrier marks as neutral text badges. Official logos are trademarks with usage
++// rules; the platform should ship a licensed icon set (see AI-edit findings).
++const payments = ["Visa", "Mastercard", "Apple Pay", "Google Pay", "Převodem", "Dobírka"];
++const carriers = ["Zásilkovna", "PPL", "Česká pošta"];
++---
++
++<div class="mt-6 grid gap-3 border-t border-white/15 pt-6 text-xs">
++  <div>
++    <p class="mb-2 text-card/70">Platby</p>
++    <ul class="flex flex-wrap gap-2" aria-label="Platební metody">
++      {payments.map((p) => <li class="rounded-sm bg-card px-2 py-1 font-bold text-panel">{p}</li>)}
++    </ul>
++  </div>
++  <div>
++    <p class="mb-2 text-card/70">Doprava</p>
++    <ul class="flex flex-wrap gap-2" aria-label="Dopravci">
++      {carriers.map((c) => <li class="rounded-sm border border-white/30 px-2 py-1 font-semibold">{c}</li>)}
++    </ul>
++  </div>
++</div>
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/layouts/Base.astro /tmp/wp2-scratch/theme/src/layouts/Base.astro
+--- themes/default/src/layouts/Base.astro	2026-09-25 01:13:56.894372923 +0200
++++ /tmp/wp2-scratch/theme/src/layouts/Base.astro	2026-09-25 01:50:10.160631092 +0200
+@@ -3,6 +3,7 @@
+ import type { Image, Seo, ShopModel } from "@platform/storefront-sdk/types";
+ import "virtual:theme-tokens.css";
+ import "../styles/global.css";
++import Badges from "../components/Badges.astro";
+ import archivo from "../fonts/archivo-latin-ext.woff2?url";
+ import ConsentBanner from "../islands/ConsentBanner";
+ import MiniCart from "../islands/MiniCart";
+@@ -80,6 +81,7 @@
+           <ul class="mt-4 grid gap-1">
+             {shop.legal_pages.map((m) => <li><a href={m.href} class="underline">{m.label}</a></li>)}
+           </ul>
++          <Badges />
+         </div>
+       </div>
+     </footer>

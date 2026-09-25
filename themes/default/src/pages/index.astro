@@ -1,0 +1,29 @@
+---
+import { imageAttrs } from "@platform/storefront-sdk/format";
+import ProductCard from "../components/ProductCard.astro";
+import Base from "../layouts/Base.astro";
+import { storefront } from "../lib/storefront";
+
+const sf = storefront(Astro.request);
+const [shop, home] = await Promise.all([sf.shop(), sf.home()]);
+// The first featured card is the largest above-the-fold image on mobile (measured LCP element).
+const CARD_SIZES = "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)";
+---
+
+<Base shop={shop} seo={home.seo} lcp={home.featured[0] && { image: home.featured[0].image, sizes: CARD_SIZES }}>
+  <h1 class="sr-only">{shop.name}</h1>
+  <section aria-label="Kategorie" class="mb-8 grid grid-cols-3 gap-3">
+    {
+      home.categories.map((c) => (
+        <a href={c.href} class="group overflow-hidden rounded-lg border border-border bg-card">
+          <img {...imageAttrs(c.image, { sizes: "calc(33vw - 1rem)", width: 360 })} loading="eager" class="aspect-[4/5] w-full bg-muted object-cover" />
+          <span class="block p-2 text-center font-display font-bold">{c.label}</span>
+        </a>
+      ))
+    }
+  </section>
+  <h2 class="mb-4 font-display text-xl font-bold">Doporučujeme</h2>
+  <ul class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+    {home.featured.map((p, i) => <li class="flex"><ProductCard product={p} eager={i < 2} priority={i === 0} /></li>)}
+  </ul>
+</Base>

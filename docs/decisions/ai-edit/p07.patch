@@ -1,0 +1,85 @@
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/components/Listing.astro /tmp/wp2-scratch/theme/src/components/Listing.astro
+--- themes/default/src/components/Listing.astro	2026-09-25 01:13:26.358075697 +0200
++++ /tmp/wp2-scratch/theme/src/components/Listing.astro	2026-09-25 01:44:18.307172145 +0200
+@@ -1,5 +1,5 @@
+ ---
+-import type { CategoryPage } from "@platform/storefront-sdk/types";
++import type { CategoryPage, Image } from "@platform/storefront-sdk/types";
+ import FacetFilters from "../islands/FacetFilters";
+ import Breadcrumbs from "./Breadcrumbs.astro";
+ import ProductCard from "./ProductCard.astro";
+@@ -7,8 +7,9 @@
+ interface Props {
+   page: CategoryPage;
+   action: string;
++  hovers?: (Image | null)[];
+ }
+-const { page, action } = Astro.props;
++const { page, action, hovers = [] } = Astro.props;
+ ---
+ 
+ <Breadcrumbs items={page.breadcrumbs} base={page.seo.canonical} />
+@@ -26,7 +27,7 @@
+     <ul class="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] md:gap-4">
+       {page.products.map((p, i) => (
+         <li class="flex">
+-          <ProductCard product={p} eager={i < 2} priority={i === 0} />
++          <ProductCard product={p} eager={i < 2} priority={i === 0} hover={hovers[i] ?? null} />
+         </li>
+       ))}
+     </ul>
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/components/ProductCard.astro /tmp/wp2-scratch/theme/src/components/ProductCard.astro
+--- themes/default/src/components/ProductCard.astro	2026-09-25 01:13:26.356104331 +0200
++++ /tmp/wp2-scratch/theme/src/components/ProductCard.astro	2026-09-25 01:44:18.307071606 +0200
+@@ -1,14 +1,16 @@
+ ---
+ import { imageAttrs } from "@platform/storefront-sdk/format";
+-import type { ProductCard } from "@platform/storefront-sdk/types";
++import type { Image, ProductCard } from "@platform/storefront-sdk/types";
+ 
+ interface Props {
+   product: ProductCard;
+   /** Above-the-fold cards load eagerly; only the first one gets fetchpriority=high. */
+   eager?: boolean;
+   priority?: boolean;
++  /** Second photo shown on hover (desktop). */
++  hover?: Image | null;
+ }
+-const { product: p, eager = false, priority = false } = Astro.props;
++const { product: p, eager = false, priority = false, hover = null } = Astro.props;
+ // sizes must match the real slot: a 50vw guess at DPR 1.75 rounds up to the next (4× heavier) variant.
+ const SIZES = "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)";
+ const img = imageAttrs(p.image, { sizes: SIZES, priority, width: 360 });
+@@ -23,6 +25,15 @@
+   <div class="relative bg-muted">
+     <img {...img} loading={eager ? "eager" : img.loading} class="aspect-[4/5] w-full object-cover" />
+     {
++      hover && (
++        <img
++          {...imageAttrs(hover, { sizes: SIZES, width: 360 })}
++          alt=""
++          class="absolute inset-0 aspect-[4/5] w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
++        />
++      )
++    }
++    {
+       p.badges.length > 0 && (
+         <ul class="absolute top-2 left-2 flex gap-1">
+           {p.badges.map((b) => <li class={`rounded-sm px-1.5 py-0.5 text-xs font-bold ${b === "Sleva" ? "bg-sale text-card" : "bg-card text-identity-ink"}`}>{b}</li>)}
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/pages/c/[...slug].astro /tmp/wp2-scratch/theme/src/pages/c/[...slug].astro
+--- themes/default/src/pages/c/[...slug].astro	2026-09-25 01:13:26.359390052 +0200
++++ /tmp/wp2-scratch/theme/src/pages/c/[...slug].astro	2026-09-25 01:44:18.307248245 +0200
+@@ -10,8 +10,12 @@
+ const [shop, page] = await Promise.all([sf.shop(), sf.category(Astro.params.slug ?? "", query)]);
+ if (!page) return Astro.rewrite("/404");
+ const first = page.products[0];
++// Card models carry one image; the second photo comes from each product's page model.
++const hovers = await Promise.all(
++  page.products.map((p) => sf.product(p.slug).then((x) => x?.product.images[1] ?? null)),
++);
+ ---
+ 
+ <Base shop={shop} seo={page.seo} lcp={first && { image: first.image, sizes: "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)" }}>
+-  <Listing page={page} action={Astro.url.pathname} />
++  <Listing page={page} action={Astro.url.pathname} hovers={hovers} />
+ </Base>

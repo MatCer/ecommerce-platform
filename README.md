@@ -15,9 +15,12 @@ crates/api        axum binary: health, OpenAPI, Admin API (/admin/v1), Internal 
 crates/worker     job runner, outbox dispatcher, cron leader
 crates/testkit    shared test helpers
 migrations/       sqlx migrations (run as app_owner)
-packages/         shared TS config + generated API clients (admin-client, storefront-sdk)
+packages/         shared TS config, generated API clients, storefront SDK, theme-kit (artifacts + gates)
 apps/auth         Better Auth (Hono): staff sign-in, magic links, TOTP, EdDSA JWTs + JWKS
-apps/mocks        Hono service standing in for third-party APIs (incl. a DNS TXT stub)
+apps/mocks        third-party API stand-ins (incl. a DNS TXT stub) + the stub Storefront API (until WP6)
+apps/edge         storefront edge: Node + Miniflare gateway (tenancy, cache, headers, checkout handoff)
+apps/checkout     platform checkout app (Astro + Solid) served on checkout.<shop>
+themes/default    default Astro + Solid theme (the template merchants fork)
 docker/           Dockerfiles, Caddyfile, Postgres init script
 ```
 
@@ -52,10 +55,14 @@ make down
 | localhost:55432 | Postgres (`app` and `app_test` databases) |
 | http://localhost:57700 | Meilisearch |
 | http://localhost:12111 | stripe-mock |
+| http://demo.localhost:8080, http://demo-sk.localhost:8080 | Demo shop (CZ / SK market) via the edge |
+| http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "Pokračovat k pokladně") |
+| https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
-`admin.localhost` and shop hosts (`demo.localhost`, `checkout.demo.localhost`) answer 502 until
-their work packages land. `/internal/*` on `api` and `auth` is never proxied by Caddy; it is for
-services on the compose network only. Every host port is configurable in `.env`
+`admin.localhost` answers 502 until its work package lands. `/internal/*` on `api` and `auth` is
+never proxied by Caddy; it is for services on the compose network only. The storefront runtime
+contract (artifacts, bindings, cache policy, handoff, budget numbers) is documented in
+[`docs/decisions/runtime-contract.md`](docs/decisions/runtime-contract.md). Every host port is configurable in `.env`
 (see `.env.example`).
 
 All published ports bind to `127.0.0.1` only, because the stack runs with well-known local
@@ -78,6 +85,8 @@ trusted network.
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
+| `make theme-build` | Build + pack the theme and checkout artifacts into `.artifacts` |
+| `make perf` | Lab budget gate (Lighthouse mobile, A26 JS, axe) over HTTPS/h2 |
 
 Running the API natively against `make dev-infra` (values from `.env.example`):
 

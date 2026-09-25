@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/*
+ * "market stall" (commerce-clarity): cool ground, white product cards, the price is the display
+ * type, amber exists only on buy actions. Values come from theme.tokens.json at runtime
+ * (virtual:theme-tokens.css, unlayered :root); `reference` makes Tailwind use the variables
+ * without emitting its own copies, so the JSON stays the single source of truth.
+ */
+@theme reference {
+  --color-background: #f5f7f9;
+  --color-foreground: #1b1f2a;
+  --color-card: #fff;
+  --color-muted: #eaedf1;
+  --color-border: #e1e4e8;
+  --color-muted-foreground: #5c6370;
+  --color-subtle: #6b7280;
+  --color-identity: #2b5aa8;
+  --color-identity-ink: #274c8a;
+  --color-identity-wash: #eef3fa;
+  --color-panel: #151d2e;
+  --color-buy: #f0b14a;
+  --color-buy-hover: #e89b35;
+  --color-stock-in: #2e7a4a;
+  --color-stock-low: #8a5a1c;
+  --color-sale: #b3261e;
+  --color-sale-wash: #fcf0ef;
+  --font-display: Archivo, system-ui, sans-serif;
+  --font-sans: system-ui, sans-serif;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+}
+
+@font-face {
+  font-family: Archivo;
+  src: url("../fonts/archivo-latin-ext.woff2") format("woff2");
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+/*
+ * One web font only (display + prices); body text uses the system stack. Measured in WP2: on
+ * the Lighthouse slow-4G profile every preloaded font (~23 kB) is bytes competing with the LCP
+ * image. A metric-matched fallback keeps the swap from shifting layout (CLS ≤ 0.05).
+ */
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial");
+  size-adjust: 101%;
+  ascent-override: 88%;
+  descent-override: 21%;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+@layer base {
+  html {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-identity);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat component styles */
+      animation-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat component styles */
+      transition-duration: 0.01ms !important;
+      /* biome-ignore lint/complexity/noImportantStyles: reduced motion must beat component styles */
+      scroll-behavior: auto !important;
+    }
+    @view-transition {
+      navigation: none;
+    }
+  }
+}
+
+@utility price {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+@utility container-shop {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+}

@@ -5,3 +5,6 @@ target
 **/node_modules
 **/dist
 docs
+.artifacts
+**/.astro
+**/.wrangler

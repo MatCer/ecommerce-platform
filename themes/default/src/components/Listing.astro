@@ -1,0 +1,45 @@
+---
+import type { CategoryPage } from "@platform/storefront-sdk/types";
+import FacetFilters from "../islands/FacetFilters";
+import Breadcrumbs from "./Breadcrumbs.astro";
+import ProductCard from "./ProductCard.astro";
+
+interface Props {
+  page: CategoryPage;
+  action: string;
+}
+const { page, action } = Astro.props;
+---
+
+<Breadcrumbs items={page.breadcrumbs} base={page.seo.canonical} />
+<header class="mb-4 flex flex-wrap items-baseline gap-x-3">
+  <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{page.category.name}</h1>
+  <p class="text-sm text-muted-foreground">{page.products.length} produktů</p>
+</header>
+<div class="mb-6 rounded-lg border border-border bg-card p-3">
+  <FacetFilters client:visible facets={page.facets} sort={page.sort} action={action} />
+</div>
+{
+  page.products.length === 0 ? (
+    <p class="py-10 text-center text-muted-foreground">Žádné produkty neodpovídají filtrům.</p>
+  ) : (
+    <ul class="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] md:gap-4">
+      {page.products.map((p, i) => (
+        <li class="flex">
+          <ProductCard product={p} eager={i < 2} priority={i === 0} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+{
+  page.pagination.pages > 1 && (
+    <nav aria-label="Stránkování" class="mt-8 flex justify-center gap-4">
+      {page.pagination.prev && <a rel="prev" href={page.pagination.prev} class="rounded-md border border-border bg-card px-4 py-2">Předchozí</a>}
+      <span class="px-2 py-2 text-sm text-muted-foreground">
+        {page.pagination.page} / {page.pagination.pages}
+      </span>
+      {page.pagination.next && <a rel="next" href={page.pagination.next} class="rounded-md border border-border bg-card px-4 py-2">Další</a>}
+    </nav>
+  )
+}

@@ -9,7 +9,9 @@ COPY packages/config/package.json packages/config/
 COPY apps/mocks/package.json apps/mocks/
 RUN pnpm install --frozen-lockfile --prod --filter @platform/mocks
 COPY apps/mocks/src apps/mocks/src
-ENV NODE_ENV=production PORT=4010
+# Fixture product photos for the stub Storefront API (WP2, until WP3/WP6 serve real media).
+COPY fixtures/media fixtures/media
+ENV NODE_ENV=production PORT=4010 MEDIA_DIR=/repo/fixtures/media
 USER node
 EXPOSE 4010
 CMD ["node", "apps/mocks/src/server.ts"]

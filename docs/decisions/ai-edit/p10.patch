@@ -1,0 +1,38 @@
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/pages/p/[slug].astro /tmp/wp2-scratch/theme/src/pages/p/[slug].astro
+--- themes/default/src/pages/p/[slug].astro	2026-09-25 01:34:12.093538957 +0200
++++ /tmp/wp2-scratch/theme/src/pages/p/[slug].astro	2026-09-25 01:51:24.182727678 +0200
+@@ -1,5 +1,6 @@
+ ---
+ import Breadcrumbs from "../../components/Breadcrumbs.astro";
++import ProductCard from "../../components/ProductCard.astro";
+ import BuyBox from "../../islands/BuyBox";
+ import Gallery from "../../islands/Gallery";
+ import Base from "../../layouts/Base.astro";
+@@ -12,6 +13,8 @@
+ const fmt = (d: string) =>
+   new Date(d).toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" });
+ const firstImage = p.images[0];
++// "Frequently bought together": recommendations for this product (page-model data, no JS).
++const together = (await sf.recommendations(`product:${p.id}`)).products.slice(0, 4);
+ ---
+ 
+ <Base shop={shop} seo={page.seo} lcp={firstImage && { image: firstImage, sizes: "(min-width: 48rem) 50vw, calc(100vw - 2rem)" }}>
+@@ -61,4 +64,18 @@
+       }
+     </div>
+   </section>
++  {
++    together.length > 0 && (
++      <section aria-labelledby="together" class="mt-12">
++        <h2 id="together" class="mb-4 font-display text-xl font-bold">Často kupováno společně</h2>
++        <ul class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
++          {together.map((r) => (
++            <li class="flex">
++              <ProductCard product={r} />
++            </li>
++          ))}
++        </ul>
++      </section>
++    )
++  }
+ </Base>

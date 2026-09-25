@@ -1,0 +1,76 @@
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/islands/RecentlyViewed.tsx /tmp/wp2-scratch/theme/src/islands/RecentlyViewed.tsx
+--- themes/default/src/islands/RecentlyViewed.tsx	1970-01-01 01:00:00.000000000 +0100
++++ /tmp/wp2-scratch/theme/src/islands/RecentlyViewed.tsx	2026-09-25 01:47:44.912933398 +0200
+@@ -0,0 +1,48 @@
++import { readConsent } from "@platform/storefront-sdk/client";
++import { imageUrl } from "@platform/storefront-sdk/format";
++import type { Image } from "@platform/storefront-sdk/types";
++import { createSignal, For, onMount, Show } from "solid-js";
++
++type Seen = { slug: string; name: string; price: string; image: Image };
++const KEY = "recently-viewed";
++
++/**
++ * "Naposledy prezerané": remembered on this device only with `personalization` consent (A20).
++ * Without consent it stores and shows nothing.
++ */
++export default function RecentlyViewed(props: { current: Seen }) {
++  const [items, setItems] = createSignal<Seen[]>([]);
++  onMount(() => {
++    if (!readConsent()?.includes("personalization")) return;
++    let list: Seen[] = [];
++    try {
++      list = JSON.parse(localStorage.getItem(KEY) ?? "[]") as Seen[];
++    } catch {
++      list = [];
++    }
++    setItems(list.filter((s) => s.slug !== props.current.slug).slice(0, 4));
++    localStorage.setItem(KEY, JSON.stringify([props.current, ...list.filter((s) => s.slug !== props.current.slug)].slice(0, 8)));
++  });
++  return (
++    <Show when={items().length > 0}>
++      <section aria-labelledby="recent" class="mt-10">
++        <h2 id="recent" class="mb-3 font-display text-xl font-bold">
++          Naposledy prezerané
++        </h2>
++        <ul class="grid grid-cols-2 gap-3 md:grid-cols-4">
++          <For each={items()}>
++            {(s) => (
++              <li class="rounded-lg border border-border bg-card">
++                <a href={`/p/${s.slug}`} class="block p-2 text-sm">
++                  <img src={imageUrl(s.image, 360)} alt="" width="180" height="225" loading="lazy" class="mb-2 aspect-[4/5] w-full rounded-md bg-muted object-cover" />
++                  <span class="block font-medium">{s.name}</span>
++                  <span class="price">{s.price}</span>
++                </a>
++              </li>
++            )}
++          </For>
++        </ul>
++      </section>
++    </Show>
++  );
++}
+diff -ruN --exclude node_modules --exclude dist --exclude .astro --exclude .perf themes/default/src/pages/p/[slug].astro /tmp/wp2-scratch/theme/src/pages/p/[slug].astro
+--- themes/default/src/pages/p/[slug].astro	2026-09-25 01:34:12.093538957 +0200
++++ /tmp/wp2-scratch/theme/src/pages/p/[slug].astro	2026-09-25 01:49:00.382121656 +0200
+@@ -2,6 +2,7 @@
+ import Breadcrumbs from "../../components/Breadcrumbs.astro";
+ import BuyBox from "../../islands/BuyBox";
+ import Gallery from "../../islands/Gallery";
++import RecentlyViewed from "../../islands/RecentlyViewed";
+ import Base from "../../layouts/Base.astro";
+ import { storefront } from "../../lib/storefront";
+ 
+@@ -61,4 +62,12 @@
+       }
+     </div>
+   </section>
++  {
++    firstImage && (
++      <RecentlyViewed
++        client:idle
++        current={{ slug: p.slug, name: p.name, price: p.variants[0]?.price.formatted ?? "", image: firstImage }}
++      />
++    )
++  }
+ </Base>
