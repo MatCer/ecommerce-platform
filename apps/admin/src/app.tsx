@@ -37,6 +37,8 @@ const PaymentMethods = lazy(() => import("./pages/PaymentMethods.tsx"));
 const PaymentExceptions = lazy(() => import("./pages/PaymentExceptions.tsx"));
 const BankTransactions = lazy(() => import("./pages/BankTransactions.tsx"));
 const Orders = lazy(() => import("./pages/Orders.tsx"));
+const Withdrawals = lazy(() => import("./pages/Withdrawals.tsx"));
+const Carriers = lazy(() => import("./pages/Carriers.tsx"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
 const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
@@ -104,6 +106,8 @@ export function App() {
           <Route path="/feeds" component={ExportFeeds} />
           <Route path="/settings/search" component={SearchSynonyms} />
           <Route path="/orders" component={Orders} />
+          <Route path="/withdrawals" component={Withdrawals} />
+          <Route path="/settings/carriers" component={Carriers} />
           <Route path="/orders/:id" component={OrderDetail} />
           <Route path="/payments/exceptions" component={PaymentExceptions} />
           <Route path="/payments/bank" component={BankTransactions} />
