@@ -260,9 +260,24 @@ async fn category_listing_filters_sorts_and_marks_filtered_urls_noindex(db: PgPo
     let (_, none) = c
         .get("/storefront/v1/pages/category/trika?f.opt.size=nope")
         .await;
-    assert_eq!(none["total"], 1, "unknown values are ignored");
+    assert_eq!(
+        none["total"], 0,
+        "an unknown value restricts (matches nothing), like search"
+    );
     let (status, _) = c.get("/storefront/v1/pages/category/missing").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    // Oversized or odd filter URLs are trimmed to the engine's limits, never a 422.
+    let many: String = (0..30)
+        .map(|i| format!("f.opt.k{i}=v&f.opt.size=x{i}"))
+        .collect::<Vec<_>>()
+        .join("&");
+    let (status, page) = c
+        .get(&format!(
+            "/storefront/v1/pages/category/trika?{many}&f.opt._x=1&page=999"
+        ))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{page}");
+    assert_eq!(page["total"], 0, "restrictions are never dropped");
     let (_, search) = c.get("/storefront/v1/pages/search?q=product%20tee").await;
     assert_eq!(search["total"], 1);
     assert_eq!(search["seo"]["robots"], "noindex,follow");

@@ -138,6 +138,7 @@ pub struct Candidate {
     pub position: i32,
     pub created_at: DateTime<Utc>,
     pub name: String,
+    pub brand: Option<String>,
     pub variants: Vec<CandidateVariant>,
     /// Filterable parameter key -> values (product and variant level).
     pub params: BTreeMap<String, BTreeSet<String>>,
@@ -152,17 +153,34 @@ pub struct FacetDef {
     pub values: Vec<(String, String)>,
 }
 
-fn matches(c: &Candidate, filters: &BTreeMap<String, BTreeSet<String>>, defs: &[FacetDef]) -> bool {
-    let kind = |k: &str| defs.iter().find(|d| d.key == k).map(|d| d.kind);
-    let params_ok = filters
-        .iter()
-        .filter(|(k, _)| kind(k) == Some(FacetKind::Parameter))
-        .all(|(k, want)| c.params.get(k).is_some_and(|have| !have.is_disjoint(want)));
-    params_ok
+/// The kind of a facet key, from its form: `opt.<code>`, `param.<key>` or `brand` (the search
+/// engine's keys, WP7).
+pub fn facet_kind(key: &str) -> Option<FacetKind> {
+    if key == "brand" {
+        Some(FacetKind::Brand)
+    } else if key.starts_with("param.") {
+        Some(FacetKind::Parameter)
+    } else if key.starts_with("opt.") {
+        Some(FacetKind::Option)
+    } else {
+        None
+    }
+}
+
+/// Every filter restricts: a product without the facet, or without a selected value, does not
+/// match (a filter is never silently widened).
+fn matches(c: &Candidate, filters: &BTreeMap<String, BTreeSet<String>>) -> bool {
+    let product_ok = filters.iter().all(|(k, want)| match facet_kind(k) {
+        Some(FacetKind::Brand) => c.brand.as_ref().is_some_and(|b| want.contains(b)),
+        Some(FacetKind::Parameter) => c.params.get(k).is_some_and(|have| !have.is_disjoint(want)),
+        Some(FacetKind::Option) => true,
+        None => false,
+    });
+    product_ok
         && c.variants.iter().any(|v| {
             filters
                 .iter()
-                .filter(|(k, _)| kind(k) == Some(FacetKind::Option))
+                .filter(|(k, _)| facet_kind(k) == Some(FacetKind::Option))
                 .all(|(k, want)| v.options.get(k).is_some_and(|x| want.contains(x)))
         })
 }
@@ -180,18 +198,13 @@ fn min_price(c: &Candidate) -> i64 {
 pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuery) -> Listing {
     candidates.retain(|c| !c.variants.is_empty());
     // Only known facets and values filter; anything else in the URL is ignored.
+    // Every requested restriction applies, known values or not (an unknown value matches
+    // nothing, like in the search engine).
     let applied: BTreeMap<String, BTreeSet<String>> = q
         .filters
         .iter()
-        .filter_map(|(k, vs)| {
-            let def = defs.iter().find(|d| &d.key == k)?;
-            let vs: BTreeSet<String> = vs
-                .iter()
-                .filter(|v| def.values.iter().any(|(dv, _)| dv == *v))
-                .cloned()
-                .collect();
-            (!vs.is_empty()).then(|| (k.clone(), vs))
-        })
+        .filter(|(k, vs)| facet_kind(k).is_some() && !vs.is_empty())
+        .map(|(k, vs)| (k.clone(), vs.clone()))
         .collect();
 
     let facets = defs
@@ -207,7 +220,7 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
                         value: value.clone(),
                         label: label.clone(),
                         selected: applied.get(&d.key).is_some_and(|s| s.contains(value)),
-                        disabled: !candidates.iter().any(|c| matches(c, &others, defs)),
+                        disabled: !candidates.iter().any(|c| matches(c, &others)),
                     }
                 })
                 .collect::<Vec<_>>();
@@ -224,7 +237,7 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
 
     let mut hits: Vec<Candidate> = candidates
         .into_iter()
-        .filter(|c| matches(c, &applied, defs))
+        .filter(|c| matches(c, &applied))
         .collect();
     match q.sort {
         Sort::Recommended => {
@@ -291,6 +304,7 @@ struct Base {
     position: i32,
     created_at: DateTime<Utc>,
     name: String,
+    brand: Option<String>,
 }
 
 /// The listing for `q` in the market of `ctx` (see the module docs).
@@ -305,7 +319,8 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
            SELECT p.id, coalesce(min(pc.position), 0) AS "position!", p.created_at,
                   (SELECT name FROM product_translations pt WHERE pt.product_id = p.id
                    ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1)
-                   AS "name!"
+                   AS "name!",
+                  p.brand
            FROM products p
            LEFT JOIN product_categories pc
                   ON pc.product_id = p.id AND pc.category_id IN (SELECT id FROM subtree)
@@ -427,6 +442,18 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             def.values.push((value, label));
         }
     }
+    let mut brands: BTreeSet<String> = base.iter().filter_map(|b| b.brand.clone()).collect();
+    if !brands.is_empty() {
+        defs.push(FacetDef {
+            key: "brand".into(),
+            label: messages::text(&ctx.locale, "listing.brand").to_owned(),
+            kind: FacetKind::Brand,
+            values: std::mem::take(&mut brands)
+                .into_iter()
+                .map(|b| (b.clone(), b))
+                .collect(),
+        });
+    }
     for mut d in param_defs.into_values() {
         // Options keep the merchant's order; parameter values are sorted.
         d.values.sort_by_cached_key(|v| fold(&v.1));
@@ -444,6 +471,7 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             position: b.position,
             created_at: b.created_at,
             name: b.name,
+            brand: b.brand,
         })
         .collect();
     Ok(select(candidates, &defs, q))
@@ -472,7 +500,10 @@ pub async fn search_listing(
         price_min: None,
         price_max: None,
         sort: q.sort.search(),
-        page: q.page.clamp(1, MAX_PAGE),
+        // The engine serves the first 1000 hits only; later pages are clamped, never a 422.
+        page: q
+            .page
+            .clamp(1, 1000 / q.per_page.clamp(1, sq::MAX_PER_PAGE) + 1),
         per_page: q.per_page.clamp(1, sq::MAX_PER_PAGE),
     };
     let found = sq::search(tx, search.meili, search.storage, &scope, &req).await?;
@@ -585,7 +616,10 @@ mod tests {
 
     fn v(color: &str, size: &str, price: i64) -> CandidateVariant {
         CandidateVariant {
-            options: BTreeMap::from([("color".into(), color.into()), ("size".into(), size.into())]),
+            options: BTreeMap::from([
+                ("opt.color".into(), color.into()),
+                ("opt.size".into(), size.into()),
+            ]),
             price_minor: price,
         }
     }
@@ -603,8 +637,9 @@ mod tests {
             created_at: DateTime::from_timestamp(i64::try_from(n).unwrap_or(0) * 1000, 0)
                 .unwrap_or_default(),
             name: name.into(),
+            brand: Some(if n == 3 { "Acme" } else { "Lnen" }.into()),
             variants,
-            params: BTreeMap::from([("material".into(), BTreeSet::from([material.into()]))]),
+            params: BTreeMap::from([("param.material".into(), BTreeSet::from([material.into()]))]),
         }
     }
 
@@ -616,9 +651,10 @@ mod tests {
             values: values.iter().map(|v| ((*v).into(), (*v).into())).collect(),
         };
         vec![
-            d("color", FacetKind::Option, &["red", "blue", "green"]),
-            d("size", FacetKind::Option, &["s", "m"]),
-            d("material", FacetKind::Parameter, &["cotton", "wool"]),
+            d("opt.color", FacetKind::Option, &["red", "blue", "green"]),
+            d("opt.size", FacetKind::Option, &["s", "m"]),
+            d("param.material", FacetKind::Parameter, &["cotton", "wool"]),
+            d("brand", FacetKind::Brand, &["Acme", "Lnen"]),
         ]
     }
 
@@ -661,48 +697,62 @@ mod tests {
         let l = select(
             catalog(),
             &defs(),
-            &query(&[("color", &["red"]), ("size", &["m"])], Sort::Recommended),
+            &query(
+                &[("opt.color", &["red"]), ("opt.size", &["m"])],
+                Sort::Recommended,
+            ),
         );
         assert_eq!(ids(&l), [2]);
         let l = select(
             catalog(),
             &defs(),
-            &query(&[("color", &["red", "blue"])], Sort::Recommended),
+            &query(&[("opt.color", &["red", "blue"])], Sort::Recommended),
         );
         assert_eq!(ids(&l), [2, 1, 3], "OR within a facet, recommended order");
         let l = select(
             catalog(),
             &defs(),
-            &query(&[("material", &["wool"])], Sort::Recommended),
+            &query(&[("param.material", &["wool"])], Sort::Recommended),
         );
         assert_eq!(ids(&l), [3]);
+        let l = select(
+            catalog(),
+            &defs(),
+            &query(&[("brand", &["Acme"])], Sort::Recommended),
+        );
+        assert_eq!(ids(&l), [3], "brand restricts in the fallback too");
     }
 
     #[test]
-    fn unknown_filters_are_ignored_and_zero_match_values_disabled() {
+    fn restrictions_never_widen_and_zero_match_values_are_disabled() {
+        // An unknown value of a known facet, or a facet no product has, matches nothing.
+        for filters in [
+            &[("opt.size", &["xl"][..])][..],
+            &[("param.fit", &["slim"][..])][..],
+        ] {
+            let l = select(catalog(), &defs(), &query(filters, Sort::Recommended));
+            assert_eq!(l.total, 0, "{filters:?}");
+        }
+        // A key that is not a facet key (`colour`) is not a filter at all.
         let l = select(
             catalog(),
             &defs(),
-            &query(
-                &[("colour", &["red"]), ("size", &["xl"])],
-                Sort::Recommended,
-            ),
+            &query(&[("colour", &["red"])], Sort::Recommended),
         );
         assert_eq!(l.total, 3);
-        assert!(l.applied.is_empty());
         let l = select(
             catalog(),
             &defs(),
-            &query(&[("material", &["wool"])], Sort::Recommended),
+            &query(&[("param.material", &["wool"])], Sort::Recommended),
         );
-        let color = l.facets.iter().find(|f| f.key == "color").unwrap();
+        let color = l.facets.iter().find(|f| f.key == "opt.color").unwrap();
         let state: Vec<(&str, bool)> = color
             .values
             .iter()
             .map(|v| (v.value.as_str(), v.disabled))
             .collect();
         assert_eq!(state, [("red", true), ("blue", false), ("green", true)]);
-        let material = l.facets.iter().find(|f| f.key == "material").unwrap();
+        let material = l.facets.iter().find(|f| f.key == "param.material").unwrap();
         // Selecting cotton instead of wool would still give results: enabled.
         assert!(material.values.iter().all(|v| !v.disabled));
         assert!(

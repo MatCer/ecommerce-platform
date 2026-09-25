@@ -367,3 +367,10 @@ separate cache namespace, never cached (already bypassed by the policy).
 
   The PDP needed a 720 px image variant: with only 640/960 the 412 px @1.75 viewport loaded the
   960 px file and LCP was 1.8 s. The media pipeline now also emits 480 and 720.
+- **Search (WP7) integration:** category and search page models list through
+  `commerce::search` (variant-correct facets, results rehydrated from Postgres) and fall back to
+  the Postgres `storefront::listing` when search is degraded (A27: Meilisearch is not part of
+  core readiness; verified by stopping it: pages 200, typeahead 503). Listing URLs use the
+  engine's `f.<facet key>` parameters in both paths. `/storefront/v1/search` and
+  `/search/suggest` use the storefront-token model like every storefront call; islands reach
+  them as `/_p/public/search*`. `make seed` queues a full index rebuild.

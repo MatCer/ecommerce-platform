@@ -380,8 +380,9 @@ pub struct ListingParams {
     pub filters: BTreeMap<String, BTreeSet<String>>,
 }
 
-const MAX_FILTER_KEYS: usize = 20;
-const MAX_FILTER_VALUES: usize = 50;
+/// The search engine's limits (WP7): more facets or values are ignored, never a 422.
+const MAX_FILTER_KEYS: usize = 10;
+const MAX_FILTER_VALUES: usize = 20;
 
 impl ListingParams {
     pub fn from_pairs(pairs: &[(String, String)]) -> Self {
@@ -400,23 +401,16 @@ impl ListingParams {
                     let Some(key) = k.strip_prefix("f.") else {
                         continue;
                     };
+                    // The same key rule as the search engine (`opt.<code>`, `param.<code>`,
+                    // `brand`).
                     let valid_key = key == "brand"
                         || key
                             .strip_prefix("opt.")
                             .or_else(|| key.strip_prefix("param."))
-                            .is_some_and(|c| {
-                                !c.is_empty()
-                                    && c.len() <= 64
-                                    && c.bytes().all(|b| {
-                                        b.is_ascii_lowercase()
-                                            || b.is_ascii_digit()
-                                            || b == b'_'
-                                            || b == b'-'
-                                    })
-                            });
+                            .is_some_and(crate::catalog::code_valid);
                     if !valid_key
-                        || v.is_empty()
-                        || v.len() > 200
+                        || v.trim().is_empty()
+                        || v.chars().count() > 200
                         || (out.filters.len() >= MAX_FILTER_KEYS && !out.filters.contains_key(key))
                     {
                         continue;
@@ -872,6 +866,8 @@ mod tests {
             ("color", "legacy"),
             ("f.nope", "x"),
             ("f.opt.Bad Key", "x"),
+            ("f.opt._leading", "x"),
+            ("f.opt.size", "  "),
         ]));
         assert_eq!(p.sort, Some(Sort::PriceAsc));
         assert_eq!(p.page, 1);

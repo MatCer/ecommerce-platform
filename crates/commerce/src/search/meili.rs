@@ -43,8 +43,21 @@ impl MeiliError {
 }
 
 impl From<MeiliError> for platform::Error {
+    /// Outages (unreachable, 5xx, rate limits, a missing index, task trouble) are
+    /// `Unavailable`: search degrades and storefront pages fall back to Postgres. A request
+    /// Meilisearch refused (a malformed query, a rejected key) is a bug or a misconfiguration
+    /// and must not be hidden behind a fallback: `Internal`.
     fn from(e: MeiliError) -> Self {
-        Self::Unavailable(format!("search: {e}"))
+        let refused = matches!(
+            &e,
+            MeiliError::Api { status, code, .. }
+                if (400..500).contains(status) && *status != 429 && code != "index_not_found"
+        );
+        if refused {
+            Self::Internal(format!("search: {e}"))
+        } else {
+            Self::Unavailable(format!("search: {e}"))
+        }
     }
 }
 
@@ -307,6 +320,45 @@ pub fn quote(value: &str) -> String {
     }
     out.push('"');
     out
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+
+    fn api(status: u16, code: &str) -> platform::Error {
+        MeiliError::Api {
+            status,
+            code: code.into(),
+            message: String::new(),
+        }
+        .into()
+    }
+
+    #[test]
+    fn only_outages_degrade() {
+        assert!(matches!(api(503, "x"), platform::Error::Unavailable(_)));
+        assert!(matches!(
+            api(404, "index_not_found"),
+            platform::Error::Unavailable(_)
+        ));
+        assert!(matches!(
+            api(429, "too_many"),
+            platform::Error::Unavailable(_)
+        ));
+        assert!(matches!(
+            api(400, "invalid_search_filter"),
+            platform::Error::Internal(_)
+        ));
+        assert!(matches!(
+            api(403, "invalid_api_key"),
+            platform::Error::Internal(_)
+        ));
+        assert!(matches!(
+            platform::Error::from(MeiliError::Timeout(1)),
+            platform::Error::Unavailable(_)
+        ));
+    }
 }
 
 #[cfg(test)]
