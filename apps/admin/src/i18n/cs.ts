@@ -789,7 +789,8 @@ export const cs: Dictionary = {
       title: "Upravit pomocí AI",
       hint: "Popište, co chcete změnit. AI upraví kopii vaší živé šablony, napíše pro změnu test a spustí všechny kontroly (až tři opravy). Nic se nezveřejní, dokud výsledek nepřijmete a nepublikujete.",
       prompt: "Co se má změnit?",
-      promptHint: "Například: „Na stránce produktu zvětši galerii a nech box s cenou viditelný při posouvání.“",
+      promptHint:
+        "Například: „Na stránce produktu zvětši galerii a nech box s cenou viditelný při posouvání.“",
       start: "Spustit úpravu AI",
       runs: "Úpravy AI",
       request: "Zadání",
@@ -918,7 +919,8 @@ export const cs: Dictionary = {
     invalid_context: "Vyberte, pro co doporučovat.",
     ai_quota_exceeded: "Měsíční limit AI tohoto obchodu je vyčerpán.",
     ai_run_in_progress: "Pro tento obchod už běží úprava AI. Počkejte na ni, nebo ji zastavte.",
-    ai_run_not_accepted: "Tato revize pochází z úpravy AI, která nebyla přijata. Nejdřív ji zkontrolujte a přijměte.",
+    ai_run_not_accepted:
+      "Tato revize pochází z úpravy AI, která nebyla přijata. Nejdřív ji zkontrolujte a přijměte.",
     revision_not_ready: "Zkontrolovaná revize už není připravená.",
     no_active_theme: "Obchod zatím nemá živou šablonu.",
     ai_unavailable: "Služba AI teď není dostupná. Zkuste to později.",

@@ -789,7 +789,8 @@ export const en = {
       title: "Edit with AI",
       hint: "Describe the change you want. The AI edits a copy of your live theme, writes a test for the change and runs every check (up to three repairs). Nothing goes live until you accept the result and publish it.",
       prompt: "What should change?",
-      promptHint: "For example: “On product pages, make the gallery bigger and keep the price box visible while scrolling.”",
+      promptHint:
+        "For example: “On product pages, make the gallery bigger and keep the price box visible while scrolling.”",
       start: "Start AI edit",
       runs: "AI edits",
       request: "Request",
@@ -805,7 +806,8 @@ export const en = {
       cancel: "Stop",
       accept: "Accept",
       discard: "Discard",
-      accepted: "Accepted. Revision #{{ number }} can now be previewed and published in the list above.",
+      accepted:
+        "Accepted. Revision #{{ number }} can now be previewed and published in the list above.",
       showRevision: "Show revision #{{ number }}",
       discarded: "Discarded. Its revisions cannot be published.",
       showChanges: "Show changes against the previous revision",
@@ -918,7 +920,8 @@ export const en = {
     invalid_context: "Pick what to recommend for.",
     ai_quota_exceeded: "The monthly AI allowance of this shop is used up.",
     ai_run_in_progress: "An AI edit is already running for this shop. Wait for it or stop it.",
-    ai_run_not_accepted: "This revision comes from an AI edit that was not accepted. Review and accept it first.",
+    ai_run_not_accepted:
+      "This revision comes from an AI edit that was not accepted. Review and accept it first.",
     revision_not_ready: "The checked revision is no longer ready.",
     no_active_theme: "The shop has no live theme yet.",
     ai_unavailable: "The AI service is not available right now. Try again later.",

@@ -791,7 +791,8 @@ export const sk: Dictionary = {
       title: "Upraviť pomocou AI",
       hint: "Opíšte, čo chcete zmeniť. AI upraví kópiu vašej živej šablóny, napíše pre zmenu test a spustí všetky kontroly (až tri opravy). Nič sa nezverejní, kým výsledok neprijmete a nepublikujete.",
       prompt: "Čo sa má zmeniť?",
-      promptHint: "Napríklad: „Na stránke produktu zväčši galériu a nechaj box s cenou viditeľný pri posúvaní.“",
+      promptHint:
+        "Napríklad: „Na stránke produktu zväčši galériu a nechaj box s cenou viditeľný pri posúvaní.“",
       start: "Spustiť úpravu AI",
       runs: "Úpravy AI",
       request: "Zadanie",
@@ -807,7 +808,8 @@ export const sk: Dictionary = {
       cancel: "Zastaviť",
       accept: "Prijať",
       discard: "Zahodiť",
-      accepted: "Prijaté. Revíziu #{{ number }} teraz môžete v zozname vyššie zobraziť a publikovať.",
+      accepted:
+        "Prijaté. Revíziu #{{ number }} teraz môžete v zozname vyššie zobraziť a publikovať.",
       showRevision: "Zobraziť revíziu #{{ number }}",
       discarded: "Zahodené. Jej revízie nemožno publikovať.",
       showChanges: "Zobraziť zmeny oproti predchádzajúcej revízii",
@@ -920,7 +922,8 @@ export const sk: Dictionary = {
     invalid_context: "Vyberte, pre čo odporúčať.",
     ai_quota_exceeded: "Mesačný limit AI tohto obchodu je vyčerpaný.",
     ai_run_in_progress: "Pre tento obchod už beží úprava AI. Počkajte na ňu alebo ju zastavte.",
-    ai_run_not_accepted: "Táto revízia pochádza z úpravy AI, ktorá nebola prijatá. Najprv ju skontrolujte a prijmite.",
+    ai_run_not_accepted:
+      "Táto revízia pochádza z úpravy AI, ktorá nebola prijatá. Najprv ju skontrolujte a prijmite.",
     revision_not_ready: "Skontrolovaná revízia už nie je pripravená.",
     no_active_theme: "Obchod zatiaľ nemá živú šablónu.",
     ai_unavailable: "Služba AI teraz nie je dostupná. Skúste to neskôr.",

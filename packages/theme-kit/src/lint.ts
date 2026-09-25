@@ -132,7 +132,8 @@ export async function lintTheme(
     const lines = (await readFile(path.join(themeDir, f), "utf8")).split("\n");
     lines.forEach((text, i) => {
       for (const r of RULES)
-        if ((!r.files || r.files.test(f)) && r.re.test(text)) v.push({ file: f, line: i + 1, rule: r.id, message: r.message });
+        if ((!r.files || r.files.test(f)) && r.re.test(text))
+          v.push({ file: f, line: i + 1, rule: r.id, message: r.message });
       for (const m of text.matchAll(SET_HTML)) {
         if (!SET_HTML_OK.test(m[1] ?? "")) {
           v.push({

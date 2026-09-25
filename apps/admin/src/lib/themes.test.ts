@@ -61,8 +61,17 @@ test("token editor validation mirrors the A6 allowlist", () => {
 });
 
 test("tags unified diff lines and run statuses", () => {
-  const d = "--- a/src/x.astro\n+++ b/src/x.astro\n@@ -1,2 +1,2 @@\n <h1>x</h1>\n-<p>a</p>\n+<p>b</p>\nBinary file public/a.png: 1 → 2 bytes\n";
-  expect(diffLines(d).map((l) => l.kind)).toEqual(["file", "file", "hunk", "ctx", "del", "add", "file"]);
+  const d =
+    "--- a/src/x.astro\n+++ b/src/x.astro\n@@ -1,2 +1,2 @@\n <h1>x</h1>\n-<p>a</p>\n+<p>b</p>\nBinary file public/a.png: 1 → 2 bytes\n";
+  expect(diffLines(d).map((l) => l.kind)).toEqual([
+    "file",
+    "file",
+    "hunk",
+    "ctx",
+    "del",
+    "add",
+    "file",
+  ]);
   expect(diffLines("")).toEqual([]);
   expect(runTone("running")).toBe("warning");
   expect(runTone("succeeded")).toBe("success");

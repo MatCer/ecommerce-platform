@@ -28,16 +28,21 @@ const lineClass = {
 export function DiffView(props: { diff: string; label: string }) {
   const lines = createMemo(() => diffLines(props.diff));
   return (
-    <pre
-      class="max-h-[32rem] overflow-auto rounded-md border border-border bg-card p-2 text-xs leading-5"
+    // A scrollable region: focusable so keyboard users can scroll it.
+    <section
       aria-label={props.label}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrollable region must be reachable by keyboard
       tabIndex={0}
+      class="max-h-[32rem] overflow-auto rounded-md border border-border bg-card p-2"
     >
-      <For each={lines()}>
-        {(l) => <div class={`${lineClass[l.kind]} whitespace-pre-wrap break-all`}>{l.text || " "}</div>}
-      </For>
-    </pre>
+      <pre class="text-xs leading-5">
+        <For each={lines()}>
+          {(l) => (
+            <div class={`${lineClass[l.kind]} whitespace-pre-wrap break-all`}>{l.text || " "}</div>
+          )}
+        </For>
+      </pre>
+    </section>
   );
 }
 
@@ -205,44 +210,46 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
       </Show>
       <QueryState query={runs}>
         {() => (
-      <Show when={items().length}>
-        <table class={tableClass}>
-          <caption class="mb-1 text-left text-xs text-muted-foreground">
-            {t("themes.ai.runs")}
-          </caption>
-          <thead>
-            <tr>
-              <Th>{t("themes.ai.request")}</Th>
-              <Th>{t("themes.status")}</Th>
-              <Th>{t("themes.created")}</Th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={items()}>
-              {(r) => (
-                <tr classList={{ "bg-muted": r.id === current() }}>
-                  <td class={`${tdClass} max-w-md`}>
-                    <button
-                      type="button"
-                      class="line-clamp-2 text-left text-accent-700 hover:underline"
-                      aria-pressed={r.id === current()}
-                      onClick={() => setSelected(r.id)}
-                    >
-                      {r.prompt}
-                    </button>
-                  </td>
-                  <td class={tdClass}>
-                    <Badge tone={runTone(r.status)}>
-                      {t(`themes.ai.statuses.${r.status as "queued"}`)}
-                    </Badge>
-                  </td>
-                  <td class={`${tdClass} text-muted-foreground`}>{formatDateTime(r.created_at)}</td>
+          <Show when={items().length}>
+            <table class={tableClass}>
+              <caption class="mb-1 text-left text-xs text-muted-foreground">
+                {t("themes.ai.runs")}
+              </caption>
+              <thead>
+                <tr>
+                  <Th>{t("themes.ai.request")}</Th>
+                  <Th>{t("themes.status")}</Th>
+                  <Th>{t("themes.created")}</Th>
                 </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
-      </Show>
+              </thead>
+              <tbody>
+                <For each={items()}>
+                  {(r) => (
+                    <tr classList={{ "bg-muted": r.id === current() }}>
+                      <td class={`${tdClass} max-w-md`}>
+                        <button
+                          type="button"
+                          class="line-clamp-2 text-left text-accent-700 hover:underline"
+                          aria-pressed={r.id === current()}
+                          onClick={() => setSelected(r.id)}
+                        >
+                          {r.prompt}
+                        </button>
+                      </td>
+                      <td class={tdClass}>
+                        <Badge tone={runTone(r.status)}>
+                          {t(`themes.ai.statuses.${r.status as "queued"}`)}
+                        </Badge>
+                      </td>
+                      <td class={`${tdClass} text-muted-foreground`}>
+                        {formatDateTime(r.created_at)}
+                      </td>
+                    </tr>
+                  )}
+                </For>
+              </tbody>
+            </table>
+          </Show>
         )}
       </QueryState>
       <Show when={current()}>

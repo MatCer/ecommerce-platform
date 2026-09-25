@@ -71,12 +71,13 @@ test("a prompt becomes a checked AI revision that is accepted, published and rol
   await expect(diff).toContainText("+++ b/src/pages/index.astro");
   await expect(diff).toContainText("data-ai-edit");
   await expect(diff).toContainText("+++ b/checks/ai-edit.spec.ts");
-  const [number, functional] = sql(
-    `SELECT r.number || '|' || (SELECT s->>'status' FROM jsonb_array_elements(r.checks->'steps') s
+  const [number, functional] =
+    sql(
+      `SELECT r.number || '|' || (SELECT s->>'status' FROM jsonb_array_elements(r.checks->'steps') s
                                 WHERE s->>'name' = 'functional')
      FROM ai_theme_runs a JOIN theme_revisions r ON r.id = a.revision_id
      WHERE a.tenant_id = ${DEMO} ORDER BY a.id DESC LIMIT 1`,
-  )[0]?.split("|") ?? [];
+    )[0]?.split("|") ?? [];
   expect(functional).toBe("passed");
 
   // Not publishable before the run is accepted.
