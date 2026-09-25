@@ -1,32 +1,56 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { expect, test } from "vitest";
 import {
+  ApiResolver,
   CachedResolver,
-  ChannelResolver,
   classifyHost,
   normalizeHost,
   type Site,
   StaticResolver,
 } from "./sites.ts";
 
-test("@channel references resolve to the pointer file (local publish = re-pack + purge)", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "wp2-channels-"));
-  await mkdir(path.join(root, "channels"));
-  await writeFile(
-    path.join(root, "channels", "default-theme"),
-    "0123456789abcdef0123456789abcdef\n",
-  );
-  const inner = new StaticResolver({
-    "demo.localhost": { theme_artifact: "@default-theme" } as Site,
+test("the API resolver maps the resolve response and caches nothing on errors", async () => {
+  const seen: string[] = [];
+  const upstream = async (r: Request) => {
+    seen.push(`${r.url} ${r.headers.get("authorization")}`);
+    const host = new URL(r.url).searchParams.get("host");
+    if (host === "down.localhost") return new Response("boom", { status: 500 });
+    if (host !== "demo-sk.localhost") return Response.json({ code: "not_found" }, { status: 404 });
+    return Response.json({
+      hostname: "demo-sk.localhost",
+      tenant_id: "t1",
+      tenant_slug: "demo",
+      market_id: "m-sk",
+      market_code: "sk",
+      currency: "EUR",
+      default_locale: "sk",
+      locales: ["sk"],
+      country_codes: ["SK"],
+      storefront_token: "sf_x",
+      theme_artifact: "0123456789abcdef0123456789abcdef",
+      retained_artifacts: [],
+      checkout_artifact: null,
+    });
+  };
+  const r = new ApiResolver("http://api:8000", "service-token", upstream);
+  expect(await r.resolve("demo-sk.localhost")).toEqual({
+    tenant_id: "t1",
+    market_id: "m-sk",
+    locale: "sk",
+    shop_host: "demo-sk.localhost",
+    storefront_token: "sf_x",
+    theme_artifact: "0123456789abcdef0123456789abcdef",
+    retained_artifacts: [],
+    checkout_artifact: null,
   });
-  const site = await new ChannelResolver(inner, root).resolve("demo.localhost");
-  expect(site?.theme_artifact).toBe("0123456789abcdef0123456789abcdef");
-  inner.set("x.localhost", { theme_artifact: "@../../etc/passwd" } as Site);
-  expect((await new ChannelResolver(inner, root).resolve("x.localhost"))?.theme_artifact).toBe(
-    "@../../etc/passwd",
+  expect(seen[0]).toBe(
+    "http://api:8000/internal/v1/resolve?host=demo-sk.localhost Bearer service-token",
   );
+  expect(await r.resolve("nope.localhost")).toBeNull();
+  await expect(r.resolve("down.localhost")).rejects.toThrow(/500/);
+  // A failed lookup is not cached as "unknown shop".
+  const cached = new CachedResolver(r);
+  await expect(cached.resolve("down.localhost")).rejects.toThrow();
+  expect(seen.filter((s) => s.includes("down.localhost")).length).toBe(2);
 });
 
 test.each([

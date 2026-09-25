@@ -1,6 +1,6 @@
 import type {
-  CategoryPage,
   HomePage,
+  ListingPage,
   ProductPage,
   Recommendations,
   SearchSuggest,
@@ -82,9 +82,9 @@ export function createStorefront({
     shop: () => required<ShopModel>("/shop"),
     home: () => required<HomePage>("/pages/home"),
     category: (slug: string, query?: Query) =>
-      get<CategoryPage>(`/pages/category/${segment(slug)}`, query),
+      get<ListingPage>(`/pages/category/${segment(slug)}`, query),
     product: (slug: string) => get<ProductPage>(`/pages/product/${segment(slug)}`),
-    search: (query: Query) => required<CategoryPage>(`/pages/search${qs(query)}`),
+    search: (query: Query) => required<ListingPage>(`/pages/search${qs(query)}`),
     suggest: (q: string) => required<SearchSuggest>(`/search/suggest${qs({ q })}`),
     /** Product recommendations; `context` is `product:<id>`, `cart` or `home` (spec §8.2). */
     recommendations: (context: string) =>

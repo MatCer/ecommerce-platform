@@ -12,7 +12,6 @@ axum.workspace = true
 chrono.workspace = true
 clap.workspace = true
 commerce.workspace = true
-hex.workspace = true
 image.workspace = true
 jsonwebtoken.workspace = true
 object_store.workspace = true

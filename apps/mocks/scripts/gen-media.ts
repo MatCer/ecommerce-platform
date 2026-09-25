@@ -1,7 +1,8 @@
 /**
- * Generates the synthetic product photos used by the stub Storefront API and the performance
- * probe: `fixtures/media/p/<name>/<width>.avif`. Grain is added on purpose so the files weigh
- * about as much as real photos (a flat SVG would make LCP numbers look better than reality).
+ * Generates the synthetic product photos the demo seed pushes through the media pipeline
+ * (`api admin seed-demo`): `fixtures/images/demo/<name>.jpg`, 960×1200. The seed adds grain
+ * per image, so the encoded variants weigh about as much as real photos (a flat image would
+ * make LCP numbers look better than reality) while the committed files stay small.
  *
  *   node apps/mocks/scripts/gen-media.ts
  */
@@ -9,8 +10,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-const OUT = path.resolve(import.meta.dirname, "../../../fixtures/media");
-const WIDTHS = [360, 480, 720, 1080];
+const OUT = path.resolve(import.meta.dirname, "../../../fixtures/images/demo");
 const W = 1080;
 const H = 1350; // 4:5 product photo
 
@@ -23,7 +23,6 @@ const PHOTOS: Record<string, [string, string, "tee" | "hoodie" | "cap" | "bag"]>
   "hoodie-ash": ["#ececec", "#8d8f93", "hoodie"],
   "cap-olive": ["#eceee4", "#6b6f3a", "cap"],
   "bag-natural": ["#f3efe6", "#d8c7a6", "bag"],
-  hero: ["#e7e0d4", "#3b5446", "hoodie"],
 };
 
 const SHAPES = {
@@ -42,25 +41,12 @@ async function photo(name: string, [bg, fg, shape]: (typeof PHOTOS)[string]) {
     <path d="${SHAPES[shape]}" fill="${fg}"/>
     <path d="${SHAPES[shape]}" fill="#fff" opacity=".08" transform="translate(12 -10)"/>
   </svg>`;
-  const noise = await sharp({
-    create: { width: W, height: H, channels: 3, noise: { type: "gaussian", mean: 128, sigma: 50 } },
-  })
-    .png()
-    .toBuffer();
-  const base = await sharp(Buffer.from(svg))
-    .composite([{ input: noise, blend: "soft-light" }])
-    .blur(0.4)
-    .png()
-    .toBuffer();
-  const dir = path.join(OUT, "p", name);
-  await mkdir(dir, { recursive: true });
-  for (const w of WIDTHS) {
-    await sharp(base)
-      .resize(w)
-      .avif({ quality: 60, effort: 4 })
-      .toFile(path.join(dir, `${w}.avif`));
-  }
+  await mkdir(OUT, { recursive: true });
+  await sharp(Buffer.from(svg))
+    .resize(960)
+    .jpeg({ quality: 88, mozjpeg: true })
+    .toFile(path.join(OUT, `${name}.jpg`));
 }
 
 for (const [name, spec] of Object.entries(PHOTOS)) await photo(name, spec);
-console.log(`wrote ${Object.keys(PHOTOS).length} photos × ${WIDTHS.length} widths to ${OUT}`);
+console.log(`wrote ${Object.keys(PHOTOS).length} photos to ${OUT}`);

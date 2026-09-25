@@ -76,7 +76,33 @@ export async function astroInlineHashes(projectDir: string) {
   return { script_hashes: scripts.map(cspHash), style_hashes: styles.map(cspHash) };
 }
 
-const sha256 = (data: string | Uint8Array) => createHash("sha256").update(data).digest("hex");
+export const sha256 = (data: string | Uint8Array) =>
+  createHash("sha256").update(data).digest("hex");
+
+/**
+ * The content address of an artifact: sha256 over every server module and client asset
+ * (path + content hash, in that order, each sorted), the tokens, the CSP hashes, the platform
+ * runtime and the kind. `packArtifact` assigns it; the edge recomputes it after downloading an
+ * artifact, so a tampered or incomplete download can never run.
+ */
+export function artifactId(input: {
+  kind: ArtifactKind;
+  /** `[path under server/, sha256]` */
+  server: [string, string][];
+  /** URL path → entry, as in the manifest. */
+  assets: Record<string, AssetEntry>;
+  tokens: ThemeTokens | null;
+  csp: ArtifactManifest["csp"];
+}): string {
+  const digest = createHash("sha256");
+  for (const [f, h] of [...input.server].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    digest.update(`server/${f}\0${h}\n`);
+  for (const p of Object.keys(input.assets).sort())
+    digest.update(`client${p}\0${input.assets[p]?.sha256}\n`);
+  digest.update(`tokens\0${JSON.stringify(input.tokens)}\ncsp\0${JSON.stringify(input.csp)}\n`);
+  digest.update(`runtime\0${JSON.stringify(RUNTIME)}\nkind\0${input.kind}\n`);
+  return digest.digest("hex").slice(0, 32);
+}
 
 /** Lists regular files under `dir` (relative, posix). Rejects symlinks and special files. */
 async function listFiles(dir: string, rel = ""): Promise<string[]> {
@@ -118,7 +144,6 @@ export async function packArtifact(opts: {
   const clientFiles = (await listFiles(clientDir)).filter((f) => !CLIENT_IGNORE.has(f));
 
   let total = 0;
-  const digest = createHash("sha256");
   // Read each file once and publish exactly the bytes that were hashed (no re-read races).
   const contents = new Map<string, Buffer>();
   const hashFile = async (abs: string, label: string) => {
@@ -126,12 +151,12 @@ export async function packArtifact(opts: {
     total += buf.byteLength;
     if (total > MAX_ARTIFACT_BYTES) throw new Error("artifact: larger than 50 MB");
     contents.set(label, buf);
-    const h = sha256(buf);
-    digest.update(`${label}\0${h}\n`);
-    return { sha256: h, size: buf.byteLength };
+    return { sha256: sha256(buf), size: buf.byteLength };
   };
 
-  for (const f of serverFiles) await hashFile(path.join(serverDir, f), `server/${f}`);
+  const serverHashes: [string, string][] = [];
+  for (const f of serverFiles)
+    serverHashes.push([f, (await hashFile(path.join(serverDir, f), `server/${f}`)).sha256]);
   const assets: Record<string, AssetEntry> = {};
   for (const f of clientFiles)
     assets[`/${f}`] = await hashFile(path.join(clientDir, f), `client/${f}`);
@@ -140,9 +165,7 @@ export async function packArtifact(opts: {
     ? validateTokens(JSON.parse(await readFile(opts.tokensFile, "utf8")))
     : null;
   const csp = await astroInlineHashes(opts.projectDir ?? path.dirname(path.resolve(opts.dist)));
-  digest.update(`tokens\0${JSON.stringify(tokens)}\ncsp\0${JSON.stringify(csp)}\n`);
-  digest.update(`runtime\0${JSON.stringify(RUNTIME)}\nkind\0${opts.kind}\n`);
-  const id = digest.digest("hex").slice(0, 32);
+  const id = artifactId({ kind: opts.kind, server: serverHashes, assets, tokens, csp });
 
   const manifest: ArtifactManifest = {
     schema: 1,

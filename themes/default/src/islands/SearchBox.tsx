@@ -1,5 +1,5 @@
 import { suggest } from "@platform/storefront-sdk/client";
-import { imageUrl } from "@platform/storefront-sdk/format";
+import { imageUrl, type Messages, t } from "@platform/storefront-sdk/format";
 import type { SearchSuggest } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 
@@ -7,7 +7,7 @@ import { createSignal, For, onCleanup, Show } from "solid-js";
  * Search typeahead (ARIA combobox). Without JS it is a plain GET form to /search, so the
  * server-rendered markup is fully functional before hydration.
  */
-export default function SearchBox(props: { q?: string }) {
+export default function SearchBox(props: { q?: string; labels: Messages }) {
   const [q, setQ] = createSignal(props.q ?? "");
   const [result, setResult] = createSignal<SearchSuggest | null>(null);
   const [active, setActive] = createSignal(-1);
@@ -52,14 +52,14 @@ export default function SearchBox(props: { q?: string }) {
     <search class="relative block w-full">
       <form action="/search" method="get">
         <label for="q" class="sr-only">
-          Hledat
+          {t(props.labels, "search.label")}
         </label>
         <input
           id="q"
           name="q"
           type="search"
           autocomplete="off"
-          placeholder="Hledat trička, mikiny…"
+          placeholder={t(props.labels, "search.placeholder")}
           value={q()}
           onInput={(e) => onInput(e.currentTarget.value)}
           onKeyDown={onKeyDown}
@@ -88,7 +88,7 @@ export default function SearchBox(props: { q?: string }) {
                 >
                   <a href={`/p/${p.slug}`} class="flex items-center gap-3 px-3 py-2 text-sm">
                     <img
-                      src={imageUrl(p.image, 120)}
+                      src={p.image ? imageUrl(p.image, 120) : undefined}
                       alt=""
                       width="32"
                       height="40"

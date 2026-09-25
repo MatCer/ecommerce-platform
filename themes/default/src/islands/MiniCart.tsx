@@ -1,9 +1,10 @@
-import { imageUrl } from "@platform/storefront-sdk/format";
+import { imageUrl, type Messages, t } from "@platform/storefront-sdk/format";
 import { createEffect, For, onMount, Show } from "solid-js";
 import { cart, loadCart, open, setOpen, updateLine } from "../lib/cart-store";
 
 /** Header cart button + drawer with free-shipping progress and the checkout handoff form (A1). */
-export default function MiniCart() {
+export default function MiniCart(props: { labels: Messages }) {
+  const l = (key: string) => t(props.labels, key);
   let dialog: HTMLDialogElement | undefined;
   onMount(() => void loadCart());
   createEffect(() => {
@@ -33,7 +34,7 @@ export default function MiniCart() {
           <circle cx="10" cy="20" r="1.3" />
           <circle cx="17" cy="20" r="1.3" />
         </svg>
-        <span class="sr-only md:not-sr-only">Košík</span>
+        <span class="sr-only md:not-sr-only">{l("cart.title")}</span>
         <span class="grid min-w-5 place-items-center rounded-full bg-identity px-1 text-xs text-card tabular-nums">
           {count()}
           <span class="sr-only"> položek</span>
@@ -44,43 +45,29 @@ export default function MiniCart() {
         ref={dialog}
         onClose={() => setOpen(false)}
         class="ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground backdrop:bg-foreground/40"
-        aria-label="Košík"
+        aria-label={l("cart.title")}
       >
         <div class="flex h-full flex-col">
           <header class="flex items-center justify-between border-b border-border p-4">
-            <h2 class="font-display text-lg font-bold">Košík</h2>
+            <h2 class="font-display text-lg font-bold">{l("cart.title")}</h2>
             <button
               type="button"
               class="rounded-md px-2 py-1 text-sm underline"
               onClick={() => setOpen(false)}
             >
-              Zavřít
+              ✕
             </button>
           </header>
           <Show
             when={cart()?.lines.length}
-            fallback={<p class="p-4 text-muted-foreground">Košík je prázdný.</p>}
+            fallback={<p class="p-4 text-muted-foreground">{l("cart.empty")}</p>}
           >
-            <Show
-              when={cart()?.free_shipping_remaining}
-              fallback={
-                <p class="bg-identity-wash p-4 text-sm font-semibold text-identity-ink">
-                  Doprava zdarma ✓
-                </p>
-              }
-            >
-              {(rest) => (
-                <p class="bg-identity-wash p-4 text-sm text-identity-ink">
-                  Do dopravy zdarma zbývá {rest().formatted}
-                </p>
-              )}
-            </Show>
             <ul class="flex-1 divide-y divide-border overflow-y-auto px-4">
               <For each={cart()?.lines}>
                 {(line) => (
                   <li class="flex gap-3 py-3">
                     <img
-                      src={imageUrl(line.image, 120)}
+                      src={line.image ? imageUrl(line.image, 120) : undefined}
                       alt=""
                       width="60"
                       height="75"
@@ -94,7 +81,7 @@ export default function MiniCart() {
                         <button
                           type="button"
                           class="size-7 rounded-sm border border-border"
-                          aria-label="Ubrat"
+                          aria-label={l("cart.decrease")}
                           onClick={() => updateLine(line.id, line.quantity - 1)}
                         >
                           −
@@ -103,7 +90,7 @@ export default function MiniCart() {
                         <button
                           type="button"
                           class="size-7 rounded-sm border border-border"
-                          aria-label="Přidat"
+                          aria-label={l("cart.increase")}
                           onClick={() => updateLine(line.id, line.quantity + 1)}
                         >
                           +
@@ -116,9 +103,18 @@ export default function MiniCart() {
               </For>
             </ul>
             <footer class="border-t border-border p-4">
+              <Show when={cart()?.discount?.amount_minor}>
+                <p class="mb-1 flex justify-between text-sm text-sale">
+                  <span>{l("cart.discount")}</span>
+                  <span class="price">−{cart()?.discount?.formatted}</span>
+                </p>
+              </Show>
               <p class="mb-3 flex justify-between text-sm">
-                <span>Mezisoučet</span>
-                <span class="price text-lg">{cart()?.subtotal?.formatted}</span>
+                <span>
+                  {l("cart.total")}{" "}
+                  <span class="text-muted-foreground">({l("cart.vat_included")})</span>
+                </span>
+                <span class="price text-lg">{cart()?.total?.formatted}</span>
               </p>
               {/* Edge-owned handoff: mints a one-time token and redirects to checkout.<host>. */}
               <form method="post" action="/_p/checkout/start">
@@ -126,7 +122,7 @@ export default function MiniCart() {
                   type="submit"
                   class="h-12 w-full rounded-md bg-buy font-display font-bold text-foreground hover:bg-buy-hover"
                 >
-                  Pokračovat k pokladně
+                  {l("cart.checkout")}
                 </button>
               </form>
             </footer>

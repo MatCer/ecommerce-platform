@@ -1,9 +1,6 @@
-import { readFile } from "node:fs/promises";
-
 /**
- * What the edge needs to know about a storefront host. This is the response contract of
- * `GET /internal/v1/resolve?host=` (spec §8.4), which WP6 implements in the API; until then
- * `StaticResolver` serves it from a JSON file.
+ * What the edge needs to know about a storefront host, mapped from the API's
+ * `GET /internal/v1/resolve?host=` (spec §8.4) by `ApiResolver`.
  */
 export interface Site {
   tenant_id: string;
@@ -13,13 +10,15 @@ export interface Site {
   shop_host: string;
   /** Public storefront token the edge injects; never exposed to theme code. */
   storefront_token: string;
-  /** Active theme artifact (content address). Publish/rollback = changing this pointer. */
-  theme_artifact: string;
+  /** Active theme artifact (content address); `null` until a theme is published for the tenant. */
+  theme_artifact: string | null;
   /**
    * Earlier artifacts of this tenant whose `/_astro/*` files stay reachable, so pages rendered
    * (or cached, prerendered, open in a tab) before a publish keep working (spec A22).
    */
   retained_artifacts: string[];
+  /** The platform checkout artifact (same for every tenant); `null` if none is published. */
+  checkout_artifact?: string | null;
 }
 
 export interface SiteResolver {
@@ -48,14 +47,11 @@ export function classifyHost(host: string): Origin {
     : { kind: "shop", shopHost: host };
 }
 
-/** Host → site map from a JSON file (`{ "demo.localhost": Site, ... }`). */
+/** Fixed host → site map (tests). */
 export class StaticResolver implements SiteResolver {
   #sites: Record<string, Site>;
   constructor(sites: Record<string, Site>) {
     this.#sites = sites;
-  }
-  static async fromFile(file: string) {
-    return new StaticResolver(JSON.parse(await readFile(file, "utf8")) as Record<string, Site>);
   }
   /** Replaces the map (used by tests and the local publish/rollback demo). */
   set(host: string, site: Site) {
@@ -66,29 +62,52 @@ export class StaticResolver implements SiteResolver {
   }
 }
 
-/**
- * Local-dev glue: `theme_artifact: "@default-theme"` points at `<artifactRoot>/channels/default-theme`
- * (written by `theme-kit pack --channel`), so a rebuilt theme is "published" by re-packing and
- * purging. This mirrors A30 (tenants point at one shared default artifact). WP6 resolves from the DB.
- */
-export class ChannelResolver implements SiteResolver {
-  readonly #inner: SiteResolver;
-  readonly #root: string;
-  constructor(inner: SiteResolver, artifactRoot: string) {
-    this.#inner = inner;
-    this.#root = artifactRoot;
-  }
-  async resolve(shopHost: string) {
-    const site = await this.#inner.resolve(shopHost);
-    if (!site) return null;
-    return { ...site, theme_artifact: await readChannel(this.#root, site.theme_artifact) };
-  }
+/** The resolve response of the API (`commerce::tenancy::Resolved`). */
+interface Resolved {
+  hostname: string;
+  tenant_id: string;
+  market_id: string;
+  default_locale: string;
+  storefront_token: string;
+  theme_artifact: string | null;
+  retained_artifacts: string[];
+  checkout_artifact: string | null;
 }
 
-/** `@name` → content of `<root>/channels/<name>`; anything else is returned unchanged. */
-export async function readChannel(root: string, ref: string): Promise<string> {
-  const m = /^@([a-z0-9-]{1,64})$/.exec(ref);
-  return m ? (await readFile(`${root}/channels/${m[1]}`, "utf8")).trim() : ref;
+/**
+ * Resolves hosts through the API's internal endpoint with the service token. Unknown hosts
+ * (404) resolve to `null`; any other failure throws (the edge answers 502, nothing is cached).
+ */
+export class ApiResolver implements SiteResolver {
+  readonly #apiOrigin: string;
+  readonly #token: string;
+  readonly #upstream: (r: Request) => Promise<Response>;
+  constructor(apiOrigin: string, token: string, upstream?: (r: Request) => Promise<Response>) {
+    this.#apiOrigin = apiOrigin;
+    this.#token = token;
+    this.#upstream = upstream ?? ((r) => fetch(r));
+  }
+  async resolve(shopHost: string): Promise<Site | null> {
+    const res = await this.#upstream(
+      new Request(
+        `${this.#apiOrigin}/internal/v1/resolve?${new URLSearchParams({ host: shopHost })}`,
+        { headers: { authorization: `Bearer ${this.#token}`, accept: "application/json" } },
+      ),
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`resolve ${shopHost}: ${res.status}`);
+    const r = (await res.json()) as Resolved;
+    return {
+      tenant_id: r.tenant_id,
+      market_id: r.market_id,
+      locale: r.default_locale,
+      shop_host: r.hostname,
+      storefront_token: r.storefront_token,
+      theme_artifact: r.theme_artifact,
+      retained_artifacts: r.retained_artifacts,
+      checkout_artifact: r.checkout_artifact,
+    };
+  }
 }
 
 /** 60 s cache in front of the resolver (spec §9.3.1), purged by `/_edge/purge`. */

@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 make --no-print-directory openapi
 
-generated=(openapi.json packages/admin-client/src/schema.d.ts packages/storefront-sdk/src/schema.d.ts)
+generated=(openapi.json openapi.storefront.json packages/admin-client/src/schema.d.ts packages/storefront-sdk/src/schema.d.ts)
 if [[ -n "$(git status --porcelain -- "${generated[@]}")" ]]; then
   echo "OpenAPI clients are stale. Run 'make openapi' and commit the result:" >&2
   git status --short -- "${generated[@]}" >&2

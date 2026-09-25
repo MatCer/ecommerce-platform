@@ -250,6 +250,21 @@ pub fn slugify(name: &str) -> String {
     out.trim_end_matches('-').to_owned()
 }
 
+/// Photo grain (xorshift noise, deterministic per image), so encoded variants weigh about as
+/// much as real photos and the performance gate does not measure flat illustrations.
+fn grain(img: &mut image::RgbImage, seed: u64) {
+    let mut x = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+    for p in img.pixels_mut() {
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        let n = (i16::from(u8::try_from(x >> 56).unwrap_or(128)) - 128) / 5;
+        for c in &mut p.0 {
+            *c = u8::try_from((i16::from(*c) + n).clamp(0, 255)).unwrap_or(*c);
+        }
+    }
+}
+
 /// Whole CZK -> minor units of EUR at ~25 CZK/EUR, ending in .90.
 fn eur_minor(czk: i64) -> i64 {
     (czk / 25) * 100 + 90
@@ -615,8 +630,10 @@ impl Seeder<'_> {
         if mirrored {
             img = img.fliph();
         }
+        let mut rgb = img.to_rgb8();
+        grain(&mut rgb, u64::from(color.hue.unsigned_abs()) + u64::from(mirrored));
         let mut out = Cursor::new(Vec::new());
-        DynamicImage::ImageRgb8(img.to_rgb8()).write_to(&mut out, ImageFormat::Jpeg)?;
+        DynamicImage::ImageRgb8(rgb).write_to(&mut out, ImageFormat::Jpeg)?;
         Ok(out.into_inner())
     }
 

@@ -1,4 +1,4 @@
-import type { Cart, ConsentPurpose, SearchSuggest } from "./types.ts";
+import type { Cart, CartState, ConsentPurpose, SearchSuggest } from "./types.ts";
 
 /**
  * Browser-side helpers for islands. Everything goes through same-origin gateway routes
@@ -19,12 +19,14 @@ const send = (method: string, path: string, body?: unknown) =>
   }).then((r) => json<Cart>(r));
 
 export const cart = {
-  get: () => send("GET", "/_p/cart"),
+  get: () => fetch("/_p/cart", { credentials: "same-origin" }).then((r) => json<CartState>(r)),
   add: (variantId: string, quantity = 1) =>
     send("POST", "/_p/cart/lines", { variant_id: variantId, quantity }),
   update: (lineId: string, quantity: number) =>
     send("PATCH", `/_p/cart/lines/${encodeURIComponent(lineId)}`, { quantity }),
   remove: (lineId: string) => send("DELETE", `/_p/cart/lines/${encodeURIComponent(lineId)}`),
+  applyCoupon: (code: string) => send("POST", "/_p/cart/coupons", { code }),
+  removeCoupon: (code: string) => send("DELETE", `/_p/cart/coupons/${encodeURIComponent(code)}`),
 };
 
 export const suggest = (q: string, signal?: AbortSignal) =>

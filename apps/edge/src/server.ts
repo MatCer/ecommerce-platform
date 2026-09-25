@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
+import { ArtifactFetcher } from "./artifacts.ts";
 import { createGateway } from "./gateway.ts";
-import { ChannelResolver, readChannel, StaticResolver } from "./sites.ts";
+import { ApiResolver } from "./sites.ts";
 
 function required(name: string): string {
   const v = process.env[name];
@@ -9,16 +10,16 @@ function required(name: string): string {
 }
 
 const artifactRoot = required("ARTIFACT_ROOT");
+const apiOrigin = required("API_ORIGIN");
+const serviceToken = required("INTERNAL_API_TOKEN");
 const gateway = createGateway({
   artifactRoot,
-  // ponytail: static host map until WP6 serves GET /internal/v1/resolve (same Site shape).
-  resolver: new ChannelResolver(
-    await StaticResolver.fromFile(required("SITES_FILE")),
-    artifactRoot,
-  ),
-  checkoutArtifact: await readChannel(artifactRoot, process.env.CHECKOUT_ARTIFACT ?? "@checkout"),
-  apiOrigin: required("API_ORIGIN"),
-  mediaOrigin: process.env.MEDIA_ORIGIN ?? required("API_ORIGIN"),
+  // Sites (tenant, market, token, active artifacts) come from the API (spec §8.4).
+  resolver: new ApiResolver(apiOrigin, serviceToken),
+  // Artifacts are downloaded from the private bucket through the API on first use (A22).
+  artifacts: new ArtifactFetcher({ root: artifactRoot, apiOrigin, token: serviceToken }),
+  apiOrigin,
+  mediaOrigin: required("MEDIA_ORIGIN"),
   scheme: process.env.PUBLIC_SCHEME === "http" ? "http" : "https",
   purgeToken: required("EDGE_PURGE_TOKEN"),
 });

@@ -1,5 +1,5 @@
 ---
-import { srcset } from "@platform/storefront-sdk/format";
+import { lcpImage, pick, t } from "@platform/storefront-sdk/format";
 import type { Image, Seo, ShopModel } from "@platform/storefront-sdk/types";
 import "virtual:theme-tokens.css";
 import "../styles/global.css";
@@ -11,6 +11,32 @@ import Rum from "../islands/Rum";
 import SearchBox from "../islands/SearchBox";
 import { jsonLd } from "../lib/storefront";
 
+const MINI_CART_KEYS = [
+  "cart.title",
+  "cart.empty",
+  "cart.subtotal",
+  "cart.discount",
+  "cart.total",
+  "cart.vat_included",
+  "cart.checkout",
+  "cart.increase",
+  "cart.decrease",
+] as const;
+const CONSENT_KEYS = [
+  "legal.cookies",
+  "consent.title",
+  "consent.text",
+  "consent.accept",
+  "consent.reject",
+  "consent.settings",
+  "consent.save",
+  "consent.analytics",
+  "consent.ads",
+  "consent.personalization",
+  "consent.email_marketing",
+  "consent.review_invites",
+] as const;
+
 interface Props {
   shop: ShopModel;
   seo: Seo;
@@ -19,6 +45,8 @@ interface Props {
   q?: string;
 }
 const { shop, seo, lcp, q } = Astro.props;
+const m = shop.messages;
+const preload = lcp && lcpImage(lcp.image, lcp.sizes).preload;
 ---
 
 <!doctype html>
@@ -34,26 +62,22 @@ const { shop, seo, lcp, q } = Astro.props;
     <meta property="og:title" content={seo.title} />
     <meta property="og:description" content={seo.description} />
     <meta property="og:url" content={seo.canonical} />
-    {
-      lcp && (
-        <link rel="preload" as="image" type="image/avif" imagesrcset={srcset(lcp.image)} imagesizes={lcp.sizes} fetchpriority="high" />
-      )
-    }
+    {preload && <link {...preload} />}
     <link rel="preload" href={archivo} as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     {seo.json_ld.map((d) => <script type="application/ld+json" set:html={jsonLd(d)} />)}
   </head>
   <body class="min-h-dvh">
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-card focus:p-3">
-      Přeskočit na obsah
+      {t(m, "nav.skip")}
     </a>
     <header class="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur">
       <div class="container-shop flex h-16 items-center gap-3 md:gap-6">
         <a href="/" class="font-display text-lg font-extrabold tracking-tight whitespace-nowrap">{shop.name}</a>
-        <div class="flex-1"><SearchBox client:idle q={q} /></div>
-        <MiniCart client:idle />
+        <div class="flex-1"><SearchBox client:idle q={q} labels={pick(m, ["search.label", "search.placeholder"])} /></div>
+        <MiniCart client:idle labels={pick(m, MINI_CART_KEYS)} />
       </div>
-      <nav aria-label="Kategorie" class="container-shop -mt-1 flex gap-5 overflow-x-auto pb-2 text-sm font-semibold">
+      <nav aria-label={t(m, "nav.categories")} class="container-shop -mt-1 flex gap-5 overflow-x-auto pb-2 text-sm font-semibold">
         {shop.menus.main.map((m) => <a href={m.href} class="py-1 whitespace-nowrap hover:text-identity-ink">{m.label}</a>)}
       </nav>
     </header>
@@ -65,10 +89,10 @@ const { shop, seo, lcp, q } = Astro.props;
     <footer class="mt-12 bg-panel text-card">
       <div class="container-shop grid gap-8 py-10 md:grid-cols-3">
         <section aria-labelledby="nl">
-          <h2 id="nl" class="mb-3 font-display text-lg font-bold">Novinky e-mailem</h2>
-          <Newsletter client:visible />
+          <h2 id="nl" class="mb-3 font-display text-lg font-bold">{t(m, "newsletter.title")}</h2>
+          <Newsletter client:visible labels={pick(m, ["newsletter.email", "newsletter.submit", "newsletter.done", "newsletter.invalid"])} />
         </section>
-        <nav aria-label="Zákaznický servis">
+        <nav aria-label={t(m, "footer.customer_service")}>
           <ul class="grid gap-2 text-sm">
             {shop.menus.footer.map((m) => <li><a href={m.href} class="underline-offset-4 hover:underline">{m.label}</a></li>)}
           </ul>
@@ -83,7 +107,7 @@ const { shop, seo, lcp, q } = Astro.props;
         </div>
       </div>
     </footer>
-    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} />
+    <ConsentBanner client:idle purposes={shop.consent.purposes} policyUrl={shop.consent.policy_url} labels={pick(m, CONSENT_KEYS)} />
     <Rum client:idle sampleRate={shop.tracking.rum_sample_rate} />
   </body>
 </html>

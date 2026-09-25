@@ -127,7 +127,6 @@ dependencies = [
  "chrono",
  "clap",
  "commerce",
- "hex",
  "http-body-util",
  "image",
  "jsonwebtoken",

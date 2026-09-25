@@ -1,32 +1,41 @@
 ---
-import type { CategoryPage } from "@platform/storefront-sdk/types";
+import { type Messages, pick, t } from "@platform/storefront-sdk/format";
+import type { ListingPage } from "@platform/storefront-sdk/types";
 import FacetFilters from "../islands/FacetFilters";
 import Breadcrumbs from "./Breadcrumbs.astro";
 import ProductCard from "./ProductCard.astro";
 
 interface Props {
-  page: CategoryPage;
+  page: ListingPage;
   action: string;
+  messages: Messages;
 }
-const { page, action } = Astro.props;
+const { page, action, messages: m } = Astro.props;
 ---
 
-<Breadcrumbs items={page.breadcrumbs} base={page.seo.canonical} />
+<Breadcrumbs items={page.breadcrumbs} label={t(m, "nav.breadcrumbs")} />
 <header class="mb-4 flex flex-wrap items-baseline gap-x-3">
-  <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{page.category.name}</h1>
-  <p class="text-sm text-muted-foreground">{page.products.length} produktů</p>
+  <h1 class="font-display text-2xl font-bold tracking-tight md:text-3xl">{page.title}</h1>
+  <p class="text-sm text-muted-foreground">{t(m, "listing.count", { count: page.total })}</p>
 </header>
+{
+  page.subcategories.length > 0 && (
+    <nav aria-label={t(m, "nav.categories")} class="mb-4 flex flex-wrap gap-2 text-sm">
+      {page.subcategories.map((c) => <a href={c.href} class="rounded-full border border-border bg-card px-3 py-1 hover:border-identity">{c.label}</a>)}
+    </nav>
+  )
+}
 <div class="mb-6 rounded-lg border border-border bg-card p-3">
-  <FacetFilters client:visible facets={page.facets} sort={page.sort} action={action} />
+  <FacetFilters client:visible facets={page.facets} sort={page.sort} action={action} labels={pick(m, ["listing.sort", "listing.apply"])} />
 </div>
 {
   page.products.length === 0 ? (
-    <p class="py-10 text-center text-muted-foreground">Žádné produkty neodpovídají filtrům.</p>
+    <p class="py-10 text-center text-muted-foreground">{t(m, page.query ? "search.no_results" : "listing.empty")}</p>
   ) : (
     <ul class="grid grid-cols-2 gap-3 md:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] md:gap-4">
       {page.products.map((p, i) => (
         <li class="flex">
-          <ProductCard product={p} eager={i < 2} priority={i === 0} />
+          <ProductCard product={p} messages={m} eager={i < 2} priority={i === 0} />
         </li>
       ))}
     </ul>
@@ -34,12 +43,12 @@ const { page, action } = Astro.props;
 }
 {
   page.pagination.pages > 1 && (
-    <nav aria-label="Stránkování" class="mt-8 flex justify-center gap-4">
-      {page.pagination.prev && <a rel="prev" href={page.pagination.prev} class="rounded-md border border-border bg-card px-4 py-2">Předchozí</a>}
+    <nav aria-label={t(m, "listing.pagination")} class="mt-8 flex justify-center gap-4">
+      {page.pagination.prev && <a rel="prev" href={page.pagination.prev} class="rounded-md border border-border bg-card px-4 py-2">{t(m, "listing.prev")}</a>}
       <span class="px-2 py-2 text-sm text-muted-foreground">
         {page.pagination.page} / {page.pagination.pages}
       </span>
-      {page.pagination.next && <a rel="next" href={page.pagination.next} class="rounded-md border border-border bg-card px-4 py-2">Další</a>}
+      {page.pagination.next && <a rel="next" href={page.pagination.next} class="rounded-md border border-border bg-card px-4 py-2">{t(m, "listing.next")}</a>}
     </nav>
   )
 }

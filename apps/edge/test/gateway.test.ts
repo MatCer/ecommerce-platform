@@ -370,6 +370,16 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
 
   test("cart proxy only exposes the cart operations", async () => {
     expect((await get(`${shop}/_p/cart/../../admin`)).status).toBe(404);
+    // The handoff is only reachable through the edge-owned /_p/checkout/start.
+    expect(
+      (
+        await get(
+          `${shop}/_p/cart/handoff`,
+          { ...origin, cookie: "cart=carttoken_00000000000000000001" },
+          { method: "POST" },
+        )
+      ).status,
+    ).toBe(404);
     expect(
       (
         await get(
@@ -393,8 +403,14 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     expect(start.status).toBe(303);
     const location = start.headers.get("location") ?? "";
     expect(location).toMatch(
-      /^http:\/\/checkout\.demo\.localhost:8280\/start\?h=[A-Za-z0-9_-]{43}$/,
+      /^http:\/\/checkout\.demo\.localhost:8280\/start\?h=handofftoken_\d{20}$/,
     );
+    // The API minted it for this cart (shop capability) and revoked the capability.
+    expect(api.calls.at(-1)).toMatchObject({
+      method: "POST",
+      url: "http://api.test/storefront/v1/cart/handoff",
+    });
+    expect(api.calls.at(-1)?.headers["x-cart-token"]).toBe("carttoken_00000000000000000001");
     expect(start.headers.get("cache-control")).toBe("no-store");
     expect(start.headers.get("set-cookie")).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
 
@@ -480,5 +496,50 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     const res = await get(`${shop}/_p/checkout/start`, origin, { method: "POST" });
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/");
+  });
+});
+
+describe("platform routes backed by the real API (WP6)", () => {
+  test("a theme 404 asks for a redirect; only same-shop targets are followed", async () => {
+    const moved = await get("http://demo.localhost/stary-produkt");
+    expect(moved.status).toBe(301);
+    expect(moved.headers.get("location")).toBe("/p/novy");
+    expect(moved.headers.get("cache-control")).toBe("no-store");
+    const temp = await get("http://demo.localhost/docasne");
+    expect([temp.status, temp.headers.get("location")]).toEqual([302, "/c/akce?x=1"]);
+    const smuggled = await get("http://demo.localhost/podvrh");
+    expect(smuggled.status).toBe(404);
+    expect(smuggled.headers.get("location")).toBeNull();
+    const call = api.calls.find((c) => c.url.includes("/redirects/resolve"));
+    expect(call?.headers).toMatchObject({ "x-tenant": "t-demo", "x-market": "m-cz" });
+  });
+
+  test("media is served only from the shop's own tenant prefix", async () => {
+    api.calls.length = 0;
+    expect((await get("http://demo.localhost/media/t-other/a/x.avif")).status).toBe(404);
+    expect((await get("http://demo.localhost/media/t-demo/../t-other/x.avif")).status).toBe(404);
+    expect(api.calls).toEqual([]);
+    await get("http://demo.localhost/media/t-demo/a/x.avif");
+    expect(api.calls.map((c) => c.url)).toEqual(["http://media.test/media/t-demo/a/x.avif"]);
+  });
+
+  test("a tenant without a published theme gets 503, not someone else's artifact", async () => {
+    resolver.set(
+      "new.localhost",
+      site({ tenant_id: "t-new", shop_host: "new.localhost", theme_artifact: null }),
+    );
+    const res = await get("http://new.localhost/");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("the checkout artifact comes from the resolved site", async () => {
+    resolver.set(
+      "sk.localhost",
+      site({ shop_host: "sk.localhost", theme_artifact: v1, checkout_artifact: checkoutId }),
+    );
+    const res = await get("http://checkout.sk.localhost/");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("Pokladna");
   });
 });

@@ -65,9 +65,11 @@ fmt: ## Format Rust and TS
 	cargo fmt --all
 	pnpm run fmt
 
-openapi: ## Regenerate openapi.json and the TS clients from the Rust API
+openapi: ## Regenerate openapi.json (+ the storefront subset) and the TS clients from the Rust API
 	cargo run --quiet --locked -p api -- openapi > openapi.json.tmp
 	mv openapi.json.tmp openapi.json
+	cargo run --quiet --locked -p api -- openapi --storefront > openapi.storefront.json.tmp
+	mv openapi.storefront.json.tmp openapi.storefront.json
 	pnpm run openapi:generate
 
 openapi-check: ## Fail if openapi.json or the generated clients are stale

@@ -1,12 +1,14 @@
 ---
+import { t } from "@platform/storefront-sdk/format";
 import Base from "../layouts/Base.astro";
 import { storefront } from "../lib/storefront";
 
 const shop = await storefront(Astro.request).shop();
+const m = shop.messages;
 Astro.response.status = 404;
 ---
 
-<Base shop={shop} seo={{ title: "Stránka nenalezena", description: "", canonical: Astro.url.href, alternates: [], json_ld: [], robots: "noindex" }}>
-  <h1 class="font-display text-2xl font-bold">Tuto stránku jsme nenašli</h1>
-  <p class="mt-2"><a href="/" class="text-identity-ink underline">Zpět na úvod</a></p>
+<Base shop={shop} seo={{ title: t(m, "notfound.title"), description: "", canonical: Astro.url.href, alternates: [], json_ld: [], robots: "noindex" }}>
+  <h1 class="font-display text-2xl font-bold">{t(m, "notfound.title")}</h1>
+  <p class="mt-2"><a href="/" class="text-identity-ink underline">{t(m, "notfound.back")}</a></p>
 </Base>

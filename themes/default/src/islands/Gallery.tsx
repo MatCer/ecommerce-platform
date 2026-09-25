@@ -6,7 +6,7 @@ import { createSignal, For, onMount, Show } from "solid-js";
  * Product gallery: a native scroll-snap strip (swipe works before hydration); the island adds
  * thumbnail navigation and keeps `aria-current` in sync. The first image is the LCP element.
  */
-export default function Gallery(props: { images: Image[] }) {
+export default function Gallery(props: { images: Image[]; label: string }) {
   const [current, setCurrent] = createSignal(0);
   // Only the LCP image is in the server HTML: lazy images in a horizontal strip sit inside
   // Chrome's lazy-load margin and would compete with it for bandwidth (measured in WP2).
@@ -34,7 +34,7 @@ export default function Gallery(props: { images: Image[] }) {
         ref={strip}
         onScroll={onScroll}
         class="flex snap-x snap-mandatory overflow-x-auto rounded-xl bg-muted [scrollbar-width:none]"
-        aria-label="Fotografie produktu"
+        aria-label={props.label}
         aria-roledescription="galerie"
         tabindex="0"
         onKeyDown={(e) => {
@@ -63,7 +63,7 @@ export default function Gallery(props: { images: Image[] }) {
               type="button"
               onClick={() => go(i())}
               aria-current={current() === i()}
-              aria-label={`Fotografie ${i() + 1} z ${props.images.length}`}
+              aria-label={`${i() + 1} / ${props.images.length}`}
               class="w-16 shrink-0 overflow-hidden rounded-md border-2 border-transparent aria-[current=true]:border-identity"
             >
               <Show

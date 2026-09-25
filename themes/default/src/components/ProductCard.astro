@@ -1,31 +1,35 @@
 ---
-import { imageAttrs } from "@platform/storefront-sdk/format";
+import { imageAttrs, type Messages, t } from "@platform/storefront-sdk/format";
 import type { ProductCard } from "@platform/storefront-sdk/types";
 
 interface Props {
   product: ProductCard;
+  messages: Messages;
   /** Above-the-fold cards load eagerly; only the first one gets fetchpriority=high. */
   eager?: boolean;
   priority?: boolean;
 }
-const { product: p, eager = false, priority = false } = Astro.props;
+const { product: p, messages: m, eager = false, priority = false } = Astro.props;
 // sizes must match the real slot: a 50vw guess at DPR 1.75 rounds up to the next (4× heavier) variant.
 const SIZES = "(min-width: 64rem) 18rem, (min-width: 48rem) 30vw, calc(50vw - 1.5rem)";
-const img = imageAttrs(p.image, { sizes: SIZES, priority, width: 360 });
-const stock = {
-  in_stock: ["Skladem", "text-stock-in"],
-  low_stock: ["Poslední kusy", "text-stock-low"],
-  out_of_stock: ["Vyprodáno", "text-subtle"],
+// `p.images[1]` is the hover image; WP8 decides how to load it without competing with the LCP.
+const main = p.images[0];
+const img = main && imageAttrs(main, { sizes: SIZES, priority, width: 360 });
+const stockClass = {
+  in_stock: "text-stock-in",
+  low_stock: "text-stock-low",
+  backorder: "text-stock-low",
+  out_of_stock: "text-subtle",
 }[p.stock];
 ---
 
 <article class="group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-shadow hover:shadow-md">
   <div class="relative bg-muted">
-    <img {...img} loading={eager ? "eager" : img.loading} class="aspect-[4/5] w-full object-cover" />
+    {img ? <img {...img} loading={eager ? "eager" : img.loading} class="aspect-[4/5] w-full object-cover" /> : <div class="aspect-[4/5] w-full" />}
     {
       p.badges.length > 0 && (
         <ul class="absolute top-2 left-2 flex gap-1">
-          {p.badges.map((b) => <li class={`rounded-sm px-1.5 py-0.5 text-xs font-bold ${b === "Sleva" ? "bg-sale text-card" : "bg-card text-identity-ink"}`}>{b}</li>)}
+          {p.badges.map((b) => <li class={`rounded-sm px-1.5 py-0.5 text-xs font-bold ${b === "sale" ? "bg-sale text-card" : "bg-card text-identity-ink"}`}>{t(m, `badge.${b}`)}</li>)}
         </ul>
       )
     }
@@ -35,11 +39,12 @@ const stock = {
       <a href={`/p/${p.slug}`} class="after:absolute after:inset-0">{p.name}</a>
     </h3>
     <p class="mt-auto flex flex-wrap items-baseline gap-x-2">
-      <span class={`price text-lg ${p.reference_price ? "text-sale" : ""}`}>{p.price.formatted}</span>
-      {p.reference_price && <s class="price text-xs font-semibold text-subtle"><span class="sr-only">Původní cena </span>{p.reference_price.formatted}</s>}
+      <span class={`price text-lg ${p.reference_price ? "text-sale" : ""}`}>{p.price_varies ? t(m, "product.price_from", { price: p.price.formatted }) : p.price.formatted}</span>
+      {p.reference_price && <s class="price text-xs font-semibold text-subtle"><span class="sr-only">{t(m, "price.original")} </span>{p.reference_price.formatted}</s>}
     </p>
-    <p class={`flex items-center gap-1.5 text-xs font-semibold ${stock?.[1]}`}>
-      <span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>{stock?.[0]}
+    {p.unit_price && <p class="text-xs text-muted-foreground">{t(m, "price.unit", { price: p.unit_price.price.formatted, unit: p.unit_price.unit })}</p>}
+    <p class={`flex items-center gap-1.5 text-xs font-semibold ${stockClass}`}>
+      <span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>{t(m, `product.${p.stock}`)}
     </p>
   </div>
 </article>
