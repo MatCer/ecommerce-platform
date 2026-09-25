@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT $2 = ANY (m.country_codes) AS \"ok!\" FROM orders o\n           JOIN markets m ON m.id = o.market_id WHERE o.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ok!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5f41d2102e7e669acc932672ce79f03b0192d04891ff99192fe52751a5a32d81"
+}

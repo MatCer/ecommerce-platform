@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.quantity, coalesce(array_agg(r.quantity) FILTER (WHERE r.id IS NOT NULL), '{}')\n                    AS \"returned!\",\n                coalesce(array_agg(r.status) FILTER (WHERE r.id IS NOT NULL), '{}') AS \"states!\"\n         FROM order_lines l LEFT JOIN return_lines r ON r.order_line_id = l.id\n         WHERE l.order_id = $1 GROUP BY l.id, l.quantity",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "quantity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "order_lines",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "returned!",
+        "type_info": "Int4Array",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "states!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "3a199543789b17fb92d6ebaae9f2d9f33c15c4aeb0ae4fa6b215de8231227a10"
+}

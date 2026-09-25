@@ -1,0 +1,6 @@
+{% extends "order.txt" %}
+{% block heading %}{{ t("order_refunded.heading", number=order.number) }}{% endblock %}
+{% block intro %}{{ t("order_refunded.intro", shop=brand.shop_name, amount=refund.amount) }}
+{{ t("order_refunded.method_" ~ refund.method, iban=refund.iban) }}
+{% for line in refund.lines %}{{ line.quantity }}x {{ line.name }}  {{ line.amount }}
+{% endfor %}{% endblock %}

@@ -176,6 +176,7 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
         )),
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
         mail_events: Some(api::auth::ServiceToken::new(MAIL_EVENTS_SECRET)),
+        carriers: None,
     }
 }
 

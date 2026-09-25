@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE withdrawals SET return_proof_at = coalesce(return_proof_at, now()) WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3b75e05c88e8a80d7526a94ead84fd5b55de937ae6acd25be94f705a2491befb"
+}

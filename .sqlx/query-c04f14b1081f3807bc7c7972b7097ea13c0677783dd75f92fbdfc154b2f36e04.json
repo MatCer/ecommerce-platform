@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kind, total_minor, tax_minor, portions FROM order_charges WHERE order_id = $1\n         ORDER BY CASE kind WHEN 'shipping' THEN 0 WHEN 'payment_fee' THEN 1 ELSE 2 END",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "order_charges",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "total_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_charges",
+            "name": "total_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "tax_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "order_charges",
+            "name": "tax_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "portions",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "order_charges",
+            "name": "portions"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c04f14b1081f3807bc7c7972b7097ea13c0677783dd75f92fbdfc154b2f36e04"
+}

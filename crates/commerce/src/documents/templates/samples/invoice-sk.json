@@ -1,0 +1,58 @@
+{
+  "locale": "sk",
+  "kind": "invoice",
+  "number": "FV202600003",
+  "issued_on": "25. 9. 2026",
+  "taxable_supply_date": "25. 9. 2026",
+  "due_on": "25. 9. 2026",
+  "vat_payer": true,
+  "currency": "EUR",
+  "order_number": "100001",
+  "variable_symbol": "100001",
+  "payment_method": "cod",
+  "paid": false,
+  "bank_account": null,
+  "supplier": {
+    "name": "Ukážkový obchod s.r.o.",
+    "address": ["Obchodná 12", "811 06 Bratislava", "Slovenská republika"],
+    "company_id": "12345678",
+    "vat_id": "2021234567",
+    "sk_ic_dph": "SK2021234567",
+    "registry": "Zapísaná v Obchodnom registri Mestského súdu Bratislava III, oddiel Sro, vložka 12345/B.",
+    "email": "obchod@example.sk",
+    "phone": "+421 900 123 456"
+  },
+  "customer": {
+    "name": "Ľubomír Šťastný",
+    "address": ["Hlavná 7", "040 01 Košice", "Slovenská republika"],
+    "email": "lubomir@example.sk"
+  },
+  "original": null,
+  "reason": null,
+  "lines": [
+    {
+      "name": "Bavlnené tričko – modré, veľkosť M",
+      "sku": "TEE-BLU-M",
+      "quantity": "1",
+      "unit_price": "100,00",
+      "vat_rate": "23 %",
+      "net": "100,00",
+      "vat": "23,00",
+      "total": "123,00"
+    }
+  ],
+  "vat_recap": [
+    {
+      "rate": "23 %",
+      "net": "100,00",
+      "vat": "23,00",
+      "gross": "123,00"
+    }
+  ],
+  "czk_recap": null,
+  "totals": {
+    "net": "100,00",
+    "vat": "23,00",
+    "gross": "123,00"
+  }
+}

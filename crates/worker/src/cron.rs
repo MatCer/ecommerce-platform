@@ -52,6 +52,19 @@ pub const SCHEDULES: &[Schedule] = &[
         kind: handlers::PAYMENTS_FIO_POLL,
         every: Duration::from_secs(600),
     },
+    // WP12: carrier tracking (spec §13: every 5 min; carriers update a few times a day, and
+    // Packeta/PPL ask integrators not to poll aggressively).
+    Schedule {
+        name: "shipping.track",
+        kind: handlers::SHIPPING_TRACK,
+        every: Duration::from_secs(900),
+    },
+    // Today's ČNB fixing (published ~14:30 CET); issuing fetches past dates on demand.
+    Schedule {
+        name: "invoicing.rates",
+        kind: commerce::invoicing::RATES_JOB,
+        every: Duration::from_secs(3600),
+    },
     Schedule {
         name: "analytics.rollup",
         kind: handlers::ROLLUP_JOB,

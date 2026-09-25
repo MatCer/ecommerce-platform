@@ -108,7 +108,7 @@ async fn accepted_after_250_with_one_job_per_key_and_sensitive_body_removed(db: 
     assert_eq!(jobs, 1);
     assert_eq!(row(&db, tenant, id).await.status, "pending");
 
-    let step = notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    let step = notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     assert_eq!(step, Step::Done);
@@ -124,7 +124,7 @@ async fn accepted_after_250_with_one_job_per_key_and_sensitive_body_removed(db: 
 
     // Idempotent: a re-run of the job sends nothing.
     assert_eq!(
-        notifications::deliver(&db, &smtp.mailer(), tenant, id)
+        notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
             .await
             .unwrap(),
         Step::Done
@@ -174,7 +174,7 @@ async fn suppressed_addresses_get_nothing(db: PgPool) {
         "bounced@example.test",
     )
     .await;
-    notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     let r = row(&db, tenant, id).await;
@@ -189,7 +189,7 @@ async fn transactional_uncertain_is_retried_exactly_once(db: PgPool) {
     let (db, tenant) = setup(db).await;
     let smtp = FakeSmtp::start(Mode::DropAfterData).await;
     let id = enqueue(&db, tenant, "k1", Stream::Transactional, "a@example.test").await;
-    let step = notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    let step = notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     assert!(matches!(step, Step::Retry(_)));
@@ -198,7 +198,7 @@ async fn transactional_uncertain_is_retried_exactly_once(db: PgPool) {
     assert!(r.has_body, "kept for the one retry");
 
     // The retry dies the same way: final `uncertain`, no third send.
-    let step = notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    let step = notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     assert_eq!(step, Step::Done);
@@ -209,7 +209,7 @@ async fn transactional_uncertain_is_retried_exactly_once(db: PgPool) {
     );
     assert!(!r.has_body);
     smtp.set_mode(Mode::Accept);
-    notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     assert!(smtp.received().is_empty());
@@ -217,11 +217,11 @@ async fn transactional_uncertain_is_retried_exactly_once(db: PgPool) {
     // A second message whose retry succeeds.
     smtp.set_mode(Mode::DropAfterData);
     let id2 = enqueue(&db, tenant, "k2", Stream::Transactional, "b@example.test").await;
-    notifications::deliver(&db, &smtp.mailer(), tenant, id2)
+    notifications::deliver(&db, &smtp.mailer(), None, tenant, id2)
         .await
         .unwrap();
     smtp.set_mode(Mode::Accept);
-    notifications::deliver(&db, &smtp.mailer(), tenant, id2)
+    notifications::deliver(&db, &smtp.mailer(), None, tenant, id2)
         .await
         .unwrap();
     assert_eq!(row(&db, tenant, id2).await.status, "accepted");
@@ -233,12 +233,12 @@ async fn marketing_uncertain_is_never_resent(db: PgPool) {
     let (db, tenant) = setup(db).await;
     let smtp = FakeSmtp::start(Mode::DropAfterData).await;
     let id = enqueue(&db, tenant, "news:1", Stream::Marketing, "a@example.test").await;
-    let step = notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    let step = notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     assert_eq!(step, Step::Done);
     smtp.set_mode(Mode::Accept);
-    notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     let r = row(&db, tenant, id).await;
@@ -264,7 +264,7 @@ async fn a_worker_dying_mid_send_leaves_uncertain_then_one_retry(db: PgPool) {
     tx.commit().await.unwrap();
     // Recent: another worker may still be sending it; nothing is touched.
     assert!(matches!(
-        notifications::deliver(&db, &smtp.mailer(), tenant, id)
+        notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
             .await
             .unwrap(),
         Step::Retry(_)
@@ -273,7 +273,7 @@ async fn a_worker_dying_mid_send_leaves_uncertain_then_one_retry(db: PgPool) {
     assert!(smtp.received().is_empty());
     // Stale: that worker is gone; uncertain, then the one retry.
     age(&db, tenant, id, "5 minutes").await;
-    notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap();
     let r = row(&db, tenant, id).await;
@@ -367,7 +367,7 @@ async fn unreachable_or_deferring_server_retries_then_fails(db: PgPool) {
     let (db, tenant) = setup(db).await;
     let down = mailer_for("smtp://127.0.0.1:1");
     let id = enqueue(&db, tenant, "k1", Stream::Transactional, "a@example.test").await;
-    let step = notifications::deliver(&db, &down, tenant, id)
+    let step = notifications::deliver(&db, &down, None, tenant, id)
         .await
         .unwrap();
     assert!(matches!(step, Step::Retry(_)));
@@ -375,7 +375,7 @@ async fn unreachable_or_deferring_server_retries_then_fails(db: PgPool) {
     let smtp = FakeSmtp::start(Mode::Defer).await;
     // Deferred (4xx) until the message runs out of SMTP attempts (8), then `failed`.
     let mut steps = 0;
-    while let Step::Retry(_) = notifications::deliver(&db, &smtp.mailer(), tenant, id)
+    while let Step::Retry(_) = notifications::deliver(&db, &smtp.mailer(), None, tenant, id)
         .await
         .unwrap()
     {
@@ -395,7 +395,7 @@ async fn unreachable_or_deferring_server_retries_then_fails(db: PgPool) {
     )
     .await;
     assert_eq!(
-        notifications::deliver(&db, &smtp.mailer(), tenant, id2)
+        notifications::deliver(&db, &smtp.mailer(), None, tenant, id2)
             .await
             .unwrap(),
         Step::Done
@@ -411,7 +411,7 @@ async fn messages_and_suppressions_are_tenant_isolated(db: PgPool) {
     let id = enqueue(&db, tenant, "k1", Stream::Transactional, "a@example.test").await;
     // The other tenant's job context cannot see (or send) it.
     assert_eq!(
-        notifications::deliver(&db, &smtp.mailer(), other, id)
+        notifications::deliver(&db, &smtp.mailer(), None, other, id)
             .await
             .unwrap(),
         Step::Done

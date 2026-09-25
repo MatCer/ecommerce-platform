@@ -1,0 +1,12 @@
+{% extends "order.mjml" %}
+{% block heading %}{{ t("order_shipped.heading", number=order.number) }}{% endblock %}
+{% block intro %}
+        <mj-text>{{ t("order_shipped.intro", shop=brand.shop_name, carrier=shipment.carrier) }}</mj-text>
+{%- if shipment.tracking_url %}
+        <mj-text>{{ t("order_shipped.tracking_number") }}: {{ shipment.tracking_number }}</mj-text>
+        <mj-button href="{{ shipment.tracking_url }}">{{ t("order_shipped.track") }}</mj-button>
+{%- endif %}
+{%- if shipment.pickup_point %}
+        <mj-text>{{ t("order_confirmation.pickup_point") }}: {{ shipment.pickup_point }}</mj-text>
+{%- endif %}
+{% endblock %}

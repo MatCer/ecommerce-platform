@@ -2,6 +2,7 @@
 import { t } from "@platform/storefront-sdk/format";
 import BankTransfer from "../../components/BankTransfer.astro";
 import OrderDetails from "../../components/OrderDetails.astro";
+import OrderDocuments from "../../components/OrderDocuments.astro";
 import PaymentStatus from "../../islands/PaymentStatus";
 import Checkout from "../../layouts/Checkout.astro";
 import { checkoutApi, messages, shopUrl } from "../../lib/api";
@@ -11,6 +12,8 @@ const api = checkoutApi(Astro.request);
 const token = Astro.params.token ?? "";
 const [shop, order] = await Promise.all([api.shop(), api.order(token)]);
 const m = shop?.messages ?? {};
+const documents = order ? await api.orderDocuments(token) : null;
+Astro.response.headers.set("Cache-Control", "no-store");
 if (!order) Astro.response.status = 404;
 // The edge sends `Referrer-Policy: no-referrer` for /o/*: the token never leaks through Referer.
 const placedAt = order
@@ -37,6 +40,7 @@ const due = order?.payment.expires_at
   shopUrl={shopUrl(Astro.url)}
   lang={shop?.locale ?? "cs"}
   accountLabel={t(m, "account.nav")}
+  withdrawalLabel={t(m, "withdraw.title")}
   wide
 >
   {
@@ -67,6 +71,8 @@ const due = order?.payment.expires_at
         </section>
         {bank && <BankTransfer bank={bank} due={due} m={m} />}
         <OrderDetails order={order} m={m} />
+        <OrderDocuments documents={documents} m={m} locale={shop?.locale ?? "cs"} />
+        {(order.status === "shipped" || order.status === "delivered") && <a href="/withdraw" class="text-identity-ink underline">{t(m, "withdraw.link")}</a>}
       </div>
     )
   }

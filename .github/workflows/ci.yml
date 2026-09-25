@@ -60,6 +60,12 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
+      - name: Install Typst (invoice PDF render test, WP12)
+        run: |
+          curl -fsSL -o /tmp/typst.tar.xz https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz
+          echo "a6d077d0a95eed5a2eba715b2dae06be954f624ccbf85758a03f389ded33118c  /tmp/typst.tar.xz" | sha256sum -c -
+          tar -xJf /tmp/typst.tar.xz -C /tmp
+          sudo install -m 0755 /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst
       - name: Create database roles (same script as docker compose)
         run: bash docker/postgres/init-roles.sh
         env:

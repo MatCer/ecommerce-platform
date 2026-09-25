@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(sum(coalesce(v.weight_g, 0)::bigint * l.quantity), 0)::bigint AS \"w!\"\n               FROM order_lines l LEFT JOIN variants v ON v.id = l.variant_id\n               WHERE l.order_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "w!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "aae0f6fab00a4d906c341d93d98be1c0ab870bdd3cf9a2d67bd128484e6c197f"
+}

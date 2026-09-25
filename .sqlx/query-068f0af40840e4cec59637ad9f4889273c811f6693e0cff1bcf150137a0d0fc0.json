@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE withdrawal_tokens SET used_at = now()\n         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()\n         RETURNING order_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "withdrawal_tokens",
+            "name": "order_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "068f0af40840e4cec59637ad9f4889273c811f6693e0cff1bcf150137a0d0fc0"
+}

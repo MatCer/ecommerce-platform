@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ship_to_country FROM orders WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ship_to_country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "ship_to_country"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c5fdc5f09946817cd9af682cc0696b8777c4f9a35c70ffc0e5b472a43011bad6"
+}

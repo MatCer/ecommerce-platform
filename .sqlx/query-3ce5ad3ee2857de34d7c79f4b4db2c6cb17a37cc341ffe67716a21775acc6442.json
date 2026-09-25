@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO order_addresses (tenant_id, order_id, kind, name, company, street, city,\n             postal_code, country, phone)\n         VALUES ($1, $2, 'shipping', $3, $4, $5, $6, $7, $8, $9)\n         ON CONFLICT (tenant_id, order_id, kind) DO UPDATE SET name = EXCLUDED.name,\n             company = EXCLUDED.company, street = EXCLUDED.street, city = EXCLUDED.city,\n             postal_code = EXCLUDED.postal_code, country = EXCLUDED.country,\n             phone = EXCLUDED.phone",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3ce5ad3ee2857de34d7c79f4b4db2c6cb17a37cc341ffe67716a21775acc6442"
+}

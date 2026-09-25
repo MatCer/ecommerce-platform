@@ -1,0 +1,88 @@
+{
+  "locale": "cs",
+  "kind": "invoice",
+  "number": "FV202600001",
+  "issued_on": "25. 9. 2026",
+  "taxable_supply_date": "25. 9. 2026",
+  "due_on": "25. 9. 2026",
+  "vat_payer": true,
+  "currency": "CZK",
+  "order_number": "100001",
+  "variable_symbol": "100001",
+  "payment_method": "bank_transfer",
+  "paid": true,
+  "bank_account": {
+    "iban": "CZ6508000000192000145399",
+    "bic": "GIBACZPX",
+    "name": "Demo obchod s.r.o."
+  },
+  "supplier": {
+    "name": "Demo obchod s.r.o.",
+    "address": ["Dlouhá 12", "110 00 Praha 1", "Česká republika"],
+    "company_id": "12345678",
+    "vat_id": "CZ12345678",
+    "sk_ic_dph": null,
+    "registry": "Zapsáno v obchodním rejstříku vedeném Městským soudem v Praze, oddíl C, vložka 123456.",
+    "email": "obchod@example.cz",
+    "phone": "+420 777 123 456"
+  },
+  "customer": {
+    "name": "Jana Nováková",
+    "address": ["Krátká 8", "602 00 Brno", "Česká republika"],
+    "email": "jana@example.cz"
+  },
+  "original": null,
+  "reason": null,
+  "lines": [
+    {
+      "name": "Bavlněné tričko – modré, velikost M",
+      "sku": "TEE-BLU-M",
+      "quantity": "2",
+      "unit_price": "200,00",
+      "vat_rate": "21 %",
+      "net": "400,00",
+      "vat": "84,00",
+      "total": "484,00"
+    },
+    {
+      "name": "Káva z pražírny, 250 g",
+      "sku": "COFFEE-250",
+      "quantity": "1",
+      "unit_price": "100,00",
+      "vat_rate": "12 %",
+      "net": "100,00",
+      "vat": "12,00",
+      "total": "112,00"
+    },
+    {
+      "name": "Doprava – výdejní místo Packeta",
+      "sku": "SHIPPING",
+      "quantity": "1",
+      "unit_price": "50,00",
+      "vat_rate": "21 %",
+      "net": "50,00",
+      "vat": "10,50",
+      "total": "60,50"
+    }
+  ],
+  "vat_recap": [
+    {
+      "rate": "21 %",
+      "net": "450,00",
+      "vat": "94,50",
+      "gross": "544,50"
+    },
+    {
+      "rate": "12 %",
+      "net": "100,00",
+      "vat": "12,00",
+      "gross": "112,00"
+    }
+  ],
+  "czk_recap": null,
+  "totals": {
+    "net": "550,00",
+    "vat": "106,50",
+    "gross": "656,50"
+  }
+}

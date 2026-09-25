@@ -159,7 +159,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "clap",
  "commerce",
@@ -648,6 +648,7 @@ dependencies = [
  "ammonia",
  "argon2",
  "axum",
+ "base64 0.23.1",
  "chrono",
  "crc32fast",
  "governor",

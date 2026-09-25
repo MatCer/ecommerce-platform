@@ -1,0 +1,51 @@
+{
+  "locale": "cs",
+  "kind": "invoice",
+  "number": "FV202600004",
+  "issued_on": "25. 9. 2026",
+  "taxable_supply_date": "25. 9. 2026",
+  "due_on": "25. 9. 2026",
+  "vat_payer": false,
+  "currency": "CZK",
+  "order_number": "100001",
+  "variable_symbol": "100001",
+  "payment_method": "fake",
+  "paid": false,
+  "bank_account": null,
+  "supplier": {
+    "name": "Petra Malá",
+    "address": ["Dlouhá 12", "110 00 Praha 1", "Česká republika"],
+    "company_id": "87654321",
+    "vat_id": null,
+    "sk_ic_dph": null,
+    "registry": null,
+    "email": "obchod@example.cz",
+    "phone": null
+  },
+  "customer": {
+    "name": "Jana Nováková",
+    "address": ["Krátká 8", "602 00 Brno", "Česká republika"],
+    "email": "jana@example.cz"
+  },
+  "original": null,
+  "reason": null,
+  "lines": [
+    {
+      "name": "Ručně šitá taška",
+      "sku": "BAG-NAT",
+      "quantity": "1",
+      "unit_price": "450,00",
+      "vat_rate": "",
+      "net": "450,00",
+      "vat": "0,00",
+      "total": "450,00"
+    }
+  ],
+  "vat_recap": [],
+  "czk_recap": null,
+  "totals": {
+    "net": "450,00",
+    "vat": "0,00",
+    "gross": "450,00"
+  }
+}

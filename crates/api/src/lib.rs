@@ -10,6 +10,7 @@ pub mod admin_catalog;
 pub mod admin_content;
 pub mod admin_email;
 pub mod admin_feeds;
+pub mod admin_fulfillment;
 pub mod admin_inventory;
 pub mod admin_marketing;
 pub mod admin_media;
@@ -97,6 +98,8 @@ pub struct AppState {
     /// Digest of `MAIL_EVENTS_SECRET` (HTTP Basic password of the SES/SNS bounce endpoint);
     /// `None` = the endpoint answers 404.
     pub mail_events: Option<auth::ServiceToken>,
+    /// Packeta/PPL (WP12); `None` in tools and tests without carrier endpoints.
+    pub carriers: Option<commerce::carriers::Carriers>,
 }
 
 #[derive(OpenApi)]
@@ -121,6 +124,7 @@ pub struct AppState {
         (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
         (name = "ai", description = "Admin API: AI helpers (proposals, glossary, bulk edit by prompt, usage)"),
         (name = "payments", description = "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"),
+        (name = "fulfillment", description = "Admin API: order management, labels and shipments, invoices and credit notes, refunds, withdrawals, carrier accounts"),
         (name = "analytics", description = "Admin API: the analytics dashboard"),
         (name = "webhooks-admin", description = "Admin API: outbound webhook subscriptions and deliveries"),
         (name = "ad-tracking", description = "Admin API: ad-platform forwarders (Meta, GA4, Google Ads, Sklik) and their delivery log"),
@@ -177,6 +181,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_orders::routes())
         .merge(admin_ai::routes())
         .merge(admin_payments::routes())
+        .merge(admin_fulfillment::routes())
         .merge(admin_analytics::routes())
         .merge(admin_webhooks::routes())
         .merge(admin_ad_tracking::routes())

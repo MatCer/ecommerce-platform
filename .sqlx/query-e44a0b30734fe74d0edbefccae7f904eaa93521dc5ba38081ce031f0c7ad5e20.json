@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE withdrawals SET goods_received_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e44a0b30734fe74d0edbefccae7f904eaa93521dc5ba38081ce031f0c7ad5e20"
+}

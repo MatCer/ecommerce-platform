@@ -2369,6 +2369,176 @@
         ]
       }
     },
+    "/admin/v1/carriers": {
+      "get": {
+        "tags": [
+          "fulfillment"
+        ],
+        "operationId": "list_carriers",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierAccountList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/carriers/{carrier}": {
+      "put": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Stores a carrier's API credentials (sealed; never returned). Admin with a fresh login.\nPacketa: `api_password`; PPL: `client_id` + `client_secret`.",
+        "operationId": "put_carrier",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "carrier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CarrierKind"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CarrierAccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "fulfillment"
+        ],
+        "operationId": "delete_carrier",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "carrier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CarrierKind"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/categories": {
       "get": {
         "tags": [
@@ -3399,6 +3569,125 @@
             }
           },
           "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/documents": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Queues a packing slip or label sheet PDF for up to 100 orders (poll `GET\n/admin/v1/documents/{id}`). Label sheets first create the missing labels.",
+        "operationId": "create_document",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentRequested"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/documents/{id}": {
+      "get": {
+        "tags": [
+          "fulfillment"
+        ],
+        "operationId": "get_document",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedDocument"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4638,6 +4927,61 @@
         ]
       }
     },
+    "/admin/v1/invoices/{id}/pdf": {
+      "get": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "An invoice or credit note PDF (404 until rendered).",
+        "operationId": "invoice_url",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadLink"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/legal-entity": {
       "get": {
         "tags": [
@@ -5570,6 +5914,81 @@
         ]
       }
     },
+    "/admin/v1/orders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Cancels an order that has not left: stock and coupon released, the customer told; a paid\norder is refunded in full with a credit note. Admin.",
+        "operationId": "cancel_order",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelOutcome"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition | already_shipped | invoice_pending | refund_rejected",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/orders/{id}/cod/collect": {
       "post": {
         "tags": [
@@ -5822,6 +6241,113 @@
         ]
       }
     },
+    "/admin/v1/orders/{id}/deliver": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "The parcel was delivered (manual; tracking does it automatically).",
+        "operationId": "deliver",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "409": {
+            "description": "no_shipment | invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/exception/refund": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Returns late or duplicate payments (A10); the exception is resolved once they are all\nrefunded (repeat to resubmit pending payouts). Admin.",
+        "operationId": "refund_exception",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Refund"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "no_open_exception",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/orders/{id}/exception/resolve": {
       "post": {
         "tags": [
@@ -5882,6 +6408,629 @@
           },
           "409": {
             "description": "no_open_exception",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/notes": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "operationId": "add_note",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderNoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/processing": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "`confirmed → processing` (packing started).",
+        "operationId": "start_processing",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/refunds": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Refunds lines/quantities and charges of a paid order through its payment method, with a\ncredit note and the refund email. Admin.",
+        "operationId": "create_refund",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundOutcome"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "nothing_to_refund | invoice_pending | refund_rejected",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_refund | invalid_iban",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/refunds/preview": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "What a refund would return (A15), without refunding.",
+        "operationId": "preview_refund",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefundInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_refund",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/returned-to-sender": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "The undelivered parcel is back (merchant-confirmed): restock, order `returned`.",
+        "operationId": "returned_to_sender",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "409": {
+            "description": "no_shipment | invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/ship": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "The carrier took the parcel: stock commit, `order.shipped`, shipped email.",
+        "operationId": "ship",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "409": {
+            "description": "no_shipment | invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/shipment": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Creates the shipment and its label at the carrier (the order becomes `processing`).",
+        "operationId": "create_label",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentView"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "order_not_ready | label_exists | label_in_progress | carrier_not_configured",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "carrier_rejected",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "the carrier is unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Voids the shipment before dispatch.",
+        "operationId": "cancel_label",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "409": {
+            "description": "no_shipment | already_shipped",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/shipment/label": {
+      "get": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "The live shipment's label PDF.",
+        "operationId": "label_url",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadLink"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/orders/{id}/shipping-address": {
+      "put": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Changes the shipping address before a label exists (same country: M1 has no financial\nedits, A13).",
+        "operationId": "update_address",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutAddress"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "409": {
+            "description": "address_locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8336,6 +9485,71 @@
             "description": "Deleted"
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/refunds/{id}/retry": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Retries a refund: a pending Stripe refund with the same idempotency key, or the payout of a\ndocumented refund whose provider refund failed (no second credit note). Admin.",
+        "operationId": "retry_refund",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refund"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_retryable | retry_in_progress",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10848,6 +12062,273 @@
             }
           },
           "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/withdrawals": {
+      "get": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Withdrawals, soonest refund deadline first.",
+        "operationId": "list_withdrawals",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "open",
+            "in": "query",
+            "description": "Only withdrawals still to refund (default true).",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/withdrawals/{id}": {
+      "get": {
+        "tags": [
+          "fulfillment"
+        ],
+        "operationId": "get_withdrawal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/withdrawals/{id}/proof": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "The customer proved they sent the goods back (the refund may go out before they arrive).",
+        "operationId": "withdrawal_proof",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/withdrawals/{id}/receive": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "The returned goods arrived: restocked (A13).",
+        "operationId": "receive_withdrawal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Withdrawal"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "already_received | invalid_transition",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/withdrawals/{id}/refund": {
+      "post": {
+        "tags": [
+          "fulfillment"
+        ],
+        "summary": "Refunds the withdrawn goods (+ shipping when everything was withdrawn). Admin.",
+        "operationId": "refund_withdrawal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundOutcome"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "goods_not_back | already_refunded | nothing_to_refund | invoice_pending",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -13663,6 +15144,297 @@
         }
       }
     },
+    "/storefront/v1/customer/orders/{id}/documents": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "my_documents",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentLinks"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/customer/orders/{id}/withdrawal": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "my_form",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalForm"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "my_declare",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Customer-Session",
+            "in": "header",
+            "description": "Session token from the checkout origin's `__Host-sid` cookie (set by the edge).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclareInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_withdrawable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/customer/password": {
       "post": {
         "tags": [
@@ -14614,6 +16386,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrderView"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/orders/{token}/documents": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "order_documents",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Order capability token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentLinks"
                 }
               }
             }
@@ -16129,6 +17971,242 @@
         }
       }
     },
+    "/storefront/v1/withdrawals": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Step 1 of the public form: order number + email. If they match an order that can be\nwithdrawn from, a single-use confirmation link (24 h) is emailed. Always `202`.",
+        "operationId": "request_link",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {},
+          "422": {
+            "description": "invalid_email",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/withdrawals/{token}": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "operationId": "form_by_token",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Emailed withdrawal link token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalForm"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "unknown, used or expired link",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "The explicit confirmation (A19): records the withdrawal, consumes the link and emails the\nreceipt with the full declaration.",
+        "operationId": "declare_by_token",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "description": "Emailed withdrawal link token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclareInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WithdrawalReceipt"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "unknown, used or expired link",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_withdrawable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "confirmation_required | invalid_withdrawal | iban_required | invalid_iban",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/webhooks/fake": {
       "post": {
         "tags": [
@@ -16914,15 +18992,23 @@
       },
       "AdminOrder": {
         "type": "object",
-        "description": "The admin's read-only order detail (full management is WP12).",
+        "description": "The admin's order detail.",
         "required": [
           "order",
           "market_id",
           "ship_to_country",
           "attempts",
-          "events"
+          "events",
+          "shipments",
+          "invoices",
+          "refunds",
+          "withdrawals",
+          "actions"
         ],
         "properties": {
+          "actions": {
+            "$ref": "#/components/schemas/OrderActions"
+          },
           "attempts": {
             "type": "array",
             "items": {
@@ -16956,6 +19042,12 @@
             "format": "date-time",
             "description": "When a person settled the exception (it then leaves the work list), and how."
           },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvoiceSummary"
+            }
+          },
           "market_id": {
             "type": "string",
             "format": "uuid"
@@ -16963,8 +19055,27 @@
           "order": {
             "$ref": "#/components/schemas/OrderView"
           },
+          "refunds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundView"
+            }
+          },
           "ship_to_country": {
             "type": "string"
+          },
+          "shipments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipmentView"
+            },
+            "description": "WP12: shipments (labels, tracking), invoices and credit notes, refunds, withdrawals and\nwhat an admin can do now."
+          },
+          "withdrawals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Withdrawal"
+            }
           }
         }
       },
@@ -18445,6 +20556,41 @@
           "cancelled"
         ]
       },
+      "CancelInput": {
+        "type": "object",
+        "properties": {
+          "iban": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bank transfer / COD: where the refund of a paid order goes."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CancelOutcome": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RefundOutcome",
+                "description": "The refund of a paid order (with its credit note)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "Carrier": {
         "type": "string",
         "enum": [
@@ -18452,6 +20598,94 @@
           "packeta_home",
           "ppl",
           "personal_pickup"
+        ]
+      },
+      "CarrierAccount": {
+        "type": "object",
+        "required": [
+          "carrier",
+          "configured"
+        ],
+        "properties": {
+          "carrier": {
+            "$ref": "#/components/schemas/CarrierKind"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "public_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Packeta: the public widget/API key (first 16 characters of the API password)."
+          },
+          "sender_label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender name on labels (Packeta `eshop`)."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CarrierAccountInput": {
+        "type": "object",
+        "description": "Credentials to store. Packeta: `api_password`; PPL: `client_id` + `client_secret`.",
+        "required": [
+          "sender_label"
+        ],
+        "properties": {
+          "api_password": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sender_label": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CarrierAccountList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierAccount"
+            }
+          }
+        }
+      },
+      "CarrierKind": {
+        "type": "string",
+        "enum": [
+          "packeta",
+          "ppl"
         ]
       },
       "CartCoupon": {
@@ -20310,6 +22544,40 @@
           }
         }
       },
+      "DeclareInput": {
+        "type": "object",
+        "required": [
+          "lines",
+          "confirm"
+        ],
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "description": "The explicit confirmation step (A19): must be `true`."
+          },
+          "iban": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required for bank transfer and cash on delivery orders."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundLine"
+            }
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional message to the shop (a reason is not required by law)."
+          }
+        },
+        "additionalProperties": false
+      },
       "Delivery": {
         "type": "object",
         "required": [
@@ -20426,6 +22694,128 @@
           "origin_threshold",
           "destination"
         ]
+      },
+      "DocumentInput": {
+        "type": "object",
+        "required": [
+          "kind",
+          "order_ids"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/GeneratedKind"
+          },
+          "locale": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Packing slip language: `cs`, `sk` or `en` (default `cs`)."
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "1-100 orders."
+          }
+        },
+        "additionalProperties": false
+      },
+      "DocumentKind": {
+        "type": "string",
+        "enum": [
+          "invoice",
+          "credit_note"
+        ]
+      },
+      "DocumentLink": {
+        "type": "object",
+        "description": "An invoice or credit note with a 5-minute download link.",
+        "required": [
+          "id",
+          "kind",
+          "number",
+          "issued_on",
+          "total",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issued_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DocumentKind"
+          },
+          "number": {
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "DocumentLinks": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentLink"
+            }
+          }
+        }
+      },
+      "DocumentRequested": {
+        "type": "object",
+        "required": [
+          "document",
+          "failures"
+        ],
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/GeneratedDocument"
+          },
+          "failures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabelFailure"
+            },
+            "description": "Orders whose label could not be created (label sheets): `{order_id, error}`."
+          }
+        }
+      },
+      "DocumentStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed"
+        ]
+      },
+      "DownloadLink": {
+        "type": "object",
+        "description": "A 5-minute download link (A21).",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        }
       },
       "EmailBlock": {
         "oneOf": [
@@ -20990,6 +23380,59 @@
             "description": "`sessions`, `view_item`, `add_to_cart`, `begin_checkout`, `purchase`."
           }
         }
+      },
+      "GeneratedDocument": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "order_ids",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/GeneratedKind"
+          },
+          "order_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/DocumentStatus"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A 5-minute download link once `ready`."
+          }
+        }
+      },
+      "GeneratedKind": {
+        "type": "string",
+        "enum": [
+          "packing_slips",
+          "labels"
+        ]
       },
       "Glossary": {
         "type": "object",
@@ -21736,6 +24179,45 @@
         },
         "additionalProperties": false
       },
+      "InvoiceSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "number",
+          "issued_on",
+          "taxable_supply_date",
+          "total",
+          "pdf_ready"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issued_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DocumentKind"
+          },
+          "number": {
+            "type": "string"
+          },
+          "pdf_ready": {
+            "type": "boolean",
+            "description": "The PDF is rendered (downloadable)."
+          },
+          "taxable_supply_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyView"
+          }
+        }
+      },
       "ItemProblem": {
         "type": "object",
         "required": [
@@ -21843,6 +24325,36 @@
             "format": "int64"
           }
         }
+      },
+      "LabelFailure": {
+        "type": "object",
+        "required": [
+          "order_id",
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "LabelInput": {
+        "type": "object",
+        "properties": {
+          "weight_g": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Parcel weight in grams; default: the variants' weights (at least 100 g)."
+          }
+        },
+        "additionalProperties": false
       },
       "Legal": {
         "type": "object",
@@ -22096,6 +24608,22 @@
             "type": "string"
           }
         }
+      },
+      "LinkRequest": {
+        "type": "object",
+        "required": [
+          "order_number",
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "order_number": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "ListingPage": {
         "type": "object",
@@ -23539,6 +26067,49 @@
           }
         }
       },
+      "OrderActions": {
+        "type": "object",
+        "required": [
+          "start_processing",
+          "create_label",
+          "cancel_label",
+          "ship",
+          "deliver",
+          "returned_to_sender",
+          "cancel",
+          "refund",
+          "edit_address"
+        ],
+        "properties": {
+          "cancel": {
+            "type": "boolean"
+          },
+          "cancel_label": {
+            "type": "boolean"
+          },
+          "create_label": {
+            "type": "boolean"
+          },
+          "deliver": {
+            "type": "boolean"
+          },
+          "edit_address": {
+            "type": "boolean"
+          },
+          "refund": {
+            "type": "boolean"
+          },
+          "returned_to_sender": {
+            "type": "boolean"
+          },
+          "ship": {
+            "type": "boolean"
+          },
+          "start_processing": {
+            "type": "boolean"
+          }
+        }
+      },
       "OrderAddress": {
         "type": "object",
         "required": [
@@ -23623,6 +26194,7 @@
       "OrderLineView": {
         "type": "object",
         "required": [
+          "id",
           "sku",
           "name",
           "options_label",
@@ -23637,6 +26209,11 @@
           "discount": {
             "$ref": "#/components/schemas/MoneyView",
             "description": "This line's share of the coupon (A15)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The order line (refunds and withdrawals name lines by it)."
           },
           "name": {
             "type": "string"
@@ -23671,6 +26248,19 @@
             "format": "uuid"
           }
         }
+      },
+      "OrderNoteInput": {
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "1-2000 characters, shown on the timeline."
+          }
+        },
+        "additionalProperties": false
       },
       "OrderPage": {
         "type": "object",
@@ -24832,6 +27422,38 @@
           "applied",
           "failed"
         ]
+      },
+      "PlannedLine": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "quantity",
+          "amount"
+        ],
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`goods`, `shipping`, `payment_fee`, `rounding`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "order_line_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "Preferences": {
         "type": "object",
@@ -26149,6 +28771,217 @@
           }
         }
       },
+      "Refund": {
+        "type": "object",
+        "required": [
+          "id",
+          "order_id",
+          "attempt_id",
+          "amount_minor",
+          "currency",
+          "status"
+        ],
+        "properties": {
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/RefundStatus"
+          }
+        }
+      },
+      "RefundInput": {
+        "type": "object",
+        "properties": {
+          "iban": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where a bank refund goes (bank transfer, cash on delivery), shown to the person paying it."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundLine"
+            },
+            "description": "Goods to refund: more units of order lines."
+          },
+          "payment_fee": {
+            "type": "boolean",
+            "description": "Refund the whole payment fee."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shipping": {
+            "type": "boolean",
+            "description": "Refund the whole shipping charge."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundLine": {
+        "type": "object",
+        "description": "A goods line to refund: `quantity` more units of an order line.",
+        "required": [
+          "order_line_id",
+          "quantity"
+        ],
+        "properties": {
+          "order_line_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefundOutcome": {
+        "type": "object",
+        "required": [
+          "refund",
+          "plan"
+        ],
+        "properties": {
+          "credit_note_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/RefundPlan"
+          },
+          "refund": {
+            "$ref": "#/components/schemas/Refund"
+          }
+        }
+      },
+      "RefundPlan": {
+        "type": "object",
+        "description": "What a refund would return (also the admin preview).",
+        "required": [
+          "lines",
+          "amount",
+          "full"
+        ],
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "full": {
+            "type": "boolean",
+            "description": "Everything the customer paid is refunded after this."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannedLine"
+            }
+          }
+        }
+      },
+      "RefundStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "succeeded",
+          "failed"
+        ]
+      },
+      "RefundView": {
+        "type": "object",
+        "required": [
+          "id",
+          "amount",
+          "status",
+          "created_by",
+          "created_at"
+        ],
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/MoneyView"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "credit_note_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "iban": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bank refunds: the account to pay."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `succeeded`, `failed`."
+          },
+          "withdrawal_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "RemitInput": {
         "type": "object",
         "properties": {
@@ -26310,6 +29143,51 @@
           },
           "to_path": {
             "type": "string"
+          }
+        }
+      },
+      "ReturnLineStatus": {
+        "type": "string",
+        "enum": [
+          "requested",
+          "approved",
+          "received",
+          "refunded_awaiting_goods",
+          "refunded",
+          "rejected"
+        ]
+      },
+      "ReturnLineView": {
+        "type": "object",
+        "required": [
+          "id",
+          "order_line_id",
+          "name",
+          "sku",
+          "quantity",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "order_line_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReturnLineStatus"
           }
         }
       },
@@ -26563,7 +29441,7 @@
           "revenue_minor": {
             "type": "integer",
             "format": "int64",
-            "description": "Sum of order totals (placed, not cancelled), minor units."
+            "description": "Sum of order totals (placed, not cancelled) less what was refunded of them (WP12,\nnetted on the order's day), minor units."
           }
         }
       },
@@ -26905,6 +29783,86 @@
           },
           "title": {
             "type": "string"
+          }
+        }
+      },
+      "ShipmentStatus": {
+        "type": "string",
+        "enum": [
+          "creating",
+          "label_created",
+          "shipped",
+          "delivered",
+          "returned",
+          "cancelled"
+        ]
+      },
+      "ShipmentView": {
+        "type": "object",
+        "required": [
+          "id",
+          "carrier",
+          "status",
+          "has_label",
+          "created_at"
+        ],
+        "properties": {
+          "carrier": {
+            "$ref": "#/components/schemas/Carrier"
+          },
+          "carrier_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "carrier_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The carrier's last reported state."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "has_label": {
+            "type": "boolean",
+            "description": "A label PDF is stored (`GET …/label`)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "shipped_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ShipmentStatus"
+          },
+          "tracking_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tracking_url": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -28852,6 +31810,248 @@
           }
         },
         "additionalProperties": false
+      },
+      "WithdrawableLine": {
+        "type": "object",
+        "required": [
+          "order_line_id",
+          "name",
+          "options_label",
+          "sku",
+          "quantity",
+          "withdrawable"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "options_label": {
+            "type": "string"
+          },
+          "order_line_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sku": {
+            "type": "string"
+          },
+          "withdrawable": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Not yet withdrawn."
+          }
+        }
+      },
+      "Withdrawal": {
+        "type": "object",
+        "required": [
+          "id",
+          "order_id",
+          "order_number",
+          "email",
+          "channel",
+          "status",
+          "declaration",
+          "declared_at",
+          "refund_due_at",
+          "late",
+          "overdue",
+          "lines"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string"
+          },
+          "declaration": {
+            "type": "string"
+          },
+          "declared_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "email": {
+            "type": "string"
+          },
+          "goods_received_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "iban": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "late": {
+            "type": "boolean",
+            "description": "Declared after the 14-day period (the merchant decides)."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReturnLineView"
+            }
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "The refund deadline has passed without a refund."
+          },
+          "refund_due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refunded_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "return_proof_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` or `refunded`."
+          }
+        }
+      },
+      "WithdrawalForm": {
+        "type": "object",
+        "required": [
+          "order_number",
+          "placed_at",
+          "eligible",
+          "needs_iban",
+          "lines",
+          "withdrawals"
+        ],
+        "properties": {
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "delivered + 14 days (the statutory period; later declarations are still recorded)."
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "eligible": {
+            "type": "boolean",
+            "description": "The order has left the warehouse (before that it is cancelled, not withdrawn)."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WithdrawableLine"
+            }
+          },
+          "needs_iban": {
+            "type": "boolean",
+            "description": "Bank transfer and cash on delivery are refunded to a bank account: the form asks for it."
+          },
+          "order_number": {
+            "type": "string"
+          },
+          "placed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "withdrawals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WithdrawalReceipt"
+            },
+            "description": "Earlier withdrawals of this order."
+          }
+        }
+      },
+      "WithdrawalList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Withdrawal"
+            }
+          }
+        }
+      },
+      "WithdrawalReceipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "declared_at",
+          "refund_due_at",
+          "declaration",
+          "status"
+        ],
+        "properties": {
+          "declaration": {
+            "type": "string",
+            "description": "The declaration as confirmed (also emailed)."
+          },
+          "declared_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "refund_due_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "description": "`open` or `refunded`."
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -28931,6 +32131,10 @@
     {
       "name": "payments",
       "description": "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"
+    },
+    {
+      "name": "fulfillment",
+      "description": "Admin API: order management, labels and shipments, invoices and credit notes, refunds, withdrawals, carrier accounts"
     },
     {
       "name": "analytics",

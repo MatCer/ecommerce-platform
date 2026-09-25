@@ -1,0 +1,5 @@
+{% extends "order.txt" %}
+{% block heading %}{{ t("order_cancelled.heading", number=order.number) }}{% endblock %}
+{% block intro %}{{ t("order_cancelled.intro_" ~ reason, shop=brand.shop_name) }}
+{% if refund %}{{ t("order_cancelled.refund") }}
+{% endif %}{% endblock %}

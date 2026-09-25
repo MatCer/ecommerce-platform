@@ -144,6 +144,16 @@ pub struct Outgoing<'a> {
     /// Marketing mail: the one-click unsubscribe URL (RFC 8058), sent as `List-Unsubscribe`
     /// with `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
     pub list_unsubscribe: Option<&'a str>,
+    /// Files attached to the message (invoices, WP12).
+    pub attachments: &'a [Attachment],
+}
+
+/// A file attached to an email.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attachment {
+    pub filename: String,
+    pub content_type: String,
+    pub body: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -241,11 +251,22 @@ fn build(t: &Transport, msg: &Outgoing<'_>) -> Result<Message, String> {
                 "List-Unsubscribe=One-Click".into(),
             ));
     }
+    let body = MultiPart::alternative_plain_html(msg.text.to_owned(), msg.html.to_owned());
+    if msg.attachments.is_empty() {
+        return builder
+            .multipart(body)
+            .map_err(|e| format!("invalid message: {e}"));
+    }
+    let mut mixed = MultiPart::mixed().multipart(body);
+    for a in msg.attachments {
+        let content_type = header::ContentType::parse(&a.content_type)
+            .map_err(|e| format!("invalid attachment type: {e}"))?;
+        let name: String = a.filename.chars().filter(|c| !c.is_control()).collect();
+        mixed = mixed
+            .singlepart(lettre::message::Attachment::new(name).body(a.body.clone(), content_type));
+    }
     builder
-        .multipart(MultiPart::alternative_plain_html(
-            msg.text.to_owned(),
-            msg.html.to_owned(),
-        ))
+        .multipart(mixed)
         .map_err(|e| format!("invalid message: {e}"))
 }
 
@@ -339,6 +360,7 @@ mod tests {
             text: "x",
             id: "0190a2b4-0000-7000-8000-000000000001",
             list_unsubscribe,
+            attachments: &[],
         }
     }
 

@@ -1,0 +1,143 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, carrier, status, carrier_ref, tracking_number, tracking_url, carrier_status,\n                label_key IS NOT NULL AS \"has_label!\", created_at, shipped_at, delivered_at\n         FROM shipments WHERE order_id = $1 ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "carrier",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "carrier"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "carrier_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "carrier_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "tracking_number",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "tracking_number"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "tracking_url",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "tracking_url"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "carrier_status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "carrier_status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "has_label!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "shipped_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "shipped_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "delivered_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "shipments",
+            "name": "delivered_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      null,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "c7b54f6f6b68885f79240ec41b5294785544008fb68e01b54ab0050c0a186299"
+}

@@ -774,7 +774,7 @@ async fn campaigns_send_once_per_subscriber_with_rechecks_and_tracking(db: PgPoo
     let prefs = campaigns::unsubscribe(&mut tx, token, None).await.unwrap();
     assert_eq!(prefs.status, Status::Unsubscribed);
     tx.commit().await.unwrap();
-    let step = notifications::deliver(&runtime, &smtp.mailer(), s.tenant, message)
+    let step = notifications::deliver(&runtime, &smtp.mailer(), None, s.tenant, message)
         .await
         .unwrap();
     assert_eq!(step, Step::Done);
@@ -1035,7 +1035,7 @@ async fn cancellation_and_withdrawn_personalization_stop_queued_mail(db: PgPool)
     let mut tx = tenant_tx(&runtime, s.tenant).await.unwrap();
     campaigns::cancel(&mut tx, "staff", campaign).await.unwrap();
     tx.commit().await.unwrap();
-    notifications::deliver(&runtime, &smtp.mailer(), s.tenant, ids[0])
+    notifications::deliver(&runtime, &smtp.mailer(), None, s.tenant, ids[0])
         .await
         .unwrap();
     assert_eq!(
@@ -1093,7 +1093,7 @@ async fn cancellation_and_withdrawn_personalization_stop_queued_mail(db: PgPool)
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    notifications::deliver(&runtime, &smtp.mailer(), s.tenant, ids[0])
+    notifications::deliver(&runtime, &smtp.mailer(), None, s.tenant, ids[0])
         .await
         .unwrap();
     assert_eq!(
@@ -1103,7 +1103,7 @@ async fn cancellation_and_withdrawn_personalization_stop_queued_mail(db: PgPool)
     assert!(smtp.received().is_empty());
     // Without personalization the next campaign is rendered from the fallback and goes out.
     let (_, ids) = sent_campaign(&runtime, &s, personal).await;
-    notifications::deliver(&runtime, &smtp.mailer(), s.tenant, ids[0])
+    notifications::deliver(&runtime, &smtp.mailer(), None, s.tenant, ids[0])
         .await
         .unwrap();
     assert_eq!(

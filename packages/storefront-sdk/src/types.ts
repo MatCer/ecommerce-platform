@@ -110,3 +110,7 @@ export type OrderPage = S["OrderPage"];
 export type NewsletterConfirmation = S["Confirmation"];
 /** Newsletter (WP18): the subscription behind a campaign email's token (preference page). */
 export type NewsletterPreferences = S["Preferences"];
+export type WithdrawalForm = S["WithdrawalForm"];
+export type WithdrawalReceipt = S["WithdrawalReceipt"];
+export type DeclareInput = S["DeclareInput"];
+export type DocumentLinks = S["DocumentLinks"];

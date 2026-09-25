@@ -1,0 +1,7 @@
+{% extends "layout.mjml" %}
+{% block content %}
+        <mj-text font-size="22px" font-weight="700">{{ t(kind ~ ".heading", doc=document.number) }}</mj-text>
+        <mj-text>{{ t(kind ~ ".intro", shop=brand.shop_name, number=order.number) }}</mj-text>
+        <mj-text>{{ t("invoice.total") }}: <strong>{{ document.total }}</strong><br />{{ t("invoice.issued_on") }}: {{ document.issued_on }}</mj-text>
+        <mj-button href="{{ order.url }}">{{ t("order.button") }}</mj-button>
+{% endblock %}

@@ -1101,6 +1101,7 @@ pub async fn test_send(
                 sensitive: false,
                 subscriber_id: None,
                 list_unsubscribe: None,
+                attachments: &[],
             },
         )
         .await?;
@@ -1395,6 +1396,7 @@ async fn send_one(
             sensitive: false,
             subscriber_id: Some(m.id),
             list_unsubscribe: Some(&one_click),
+            attachments: &[],
         },
     )
     .await?;

@@ -1,0 +1,48 @@
+{
+  "locale": "cs",
+  "shop": "Demo obchod",
+  "orders": [
+    {
+      "number": "100001",
+      "placed_on": "25. 9. 2026",
+      "shipping": "Packeta – výdejní místo",
+      "pickup_point": "4101 · Z-BOX Praha 1, Dlouhá 1",
+      "address": ["Jana Nováková", "Krátká 8", "602 00 Brno"],
+      "email": "jana@example.cz",
+      "phone": "+420 777 123 456",
+      "notes": "Prosím dobře zabalit kávu.",
+      "lines": [
+        {
+          "sku": "TEE-BLU-M",
+          "name": "Bavlněné tričko",
+          "options": "Barva: modrá / Velikost: M",
+          "quantity": "2"
+        },
+        {
+          "sku": "COFFEE-250",
+          "name": "Káva z pražírny",
+          "options": "250 g / zrnková",
+          "quantity": "1"
+        }
+      ]
+    },
+    {
+      "number": "100002",
+      "placed_on": "25. 9. 2026",
+      "shipping": "PPL – doručení na adresu",
+      "pickup_point": null,
+      "address": ["Petr Dvořák", "Nová 10", "779 00 Olomouc"],
+      "email": "petr@example.cz",
+      "phone": null,
+      "notes": null,
+      "lines": [
+        {
+          "sku": "BAG-NAT",
+          "name": "Ručně šitá taška",
+          "options": "",
+          "quantity": "1"
+        }
+      ]
+    }
+  ]
+}

@@ -21,6 +21,7 @@ use std::sync::LazyLock;
 
 use minijinja::value::Kwargs;
 use minijinja::{AutoEscape, Environment, State, UndefinedBehavior};
+use object_store::ObjectStoreExt;
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
 use platform::mail::{Delivery, Mailer, Outgoing, Stream};
@@ -217,6 +218,61 @@ static TEMPLATES: LazyLock<Environment<'static>> = LazyLock::new(|| {
         ),
         ("campaign.mjml", include_str!("templates/campaign.mjml")),
         ("campaign.txt", include_str!("templates/campaign.txt")),
+        (
+            "order_shipped.mjml",
+            include_str!("templates/order_shipped.mjml"),
+        ),
+        (
+            "order_shipped.txt",
+            include_str!("templates/order_shipped.txt"),
+        ),
+        (
+            "order_delivered.mjml",
+            include_str!("templates/order_delivered.mjml"),
+        ),
+        (
+            "order_delivered.txt",
+            include_str!("templates/order_delivered.txt"),
+        ),
+        (
+            "order_cancelled.mjml",
+            include_str!("templates/order_cancelled.mjml"),
+        ),
+        (
+            "order_cancelled.txt",
+            include_str!("templates/order_cancelled.txt"),
+        ),
+        (
+            "order_refunded.mjml",
+            include_str!("templates/order_refunded.mjml"),
+        ),
+        (
+            "order_refunded.txt",
+            include_str!("templates/order_refunded.txt"),
+        ),
+        ("invoice.mjml", include_str!("templates/invoice.mjml")),
+        ("invoice.txt", include_str!("templates/invoice.txt")),
+        (
+            "credit_note.mjml",
+            include_str!("templates/credit_note.mjml"),
+        ),
+        ("credit_note.txt", include_str!("templates/credit_note.txt")),
+        (
+            "withdrawal_link.mjml",
+            include_str!("templates/withdrawal_link.mjml"),
+        ),
+        (
+            "withdrawal_link.txt",
+            include_str!("templates/withdrawal_link.txt"),
+        ),
+        (
+            "withdrawal_receipt.mjml",
+            include_str!("templates/withdrawal_receipt.mjml"),
+        ),
+        (
+            "withdrawal_receipt.txt",
+            include_str!("templates/withdrawal_receipt.txt"),
+        ),
     ] {
         // Templates are compiled into the binary and covered by tests.
         if let Err(e) = env.add_template(name, source) {
@@ -240,13 +296,31 @@ pub enum Template {
     PaymentReminder,
     /// Newsletter double opt-in (WP18): the confirmation link.
     NewsletterConfirm,
+    /// WP12: the parcel left (tracking link), arrived, the order was cancelled or refunded.
+    OrderShipped,
+    OrderDelivered,
+    OrderCancelled,
+    OrderRefunded,
+    /// WP12: an invoice / credit note, with its PDF attached.
+    Invoice,
+    CreditNote,
+    /// A19: the confirmation link of the public withdrawal form, and the durable receipt.
+    WithdrawalLink,
+    WithdrawalReceipt,
 }
 
 impl Template {
     /// Templates whose subject and intro a tenant may replace (§11.4).
-    pub const EDITABLE: [Self; 6] = [
+    pub const EDITABLE: [Self; 13] = [
         Self::OrderConfirmation,
         Self::PaymentReminder,
+        Self::OrderShipped,
+        Self::OrderDelivered,
+        Self::OrderRefunded,
+        Self::Invoice,
+        Self::CreditNote,
+        Self::WithdrawalLink,
+        Self::WithdrawalReceipt,
         Self::MagicLink,
         Self::PasswordChanged,
         Self::NewsletterConfirm,
@@ -262,6 +336,14 @@ impl Template {
             Self::OrderConfirmation => "order_confirmation",
             Self::PaymentReminder => "payment_reminder",
             Self::NewsletterConfirm => "newsletter_confirm",
+            Self::OrderShipped => "order_shipped",
+            Self::OrderDelivered => "order_delivered",
+            Self::OrderCancelled => "order_cancelled",
+            Self::OrderRefunded => "order_refunded",
+            Self::Invoice => "invoice",
+            Self::CreditNote => "credit_note",
+            Self::WithdrawalLink => "withdrawal_link",
+            Self::WithdrawalReceipt => "withdrawal_receipt",
         }
     }
 
@@ -290,7 +372,11 @@ pub fn render(
 ) -> Result<Rendered, Error> {
     let name = template.name();
     let mut subject_args = vec![("shop", brand.shop_name.clone())];
-    if let Some(number) = vars.pointer("/order/number").and_then(Value::as_str) {
+    if let Some(number) = vars
+        .pointer("/order/number")
+        .or_else(|| vars.pointer("/number"))
+        .and_then(Value::as_str)
+    {
         subject_args.push(("number", number.to_owned()));
     }
     let subject_key = format!("{name}.subject");
@@ -361,6 +447,24 @@ pub struct Email<'a> {
 /// Renders the email and stores it with its `mail.send` job in the caller's transaction.
 /// Returns the message id (the existing one for a repeated idempotency key).
 pub async fn enqueue(tx: &mut TenantTx, brand: &Brand, email: Email<'_>) -> Result<Uuid, Error> {
+    enqueue_with_attachments(tx, brand, email, &[]).await
+}
+
+/// A private-bucket object attached when the message is sent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize)]
+pub struct AttachmentRef {
+    pub key: String,
+    pub filename: String,
+    pub content_type: String,
+}
+
+/// [`enqueue`] with files from the private bucket, loaded by the worker at send time.
+pub async fn enqueue_with_attachments(
+    tx: &mut TenantTx,
+    brand: &Brand,
+    email: Email<'_>,
+    attachments: &[AttachmentRef],
+) -> Result<Uuid, Error> {
     let r = render(email.template, email.locale, brand, &email.vars)?;
     store(
         tx,
@@ -374,6 +478,7 @@ pub async fn enqueue(tx: &mut TenantTx, brand: &Brand, email: Email<'_>) -> Resu
             sensitive: email.sensitive,
             subscriber_id: None,
             list_unsubscribe: None,
+            attachments,
         },
     )
     .await
@@ -394,15 +499,18 @@ pub struct Stored<'a> {
     pub subscriber_id: Option<Uuid>,
     /// Marketing: the RFC 8058 one-click unsubscribe URL.
     pub list_unsubscribe: Option<&'a str>,
+    /// Private-bucket files attached at send time (invoices).
+    pub attachments: &'a [AttachmentRef],
 }
 
 /// Stores a rendered message with its `mail.send` job (idempotent per key).
 pub async fn store(tx: &mut TenantTx, m: Stored<'_>) -> Result<Uuid, Error> {
+    let files = serde_json::to_value(m.attachments).map_err(|e| Error::Internal(e.to_string()))?;
     let inserted = sqlx::query_scalar!(
         "INSERT INTO email_messages (tenant_id, stream, template, idempotency_key, to_email, locale,
                                      subject, html, body_text, sensitive, subscriber_id,
-                                     list_unsubscribe)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                     list_unsubscribe, attachments)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT ON CONSTRAINT email_messages_idempotency DO NOTHING
          RETURNING id",
         tx.tenant_id(),
@@ -416,7 +524,8 @@ pub async fn store(tx: &mut TenantTx, m: Stored<'_>) -> Result<Uuid, Error> {
         m.rendered.text,
         m.sensitive,
         m.subscriber_id,
-        m.list_unsubscribe
+        m.list_unsubscribe,
+        files
     )
     .fetch_optional(&mut **tx)
     .await?;
@@ -521,6 +630,7 @@ pub struct Sending {
     /// SMTP attempts including this one.
     pub attempts: i32,
     pub uncertain_count: i16,
+    pub attachments: Vec<AttachmentRef>,
 }
 
 /// Longest a send can legitimately stay `sending` (SMTP timeout 30 s, lease 60 s). Older
@@ -538,7 +648,7 @@ pub async fn begin_send(
     let mut tx = tenant_tx(db, tenant).await?;
     let Some(m) = sqlx::query!(
         r#"SELECT stream, to_email, subject, html, body_text, status, uncertain_count, attempts,
-                  subscriber_id, list_unsubscribe,
+                  subscriber_id, list_unsubscribe, attachments,
                   updated_at < now() - make_interval(secs => $2) AS "stale!"
            FROM email_messages WHERE id = $1 FOR UPDATE"#,
         id,
@@ -625,6 +735,8 @@ pub async fn begin_send(
         list_unsubscribe: m.list_unsubscribe,
         attempts: m.attempts + 1,
         uncertain_count: uncertain,
+        attachments: serde_json::from_value(m.attachments)
+            .map_err(|e| Error::Internal(format!("stored attachments: {e}")))?,
     }))
 }
 
@@ -724,12 +836,49 @@ pub async fn finish_send(db: &PgPool, s: &Sending, outcome: Delivery) -> Result<
     Ok(step)
 }
 
-/// The `mail.send` job: sends message `id` of `tenant` if its state allows it.
-pub async fn deliver(db: &PgPool, mailer: &Mailer, tenant: Uuid, id: Uuid) -> Result<Step, Error> {
+/// The `mail.send` job: sends message `id` of `tenant` if its state allows it. Attachments
+/// come from the private bucket (`storage`); a message with attachments waits (retries) while
+/// storage is unavailable.
+pub async fn deliver(
+    db: &PgPool,
+    mailer: &Mailer,
+    storage: Option<&platform::storage::Storage>,
+    tenant: Uuid,
+    id: Uuid,
+) -> Result<Step, Error> {
     let s = match begin_send(db, tenant, id).await? {
         Ok(s) => s,
         Err(step) => return Ok(step),
     };
+    let mut files = Vec::with_capacity(s.attachments.len());
+    for a in &s.attachments {
+        let body = match storage {
+            Some(st) => match st
+                .private
+                .get(&object_store::path::Path::from(a.key.as_str()))
+                .await
+            {
+                Ok(r) => r.bytes().await.map_err(|e| e.to_string()),
+                Err(e) => Err(e.to_string()),
+            },
+            None => Err("storage is not configured".to_owned()),
+        };
+        match body {
+            Ok(b) => files.push(platform::mail::Attachment {
+                filename: a.filename.clone(),
+                content_type: a.content_type.clone(),
+                body: b.to_vec(),
+            }),
+            Err(e) => {
+                return finish_send(
+                    db,
+                    &s,
+                    Delivery::NotSent(format!("attachment {}: {e}", a.key)),
+                )
+                .await;
+            }
+        }
+    }
     let shop_name = {
         let mut tx = tenant_tx(db, tenant).await?;
         let name = sqlx::query_scalar!("SELECT name FROM platform.tenants WHERE id = $1", tenant)
@@ -749,6 +898,7 @@ pub async fn deliver(db: &PgPool, mailer: &Mailer, tenant: Uuid, id: Uuid) -> Re
             text: &s.text,
             id: &id_text,
             list_unsubscribe: s.list_unsubscribe.as_deref(),
+            attachments: &files,
         })
         .await;
     finish_send(db, &s, outcome).await
