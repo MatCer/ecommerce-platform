@@ -128,6 +128,8 @@ const ORDER_PAGE_RE = /^\/o\/[0-9a-f]{64}$/;
 
 const MAX_JSON_BODY = 16 * 1024;
 const MAX_EVENTS_BODY = 64 * 1024;
+/** Context, limit and up to 12 recently viewed ids fit well under this. */
+const MAX_RECOMMENDATIONS_QUERY = 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
 /** Customer session (A1): checkout origin only, host-only via the `__Host-` prefix. */
@@ -618,8 +620,8 @@ export function createGateway(opts: GatewayOptions) {
     }
     const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
     const session = capabilityCookie(req, SESSION_COOKIE);
-    // A20: place-order links a consented visitor's purchase to their analytics session.
-    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    // A20: place-order links a consented visitor's purchase to their analytics session and
+    // (WP20) to the ad platforms; the API resolves both consents from its records.
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1${apiPath}${rest}`, {
         method: req.method,
@@ -627,7 +629,7 @@ export function createGateway(opts: GatewayOptions) {
           ...(body ? { "content-type": "application/json" } : {}),
           ...(cart ? { "x-cart-token": cart } : {}),
           ...(session ? { "x-customer-session": session } : {}),
-          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+          ...consentSubject(req),
           ...(clientIp ? { "x-client-ip": clientIp } : {}),
           ...(key ? { "idempotency-key": key } : {}),
         }),
@@ -932,6 +934,39 @@ ${
     });
   }
 
+  /**
+   * `/_p/recommendations` (WP17, shop origin): the private variant of `/recommendations`. Only
+   * here does the API get the visitor's cart capability (cross-sell for the cart) and consent
+   * subject (A20: personalization and recently viewed only while its records grant
+   * `personalization`); SSR and `/_p/public/*` never carry either, so they stay public. Never
+   * cached (A2). Unprefixed only, like the cart (its cookie is `Path=/_p`): `?locale=` picks
+   * one of the market's locales instead of a path prefix.
+   */
+  async function recommendationsProxy(site: Site, req: Request, url: URL): Promise<Response> {
+    if (req.method !== "GET") return text(405, "Method not allowed", { allow: "GET" });
+    if (url.search.length > MAX_RECOMMENDATIONS_QUERY)
+      return problem(414, "uri_too_long", "recommendations query too long");
+    const locale = url.searchParams.get("locale");
+    const localized = locale && site.locales.includes(locale) ? { ...site, locale } : site;
+    const token = readCookie(req.headers, SHOP_CART_COOKIE);
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/recommendations${url.search}`, {
+        headers: apiHeaders(localized, {
+          accept: "application/json",
+          ...(token && TOKEN_RE.test(token) ? { "x-cart-token": token } : {}),
+          ...consentSubject(req),
+        }),
+      }),
+    );
+    return new Response(await res.arrayBuffer(), {
+      status: res.status,
+      headers: withRetryAfter(res, {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+        "cache-control": "private, no-store",
+      }),
+    });
+  }
+
   async function events(site: Site, req: Request, host: string, port: string): Promise<Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     if (!sameOrigin(req, host, port)) return problem(403, "cross_origin", "cross-origin request");
@@ -939,14 +974,14 @@ ${
     const capped = await readCapped(req.body, MAX_EVENTS_BODY).catch(() => null);
     if (!capped) return problem(413, "payload_too_large", "events batch too large");
     const body = capped.buffer;
-    // A20: the API stores events only if this subject's consent records grant `analytics`.
-    const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
+    // A20: the API stores events only if this subject's consent records grant `analytics`,
+    // and forwards them to ad platforms only if they grant `ads` (WP20).
     await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/events`, {
         method: "POST",
         headers: apiHeaders(site, {
           "content-type": "application/json",
-          ...(subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {}),
+          ...consentSubject(req),
         }),
         body,
       }),
@@ -1042,6 +1077,7 @@ ${
     if (p === "/_p/checkout/start") return checkoutStart(site, req, host, port);
     if (p.startsWith("/_p/public/"))
       return publicProxy(site, req, url, p.slice("/_p/public".length));
+    if (p === "/_p/recommendations") return recommendationsProxy(site, req, url);
     if (p === "/_p/e") return events(site, req, host, port);
     if (p === "/_p/newsletter") return newsletter(site, req, host, port);
     if (p === "/_p/speculation-rules.json") {
@@ -1367,9 +1403,16 @@ function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Prom
 }
 
 /** The anonymous consent subject from its cookie, as an API header (A20). */
+/**
+ * The consent subject (A20) and, with it, the browser's user agent: Meta requires it on
+ * website events, and the API keeps it only while an `ads`-consented delivery is open (WP20).
+ * Nothing without a consent cookie.
+ */
 function consentSubject(req: Request): Record<string, string> {
   const subject = readCookie(req.headers, CONSENT_ID_COOKIE);
-  return subject && CONSENT_ID_RE.test(subject) ? { "x-consent-subject": subject } : {};
+  if (!subject || !CONSENT_ID_RE.test(subject)) return {};
+  const ua = (req.headers.get("user-agent") ?? "").replace(/[^\x20-\x7e]/g, "").slice(0, 512);
+  return { "x-consent-subject": subject, ...(ua ? { "x-client-user-agent": ua } : {}) };
 }
 
 /** API answers keep a rate limit's `Retry-After` (spec §8.1) when proxied. */

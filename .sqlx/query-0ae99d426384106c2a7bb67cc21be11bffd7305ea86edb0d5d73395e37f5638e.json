@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH RECURSIVE subtree AS (\n                       SELECT id FROM categories WHERE id = $1\n                       UNION ALL\n                       SELECT c.id FROM categories c JOIN subtree s ON c.parent_id = s.id\n                   )\n                   SELECT id AS \"id!\" FROM subtree",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0ae99d426384106c2a7bb67cc21be11bffd7305ea86edb0d5d73395e37f5638e"
+}

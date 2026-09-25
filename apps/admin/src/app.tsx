@@ -32,6 +32,8 @@ const Redirects = lazy(() => import("./pages/Redirects.tsx"));
 const Imports = lazy(() => import("./pages/Imports.tsx"));
 const ExportFeeds = lazy(() => import("./pages/ExportFeeds.tsx"));
 const SearchSynonyms = lazy(() => import("./pages/SearchSynonyms.tsx"));
+const Collections = lazy(() => import("./pages/Collections.tsx"));
+const Recommendations = lazy(() => import("./pages/Recommendations.tsx"));
 const ShippingMethods = lazy(() => import("./pages/ShippingMethods.tsx"));
 const PaymentMethods = lazy(() => import("./pages/PaymentMethods.tsx"));
 const PaymentExceptions = lazy(() => import("./pages/PaymentExceptions.tsx"));
@@ -40,7 +42,10 @@ const Orders = lazy(() => import("./pages/Orders.tsx"));
 const Withdrawals = lazy(() => import("./pages/Withdrawals.tsx"));
 const Carriers = lazy(() => import("./pages/Carriers.tsx"));
 const OrderDetail = lazy(() => import("./pages/OrderDetail.tsx"));
+const AiBulkEdit = lazy(() => import("./pages/AiBulkEdit.tsx"));
+const AiSettings = lazy(() => import("./pages/AiSettings.tsx"));
 const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
+const AdTracking = lazy(() => import("./pages/AdTracking.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -88,6 +93,7 @@ export function App() {
           <Route path="/categories" component={Categories} />
           <Route path="/parameters" component={Parameters} />
           <Route path="/inventory" component={Inventory} />
+          <Route path="/ai/bulk-edit" component={AiBulkEdit} />
           <Route path="/price-lists" component={PriceLists} />
           <Route path="/sales" component={Sales} />
           <Route path="/coupons" component={Coupons} />
@@ -105,6 +111,9 @@ export function App() {
           <Route path="/imports/:id" component={Imports} />
           <Route path="/feeds" component={ExportFeeds} />
           <Route path="/settings/search" component={SearchSynonyms} />
+          <Route path="/collections" component={Collections} />
+          <Route path="/settings/recommendations" component={Recommendations} />
+          <Route path="/settings/ai" component={AiSettings} />
           <Route path="/orders" component={Orders} />
           <Route path="/withdrawals" component={Withdrawals} />
           <Route path="/settings/carriers" component={Carriers} />
@@ -117,6 +126,7 @@ export function App() {
           <Route path="/staff" component={Staff} />
           <Route path="/audit-log" component={AuditLog} />
           <Route path="/settings/webhooks" component={Webhooks} />
+          <Route path="/settings/ad-tracking" component={AdTracking} />
           <Route path="/platform/jobs" component={PlatformJobs} />
           <Route path="/account/security" component={Security} />
           <Route path="*" component={NotFound} />

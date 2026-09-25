@@ -40,6 +40,12 @@ pub fn subscribers(event_type: &str) -> &'static [&'static str] {
         commerce::customers::EMAIL_VERIFIED_EVENT => {
             &[handlers::EVENTS_LOG, handlers::LINK_GUEST_ORDERS]
         }
+        // Refunds also go to the ad platforms that take them (WP20).
+        commerce::orders::REFUNDED_EVENT => &[
+            handlers::EVENTS_LOG,
+            handlers::FANOUT_JOB,
+            handlers::AD_REFUND_JOB,
+        ],
         // ponytail: a fan-out job per event even for tenants without subscriptions (it finds
         // none and finishes); filter here if event volume makes that noticeable.
         t if commerce::webhooks::is_event(t) => &[handlers::EVENTS_LOG, handlers::FANOUT_JOB],
@@ -124,5 +130,6 @@ mod tests {
         }
         assert!(subscribers("product.updated").contains(&handlers::EDGE_PURGE));
         assert_eq!(subscribers("coupon.created"), [handlers::EVENTS_LOG]);
+        assert!(subscribers("order.refunded").contains(&handlers::AD_REFUND_JOB));
     }
 }

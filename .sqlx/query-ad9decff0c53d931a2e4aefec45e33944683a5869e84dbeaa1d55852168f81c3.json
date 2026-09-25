@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO recommendation_settings (tenant_id, bestsellers, bought_together, seasonal,\n                                              recently_viewed, personalized, excluded_product_ids)\n         VALUES ($1, $2, $3, $4, $5, $6, $7)\n         ON CONFLICT (tenant_id) DO UPDATE SET\n             bestsellers = EXCLUDED.bestsellers, bought_together = EXCLUDED.bought_together,\n             seasonal = EXCLUDED.seasonal, recently_viewed = EXCLUDED.recently_viewed,\n             personalized = EXCLUDED.personalized,\n             excluded_product_ids = EXCLUDED.excluded_product_ids, updated_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ad9decff0c53d931a2e4aefec45e33944683a5869e84dbeaa1d55852168f81c3"
+}

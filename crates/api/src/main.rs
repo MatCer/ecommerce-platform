@@ -123,6 +123,17 @@ fn checkout_settings(
     })
 }
 
+/// AI helpers from `AiConfig` (Anthropic with a key, else the fake provider; off in prod).
+fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
+    let ai = commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?;
+    match ai.provider() {
+        "fake" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers use the fake provider"),
+        "disabled" => tracing::warn!("ANTHROPIC_API_KEY not set: AI helpers are disabled"),
+        _ => tracing::info!(model = %ai.helper_model, "AI helpers use the Anthropic API"),
+    }
+    Ok(ai)
+}
+
 fn init_tracing() -> anyhow::Result<()> {
     platform::telemetry::init().map_err(|e| anyhow!(e))
 }
@@ -180,11 +191,23 @@ async fn serve() -> anyhow::Result<()> {
         ),
         admin_origin: HeaderValue::from_str(&auth.admin_origin).context("ADMIN_ORIGIN")?,
         public_urls: commerce::storefront::PublicUrls {
-            scheme: sf.scheme,
+            scheme: sf.scheme.clone(),
             port: sf.port,
         },
         edge: api::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
         webhooks: webhooks(&ops, cfg.env)?,
+        ads: match ops.secrets_key {
+            Some(key) => Some(commerce::adtracking::AdTracking::new(
+                platform::crypto::SecretBox::new(&key),
+                platform::http::SafeClient::from_env()?,
+                commerce::adtracking::AdTracking::endpoints_from_env(),
+                commerce::storefront::PublicUrls {
+                    scheme: sf.scheme,
+                    port: sf.port,
+                },
+            )),
+            None => None,
+        },
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(
             ops.storefront_rate_per_second,
             ops.storefront_rate_burst,
@@ -196,6 +219,7 @@ async fn serve() -> anyhow::Result<()> {
             checkout.payments.secrets.clone(),
         )?),
         checkout,
+        ai: ai_helpers()?,
     };
     let limiter = state.rate_limit.clone();
     tokio::spawn(async move {

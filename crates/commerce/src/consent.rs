@@ -242,6 +242,10 @@ async fn insert(
     )
     .execute(&mut **tx)
     .await?;
+    // A20: a withdrawal stops what is still queued for the subject.
+    if choices.contains(&(ConsentPurpose::Ads, false)) {
+        crate::adtracking::cancel_for_subject(tx, subject).await?;
+    }
     Ok(())
 }
 
@@ -282,6 +286,15 @@ pub async fn current(
     subject: &Subject,
     purpose: ConsentPurpose,
 ) -> Result<bool, Error> {
+    Ok(latest(tx, subject, purpose).await?.unwrap_or(false))
+}
+
+/// The subject's latest choice for `purpose`; `None` when never asked.
+pub async fn latest(
+    tx: &mut TenantTx,
+    subject: &Subject,
+    purpose: ConsentPurpose,
+) -> Result<Option<bool>, Error> {
     let (kind, id) = subject.parts();
     Ok(sqlx::query_scalar!(
         "SELECT granted FROM consent_records
@@ -292,8 +305,7 @@ pub async fn current(
         purpose.as_str()
     )
     .fetch_optional(&mut **tx)
-    .await?
-    .unwrap_or(false))
+    .await?)
 }
 
 /// At sign-in: the anonymous subject's choices that are newer than the customer's own become

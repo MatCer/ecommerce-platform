@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ad_deliveries\n         SET status = 'cancelled', last_error = 'ads consent withdrawn', user_agent = NULL,\n             finished_at = now(), updated_at = now()\n         WHERE status IN ('pending', 'retrying', 'paused', 'sending')\n           AND (subject = $1 OR customer_id = $2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "09041dabc27faa9f82d4eae034d75907ef4c76b3ae93de956da3f4b968957c39"
+}

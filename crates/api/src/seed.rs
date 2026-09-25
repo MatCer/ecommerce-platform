@@ -350,6 +350,7 @@ impl Seeder<'_> {
         self.checkout_methods(tenant_id, cz, sk).await?;
         self.carrier_accounts(tenant_id).await?;
         self.content(tenant_id).await?;
+        self.history(tenant_id, cz, sk).await?;
         let mut tx = self.tx(tenant_id).await?;
         themes::assign_default(&mut tx, ACTOR).await?;
         // A full search index build (WP7) for the demo catalog, run by the worker. Product
@@ -1042,6 +1043,191 @@ impl Seeder<'_> {
             )
             .await?;
         }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Demo order history for the recommendations (WP17): about two orders a day over the last
+    /// 90 days with recurring baskets (so "bought together" has pairs above the support
+    /// threshold) and a month of orders a year ago (seasonal bestsellers). Inserted as placed,
+    /// paid, cash-on-delivery orders without stock movements: it is history, not live demand.
+    /// Deterministic; skipped when the history exists. Ends with a backfill rollup job.
+    async fn history(&self, tenant_id: Uuid, cz: Uuid, sk: Uuid) -> anyhow::Result<()> {
+        let mut tx = self.tx(tenant_id).await?;
+        let exists = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM orders WHERE email LIKE '%@history.example.com') AS "e!""#
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if exists {
+            return Ok(());
+        }
+        // (product index in PRODUCTS, default variant, product id, sku, cs name)
+        let mut catalog = Vec::new();
+        for (i, (_, cs, _, _)) in PRODUCTS.iter().enumerate() {
+            let row = sqlx::query!(
+                "SELECT v.id, v.product_id, v.sku FROM variants v
+                 JOIN product_translations t ON t.product_id = v.product_id
+                 WHERE t.locale = 'cs' AND t.slug = $1
+                 ORDER BY v.is_default DESC, v.sku LIMIT 1",
+                slugify(cs)
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            if let Some(r) = row {
+                catalog.push((i, r.id, r.product_id, r.sku, (*cs).to_owned()));
+            }
+        }
+        if catalog.len() < PRODUCTS.len() {
+            return Err(anyhow!("history needs the whole demo catalog"));
+        }
+        // Baskets shoppers keep buying together (indices into PRODUCTS).
+        const BASKETS: &[&[usize]] = &[
+            &[0, 37],     // Tričko Basic + Kšiltovka Classic
+            &[1, 48],     // Tričko Oversize + Taška Shopper
+            &[20, 36],    // Mikina s kapucí Klasik + Čepice Merino
+            &[22, 49],    // Mikina na zip + Batoh Roll-top
+            &[8, 27, 44], // Merino: tričko, mikina, čelenka
+            &[2, 50],     // Tričko s kapsičkou + Plátěná taška
+        ];
+        // A year ago: hoodies and warm caps.
+        const LAST_YEAR: &[usize] = &[20, 21, 24, 25, 36, 38, 42];
+        let mut state: u64 = 0x5eed_1717;
+        let mut next = move |n: u64| {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) % n
+        };
+        let now = Utc::now();
+        let mut orders: Vec<(chrono::DateTime<Utc>, Vec<usize>)> = Vec::new();
+        for day in 1..=90_i64 {
+            for _ in 0..=next(2) {
+                let at = now - Duration::days(day)
+                    + Duration::seconds(i64::try_from(next(80_000)).unwrap_or(0));
+                let lines: Vec<usize> = if next(10) < 6 {
+                    BASKETS[usize::try_from(next(BASKETS.len() as u64)).unwrap_or(0)].to_vec()
+                } else {
+                    let a = usize::try_from(next(PRODUCTS.len() as u64)).unwrap_or(0);
+                    let b = usize::try_from(next(PRODUCTS.len() as u64)).unwrap_or(0);
+                    if a == b || next(2) == 0 {
+                        vec![a]
+                    } else {
+                        vec![a, b]
+                    }
+                };
+                orders.push((at, lines));
+            }
+        }
+        for day in 350..=380_i64 {
+            let at = now - Duration::days(day)
+                + Duration::seconds(i64::try_from(next(80_000)).unwrap_or(0));
+            let p = LAST_YEAR[usize::try_from(next(LAST_YEAR.len() as u64)).unwrap_or(0)];
+            orders.push((at, vec![p]));
+        }
+        orders.sort_by_key(|(at, _)| *at);
+
+        for (n, (at, lines)) in orders.iter().enumerate() {
+            let slovak = next(4) == 0;
+            let (market, currency, locale, country, rate) = if slovak {
+                (sk, "EUR", "sk", "SK", 23_i64)
+            } else {
+                (cz, "CZK", "cs", "CZ", 21_i64)
+            };
+            let priced: Vec<(Uuid, Uuid, String, String, i64, i32)> = lines
+                .iter()
+                .map(|&i| {
+                    let (_, variant, product, sku, name) = &catalog[i];
+                    let (kind, ..) = PRODUCTS[i];
+                    let czk = kind.price(i);
+                    let unit = if slovak { eur_minor(czk) } else { czk * 100 };
+                    let qty = if next(6) == 0 { 2 } else { 1 };
+                    (*variant, *product, sku.clone(), name.clone(), unit, qty)
+                })
+                .collect();
+            let total: i64 = priced.iter().map(|l| l.4 * i64::from(l.5)).sum();
+            let tax = total * rate / (100 + rate);
+            let delivered = *at < now - Duration::days(5);
+            let cart = sqlx::query_scalar!(
+                "INSERT INTO carts (tenant_id, market_id, locale, currency, status, created_at,
+                                    updated_at, last_activity_at)
+                 VALUES ($1, $2, $3, $4, 'converted', $5, $5, $5) RETURNING id",
+                tenant_id,
+                market,
+                locale,
+                currency,
+                at
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            let number = sqlx::query_scalar!(
+                "INSERT INTO order_numbers (tenant_id, last) VALUES ($1, $2)
+                 ON CONFLICT (tenant_id) DO UPDATE SET last = order_numbers.last + 1
+                 RETURNING last",
+                tenant_id,
+                commerce::checkout::FIRST_NUMBER
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            let order = sqlx::query_scalar!(
+                r#"INSERT INTO orders (tenant_id, number, market_id, cart_id, email, locale, currency,
+                                       status, payment_status, fulfillment_status, ship_to_country,
+                                       vat_payer, subtotal_minor, discount_minor, shipping_minor,
+                                       payment_fee_minor, tax_minor, rounding_minor, total_minor,
+                                       vat_recap, shipping_method_snapshot, payment_method, notes,
+                                       placed_at, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'paid', $9, $10, true, $11, 0, 0, 0,
+                           $12, 0, $11, '[]', '{}', 'cod', 'Demo history (seed)', $13, $13)
+                   RETURNING id"#,
+                tenant_id,
+                number,
+                market,
+                cart,
+                format!("zakaznik{n}@history.example.com"),
+                locale,
+                currency,
+                if delivered { "delivered" } else { "confirmed" },
+                if delivered { "delivered" } else { "unfulfilled" },
+                country,
+                total,
+                tax,
+                at
+            )
+            .fetch_one(&mut *tx)
+            .await?;
+            for (pos, (variant, product, sku, name, unit, qty)) in priced.iter().enumerate() {
+                let line = unit * i64::from(*qty);
+                let line_tax = line * rate / (100 + rate);
+                sqlx::query!(
+                    "INSERT INTO order_lines (tenant_id, order_id, position, variant_id, product_id,
+                                              sku, name, quantity, unit_gross_minor, base_minor,
+                                              discount_minor, total_minor, tax_rate, tax_minor,
+                                              net_minor)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $10, $11, $12, $13)",
+                    tenant_id,
+                    order,
+                    i32::try_from(pos + 1).unwrap_or(1),
+                    variant,
+                    product,
+                    sku,
+                    name,
+                    qty,
+                    unit,
+                    line,
+                    rate.to_string(),
+                    line_tax,
+                    line - line_tax
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+        let mut job = platform::queue::NewJob::new(
+            commerce::recommendations::ROLLUP_JOB,
+            json!({ "backfill": true }),
+        );
+        job.tenant_id = Some(tenant_id);
+        platform::queue::enqueue(&mut *tx, &job).await?;
         tx.commit().await?;
         Ok(())
     }

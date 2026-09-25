@@ -10,6 +10,985 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/ad-platforms": {
+      "get": {
+        "tags": [
+          "ad-tracking"
+        ],
+        "summary": "Every platform's configuration (never the credentials).",
+        "operationId": "list_ad_platforms",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdPlatformList"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ad-platforms/deliveries": {
+      "get": {
+        "tags": [
+          "ad-tracking"
+        ],
+        "summary": "The delivery log, newest first: status, attempts, response code, error. No payloads.",
+        "operationId": "list_ad_deliveries",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AdPlatform"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1-100, default 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdDeliveryPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ad-platforms/{platform}": {
+      "patch": {
+        "tags": [
+          "ad-tracking"
+        ],
+        "summary": "Changes a platform's configuration (absent fields are kept; credentials are merged).\nEnabling needs complete settings and credentials; resuming sends what was held.",
+        "operationId": "update_ad_platform",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "path",
+            "description": "`meta`, `ga4`, `google_ads` or `sklik`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdPlatformUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdPlatformConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ad-platforms/{platform}/test": {
+      "post": {
+        "tags": [
+          "ad-tracking"
+        ],
+        "summary": "Checks the stored settings and credentials against the vendor without recording an event\n(Meta: reads the pixel; GA4: validation server; Google Ads: OAuth + validate-only upload;\nSeznam: no test endpoint, the settings only).",
+        "operationId": "test_ad_platform",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "platform",
+            "in": "path",
+            "description": "`meta`, `ga4`, `google_ads` or `sklik`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdConnectionTest"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Starts planning a bulk edit from the staff's request (a job): poll\n`GET /ai/bulk-plans/{id}`; a `ready` plan carries the target count and a preview (the dry\nrun). Nothing changes until the plan is applied.",
+        "operationId": "create_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewPlan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans/{id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "get_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/bulk-plans/{id}/apply": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Confirms a `ready` plan and applies it in the background (progress on the plan). Plans that\nchange prices need a sign-in at most 15 minutes old (`401 reauth_required`, A9). Honors\n`Idempotency-Key`.",
+        "operationId": "apply_plan",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/glossary": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Terms translations must keep (brand names) or translate one fixed way.",
+        "operationId": "get_glossary",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Glossary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Replaces the glossary (at most 500 terms). Audited.",
+        "operationId": "put_glossary",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Glossary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Glossary"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/marks": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Fields of an entity whose current text was written by AI (AI Act transparency labels).",
+        "operationId": "list_marks",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/EntityType"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "description": "The entity's id (a menu's handle).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiMarkList"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Starts generating a proposal (a job): poll `GET /ai/proposals/{id}` until it is `ready`\nor `failed`. `402 ai_quota_exceeded` when the monthly allowance is used up.",
+        "operationId": "create_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "get_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}/accept": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Writes the chosen fields through the entity's service (audited) and labels them as\nAI-generated. `409 proposal_stale` when a field changed since the proposal was made.",
+        "operationId": "accept_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/proposals/{id}/discard": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "operationId": "discard_proposal",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/ai/usage": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "This month's AI usage of the shop, its token allowance and the provider in use.",
+        "operationId": "usage",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/analytics/dashboard": {
       "get": {
         "tags": [
@@ -1416,6 +2395,281 @@
           },
           "422": {
             "description": "invalid_cod_report",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/collections": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Collections, newest first.",
+        "operationId": "list_collections",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Creates a collection. `seasonal` needs a schedule window; `manual` may have one. Honors\n`Idempotency-Key`.",
+        "operationId": "create_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "1-255 visible ASCII characters; kept for 24 hours.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/collections/{id}": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "operationId": "get_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Replaces a collection.",
+        "operationId": "update_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "recommendations"
+        ],
+        "operationId": "delete_collection",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6626,6 +7880,211 @@
         ]
       }
     },
+    "/admin/v1/recommendations/explain": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Why these products: the strategy chain for a context, every recommended product with its\nstrategy and score, and every candidate that was left out with the reason (excluded, not\nsold in the market, out of stock, duplicate, ...).",
+        "operationId": "explain",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "market_id",
+            "in": "query",
+            "description": "The market to recommend in.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "As on the storefront: `product:<id>`, `category:<id>`, `collection:<id>`, `home`,\n`cart` or `recent`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1-24 (default 8).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "`recent`: product ids; `cart`: the cart's product ids (comma-separated).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "description": "Recommend for this customer: their affinity, only if their `personalization` consent\nis granted.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "description": "Evaluate as of this time (preview a scheduled collection). Default: now.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationExplain"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/recommendations/settings": {
+      "get": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Which strategies run and which products are never recommended.",
+        "operationId": "get_settings",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettings"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "recommendations"
+        ],
+        "summary": "Replaces the settings. Owner or admin.",
+        "operationId": "put_settings",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationSettings"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/redirects": {
       "get": {
         "tags": [
@@ -10829,6 +12288,18 @@
                 "null"
               ]
             }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         ],
         "responses": {
@@ -10909,6 +12380,18 @@
             "name": "X-Client-Ip",
             "in": "header",
             "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
             "required": false,
             "schema": {
               "type": [
@@ -12351,7 +13834,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nAlways `202`, so the answer does not reveal the consent state.",
+        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nPage views and shopping steps also go to the enabled ad platforms while the subject grants\n`ads` (WP20). Always `202`, so the answer does not reveal the consent state.",
         "operationId": "events",
         "parameters": [
           {
@@ -12413,6 +13896,18 @@
             "name": "X-Client-Ip",
             "in": "header",
             "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
             "required": false,
             "schema": {
               "type": [
@@ -13766,6 +15261,7 @@
         "tags": [
           "storefront"
         ],
+        "summary": "Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),\nseasonal collections, personalized picks and recently viewed, each filtered by market\nvisibility, status and availability, falling back to bestsellers. Without visitor headers\nthe answer is public and cacheable; with a cart or consent subject it is private\n(`Cache-Control: private, no-store`, A2). Personal signals are used only while the\nsubject's `personalization` consent is granted (A20). `recent` ignores visitor headers.",
         "operationId": "recommendations",
         "parameters": [
           {
@@ -13800,9 +15296,53 @@
             }
           },
           {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Shop cart capability (`cart` cookie): cross-sell for the cart's products.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous consent subject: personalization and recently viewed when its records grant\n`personalization` (A20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "context",
             "in": "query",
-            "description": "`product:<id>`, `cart` or `home`.",
+            "description": "`product:<id>`, `category:<id>`, `collection:<id>`, `home` (default), `cart` or\n`recent`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Products, 1-24 (default 8).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "`recent` only: the device's recently viewed product ids, comma-separated (at most 12);\nvalidated and rehydrated with live prices, never linked to a visitor.",
             "required": false,
             "schema": {
               "type": "string"
@@ -13815,6 +15355,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Recommendations"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -14637,6 +16186,410 @@
   },
   "components": {
     "schemas": {
+      "AcceptProposal": {
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldRef"
+            },
+            "description": "The fields to write (a subset of `changes`). Creating a translation always includes\nits name/title and slug."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdConnectionTest": {
+        "type": "object",
+        "required": [
+          "ok",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "What was checked or what failed (no secrets)."
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "response_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The vendor's HTTP status, when it answered."
+          }
+        }
+      },
+      "AdDelivery": {
+        "type": "object",
+        "required": [
+          "id",
+          "platform",
+          "event_name",
+          "event_id",
+          "status",
+          "attempts",
+          "occurred_at",
+          "created_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The dedupe key sent to the vendor."
+          },
+          "event_name": {
+            "type": "string",
+            "description": "Our event name (`purchase`, `view_item`, ...)."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "order_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/AdPlatform"
+          },
+          "response_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `retrying`, `paused`, `sending`, `succeeded`, `dead`, `cancelled` or `skipped`."
+          }
+        }
+      },
+      "AdDeliveryPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdDelivery"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Pass as `cursor` for the next (older) page; absent on the last page."
+          }
+        }
+      },
+      "AdPlatform": {
+        "type": "string",
+        "description": "The ad platforms.",
+        "enum": [
+          "meta",
+          "ga4",
+          "google_ads",
+          "sklik"
+        ]
+      },
+      "AdPlatformConfig": {
+        "type": "object",
+        "required": [
+          "platform",
+          "enabled",
+          "paused",
+          "test_mode",
+          "market_ids",
+          "settings",
+          "has_credentials",
+          "setting_fields",
+          "credential_fields",
+          "events",
+          "complete",
+          "notices"
+        ],
+        "properties": {
+          "complete": {
+            "type": "boolean",
+            "description": "Settings and credentials are complete (the platform can be enabled)."
+          },
+          "credential_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "credentials_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Our event names the platform takes."
+          },
+          "has_credentials": {
+            "type": "boolean"
+          },
+          "market_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Markets whose events are forwarded."
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Known limits, as codes: `sklik_no_browser_ids`, `sklik_czk_only`,\n`sklik_no_test_channel`, `google_ads_purchases_only`."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused: events are kept (`paused`) and sent after resuming."
+          },
+          "platform": {
+            "$ref": "#/components/schemas/AdPlatform"
+          },
+          "setting_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Settings and credential fields the platform uses."
+          },
+          "settings": {
+            "$ref": "#/components/schemas/AdPlatformSettings"
+          },
+          "test_mode": {
+            "type": "boolean",
+            "description": "The vendor's test channel (Meta test code, GA4 validation server, Google Ads\nvalidate-only); Seznam has none, so nothing is sent."
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AdPlatformCredentials": {
+        "type": "object",
+        "description": "Secrets. Write-only: merged into the stored ones (a field left out keeps its value).",
+        "properties": {
+          "access_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta: a Conversions API access token."
+          },
+          "api_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "GA4: a Measurement Protocol API secret."
+          },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google: OAuth client id, client secret and a refresh token with the\n`https://www.googleapis.com/auth/datamanager` scope."
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refresh_token": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdPlatformList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdPlatformConfig"
+            }
+          }
+        }
+      },
+      "AdPlatformSettings": {
+        "type": "object",
+        "description": "Non-secret ids. Only the fields of the platform are accepted.",
+        "properties": {
+          "conversion_action_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google Ads: the conversion action (type \"import from clicks\")."
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google Ads: the account the conversions belong to (10 digits)."
+          },
+          "login_customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Google Ads: the manager account used to sign in, when not the account itself."
+          },
+          "measurement_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "GA4: `G-XXXXXXX`."
+          },
+          "pixel_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta: the dataset (pixel) id."
+          },
+          "sem_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seznam: the server-to-server SEM id (differs from the browser SEM id)."
+          },
+          "test_event_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Meta: the Events Manager test code used in test mode (`TEST12345`)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "AdPlatformUpdate": {
+        "type": "object",
+        "description": "A partial update; absent fields keep their value.",
+        "properties": {
+          "credentials": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdPlatformCredentials",
+                "description": "Merged into the stored credentials."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "market_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "paused": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "settings": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdPlatformSettings",
+                "description": "Replaces the settings."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "test_mode": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "Address": {
         "type": "object",
         "required": [
@@ -14899,6 +16852,100 @@
           }
         }
       },
+      "Affinity": {
+        "type": "object",
+        "description": "A visitor's interests (only ever loaded with `personalization` consent, A20).",
+        "required": [
+          "scores",
+          "seen"
+        ],
+        "properties": {
+          "scores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AffinityScore"
+            }
+          },
+          "seen": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Products the visitor already looked at (ranked lower)."
+          }
+        }
+      },
+      "AffinityDim": {
+        "type": "string",
+        "enum": [
+          "category",
+          "brand"
+        ]
+      },
+      "AffinityScore": {
+        "type": "object",
+        "required": [
+          "dim",
+          "key",
+          "score"
+        ],
+        "properties": {
+          "dim": {
+            "$ref": "#/components/schemas/AffinityDim"
+          },
+          "key": {
+            "type": "string",
+            "description": "Category id or brand name."
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "AiMark": {
+        "type": "object",
+        "required": [
+          "locale",
+          "field",
+          "feature",
+          "model",
+          "ai_generated_at"
+        ],
+        "properties": {
+          "ai_generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        }
+      },
+      "AiMarkList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiMark"
+            }
+          }
+        }
+      },
       "Alternate": {
         "type": "object",
         "required": [
@@ -14912,6 +16959,24 @@
           "locale": {
             "type": "string",
             "description": "hreflang value (`cs-CZ`, `x-default`)."
+          }
+        }
+      },
+      "ApplyProgress": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Products deleted meanwhile or no longer valid for a change."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -15956,6 +18021,90 @@
           }
         }
       },
+      "BulkPlan": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt",
+          "status",
+          "errors",
+          "target_count",
+          "sample",
+          "progress",
+          "needs_fresh_auth",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "applied_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why the plan was rejected (or failed)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "needs_fresh_auth": {
+            "type": "boolean",
+            "description": "Confirming needs a sign-in at most 15 minutes old (price changes, A9)."
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Plan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "progress": {
+            "$ref": "#/components/schemas/ApplyProgress"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "sample": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleRow"
+            },
+            "description": "Before/after of the first products."
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlanStatus"
+          },
+          "target_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Matching products (frozen at preview; the apply changes exactly these)."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "CacheHints": {
         "type": "object",
         "description": "Cache hints the edge reads from every page model (spec §8.2, A2).",
@@ -16554,6 +18703,30 @@
           "tax"
         ]
       },
+      "Change": {
+        "type": "object",
+        "description": "One proposed field value.",
+        "required": [
+          "locale",
+          "field",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "description": "The proposed value: text, or the block/label list."
+          },
+          "before": {
+            "description": "The value when the proposal was generated (`null`: none yet)."
+          },
+          "field": {
+            "type": "string",
+            "description": "`name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`\nfor a menu's labels: `[{path, label}]`)."
+          },
+          "locale": {
+            "type": "string"
+          }
+        }
+      },
       "Channel": {
         "type": "string",
         "enum": [
@@ -16897,6 +19070,147 @@
           }
         },
         "additionalProperties": false
+      },
+      "Collection": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "title_i18n",
+          "kind",
+          "product_ids",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "Open now (inside its window, or unscheduled)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CollectionKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "In display order."
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "title_i18n": {
+            "type": "object",
+            "description": "Shopper-facing heading per locale; the name where missing.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectionInput": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "product_ids"
+        ],
+        "properties": {
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Required for `seasonal`; after `starts_at`."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CollectionKind"
+          },
+          "name": {
+            "type": "string",
+            "example": "Vánoce"
+          },
+          "product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Products in display order (at most 200; duplicates are dropped)."
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Required for `seasonal`."
+          },
+          "title_i18n": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CollectionKind": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "seasonal"
+        ]
+      },
+      "CollectionList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Collection"
+            }
+          }
+        }
       },
       "Collector": {
         "type": "string",
@@ -17793,6 +20107,83 @@
           }
         }
       },
+      "EntityType": {
+        "type": "string",
+        "enum": [
+          "product",
+          "category",
+          "page",
+          "menu"
+        ]
+      },
+      "Explained": {
+        "type": "object",
+        "required": [
+          "chain",
+          "items",
+          "skipped"
+        ],
+        "properties": {
+          "chain": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Strategy"
+            },
+            "description": "The strategies tried, in order."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplainedItem"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Skipped"
+            }
+          },
+          "strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "The strategy of the first product (what a theme titles the slot by)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A collection's heading when the first product comes from one."
+          }
+        }
+      },
+      "ExplainedItem": {
+        "type": "object",
+        "required": [
+          "product",
+          "strategy",
+          "score"
+        ],
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductCard"
+          },
+          "score": {
+            "type": "number",
+            "format": "double",
+            "description": "Strategy-specific: orders together, decayed units, affinity, collection position."
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/Strategy"
+          }
+        }
+      },
       "Facet": {
         "type": "object",
         "required": [
@@ -17994,6 +20385,32 @@
         },
         "additionalProperties": false
       },
+      "FeatureUsage": {
+        "type": "object",
+        "required": [
+          "feature",
+          "calls",
+          "tokens",
+          "cost_micros"
+        ],
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "feature": {
+            "type": "string"
+          },
+          "tokens": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "FeedFile": {
         "type": "object",
         "required": [
@@ -18055,6 +20472,22 @@
             }
           }
         }
+      },
+      "FieldRef": {
+        "type": "object",
+        "required": [
+          "locale",
+          "field"
+        ],
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "FulfillmentStatus": {
         "type": "string",
@@ -18136,6 +20569,45 @@
           "packing_slips",
           "labels"
         ]
+      },
+      "Glossary": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlossaryEntry"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlossaryEntry": {
+        "type": "object",
+        "required": [
+          "term"
+        ],
+        "properties": {
+          "term": {
+            "type": "string",
+            "description": "The term as written in the source text, e.g. `Lnen & Co.`.",
+            "example": "Lnen & Co."
+          },
+          "translations": {
+            "type": "object",
+            "description": "Locale -> the fixed translation; locales not listed keep the term unchanged.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "GoLiveCheck": {
         "type": "object",
@@ -18405,7 +20877,26 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductCard"
-            }
+            },
+            "description": "Public home recommendations: an open seasonal collection, else the market's best\nsellers (newest products in a shop without sales). Personal picks (\"for you\") are a\nseparate, private request (`/recommendations?context=home` via `/_p/recommendations`)."
+          },
+          "featured_strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "Where `featured` comes from (`seasonal`, `bestsellers`, `newest`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "featured_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The seasonal collection's heading, if `featured` is one."
           },
           "hero": {
             "$ref": "#/components/schemas/Hero",
@@ -19110,6 +21601,14 @@
           "withdrawal",
           "complaints",
           "reviews"
+        ]
+      },
+      "Length": {
+        "type": "string",
+        "enum": [
+          "short",
+          "medium",
+          "long"
         ]
       },
       "Level": {
@@ -20002,6 +22501,20 @@
         },
         "additionalProperties": false
       },
+      "NewPlan": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "What to change, in the staff's words (1-2000 characters).",
+            "example": "Raise prices of T-shirts by 5 % in SK"
+          }
+        },
+        "additionalProperties": false
+      },
       "NewPriceList": {
         "type": "object",
         "required": [
@@ -20030,6 +22543,48 @@
           "name": {
             "type": "string",
             "example": "Česko – maloobchod"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewProposal": {
+        "type": "object",
+        "required": [
+          "kind",
+          "entity_type",
+          "entity_id",
+          "locale"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "description": "The entity's id (a menu's handle)."
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "length": {
+            "$ref": "#/components/schemas/Length",
+            "description": "Descriptions only."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Language of the text to write; the source language for `translate`.",
+            "example": "cs"
+          },
+          "target_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`translate` only: 1-5 languages to translate into."
+          },
+          "tone": {
+            "$ref": "#/components/schemas/Tone",
+            "description": "Descriptions only."
           }
         },
         "additionalProperties": false
@@ -20267,6 +22822,158 @@
             "description": "Stripe-hosted onboarding (single use, expires in minutes); in simulator mode the admin\npage itself (the account becomes ready through a simulated `account.updated`)."
           }
         }
+      },
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "field",
+              "value",
+              "op"
+            ],
+            "properties": {
+              "field": {
+                "$ref": "#/components/schemas/PlanField"
+              },
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Required for translated fields, `null` for `brand`."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_field"
+                ]
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "market",
+              "op"
+            ],
+            "properties": {
+              "amount_minor": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64",
+                "description": "Fixed change in minor units; exclusive with `percent`."
+              },
+              "market": {
+                "type": "string",
+                "description": "Market code or price list code."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "adjust_price"
+                ]
+              },
+              "percent": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "format": "double",
+                "description": "Percent change (5 = +5 %); exclusive with `amount_minor`."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "category",
+              "op"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "add_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "category",
+              "op"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "remove_category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "parameter",
+              "value",
+              "op"
+            ],
+            "properties": {
+              "locale": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Text parameters: one locale, or `null` for every shop locale."
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_parameter"
+                ]
+              },
+              "parameter": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "status",
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set_status"
+                ]
+              },
+              "status": {
+                "$ref": "#/components/schemas/ProductStatus"
+              }
+            }
+          }
+        ],
+        "description": "The allowlisted operations; anything else fails to parse."
       },
       "OptionValue": {
         "type": "object",
@@ -21125,6 +23832,23 @@
           }
         }
       },
+      "ParameterFilter": {
+        "type": "object",
+        "required": [
+          "parameter",
+          "value"
+        ],
+        "properties": {
+          "parameter": {
+            "type": "string",
+            "description": "Parameter key."
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ParameterInput": {
         "type": "object",
         "required": [
@@ -21616,6 +24340,51 @@
           }
         }
       },
+      "Plan": {
+        "type": "object",
+        "required": [
+          "explanation",
+          "selector",
+          "operations"
+        ],
+        "properties": {
+          "explanation": {
+            "type": "string",
+            "description": "The model's summary for the staff (plain text)."
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            }
+          },
+          "selector": {
+            "$ref": "#/components/schemas/Selector"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlanField": {
+        "type": "string",
+        "description": "Text fields a plan may set.",
+        "enum": [
+          "brand",
+          "short_description",
+          "seo_title",
+          "seo_description"
+        ]
+      },
+      "PlanStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "rejected",
+          "applying",
+          "applied",
+          "failed"
+        ]
+      },
       "PlannedLine": {
         "type": "object",
         "required": [
@@ -21655,6 +24424,33 @@
           "base",
           "tax"
         ]
+      },
+      "PriceFilter": {
+        "type": "object",
+        "required": [
+          "market"
+        ],
+        "properties": {
+          "market": {
+            "type": "string",
+            "description": "Market code or price list code."
+          },
+          "max_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "min_minor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
       },
       "PriceHistory": {
         "type": "object",
@@ -22470,6 +25266,115 @@
           }
         }
       },
+      "Proposal": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "entity_type",
+          "entity_id",
+          "locale",
+          "target_locales",
+          "tone",
+          "length",
+          "status",
+          "progress",
+          "changes",
+          "warnings",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "entity_id": {
+            "type": "string"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/EntityType"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Failure code: `ai_quota_exceeded`, `ai_unavailable`, `ai_refused`,\n`ai_invalid_output`, `entity_missing`, `nothing_to_translate`."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProposalKind"
+          },
+          "length": {
+            "$ref": "#/components/schemas/Length"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model that wrote it (`fake` for the demo provider)."
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProposalStatus"
+          },
+          "target_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tone": {
+            "$ref": "#/components/schemas/Tone"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Things to check before accepting (e.g. a glossary term not kept)."
+          }
+        }
+      },
+      "ProposalKind": {
+        "type": "string",
+        "enum": [
+          "product_description",
+          "seo",
+          "category_description",
+          "translate"
+        ]
+      },
+      "ProposalStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "ready",
+          "failed",
+          "accepted",
+          "discarded"
+        ]
+      },
       "Purposes": {
         "type": "object",
         "description": "Per-purpose choices: `None` = not asked (or not part of this choice).",
@@ -22574,6 +25479,81 @@
           }
         }
       },
+      "RecommendationExplain": {
+        "type": "object",
+        "required": [
+          "personalization",
+          "result",
+          "names"
+        ],
+        "properties": {
+          "affinity": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Affinity",
+                "description": "The customer's interests, when personalization is allowed."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "names": {
+            "type": "object",
+            "description": "Names of the skipped products (recommended ones carry theirs in the card).",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "personalization": {
+            "type": "boolean",
+            "description": "The customer's `personalization` consent is granted (always false without one)."
+          },
+          "result": {
+            "$ref": "#/components/schemas/Explained"
+          }
+        }
+      },
+      "RecommendationSettings": {
+        "type": "object",
+        "required": [
+          "bestsellers",
+          "bought_together",
+          "seasonal",
+          "recently_viewed",
+          "personalized"
+        ],
+        "properties": {
+          "bestsellers": {
+            "type": "boolean"
+          },
+          "bought_together": {
+            "type": "boolean"
+          },
+          "excluded_product_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Never recommended (gift cards, samples, ...). At most 500."
+          },
+          "personalized": {
+            "type": "boolean"
+          },
+          "recently_viewed": {
+            "type": "boolean"
+          },
+          "seasonal": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "Recommendations": {
         "type": "object",
         "required": [
@@ -22582,13 +25562,32 @@
         ],
         "properties": {
           "cache": {
-            "$ref": "#/components/schemas/CacheHints"
+            "$ref": "#/components/schemas/CacheHints",
+            "description": "Public for the anonymous variant; private (and `Cache-Control: private, no-store`)\nwhen the request carried a cart or a consent subject (A2)."
           },
           "products": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductCard"
             }
+          },
+          "strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "The strategy of the first product, so a theme can title the slot (\"Frequently bought\ntogether\", \"For you\", ...); absent when there are no products."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A merchant collection's heading when the products come from one."
           }
         }
       },
@@ -23314,6 +26313,49 @@
           }
         }
       },
+      "SampleChange": {
+        "type": "object",
+        "required": [
+          "what",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "after": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string",
+            "description": "`brand`, `seo_title (cs)`, `price TS-M (EUR)`, `category`, `parameter material`,\n`status`."
+          }
+        }
+      },
+      "SampleRow": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "name",
+          "changes"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SampleChange"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SearchHit": {
         "type": "object",
         "required": [
@@ -23435,6 +26477,49 @@
             "description": "One index per locale the tenant's markets sell in."
           }
         }
+      },
+      "Selector": {
+        "type": "object",
+        "description": "Which products change: every non-empty condition must hold.",
+        "properties": {
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Brand names (case-insensitive)."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Category slugs (any locale); subcategories included."
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterFilter"
+            }
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PriceFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "statuses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductStatus"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "Seo": {
         "type": "object",
@@ -23956,6 +27041,37 @@
         },
         "additionalProperties": false
       },
+      "SkipReason": {
+        "type": "string",
+        "enum": [
+          "current",
+          "in_cart",
+          "excluded",
+          "duplicate",
+          "not_sold",
+          "out_of_stock"
+        ]
+      },
+      "Skipped": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "strategy",
+          "reason"
+        ],
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SkipReason"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/Strategy"
+          }
+        }
+      },
       "Sort": {
         "type": "string",
         "enum": [
@@ -24101,6 +27217,19 @@
             "description": "Public storefront token of the tenant (the edge sends it; it grants only public reads\nand cart operations of this tenant)."
           }
         }
+      },
+      "Strategy": {
+        "type": "string",
+        "description": "Where a recommended product came from.",
+        "enum": [
+          "bought_together",
+          "bestsellers",
+          "seasonal",
+          "collection",
+          "recently_viewed",
+          "personalized",
+          "newest"
+        ]
       },
       "StripeAccount": {
         "type": "object",
@@ -24540,6 +27669,17 @@
           "unknown"
         ]
       },
+      "Tone": {
+        "type": "string",
+        "description": "Voice of generated descriptions.",
+        "enum": [
+          "neutral",
+          "friendly",
+          "premium",
+          "technical",
+          "playful"
+        ]
+      },
       "TopProduct": {
         "type": "object",
         "required": [
@@ -24785,6 +27925,53 @@
           },
           "url": {
             "type": "string"
+          }
+        }
+      },
+      "UsageSummary": {
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "month_start",
+          "tokens_used",
+          "tokens_quota",
+          "cost_micros",
+          "by_feature"
+        ],
+        "properties": {
+          "by_feature": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureUsage"
+            }
+          },
+          "cost_micros": {
+            "type": "integer",
+            "format": "int64",
+            "description": "USD micros this month at the configured list prices."
+          },
+          "model": {
+            "type": "string"
+          },
+          "month_start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the metered calendar month (UTC)."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`anthropic`, `fake` (demo fixtures, no key configured) or `disabled`."
+          },
+          "tokens_quota": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Monthly allowance: the plan default or a superadmin override."
+          },
+          "tokens_used": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Tokens used this month (input incl. cache reads/writes + output)."
           }
         }
       },
@@ -25407,6 +28594,10 @@
       "description": "Admin API: sales and coupons"
     },
     {
+      "name": "recommendations",
+      "description": "Admin API: collections, recommendation settings, why-recommended explanations"
+    },
+    {
       "name": "inventory",
       "description": "Admin API: stock levels and movements"
     },
@@ -25431,6 +28622,10 @@
       "description": "Admin API: shipping and payment methods, orders"
     },
     {
+      "name": "ai",
+      "description": "Admin API: AI helpers (proposals, glossary, bulk edit by prompt, usage)"
+    },
+    {
       "name": "payments",
       "description": "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"
     },
@@ -25445,6 +28640,10 @@
     {
       "name": "webhooks-admin",
       "description": "Admin API: outbound webhook subscriptions and deliveries"
+    },
+    {
+      "name": "ad-tracking",
+      "description": "Admin API: ad-platform forwarders (Meta, GA4, Google Ads, Sklik) and their delivery log"
     },
     {
       "name": "platform",

@@ -23,6 +23,14 @@ x-runtime-db: &runtime-db
   # WP14: key for stored integration secrets (webhook signing secrets, AES-256-GCM).
   SECRETS_KEY: ${SECRETS_KEY:-0000000000000000000000000000000000000000000000000000000000000001}
 
+# AI helpers (WP22). Without ANTHROPIC_API_KEY the fake provider answers from fixtures (dev);
+# with APP_ENV=prod and no key the helpers are off.
+x-ai: &ai
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_HELPER_MODEL: ${AI_HELPER_MODEL:-claude-sonnet-5}
+  AI_THEME_MODEL: ${AI_THEME_MODEL:-claude-opus-5-5}
+  AI_PLAN_QUOTAS: ${AI_PLAN_QUOTAS:-standard=2000000}
+
 services:
   postgres:
     <<: *infra
@@ -255,7 +263,7 @@ services:
     <<: *rust-app
     command: ["/usr/local/bin/api"]
     environment:
-      <<: *runtime-db
+      <<: [*runtime-db, *ai]
       API_BIND: 0.0.0.0:8000
       METRICS_BIND: 0.0.0.0:9100
       # Storefront API rate limit per storefront token + client IP (spec §8.1).
@@ -300,6 +308,10 @@ services:
       PACKETA_API_URL: ${PACKETA_API_URL:-http://mocks:4010/packeta/api/rest}
       PACKETA_VALIDATE_URL: ${PACKETA_VALIDATE_URL:-http://mocks:4010/packeta/pps/api/widget/v1/validate}
       PPL_API_URL: ${PPL_API_URL:-http://mocks:4010/ppl}
+      # Dev only (WP20): ad-platform connection tests go to the vendor mocks, reached through
+      # the SSRF-safe client's dev allowlist. Both are ignored unless APP_ENV=dev.
+      AD_PLATFORMS_BASE_URL: http://mocks:4010/ads
+      SAFE_FETCH_ALLOW_HOSTS: mocks
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }
@@ -316,7 +328,7 @@ services:
     <<: *rust-app
     command: ["/usr/local/bin/worker"]
     environment:
-      <<: *runtime-db
+      <<: [*runtime-db, *ai]
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       METRICS_BIND: 0.0.0.0:9101
       MEILI_URL: http://meilisearch:7700
@@ -355,6 +367,9 @@ services:
       PACKETA_VALIDATE_URL: ${PACKETA_VALIDATE_URL:-http://mocks:4010/packeta/pps/api/widget/v1/validate}
       PPL_API_URL: ${PPL_API_URL:-http://mocks:4010/ppl}
       CNB_RATES_URL: ${CNB_RATES_URL:-http://mocks:4010/cnb/denni_kurz.txt}
+      # Dev only (WP20): every ad-platform call goes to the vendor mocks (ignored unless
+      # APP_ENV=dev).
+      AD_PLATFORMS_BASE_URL: http://mocks:4010/ads
     depends_on:
       migrate: { condition: service_completed_successfully }
       minio-init: { condition: service_completed_successfully }

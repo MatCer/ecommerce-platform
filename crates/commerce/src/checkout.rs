@@ -55,7 +55,8 @@ use crate::tax;
 /// Idempotency operation of order placement (scoped to the cart).
 const PLACE_OP: &str = "POST /checkout/place-order";
 /// Order numbers start here (six digits; at most ten, they are the variable symbol, A25).
-const FIRST_NUMBER: i64 = 100_001;
+/// The first order number of a tenant.
+pub const FIRST_NUMBER: i64 = 100_001;
 const MAX_NOTE: usize = 1000;
 
 /// The Packeta pickup-point widget (spec §10.5): loaded on interaction on the checkout origin.

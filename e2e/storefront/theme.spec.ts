@@ -301,10 +301,10 @@ test.describe("consent (A20)", () => {
     await banner.getByRole("button", { name: "Uložit výběr" }).click();
     await expect(banner).toBeHidden();
     await page.reload();
-    // Personalization granted: this visit is remembered for "recently viewed".
+    // Personalization granted: this visit is remembered for "recently viewed" (its id).
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("sf:personalization:recent")))
-      .toContain("mikina-fleece");
+      .toMatch(/[0-9a-f-]{36}/);
   });
 
   test("recently viewed appears only with personalization consent", async ({ page, context }) => {

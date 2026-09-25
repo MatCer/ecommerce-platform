@@ -159,11 +159,18 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
             },
             packeta: None,
         }),
+        ai: commerce::ai::Ai::fake(),
         webhooks: Some(commerce::webhooks::Webhooks {
             secrets: platform::crypto::SecretBox::new(&[9; 32]),
             http: platform::http::SafeClient::new(vec!["localhost".to_owned()]).unwrap(),
             require_https: false,
         }),
+        ads: Some(commerce::adtracking::AdTracking::new(
+            platform::crypto::SecretBox::new(&[9; 32]),
+            platform::http::SafeClient::new(vec!["localhost".to_owned()]).unwrap(),
+            commerce::adtracking::vendors::Endpoints::default(),
+            commerce::storefront::PublicUrls::default(),
+        )),
         rate_limit: Arc::new(api::rate_limit::StorefrontLimiter::new(1000, 1000)),
         carriers: None,
     }

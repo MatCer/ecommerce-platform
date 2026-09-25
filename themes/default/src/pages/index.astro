@@ -3,6 +3,7 @@ import { imageAttrs } from "@platform/storefront-sdk/format";
 import Icon from "../components/Icon.astro";
 import ProductGrid from "../components/ProductGrid.astro";
 import TrustRow from "../components/TrustRow.astro";
+import ForYou from "../islands/ForYou";
 import Base from "../layouts/Base.astro";
 import { i18n } from "../lib/i18n";
 import { CARD_SIZES, cardImage, TILE_SIZES } from "../lib/images";
@@ -10,7 +11,20 @@ import { storefront } from "../lib/storefront";
 
 const sf = storefront(Astro.request);
 const [shop, home] = await Promise.all([sf.shop(), sf.home()]);
-const { t } = i18n(shop);
+const { t, pick } = i18n(shop);
+// The public home recommendations (WP17): an open seasonal collection under its own heading,
+// else the market's bestsellers (newest products in a shop without sales yet).
+const featuredTitle =
+  home.featured_title ??
+  t(
+    home.featured_strategy === "bestsellers"
+      ? "home.bestsellers"
+      : home.featured_strategy === "seasonal"
+        ? "home.seasonal"
+        : home.featured_strategy === "newest"
+          ? "home.newest"
+          : "home.featured",
+  );
 // The family forbids a tall hero above the products: a shallow brand block sits beside the
 // category tiles, which are the largest above-the-fold images (the first one is the LCP).
 const tiles = home.categories.slice(0, 4);
@@ -59,11 +73,13 @@ const lcp = tile
     }
   </section>
 
+  <ForYou client:idle title={t("home.for_you")} base={shop.base_path} locale={shop.locale} labels={pick(["product.price_from"])} />
+
   {
     home.featured.length > 0 && (
       <section aria-labelledby="featured" class="container-shop mt-14 md:mt-20">
         <div class="mb-5 flex items-end justify-between gap-4">
-          <h2 id="featured" class="text-2xl font-extrabold md:text-3xl">{t("home.featured")}</h2>
+          <h2 id="featured" class="text-2xl font-extrabold md:text-3xl">{featuredTitle}</h2>
           <a href={home.hero.cta.href} class="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-identity-ink hover:underline">
             {t("home.view_all")}
             <Icon name="chevronRight" class="size-4" />

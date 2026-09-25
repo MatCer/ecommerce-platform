@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT v.product_id AS \"product_id!\"\n           FROM carts c\n           JOIN cart_lines l ON l.cart_id = c.id\n           JOIN variants v ON v.id = l.variant_id\n           WHERE c.shop_token_hash = $1 AND c.status = 'open' AND c.market_id = $2\n             AND c.last_activity_at > $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variants",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9a755294d70ce9b6bfb2b38e1d5b0e9b05141f39b2e3e5e849a9aadf5348dbef"
+}

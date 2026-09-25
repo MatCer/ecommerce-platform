@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ai_bulk_items (tenant_id, plan_id, product_id)\n         SELECT $1, $2, unnest($3::uuid[])",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "560c3b309b3d6ca3ed3d884ee875407fde7b9936a67262b0f3d12923c365fad8"
+}

@@ -3,8 +3,8 @@ import type { ProductCard, ShopModel } from "@platform/storefront-sdk/types";
 import ProductGrid from "./ProductGrid.astro";
 
 /**
- * Cross-sell slot: renders the products the platform recommends and nothing at all when there
- * are none (WP17 replaces today's same-category placeholder with real recommendations).
+ * Cross-sell slot: renders the products the platform recommends (`sf.recommendations`, WP17:
+ * bought together, then bestsellers) and nothing at all when there are none.
  */
 interface Props {
   products: ProductCard[];

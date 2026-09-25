@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM product_scores",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "f6dd4aef5518fa8bdfba9eb6bff26ddc04c7a39d966ad54ca6b44da5a111a559"
+}

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
+import { adRoutes } from "./ads.ts";
 import { cnbRoutes } from "./cnb.ts";
 import { fioRoutes } from "./fio.ts";
 import { packetaRoutes } from "./packeta.ts";
@@ -21,6 +22,7 @@ pplRoutes(app);
 cnbRoutes(app);
 fioRoutes(app);
 webhookRoutes(app);
+adRoutes(app);
 
 /**
  * DNS TXT stub for custom-domain verification (spec A29). Tests and operators publish records

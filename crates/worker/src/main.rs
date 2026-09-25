@@ -65,17 +65,31 @@ async fn main() -> anyhow::Result<()> {
     // Edge purges and public URLs (export feeds); the SSRF-safe client for imports and
     // webhooks (A21).
     let sf = StorefrontConfig::from_env()?;
+    let urls = commerce::storefront::PublicUrls {
+        scheme: sf.scheme,
+        port: sf.port,
+    };
+    // Ad-platform forwarding: fixed vendor hosts through the SSRF-safe client (A21); in dev,
+    // AD_PLATFORMS_BASE_URL points them at the mocks.
+    let ads = ops.secrets_key.map(|key| {
+        commerce::adtracking::AdTracking::new(
+            platform::crypto::SecretBox::new(&key),
+            fetch.clone(),
+            commerce::adtracking::AdTracking::endpoints_from_env(),
+            urls.clone(),
+        )
+    });
     let extra = handlers::Extra {
         edge: platform::edge::EdgePurge::new(sf.edge_purge_url, sf.edge_purge_token),
         fetch,
-        urls: commerce::storefront::PublicUrls {
-            scheme: sf.scheme,
-            port: sf.port,
-        },
+        urls,
+        ai: commerce::ai::Ai::from_config(&platform::config::AiConfig::from_env()?)?,
         webhooks,
         fio: fio_poller(env, &ops)?,
         fulfillment: Some(fulfillment(env, &ops)?),
+        ads,
     };
+    tracing::info!(provider = extra.ai.provider(), "AI helpers");
 
     let (stop, shutdown) = tokio::sync::watch::channel(false);
     if let Some(bind) = ops.metrics_bind {

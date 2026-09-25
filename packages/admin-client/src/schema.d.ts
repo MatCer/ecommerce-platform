@@ -4,6 +4,263 @@
  */
 
 export interface paths {
+    "/admin/v1/ad-platforms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every platform's configuration (never the credentials). */
+        get: operations["list_ad_platforms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ad-platforms/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The delivery log, newest first: status, attempts, response code, error. No payloads. */
+        get: operations["list_ad_deliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ad-platforms/{platform}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Changes a platform's configuration (absent fields are kept; credentials are merged).
+         *     Enabling needs complete settings and credentials; resuming sends what was held.
+         */
+        patch: operations["update_ad_platform"];
+        trace?: never;
+    };
+    "/admin/v1/ad-platforms/{platform}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Checks the stored settings and credentials against the vendor without recording an event
+         *     (Meta: reads the pixel; GA4: validation server; Google Ads: OAuth + validate-only upload;
+         *     Seznam: no test endpoint, the settings only).
+         */
+        post: operations["test_ad_platform"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts planning a bulk edit from the staff's request (a job): poll
+         *     `GET /ai/bulk-plans/{id}`; a `ready` plan carries the target count and a preview (the dry
+         *     run). Nothing changes until the plan is applied.
+         */
+        post: operations["create_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_plan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/bulk-plans/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirms a `ready` plan and applies it in the background (progress on the plan). Plans that
+         *     change prices need a sign-in at most 15 minutes old (`401 reauth_required`, A9). Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["apply_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/glossary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Terms translations must keep (brand names) or translate one fixed way. */
+        get: operations["get_glossary"];
+        /** Replaces the glossary (at most 500 terms). Audited. */
+        put: operations["put_glossary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/marks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fields of an entity whose current text was written by AI (AI Act transparency labels). */
+        get: operations["list_marks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts generating a proposal (a job): poll `GET /ai/proposals/{id}` until it is `ready`
+         *     or `failed`. `402 ai_quota_exceeded` when the monthly allowance is used up.
+         */
+        post: operations["create_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_proposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Writes the chosen fields through the entity's service (audited) and labels them as
+         *     AI-generated. `409 proposal_stale` when a field changed since the proposal was made.
+         */
+        post: operations["accept_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/proposals/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["discard_proposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/ai/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** This month's AI usage of the shop, its token allowance and the provider in use. */
+        get: operations["usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/analytics/dashboard": {
         parameters: {
             query?: never;
@@ -300,6 +557,44 @@ export interface paths {
          */
         post: operations["cod_report"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collections, newest first. */
+        get: operations["list_collections"];
+        put?: never;
+        /**
+         * Creates a collection. `seasonal` needs a schedule window; `manual` may have one. Honors
+         *     `Idempotency-Key`.
+         */
+        post: operations["create_collection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/collections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_collection"];
+        /** Replaces a collection. */
+        put: operations["update_collection"];
+        post?: never;
+        delete: operations["delete_collection"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1431,6 +1726,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/recommendations/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Why these products: the strategy chain for a context, every recommended product with its
+         *     strategy and score, and every candidate that was left out with the reason (excluded, not
+         *     sold in the market, out of stock, duplicate, ...).
+         */
+        get: operations["explain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/recommendations/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which strategies run and which products are never recommended. */
+        get: operations["get_settings"];
+        /** Replaces the settings. Owner or admin. */
+        put: operations["put_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/redirects": {
         parameters: {
             query?: never;
@@ -2493,7 +2827,8 @@ export interface paths {
          *     `add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent
          *     records of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant
          *     `analytics` right now; purposes the client claims are ignored and unknown props dropped.
-         *     Always `202`, so the answer does not reveal the consent state.
+         *     Page views and shopping steps also go to the enabled ad platforms while the subject grants
+         *     `ads` (WP20). Always `202`, so the answer does not reveal the consent state.
          */
         post: operations["events"];
         delete?: never;
@@ -2799,6 +3134,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),
+         *     seasonal collections, personalized picks and recently viewed, each filtered by market
+         *     visibility, status and availability, falling back to bestsellers. Without visitor headers
+         *     the answer is public and cacheable; with a cart or consent subject it is private
+         *     (`Cache-Control: private, no-store`, A2). Personal signals are used only while the
+         *     subject's `personalization` consent is granted (A20). `recent` ignores visitor headers.
+         */
         get: operations["recommendations"];
         put?: never;
         post?: never;
@@ -2969,6 +3312,136 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptProposal: {
+            /**
+             * @description The fields to write (a subset of `changes`). Creating a translation always includes
+             *     its name/title and slug.
+             */
+            fields: components["schemas"]["FieldRef"][];
+        };
+        AdConnectionTest: {
+            /** @description What was checked or what failed (no secrets). */
+            message: string;
+            ok: boolean;
+            /**
+             * Format: int32
+             * @description The vendor's HTTP status, when it answered.
+             */
+            response_code?: number | null;
+        };
+        AdDelivery: {
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description The dedupe key sent to the vendor.
+             */
+            event_id: string;
+            /** @description Our event name (`purchase`, `view_item`, ...). */
+            event_name: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            last_error?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            order_id?: string | null;
+            platform: components["schemas"]["AdPlatform"];
+            /** Format: int32 */
+            response_code?: number | null;
+            /** @description `pending`, `retrying`, `paused`, `sending`, `succeeded`, `dead`, `cancelled` or `skipped`. */
+            status: string;
+        };
+        AdDeliveryPage: {
+            items: components["schemas"]["AdDelivery"][];
+            /**
+             * Format: uuid
+             * @description Pass as `cursor` for the next (older) page; absent on the last page.
+             */
+            next_cursor?: string | null;
+        };
+        /**
+         * @description The ad platforms.
+         * @enum {string}
+         */
+        AdPlatform: "meta" | "ga4" | "google_ads" | "sklik";
+        AdPlatformConfig: {
+            /** @description Settings and credentials are complete (the platform can be enabled). */
+            complete: boolean;
+            credential_fields: string[];
+            credentials_hint?: string | null;
+            enabled: boolean;
+            /** @description Our event names the platform takes. */
+            events: string[];
+            has_credentials: boolean;
+            /** @description Markets whose events are forwarded. */
+            market_ids: string[];
+            /**
+             * @description Known limits, as codes: `sklik_no_browser_ids`, `sklik_czk_only`,
+             *     `sklik_no_test_channel`, `google_ads_purchases_only`.
+             */
+            notices: string[];
+            /** @description Paused: events are kept (`paused`) and sent after resuming. */
+            paused: boolean;
+            platform: components["schemas"]["AdPlatform"];
+            /** @description Settings and credential fields the platform uses. */
+            setting_fields: string[];
+            settings: components["schemas"]["AdPlatformSettings"];
+            /**
+             * @description The vendor's test channel (Meta test code, GA4 validation server, Google Ads
+             *     validate-only); Seznam has none, so nothing is sent.
+             */
+            test_mode: boolean;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        /** @description Secrets. Write-only: merged into the stored ones (a field left out keeps its value). */
+        AdPlatformCredentials: {
+            /** @description Meta: a Conversions API access token. */
+            access_token?: string | null;
+            /** @description GA4: a Measurement Protocol API secret. */
+            api_secret?: string | null;
+            /**
+             * @description Google: OAuth client id, client secret and a refresh token with the
+             *     `https://www.googleapis.com/auth/datamanager` scope.
+             */
+            client_id?: string | null;
+            client_secret?: string | null;
+            refresh_token?: string | null;
+        };
+        AdPlatformList: {
+            items: components["schemas"]["AdPlatformConfig"][];
+        };
+        /** @description Non-secret ids. Only the fields of the platform are accepted. */
+        AdPlatformSettings: {
+            /** @description Google Ads: the conversion action (type "import from clicks"). */
+            conversion_action_id?: string | null;
+            /** @description Google Ads: the account the conversions belong to (10 digits). */
+            customer_id?: string | null;
+            /** @description Google Ads: the manager account used to sign in, when not the account itself. */
+            login_customer_id?: string | null;
+            /** @description GA4: `G-XXXXXXX`. */
+            measurement_id?: string | null;
+            /** @description Meta: the dataset (pixel) id. */
+            pixel_id?: string | null;
+            /** @description Seznam: the server-to-server SEM id (differs from the browser SEM id). */
+            sem_id?: string | null;
+            /** @description Meta: the Events Manager test code used in test mode (`TEST12345`). */
+            test_event_code?: string | null;
+        };
+        /** @description A partial update; absent fields keep their value. */
+        AdPlatformUpdate: {
+            credentials?: components["schemas"]["AdPlatformCredentials"] | null;
+            enabled?: boolean | null;
+            market_ids?: string[] | null;
+            paused?: boolean | null;
+            settings?: components["schemas"]["AdPlatformSettings"] | null;
+            test_mode?: boolean | null;
+        };
         Address: {
             city: string;
             company?: string | null;
@@ -3043,10 +3516,47 @@ export interface components {
             shipments: components["schemas"]["ShipmentView"][];
             withdrawals: components["schemas"]["Withdrawal"][];
         };
+        /** @description A visitor's interests (only ever loaded with `personalization` consent, A20). */
+        Affinity: {
+            scores: components["schemas"]["AffinityScore"][];
+            /** @description Products the visitor already looked at (ranked lower). */
+            seen: string[];
+        };
+        /** @enum {string} */
+        AffinityDim: "category" | "brand";
+        AffinityScore: {
+            dim: components["schemas"]["AffinityDim"];
+            /** @description Category id or brand name. */
+            key: string;
+            /** Format: double */
+            score: number;
+        };
+        AiMark: {
+            /** Format: date-time */
+            ai_generated_at: string;
+            feature: string;
+            field: string;
+            locale: string;
+            model: string;
+        };
+        AiMarkList: {
+            items: components["schemas"]["AiMark"][];
+        };
         Alternate: {
             href: string;
             /** @description hreflang value (`cs-CZ`, `x-default`). */
             locale: string;
+        };
+        ApplyProgress: {
+            /** Format: int64 */
+            done?: number;
+            /**
+             * Format: int64
+             * @description Products deleted meanwhile or no longer valid for a change.
+             */
+            skipped?: number;
+            /** Format: int64 */
+            total?: number;
         };
         Asset: {
             /** Format: int64 */
@@ -3322,6 +3832,32 @@ export interface components {
             published_at: string;
             title: string;
         };
+        BulkPlan: {
+            /** Format: date-time */
+            applied_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Why the plan was rejected (or failed). */
+            errors: string[];
+            /** Format: uuid */
+            id: string;
+            model?: string | null;
+            /** @description Confirming needs a sign-in at most 15 minutes old (price changes, A9). */
+            needs_fresh_auth: boolean;
+            plan?: components["schemas"]["Plan"] | null;
+            progress: components["schemas"]["ApplyProgress"];
+            prompt: string;
+            /** @description Before/after of the first products. */
+            sample: components["schemas"]["SampleRow"][];
+            status: components["schemas"]["PlanStatus"];
+            /**
+             * Format: int32
+             * @description Matching products (frozen at preview; the apply changes exactly these).
+             */
+            target_count: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
         /** @description Cache hints the edge reads from every page model (spec §8.2, A2). */
         CacheHints: {
             /**
@@ -3501,6 +4037,19 @@ export interface components {
          * @enum {string}
          */
         Cause: "base" | "sale" | "tax";
+        /** @description One proposed field value. */
+        Change: {
+            /** @description The proposed value: text, or the block/label list. */
+            after: unknown;
+            /** @description The value when the proposal was generated (`null`: none yet). */
+            before?: unknown;
+            /**
+             * @description `name`, `description_html`, `seo_title`, ... (`blocks` for a page's blocks, `labels`
+             *     for a menu's labels: `[{path, label}]`).
+             */
+            field: string;
+            locale: string;
+        };
         /** @enum {string} */
         Channel: "google" | "heureka" | "zbozi";
         /** @enum {string} */
@@ -3585,6 +4134,53 @@ export interface components {
             collector: components["schemas"]["Collector"];
             /** @description `cash` (rounded, A16) or `card`. */
             tender: components["schemas"]["Tender"];
+        };
+        Collection: {
+            /** @description Open now (inside its window, or unscheduled). */
+            active: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            ends_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["CollectionKind"];
+            name: string;
+            /** @description In display order. */
+            product_ids: string[];
+            /** Format: date-time */
+            starts_at?: string | null;
+            /** @description Shopper-facing heading per locale; the name where missing. */
+            title_i18n: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CollectionInput: {
+            /**
+             * Format: date-time
+             * @description Required for `seasonal`; after `starts_at`.
+             */
+            ends_at?: string | null;
+            kind: components["schemas"]["CollectionKind"];
+            /** @example Vánoce */
+            name: string;
+            /** @description Products in display order (at most 200; duplicates are dropped). */
+            product_ids: string[];
+            /**
+             * Format: date-time
+             * @description Required for `seasonal`.
+             */
+            starts_at?: string | null;
+            title_i18n?: {
+                [key: string]: string;
+            };
+        };
+        /** @enum {string} */
+        CollectionKind: "manual" | "seasonal";
+        CollectionList: {
+            items: components["schemas"]["Collection"][];
         };
         /** @enum {string} */
         Collector: "carrier" | "merchant";
@@ -3864,6 +4460,26 @@ export interface components {
         DownloadLink: {
             url: string;
         };
+        /** @enum {string} */
+        EntityType: "product" | "category" | "page" | "menu";
+        Explained: {
+            /** @description The strategies tried, in order. */
+            chain: components["schemas"]["Strategy"][];
+            items: components["schemas"]["ExplainedItem"][];
+            skipped: components["schemas"]["Skipped"][];
+            strategy?: components["schemas"]["Strategy"] | null;
+            /** @description A collection's heading when the first product comes from one. */
+            title?: string | null;
+        };
+        ExplainedItem: {
+            product: components["schemas"]["ProductCard"];
+            /**
+             * Format: double
+             * @description Strategy-specific: orders together, decayed units, affinity, collection position.
+             */
+            score: number;
+            strategy: components["schemas"]["Strategy"];
+        };
         Facet: {
             /** @description `opt.<code>`, `param.<key>` or `brand`; the filter key to send back. */
             key: string;
@@ -3926,6 +4542,15 @@ export interface components {
             answer_html: string;
             question: string;
         };
+        FeatureUsage: {
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            cost_micros: number;
+            feature: string;
+            /** Format: int64 */
+            tokens: number;
+        };
         FeedFile: {
             /** Format: int64 */
             bytes?: number | null;
@@ -3942,6 +4567,10 @@ export interface components {
         };
         FeedFileList: {
             items: components["schemas"]["FeedFile"][];
+        };
+        FieldRef: {
+            field: string;
+            locale: string;
         };
         /** @enum {string} */
         FulfillmentStatus: "unfulfilled" | "label_created" | "shipped" | "delivered" | "returned";
@@ -3968,6 +4597,20 @@ export interface components {
         };
         /** @enum {string} */
         GeneratedKind: "packing_slips" | "labels";
+        Glossary: {
+            entries: components["schemas"]["GlossaryEntry"][];
+        };
+        GlossaryEntry: {
+            /**
+             * @description The term as written in the source text, e.g. `Lnen & Co.`.
+             * @example Lnen & Co.
+             */
+            term: string;
+            /** @description Locale -> the fixed translation; locales not listed keep the term unchanged. */
+            translations?: {
+                [key: string]: string;
+            };
+        };
         GoLiveCheck: {
             code: components["schemas"]["CheckCode"];
             /** @description What is missing: field names, `<legal type>:<locale>` pairs, or product names. */
@@ -4031,7 +4674,15 @@ export interface components {
         HomePage: {
             cache: components["schemas"]["CacheHints"];
             categories: components["schemas"]["CategoryTile"][];
+            /**
+             * @description Public home recommendations: an open seasonal collection, else the market's best
+             *     sellers (newest products in a shop without sales). Personal picks ("for you") are a
+             *     separate, private request (`/recommendations?context=home` via `/_p/recommendations`).
+             */
             featured: components["schemas"]["ProductCard"][];
+            featured_strategy?: components["schemas"]["Strategy"] | null;
+            /** @description The seasonal collection's heading, if `featured` is one. */
+            featured_title?: string | null;
             /** @description Placeholder built from the catalog until CMS blocks exist (WP13). */
             hero: components["schemas"]["Hero"];
             seo: components["schemas"]["Seo"];
@@ -4300,6 +4951,8 @@ export interface components {
          * @enum {string}
          */
         LegalType: "terms" | "privacy" | "cookies" | "withdrawal" | "complaints" | "reviews";
+        /** @enum {string} */
+        Length: "short" | "medium" | "long";
         Level: {
             /** @description Sell below zero. */
             allow_backorder: boolean;
@@ -4574,6 +5227,13 @@ export interface components {
             name: string;
             tax_mode?: components["schemas"]["TaxMode"];
         };
+        NewPlan: {
+            /**
+             * @description What to change, in the staff's words (1-2000 characters).
+             * @example Raise prices of T-shirts by 5 % in SK
+             */
+            prompt: string;
+        };
         NewPriceList: {
             /**
              * @description Lowercase identifier, unique per tenant.
@@ -4586,6 +5246,23 @@ export interface components {
             market_ids?: string[];
             /** @example Česko – maloobchod */
             name: string;
+        };
+        NewProposal: {
+            /** @description The entity's id (a menu's handle). */
+            entity_id: string;
+            entity_type: components["schemas"]["EntityType"];
+            kind: components["schemas"]["ProposalKind"];
+            /** @description Descriptions only. */
+            length?: components["schemas"]["Length"];
+            /**
+             * @description Language of the text to write; the source language for `translate`.
+             * @example cs
+             */
+            locale: string;
+            /** @description `translate` only: 1-5 languages to translate into. */
+            target_locales?: string[];
+            /** @description Descriptions only. */
+            tone?: components["schemas"]["Tone"];
         };
         NewSubscription: {
             active?: boolean;
@@ -4672,6 +5349,49 @@ export interface components {
              *     page itself (the account becomes ready through a simulated `account.updated`).
              */
             url: string;
+        };
+        /** @description The allowlisted operations; anything else fails to parse. */
+        Operation: {
+            field: components["schemas"]["PlanField"];
+            /** @description Required for translated fields, `null` for `brand`. */
+            locale?: string | null;
+            /** @enum {string} */
+            op: "set_field";
+            value: string;
+        } | {
+            /**
+             * Format: int64
+             * @description Fixed change in minor units; exclusive with `percent`.
+             */
+            amount_minor?: number | null;
+            /** @description Market code or price list code. */
+            market: string;
+            /** @enum {string} */
+            op: "adjust_price";
+            /**
+             * Format: double
+             * @description Percent change (5 = +5 %); exclusive with `amount_minor`.
+             */
+            percent?: number | null;
+        } | {
+            category: string;
+            /** @enum {string} */
+            op: "add_category";
+        } | {
+            category: string;
+            /** @enum {string} */
+            op: "remove_category";
+        } | {
+            /** @description Text parameters: one locale, or `null` for every shop locale. */
+            locale?: string | null;
+            /** @enum {string} */
+            op: "set_parameter";
+            parameter: string;
+            value: string;
+        } | {
+            /** @enum {string} */
+            op: "set_status";
+            status: components["schemas"]["ProductStatus"];
         };
         OptionValue: {
             /** @example red */
@@ -4918,6 +5638,11 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        ParameterFilter: {
+            /** @description Parameter key. */
+            parameter: string;
+            value: string;
+        };
         ParameterInput: {
             filterable?: boolean;
             /**
@@ -5083,6 +5808,19 @@ export interface components {
             order_id: string;
             payment: components["schemas"]["PaymentStart"];
         };
+        Plan: {
+            /** @description The model's summary for the staff (plain text). */
+            explanation: string;
+            operations: components["schemas"]["Operation"][];
+            selector: components["schemas"]["Selector"];
+        };
+        /**
+         * @description Text fields a plan may set.
+         * @enum {string}
+         */
+        PlanField: "brand" | "short_description" | "seo_title" | "seo_description";
+        /** @enum {string} */
+        PlanStatus: "pending" | "ready" | "rejected" | "applying" | "applied" | "failed";
         PlannedLine: {
             amount: components["schemas"]["MoneyView"];
             /** @description `goods`, `shipping`, `payment_fee`, `rounding`. */
@@ -5098,6 +5836,14 @@ export interface components {
          * @enum {string}
          */
         PriceChangeReason: "base" | "tax";
+        PriceFilter: {
+            /** @description Market code or price list code. */
+            market: string;
+            /** Format: int64 */
+            max_minor?: number | null;
+            /** Format: int64 */
+            min_minor?: number | null;
+        };
         PriceHistory: {
             items: components["schemas"]["VariantPriceHistory"][];
         };
@@ -5329,6 +6075,37 @@ export interface components {
             /** Format: int32 */
             updated: number;
         };
+        Proposal: {
+            changes: components["schemas"]["Change"][];
+            /** Format: date-time */
+            created_at: string;
+            entity_id: string;
+            entity_type: components["schemas"]["EntityType"];
+            /**
+             * @description Failure code: `ai_quota_exceeded`, `ai_unavailable`, `ai_refused`,
+             *     `ai_invalid_output`, `entity_missing`, `nothing_to_translate`.
+             */
+            error?: string | null;
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["ProposalKind"];
+            length: components["schemas"]["Length"];
+            locale: string;
+            /** @description The model that wrote it (`fake` for the demo provider). */
+            model?: string | null;
+            progress: components["schemas"]["Progress"];
+            status: components["schemas"]["ProposalStatus"];
+            target_locales: string[];
+            tone: components["schemas"]["Tone"];
+            /** Format: date-time */
+            updated_at: string;
+            /** @description Things to check before accepting (e.g. a glossary term not kept). */
+            warnings: string[];
+        };
+        /** @enum {string} */
+        ProposalKind: "product_description" | "seo" | "category_description" | "translate";
+        /** @enum {string} */
+        ProposalStatus: "pending" | "ready" | "failed" | "accepted" | "discarded";
         /** @description Per-purpose choices: `None` = not asked (or not part of this choice). */
         Purposes: {
             ads?: boolean | null;
@@ -5362,9 +6139,35 @@ export interface components {
             new: boolean;
             received: boolean;
         };
+        RecommendationExplain: {
+            affinity?: components["schemas"]["Affinity"] | null;
+            /** @description Names of the skipped products (recommended ones carry theirs in the card). */
+            names: {
+                [key: string]: string;
+            };
+            /** @description The customer's `personalization` consent is granted (always false without one). */
+            personalization: boolean;
+            result: components["schemas"]["Explained"];
+        };
+        RecommendationSettings: {
+            bestsellers: boolean;
+            bought_together: boolean;
+            /** @description Never recommended (gift cards, samples, ...). At most 500. */
+            excluded_product_ids?: string[];
+            personalized: boolean;
+            recently_viewed: boolean;
+            seasonal: boolean;
+        };
         Recommendations: {
+            /**
+             * @description Public for the anonymous variant; private (and `Cache-Control: private, no-store`)
+             *     when the request carried a cart or a consent subject (A2).
+             */
             cache: components["schemas"]["CacheHints"];
             products: components["schemas"]["ProductCard"][];
+            strategy?: components["schemas"]["Strategy"] | null;
+            /** @description A merchant collection's heading when the products come from one. */
+            title?: string | null;
         };
         Redirect: {
             /** Format: int32 */
@@ -5603,6 +6406,21 @@ export interface components {
              */
             revenue_minor: number;
         };
+        SampleChange: {
+            after: string;
+            before: string;
+            /**
+             * @description `brand`, `seo_title (cs)`, `price TS-M (EUR)`, `category`, `parameter material`,
+             *     `status`.
+             */
+            what: string;
+        };
+        SampleRow: {
+            changes: components["schemas"]["SampleChange"][];
+            name: string;
+            /** Format: uuid */
+            product_id: string;
+        };
         SearchHit: {
             brand?: string | null;
             /** @description The first product image, in the list-sized variants (up to 640 px). */
@@ -5640,6 +6458,16 @@ export interface components {
         SearchStatus: {
             /** @description One index per locale the tenant's markets sell in. */
             indexes: components["schemas"]["IndexStatus"][];
+        };
+        /** @description Which products change: every non-empty condition must hold. */
+        Selector: {
+            /** @description Brand names (case-insensitive). */
+            brands?: string[];
+            /** @description Category slugs (any locale); subcategories included. */
+            categories?: string[];
+            parameters?: components["schemas"]["ParameterFilter"][];
+            price?: components["schemas"]["PriceFilter"] | null;
+            statuses?: components["schemas"]["ProductStatus"][];
         };
         Seo: {
             alternates: components["schemas"]["Alternate"][];
@@ -5806,6 +6634,14 @@ export interface components {
             outcome: components["schemas"]["Outcome"];
         };
         /** @enum {string} */
+        SkipReason: "current" | "in_cart" | "excluded" | "duplicate" | "not_sold" | "out_of_stock";
+        Skipped: {
+            /** Format: uuid */
+            product_id: string;
+            reason: components["schemas"]["SkipReason"];
+            strategy: components["schemas"]["Strategy"];
+        };
+        /** @enum {string} */
         Sort: "recommended" | "price_asc" | "price_desc" | "newest";
         SortOption: {
             href: string;
@@ -5866,6 +6702,11 @@ export interface components {
              */
             token: string;
         };
+        /**
+         * @description Where a recommended product came from.
+         * @enum {string}
+         */
+        Strategy: "bought_together" | "bestsellers" | "seasonal" | "collection" | "recently_viewed" | "personalized" | "newest";
         StripeAccount: {
             account_id: string;
             /** @description `active`, `inactive` or `pending`. */
@@ -6008,6 +6849,11 @@ export interface components {
         };
         /** @enum {string} */
         Tender: "cash" | "card" | "unknown";
+        /**
+         * @description Voice of generated descriptions.
+         * @enum {string}
+         */
+        Tone: "neutral" | "friendly" | "premium" | "technical" | "playful";
         TopProduct: {
             currency: string;
             name: string;
@@ -6086,6 +6932,32 @@ export interface components {
             /** @example PUT */
             method: string;
             url: string;
+        };
+        UsageSummary: {
+            by_feature: components["schemas"]["FeatureUsage"][];
+            /**
+             * Format: int64
+             * @description USD micros this month at the configured list prices.
+             */
+            cost_micros: number;
+            model: string;
+            /**
+             * Format: date-time
+             * @description Start of the metered calendar month (UTC).
+             */
+            month_start: string;
+            /** @description `anthropic`, `fake` (demo fixtures, no key configured) or `disabled`. */
+            provider: string;
+            /**
+             * Format: int64
+             * @description Monthly allowance: the plan default or a superadmin override.
+             */
+            tokens_quota: number;
+            /**
+             * Format: int64
+             * @description Tokens used this month (input incl. cache reads/writes + output).
+             */
+            tokens_used: number;
         };
         Variant: {
             ean?: string | null;
@@ -6291,6 +7163,608 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_ad_platforms: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdPlatformList"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_ad_deliveries: {
+        parameters: {
+            query?: {
+                platform?: components["schemas"]["AdPlatform"];
+                status?: string;
+                cursor?: string;
+                /** @description 1-100, default 50. */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdDeliveryPage"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_ad_platform: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                /** @description `meta`, `ga4`, `google_ads` or `sklik`. */
+                platform: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdPlatformUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdPlatformConfig"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    test_ad_platform: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                /** @description `meta`, `ga4`, `google_ads` or `sklik`. */
+                platform: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdConnectionTest"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewPlan"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    apply_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkPlan"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_glossary: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+        };
+    };
+    put_glossary: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Glossary"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Glossary"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_marks: {
+        parameters: {
+            query: {
+                entity_type: components["schemas"]["EntityType"];
+                /** @description The entity's id (a menu's handle). */
+                entity_id: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiMarkList"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProposal"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    accept_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptProposal"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    discard_proposal: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    usage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummary"];
+                };
+            };
+        };
+    };
     analytics_dashboard: {
         parameters: {
             query: {
@@ -7128,6 +8602,171 @@ export interface operations {
             };
             /** @description invalid_cod_report */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_collections: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionList"];
+                };
+            };
+        };
+    };
+    create_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+                /** @description 1-255 visible ASCII characters; kept for 24 hours. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_collection: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10287,6 +11926,119 @@ export interface operations {
             };
         };
     };
+    explain: {
+        parameters: {
+            query: {
+                /** @description The market to recommend in. */
+                market_id: string;
+                /**
+                 * @description As on the storefront: `product:<id>`, `category:<id>`, `collection:<id>`, `home`,
+                 *     `cart` or `recent`.
+                 */
+                context?: string;
+                /** @description 1-24 (default 8). */
+                limit?: number;
+                /** @description `recent`: product ids; `cart`: the cart's product ids (comma-separated). */
+                ids?: string;
+                /**
+                 * @description Recommend for this customer: their affinity, only if their `personalization` consent
+                 *     is granted.
+                 */
+                customer_id?: string;
+                /** @description Evaluate as of this time (preview a scheduled collection). Default: now. */
+                at?: string;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationExplain"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationSettings"];
+                };
+            };
+        };
+    };
+    put_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecommendationSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationSettings"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_redirects: {
         parameters: {
             query?: {
@@ -12746,6 +14498,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -12778,6 +14532,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -13539,6 +15295,8 @@ export interface operations {
                 "X-Customer-Session"?: string | null;
                 /** @description The client's IP (stored as a salted hash with the record). */
                 "X-Client-Ip"?: string | null;
+                /** @description The browser's user agent (ad platforms that require it, WP20). */
+                "X-Client-User-Agent"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14206,8 +15964,18 @@ export interface operations {
     recommendations: {
         parameters: {
             query?: {
-                /** @description `product:<id>`, `cart` or `home`. */
+                /**
+                 * @description `product:<id>`, `category:<id>`, `collection:<id>`, `home` (default), `cart` or
+                 *     `recent`.
+                 */
                 context?: string;
+                /** @description Products, 1-24 (default 8). */
+                limit?: number;
+                /**
+                 * @description `recent` only: the device's recently viewed product ids, comma-separated (at most 12);
+                 *     validated and rehydrated with live prices, never linked to a visitor.
+                 */
+                ids?: string;
             };
             header: {
                 /** @description The tenant's public storefront token. */
@@ -14216,6 +15984,13 @@ export interface operations {
                 "X-Market": string;
                 /** @description Locale hint (one of the market's locales). */
                 "X-Locale"?: string | null;
+                /** @description Shop cart capability (`cart` cookie): cross-sell for the cart's products. */
+                "X-Cart-Token"?: string | null;
+                /**
+                 * @description Anonymous consent subject: personalization and recently viewed when its records grant
+                 *     `personalization` (A20).
+                 */
+                "X-Consent-Subject"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -14228,6 +16003,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Recommendations"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

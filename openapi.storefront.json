@@ -1504,6 +1504,18 @@
                 "null"
               ]
             }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         ],
         "responses": {
@@ -1584,6 +1596,18 @@
             "name": "X-Client-Ip",
             "in": "header",
             "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
             "required": false,
             "schema": {
               "type": [
@@ -3026,7 +3050,7 @@
         "tags": [
           "storefront"
         ],
-        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nAlways `202`, so the answer does not reveal the consent state.",
+        "summary": "Events beacon (`/_p/e`, A20): `{\"events\": [...]}` with `page_view`, `view_item`,\n`add_to_cart`, `begin_checkout` and `web_vital` events. Stored only when the consent\nrecords of the anonymous subject (`X-Consent-Subject`, the edge's consent cookie) grant\n`analytics` right now; purposes the client claims are ignored and unknown props dropped.\nPage views and shopping steps also go to the enabled ad platforms while the subject grants\n`ads` (WP20). Always `202`, so the answer does not reveal the consent state.",
         "operationId": "events",
         "parameters": [
           {
@@ -3088,6 +3112,18 @@
             "name": "X-Client-Ip",
             "in": "header",
             "description": "The client's IP (stored as a salted hash with the record).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Client-User-Agent",
+            "in": "header",
+            "description": "The browser's user agent (ad platforms that require it, WP20).",
             "required": false,
             "schema": {
               "type": [
@@ -4441,6 +4477,7 @@
         "tags": [
           "storefront"
         ],
+        "summary": "Recommended products (spec §11.2): bought together, bestsellers (per market, time-decayed),\nseasonal collections, personalized picks and recently viewed, each filtered by market\nvisibility, status and availability, falling back to bestsellers. Without visitor headers\nthe answer is public and cacheable; with a cart or consent subject it is private\n(`Cache-Control: private, no-store`, A2). Personal signals are used only while the\nsubject's `personalization` consent is granted (A20). `recent` ignores visitor headers.",
         "operationId": "recommendations",
         "parameters": [
           {
@@ -4475,9 +4512,53 @@
             }
           },
           {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Shop cart capability (`cart` cookie): cross-sell for the cart's products.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Consent-Subject",
+            "in": "header",
+            "description": "Anonymous consent subject: personalization and recently viewed when its records grant\n`personalization` (A20).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
             "name": "context",
             "in": "query",
-            "description": "`product:<id>`, `cart` or `home`.",
+            "description": "`product:<id>`, `category:<id>`, `collection:<id>`, `home` (default), `cart` or\n`recent`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Products, 1-24 (default 8).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "`recent` only: the device's recently viewed product ids, comma-separated (at most 12);\nvalidated and rehydrated with live prices, never linked to a visitor.",
             "required": false,
             "schema": {
               "type": "string"
@@ -4490,6 +4571,15 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Recommendations"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -6782,7 +6872,26 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductCard"
-            }
+            },
+            "description": "Public home recommendations: an open seasonal collection, else the market's best\nsellers (newest products in a shop without sales). Personal picks (\"for you\") are a\nseparate, private request (`/recommendations?context=home` via `/_p/recommendations`)."
+          },
+          "featured_strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "Where `featured` comes from (`seasonal`, `bestsellers`, `newest`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "featured_title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The seasonal collection's heading, if `featured` is one."
           },
           "hero": {
             "$ref": "#/components/schemas/Hero",
@@ -8293,13 +8402,32 @@
         ],
         "properties": {
           "cache": {
-            "$ref": "#/components/schemas/CacheHints"
+            "$ref": "#/components/schemas/CacheHints",
+            "description": "Public for the anonymous variant; private (and `Cache-Control: private, no-store`)\nwhen the request carried a cart or a consent subject (A2)."
           },
           "products": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProductCard"
             }
+          },
+          "strategy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Strategy",
+                "description": "The strategy of the first product, so a theme can title the slot (\"Frequently bought\ntogether\", \"For you\", ...); absent when there are no products."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A merchant collection's heading when the products come from one."
           }
         }
       },
@@ -8773,6 +8901,19 @@
           "low_stock",
           "backorder",
           "out_of_stock"
+        ]
+      },
+      "Strategy": {
+        "type": "string",
+        "description": "Where a recommended product came from.",
+        "enum": [
+          "bought_together",
+          "bestsellers",
+          "seasonal",
+          "collection",
+          "recently_viewed",
+          "personalized",
+          "newest"
         ]
       },
       "Suggestions": {

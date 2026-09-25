@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_proposals SET status = 'ready', changes = $2, warnings = $3, model = $4,\n                        progress = jsonb_set(progress, '{done}', progress->'total'),\n                        updated_at = now()\n                 WHERE id = $1 AND status = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d2444f2b4b2377bb28a342b0dd1f4d634f782432d48677c039772162f19e606"
+}

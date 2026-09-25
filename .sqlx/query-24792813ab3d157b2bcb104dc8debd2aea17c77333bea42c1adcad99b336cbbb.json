@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT status, plan, refs, model, applied_by FROM ai_bulk_plans WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "plan",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "plan"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "refs",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "refs"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "model",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "model"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "applied_by",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_bulk_plans",
+            "name": "applied_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "24792813ab3d157b2bcb104dc8debd2aea17c77333bea42c1adcad99b336cbbb"
+}

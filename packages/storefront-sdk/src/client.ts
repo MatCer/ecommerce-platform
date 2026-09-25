@@ -85,18 +85,20 @@ export interface BeaconEvent {
 }
 
 /**
- * Batched, consent-aware beacon to `/_p/e`. Sends nothing unless `purpose` was granted; the
- * server re-checks consent from its own records and never trusts the client (A20).
+ * Batched, consent-aware beacon to `/_p/e`. Sends nothing unless one of `purposes` was
+ * granted; the server re-checks consent per use from its own records and never trusts the
+ * client (A20): events are stored for analytics only with `analytics` and forwarded to ad
+ * platforms only with `ads` (WP20).
  */
 export function createBeacon({
-  purpose = "analytics",
+  purposes = ["analytics", "ads"],
   endpoint = "/_p/e",
 }: {
-  purpose?: ConsentPurpose;
+  purposes?: readonly ConsentPurpose[];
   endpoint?: string;
 } = {}) {
   let queue: BeaconEvent[] = [];
-  const allowed = () => hasConsent(purpose);
+  const allowed = () => purposes.some(hasConsent);
   const flush = () => {
     if (!queue.length) return;
     if (allowed())
@@ -118,8 +120,9 @@ export function createBeacon({
 let shared: ReturnType<typeof createBeacon> | undefined;
 
 /**
- * Queues an analytics event (`page_view`, `view_item`, `add_to_cart`, `begin_checkout`) on
- * the page's one shared beacon: nothing is queued or sent without `analytics` consent, and the
+ * Queues an event (`page_view`, `view_item`, `add_to_cart`, `begin_checkout`, `search`) on
+ * the page's one shared beacon: nothing is queued or sent without `analytics` or `ads`
+ * consent (searches and vitals need `analytics`: ad platforms do not get them), and the
  * server checks its own consent records again (A20). Sent when the page is hidden; call
  * `flushEvents()` before a navigation that must not lose it.
  */
@@ -127,7 +130,10 @@ const sharedBeacon = () => {
   shared ??= createBeacon();
   return shared;
 };
-export const track = (e: BeaconEvent) => sharedBeacon().track(e);
+export const track = (e: BeaconEvent) => {
+  if ((e.type === "search" || e.type === "web_vital") && !hasConsent("analytics")) return;
+  sharedBeacon().track(e);
+};
 export const flushEvents = () => shared?.flush();
 
 /**

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT dim, key, score FROM customer_affinity WHERE customer_id = $1\n         ORDER BY score DESC, key LIMIT 50",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "dim",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_affinity",
+            "name": "dim"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "customer_affinity",
+            "name": "key"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "customer_affinity",
+            "name": "score"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "721b6f4bd4d6ce06116f242921420005a1916ebe13317388cb5f146d2fd01ea7"
+}
