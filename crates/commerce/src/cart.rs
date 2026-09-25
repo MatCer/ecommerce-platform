@@ -204,6 +204,13 @@ pub async fn find(
     if scope.is_some_and(|s| s != found) {
         return Err(cart_not_found());
     }
+    // Expiry counts from the last use (§10.3), reads included; the content version stays.
+    sqlx::query!(
+        "UPDATE carts SET last_activity_at = now() WHERE id = $1",
+        row.id
+    )
+    .execute(&mut **tx)
+    .await?;
     Ok(CartRef {
         id: row.id,
         market_id: row.market_id,
@@ -343,7 +350,7 @@ pub async fn update_line(
     )
     .fetch_optional(&mut **tx)
     .await?
-    .ok_or(Error::NotFound)?;
+    .ok_or_else(unknown_line)?;
     ensure_stock(tx, variant_id, update.quantity).await?;
     sqlx::query!(
         "UPDATE cart_lines SET quantity = $3, updated_at = now() WHERE id = $1 AND cart_id = $2",
@@ -366,9 +373,15 @@ pub async fn remove_line(tx: &mut TenantTx, cart: &CartRef, line_id: Uuid) -> Re
     .await?
     .rows_affected();
     if removed == 0 {
-        return Err(Error::NotFound);
+        return Err(unknown_line());
     }
     touch(tx, cart.id).await
+}
+
+/// 404 means "no such cart" to the edge (it then drops the capability cookie), so errors about
+/// a cart's content are 422s.
+fn unknown_line() -> Error {
+    invalid("unknown_line", "the cart has no such line")
 }
 
 /// Applies a coupon (replacing any other: one coupon per cart). `422` with the coupon's reason
@@ -414,7 +427,10 @@ pub async fn remove_coupon(tx: &mut TenantTx, cart: &CartRef, code: &str) -> Res
     .await?
     .rows_affected();
     if removed == 0 {
-        return Err(Error::NotFound);
+        return Err(invalid(
+            "coupon_not_applied",
+            "this coupon is not applied to the cart",
+        ));
     }
     touch(tx, cart.id).await
 }
@@ -525,9 +541,10 @@ async fn rates(
             .map_err(|()| Error::Internal(format!("bad stored rate {}", c.rate)))
     };
     let mut out = HashMap::new();
+    let mut categories = tax_categories::product_rates(tx, product_ids, &country, today).await?;
     for id in product_ids {
-        let cat = tax_categories::product_rate(tx, *id, &country, today)
-            .await?
+        let cat = categories
+            .remove(id)
             .ok_or_else(|| invalid("no_tax_rate", format!("no VAT rate is known for {country}")))?;
         out.insert(*id, parse(cat)?);
     }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT pt.product_id, pt.locale, pt.slug, p.updated_at FROM product_translations pt\n         JOIN products p ON p.id = pt.product_id AND p.status = 'active'\n         WHERE EXISTS (\n             SELECT 1 FROM variants v JOIN price_intervals pi\n                 ON pi.variant_id = v.id AND pi.price_list_id = $1\n                AND pi.valid_from <= $2 AND (pi.valid_to IS NULL OR pi.valid_to > $2)\n             WHERE v.product_id = p.id)\n         ORDER BY pt.product_id",
+  "query": "SELECT pt.product_id, pt.locale, pt.slug, p.updated_at FROM product_translations pt\n         JOIN products p ON p.id = pt.product_id\n         WHERE pt.product_id = ANY($1)\n         ORDER BY pt.product_id",
   "describe": {
     "columns": [
       {
@@ -50,8 +50,7 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Timestamptz"
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -61,5 +60,5 @@
       false
     ]
   },
-  "hash": "e20891b660ad01aa3bbd5fc57ff71b1f8088600fde35f81bfba6b8384522b340"
+  "hash": "d773139ce6385bc4c4d1ad195acc7043500a17cc97f10b7c02e6781bbc120a45"
 }

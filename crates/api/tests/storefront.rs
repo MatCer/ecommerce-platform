@@ -740,3 +740,146 @@ async fn artifacts_are_published_to_tenants_and_served_to_the_edge(db: PgPool) {
             .is_empty()
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn keyed_cart_mutations_run_once(db: PgPool) {
+    let c = setup(db).await;
+    let token = c.new_cart(c.shop.cz).await;
+    let add = |key: &'static str, qty: i64| {
+        sf(
+            Call::post(
+                "/storefront/v1/cart/lines",
+                json!({ "variant_id": c.shop.variants[0], "quantity": qty }),
+            ),
+            &c.shop,
+            c.shop.cz,
+        )
+        .header("x-cart-token", token.clone())
+        .header("idempotency-key", key)
+    };
+    let (status, first, _) = add("add-1", 2).send(&c.s).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, again, res) = add("add-1", 2).send(&c.s).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(res.headers()["idempotent-replayed"], "true");
+    assert_eq!(again["item_count"], first["item_count"]);
+    assert_eq!(again["item_count"], 2, "counted once");
+    let (status, body, _) = add("add-1", 3).send(&c.s).await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::CONFLICT, Some("idempotency_conflict"))
+    );
+    let (_, other, _) = add("add-2", 1).send(&c.s).await;
+    assert_eq!(other["item_count"], 3);
+    // Line and coupon errors are 422s: 404 is reserved for an unknown cart.
+    let (status, body) = c
+        .cart(
+            Call::delete(&format!("/storefront/v1/cart/lines/{}", Uuid::now_v7())),
+            c.shop.cz,
+            &token,
+        )
+        .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("unknown_line"))
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_handoff_redemptions_yield_one_capability(db: PgPool) {
+    let c = setup(db).await;
+    let token = c.new_cart(c.shop.cz).await;
+    c.cart(
+        Call::post(
+            "/storefront/v1/cart/lines",
+            json!({ "variant_id": c.shop.variants[0] }),
+        ),
+        c.shop.cz,
+        &token,
+    )
+    .await;
+    let (_, body) = c
+        .cart(
+            Call::post("/storefront/v1/cart/handoff", json!({})),
+            c.shop.cz,
+            &token,
+        )
+        .await;
+    let h = body["token"].as_str().unwrap().to_owned();
+    let redeem = || {
+        sf(
+            Call::post("/storefront/v1/checkout/handoff", json!({ "token": h })),
+            &c.shop,
+            c.shop.cz,
+        )
+        .send(&c.s)
+    };
+    let (a, b, d) = tokio::join!(redeem(), redeem(), redeem());
+    let ok = [a.0, b.0, d.0]
+        .iter()
+        .filter(|s| **s == StatusCode::OK)
+        .count();
+    assert_eq!(ok, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn hreflang_lists_only_markets_that_sell_the_product(db: PgPool) {
+    let c = setup(db).await;
+    // An sk translation, so an SK URL would exist ...
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO product_translations (tenant_id, product_id, locale, name, slug)
+         VALUES ($1, $2, 'sk', 'Tričko', 'tricko-sk')",
+    )
+    .bind(c.shop.tenant)
+    .bind(c.shop.product)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let (_, page) = c.get("/storefront/v1/pages/product/tee-cs").await;
+    let alts: Vec<&str> = page["seo"]["alternates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["locale"].as_str().unwrap())
+        .collect();
+    assert_eq!(alts, ["cs-CZ", "x-default", "sk-SK"]);
+    // ... but once SK no longer sells it, no SK alternate and no SK sitemap entry.
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    for v in c.shop.variants {
+        commerce::pricing::delete_price(&mut tx, "t", c.shop.eur, v)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+    let (_, page) = c.get("/storefront/v1/pages/product/tee-cs").await;
+    let alts: Vec<&str> = page["seo"]["alternates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["locale"].as_str().unwrap())
+        .collect();
+    assert_eq!(alts, ["cs-CZ", "x-default"]);
+    let (_, chunk, _) = sf(
+        Call::get("/storefront/v1/files/sitemap-1.xml"),
+        &c.shop,
+        c.shop.cz,
+    )
+    .send_text(&c.s)
+    .await;
+    assert!(chunk.contains("/p/tee-cs"));
+    assert!(!chunk.contains("tricko-sk"), "{chunk}");
+    let (_, sk, _) = sf(
+        Call::get("/storefront/v1/files/sitemap-1.xml"),
+        &c.shop,
+        c.shop.sk,
+    )
+    .send_text(&c.s)
+    .await;
+    assert!(!sk.contains("tricko-sk"), "{sk}");
+}

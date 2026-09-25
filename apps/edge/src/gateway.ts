@@ -109,6 +109,7 @@ function readCookie(headers: Headers, name: string): string | undefined {
 }
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+const IDEMPOTENCY_KEY_RE = /^[\x21-\x7e]{1,255}$/;
 /** A path on the same shop: one leading slash, no `//` or `/\` host smuggling, no spaces. */
 const SAME_SHOP_PATH = /^\/(?![/\\])[^\s\\]*$/;
 const CLEAR_CART_COOKIE = `${SHOP_CART_COOKIE}=; Path=/_p; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
@@ -278,6 +279,8 @@ export function createGateway(opts: GatewayOptions) {
     if (!artifact)
       return text(503, "This shop has not been published yet", { "retry-after": "60" });
     const m = await manifest(artifact);
+    // Theme workers get the theme bindings only; a checkout artifact never runs as a theme.
+    if (m.kind !== "theme") throw new Error(`artifact ${artifact} is not a theme`);
     const normalized = normalizeUrl(url);
     const verdict = requestVerdict({
       method: req.method,
@@ -458,12 +461,15 @@ export function createGateway(opts: GatewayOptions) {
       setCookie = cartCookie(token);
     }
 
+    // Idempotency-Key (§8.1): the API runs a keyed cart mutation once and replays it after.
+    const key = req.headers.get("idempotency-key");
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/cart${rest}`, {
         method: req.method,
         headers: apiHeaders(site, {
           "x-cart-token": token,
           ...(body ? { "content-type": "application/json" } : {}),
+          ...(key && IDEMPOTENCY_KEY_RE.test(key) ? { "idempotency-key": key } : {}),
         }),
         body,
       }),
@@ -472,11 +478,17 @@ export function createGateway(opts: GatewayOptions) {
       "content-type": res.headers.get("content-type") ?? "application/json",
       "cache-control": "no-store",
     });
+    const replayed = res.headers.get("idempotent-replayed");
+    if (replayed) headers.set("idempotent-replayed", replayed);
     if (setCookie) headers.append("set-cookie", setCookie);
+    // The API answers 404 only for a cart it does not know (line/coupon errors are 422).
     if (res.status === 404 && !setCookie) {
       // Unknown, expired or rotated (handed off) cart: forget the capability.
       headers.append("set-cookie", CLEAR_CART_COOKIE);
       if (req.method === "GET") return Response.json(EMPTY_CART, { headers });
+    } else if (res.ok && !setCookie) {
+      // Expiry counts from the last use (§10.3): every successful use renews the cookie.
+      headers.append("set-cookie", cartCookie(token));
     }
     return new Response(await res.arrayBuffer(), { status: res.status, headers });
   }
@@ -719,6 +731,8 @@ export function createGateway(opts: GatewayOptions) {
     let cartToken = readCookie(req.headers, CHECKOUT_CART_COOKIE);
     if (cartToken && !TOKEN_RE.test(cartToken)) cartToken = undefined;
     const m = await manifest(checkoutArtifact);
+    // The checkout binding (cart capability) is only ever handed to the platform checkout.
+    if (m.kind !== "checkout") throw new Error(`artifact ${checkoutArtifact} is not a checkout`);
     const r = await render(checkoutArtifact, normalizeUrl(url), site, { cartToken });
     const headers = r.headers;
     const csp = contentSecurityPolicy("checkout", {

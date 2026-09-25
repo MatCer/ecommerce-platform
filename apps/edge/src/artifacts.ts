@@ -1,13 +1,17 @@
 import { mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type ArtifactManifest, artifactId, sha256 } from "@platform/theme-kit";
+import { type ArtifactManifest, artifactId, sha256, validateManifest } from "@platform/theme-kit";
 import type { Upstream } from "./bindings.ts";
 
 const ID_RE = /^[0-9a-f]{32}$/;
 // Plain relative segments only: no `..`, no empty segments, no backslashes.
 const REL_RE = /^[A-Za-z0-9._@+~-]+(\/[A-Za-z0-9._@+~-]+)*$/;
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024; // A6
+const MAX_MANIFEST_BYTES = 2 * 1024 * 1024;
+const MAX_FILES = 5000;
 const CONCURRENCY = 8;
+/** One artifact download, all files included, must finish within this. */
+const DOWNLOAD_DEADLINE_MS = 60_000;
 
 const safeRel = (p: string) => REL_RE.test(p) && !p.split("/").some((s) => s === "." || s === "..");
 
@@ -43,20 +47,60 @@ export class ArtifactFetcher {
     return p;
   }
 
-  async #get(id: string, rel: string): Promise<Uint8Array> {
+  /** Streams one file into memory against the download's shared byte budget. */
+  async #get(
+    id: string,
+    rel: string,
+    budget: { left: number },
+    signal: AbortSignal,
+  ): Promise<Uint8Array> {
     const res = await this.#upstream(
       new Request(`${this.#apiOrigin}/internal/v1/artifacts/${id}/${rel}`, {
         headers: { authorization: `Bearer ${this.#token}` },
+        signal,
       }),
     );
-    if (!res.ok) throw new Error(`artifact ${id}: ${rel} → ${res.status}`);
-    return new Uint8Array(await res.arrayBuffer());
+    if (!res.ok || !res.body) throw new Error(`artifact ${id}: ${rel} → ${res.status}`);
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    const reader = res.body.getReader();
+    try {
+      for (;;) {
+        if (signal.aborted) throw new Error(`artifact ${id}: download timed out`);
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        budget.left -= value.byteLength;
+        if (budget.left < 0) throw new Error(`artifact ${id}: larger than the size limit`);
+        chunks.push(value);
+      }
+    } catch (err) {
+      await reader.cancel().catch(() => {});
+      throw err;
+    }
+    const out = new Uint8Array(size);
+    let offset = 0;
+    for (const c of chunks) {
+      out.set(c, offset);
+      offset += c.byteLength;
+    }
+    return out;
   }
 
   async #download(id: string): Promise<void> {
-    const manifestBytes = await this.#get(id, "manifest.json");
-    const m = JSON.parse(new TextDecoder().decode(manifestBytes)) as ArtifactManifest;
-    if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
+    const signal = AbortSignal.timeout(DOWNLOAD_DEADLINE_MS);
+    const manifestBytes = await this.#get(
+      id,
+      "manifest.json",
+      { left: MAX_MANIFEST_BYTES },
+      signal,
+    );
+    const m = validateManifest(
+      JSON.parse(new TextDecoder().decode(manifestBytes)) as ArtifactManifest,
+      id,
+    );
+    if (m.runtime.modules.length + Object.keys(m.assets ?? {}).length > MAX_FILES)
+      throw new Error(`artifact ${id}: too many files`);
     const files: string[] = [];
     for (const mod of m.runtime.modules) {
       if (!safeRel(mod)) throw new Error(`artifact ${id}: bad module path ${mod}`);
@@ -69,16 +113,14 @@ export class ArtifactFetcher {
     }
 
     const bodies = new Map<string, Uint8Array>();
-    let total = manifestBytes.byteLength;
+    // One budget for every file: the limit holds while the downloads are in flight.
+    const budget = { left: MAX_ARTIFACT_BYTES };
     for (let i = 0; i < files.length; i += CONCURRENCY) {
       const batch = files.slice(i, i + CONCURRENCY);
-      const got = await Promise.all(batch.map((f) => this.#get(id, f)));
+      const got = await Promise.all(batch.map((f) => this.#get(id, f, budget, signal)));
       batch.forEach((f, k) => {
-        const body = got[k] as Uint8Array;
-        total += body.byteLength;
-        bodies.set(f, body);
+        bodies.set(f, got[k] as Uint8Array);
       });
-      if (total > MAX_ARTIFACT_BYTES) throw new Error(`artifact ${id}: larger than 50 MB`);
     }
 
     // Every byte must match the content address before the artifact can run.

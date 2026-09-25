@@ -10,18 +10,22 @@ async function json<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-const send = (method: string, path: string, body?: unknown) =>
+const send = (method: string, path: string, body?: unknown, idempotencyKey?: string) =>
   fetch(path, {
     method,
-    headers: body === undefined ? {} : { "content-type": "application/json" },
+    headers: {
+      ...(body === undefined ? {} : { "content-type": "application/json" }),
+      ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: "same-origin",
   }).then((r) => json<Cart>(r));
 
 export const cart = {
   get: () => fetch("/_p/cart", { credentials: "same-origin" }).then((r) => json<CartState>(r)),
-  add: (variantId: string, quantity = 1) =>
-    send("POST", "/_p/cart/lines", { variant_id: variantId, quantity }),
+  /** Pass the same `idempotencyKey` when retrying an add, so it is counted once. */
+  add: (variantId: string, quantity = 1, idempotencyKey?: string) =>
+    send("POST", "/_p/cart/lines", { variant_id: variantId, quantity }, idempotencyKey),
   update: (lineId: string, quantity: number) =>
     send("PATCH", `/_p/cart/lines/${encodeURIComponent(lineId)}`, { quantity }),
   remove: (lineId: string) => send("DELETE", `/_p/cart/lines/${encodeURIComponent(lineId)}`),

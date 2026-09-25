@@ -151,6 +151,8 @@ CREATE TABLE theme_revisions (
     checks       jsonb NOT NULL DEFAULT '{}',
     created_by   text NOT NULL,
     published_at timestamptz,
+    -- When a newer revision replaced it (asset retention counts from here, A22).
+    superseded_at timestamptz,
     created_at   timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id),
     UNIQUE (tenant_id, id),

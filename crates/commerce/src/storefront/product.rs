@@ -2,7 +2,7 @@
 //! variants with options, media, effective price + Omnibus reference, unit price, stock state,
 //! parameters, GPSR, breadcrumbs, JSON-LD (Product, Offer, BreadcrumbList).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
 use platform::Error;
@@ -363,6 +363,19 @@ pub async fn product_page(
     .into_iter()
     .map(|r| (r.locale, r.slug))
     .collect();
+    // hreflang only points at markets that sell the product (a price in their list now).
+    let sold_in: BTreeSet<Uuid> = sqlx::query_scalar!(
+        "SELECT DISTINCT pi.price_list_id FROM price_intervals pi
+         JOIN variants v ON v.id = pi.variant_id
+         WHERE v.product_id = $1 AND pi.valid_from <= $2
+           AND (pi.valid_to IS NULL OR pi.valid_to > $2)",
+        product_id,
+        ctx.now
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .collect();
 
     let path = format!("/p/{}", p.slug);
     let canonical = ctx.url(&path);
@@ -419,7 +432,11 @@ pub async fn product_page(
         title,
         description,
         alternates: alternates(ctx, |m| {
-            slugs.get(&m.default_locale).map(|s| format!("/p/{s}"))
+            let sold = m.price_list_id.is_some_and(|l| sold_in.contains(&l));
+            slugs
+                .get(&m.default_locale)
+                .filter(|_| sold)
+                .map(|s| format!("/p/{s}"))
         }),
         json_ld: vec![product_ld, breadcrumb_ld(ctx, &breadcrumbs)],
         canonical,

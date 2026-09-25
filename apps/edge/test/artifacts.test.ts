@@ -94,3 +94,42 @@ test("a manifest for another id, bad ids and a wrong token are refused", async (
   });
   await expect(g.ensure(other)).rejects.toThrow(/manifest mismatch/);
 });
+
+test("the runtime section must be the platform's: entry point, date and flags are not trusted", async () => {
+  const mutate =
+    (fn: (m: { runtime: Record<string, unknown> }) => void) => (rel: string, body: Buffer) => {
+      if (rel !== "manifest.json") return body;
+      const m = JSON.parse(body.toString("utf8"));
+      fn(m);
+      return Buffer.from(JSON.stringify(m));
+    };
+  for (const tamper of [
+    mutate((m) => {
+      m.runtime.main = "evil.mjs";
+    }),
+    mutate((m) => {
+      m.runtime.compatibility_flags = ["nodejs_compat"];
+    }),
+    mutate((m) => {
+      m.runtime.compatibility_date = "2099-01-01";
+    }),
+    mutate((m) => {
+      m.runtime.modules = ["other.mjs", "entry.mjs"];
+    }),
+  ]) {
+    const root = await mkdtemp(path.join(tmpdir(), "wp6-dst-"));
+    const { upstream } = api(tamper);
+    const f = new ArtifactFetcher({ root, apiOrigin: "http://api", token: "svc-token", upstream });
+    await expect(f.ensure(id)).rejects.toThrow(/runtime|content address|does not match/);
+    expect(await exists(path.join(root, id))).toBe(false);
+  }
+});
+
+test("downloads are bounded: an oversized manifest is cut off while streaming", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "wp6-dst-"));
+  const { upstream } = api((rel, body) =>
+    rel === "manifest.json" ? Buffer.concat([body, Buffer.alloc(3 * 1024 * 1024, 32)]) : body,
+  );
+  const f = new ArtifactFetcher({ root, apiOrigin: "http://api", token: "svc-token", upstream });
+  await expect(f.ensure(id)).rejects.toThrow(/size limit/);
+});

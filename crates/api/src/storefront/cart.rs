@@ -8,6 +8,7 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use commerce::cart::{self, CartRef, CartView, CouponCode, LineUpdate, NewLine, Scope};
+use commerce::idempotency;
 use commerce::storefront::Context;
 use platform::Error;
 use platform::db::TenantTx;
@@ -19,7 +20,7 @@ use uuid::Uuid;
 
 use super::{CART_HEADER, CartHeader, Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
-use crate::admin::parse_json;
+use crate::admin::{REPLAYED, idempotency_key, parse_json};
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -48,23 +49,63 @@ fn no_store(mut res: Response) -> Response {
     res
 }
 
+/// A cart mutation's identity for `Idempotency-Key` (§8.1, A12): the operation and a hash of
+/// the request (path parameters and body).
+struct Mutation {
+    op: &'static str,
+    hash: String,
+}
+
+fn mutation(op: &'static str, request: &[u8]) -> Option<Mutation> {
+    Some(Mutation {
+        op,
+        hash: idempotency::request_hash(request),
+    })
+}
+
 /// Finds the cart behind the capability (`scope`: required capability, `None` = either),
-/// runs `f` on it and answers with the recomputed cart.
+/// runs `f` on it and answers with the recomputed cart. A mutation with an `Idempotency-Key`
+/// runs once per cart and key: a retry replays the stored response (`Idempotent-Replayed`),
+/// the same key with another request is `409 idempotency_conflict`.
 async fn with_cart(
     s: &AppState,
     shopper: &Shopper,
     headers: &HeaderMap,
     scope: Option<Scope>,
+    change: Option<Mutation>,
     f: impl AsyncFnOnce(&mut TenantTx, &Context, &CartRef) -> Result<(), Error>,
 ) -> Result<Response, Error> {
     let token = token(headers)?;
-    let view = with_ctx(s, shopper, async |tx, ctx| {
+    let key = match &change {
+        Some(_) => idempotency_key(headers)?,
+        None => None,
+    };
+    let (view, replayed) = with_ctx(s, shopper, async |tx, ctx| {
         let cart = cart::find(tx, ctx, &token, scope).await?;
+        // Keys are scoped to the cart: two carts never share an idempotency record.
+        let op = change
+            .as_ref()
+            .map(|m| format!("{} cart:{}", m.op, cart.id));
+        if let (Some(key), Some(op), Some(m)) = (&key, &op, &change)
+            && let Some(stored) = idempotency::begin(tx, op, key, &m.hash).await?
+        {
+            return Ok((stored.body, true));
+        }
         f(tx, ctx, &cart).await?;
-        cart::view(tx, ctx, &cart).await
+        let view = serde_json::to_value(cart::view(tx, ctx, &cart).await?)
+            .map_err(|e| Error::Internal(e.to_string()))?;
+        if let (Some(key), Some(op)) = (&key, &op) {
+            idempotency::finish(tx, op, key, StatusCode::OK.as_u16(), &view).await?;
+        }
+        Ok((view, false))
     })
     .await?;
-    Ok(no_store(Json(view).into_response()))
+    let mut res = no_store(Json(view).into_response());
+    if replayed {
+        res.headers_mut()
+            .insert(REPLAYED, HeaderValue::from_static("true"));
+    }
+    Ok(res)
 }
 
 /// Creates an empty cart; the capability comes back in `X-Cart-Token` (the edge stores it in
@@ -111,7 +152,7 @@ async fn get_cart(
     State(s): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Response, Error> {
-    with_cart(&s, &shopper, &headers, None, async |_, _, _| Ok(())).await
+    with_cart(&s, &shopper, &headers, None, None, async |_, _, _| Ok(())).await
 }
 
 #[utoipa::path(
@@ -139,6 +180,7 @@ async fn add_line(
         &shopper,
         &headers,
         Some(Scope::Shop),
+        mutation("POST /cart/lines", &body),
         async |tx, ctx, c| cart::add_line(tx, ctx, c, &line).await,
     )
     .await
@@ -171,6 +213,10 @@ async fn update_line(
         &shopper,
         &headers,
         Some(Scope::Shop),
+        mutation(
+            "PATCH /cart/lines",
+            &[id.as_bytes().as_slice(), &body].concat(),
+        ),
         async |tx, _, c| cart::update_line(tx, c, id, &update).await,
     )
     .await
@@ -195,6 +241,7 @@ async fn remove_line(
         &shopper,
         &headers,
         Some(Scope::Shop),
+        mutation("DELETE /cart/lines", id.as_bytes()),
         async |tx, _, c| cart::remove_line(tx, c, id).await,
     )
     .await
@@ -225,6 +272,7 @@ async fn apply_coupon(
         &shopper,
         &headers,
         Some(Scope::Shop),
+        mutation("POST /cart/coupons", &body),
         async |tx, ctx, c| cart::apply_coupon(tx, ctx, c, &code.code).await,
     )
     .await
@@ -249,6 +297,7 @@ async fn remove_coupon(
         &shopper,
         &headers,
         Some(Scope::Shop),
+        mutation("DELETE /cart/coupons", code.as_bytes()),
         async |tx, _, c| cart::remove_coupon(tx, c, &code).await,
     )
     .await

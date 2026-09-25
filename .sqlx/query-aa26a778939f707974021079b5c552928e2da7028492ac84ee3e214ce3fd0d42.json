@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE theme_revisions SET status = 'superseded' WHERE id = $1",
+  "query": "UPDATE carts SET last_activity_at = now() WHERE id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "64bf0e9740e8f50877f53d47d6611eaeb688b2a858a322a173a52cbb8326c830"
+  "hash": "aa26a778939f707974021079b5c552928e2da7028492ac84ee3e214ce3fd0d42"
 }

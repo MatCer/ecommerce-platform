@@ -2,7 +2,7 @@
 //! XML sitemaps (an index plus chunks of at most 10 000 URLs with hreflang alternates). The
 //! edge passes `/robots.txt`, `/llms.txt` and `/sitemap*.xml` through to the API.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::Write as _;
 
 use chrono::{DateTime, Utc};
@@ -33,12 +33,18 @@ fn xml_escape(s: &str) -> String {
 struct Entry {
     /// Locale -> path (`/p/<slug>`); the entry is listed for markets whose locale has one.
     paths: BTreeMap<String, String>,
+    /// Products: the price lists that sell it now (a market lists it only if its list does).
+    lists: Option<BTreeSet<Uuid>>,
     lastmod: Option<DateTime<Utc>>,
 }
 
 impl Entry {
     fn path_for(&self, m: &MarketCtx) -> Option<String> {
-        self.paths.get(&m.default_locale).cloned()
+        let sold = match &self.lists {
+            None => true,
+            Some(lists) => m.price_list_id.is_some_and(|l| lists.contains(&l)),
+        };
+        self.paths.get(&m.default_locale).filter(|_| sold).cloned()
     }
 }
 
@@ -49,6 +55,7 @@ async fn entries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Entry>, Error> 
             .iter()
             .map(|m| (m.default_locale.clone(), "/".to_owned()))
             .collect(),
+        lists: None,
         lastmod: None,
     }];
     let mut categories: BTreeMap<Uuid, Entry> = BTreeMap::new();
@@ -63,28 +70,38 @@ async fn entries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Entry>, Error> 
             .entry(r.category_id)
             .or_insert(Entry {
                 paths: BTreeMap::new(),
+                lists: None,
                 lastmod: Some(r.updated_at),
             })
             .paths
             .insert(r.locale, format!("/c/{}", r.slug));
     }
     out.extend(categories.into_values());
-    // Products sold in this market: active with a current price in its price list.
-    let Some(list) = ctx.market.price_list_id else {
-        return Ok(out);
-    };
+    // Active products and the price lists that sell them now; each market (this one and the
+    // hreflang alternates) lists a product only where it has a price.
+    let mut sold: BTreeMap<Uuid, BTreeSet<Uuid>> = BTreeMap::new();
+    for r in sqlx::query!(
+        "SELECT DISTINCT v.product_id, pi.price_list_id FROM variants v
+         JOIN products p ON p.id = v.product_id AND p.status = 'active'
+         JOIN price_intervals pi ON pi.variant_id = v.id
+          AND pi.valid_from <= $1 AND (pi.valid_to IS NULL OR pi.valid_to > $1)",
+        ctx.now
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    {
+        sold.entry(r.product_id)
+            .or_default()
+            .insert(r.price_list_id);
+    }
+    let ids: Vec<Uuid> = sold.keys().copied().collect();
     let mut products: BTreeMap<Uuid, Entry> = BTreeMap::new();
     for r in sqlx::query!(
         "SELECT pt.product_id, pt.locale, pt.slug, p.updated_at FROM product_translations pt
-         JOIN products p ON p.id = pt.product_id AND p.status = 'active'
-         WHERE EXISTS (
-             SELECT 1 FROM variants v JOIN price_intervals pi
-                 ON pi.variant_id = v.id AND pi.price_list_id = $1
-                AND pi.valid_from <= $2 AND (pi.valid_to IS NULL OR pi.valid_to > $2)
-             WHERE v.product_id = p.id)
+         JOIN products p ON p.id = pt.product_id
+         WHERE pt.product_id = ANY($1)
          ORDER BY pt.product_id",
-        list,
-        ctx.now
+        &ids
     )
     .fetch_all(&mut **tx)
     .await?
@@ -93,6 +110,7 @@ async fn entries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Entry>, Error> 
             .entry(r.product_id)
             .or_insert(Entry {
                 paths: BTreeMap::new(),
+                lists: sold.get(&r.product_id).cloned(),
                 lastmod: Some(r.updated_at),
             })
             .paths

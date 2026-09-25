@@ -252,8 +252,8 @@ async fn publishing_keeps_recent_artifacts_retained(db: PgPool) {
             ids[0].clone()
         ]
     );
-    // Older than 7 days: only the previous 3 revisions remain.
-    sqlx::query("UPDATE theme_revisions SET published_at = now() - interval '30 days'")
+    // Superseded more than 7 days ago: only the previous 3 revisions remain.
+    sqlx::query("UPDATE theme_revisions SET superseded_at = now() - interval '30 days'")
         .execute(&mut *tx)
         .await
         .unwrap();
@@ -262,6 +262,22 @@ async fn publishing_keeps_recent_artifacts_retained(db: PgPool) {
         active.retained,
         [ids[3].clone(), ids[2].clone(), ids[1].clone()]
     );
+    tx.rollback().await.unwrap();
+    // A long-lived revision replaced just now stays retained, whatever its age.
+    let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
+    sqlx::query(
+        "UPDATE theme_revisions SET published_at = now() - interval '300 days',
+             superseded_at = now() - interval '300 days'",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE theme_revisions SET superseded_at = now() WHERE number = 1")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let active = themes::active(&mut tx).await.unwrap();
+    assert!(active.retained.contains(&ids[0]), "{:?}", active.retained);
     tx.rollback().await.unwrap();
 
     // A custom revision (M3) is left alone by default publishes.

@@ -72,6 +72,44 @@ pub async fn rate(
     .await?)
 }
 
+/// [`product_rate`] for many products at once (two queries): product -> category in force.
+/// Products whose category has no rate for `country` on `at` are absent.
+pub async fn product_rates(
+    tx: &mut TenantTx,
+    product_ids: &[Uuid],
+    country: &str,
+    at: NaiveDate,
+) -> Result<std::collections::HashMap<Uuid, TaxCategory>, Error> {
+    let codes = sqlx::query!(
+        r#"SELECT p.id AS "id!", coalesce(ptc.code, $3) AS "code!"
+           FROM unnest($1::uuid[]) AS p (id)
+           LEFT JOIN product_tax_categories ptc ON ptc.product_id = p.id AND ptc.country = $2"#,
+        product_ids,
+        country,
+        STANDARD
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let rates: std::collections::HashMap<String, TaxCategory> = sqlx::query_as!(
+        TaxCategory,
+        r#"SELECT DISTINCT ON (code) country, code, trim_scale(rate)::text AS "rate!", valid_from
+           FROM platform.tax_categories
+           WHERE country = $1 AND valid_from <= $2
+           ORDER BY code, valid_from DESC"#,
+        country,
+        at
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|c| (c.code.clone(), c))
+    .collect();
+    Ok(codes
+        .into_iter()
+        .filter_map(|r| Some((r.id, rates.get(&r.code)?.clone())))
+        .collect())
+}
+
 /// The tax category that applies to `product_id` shipped to `country` on `at`: its mapping
 /// for that country, else `standard`. `None` for a country without seeded rates.
 pub async fn product_rate(

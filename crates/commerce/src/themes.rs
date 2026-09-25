@@ -97,13 +97,31 @@ pub async fn register_artifact(
     if !files.iter().any(|(p, _)| p == "manifest.json") {
         return Err(invalid("invalid_artifact", "manifest.json is missing"));
     }
-    for (path, bytes) in files {
-        if !artifact_path_valid(&path) {
-            return Err(invalid(
-                "invalid_artifact",
-                format!("unexpected artifact file {path:?}"),
-            ));
+    if let Some((path, _)) = files.iter().find(|(p, _)| !artifact_path_valid(p)) {
+        return Err(invalid(
+            "invalid_artifact",
+            format!("unexpected artifact file {path:?}"),
+        ));
+    }
+    // Registered artifacts are immutable (edges may run them): publishing the same id again
+    // must bring exactly the stored bytes, and nothing is written.
+    if artifact_exists(db, id).await? {
+        for (path, bytes) in &files {
+            let stored = match storage.private.get(&object_key(id, path)).await {
+                Ok(r) => Some(r.bytes().await?),
+                Err(object_store::Error::NotFound { .. }) => None,
+                Err(e) => return Err(e.into()),
+            };
+            if stored.as_deref() != Some(bytes.as_slice()) {
+                return Err(Error::Conflict {
+                    code: "artifact_mismatch",
+                    detail: format!("artifact {id} is already published with different {path}"),
+                });
+            }
         }
+        return Ok(());
+    }
+    for (path, bytes) in files {
         storage
             .private
             .put(&object_key(id, &path), PutPayload::from(bytes))
@@ -197,7 +215,7 @@ pub async fn activate_default(
     .await?;
     if let Some(p) = parent {
         sqlx::query!(
-            "UPDATE theme_revisions SET status = 'superseded' WHERE id = $1",
+            "UPDATE theme_revisions SET status = 'superseded', superseded_at = now() WHERE id = $1",
             p
         )
         .execute(&mut **tx)
@@ -294,7 +312,8 @@ pub async fn active(tx: &mut TenantTx) -> Result<ActiveTheme, Error> {
     let retained = sqlx::query_scalar!(
         "SELECT artifact_id FROM theme_revisions
          WHERE artifact_id <> $1 AND status = 'superseded'
-           AND (number >= $2::int - $3::int OR published_at > now() - make_interval(days => $4::int))
+           AND (number >= $2::int - $3::int
+                OR superseded_at > now() - make_interval(days => $4::int))
          GROUP BY artifact_id ORDER BY max(number) DESC",
         current.artifact_id,
         current.number,

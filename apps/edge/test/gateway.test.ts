@@ -533,6 +533,42 @@ describe("platform routes backed by the real API (WP6)", () => {
     expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
+  test("an artifact of the wrong kind never runs (theme vs checkout bindings)", async () => {
+    resolver.set(
+      "kind.localhost",
+      site({ shop_host: "kind.localhost", theme_artifact: checkoutId, checkout_artifact: v1 }),
+    );
+    expect((await get("http://kind.localhost/")).status).toBe(502);
+    expect((await get("http://checkout.kind.localhost/")).status).toBe(502);
+  });
+
+  test("cart calls forward a valid Idempotency-Key and renew the capability cookie", async () => {
+    const shop = "http://demo.localhost:8280";
+    const cookie = "cart=carttoken_00000000000000000001";
+    api.calls.length = 0;
+    const res = await get(
+      `${shop}/_p/cart/lines`,
+      { origin: shop, cookie, "content-type": "application/json", "idempotency-key": "add-42" },
+      { method: "POST", body: JSON.stringify({ variant_id: "v1" }) },
+    );
+    expect(res.status).toBe(200);
+    expect(api.calls.at(-1)?.headers["idempotency-key"]).toBe("add-42");
+    expect(res.headers.get("set-cookie")).toMatch(
+      /^cart=carttoken_00000000000000000001; .*Max-Age=2592000/,
+    );
+    await get(
+      `${shop}/_p/cart/lines`,
+      {
+        origin: shop,
+        cookie,
+        "content-type": "application/json",
+        "idempotency-key": "bad key\u0001",
+      },
+      { method: "POST", body: JSON.stringify({ variant_id: "v1" }) },
+    );
+    expect(api.calls.at(-1)?.headers["idempotency-key"]).toBeUndefined();
+  });
+
   test("the checkout artifact comes from the resolved site", async () => {
     resolver.set(
       "sk.localhost",

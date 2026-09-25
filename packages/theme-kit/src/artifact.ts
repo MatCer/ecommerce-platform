@@ -206,17 +206,40 @@ async function exists(p: string) {
 
 const ID_RE = /^[0-9a-f]{32}$/;
 
+/**
+ * Checks what the content address does not cover: the manifest's runtime section must be the
+ * platform's (A22). The id covers every module and asset, the tokens, the CSP hashes and the
+ * kind; the entry point, compatibility date and flags are fixed by the platform, so a
+ * manifest that names anything else is refused instead of trusted.
+ */
+export function validateManifest(m: ArtifactManifest, id: string): ArtifactManifest {
+  if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
+  if (m.kind !== "theme" && m.kind !== "checkout")
+    throw new Error(`artifact ${id}: unknown kind ${JSON.stringify(m.kind)}`);
+  const r = m.runtime;
+  const flags = JSON.stringify(r?.compatibility_flags);
+  if (
+    r?.compatibility_date !== RUNTIME.compatibility_date ||
+    flags !== JSON.stringify(RUNTIME.compatibility_flags) ||
+    r.main !== "entry.mjs" ||
+    !Array.isArray(r.modules) ||
+    r.modules[0] !== "entry.mjs" ||
+    new Set(r.modules).size !== r.modules.length
+  )
+    throw new Error(`artifact ${id}: runtime section differs from the platform runtime`);
+  for (const mod of r.modules) {
+    if (typeof mod !== "string" || mod.startsWith("/") || mod.split("/").includes("..")) {
+      throw new Error(`artifact ${id}: bad module path ${mod}`);
+    }
+  }
+  return m;
+}
+
 /** Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. */
 export async function readManifest(root: string, id: string): Promise<ArtifactManifest> {
   if (!ID_RE.test(id)) throw new Error(`artifact: invalid id ${JSON.stringify(id)}`);
   const m = JSON.parse(
     await readFile(path.join(root, id, "manifest.json"), "utf8"),
   ) as ArtifactManifest;
-  if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
-  for (const mod of m.runtime.modules) {
-    if (mod.startsWith("/") || mod.split("/").includes("..")) {
-      throw new Error(`artifact ${id}: bad module path ${mod}`);
-    }
-  }
-  return m;
+  return validateManifest(m, id);
 }
