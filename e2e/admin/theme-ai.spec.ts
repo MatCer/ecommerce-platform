@@ -63,7 +63,7 @@ test("a prompt becomes a checked AI revision that is accepted, published and rol
   await ai.getByRole("button", { name: "Start AI edit" }).click();
 
   // The run: tool steps, a real build + gates (the agent's functional check included).
-  const run = ai.getByRole("article");
+  const run = ai.getByRole("article").filter({ hasText: prompt });
   await expect(run.getByText("Ready for review")).toBeVisible({ timeout: 12 * 60_000 });
   await expect(run.getByText("Ran the checks")).toBeVisible();
   await expect(run.getByText(/All checks passed on revision #\d+/)).toBeVisible();
