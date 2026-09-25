@@ -589,11 +589,10 @@ describe("checkout, order page and fake gateway (WP10)", () => {
     // Orders: the capability is the path; nothing else.
     expect((await get(`${checkout}/_p/orders/${order}/payment`)).status).toBe(200);
     expect((await get(`${checkout}/_p/orders/short/payment`)).status).toBe(404);
-    const retry = await get(
-      `${checkout}/_p/orders/${order}/payment-attempts`,
-      json,
-      { method: "POST", body: "{}" },
-    );
+    const retry = await get(`${checkout}/_p/orders/${order}/payment-attempts`, json, {
+      method: "POST",
+      body: "{}",
+    });
     expect(retry.status).toBe(200);
     expect(retry.headers.get("referrer-policy")).toBe("no-referrer");
     // The shop origin has none of it.
@@ -624,9 +623,7 @@ describe("checkout, order page and fake gateway (WP10)", () => {
       url: `http://api.test/storefront/v1/checkout/fake-pay/${attempt}`,
       body: '{"outcome":"succeeded"}',
     });
-    expect((await post("//evil.example/", { origin: checkout })).headers.get("location")).toBe(
-      "/",
-    );
+    expect((await post("//evil.example/", { origin: checkout })).headers.get("location")).toBe("/");
     expect((await post(`/o/${order}`, { origin: "http://evil.localhost" })).status).toBe(403);
   });
 

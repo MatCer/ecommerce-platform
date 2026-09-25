@@ -379,7 +379,9 @@ export default function CheckoutForm(props: {
           />
           <Show when={elsewhere()}>
             <fieldset class="mt-4 border-t border-border pt-4">
-              <legend class="mb-2 text-sm font-semibold">{t(m, "checkout.delivery_address")}</legend>
+              <legend class="mb-2 text-sm font-semibold">
+                {t(m, "checkout.delivery_address")}
+              </legend>
               {addressFields(delivery, setDelivery, "shipping")}
             </fieldset>
           </Show>
@@ -519,7 +521,9 @@ export default function CheckoutForm(props: {
               </a>
             </div>
             <fieldset class="grid gap-3 border-t border-border pt-3">
-              <legend class="mb-1 text-sm text-muted-foreground">{t(m, "checkout.optional")}</legend>
+              <legend class="mb-1 text-sm text-muted-foreground">
+                {t(m, "checkout.optional")}
+              </legend>
               <Checkbox
                 label={t(m, "checkout.marketing")}
                 description={t(m, "consent.email_marketing_hint")}

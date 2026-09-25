@@ -66,7 +66,11 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
       </p>
       <Show when={p().can_retry}>
         <div>
-          <Button variant="primary" loading={busy()} onClick={() => void go(`${base}/payment-attempts`)}>
+          <Button
+            variant="primary"
+            loading={busy()}
+            onClick={() => void go(`${base}/payment-attempts`)}
+          >
             {t(m, "order.payment_retry")}
           </Button>
         </div>

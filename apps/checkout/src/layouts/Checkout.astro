@@ -11,7 +11,14 @@ interface Props {
   /** The two-column checkout needs more room than the account pages. */
   wide?: boolean;
 }
-const { title, shopName, shopUrl, lang = "cs", accountLabel = "Můj účet", wide = false } = Astro.props;
+const {
+  title,
+  shopName,
+  shopUrl,
+  lang = "cs",
+  accountLabel = "Můj účet",
+  wide = false,
+} = Astro.props;
 const width = wide ? "max-w-5xl" : "max-w-3xl";
 ---
 

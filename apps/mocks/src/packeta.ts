@@ -21,13 +21,48 @@ interface Point {
 
 const POINTS: Record<string, Point[]> = {
   cz: [
-    { id: "4101", name: "Z-BOX Praha 1, Dlouhá", street: "Dlouhá 1", city: "Praha", zip: "110 00", country: "cz" },
-    { id: "4102", name: "Trafika Vinohrady", street: "Vinohradská 48", city: "Praha", zip: "120 00", country: "cz" },
-    { id: "4103", name: "Z-BOX Brno, Náměstí Svobody", street: "Náměstí Svobody 5", city: "Brno", zip: "602 00", country: "cz" },
+    {
+      id: "4101",
+      name: "Z-BOX Praha 1, Dlouhá",
+      street: "Dlouhá 1",
+      city: "Praha",
+      zip: "110 00",
+      country: "cz",
+    },
+    {
+      id: "4102",
+      name: "Trafika Vinohrady",
+      street: "Vinohradská 48",
+      city: "Praha",
+      zip: "120 00",
+      country: "cz",
+    },
+    {
+      id: "4103",
+      name: "Z-BOX Brno, Náměstí Svobody",
+      street: "Náměstí Svobody 5",
+      city: "Brno",
+      zip: "602 00",
+      country: "cz",
+    },
   ],
   sk: [
-    { id: "5101", name: "Z-BOX Bratislava, Obchodná", street: "Obchodná 12", city: "Bratislava", zip: "811 06", country: "sk" },
-    { id: "5102", name: "Papiernictvo Košice", street: "Hlavná 30", city: "Košice", zip: "040 01", country: "sk" },
+    {
+      id: "5101",
+      name: "Z-BOX Bratislava, Obchodná",
+      street: "Obchodná 12",
+      city: "Bratislava",
+      zip: "811 06",
+      country: "sk",
+    },
+    {
+      id: "5102",
+      name: "Papiernictvo Košice",
+      street: "Hlavná 30",
+      city: "Košice",
+      zip: "040 01",
+      country: "sk",
+    },
   ],
 };
 
@@ -36,7 +71,9 @@ export function safeOrigin(raw: string | undefined): string | null {
   if (!raw) return null;
   try {
     const u = new URL(raw);
-    return (u.protocol === "http:" || u.protocol === "https:") && u.origin === raw ? u.origin : null;
+    return (u.protocol === "http:" || u.protocol === "https:") && u.origin === raw
+      ? u.origin
+      : null;
   } catch {
     return null;
   }

@@ -13,9 +13,10 @@ const m = shop?.messages ?? {};
 if (!order) Astro.response.status = 404;
 // The edge sends `Referrer-Policy: no-referrer` for /o/*: the token never leaks through Referer.
 const placedAt = order
-  ? new Intl.DateTimeFormat(shop?.locale ?? "cs", { dateStyle: "medium", timeStyle: "short" }).format(
-      new Date(order.placed_at),
-    )
+  ? new Intl.DateTimeFormat(shop?.locale ?? "cs", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(order.placed_at))
   : "";
 ---
 

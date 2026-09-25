@@ -32,9 +32,6 @@ interface OrderModel {
   payment: { status: string };
 }
 
-/** The first test's order, for the admin check at the end. */
-let placed = "";
-
 async function newPage(browser: Browser, locale = "cs-CZ"): Promise<Page> {
   const ctx = await browser.newContext({ locale });
   // A decided consent keeps the theme's banner closed.
@@ -54,7 +51,9 @@ async function toCheckout(
   coupon?: string,
 ): Promise<CartModel> {
   await page.goto(`${shop}/`);
-  const model = (await (await page.request.get(`${shop}/_p/public/pages/product/${slug}`)).json()) as {
+  const model = (await (
+    await page.request.get(`${shop}/_p/public/pages/product/${slug}`)
+  ).json()) as {
     product: { variants: { id: string }[] };
   };
   // Every placed order reserves stock (A13): take the first variant that still has enough.
@@ -125,7 +124,9 @@ async function fakePay(page: Page, button: "Pay" | "Fail the payment"): Promise<
 }
 
 async function order(page: Page, shop: string, token: string): Promise<OrderModel> {
-  return (await (await page.request.get(`${checkoutOf(shop)}/_p/orders/${token}`)).json()) as OrderModel;
+  return (await (
+    await page.request.get(`${checkoutOf(shop)}/_p/orders/${token}`)
+  ).json()) as OrderModel;
 }
 
 interface MailSummary {
@@ -141,10 +142,11 @@ async function mail(to: string, subject: string): Promise<{ Text: string; HTML: 
     const res = await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
     const body = (await res.json()) as { messages: MailSummary[] };
     const hit = body.messages.find((m) => m.Subject.includes(subject));
-    if (hit) return (await (await fetch(`${mailpit}/api/v1/message/${hit.ID}`)).json()) as {
-      Text: string;
-      HTML: string;
-    };
+    if (hit)
+      return (await (await fetch(`${mailpit}/api/v1/message/${hit.ID}`)).json()) as {
+        Text: string;
+        HTML: string;
+      };
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`no email "${subject}" to ${to}`);
@@ -161,7 +163,9 @@ async function signIn(page: Page, shop: string, email: string, next: string) {
   const deadline = Date.now() + 20_000;
   let link: string | undefined;
   while (!link && Date.now() < deadline) {
-    const res = await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`);
+    const res = await fetch(
+      `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`,
+    );
     const body = (await res.json()) as { messages: MailSummary[] };
     const fresh = body.messages.find((m) => new Date(m.Created) >= since);
     if (fresh) {
@@ -183,7 +187,7 @@ test("guest checkout in CZ: Packeta pickup point, fake payment, confirmation pag
 }) => {
   const page = await newPage(browser);
   const email = `host-${run}@example.test`;
-  await toCheckout(page, CZ, "tricko-basic", 2);
+  await toCheckout(page, CZ, "tricko-henley", 2);
   await expect(page.getByRole("heading", { level: 1, name: "Pokladna" })).toBeVisible();
   await expectAccessible(page, "checkout");
 
@@ -210,7 +214,6 @@ test("guest checkout in CZ: Packeta pickup point, fake payment, confirmation pag
   await expectAccessible(page, "order page");
   const o = await order(page, CZ, token);
   expect(o).toMatchObject({ status: "confirmed", payment: { status: "paid" } });
-  placed = o.number;
 
   const confirmation = await mail(email, `Potvrzení objednávky ${o.number}`);
   expect(confirmation.Text).toContain("Z-BOX Praha 1");
@@ -221,7 +224,7 @@ test("guest checkout in CZ: Packeta pickup point, fake payment, confirmation pag
 
 test("SK checkout with home delivery", async ({ browser }) => {
   const page = await newPage(browser, "sk-SK");
-  await toCheckout(page, SK, "tricko-basic");
+  await toCheckout(page, SK, "tricko-oversize");
   await expect(page.getByRole("heading", { level: 1, name: "Pokladňa" })).toBeVisible();
   await fillContactAndAddress(page, `sk-${run}@example.test`, "Bratislava");
   await page.getByRole("radio", { name: /Packeta – na adresu/ }).check();
@@ -238,7 +241,7 @@ test("SK checkout with home delivery", async ({ browser }) => {
 
 test("a failed payment is retried with a new attempt and succeeds", async ({ browser }) => {
   const page = await newPage(browser);
-  await toCheckout(page, CZ, "tricko-basic");
+  await toCheckout(page, CZ, "tricko-henley");
   await fillContactAndAddress(page, `retry-${run}@example.test`);
   await choosePickupPoint(page, /Trafika Vinohrady/);
   await page.getByRole("radio", { name: /Testovací platba/ }).check();
@@ -274,7 +277,7 @@ test("coupon and sale: the order totals match the cart", async ({ browser }) => 
 test("a signed-in customer finds the order in the account", async ({ browser }) => {
   const page = await newPage(browser);
   const email = `ucet-${run}@example.test`;
-  await toCheckout(page, CZ, "tricko-basic");
+  await toCheckout(page, CZ, "tricko-henley");
   await signIn(page, CZ, email, "/");
   await expect(page.getByText(`Nakupujete jako ${email}`)).toBeVisible();
   await expect(page.locator('input[autocomplete="email"]')).toHaveValue(email);
@@ -295,7 +298,7 @@ test("a signed-in customer finds the order in the account", async ({ browser }) 
 test("a guest order joins the account after an email-link sign-in (A5)", async ({ browser }) => {
   const page = await newPage(browser);
   const email = `pozdeji-${run}@example.test`;
-  await toCheckout(page, CZ, "tricko-basic");
+  await toCheckout(page, CZ, "tricko-henley");
   await fillContactAndAddress(page, email);
   await choosePickupPoint(page, /Z-BOX Praha 1/);
   await page.getByRole("radio", { name: /Testovací platba/ }).check();
@@ -321,7 +324,6 @@ test("a guest order joins the account after an email-link sign-in (A5)", async (
 test("the admin lists the order and shows its detail; shipping and payment settings render", async ({
   browser,
 }) => {
-  expect(placed).not.toBe("");
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await useEnglish(page);
@@ -333,9 +335,12 @@ test("the admin lists the order and shows its detail; shipping and payment setti
   await page.goto(await magicLink(owner, since));
   const menu = page.getByRole("navigation", { name: "Main navigation" });
   await menu.getByRole("link", { name: "Orders", exact: true }).click();
-  await page.getByRole("link", { name: placed, exact: true }).click();
-  await expect(page.getByRole("heading", { name: placed })).toBeVisible();
-  await expect(page.getByText("Z-BOX Praha 1").first()).toBeVisible();
+  // Newest first: the list starts with this run's latest order.
+  const first = page.getByRole("link", { name: /^\d{6,10}$/ }).first();
+  const number = (await first.textContent()) ?? "";
+  await first.click();
+  await expect(page.getByRole("heading", { name: number })).toBeVisible();
+  await expect(page.getByText("placed", { exact: true }).first()).toBeVisible();
   await expectAccessible(page, "admin order detail");
   await menu.getByRole("link", { name: "Shipping", exact: true }).click();
   await expect(page.getByText("Packeta pickup point").first()).toBeVisible();
