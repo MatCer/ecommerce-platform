@@ -227,7 +227,6 @@ pub struct ParameterValue {
     /// Variant-level value (by SKU); omit for a product-level value.
     pub variant_sku: Option<String>,
     /// `{"cs": "bavlna"}` for text parameters, a number or a boolean otherwise.
-    #[schema(value_type = Object)]
     pub value: Value,
 }
 

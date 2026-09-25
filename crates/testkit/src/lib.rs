@@ -7,6 +7,8 @@
 // Test support code: panicking on setup failures is the desired behaviour.
 #![allow(clippy::unwrap_used)]
 
+pub mod catalog;
+
 use std::sync::Arc;
 
 use object_store::memory::InMemory;

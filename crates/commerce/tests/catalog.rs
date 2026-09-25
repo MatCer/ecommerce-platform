@@ -787,3 +787,24 @@ async fn tenants_cannot_reach_each_others_catalog(db: PgPool) {
         Some("23503")
     );
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn testkit_fixtures_build_valid_products(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let root = testkit::catalog::category(&runtime, tenant, "root", None).await;
+    let child = testkit::catalog::category(&runtime, tenant, "child", Some(root.id)).await;
+    assert_eq!(child.parent_id, Some(root.id));
+
+    let multi = testkit::catalog::product(&runtime, tenant, "FX", 3).await;
+    let skus: Vec<&str> = multi.variants.iter().map(|v| v.sku.as_str()).collect();
+    assert_eq!(skus, ["FX-1", "FX-2", "FX-3"]);
+    assert!(multi.variants[0].is_default);
+    assert_eq!(multi.options[0].values.len(), 3);
+
+    let mut input = testkit::catalog::product_input("ONE", 1);
+    input.category_ids = vec![child.id];
+    let single = testkit::catalog::create(&runtime, tenant, &input).await;
+    assert!(single.options.is_empty());
+    assert_eq!(single.category_ids, vec![child.id]);
+}

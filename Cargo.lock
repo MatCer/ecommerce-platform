@@ -3146,6 +3146,7 @@ dependencies = [
 name = "testkit"
 version = "0.1.0"
 dependencies = [
+ "commerce",
  "object_store",
  "platform",
  "sqlx",
