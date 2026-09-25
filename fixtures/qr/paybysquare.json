@@ -1,0 +1,61 @@
+{
+  "generator": "bysquare@4.0.2",
+  "version": "1.2.0",
+  "cases": [
+    {
+      "name": "basic",
+      "amount_minor": 1290,
+      "iban": "SK9611000000002918599669",
+      "bic": "TATRSKBX",
+      "variable_symbol": "100001",
+      "note": "Objednávka 100001",
+      "beneficiary_name": "Demo obchod s.r.o.",
+      "payload": "\t1\t1\t12.9\tEUR\t\t100001\t\t\t\tObjednavka 100001\t1\tSK9611000000002918599669\tTATRSKBX\t0\t0\tDemo obchod s.r.o.\t\t",
+      "qr": "0806M0009K18RB3L2MEI9JGKAMVTITLTNODVQGNU6LFFNJGTMM1G72NRRKS3UGJQ5FPR195MA2UC5L7TDJI72ELS3ATNASH36OB77EUGBCAOB9S34DKKU8GC60IC4NKE2C97BV1PEU58QTHH4A75VPOMGGJ1VVSOHA000"
+    },
+    {
+      "name": "whole_amount_without_bic",
+      "amount_minor": 10000,
+      "iban": "SK3112000000198742637541",
+      "bic": null,
+      "variable_symbol": "100002",
+      "note": "Objednavka 100002",
+      "beneficiary_name": "Demo",
+      "payload": "\t1\t1\t100\tEUR\t\t100002\t\t\t\tObjednavka 100002\t1\tSK3112000000198742637541\t\t0\t0\tDemo\t\t",
+      "qr": "080580009M1VVC0O7II8FNR1UTN0O0HEV5SVL6GOCPO46J3V18ER29P7823HCP927KR0KF15C7CTK8OHOE3E0M467G2ULUROSBN15PHBKNLND1KEV3EDQLHTBNVVNN0G00"
+    },
+    {
+      "name": "diacritics_tabs_and_star",
+      "amount_minor": 4250,
+      "iban": "SK9611000000002918599669",
+      "bic": "TATRSKBXXXX",
+      "variable_symbol": "123",
+      "note": "Ľubovoľná\tpoznámka * čšťžýáíé",
+      "beneficiary_name": "Ľubomír Šťastný – Žilina",
+      "payload": "\t1\t1\t42.5\tEUR\t\t123\t\t\t\tLubovolna poznamka * cstzyaie\t1\tSK9611000000002918599669\tTATRSKBXXXX\t0\t0\tLubomir Stastny – Zilina\t\t",
+      "qr": "0807U000AKFTBI009C61MEIVRVNGA5PDEUHKVC3TMM5GQGJF7B5QM0NES5BGHBS9064M85EVNBMU9PAVE1J33J1KJ43IH1JA1DPSC9KGBCK4FM2BH782DF6EU6I4TR93B9CPORHMCQ6JSMK70IU9ANJT2MTMN2KBFO9QQV5UJK3SPFOVI6H4ATBVBNLHV4QV19QVPUT600"
+    },
+    {
+      "name": "large_amount_long_note",
+      "amount_minor": 12345678,
+      "iban": "SK0809000000000123123123",
+      "bic": "GIBASKBX",
+      "variable_symbol": "9999999999",
+      "note": "Platba za objednávku číslo 9999999999 v obchode Demo obchod",
+      "beneficiary_name": "Veľmi dlhý názov obchodníka s.r.o.",
+      "payload": "\t1\t1\t123456.78\tEUR\t\t9999999999\t\t\t\tPlatba za objednavku cislo 9999999999 v obchode Demo obchod\t1\tSK0809000000000123123123\tGIBASKBX\t0\t0\tVelmi dlhy nazov obchodnika s.r.o.\t\t",
+      "qr": "080AS0006MU5CR7G92SVF58DCCC6QILN7OET0CTE7EE2IIUC20VA7LFO1RN9P06VVD0TM7M5N00942BE1B623UE72AK02EBE5G1VPFEAKD742EI7NJ76CSBBHHMTG9C7RQ29C29HMT5H9KTMM7P3LORO7JT1ARB9M25JBIMJT9NH4Q0L57CDORU2EHP41D1274JD603E3MJFUK9CAP3IAJLDTVVU1GB800"
+    },
+    {
+      "name": "five_cents",
+      "amount_minor": 5,
+      "iban": "SK9611000000002918599669",
+      "bic": "TATRSKBX",
+      "variable_symbol": "100003",
+      "note": "",
+      "beneficiary_name": "Demo",
+      "payload": "\t1\t1\t0.05\tEUR\t\t100003\t\t\t\t\t1\tSK9611000000002918599669\tTATRSKBX\t0\t0\tDemo\t\t",
+      "qr": "0804O000F46OARIG9L807LFQ41A7KGIQI6E1GER9OMU5JNF6EAMKBBALGQQFOGRKRANI4AHVT9E2RPKDQIDP238RJNE0AQJ41DOVI99F39EAB2TVNVVVGGGG00"
+    }
+  ]
+}

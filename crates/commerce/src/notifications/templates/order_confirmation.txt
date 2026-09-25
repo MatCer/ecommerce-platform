@@ -9,5 +9,5 @@
 {{ t("order_confirmation.pickup_point") }}: {{ shipping.pickup_point }}{% endif %}{% if shipping.address %}
 {{ shipping.address }}{% endif %}
 {{ t("order_confirmation.payment") }}: {{ payment.method }}
-{% if payment.bank_transfer %}{{ t("order_confirmation.bank_transfer") }}{% elif payment.cod %}{{ t("order_confirmation.cod") }}{% else %}{{ t("order_confirmation.prepaid") }}{% endif %}
+{% if payment.bank_transfer and bank %}{% include "bank_transfer.txt" %}{% elif payment.bank_transfer %}{{ t("order_confirmation.bank_transfer") }}{% elif payment.cod %}{{ t("order_confirmation.cod") }}{% else %}{{ t("order_confirmation.prepaid") }}{% endif %}
 {% endblock %}

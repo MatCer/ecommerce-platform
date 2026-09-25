@@ -10,15 +10,24 @@
 //! machine, so a success after expiry is recorded as a late payment (order exception, no
 //! restock).
 //!
-//! WP10 implements the fake gateway (local/e2e, `PAYMENTS_FAKE=1`) and cash on delivery (no
-//! provider: the courier collects, A16). Stripe and bank transfer are configured here but stay
-//! unavailable at checkout until their adapters land (WP11).
+//! Adapters: the fake gateway (local/e2e, `PAYMENTS_FAKE=1`), Stripe Connect ([`stripe`]),
+//! bank transfer with QR codes and statement matching ([`bank`]) and cash on delivery
+//! ([`cod`], collected by the courier, A16).
+
+pub mod bank;
+pub mod cod;
+mod lzma;
+pub mod qr;
+pub mod statements;
+pub mod stripe;
 
 use std::future::Future;
+use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 use platform::Error;
+use platform::crypto::SecretBox;
 use platform::db::TenantTx;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -29,7 +38,8 @@ use uuid::Uuid;
 use crate::audit;
 use crate::catalog::{I18n, check_i18n};
 use crate::markets::invalid;
-use crate::orders::{self, status::PaymentCommand};
+use crate::orders::{self, status::CodStatus, status::PaymentCommand};
+use crate::pricing::cart::Tender;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -84,20 +94,34 @@ impl MethodKind {
 // Gateways
 
 /// Platform payment settings.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct Payments {
     /// `PAYMENTS_FAKE=1`: the fake gateway and its signing secret.
     pub fake: Option<FakeGateway>,
+    /// Stripe Connect (real, or stripe-mock + simulator locally).
+    pub stripe: Option<stripe::Stripe>,
+    /// `PAYMENTS_SECRET_KEY`: encrypts stored provider credentials (Fio API tokens).
+    pub secrets: Option<Arc<SecretBox>>,
+}
+
+impl std::fmt::Debug for Payments {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Payments")
+            .field("fake", &self.fake)
+            .field("stripe", &self.stripe)
+            .field("secrets", &self.secrets.is_some())
+            .finish()
+    }
 }
 
 impl Payments {
-    /// Whether checkout may offer `kind` (an adapter exists and is configured).
+    /// Whether the platform has an adapter for `kind`. Per tenant and market there is more:
+    /// see [`methods`] (a receiving account for bank transfer, a ready Stripe account).
     pub fn available(&self, kind: MethodKind) -> bool {
         match kind {
             MethodKind::Fake => self.fake.is_some(),
-            MethodKind::Cod => true,
-            // WP11: Stripe Connect and bank transfer (SPAYD / PAY by square) adapters.
-            MethodKind::Stripe | MethodKind::BankTransfer => false,
+            MethodKind::Cod | MethodKind::BankTransfer => true,
+            MethodKind::Stripe => self.stripe.is_some(),
         }
     }
 }
@@ -118,8 +142,19 @@ pub struct AttemptInit {
 pub enum NextAction {
     /// Go to the provider's page (relative or absolute URL).
     Redirect { url: String },
-    /// Nothing to pay now (cash on delivery).
+    /// Nothing to pay online now: cash on delivery, or a bank transfer (the order page shows
+    /// the instructions and the QR code).
     None,
+    /// Stripe's Payment Element on the order page (loaded only for this action): the intent
+    /// lives on the shop's connected account.
+    Stripe {
+        publishable_key: String,
+        account_id: String,
+        client_secret: String,
+    },
+    /// Local mode: no real Stripe key. The order page offers the "Stripe test simulator",
+    /// whose buttons make the API emit signed webhook events.
+    StripeSimulator,
 }
 
 /// A provider-side payment for an attempt.
@@ -258,8 +293,12 @@ pub struct PaymentMethod {
     /// Payment window for unpaid orders; `null` = the method's default.
     pub timeout_minutes: Option<i32>,
     pub position: i32,
-    /// Whether the platform can take payments with it yet (adapter present and configured).
+    /// Whether the shop can take payments with it now (adapter present and configured).
     pub available: bool,
+    /// Why not: `not_configured` (no platform adapter), `no_bank_account` (bank transfer
+    /// needs the market's receiving account), `stripe_onboarding` (the connected account
+    /// cannot take card payments yet or lost the capability, A11).
+    pub unavailable_reason: Option<String>,
 }
 
 impl PaymentMethod {
@@ -315,9 +354,25 @@ pub async fn methods(
     )
     .fetch_all(&mut **tx)
     .await?;
+    let has_bank_account = bank::account(tx, market_id).await?.is_some();
+    let stripe_ready = match &payments.stripe {
+        Some(s) => stripe::account(tx)
+            .await?
+            .is_some_and(|a| a.ready && a.livemode == s.livemode()),
+        None => false,
+    };
     let mut out = Vec::new();
     for (i, kind) in MethodKind::ALL.into_iter().enumerate() {
         let row = rows.iter().find(|r| r.kind == kind.as_str());
+        let unavailable_reason = if !payments.available(kind) {
+            Some("not_configured")
+        } else if kind == MethodKind::BankTransfer && !has_bank_account {
+            Some("no_bank_account")
+        } else if kind == MethodKind::Stripe && !stripe_ready {
+            Some("stripe_onboarding")
+        } else {
+            None
+        };
         out.push(PaymentMethod {
             market_id,
             kind,
@@ -329,7 +384,8 @@ pub async fn methods(
                 .unwrap_or_default(),
             timeout_minutes: row.and_then(|r| r.timeout_minutes),
             position: row.map_or(i32::try_from(i).unwrap_or(0), |r| r.position),
-            available: payments.available(kind),
+            available: unavailable_reason.is_none(),
+            unavailable_reason: unavailable_reason.map(str::to_owned),
         });
     }
     out.sort_by_key(|m| m.position);
@@ -419,6 +475,12 @@ pub struct Attempt {
     pub expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
+    /// Bank transfer: the variable symbol (A25).
+    pub variable_symbol: Option<String>,
+    /// Cash on delivery (A16): where the money is.
+    pub cod_status: Option<CodStatus>,
+    pub tender: Option<Tender>,
+    pub collector: Option<cod::Collector>,
 }
 
 /// One attempt. Attempts change only under their order's row lock (`orders::lock`), so
@@ -426,7 +488,7 @@ pub struct Attempt {
 pub async fn attempt(tx: &mut TenantTx, id: Uuid) -> Result<Attempt, Error> {
     let r = sqlx::query!(
         "SELECT id, order_id, method, status, amount_minor, currency, provider_ref, expires_at,
-                created_at, completed_at
+                created_at, completed_at, variable_symbol, cod_status, tender, collector
          FROM payment_attempts WHERE id = $1",
         id
     )
@@ -444,6 +506,19 @@ pub async fn attempt(tx: &mut TenantTx, id: Uuid) -> Result<Attempt, Error> {
         expires_at: r.expires_at,
         created_at: r.created_at,
         completed_at: r.completed_at,
+        variable_symbol: r.variable_symbol,
+        cod_status: r
+            .cod_status
+            .as_deref()
+            .map(|s| s.parse::<CodStatus>())
+            .transpose()
+            .map_err(|()| Error::Internal("stored COD status".into()))?,
+        tender: r.tender.as_deref().map(cod::parse_tender).transpose()?,
+        collector: r
+            .collector
+            .as_deref()
+            .map(cod::Collector::parse)
+            .transpose()?,
     })
 }
 
@@ -462,7 +537,9 @@ pub async fn attempts(tx: &mut TenantTx, order_id: Uuid) -> Result<Vec<Attempt>,
     Ok(out)
 }
 
-/// A new pending attempt for the order's total (placement or a retry).
+/// A new pending attempt for the order's total (placement or a retry). A bank transfer
+/// carries its receiving account, variable symbol and instructions (A25); cash on delivery
+/// starts `pending` with an unknown tender (A16).
 pub(crate) async fn create_attempt(
     tx: &mut TenantTx,
     order_id: Uuid,
@@ -470,17 +547,31 @@ pub(crate) async fn create_attempt(
     amount_minor: i64,
     currency: &str,
     expires_at: Option<DateTime<Utc>>,
+    bank: Option<&bank::Details>,
 ) -> Result<Uuid, Error> {
+    if (method == MethodKind::BankTransfer) != bank.is_some() {
+        return Err(Error::Internal(
+            "bank details belong to bank transfers".into(),
+        ));
+    }
+    let cod = method.is_cod();
     Ok(sqlx::query_scalar!(
-        "INSERT INTO payment_attempts (id, tenant_id, order_id, method, amount_minor, currency, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+        "INSERT INTO payment_attempts (id, tenant_id, order_id, method, amount_minor, currency,
+             expires_at, bank_account_id, variable_symbol, instructions, cod_status, tender)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                 CASE WHEN $11 THEN 'pending' END, CASE WHEN $11 THEN 'unknown' END)
+         RETURNING id",
         crate::id::new_id(),
         tx.tenant_id(),
         order_id,
         method.as_str(),
         amount_minor,
         currency,
-        expires_at
+        expires_at,
+        bank.map(|b| b.account_id),
+        bank.map(|b| b.variable_symbol.clone()),
+        bank.map(|b| b.instructions.clone()),
+        cod
     )
     .fetch_one(&mut **tx)
     .await?)
@@ -499,11 +590,24 @@ pub async fn init(
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
     let a = attempt(&mut tx, attempt_id).await?;
     let window = sqlx::query!(
-        "SELECT status, payment_expires_at FROM orders WHERE id = $1",
+        "SELECT status, payment_expires_at, number FROM orders WHERE id = $1",
         a.order_id
     )
     .fetch_one(&mut *tx)
     .await?;
+    let stripe_account = match a.method {
+        MethodKind::Stripe => stripe::account(&mut tx).await?,
+        _ => None,
+    };
+    let fee_bps = sqlx::query_scalar!(
+        "SELECT application_fee_bps FROM platform.tenants WHERE id = $1",
+        tenant_id
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    let shop = sqlx::query_scalar!("SELECT name FROM platform.tenants WHERE id = $1", tenant_id)
+        .fetch_one(&mut *tx)
+        .await?;
     tx.commit().await?;
     if a.status != AttemptStatus::Pending {
         return Err(Error::Conflict {
@@ -537,7 +641,53 @@ pub async fn init(
                 .await?
         }
         MethodKind::Cod => CodGateway.init(&req).await?,
-        MethodKind::Stripe | MethodKind::BankTransfer => return Err(unavailable()),
+        // The instructions were fixed at placement; the order page shows them.
+        MethodKind::BankTransfer => Intent {
+            provider_ref: format!("vs_{}", a.variable_symbol.clone().unwrap_or_default()),
+            action: NextAction::None,
+        },
+        MethodKind::Stripe => {
+            let s = payments.stripe.as_ref().ok_or_else(unavailable)?;
+            let acc = stripe_account
+                .filter(|acc| acc.ready && acc.livemode == s.livemode())
+                .ok_or_else(unavailable)?;
+            // A stored intent is reused (the idempotency key expires after 24 h).
+            let pi = match &a.provider_ref {
+                Some(id) if s.simulator() => stripe::PaymentIntent {
+                    id: id.clone(),
+                    client_secret: None,
+                },
+                Some(id) => s.retrieve_intent(&acc.account_id, id).await?,
+                None => {
+                    s.create_intent(
+                        &acc.account_id,
+                        &stripe::IntentRequest {
+                            tenant_id,
+                            order_id: a.order_id,
+                            attempt_id,
+                            amount_minor: a.amount_minor,
+                            currency: a.currency.clone(),
+                            application_fee_minor: stripe::application_fee(a.amount_minor, fee_bps),
+                            description: format!("{shop} {}", window.number),
+                        },
+                    )
+                    .await?
+                }
+            };
+            let action = match (s.simulator(), s.publishable_key(), pi.client_secret) {
+                (true, _, _) => NextAction::StripeSimulator,
+                (false, Some(pk), Some(secret)) => NextAction::Stripe {
+                    publishable_key: pk.to_owned(),
+                    account_id: acc.account_id.clone(),
+                    client_secret: secret,
+                },
+                _ => return Err(Error::Unavailable("stripe: no client secret".into())),
+            };
+            Intent {
+                provider_ref: pi.id,
+                action,
+            }
+        }
     };
     let mut tx = platform::db::tenant_tx(db, tenant_id).await?;
     sqlx::query!(
@@ -571,7 +721,8 @@ pub async fn retry(tx: &mut TenantTx, payments: &Payments, order_id: Uuid) -> Re
     .fetch_optional(&mut **tx)
     .await?;
     let window_open = order.payment_expires_at.is_none_or(|e| e > Utc::now());
-    if order.status != "pending" || open.is_some() || !window_open || method.is_cod() {
+    let retriable = !method.is_cod() && method != MethodKind::BankTransfer;
+    if order.status != "pending" || open.is_some() || !window_open || !retriable {
         return Err(Error::Conflict {
             code: "retry_not_allowed",
             detail: "this order cannot be paid again".into(),
@@ -587,6 +738,7 @@ pub async fn retry(tx: &mut TenantTx, payments: &Payments, order_id: Uuid) -> Re
         order.total_minor,
         &order.currency,
         order.payment_expires_at,
+        None,
     )
     .await?;
     orders::event(
@@ -739,6 +891,7 @@ mod tests {
         assert!(!none.available(MethodKind::Stripe));
         let fake = Payments {
             fake: Some(FakeGateway::new(b"k".to_vec())),
+            ..Payments::default()
         };
         assert!(fake.available(MethodKind::Fake));
         assert_eq!(

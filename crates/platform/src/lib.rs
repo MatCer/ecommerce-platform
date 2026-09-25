@@ -3,6 +3,7 @@
 
 pub mod auth_service;
 pub mod config;
+pub mod crypto;
 pub mod db;
 pub mod edge;
 pub mod error;

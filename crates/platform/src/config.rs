@@ -440,9 +440,190 @@ impl CheckoutConfig {
     }
 }
 
+/// How the platform talks to Stripe (WP11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StripeMode {
+    /// `sk_live_…`: real money.
+    Live,
+    /// `sk_test_…`: Stripe's test mode (the real Payment Element with test cards).
+    Test,
+    /// No key: API calls go to stripe-mock and the checkout offers a signed-event simulator
+    /// (local and CI only, refused with `APP_ENV=prod`).
+    Simulator,
+}
+
+/// Stripe Connect settings. Not `Debug`: it holds the secret key and the webhook secret.
+#[derive(Clone, PartialEq, Eq)]
+pub struct StripeConfig {
+    pub mode: StripeMode,
+    /// `https://api.stripe.com`, `STRIPE_API_URL` to override, or `STRIPE_MOCK_URL`.
+    pub api_url: Url,
+    pub secret_key: String,
+    /// `STRIPE_PUBLISHABLE_KEY` (real modes only): the Payment Element's key.
+    pub publishable_key: Option<String>,
+    /// `STRIPE_WEBHOOK_SECRET` (`whsec_…`): the Connect webhook endpoint's signing secret.
+    pub webhook_secret: String,
+}
+
+/// Payment providers (WP11). Not `Debug`: secrets.
+#[derive(Clone, PartialEq, Eq)]
+pub struct PaymentsConfig {
+    /// `None`: Stripe is not offered.
+    pub stripe: Option<StripeConfig>,
+    /// `PAYMENTS_SECRET_KEY` (64 hex characters): encrypts stored provider credentials (Fio
+    /// API tokens, A21). Unset: tokens cannot be saved or used.
+    pub secret_key: Option<String>,
+    /// `FIO_API_URL`: the Fio banka API (`https://fioapi.fio.cz`, the local mock in compose).
+    pub fio_api_url: Url,
+}
+
+impl PaymentsConfig {
+    pub fn from_env(env: AppEnv) -> Result<Self, ConfigError> {
+        Self::from_lookup(&process_env, env)
+    }
+
+    pub fn from_lookup(lookup: Lookup, env: AppEnv) -> Result<Self, ConfigError> {
+        let invalid = |name, reason: &str| ConfigError::Invalid {
+            name,
+            reason: reason.into(),
+        };
+        let secret_key = get(lookup, "PAYMENTS_SECRET_KEY");
+        if secret_key.as_ref().is_some_and(|k| {
+            k.trim().len() != 64 || !k.trim().bytes().all(|b| b.is_ascii_hexdigit())
+        }) {
+            return Err(invalid("PAYMENTS_SECRET_KEY", "must be 64 hex characters"));
+        }
+        let fio_api_url = match get(lookup, "FIO_API_URL") {
+            Some(_) => url(lookup, "FIO_API_URL")?,
+            None => Url::parse("https://fioapi.fio.cz/")
+                .map_err(|e| invalid("FIO_API_URL", &e.to_string()))?,
+        };
+        let webhook_secret = get(lookup, "STRIPE_WEBHOOK_SECRET");
+        if webhook_secret.as_ref().is_some_and(|s| s.len() < 16) {
+            return Err(invalid(
+                "STRIPE_WEBHOOK_SECRET",
+                "must be at least 16 characters",
+            ));
+        }
+        let stripe = if let Some(key) = get(lookup, "STRIPE_SECRET_KEY") {
+            let mode = match key.split('_').take(2).collect::<Vec<_>>()[..] {
+                ["sk" | "rk", "live"] => StripeMode::Live,
+                ["sk" | "rk", "test"] => StripeMode::Test,
+                _ => {
+                    return Err(invalid(
+                        "STRIPE_SECRET_KEY",
+                        "expected sk_live_… or sk_test_…",
+                    ));
+                }
+            };
+            let publishable_key = required(lookup, "STRIPE_PUBLISHABLE_KEY")?;
+            if !publishable_key.starts_with("pk_") {
+                return Err(invalid("STRIPE_PUBLISHABLE_KEY", "expected pk_…"));
+            }
+            Some(StripeConfig {
+                mode,
+                api_url: match get(lookup, "STRIPE_API_URL") {
+                    Some(_) => url(lookup, "STRIPE_API_URL")?,
+                    None => Url::parse("https://api.stripe.com/")
+                        .map_err(|e| invalid("STRIPE_API_URL", &e.to_string()))?,
+                },
+                secret_key: key,
+                publishable_key: Some(publishable_key),
+                webhook_secret: webhook_secret
+                    .ok_or(ConfigError::Missing("STRIPE_WEBHOOK_SECRET"))?,
+            })
+        } else if get(lookup, "STRIPE_MOCK_URL").is_some() {
+            if env == AppEnv::Prod {
+                return Err(invalid(
+                    "STRIPE_MOCK_URL",
+                    "the Stripe simulator is refused with APP_ENV=prod",
+                ));
+            }
+            Some(StripeConfig {
+                mode: StripeMode::Simulator,
+                api_url: url(lookup, "STRIPE_MOCK_URL")?,
+                // stripe-mock accepts any test key.
+                secret_key: "sk_test_simulator".into(),
+                publishable_key: None,
+                webhook_secret: webhook_secret
+                    .ok_or(ConfigError::Missing("STRIPE_WEBHOOK_SECRET"))?,
+            })
+        } else {
+            None
+        };
+        Ok(Self {
+            stripe,
+            secret_key,
+            fio_api_url,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn payments(vars: &[(&str, &str)], env: AppEnv) -> Result<PaymentsConfig, ConfigError> {
+        let vars: Vec<(String, String)> = vars
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        let lookup = move |name: &str| vars.iter().find(|(k, _)| k == name).map(|(_, v)| v.clone());
+        PaymentsConfig::from_lookup(&lookup, env)
+    }
+
+    #[test]
+    fn payments_config_modes() {
+        let none = payments(&[], AppEnv::Dev).unwrap();
+        assert!(none.stripe.is_none());
+        assert_eq!(none.fio_api_url.as_str(), "https://fioapi.fio.cz/");
+
+        let sim = payments(
+            &[
+                ("STRIPE_MOCK_URL", "http://stripe-mock:12111"),
+                ("STRIPE_WEBHOOK_SECRET", "whsec_local_0123456789"),
+            ],
+            AppEnv::Dev,
+        )
+        .unwrap()
+        .stripe
+        .unwrap();
+        assert_eq!(sim.mode, StripeMode::Simulator);
+        assert_eq!(sim.api_url.as_str(), "http://stripe-mock:12111/");
+        assert!(
+            payments(
+                &[
+                    ("STRIPE_MOCK_URL", "http://stripe-mock:12111"),
+                    ("STRIPE_WEBHOOK_SECRET", "whsec_local_0123456789"),
+                ],
+                AppEnv::Prod,
+            )
+            .is_err(),
+            "no simulator in prod"
+        );
+
+        let real = payments(
+            &[
+                ("STRIPE_SECRET_KEY", "sk_live_abc"),
+                ("STRIPE_PUBLISHABLE_KEY", "pk_live_abc"),
+                ("STRIPE_WEBHOOK_SECRET", "whsec_0123456789abcdef"),
+                ("STRIPE_MOCK_URL", "http://ignored"),
+            ],
+            AppEnv::Prod,
+        )
+        .unwrap()
+        .stripe
+        .unwrap();
+        assert_eq!(real.mode, StripeMode::Live);
+        assert_eq!(real.api_url.as_str(), "https://api.stripe.com/");
+        assert!(
+            payments(&[("STRIPE_SECRET_KEY", "sk_test_abc")], AppEnv::Dev).is_err(),
+            "a real key needs the publishable key and the webhook secret"
+        );
+        assert!(payments(&[("STRIPE_SECRET_KEY", "pk_test_abc")], AppEnv::Dev).is_err());
+        assert!(payments(&[("PAYMENTS_SECRET_KEY", "abc")], AppEnv::Dev).is_err());
+        assert!(payments(&[("PAYMENTS_SECRET_KEY", &"a".repeat(64))], AppEnv::Dev).is_ok());
+    }
     use std::collections::HashMap;
 
     #[test]
