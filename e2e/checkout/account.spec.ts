@@ -172,7 +172,7 @@ test("the theme's consent banner is recorded, then changed on the preferences pa
     .poll(async () =>
       (await page.context().cookies(shop)).find((c) => c.name === "__Secure-consent_id"),
     )
-    .toMatchObject({ httpOnly: true, domain: "demo.localhost" });
+    .toMatchObject({ httpOnly: true, domain: ".demo.localhost" });
   const consentCookies = (await page.context().cookies(shop)).filter((c) => c.name === "consent");
   expect(consentCookies.map((c) => c.value)).toEqual(["analytics%2Cads%2Cpersonalization"]);
 
