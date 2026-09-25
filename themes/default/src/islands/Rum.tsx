@@ -2,7 +2,8 @@ import { startRum, track } from "@platform/storefront-sdk/client";
 import { onMount } from "solid-js";
 
 /**
- * Analytics (A20, consented visitors only): the page view (+ the product on a product page) and
+ * Analytics and ad-platform events (A20, WP20; consented visitors only, per purpose): the page
+ * view (+ the product on a product page), the search and
  * Web Vitals RUM (§9.6, sampled; the reporter loads lazily). Renders nothing.
  */
 export default function Rum(props: {
