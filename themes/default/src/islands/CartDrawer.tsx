@@ -145,22 +145,15 @@ export default function CartDrawer(props: {
               <For each={lines()}>
                 {(line) => (
                   <li class="flex gap-4 py-4">
-                    {/* The photo repeats the name link next to it: out of the tab order, named. */}
-                    <a
-                      href={`${props.base}/p/${line.slug}`}
-                      class="shrink-0"
-                      tabIndex={-1}
-                      aria-label={line.product_name}
-                    >
-                      <img
-                        src={line.image ? imageUrl(line.image, 160) : undefined}
-                        alt=""
-                        width="64"
-                        height="80"
-                        loading="lazy"
-                        class="h-20 w-16 rounded-md bg-muted object-cover"
-                      />
-                    </a>
+                    {/* Decorative: the name next to it is the link (a nameless photo link failed axe). */}
+                    <img
+                      src={line.image ? imageUrl(line.image, 160) : undefined}
+                      alt=""
+                      width="64"
+                      height="80"
+                      loading="lazy"
+                      class="h-20 w-16 shrink-0 rounded-md bg-muted object-cover"
+                    />
                     <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
                       <a
                         href={`${props.base}/p/${line.slug}`}
