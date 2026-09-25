@@ -117,3 +117,35 @@ export function tokenErrors(t: TokenGroups): Record<string, "color" | "font" | "
 
 /** `#rrggbb` for the native colour picker, when the value is one. */
 export const hexOf = (v: string) => (/^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim() : undefined);
+
+/** AI theme edits (WP24): a run that is still working (poll it). */
+export const RUN_ACTIVE = new Set(["queued", "running"]);
+
+export function runTone(status: string): Tone {
+  if (status === "succeeded" || status === "accepted") return "success";
+  if (status === "failed") return "error";
+  if (RUN_ACTIVE.has(status)) return "warning";
+  return "neutral";
+}
+
+export type DiffKind = "file" | "hunk" | "add" | "del" | "ctx";
+
+/** A unified diff split into lines tagged for colouring (no HTML is ever built from it). */
+export function diffLines(diff: string): { kind: DiffKind; text: string }[] {
+  return diff
+    .split("\n")
+    .filter((line, i, all) => line !== "" || i < all.length - 1)
+    .map((text) => {
+      const kind: DiffKind =
+        text.startsWith("+++ ") || text.startsWith("--- ") || text.startsWith("Binary file ")
+          ? "file"
+          : text.startsWith("@@")
+            ? "hunk"
+            : text.startsWith("+")
+              ? "add"
+              : text.startsWith("-")
+                ? "del"
+                : "ctx";
+      return { kind, text };
+    });
+}

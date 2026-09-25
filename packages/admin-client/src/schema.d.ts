@@ -4376,6 +4376,82 @@ export interface components {
         AiMarkList: {
             items: components["schemas"]["AiMark"][];
         };
+        AiThemeNewRun: {
+            /**
+             * Format: uuid
+             * @description The revision to start from; default: the active one. Must have passed the checks.
+             */
+            base_revision_id?: string | null;
+            /** @description What the merchant wants changed (1–4000 characters). */
+            prompt: string;
+        };
+        AiThemeRunDetail: {
+            /** @description Unified diff from the base revision's source to the run's result. */
+            diff?: string | null;
+            limits: components["schemas"]["AiThemeRunLimits"];
+            /** @description The builder's report of the last check (`steps`, `failures`, …). */
+            report?: Record<string, never> | null;
+            run: components["schemas"]["AiThemeRunSummary"];
+            steps: components["schemas"]["AiThemeStep"][];
+            /** @description The agent's closing message for the merchant. */
+            summary?: string | null;
+        };
+        AiThemeRunLimits: {
+            /** Format: int32 */
+            max_checks: number;
+            /** Format: int32 */
+            max_turns: number;
+        };
+        AiThemeRunList: {
+            items: components["schemas"]["AiThemeRunSummary"][];
+            /** @description `anthropic`, `fake` (the scripted demo agent, no key configured) or `disabled`. */
+            provider: string;
+        };
+        AiThemeRunSummary: {
+            /** Format: uuid */
+            base_revision_id: string;
+            cancel_requested: boolean;
+            /** Format: int32 */
+            checks_run: number;
+            /** Format: int64 */
+            cost_micros: number;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string;
+            /** @description Why the run failed (`turn_limit: …`, `checks_failed: …`), empty otherwise. */
+            error?: string | null;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            model?: string | null;
+            prompt: string;
+            /**
+             * Format: uuid
+             * @description The latest checked revision (the one accept makes publishable).
+             */
+            revision_id?: string | null;
+            /** Format: int32 */
+            revision_number?: number | null;
+            /** @description `queued`, `running`, `succeeded`, `failed`, `cancelled`, `accepted` or `discarded`. */
+            status: string;
+            /** Format: int64 */
+            tokens: number;
+            /** Format: int32 */
+            turns: number;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description One tool call of the agent, as shown in the admin. */
+        AiThemeStep: {
+            /** Format: date-time */
+            at: string;
+            detail: string;
+            ok: boolean;
+            path?: string | null;
+            /** @description `list_files`, `read_file`, `write_file`, `delete_file` or `run_checks`. */
+            tool: string;
+        };
         Alternate: {
             href: string;
             /** @description hreflang value (`cs-CZ`, `x-default`). */
@@ -6367,15 +6443,6 @@ export interface components {
             /** @description Descriptions only. */
             tone?: components["schemas"]["Tone"];
         };
-        NewRun: {
-            /**
-             * Format: uuid
-             * @description The revision to start from; default: the active one. Must have passed the checks.
-             */
-            base_revision_id?: string | null;
-            /** @description What the merchant wants changed (1–4000 characters). */
-            prompt: string;
-        };
         NewSubscription: {
             active?: boolean;
             description?: string;
@@ -7553,65 +7620,8 @@ export interface components {
             conditions?: components["schemas"]["Condition"][];
             match?: components["schemas"]["Match"];
         };
-        RunDetail: {
-            /** @description Unified diff from the base revision's source to the run's result. */
-            diff?: string | null;
-            limits: components["schemas"]["RunLimits"];
-            /** @description The builder's report of the last check (`steps`, `failures`, …). */
-            report?: Record<string, never> | null;
-            run: components["schemas"]["RunSummary"];
-            steps: components["schemas"]["Step"][];
-            /** @description The agent's closing message for the merchant. */
-            summary?: string | null;
-        };
-        RunLimits: {
-            /** Format: int32 */
-            max_checks: number;
-            /** Format: int32 */
-            max_turns: number;
-        };
-        RunList: {
-            items: components["schemas"]["RunSummary"][];
-            /** @description `anthropic`, `fake` (the scripted demo agent, no key configured) or `disabled`. */
-            provider: string;
-        };
         /** @enum {string} */
         RunStatus: "pending" | "analyzing" | "analyzed" | "applying" | "applied" | "failed";
-        RunSummary: {
-            /** Format: uuid */
-            base_revision_id: string;
-            cancel_requested: boolean;
-            /** Format: int32 */
-            checks_run: number;
-            /** Format: int64 */
-            cost_micros: number;
-            /** Format: date-time */
-            created_at: string;
-            created_by: string;
-            /** @description Why the run failed (`turn_limit: …`, `checks_failed: …`), empty otherwise. */
-            error?: string | null;
-            /** Format: date-time */
-            finished_at?: string | null;
-            /** Format: uuid */
-            id: string;
-            model?: string | null;
-            prompt: string;
-            /**
-             * Format: uuid
-             * @description The latest checked revision (the one accept makes publishable).
-             */
-            revision_id?: string | null;
-            /** Format: int32 */
-            revision_number?: number | null;
-            /** @description `queued`, `running`, `succeeded`, `failed`, `cancelled`, `accepted` or `discarded`. */
-            status: string;
-            /** Format: int64 */
-            tokens: number;
-            /** Format: int32 */
-            turns: number;
-            /** Format: date-time */
-            updated_at: string;
-        };
         Sale: {
             /** Format: date-time */
             created_at: string;
@@ -8016,16 +8026,6 @@ export interface components {
             checks: Record<string, never>;
             /** @description `building`, `ready` or `failed`. */
             status: string;
-        };
-        /** @description One tool call of the agent, as shown in the admin. */
-        Step: {
-            /** Format: date-time */
-            at: string;
-            detail: string;
-            ok: boolean;
-            path?: string | null;
-            /** @description `list_files`, `read_file`, `write_file`, `delete_file` or `run_checks`. */
-            tool: string;
         };
         /** @enum {string} */
         StockState: "in_stock" | "low_stock" | "backorder" | "out_of_stock";
@@ -15622,7 +15622,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunList"];
+                    "application/json": components["schemas"]["AiThemeRunList"];
                 };
             };
         };
@@ -15639,7 +15639,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NewRun"];
+                "application/json": components["schemas"]["AiThemeNewRun"];
             };
         };
         responses: {
@@ -15648,7 +15648,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunSummary"];
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
                 };
             };
             /** @description ai_quota_exceeded */
@@ -15722,7 +15722,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunDetail"];
+                    "application/json": components["schemas"]["AiThemeRunDetail"];
                 };
             };
             404: {
@@ -15754,7 +15754,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunSummary"];
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
                 };
             };
             403: {
@@ -15803,7 +15803,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunSummary"];
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
                 };
             };
             403: {
@@ -15852,7 +15852,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunSummary"];
+                    "application/json": components["schemas"]["AiThemeRunSummary"];
                 };
             };
             403: {

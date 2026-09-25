@@ -92,6 +92,7 @@ impl Default for Limits {
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+#[schema(as = AiThemeNewRun)]
 pub struct NewRun {
     /// What the merchant wants changed (1–4000 characters).
     pub prompt: String,
@@ -100,6 +101,7 @@ pub struct NewRun {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = AiThemeRunSummary)]
 pub struct RunSummary {
     pub id: Uuid,
     pub prompt: String,
@@ -125,6 +127,7 @@ pub struct RunSummary {
 
 /// One tool call of the agent, as shown in the admin.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[schema(as = AiThemeStep)]
 pub struct Step {
     pub at: DateTime<Utc>,
     /// `list_files`, `read_file`, `write_file`, `delete_file` or `run_checks`.
@@ -135,12 +138,14 @@ pub struct Step {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = AiThemeRunLimits)]
 pub struct RunLimits {
     pub max_turns: i32,
     pub max_checks: i32,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = AiThemeRunDetail)]
 pub struct RunDetail {
     pub run: RunSummary,
     /// The agent's closing message for the merchant.

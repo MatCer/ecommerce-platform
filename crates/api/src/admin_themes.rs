@@ -335,6 +335,7 @@ async fn revision_diff(
 }
 
 #[derive(Serialize, ToSchema)]
+#[schema(as = AiThemeRunList)]
 pub struct RunList {
     pub items: Vec<RunSummary>,
     /// `anthropic`, `fake` (the scripted demo agent, no key configured) or `disabled`.
