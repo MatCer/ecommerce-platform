@@ -5,7 +5,9 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./vite": "./src/vite.ts"
+    "./vite": "./src/vite.ts",
+    "./lint": "./src/lint.ts",
+    "./budget": "./src/budget.ts"
   },
   "bin": {
     "theme-kit": "./src/cli.ts"

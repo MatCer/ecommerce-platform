@@ -1,0 +1,19 @@
+{
+  "name": "@platform/theme-builder",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "@platform/theme-default": "workspace:*",
+    "@platform/theme-kit": "workspace:*",
+    "@playwright/test": "catalog:"
+  },
+  "devDependencies": {
+    "@platform/config": "workspace:*"
+  }
+}

@@ -24,6 +24,8 @@ const { values } = parseArgs({
     preview: { type: "boolean", default: false },
     cookie: { type: "string" },
     pages: { type: "string" },
+    /** Token-only revisions (WP23): only the merchant screenshots, no purchase flow. */
+    "screenshots-only": { type: "boolean", default: false },
   },
 });
 await mkdir(values.shots, { recursive: true });
@@ -50,6 +52,13 @@ async function budget(p: Page) {
   calls.push(`${new URL(p.url()).pathname}=${n}`);
   if (!(n <= BUDGET.maxSubrequests))
     throw new Error(`${p.url()}: ${n} storefront calls per render > ${BUDGET.maxSubrequests}`);
+}
+
+if (values["screenshots-only"]) {
+  await screenshots();
+  await browser.close();
+  console.log("smoke: screenshots only");
+  process.exit(0);
 }
 
 try {
