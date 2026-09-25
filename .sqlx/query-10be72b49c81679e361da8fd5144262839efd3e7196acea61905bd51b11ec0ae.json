@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH RECURSIVE up (product_id, category_id) AS (\n               SELECT product_id, category_id FROM product_categories WHERE product_id = ANY($1)\n               UNION\n               SELECT up.product_id, c.parent_id FROM up\n               JOIN categories c ON c.id = up.category_id\n               WHERE c.parent_id IS NOT NULL\n           )\n           SELECT product_id AS \"product_id!\", array_agg(category_id) AS \"category_ids!\"\n           FROM up GROUP BY product_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id!",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "category_ids!",
+        "type_info": "UuidArray",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "10be72b49c81679e361da8fd5144262839efd3e7196acea61905bd51b11ec0ae"
+}

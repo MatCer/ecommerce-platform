@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT usage_limit, per_customer_limit, used_count, starts_at, ends_at\n         FROM coupons WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "usage_limit",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "usage_limit"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "per_customer_limit",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "per_customer_limit"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "used_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "used_count"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "starts_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "starts_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ends_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "ends_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "3f75f9defaeba01306f7d25b7c70ee9b9cc7003647024161bba8efd913d29588"
+}

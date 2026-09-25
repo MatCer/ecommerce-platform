@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT country_codes FROM markets WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "country_codes",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "markets",
+            "name": "country_codes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "29d2523c6510147a7d08fc7a36d27e579be30eedad8ec406f1404f3db78284f6"
+}

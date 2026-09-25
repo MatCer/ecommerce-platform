@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO coupons (id, tenant_id, code, kind, value, currency, min_subtotal_minor,\n                              starts_at, ends_at, usage_limit, per_customer_limit, published)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Int4",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1d4b56cabed6c20e98431d8915fd91da8ec7e1e55cd86f1b8d4562bd03b48592"
+}

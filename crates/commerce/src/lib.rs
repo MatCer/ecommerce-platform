@@ -8,8 +8,13 @@ pub mod audit;
 pub mod catalog;
 pub mod id;
 pub mod idempotency;
+pub mod inventory;
 pub mod markets;
 pub mod media;
+pub mod money;
+pub mod pricing;
+pub mod promotions;
+pub mod tax;
 pub mod tenancy;
 
 /// Postgres `unique_violation` (23505).

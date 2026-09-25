@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO coupon_redemptions (id, tenant_id, coupon_id, customer_key, order_ref, redeemed_at)\n         VALUES ($1, $2, $3, $4, $5, $6)\n         RETURNING id, coupon_id, order_ref, redeemed_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "coupon_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "coupon_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "order_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "order_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "redeemed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupon_redemptions",
+            "name": "redeemed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5d50a85ce7d733185a3d1d736d4547537585d39a4b5c886f2e5b9e3f194700ac"
+}

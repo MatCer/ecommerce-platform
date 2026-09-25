@@ -1,0 +1,81 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT kind, value, currency, min_subtotal_minor, coalesce(starts_at, created_at) AS \"from!\",\n                ends_at\n         FROM coupons WHERE published AND kind IN ('percent', 'fixed')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "value",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "currency",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "currency"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "min_subtotal_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "min_subtotal_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "from!",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "ends_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "coupons",
+            "name": "ends_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      null,
+      true
+    ]
+  },
+  "hash": "ebe8fc6f28ee40590657e4037a1afab09feeab2c142baff9e027c4366e1c408a"
+}

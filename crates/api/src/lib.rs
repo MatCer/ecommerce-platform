@@ -3,7 +3,10 @@
 
 pub mod admin;
 pub mod admin_catalog;
+pub mod admin_inventory;
 pub mod admin_media;
+pub mod admin_pricing;
+pub mod admin_promotions;
 pub mod auth;
 pub mod cli;
 pub mod internal;
@@ -65,6 +68,9 @@ pub struct AppState {
         (name = "admin", description = "Admin API: staff JWT from the auth service + X-Tenant-Id"),
         (name = "catalog", description = "Admin API: products, categories, parameters, tax categories"),
         (name = "media", description = "Admin API: image assets (presigned uploads, variants)"),
+        (name = "pricing", description = "Admin API: tax profile, price lists, variant prices, price history"),
+        (name = "promotions", description = "Admin API: sales and coupons"),
+        (name = "inventory", description = "Admin API: stock levels and movements"),
         (name = "internal", description = "Internal API for platform services (service token)")
     )
 )]
@@ -101,6 +107,9 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin::routes())
         .merge(admin_catalog::routes())
         .merge(admin_media::routes())
+        .merge(admin_pricing::routes())
+        .merge(admin_promotions::routes())
+        .merge(admin_inventory::routes())
         .merge(internal::routes())
         .split_for_parts()
 }

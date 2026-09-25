@@ -1,0 +1,150 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, variant_id, kind, quantity, ref_type, ref_id, on_hand_after, reserved_after,\n                actor, note, created_at\n         FROM stock_movements WHERE variant_id = $1 AND ($2::uuid IS NULL OR id < $2)\n         ORDER BY id DESC LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "quantity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ref_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "ref_type"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "ref_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "ref_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "on_hand_after",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "on_hand_after"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "reserved_after",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "reserved_after"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "actor",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stock_movements",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "c6cfd01e286f392c171c1f1ee7ac2f09dcbea8d531557d594e1edf74666480b1"
+}

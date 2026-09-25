@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sales SET name = $2, kind = $3, value = $4, currency = $5, starts_at = $6,\n                          ends_at = $7, targets = $8, updated_at = now()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Int8",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b452f353199ae8b254863b25c8132fe27738b26bd1554ddf22bf74cea26ba79d"
+}

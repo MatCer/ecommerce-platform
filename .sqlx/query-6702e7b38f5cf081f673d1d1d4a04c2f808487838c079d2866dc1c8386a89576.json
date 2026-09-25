@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO variant_prices (tenant_id, price_list_id, variant_id, amount_minor,\n                                     compare_at_minor)\n         SELECT $1, $2, v, a, c FROM UNNEST($3::uuid[], $4::bigint[], $5::bigint[]) AS u (v, a, c)\n         ON CONFLICT (tenant_id, price_list_id, variant_id) DO UPDATE SET\n             amount_minor = EXCLUDED.amount_minor,\n             compare_at_minor = EXCLUDED.compare_at_minor,\n             updated_at = now()\n         RETURNING variant_id, amount_minor, compare_at_minor, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "compare_at_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "compare_at_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray",
+        "Int8Array",
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "6702e7b38f5cf081f673d1d1d4a04c2f808487838c079d2866dc1c8386a89576"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE markets SET price_list_id = NULL WHERE price_list_id = $1 AND NOT (id = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dbef61f1a1e64e675130f999605365d739b44e40a7fb0419997eb2b8c2f3bef0"
+}

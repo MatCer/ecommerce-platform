@@ -1,0 +1,110 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT establishment_country, vat_payer, vat_id, sk_ic_dph, distance_sales_mode,\n                origin_threshold_confirmed_at, cash_rounding_in_vat_base, updated_at\n         FROM tax_profiles",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "establishment_country",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "establishment_country"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "vat_payer",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "vat_payer"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "vat_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "vat_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "sk_ic_dph",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "sk_ic_dph"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "distance_sales_mode",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "distance_sales_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "origin_threshold_confirmed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "origin_threshold_confirmed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "cash_rounding_in_vat_base",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "cash_rounding_in_vat_base"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "tax_profiles",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "2da2e4a528efbd938fd704cf8ab6469fe4a42b3fbc3aefbfce0d958ee5d4a848"
+}

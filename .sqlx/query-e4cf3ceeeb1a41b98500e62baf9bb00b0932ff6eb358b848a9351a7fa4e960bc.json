@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT variant_id, amount_minor, compare_at_minor FROM variant_prices\n         WHERE price_list_id = $1 AND variant_id = ANY($2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "compare_at_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "variant_prices",
+            "name": "compare_at_minor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e4cf3ceeeb1a41b98500e62baf9bb00b0932ff6eb358b848a9351a7fa4e960bc"
+}

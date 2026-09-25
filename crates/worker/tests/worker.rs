@@ -429,3 +429,61 @@ async fn media_job_failing_every_attempt_marks_the_asset_failed(db: PgPool) {
     assert_eq!(asset.status, AssetStatus::Failed);
     assert!(asset.error.unwrap().contains("upload the image again"));
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn scheduled_sale_start_publishes_price_changed(db: PgPool) {
+    use commerce::money::Currency;
+    use commerce::promotions::sales::{self, SaleDiscount, SaleInput, SaleTargets};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "shop").await;
+    let product = testkit::catalog::product(&runtime, tenant, "T", 1).await;
+    let list = testkit::pricing::price_list(&runtime, tenant, "cz", Currency::Czk).await;
+    let variant = product.variants[0].id;
+    testkit::pricing::set_prices(&runtime, tenant, list.id, &[(variant, 10_000)]).await;
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    sales::create(
+        &mut tx,
+        "u",
+        &SaleInput {
+            name: "Soon".into(),
+            discount: SaleDiscount::Percent { basis_points: 1000 },
+            starts_at: Some(Utc::now() + chrono::Duration::milliseconds(500)),
+            ends_at: None,
+            targets: SaleTargets {
+                all: true,
+                ..SaleTargets::default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(testkit::memory_storage()),
+        fast_config(),
+    );
+    let mut found = None;
+    for _ in 0..250 {
+        found = sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT payload FROM queue.outbox
+             WHERE tenant_id = $1 AND type = 'price.changed' AND payload->>'cause' = 'sale'",
+        )
+        .bind(tenant)
+        .fetch_optional(&db)
+        .await
+        .unwrap();
+        if found.is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let event = found.expect("no price.changed for the sale start");
+    assert_eq!(event["before_minor"], 10_000);
+    assert_eq!(event["after_minor"], 9_000);
+    assert_eq!(event["variant_id"], variant.to_string());
+}

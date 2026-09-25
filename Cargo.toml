@@ -45,6 +45,7 @@ uuid = { version = "1.26.1", features = ["v7", "serde"] }
 ravif = { version = "0.13.0", default-features = false }
 # Lossy WebP (libwebp); `image` only encodes lossless WebP.
 webp = { version = "0.3.1", default-features = false }
+proptest = "1.11.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

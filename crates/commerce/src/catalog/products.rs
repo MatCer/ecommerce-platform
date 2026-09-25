@@ -558,6 +558,8 @@ pub async fn replace(
     // Locks the row: concurrent replaces of one product run one after the other.
     let before = get_locked(tx, id).await?;
     save(tx, id, input).await?;
+    // Category membership decides which sales apply (A18 intervals).
+    crate::pricing::refresh_product(tx, id).await?;
     let product = get(tx, id).await?;
     audit::record(
         tx,

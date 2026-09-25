@@ -1,0 +1,127 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, price_list_id, variant_id, amount_minor, valid_from, valid_to, cause, sale_id,\n                imported\n         FROM price_intervals\n         WHERE (valid_to IS NULL OR valid_to > $1)\n           AND ($2 OR variant_id = ANY($3)) AND ($4::uuid IS NULL OR price_list_id = $4)\n         ORDER BY valid_from",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "price_list_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "price_list_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "variant_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "variant_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "amount_minor",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "amount_minor"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "valid_from",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "valid_from"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "valid_to",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "valid_to"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "cause",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "cause"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "sale_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "sale_id"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "imported",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "price_intervals",
+            "name": "imported"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Bool",
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "55d79780ba5bcc2262ebae221c6dc336cbaabf97da2a5971f0355688433aae1d"
+}
