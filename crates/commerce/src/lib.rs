@@ -27,6 +27,7 @@ pub mod payments;
 pub mod pricing;
 pub mod privacy;
 pub mod promotions;
+pub mod recommendations;
 pub mod redirects;
 pub mod search;
 pub mod shipping;
