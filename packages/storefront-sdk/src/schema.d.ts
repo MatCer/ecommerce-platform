@@ -1538,7 +1538,7 @@ export interface operations {
                 headers: {
                     /** @description The anonymous subject id (for the edge's cookie) */
                     "X-Consent-Subject"?: string;
-                    /** @description `<text_version>.<mask>` for the script-readable cookie */
+                    /** @description Granted purposes, comma-separated, for the script-readable `consent` cookie */
                     "X-Consent-Summary"?: string;
                     [name: string]: unknown;
                 };

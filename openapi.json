@@ -5180,7 +5180,7 @@
                 "schema": {
                   "type": "string"
                 },
-                "description": "`<text_version>.<mask>` for the script-readable cookie"
+                "description": "Granted purposes, comma-separated, for the script-readable `consent` cookie"
               }
             },
             "content": {
