@@ -239,9 +239,9 @@ compose `edge` + stub API behind Caddy **over TLS + HTTP/2**, fixture photos ~35
 
 | Page | LCP | TBT | CLS | JS gz (A26) | JS gz + RUM sampled | 3rd-party | axe serious/critical | storefront calls |
 |---|---|---|---|---|---|---|---|---|
-| `/` | 1127 ms | 0 ms | 0.009 | 21.1 kB | 26.0 kB | 0 | 0 | 2 |
-| `/c/trika` | 1202 ms | 0 ms | 0.014 | 22.2 kB | 27.0 kB | 0 | 0 | 2 |
-| `/p/tricko-basic` | 1352 ms | 0 ms | 0.000 | 24.4 kB | 29.2 kB | 0 | 0 | 2 |
+| `/` | 1128 ms | 0 ms | 0.009 | 21.1 kB | 26.0 kB | 0 | 0 | 2 |
+| `/c/trika` | 1202 ms | 0 ms | 0.019 | 22.2 kB | 27.0 kB | 0 | 0 | 2 |
+| `/p/tricko-basic` | 1202 ms | 0 ms | 0.000 | 24.4 kB | 29.2 kB | 0 | 0 | 2 |
 
 Final run on the compose stack. Repeated 3-run medians of the same build gave PDP LCP between
 1.20 and 1.35 s; home (1.13 s) and category (1.20 s) were stable.
