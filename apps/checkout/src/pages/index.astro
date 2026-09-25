@@ -1,6 +1,7 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
 import CheckoutForm from "../islands/CheckoutForm";
+import ResumePlacement from "../islands/ResumePlacement";
 import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, messages, shopUrl } from "../lib/api";
 
@@ -23,9 +24,12 @@ const back = shopUrl(Astro.url);
   <h1 class="mb-4 font-display text-2xl font-bold">{t(m, "checkout.title")}</h1>
   {
     !view || view.cart.lines.length === 0 ? (
+      <>
+      <ResumePlacement client:load m={messages(m, "checkout.resuming")} />
       <p>
         {t(m, "checkout.empty")} <a href={back} class="text-identity-ink underline">{t(m, "checkout.back_to_shop")}</a>
       </p>
+      </>
     ) : (
       <CheckoutForm
         client:load

@@ -630,7 +630,9 @@ pub async fn apply_outcome(
         Outcome::Succeeded => AttemptStatus::Succeeded,
         Outcome::Failed => AttemptStatus::Failed,
     };
-    if a.status == target {
+    // Repeated outcomes, and a failure for an attempt that already expired, change nothing (the
+    // expiry above must still commit).
+    if a.status == target || (outcome == Outcome::Failed && a.status == AttemptStatus::Expired) {
         return Ok(a);
     }
     let accepts = match outcome {

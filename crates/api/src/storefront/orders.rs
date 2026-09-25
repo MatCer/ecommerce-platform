@@ -52,7 +52,11 @@ fn token(path: Result<Path<String>, PathRejection>) -> Result<String, Error> {
 }
 
 /// Whether the requester may pay `order` (see the module docs).
-async fn may_pay(tx: &mut TenantTx, headers: &HeaderMap, order: Uuid) -> Result<bool, Error> {
+pub(super) async fn may_pay(
+    tx: &mut TenantTx,
+    headers: &HeaderMap,
+    order: Uuid,
+) -> Result<bool, Error> {
     let customer = match header_str(headers, SESSION_HEADER) {
         Some(t) => customers::authenticate(tx, t).await?.map(|s| s.customer_id),
         None => None,

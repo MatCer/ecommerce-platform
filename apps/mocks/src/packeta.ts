@@ -161,7 +161,15 @@ const send = (msg) => { if (target) parent.postMessage(msg, target); };
 document.querySelectorAll("button[data-i]").forEach((b) =>
   b.addEventListener("click", () => send({ type: "packeta.point", point: points[Number(b.dataset.i)] })));
 document.querySelector("[data-close]").addEventListener("click", () => send({ type: "packeta.close" }));
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") send({ type: "packeta.close" }); });
+// A modal dialog: Escape closes it, Tab and Shift+Tab cycle inside it.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") return send({ type: "packeta.close" });
+  if (e.key !== "Tab") return;
+  const all = Array.from(document.querySelectorAll("button"));
+  const first = all[0], last = all[all.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 </script></html>`;
 }
 

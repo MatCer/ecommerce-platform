@@ -97,14 +97,27 @@ async function fillContactAndAddress(page: Page, email: string | null, city = "P
 }
 
 /** Chooses the Packeta pickup method and a point in the (mock) widget. */
-async function choosePickupPoint(page: Page, point: RegExp) {
+async function choosePickupPoint(page: Page, point: RegExp, keyboard = false) {
   await page.getByRole("radio", { name: /Zásilkovna – výdejní místo/ }).check();
   const widget = page.frameLocator('iframe[title="Packeta"]');
-  await expect(widget.getByRole("button", { name: point })).toBeVisible();
+  const target = widget.getByRole("button", { name: point });
+  await expect(target).toBeVisible();
   // A modal: the checkout behind it is inert (out of the tab order) while it is open.
   await expect(page.locator("main")).toHaveJSProperty("inert", true);
-  // The widget removes its frame right after the choice; a plain click would wait on it.
-  await widget.getByRole("button", { name: point }).dispatchEvent("click");
+  if (keyboard) {
+    // Tab cycles inside the dialog; Enter chooses (A26: keyboard pickup-point selection).
+    const first = widget.getByRole("button").first();
+    await first.focus();
+    await page.keyboard.press("Shift+Tab");
+    await expect(widget.getByRole("button", { name: "Zavřít" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(first).toBeFocused();
+    await target.focus();
+    await page.keyboard.press("Enter");
+  } else {
+    // The widget removes its frame right after the choice; a plain click would wait on it.
+    await target.dispatchEvent("click");
+  }
   await expect(page.getByTestId("pickup-point")).toContainText(point);
 }
 
@@ -170,7 +183,10 @@ async function signIn(page: Page, shop: string, email: string, next: string) {
       `${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`,
     );
     const body = (await res.json()) as { messages: MailSummary[] };
-    const fresh = body.messages.find((m) => new Date(m.Created) >= since);
+    // Only the sign-in email: the order confirmation may arrive at the same moment.
+    const fresh = body.messages.find(
+      (m) => new Date(m.Created) >= since && m.Subject.startsWith("Přihlášení"),
+    );
     if (fresh) {
       const msg = (await (await fetch(`${mailpit}/api/v1/message/${fresh.ID}`)).json()) as {
         Text: string;
@@ -199,7 +215,7 @@ test("guest checkout in CZ: Packeta pickup point, fake payment, confirmation pag
   await expect(page.getByRole("alert")).toContainText("Vyplňte prosím");
 
   await fillContactAndAddress(page, email);
-  await choosePickupPoint(page, /Z-BOX Praha 1/);
+  await choosePickupPoint(page, /Z-BOX Praha 1/, true);
   // Keyboard: the payment choice is a native radio group.
   await page.getByRole("radio", { name: /Testovací platba/ }).focus();
   await page.keyboard.press("Space");
@@ -242,7 +258,7 @@ test("SK checkout with home delivery", async ({ browser }) => {
   await page.context().close();
 });
 
-test("a lost placement response is replayed with the same key: one order (A12)", async ({
+test("a lost placement response is replayed after a reload with the same key: one order (A12)", async ({
   browser,
 }) => {
   const page = await newPage(browser);
@@ -261,7 +277,8 @@ test("a lost placement response is replayed with the same key: one order (A12)",
   });
   await acceptAndPlace(page);
   await expect(page.getByRole("alert")).toContainText("nepodařilo");
-  await page.getByRole("button", { name: "Objednat s povinností platby" }).click();
+  // A reload shows no checkout (the cart is converted); the kept placement is replayed.
+  await page.reload();
   const token = await fakePay(page, "Pay");
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);

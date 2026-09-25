@@ -111,6 +111,7 @@
   "checkout.placing": "Placing the order…",
   "checkout.price_updated": "The total changed with the address. Review the summary and confirm the order again.",
   "checkout.required_legal": "To place the order, accept the terms and acknowledge the withdrawal information.",
+  "checkout.resuming": "Completing your order…",
   "checkout.review": "Review and order",
   "checkout.reviews": "You may ask me to review my purchase",
   "checkout.saved_address": "Saved address",

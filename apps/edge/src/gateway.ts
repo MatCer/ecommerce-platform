@@ -642,6 +642,14 @@ export function createGateway(opts: GatewayOptions) {
   ): Promise<Response> {
     if (!UUID_RE.test(attempt)) return text(404, "Not found");
     const api = `${opts.apiOrigin}/storefront/v1/checkout/fake-pay/${attempt}`;
+    // Paying needs the placing browser's cart or the customer's session (A4: the order token
+    // is read-only), exactly like the order page's payment routes.
+    const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
+    const session = capabilityCookie(req, SESSION_COOKIE);
+    const payer = {
+      ...(cart ? { "x-cart-token": cart } : {}),
+      ...(session ? { "x-customer-session": session } : {}),
+    };
     const ret = url.searchParams.get("return") ?? "";
     const back = ORDER_PAGE_RE.test(ret) ? ret : "/";
     if (req.method === "POST") {
@@ -654,7 +662,7 @@ export function createGateway(opts: GatewayOptions) {
       const res = await upstream(
         new Request(api, {
           method: "POST",
-          headers: apiHeaders(site, { "content-type": "application/json" }),
+          headers: apiHeaders(site, { "content-type": "application/json", ...payer }),
           body: JSON.stringify({ outcome }),
         }),
       );
@@ -667,10 +675,10 @@ export function createGateway(opts: GatewayOptions) {
     }
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, POST" });
-    const res = await upstream(new Request(api, { headers: apiHeaders(site) }));
+    const res = await upstream(new Request(api, { headers: apiHeaders(site, payer) }));
     if (!res.ok) {
       await res.body?.cancel();
-      return text(res.status === 404 ? 404 : 502, "Not found");
+      return text(res.status === 404 || res.status === 403 ? res.status : 502, "Not found");
     }
     const p = (await res.json()) as {
       order_number?: unknown;

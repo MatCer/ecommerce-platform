@@ -615,7 +615,7 @@ describe("checkout, order page and fake gateway (WP10)", () => {
         { ...headers, "content-type": "application/x-www-form-urlencoded" },
         { method: "POST", body: "outcome=succeeded" },
       );
-    const paid = await post(`/o/${order}`, { origin: checkout });
+    const paid = await post(`/o/${order}`, { origin: checkout, cookie });
     expect(paid.status).toBe(303);
     expect(paid.headers.get("location")).toBe(`/o/${order}`);
     expect(api.calls.at(-1)).toMatchObject({
@@ -623,6 +623,8 @@ describe("checkout, order page and fake gateway (WP10)", () => {
       url: `http://api.test/storefront/v1/checkout/fake-pay/${attempt}`,
       body: '{"outcome":"succeeded"}',
     });
+    // The payer's credentials go along (the order token alone is read-only, A4).
+    expect(api.calls.at(-1)?.headers["x-cart-token"]).toBe("checkouttoken_000000000001");
     expect((await post("//evil.example/", { origin: checkout })).headers.get("location")).toBe("/");
     expect((await post(`/o/${order}`, { origin: "http://evil.localhost" })).status).toBe(403);
   });

@@ -837,7 +837,15 @@ async fn the_payment_deadline_holds_before_the_expiry_job_runs(db: PgPool) {
     .await
     .unwrap_err();
     assert_eq!(code(&e), "payment_window_closed");
-    // The provider confirms anyway: the order expires first, so it is a late payment.
+    // A failure reported after the deadline: the order expires (committed), nothing else.
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let a = payments::apply_outcome(&mut tx, placed.attempt_id, Outcome::Failed, "fake")
+        .await
+        .unwrap();
+    assert_eq!(a.status, payments::AttemptStatus::Expired);
+    tx.commit().await.unwrap();
+    assert_eq!(level(&runtime, &shop, shop.variants[0]).await.reserved, 0);
+    // The provider confirms anyway: a late payment.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     payments::apply_outcome(&mut tx, placed.attempt_id, Outcome::Succeeded, "fake")
         .await

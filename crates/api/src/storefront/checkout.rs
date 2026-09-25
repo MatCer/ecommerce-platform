@@ -329,15 +329,17 @@ fn attempt_id(path: Result<Path<Uuid>, PathRejection>) -> Result<Uuid, Error> {
     get,
     path = "/storefront/v1/checkout/fake-pay/{attempt}",
     tag = "storefront",
-    params(StorefrontHeaders, ("attempt" = Uuid, Path)),
+    params(StorefrontHeaders, super::orders::PayerHeaders, ("attempt" = Uuid, Path)),
     responses(
         (status = 200, body = FakePayment),
+        (status = 403, description = "payment_not_allowed", body = platform::Problem, content_type = "application/problem+json"),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn fake_pay_page(
     shopper: Shopper,
     State(s): State<AppState>,
+    headers: HeaderMap,
     attempt: Result<Path<Uuid>, PathRejection>,
 ) -> Result<Response, Error> {
     let id = attempt_id(attempt)?;
@@ -348,6 +350,12 @@ async fn fake_pay_page(
         let a = payments::attempt(tx, id).await?;
         if a.method != payments::MethodKind::Fake {
             return Err(Error::NotFound);
+        }
+        // Like any payment: the order token alone is read-only (A4).
+        if !super::orders::may_pay(tx, &headers, a.order_id).await? {
+            return Err(Error::Forbidden {
+                code: "payment_not_allowed",
+            });
         }
         let o = commerce::orders::view(tx, a.order_id).await?;
         Ok(FakePayment {
@@ -367,7 +375,7 @@ async fn fake_pay_page(
     post,
     path = "/storefront/v1/checkout/fake-pay/{attempt}",
     tag = "storefront",
-    params(StorefrontHeaders, ("attempt" = Uuid, Path)),
+    params(StorefrontHeaders, super::orders::PayerHeaders, ("attempt" = Uuid, Path)),
     request_body = FakePayInput,
     responses(
         (status = 200, body = FakePayment),
@@ -378,6 +386,7 @@ async fn fake_pay_page(
 async fn fake_pay(
     shopper: Shopper,
     State(s): State<AppState>,
+    headers: HeaderMap,
     attempt: Result<Path<Uuid>, PathRejection>,
     body: Bytes,
 ) -> Result<Response, Error> {
@@ -390,6 +399,12 @@ async fn fake_pay(
         let a = payments::attempt(tx, id).await?;
         if a.method != payments::MethodKind::Fake {
             return Err(Error::NotFound);
+        }
+        // Like any payment: the order token alone is read-only (A4).
+        if !super::orders::may_pay(tx, &headers, a.order_id).await? {
+            return Err(Error::Forbidden {
+                code: "payment_not_allowed",
+            });
         }
         Ok(FakeEvent {
             id: Uuid::now_v7(),
@@ -404,5 +419,5 @@ async fn fake_pay(
     let raw = serde_json::to_vec(&event).map_err(|e| Error::Internal(e.to_string()))?;
     let signature = gateway.sign(&raw, Utc::now())?;
     crate::webhooks::fake_event(&s, &signature, &raw).await?;
-    fake_pay_page(shopper, State(s), Ok(Path(id))).await
+    fake_pay_page(shopper, State(s), headers, Ok(Path(id))).await
 }

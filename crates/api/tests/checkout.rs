@@ -180,12 +180,16 @@ impl Ctx {
         body
     }
 
-    async fn fake_pay(&self, attempt: &str, outcome: &str) -> (StatusCode, Value) {
+    /// The fake provider page's button, from the browser that placed the order.
+    async fn fake_pay(&self, cart: &str, attempt: &str, outcome: &str) -> (StatusCode, Value) {
         let (s, b, _) = self
-            .call(Call::post(
-                &format!("/storefront/v1/checkout/fake-pay/{attempt}"),
-                json!({"outcome": outcome}),
-            ))
+            .checkout(
+                cart,
+                Call::post(
+                    &format!("/storefront/v1/checkout/fake-pay/{attempt}"),
+                    json!({"outcome": outcome}),
+                ),
+            )
             .await;
         (s, b)
     }
@@ -282,7 +286,16 @@ async fn guest_checkout_pays_after_a_failed_attempt(db: PgPool) {
     assert_eq!(order["shipping"]["pickup_point"]["id"], "4321");
 
     // The fake provider page: fail, then retry with a new attempt and succeed.
-    let (status, page) = c.fake_pay(&attempt, "failed").await;
+    // Another browser holding only the order token cannot pay (A4: read-only).
+    let (status, problem, _) = c
+        .call(Call::post(
+            &format!("/storefront/v1/checkout/fake-pay/{attempt}"),
+            json!({"outcome": "succeeded"}),
+        ))
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(problem["code"], "payment_not_allowed");
+    let (status, page) = c.fake_pay(&cart, &attempt, "failed").await;
     assert_eq!(status, StatusCode::OK, "{page}");
     assert_eq!(page["status"], "failed");
     // The order token alone is read-only (A4): paying needs the placing browser's cart
@@ -338,7 +351,7 @@ async fn guest_checkout_pays_after_a_failed_attempt(db: PgPool) {
         "the first attempt is finished"
     );
 
-    let (status, page) = c.fake_pay(&second, "succeeded").await;
+    let (status, page) = c.fake_pay(&cart, &second, "succeeded").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(page["status"], "succeeded");
     let order = c.order(&token).await;

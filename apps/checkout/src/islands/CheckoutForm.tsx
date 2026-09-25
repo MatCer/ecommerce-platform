@@ -5,14 +5,19 @@ import type {
   CheckoutView,
   PaymentMethodKind,
   PickupPoint,
-  PlacedOrder,
-  PlaceOrderInput,
   ShippingOption,
 } from "@platform/storefront-sdk/types";
 import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
-import { createSignal, For, type JSX, Show } from "solid-js";
+import { createSignal, For, type JSX, onMount, Show } from "solid-js";
 import { call } from "../lib/client";
 import { loadPacketa, toPickupPoint } from "../lib/packeta";
+import {
+  forgetPlacement,
+  nextUrl,
+  type Placement,
+  sendPlacement,
+  unknownOutcome,
+} from "../lib/placement";
 
 type M = Record<string, string>;
 
@@ -118,7 +123,10 @@ export default function CheckoutForm(props: {
   const [notice, setNotice] = createSignal("");
   const [touched, setTouched] = createSignal(false);
   /** A placement whose outcome is unknown, replayed as is on the next click. */
-  let pending: { key: string; body: PlaceOrderInput } | null = null;
+  // An open cart means no order came of an earlier placement: nothing to resume (a converted
+  // cart shows the empty page, whose ResumePlacement replays a kept placement).
+  let pending: Placement | null = null;
+  onMount(forgetPlacement);
 
   const regions = (() => {
     try {
@@ -186,20 +194,16 @@ export default function CheckoutForm(props: {
   const addressesValid = () => complete(billing()) && (!elsewhere() || complete(delivery()));
 
   /** Sends a placement; an unknown outcome keeps it for an exact replay (A12). */
-  async function submit(p: { key: string; body: PlaceOrderInput }) {
-    const r = await call<PlacedOrder>("POST", "/_p/checkout/place-order", p.body, {
-      "idempotency-key": p.key,
-    });
+  async function submit(p: Placement) {
+    const r = await sendPlacement(p);
     if (r.ok && r.data) {
-      const action = r.data.payment.action;
-      location.assign(action?.type === "redirect" ? action.url : r.data.confirmation_url);
+      location.assign(nextUrl(r.data));
       return;
     }
     setPlacing(false);
-    // Lost response, gateway error or still running: the order may exist. The next click
-    // replays the same key and body (no step is saved before it, so nothing can change).
-    const unknown = r.code === "network" || r.status >= 500 || r.code === "idempotency_in_progress";
-    pending = unknown ? p : null;
+    // Lost response, gateway error or still running: the order may exist. The next click (or
+    // a reload) replays the same key and body; no step is saved before it, so nothing changes.
+    pending = unknownOutcome(r) ? p : null;
     setError(checkoutProblem(m, r.code));
     if (r.code === "cart_changed" || r.code === "price_changed") {
       const fresh = await call<CheckoutView>("GET", "/_p/checkout");
@@ -239,6 +243,7 @@ export default function CheckoutForm(props: {
     }
     await submit({
       key: newKey(),
+      at: Date.now(),
       body: {
         version: now.cart.version,
         total_minor: now.totals.total.amount_minor,
