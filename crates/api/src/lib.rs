@@ -20,6 +20,7 @@ pub mod admin_platform;
 pub mod admin_pricing;
 pub mod admin_promotions;
 pub mod admin_recommendations;
+pub mod admin_reviews;
 pub mod admin_search;
 pub mod admin_staff;
 pub mod admin_storefront;
@@ -138,6 +139,7 @@ pub struct AppState {
         (name = "platform", description = "Admin API for platform superadmins: the job queue"),
         (name = "marketing", description = "Admin API: newsletter subscribers, segments, campaigns"),
         (name = "email", description = "Admin API: sent emails, suppressions, email logo and texts"),
+        (name = "reviews", description = "Admin API: review moderation (publish, reject, hide) and replies"),
         (name = "webhooks", description = "Provider webhooks: payments (signed), email bounces/complaints"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
         (name = "internal", description = "Internal API for platform services (service token)")
@@ -207,6 +209,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_platform::routes())
         .merge(admin_marketing::routes())
         .merge(admin_email::routes())
+        .merge(admin_reviews::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())
         .merge(internal::routes())

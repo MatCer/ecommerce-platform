@@ -2,6 +2,8 @@
 import Breadcrumbs from "../../components/Breadcrumbs.astro";
 import ProductDetails from "../../components/ProductDetails.astro";
 import RecommendationSlot from "../../components/RecommendationSlot.astro";
+import Reviews from "../../components/Reviews.astro";
+import Stars from "../../components/Stars.astro";
 import TrustRow from "../../components/TrustRow.astro";
 import BuyBox from "../../islands/BuyBox";
 import Gallery from "../../islands/Gallery";
@@ -15,7 +17,8 @@ const sf = storefront(Astro.request);
 const [shop, page] = await Promise.all([sf.shop(), sf.product(Astro.params.slug ?? "")]);
 if (!page) return Astro.rewrite("/404");
 const { product: p } = page;
-const { t, pick } = i18n(shop);
+const { t, tn, pick } = i18n(shop);
+const rating = page.reviews.summary;
 // An optional slot must never take the page down with it.
 const recommended = await sf.recommendations(`product:${p.id}`, { limit: 4 }).catch(() => null);
 const recommendedTitle =
@@ -55,6 +58,14 @@ const BUY_KEYS = [
           {p.brand && <p class="eyebrow mb-2 text-identity-ink">{p.brand}</p>}
           <h1 class="text-3xl leading-tight font-extrabold md:text-4xl">{p.name}</h1>
           {p.short_description && <p class="mt-2 text-muted-foreground">{p.short_description}</p>}
+          {
+            rating && (
+              <a href="#reviews" class="mt-2 inline-flex items-center gap-2 text-sm underline-offset-2 hover:underline">
+                <Stars rating={rating.average} label={t("reviews.average", { average: rating.average.toLocaleString(shop.locale) })} />
+                <span>{tn("reviews.count", rating.count)}</span>
+              </a>
+            )
+          }
         </div>
         <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} selected={Astro.url.searchParams.get("variant")} />
         <div class="border-t border-border pt-5">
@@ -64,6 +75,7 @@ const BUY_KEYS = [
     </div>
 
     <ProductDetails product={p} shop={shop} />
+    <Reviews reviews={page.reviews} shop={shop} />
     <RecommendationSlot products={recommended?.products ?? []} shop={shop} title={recommendedTitle} id="recommended" />
     <RecentlyViewed client:idle title={t("product.recently_viewed")} base={shop.base_path} current={p.id} labels={pick(["product.price_from"])} />
   </div>

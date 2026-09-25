@@ -5115,6 +5115,170 @@
         }
       }
     },
+    "/storefront/v1/reviews": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "Submits a review with a review link's token (single use). Plain text only; the review\nwaits for moderation.",
+        "operationId": "submit",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSubmitted"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, used or expired token",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "too_many_reviews",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/reviews/invitation": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "What the review form shows for a link (reading changes nothing).",
+        "operationId": "invitation",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "description": "The token from the review link.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewInvitation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid, used or expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/search": {
       "get": {
         "tags": [
@@ -8830,6 +8994,7 @@
         "required": [
           "product",
           "breadcrumbs",
+          "reviews",
           "seo",
           "cache"
         ],
@@ -8857,8 +9022,97 @@
           "product": {
             "$ref": "#/components/schemas/ProductDetail"
           },
+          "reviews": {
+            "$ref": "#/components/schemas/ProductReviews",
+            "description": "Published reviews, their summary and the verification disclosure link (WP16)."
+          },
           "seo": {
             "$ref": "#/components/schemas/Seo"
+          }
+        }
+      },
+      "ProductReviews": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicReview"
+            },
+            "description": "Newest published reviews (at most 20)."
+          },
+          "summary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RatingSummary",
+                "description": "Absent while the product has no published review."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The shop's published \"how we verify reviews\" page (Omnibus disclosure)."
+          }
+        }
+      },
+      "PublicReview": {
+        "type": "object",
+        "description": "A published review as the shop shows it (plain text; escape on output).",
+        "required": [
+          "id",
+          "customer_name",
+          "rating",
+          "title",
+          "body",
+          "verified",
+          "locale",
+          "published_on"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locale": {
+            "type": "string",
+            "description": "Language the review was written in (`lang` attribute)."
+          },
+          "published_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reply": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The merchant's public reply."
+          },
+          "title": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Written through a review link of a delivered order line."
           }
         }
       },
@@ -8905,6 +9159,33 @@
           "spayd",
           "pay_by_square"
         ]
+      },
+      "RatingSummary": {
+        "type": "object",
+        "required": [
+          "average",
+          "count",
+          "histogram"
+        ],
+        "properties": {
+          "average": {
+            "type": "number",
+            "format": "double",
+            "description": "Mean rating, one decimal."
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "histogram": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Review counts for 1..5 stars (index 0 = 1 star)."
+          }
+        }
       },
       "Recommendations": {
         "type": "object",
@@ -8977,6 +9258,73 @@
           },
           "to_path": {
             "type": "string"
+          }
+        }
+      },
+      "ReviewInput": {
+        "type": "object",
+        "required": [
+          "token",
+          "rating",
+          "name",
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "1-4000 characters of plain text."
+          },
+          "name": {
+            "type": "string",
+            "description": "Shown publicly (1-60 characters)."
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1-5 stars."
+          },
+          "title": {
+            "type": "string",
+            "description": "Optional headline (≤ 120 characters)."
+          },
+          "token": {
+            "type": "string",
+            "description": "The capability from the review link."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewInvitation": {
+        "type": "object",
+        "description": "What the review form shows for a token (a read, no change).",
+        "required": [
+          "product_name",
+          "options_label",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "options_label": {
+            "type": "string"
+          },
+          "product_name": {
+            "type": "string",
+            "description": "Product name and options as bought."
+          }
+        }
+      },
+      "ReviewSubmitted": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `pending`: the shop publishes reviews after moderation."
           }
         }
       },

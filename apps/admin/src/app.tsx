@@ -48,6 +48,7 @@ const Webhooks = lazy(() => import("./pages/Webhooks.tsx"));
 const AdTracking = lazy(() => import("./pages/AdTracking.tsx"));
 const PlatformJobs = lazy(() => import("./pages/PlatformJobs.tsx"));
 const Subscribers = lazy(() => import("./pages/Subscribers.tsx"));
+const Reviews = lazy(() => import("./pages/Reviews.tsx"));
 const Segments = lazy(() => import("./pages/Segments.tsx"));
 const Campaigns = lazy(() => import("./pages/Campaigns.tsx"));
 const CampaignEditor = lazy(() => import("./pages/CampaignEditor.tsx"));
@@ -138,6 +139,7 @@ export function App() {
           <Route path="/settings/emails" component={Emails} />
           <Route path="/settings/email-branding" component={EmailBranding} />
           <Route path="/marketing/subscribers" component={Subscribers} />
+          <Route path="/marketing/reviews" component={Reviews} />
           <Route path="/marketing/segments" component={Segments} />
           <Route path="/marketing/campaigns" component={Campaigns} />
           <Route path="/marketing/campaigns/new" component={CampaignEditor} />

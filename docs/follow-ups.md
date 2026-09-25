@@ -69,3 +69,8 @@
 | WP18 | The marketing rate is one platform constant (500 messages per tenant and minute) and limits how fast campaign messages are queued, not SMTP itself (a backlog after an outage drains faster); per-tenant quotas, a delivery-time rate limit | later |
 | WP18 | Subscriber import (CSV) and the AI copy assist per segment (§11.5) | WP13b / M3 |
 | WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
+| WP16 | Review invites: after delivery (default 7 days) and only with the `review_invites` consent, call `commerce::reviews::issue_tokens(tx, order_id, now)` and mail one `reviews::review_url(ctx, token)` per product (the e2e writes its token via SQL until then) | WP19 |
+| WP16 | GDPR erasure/export must cover `reviews` (reviewer name, text, `ip_hash`) and `review_tokens`; erasing an order line keeps the review but drops its link (`order_line_id` → NULL) | WP13b |
+| WP16 | The product page shows the 20 newest published reviews (summary and JSON-LD cover all); no pagination, sorting or filtering by rating yet | later |
+| WP16 | Tokens are issued per order, not per returned/withdrawn line: a line returned after delivery can still be reviewed while its token lives | later |
+| WP16 | Seeded demos keep the old "reviews" legal page text (templates install only missing pages); re-install or edit it | WP15 (seed polish) |

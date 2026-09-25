@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE reviews SET status = $2, moderated_at = now(), moderated_by = $3,\n             published_at = CASE WHEN $2 = 'published' THEN coalesce(published_at, now())\n                                 ELSE published_at END,\n             updated_at = now()\n         WHERE id = $1 RETURNING product_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2d848e4f6a82765477a0e7c6bb821acbf6b27946d47be58692fe46dbb86c16cc"
+}
