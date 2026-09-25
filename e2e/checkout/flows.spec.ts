@@ -14,9 +14,11 @@ test.afterAll(async () => {
 });
 
 test("back-in-stock watch confirms, fires once and can unsubscribe", async ({ browser }) => {
+  // A product no other spec orders: parallel checkouts would otherwise hold reservations on it
+  // and setting the stock to 0 would be refused (`below_reserved`).
   const variant =
     sql(`SELECT v.id FROM variants v JOIN product_translations t ON t.product_id=v.product_id
-    WHERE t.slug='tricko-henley' AND t.locale='cs' ORDER BY v.position LIMIT 1`);
+    WHERE t.slug='cepice-s-bambuli' AND t.locale='cs' ORDER BY v.position LIMIT 1`);
   const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
   const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString());
   expect(auth.ok()).toBeTruthy();
@@ -51,7 +53,7 @@ test("back-in-stock watch confirms, fires once and can unsubscribe", async ({ br
 
   await adjust(1);
   const alert = await mail(email, "Upozornění na produkt");
-  expect(alert.Text).toContain("tricko-henley");
+  expect(alert.Text).toContain("cepice-s-bambuli");
   const unsubscribe = alert.Text.match(
     /https?:\/\/[^\s]+\/watch\/unsubscribe\?token=[0-9a-f]{64}/,
   )?.[0];
