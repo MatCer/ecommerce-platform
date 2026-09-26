@@ -125,3 +125,10 @@ status/visibility/media cards in the aside; sticky nothing; one Save.
 language and account menus. Content renders in `main#main`, a white rounded panel. Adding a
 nav destination = one entry in `groups`. Sections default to expanded because e2e clicks nav
 links directly; tab stops before page content are ~50 (keyboard e2e allows 100).
+
+## Screenshots
+
+`docs/screenshots/pajamas/<view>-<light|dark>-<width>.png` for login, dashboard, products,
+product-editor, order-detail, settings-form (tax), modal (new coupon) and dropdown (account
+menu): light and dark at 1440px, light at 390px. Only seeded demo data with fake identities
+(`*.example`, `example.test` addresses); never shoot orders or customers of real people.
