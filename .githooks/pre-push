@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Refuses a push to main; main is PR-only and PRs are merged with `pnpm verify-merge <PR#>`.
+# Runs no tests: WIP pushes stay free. Tests run once, before merge (docs/runbook.md).
+#
+# Enable once per clone (`pnpm install` does it via the root `prepare` script):
+#   git config core.hooksPath .githooks
+set -euo pipefail
+
+while read -r local_ref _local_sha remote_ref _remote_sha; do
+  [ "$remote_ref" = refs/heads/main ] || continue
+  if [ "$local_ref" = "(delete)" ]; then
+    echo "pre-push: refusing to delete main." >&2
+  else
+    cat >&2 <<'MSG'
+pre-push: refusing to push directly to main.
+
+main is PR-only. Push a branch, open a PR, then merge it with the local test run:
+
+  git switch -c feat/<slug> && git push -u origin feat/<slug>
+  gh pr create --fill
+  pnpm verify-merge <PR#>
+
+A direct push to main also fails CI's gate job.
+MSG
+  fi
+  exit 1
+done

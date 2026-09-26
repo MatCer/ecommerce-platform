@@ -35,6 +35,7 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
 ## Quick start
 
 ```bash
+git config core.hooksPath .githooks   # refuses pushes to main; `pnpm install` also sets it
 pnpm install
 make up          # builds images, starts everything, waits until healthy (creates .env on first run)
 make seed        # 60-product CZ/SK shop, images, legal pages, payments and published artifacts
@@ -124,6 +125,7 @@ trusted network.
 | `make fmt` | Format Rust and TS |
 | `make openapi` | Regenerate `openapi.json` and the TS clients; commit the result |
 | `make openapi-check` | Fail if the generated clients are stale (runs in CI) |
+| `pnpm verify-merge <PR#> [--full]` | Test a PR on a throwaway stack, record `local-verify`, squash-merge (runbook "Verify and merge") |
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |

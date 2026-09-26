@@ -25,7 +25,7 @@ infeasible, choose the best-practice alternative, record it in the PR under
    (`make up` / `make dev-infra` once they exist), exercise the flow (curl, Playwright, psql),
    and run the full check suite (`make lint test` + e2e/perf where the WP touches them).
    If you touched config, Dockerfiles or binaries, also run `scripts/smoke-images.sh` against freshly
-   built images (CI runs it with no dependencies available: binaries must boot and report degraded
+   built images (`pnpm verify-merge --full` runs it with no dependencies available: binaries must boot and report degraded
    readiness rather than crash when optional config/deps are missing).
    Bring your compose stack down when finished (`docker compose -p <project> down`).
 6. Independent review before the PR: run an Astra review yourself via Codex, read-only:
