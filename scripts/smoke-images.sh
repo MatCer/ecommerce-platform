@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke-tests built images without the rest of the stack (used by CI, runnable locally):
+# Smoke-tests built images without the rest of the stack (`pnpm verify-merge --full` runs it; runnable alone):
 #   scripts/smoke-images.sh <rust-image> <mocks-image> [<theme-builder-image>] [<auth-image>]
 # api: /healthz 200, `api healthcheck` exits 0, /readyz fails closed (503) with no dependencies.
 # worker: stays up without a database, exits 0 on SIGTERM. mocks: /healthz 200.
