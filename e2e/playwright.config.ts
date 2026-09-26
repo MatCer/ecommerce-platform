@@ -24,6 +24,17 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: ["admin/themes.spec.ts", "admin/theme-ai.spec.ts"],
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
+    },
+    {
+      // Both suites publish/reset the demo shop and derive revision numbers from
+      // its latest revision. Keep those mutations exclusive, including storefront
+      // readers in the regular project. Global concurrency remains capped at four.
+      name: "chromium-themes",
+      testMatch: ["admin/themes.spec.ts", "admin/theme-ai.spec.ts"],
+      dependencies: ["chromium"],
+      workers: 1,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
     },
   ],

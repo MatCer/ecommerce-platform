@@ -167,7 +167,7 @@ export default function Themes() {
         title={t("themes.title")}
         description={t("themes.description")}
         actions={
-          <Show when={can("admin")}>
+          <Show when={can("admin") && list.isSuccess}>
             <Show
               when={items().some((r) => r.origin === "custom")}
               fallback={

@@ -10,7 +10,12 @@ afterAll(async () => {
   await browser?.close();
 });
 
-test("a faulty sticky header fails the accessibility scan without altering its layout", async () => {
+// Real Chromium: three full scans plus six centered target checks measured 3.52 s
+// locally (3.39 s with target-only rechecks), and exceeded 5 s in CI run 36220248489.
+// Keep this browser integration budget local; ordinary unit tests retain 5 s.
+test("a faulty sticky header fails the accessibility scan without altering its layout", {
+  timeout: 15_000,
+}, async () => {
   const context = await browser.newContext({ viewport: { width: 412, height: 400 } });
   const page = await context.newPage();
   await page.setContent(`<!doctype html><html lang="en"><head><title>Sticky fixture</title>
@@ -42,5 +47,15 @@ test("a footer target clipped at one scroll position is checked again when cente
   expect(await page.locator("header").evaluate((el) => getComputedStyle(el).position)).toBe(
     "sticky",
   );
+  await context.close();
+});
+
+test("a page that fits the viewport still checks rules other than target size", async () => {
+  const context = await browser.newContext({ viewport: { width: 412, height: 400 } });
+  const page = await context.newPage();
+  await page.setContent(`<!doctype html><html lang="en"><head><title>Short fixture</title>
+    </head><body><main><button style="width:44px;height:44px"></button></main></body></html>`);
+  const failures = await scanAxe(page);
+  expect(failures.some((failure) => failure.id === "button-name")).toBe(true);
   await context.close();
 });

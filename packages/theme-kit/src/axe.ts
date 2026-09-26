@@ -11,7 +11,9 @@ async function failsWhenCentered(page: Page, target: readonly unknown[]): Promis
   const previous = await page.evaluate(() => window.scrollY);
   await page.locator(selector).evaluate((el) => el.scrollIntoView({ block: "center" }));
   await page.waitForTimeout(120);
-  const centered = await new AxeBuilder({ page }).withTags(tags).analyze();
+  // Only target-size can be excused by centering. Other rules are already checked
+  // by the full scan at each sampled position and must not be rerun per target.
+  const centered = await new AxeBuilder({ page }).withRules(["target-size"]).analyze();
   await page.evaluate((y) => window.scrollTo(0, y), previous);
   await page.waitForTimeout(120);
   return centered.violations.some(
@@ -43,7 +45,7 @@ export async function scanAxe(page: Page) {
     Math.max(0, height - viewport - stickyTop - 160),
   ];
   const failures = new Map<string, { id: string; impact: string; nodes: number }>();
-  for (const top of positions) {
+  for (const top of new Set(positions)) {
     await page.evaluate((y) => window.scrollTo(0, y), top);
     await page.waitForTimeout(120);
     const result = await new AxeBuilder({ page }).withTags(tags).analyze();

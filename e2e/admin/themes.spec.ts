@@ -145,16 +145,45 @@ test.afterAll(async () => {
 let forked = 0;
 let tokens = 0;
 
+test("theme actions wait for the revision list", async () => {
+  let markRequested!: () => void;
+  let release!: () => void;
+  const requested = new Promise<void>((resolve) => {
+    markRequested = resolve;
+  });
+  const responseGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const url = "**/admin/v1/themes/revisions";
+  await page.route(url, async (route) => {
+    markRequested();
+    await responseGate;
+    await route.continue();
+  });
+  const action = page.getByRole("button", {
+    name: /^(Create my own theme|Reset to default theme)$/,
+  });
+  try {
+    await page.goto("/themes");
+    await requested;
+    await expect(page.getByRole("heading", { name: "Theme", exact: true })).toBeVisible();
+    await expect(action).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Upload archive" })).toHaveCount(0);
+  } finally {
+    release();
+  }
+  await expect(action).toBeVisible();
+  await page.unroute(url);
+});
+
 test("forking the default theme builds and passes every gate", async () => {
   test.setTimeout(10 * 60_000);
   await page.goto("/themes");
   await expect(page.getByRole("heading", { name: "Theme", exact: true })).toBeVisible();
   const start = latest();
-  const fork = page.getByRole("button", { name: "Create my own theme" });
-  await ((await fork.isVisible())
-    ? fork
-    : page.getByRole("button", { name: "Reset to default theme" })
-  ).click();
+  await page
+    .getByRole("button", { name: /^(Create my own theme|Reset to default theme)$/ })
+    .click({ timeout: 10_000 });
   await expect(page.getByText(/is being built and checked/)).toBeVisible();
   forked = start + 1;
   const result = await settled(forked);

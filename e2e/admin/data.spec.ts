@@ -58,6 +58,10 @@ async function apply(page: Page): Promise<void> {
 }
 
 test("merchant imports, exports and answers a GDPR request", async ({ page }) => {
+  // CI run 36220248489: 62.7 s of progressing UI work, including five axe scans,
+  // six import polls (14.6 s) and export readiness (3.7 s). Budget this complete
+  // workflow at 2x measured latency; individual operation deadlines stay bounded.
+  test.setTimeout(120_000);
   const anna = `anna-${run}@example.com`;
   const news = `news-${run}@example.com`;
   const cold = `cold-${run}@example.com`;
