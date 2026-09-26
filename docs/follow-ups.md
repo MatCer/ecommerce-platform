@@ -91,3 +91,4 @@
 | WP16 | The product page shows the 20 newest published reviews (summary and JSON-LD cover all); no pagination, sorting or filtering by rating yet | later |
 | WP16 | Tokens are issued per order, not per returned/withdrawn line: a line returned after delivery can still be reviewed while its token lives | later |
 | WP16 | ~~Old seeded review disclosure survives reruns~~: `make seed` refreshes only the pre-WP16 stock text and preserves merchant edits. | done (WP15) |
+| WP26 | The checkout handoff cookie (`__Secure-hf-<digest prefix>`, SHA-256 of the token, `Domain=<shop_host>`) can still be tossed by a same-site host under the shop domain (a descendant of a custom domain, or a sibling where the platform domain is not a public suffix); the old Sec-Fetch-Site check had the same gap | accepted: same-site hosts are trusted |

@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
@@ -148,11 +148,16 @@ const CHECKOUT_CART_COOKIE = "__Host-cart";
  * Binds a checkout handoff to the browser that started it (WP26). Scoped to the shop host so
  * `checkout.<shop_host>` receives it; a cross-site page cannot plant it, so a link carrying an
  * attacker's `h` finds no matching cookie. Sec-Fetch-Site cannot do this: Firefox sends
- * `cross-site` or nothing on the shop's own 303.
+ * `cross-site` or nothing on the shop's own 303. The cookie holds SHA-256(h), never `h`, so
+ * other hosts under the shop domain never receive the redeemable token, and is named per
+ * handoff so concurrent tabs do not clobber each other. Residual: a same-site (descendant)
+ * host can still toss a cookie, as it could forge Sec-Fetch-Site before; same-site hosts are
+ * trusted (docs/follow-ups.md).
  */
-const HANDOFF_COOKIE = "__Secure-handoff";
-const handoffCookie = (shopHost: string, value: string, maxAge: number) =>
-  `${HANDOFF_COOKIE}=${value}; Domain=${shopHost}; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+const handoffDigest = (h: string) => createHash("sha256").update(h).digest("hex");
+const handoffCookieName = (digest: string) => `__Secure-hf-${digest.slice(0, 16)}`;
+const handoffCookie = (shopHost: string, digest: string, value: string, maxAge: number) =>
+  `${handoffCookieName(digest)}=${value}; Domain=${shopHost}; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 /** Customer session (A1): checkout origin only, host-only via the `__Host-` prefix. */
 const SESSION_COOKIE = "__Host-sid";
 const SESSION_MAX_AGE = 30 * 86_400;
@@ -981,7 +986,8 @@ ${
     });
     // The API rotated the capability (A4); the shop-side token is dead now.
     headers.append("set-cookie", CLEAR_CART_COOKIE);
-    headers.append("set-cookie", handoffCookie(site.shop_host, h, 120));
+    const digest = handoffDigest(h);
+    headers.append("set-cookie", handoffCookie(site.shop_host, digest, digest, 120));
     return new Response(null, { status: 303, headers });
   }
 
@@ -1569,12 +1575,17 @@ ${
       // Only the browser that got the shop's 303 holds the matching handoff cookie. A link
       // planted by another site or pasted from mail is refused without burning the token, so an
       // attacker cannot push their cart into a victim's checkout.
-      const bound = Buffer.from(readCookie(req.headers, HANDOFF_COOKIE) ?? "");
-      const given = Buffer.from(h);
+      const digest = TOKEN_RE.test(h) ? handoffDigest(h) : undefined;
+      const cookie = digest && readCookie(req.headers, handoffCookieName(digest));
       const redeemable =
-        req.method === "GET" && given.length === bound.length && timingSafeEqual(given, bound);
+        req.method === "GET" &&
+        digest !== undefined &&
+        cookie?.length === digest.length &&
+        timingSafeEqual(Buffer.from(cookie), Buffer.from(digest));
+      // Only this handoff's cookie is ever cleared: another tab's pending handoff stays intact.
+      const clearBinding = digest && cookie ? handoffCookie(site.shop_host, digest, "", 0) : null;
       let cartToken: string | undefined;
-      if (redeemable && TOKEN_RE.test(h)) {
+      if (redeemable) {
         // Bound to this tenant and market by the API: another shop's checkout cannot redeem it.
         const res = await upstream(
           new Request(`${opts.apiOrigin}/storefront/v1/checkout/handoff`, {
@@ -1595,7 +1606,7 @@ ${
               "content-type": "text/html; charset=utf-8",
               "cache-control": "no-store",
               "referrer-policy": "no-referrer",
-              "set-cookie": handoffCookie(site.shop_host, "", 0),
+              ...(clearBinding ? { "set-cookie": clearBinding } : {}),
             },
           },
         );
@@ -1609,7 +1620,7 @@ ${
         "set-cookie",
         `${CHECKOUT_CART_COOKIE}=${cartToken}; Path=/; HttpOnly; Secure; SameSite=Lax`,
       );
-      headers.append("set-cookie", handoffCookie(site.shop_host, "", 0));
+      if (clearBinding) headers.append("set-cookie", clearBinding);
       return new Response(null, { status: 303, headers });
     }
     if (p === "/_p/tokens.css") {
