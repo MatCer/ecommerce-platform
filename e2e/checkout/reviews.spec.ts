@@ -6,61 +6,65 @@
  *
  * WP19's invite flow issues the review link after the dev clock advances seven days.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { type Browser, expect, type Page, test } from "@playwright/test";
 import { expectAccessible, run, signInOwner, sql } from "../admin/support";
 import { rateHeaders } from "../rate-client";
-import { CZ, mail, newPage } from "./support";
+import {
+  acceptAndPlace,
+  CZ,
+  choosePickupPoint,
+  fakePay,
+  fillContactAndAddress,
+  mail,
+  newPage,
+  order,
+  toCheckout,
+} from "./support";
 
 const SLUG = "tricko-henley";
 
-/** A delivered order with one line. WP19 sends the review link through Mailpit. */
-async function reviewLink(): Promise<string> {
-  // Far above the shop's own order numbers (allocated from `order_numbers`).
-  const number = 9_000_000_000 + Math.floor(Math.random() * 900_000_000);
-  sql(`
-    WITH t AS (SELECT id FROM platform.tenants WHERE slug = 'demo'),
-    m AS (SELECT id FROM markets WHERE tenant_id = (SELECT id FROM t) AND is_default),
-    p AS (SELECT p.id AS product_id, v.id AS variant_id, v.sku FROM products p
-          JOIN product_translations pt ON pt.product_id = p.id
-          JOIN variants v ON v.product_id = p.id
-          WHERE p.tenant_id = (SELECT id FROM t) AND pt.slug = '${SLUG}' LIMIT 1),
-    c AS (INSERT INTO carts (tenant_id, market_id, locale, currency, status)
-          SELECT (SELECT id FROM t), (SELECT id FROM m), 'cs', 'CZK', 'converted' RETURNING id),
-    o AS (INSERT INTO orders (tenant_id, number, market_id, cart_id, email, locale, currency,
-                              status, payment_status, fulfillment_status, ship_to_country,
-                              vat_payer, subtotal_minor, discount_minor, shipping_minor,
-                              payment_fee_minor, tax_minor, rounding_minor, total_minor,
-                              vat_recap, shipping_method_snapshot, payment_method)
-          SELECT (SELECT id FROM t), ${number}, (SELECT id FROM m), (SELECT id FROM c),
-                 'wp16-${run}@example.test', 'cs', 'CZK', 'delivered', 'paid', 'delivered', 'CZ',
-                 true, 49900, 0, 0, 0, 0, 0, 49900, '[]',
-                 jsonb_build_object('id', gen_random_uuid(), 'carrier', 'personal_pickup',
-                                    'name', 'Personal pickup', 'price_minor', 0), 'cod'
-          RETURNING id, tenant_id),
-    l AS (INSERT INTO order_lines (tenant_id, order_id, position, variant_id, product_id, sku,
-                                   name, quantity, unit_gross_minor, base_minor, discount_minor,
-                                   total_minor, tax_rate, tax_minor, net_minor)
-          SELECT o.tenant_id, o.id, 1, p.variant_id, p.product_id, p.sku, 'Tričko Henley', 1,
-                 49900, 49900, 0, 49900, '21', 0, 49900 FROM o, p
-          RETURNING order_id, tenant_id),
-    shipment AS (INSERT INTO shipments (tenant_id, order_id, carrier, status, delivered_at, created_by)
-          SELECT tenant_id, order_id, 'personal_pickup', 'delivered', now(), 'e2e' FROM l
-          RETURNING tenant_id),
-    consent AS (INSERT INTO consent_records (tenant_id, subject_type, subject_id, purpose,
-                                            granted, text_version, source)
-          SELECT tenant_id, 'email', 'wp16-${run}@example.test', 'review_invites', true,
-                 '2026-09-25', 'checkout' FROM shipment RETURNING tenant_id)
-    SELECT tenant_id FROM consent`);
+/** A paid, delivered order with checkout consent. WP19 sends its review link through Mailpit. */
+async function reviewLink(browser: Browser): Promise<string> {
+  const email = `wp16-${run}@example.test`;
+  const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
+  sql(`INSERT INTO flow_test_clocks(tenant_id,offset_seconds) VALUES('${tenant}',0)
+    ON CONFLICT(tenant_id) DO UPDATE SET offset_seconds=0`);
+  const shopper = await newPage(browser);
+  await toCheckout(shopper, CZ, SLUG);
+  await fillContactAndAddress(shopper, email);
+  await choosePickupPoint(shopper, /Z-BOX Praha 1/);
+  await shopper.getByRole("radio", { name: /Testovací platba/ }).check();
+  await shopper.getByText(/hodnocení/).click();
+  await acceptAndPlace(shopper);
+  const orderToken = await fakePay(shopper, "Pay");
+  const placed = await order(shopper, CZ, orderToken);
+  expect(
+    sql(`SELECT granted || ':' || source FROM consent_records WHERE subject_id='${email}'
+    AND purpose='review_invites' ORDER BY at DESC,id DESC LIMIT 1`),
+  ).toBe("true:checkout");
+  await admin.goto("/orders");
+  await admin.getByRole("link", { name: placed.number, exact: true }).click();
+  for (const [action, dialog] of [
+    ["Create label", true],
+    ["Mark shipped", false],
+    ["Mark delivered", false],
+  ] as const) {
+    await admin.getByRole("button", { name: action, exact: true }).first().click();
+    if (dialog) await admin.getByRole("dialog").getByRole("button", { name: action }).click();
+  }
+  await expect.poll(async () => (await order(shopper, CZ, orderToken)).status).toBe("delivered");
+  await shopper.context().close();
 
   const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString(), {
     headers: rateHeaders(admin),
   });
   expect(auth.ok()).toBeTruthy();
   const { token } = (await auth.json()) as { token: string };
-  const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
   const api = new URL(admin.url());
   api.hostname = api.hostname.replace(/^admin\./, "api.");
-  const fixtureId = sql(`SELECT id FROM orders WHERE number=${number} AND tenant_id='${tenant}'`);
+  const fixtureId = sql(
+    `SELECT id FROM orders WHERE number=${placed.number} AND tenant_id='${tenant}'`,
+  );
   api.pathname = `/admin/v1/orders/${fixtureId}`;
   const detail = await admin.request.get(api.toString(), {
     headers: { authorization: `Bearer ${token}`, "x-tenant-id": tenant },
@@ -72,7 +76,15 @@ async function reviewLink(): Promise<string> {
     data: { hours: 8 * 24 },
   });
   expect(advanced.ok()).toBeTruthy();
-  const message = await mail(`wp16-${run}@example.test`, "Ohodnoťte svůj nákup");
+  await expect
+    .poll(
+      () =>
+        sql(`SELECT r.status || ':' || s.status FROM flow_runs r
+    JOIN flow_steps s ON s.run_id=r.id WHERE r.source_id='${fixtureId}'`),
+      { timeout: 30_000 },
+    )
+    .toBe("completed:sent");
+  const message = await mail(email, "Ohodnoťte svůj nákup");
   const link = message.Text.match(/https?:\/\/[^\s]+\/review\?token=[0-9a-f]{64}/)?.[0];
   expect(link).toBeDefined();
   if (!link) throw new Error("review invite did not contain a link");
@@ -92,7 +104,7 @@ test.afterAll(async () => {
 test("review link → form → moderation → product page with rating JSON-LD", async ({ browser }) => {
   const name = `Jana ${run}`;
   const body = `Pohodlné tričko, sedí přesně. <b>${run}</b>`;
-  const link = await reviewLink();
+  const link = await reviewLink(browser);
   const page = await newPage(browser);
 
   await page.goto(link);
