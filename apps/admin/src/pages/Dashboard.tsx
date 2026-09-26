@@ -298,7 +298,6 @@ function Panel(props: {
   return (
     <section aria-labelledby={props.id} class={`flex min-w-0 flex-col ${props.class ?? ""}`}>
       <Card
-        class="flex-1"
         title={<span id={props.id}>{props.title}</span>}
         description={props.description}
         actions={props.actions}
@@ -320,7 +319,7 @@ function Stat(props: { label: string; value: string; hint?: string }) {
   return (
     <div class="flex min-w-0 flex-col gap-1">
       <dt class="text-sm text-muted-foreground">{props.label}</dt>
-      <dd class="figures truncate text-2xl font-semibold tracking-tight text-heading">
+      <dd class="figures text-xl font-semibold tracking-tight break-words text-heading">
         {props.value}
       </dd>
       <Show when={props.hint}>
@@ -348,7 +347,7 @@ function Overview(props: { data: Dashboard }) {
 
   return (
     <div class="flex flex-col gap-4">
-      <div class="grid gap-4 xl:grid-cols-2">
+      <div class="grid items-start gap-4 xl:grid-cols-2">
         <Panel
           id="sales"
           title={t("dashboard.sales")}
@@ -364,10 +363,10 @@ function Overview(props: { data: Dashboard }) {
               </dl>
             }
           >
-            <div class="flex flex-col gap-4 divide-y divide-border">
+            <div class="flex flex-col divide-y divide-border">
               <For each={d().sales}>
                 {(s) => (
-                  <div class="flex flex-col gap-2 [&:not(:first-child)]:pt-4">
+                  <div class="flex flex-col gap-2 py-4 first:pt-0 last:pb-0">
                     <Show when={d().sales.length > 1}>
                       <p class="col-label">{s.currency}</p>
                     </Show>
@@ -454,7 +453,7 @@ function Overview(props: { data: Dashboard }) {
         </Panel>
       </Show>
 
-      <div class="grid gap-4 lg:grid-cols-2">
+      <div class="grid items-start gap-4 lg:grid-cols-2">
         <Panel
           id="funnel"
           title={t("dashboard.funnelTitle")}
