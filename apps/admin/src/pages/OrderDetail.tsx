@@ -144,7 +144,7 @@ export default function OrderDetail() {
                         </table>
                       </div>
                     </Section>
-                    <div class="grid gap-4 lg:grid-cols-2">
+                    <div class="grid gap-4 2xl:grid-cols-2">
                       <Section title={t("orders.totals")}>
                         <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm [&_dt]:text-muted-foreground">
                           <For
