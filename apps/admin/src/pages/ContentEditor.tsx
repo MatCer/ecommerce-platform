@@ -1,4 +1,4 @@
-import { Button, SelectField, showToast, Tabs, TextField } from "@platform/ui";
+import { Alert, Button, Card, SelectField, showToast, Tabs, TextField } from "@platform/ui";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
@@ -111,119 +111,124 @@ export default function ContentEditor() {
   }));
   const editor = () => (
     <form
-      class="flex max-w-4xl flex-col gap-5"
+      id="content-form"
+      class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"
       onSubmit={(e) => {
         e.preventDefault();
         save.mutate();
       }}
     >
-      <Show when={draft().kind === "legal"}>
-        <p role="note" class="rounded-md border border-warning-700 bg-warning-50 p-3 text-sm">
-          {t("content.notice")}
-        </p>
-      </Show>
-      <Show when={error()}>
-        <p role="alert" class="text-sm text-error-700">
-          {error()}
-        </p>
-      </Show>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <SelectField
-          label={t("content.status")}
-          value={draft().status ?? "draft"}
-          options={[
-            { value: "draft", label: t("content.draft") },
-            { value: "published", label: t("content.published") },
-          ]}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, status: v === "published" ? "published" : "draft" }))
-          }
-        />
-        <DateTimeField
-          label={t("content.publishDate")}
-          value={toLocalInput(draft().published_at)}
-          onChange={(v) => setDraft((d) => ({ ...d, published_at: fromLocalInput(v) }))}
-        />
-      </div>
-      <Show when={blog()}>
-        <ContentAsset
-          label={t("content.cover")}
-          value={draft().image_asset_id ?? ""}
-          onChange={(image_asset_id) =>
-            setDraft((d) => ({ ...d, image_asset_id: image_asset_id || null }))
-          }
-        />
-      </Show>
-      <Tabs
-        label={t("content.translations")}
-        value={locale()}
-        onChange={setLocale}
-        items={CONTENT_LOCALES.map((l) => ({
-          value: l,
-          label: l.toUpperCase(),
-          content: () => (
-            <div class="flex flex-col gap-3">
-              <TextField
-                label={t("content.title")}
-                value={translation(l).title}
-                onChange={(title) =>
-                  update(l, { title, ...(!editedSlugs().has(l) ? { slug: slugify(title) } : {}) })
-                }
-              />
-              <TextField
-                label={t("content.slug")}
-                value={translation(l).slug}
-                onChange={(slug) => {
-                  setEditedSlugs(new Set([...editedSlugs(), l]));
-                  update(l, { slug });
-                }}
-              />
-              <TextField
-                label={t("content.excerpt")}
-                multiline
-                value={translation(l).excerpt ?? ""}
-                onChange={(excerpt) => update(l, { excerpt })}
-              />
-              <div class="grid gap-3 sm:grid-cols-2">
-                <TextField
-                  label={t("content.seoTitle")}
-                  value={translation(l).seo_title ?? ""}
-                  onChange={(seo_title) => update(l, { seo_title })}
-                />
-                <TextField
-                  label={t("content.seoDescription")}
-                  multiline
-                  value={translation(l).seo_description ?? ""}
-                  onChange={(seo_description) => update(l, { seo_description })}
-                />
-              </div>
-              <BlockEditor
-                blocks={translation(l).blocks ?? []}
-                onChange={(blocks) => update(l, { blocks })}
-              />
-            </div>
-          ),
-        }))}
-      />
-      <div>
-        <Button type="submit" variant="confirm" loading={save.isPending}>
-          {t("common.save")}
-        </Button>
-      </div>
-      <Show when={params.id}>
-        {(id) => (
-          <AiPanel
-            entityType="page"
-            entityId={id()}
-            locale={locale()}
-            onAccepted={() => {
-              setLoaded("");
-              void page.refetch();
-            }}
-            acceptHint={t("ai.unsavedHint")}
+      <aside class="flex min-w-0 flex-col gap-4 xl:order-last">
+        <Card>
+          <div class="flex flex-col gap-5">
+            <SelectField
+              label={t("content.status")}
+              value={draft().status ?? "draft"}
+              options={[
+                { value: "draft", label: t("content.draft") },
+                { value: "published", label: t("content.published") },
+              ]}
+              onChange={(v) =>
+                setDraft((d) => ({ ...d, status: v === "published" ? "published" : "draft" }))
+              }
+            />
+            <DateTimeField
+              label={t("content.publishDate")}
+              value={toLocalInput(draft().published_at)}
+              onChange={(v) => setDraft((d) => ({ ...d, published_at: fromLocalInput(v) }))}
+            />
+          </div>
+        </Card>
+        <Show when={blog()}>
+          <Card>
+            <ContentAsset
+              label={t("content.cover")}
+              value={draft().image_asset_id ?? ""}
+              onChange={(image_asset_id) =>
+                setDraft((d) => ({ ...d, image_asset_id: image_asset_id || null }))
+              }
+            />
+          </Card>
+        </Show>
+      </aside>
+      <div class="flex min-w-0 flex-col gap-4">
+        <Show when={draft().kind === "legal"}>
+          <Alert tone="warning">{t("content.notice")}</Alert>
+        </Show>
+        <Show when={error()}>
+          <Alert tone="error">{error()}</Alert>
+        </Show>
+        <Card>
+          <Tabs
+            label={t("content.translations")}
+            value={locale()}
+            onChange={setLocale}
+            items={CONTENT_LOCALES.map((l) => ({
+              value: l,
+              label: l.toUpperCase(),
+              content: () => (
+                <div class="flex flex-col gap-5 pt-4">
+                  <TextField
+                    label={t("content.title")}
+                    value={translation(l).title}
+                    onChange={(title) =>
+                      update(l, {
+                        title,
+                        ...(!editedSlugs().has(l) ? { slug: slugify(title) } : {}),
+                      })
+                    }
+                  />
+                  <TextField
+                    label={t("content.slug")}
+                    value={translation(l).slug}
+                    onChange={(slug) => {
+                      setEditedSlugs(new Set([...editedSlugs(), l]));
+                      update(l, { slug });
+                    }}
+                  />
+                  <TextField
+                    label={t("content.excerpt")}
+                    multiline
+                    value={translation(l).excerpt ?? ""}
+                    onChange={(excerpt) => update(l, { excerpt })}
+                  />
+                  <div class="grid gap-5 sm:grid-cols-2">
+                    <TextField
+                      label={t("content.seoTitle")}
+                      value={translation(l).seo_title ?? ""}
+                      onChange={(seo_title) => update(l, { seo_title })}
+                    />
+                    <TextField
+                      label={t("content.seoDescription")}
+                      multiline
+                      value={translation(l).seo_description ?? ""}
+                      onChange={(seo_description) => update(l, { seo_description })}
+                    />
+                  </div>
+                  <BlockEditor
+                    blocks={translation(l).blocks ?? []}
+                    onChange={(blocks) => update(l, { blocks })}
+                  />
+                </div>
+              ),
+            }))}
           />
-        )}
-      </Show>
+        </Card>
+        <Show when={params.id}>
+          {(id) => (
+            <AiPanel
+              entityType="page"
+              entityId={id()}
+              locale={locale()}
+              onAccepted={() => {
+                setLoaded("");
+                void page.refetch();
+              }}
+              acceptHint={t("ai.unsavedHint")}
+            />
+          )}
+        </Show>
+      </div>
     </form>
   );
   return (
@@ -231,6 +236,11 @@ export default function ContentEditor() {
       <PageHeader
         title={t(params.id ? "content.editPage" : blog() ? "content.newPost" : "content.newPage")}
         back={{ href: base(), label: t(blog() ? "content.blog" : "content.pages") }}
+        actions={
+          <Button type="submit" form="content-form" variant="confirm" loading={save.isPending}>
+            {t("common.save")}
+          </Button>
+        }
       />
       <Show when={params.id} fallback={editor()}>
         <QueryState query={page}>{() => editor()}</QueryState>

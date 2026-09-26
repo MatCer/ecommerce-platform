@@ -1,4 +1,4 @@
-import { Button, SelectField, showToast, TextField } from "@platform/ui";
+import { Alert, Button, SelectField, showToast, TextField } from "@platform/ui";
 import { createMutation, createQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Index, Show } from "solid-js";
 import { AiPanel } from "../components/AiPanel.tsx";
@@ -18,6 +18,10 @@ import {
 import { tenantKey } from "../lib/me.ts";
 import { CONTENT_LOCALES, compactI18n } from "../lib/product-form.ts";
 import { categoryOptions, useCategoryTree } from "../lib/queries.ts";
+
+/** Menu entry header bar (fieldset legend styled like a card header). */
+const legendClass =
+  "float-left flex h-10 w-full items-center border-b border-border bg-subtle pr-28 pl-4 text-sm font-semibold text-heading";
 
 const blank = (): MenuEntry => ({ link: { type: "url", url: "" }, label_i18n: {}, children: [] });
 export default function ContentMenus() {
@@ -74,7 +78,7 @@ export default function ContentMenus() {
           e.link.type === "url" ? { type: "url", url: value } : { type: e.link.type, id: value },
       }));
     return (
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-2">
         <SelectField
           label={t("content.linkType")}
           value={entry().link.type}
@@ -158,67 +162,85 @@ export default function ContentMenus() {
     remove: () => void,
     label: string,
   ) => (
-    <div class="my-2 flex flex-wrap gap-1">
+    <div class="absolute top-2 right-2 flex gap-1">
       <Button
+        category="tertiary"
+        size="small"
+        iconOnly
+        icon="chevron-up"
         disabled={i === 0}
         aria-label={`${t("common.moveUp")}: ${label}`}
         onClick={() => move(-1)}
-      >
-        {t("common.moveUp")}
-      </Button>
+      />
       <Button
+        category="tertiary"
+        size="small"
+        iconOnly
+        icon="chevron-down"
         disabled={i === count - 1}
         aria-label={`${t("common.moveDown")}: ${label}`}
         onClick={() => move(1)}
-      >
-        {t("common.moveDown")}
-      </Button>
-      <Button aria-label={`${t("common.remove")}: ${label}`} onClick={remove}>
-        {t("common.remove")}
-      </Button>
+      />
+      <Button
+        category="tertiary"
+        size="small"
+        iconOnly
+        icon="remove"
+        aria-label={`${t("common.remove")}: ${label}`}
+        onClick={remove}
+      />
     </div>
   );
   return (
     <>
-      <PageHeader title={t("content.menus")} />
+      <PageHeader
+        title={t("content.menus")}
+        actions={
+          <Button type="submit" form="menu-form" variant="confirm" loading={save.isPending}>
+            {t("common.save")}
+          </Button>
+        }
+      />
       <QueryState query={menus}>
         {(data) => (
           <form
+            id="menu-form"
             class="flex max-w-4xl flex-col gap-4"
             onSubmit={(e) => {
               e.preventDefault();
               save.mutate();
             }}
           >
-            <SelectField
-              label={t("content.handle")}
-              value={handle()}
-              disabled={save.isPending}
-              onChange={setHandle}
-              options={[...new Set(["main", "footer", ...data.items.map((m) => m.handle)])].map(
-                (value) => ({
-                  value,
-                  label:
-                    value === "main"
-                      ? t("content.main")
-                      : value === "footer"
-                        ? t("content.footer")
-                        : value,
-                }),
-              )}
-            />
-            <p role="status" class="text-sm">
-              {t("content.entryCount", { count: countMenu(items()) })}
-            </p>
-            <Show when={error()}>
-              <p role="alert" class="text-error-700">
-                {error()}
+            <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+              <SelectField
+                class="w-64"
+                label={t("content.handle")}
+                value={handle()}
+                disabled={save.isPending}
+                onChange={setHandle}
+                options={[...new Set(["main", "footer", ...data.items.map((m) => m.handle)])].map(
+                  (value) => ({
+                    value,
+                    label:
+                      value === "main"
+                        ? t("content.main")
+                        : value === "footer"
+                          ? t("content.footer")
+                          : value,
+                  }),
+                )}
+              />
+              <p role="status" class="figures pb-1.5 text-sm text-muted-foreground">
+                {t("content.entryCount", { count: countMenu(items()) })}
               </p>
+            </div>
+            <Show when={error()}>
+              <Alert tone="error">{error()}</Alert>
             </Show>
             <Index each={items()}>
               {(entry, i) => (
-                <fieldset class="min-w-0 rounded-md border border-border p-3">
-                  <legend>
+                <fieldset class="relative min-w-0 overflow-hidden rounded-lg border border-border bg-background">
+                  <legend class={legendClass}>
                     {t("content.entry")} {i + 1}
                   </legend>
                   {controls(
@@ -228,60 +250,61 @@ export default function ContentMenus() {
                     () => setItems(removeItem(items(), i)),
                     String(i + 1),
                   )}
-                  {fields(entry, [i])}
-                  <div class="ml-2 mt-3 flex flex-col gap-3 sm:ml-6">
-                    <Index each={entry().children ?? []}>
-                      {(child, j) => (
-                        <fieldset class="min-w-0 border-t border-border pt-2">
-                          <legend>
-                            {t("content.entry")} {i + 1}.{j + 1}
-                          </legend>
-                          {controls(
-                            j,
-                            entry().children?.length ?? 0,
-                            (d) =>
-                              setItems(
-                                updateMenu(items(), [i], (e) => ({
-                                  ...e,
-                                  children: moveItem(e.children ?? [], j, d),
-                                })),
-                              ),
-                            () =>
-                              setItems(
-                                updateMenu(items(), [i], (e) => ({
-                                  ...e,
-                                  children: removeItem(e.children ?? [], j),
-                                })),
-                              ),
-                            `${i + 1}.${j + 1}`,
-                          )}
-                          {fields(child, [i, j])}
-                        </fieldset>
-                      )}
-                    </Index>
+                  <div class="clear-both flex flex-col gap-4 p-4">
+                    {fields(entry, [i])}
+                    <div class="flex flex-col gap-3 sm:ml-6">
+                      <Index each={entry().children ?? []}>
+                        {(child, j) => (
+                          <fieldset class="relative min-w-0 overflow-hidden rounded-lg border border-border">
+                            <legend class={legendClass}>
+                              {t("content.entry")} {i + 1}.{j + 1}
+                            </legend>
+                            {controls(
+                              j,
+                              entry().children?.length ?? 0,
+                              (d) =>
+                                setItems(
+                                  updateMenu(items(), [i], (e) => ({
+                                    ...e,
+                                    children: moveItem(e.children ?? [], j, d),
+                                  })),
+                                ),
+                              () =>
+                                setItems(
+                                  updateMenu(items(), [i], (e) => ({
+                                    ...e,
+                                    children: removeItem(e.children ?? [], j),
+                                  })),
+                                ),
+                              `${i + 1}.${j + 1}`,
+                            )}
+                            <div class="clear-both p-4">{fields(child, [i, j])}</div>
+                          </fieldset>
+                        )}
+                      </Index>
+                    </div>
+                    <Button
+                      class="self-start sm:ml-6"
+                      category="tertiary"
+                      icon="plus"
+                      onClick={() =>
+                        setItems(
+                          updateMenu(items(), [i], (e) => ({
+                            ...e,
+                            children: [...(e.children ?? []), blank()],
+                          })),
+                        )
+                      }
+                    >
+                      {t("content.addChild")}
+                    </Button>
                   </div>
-                  <Button
-                    class="mt-3"
-                    onClick={() =>
-                      setItems(
-                        updateMenu(items(), [i], (e) => ({
-                          ...e,
-                          children: [...(e.children ?? []), blank()],
-                        })),
-                      )
-                    }
-                  >
-                    {t("content.addChild")}
-                  </Button>
                 </fieldset>
               )}
             </Index>
-            <div class="flex flex-wrap gap-2">
-              <Button onClick={() => setItems([...items(), blank()])}>
+            <div>
+              <Button icon="plus" onClick={() => setItems([...items(), blank()])}>
                 {t("content.addEntry")}
-              </Button>
-              <Button type="submit" variant="confirm" loading={save.isPending}>
-                {t("common.save")}
               </Button>
             </div>
             <Show when={data.items.some((m) => m.handle === handle())}>
