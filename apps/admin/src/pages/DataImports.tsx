@@ -114,7 +114,7 @@ function Report(props: { report: Schemas["DataImportReport"] }) {
       <Show when={r().errors.length}>
         <Card
           padding="none"
-          titleId="row-errors"
+          labelledBy="row-errors"
           title={t("data.rowErrors")}
           count={r().errors.length}
           description={r().truncated ? t("data.truncated") : undefined}
@@ -144,7 +144,7 @@ function Report(props: { report: Schemas["DataImportReport"] }) {
         </Card>
       </Show>
       <Show when={r().preview.length}>
-        <Card padding="none" titleId="import-preview" title={t("data.preview")}>
+        <Card padding="none" labelledBy="import-preview" title={t("data.preview")}>
           <div class="overflow-x-auto">
             <table class={tableClass} aria-labelledby="import-preview">
               <thead>

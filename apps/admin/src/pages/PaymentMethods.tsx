@@ -76,7 +76,7 @@ function StripeCard() {
     }
   });
   return (
-    <Card class="mb-6" title={t("pay.stripeTitle")}>
+    <Card labelledBy="stripe-heading" class="mb-6" title={t("pay.stripeTitle")}>
       <QueryState query={status}>
         {(s) => (
           <Show

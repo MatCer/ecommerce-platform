@@ -112,7 +112,7 @@ function CampaignPreview(props: { campaign: Campaign }) {
       ),
   }));
   return (
-    <Card title={t("marketing.preview")}>
+    <Card labelledBy="campaign-preview" title={t("marketing.preview")}>
       <div class="mb-4 grid gap-3 sm:grid-cols-3">
         <SelectField
           label={t("marketing.language")}
@@ -458,7 +458,7 @@ export default function CampaignEditor() {
         </dl>
         <p class="mt-4 text-sm text-muted-foreground">{t("marketing.notEditable")}</p>
       </Card>
-      <Card title={t("marketing.stats")}>
+      <Card labelledBy="campaign-stats" title={t("marketing.stats")}>
         <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-6">
           <For each={STATS}>
             {(k) => (

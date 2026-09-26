@@ -66,7 +66,7 @@ function Exports() {
     <Card
       class="mb-6 max-w-3xl"
       padding="none"
-      titleId="export-title"
+      labelledBy="export-title"
       title={t("data.exportTitle")}
       description={t("data.exportHint")}
       actions={
@@ -179,7 +179,12 @@ function PrivacyRequests() {
   }));
   const valid = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email().trim());
   return (
-    <Card class="max-w-3xl" title={t("data.privacyTitle")} description={t("data.privacyHint")}>
+    <Card
+      labelledBy="privacy-title"
+      class="max-w-3xl"
+      title={t("data.privacyTitle")}
+      description={t("data.privacyHint")}
+    >
       <div class="flex flex-col gap-4">
         <div class="max-w-sm">
           <TextField

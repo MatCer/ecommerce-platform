@@ -370,7 +370,7 @@ export default function Webhooks() {
 
               <Card
                 padding="none"
-                titleId="deliveries"
+                labelledBy="deliveries"
                 title={t("webhooks.deliveries")}
                 description={t("webhooks.deliveriesDesc")}
                 actions={

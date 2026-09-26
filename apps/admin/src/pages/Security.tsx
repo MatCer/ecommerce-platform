@@ -112,6 +112,7 @@ export default function Security() {
       <QueryState query={state}>
         {(s) => (
           <Card
+            labelledBy="tfa-h"
             class="max-w-2xl"
             title={t("security.twoFactor")}
             description={t("security.lead")}

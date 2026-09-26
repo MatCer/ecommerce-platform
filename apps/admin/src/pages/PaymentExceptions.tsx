@@ -39,6 +39,7 @@ export default function PaymentExceptions() {
             <div class="grid gap-6">
               <Show when={data.bank_transactions.length}>
                 <Card
+                  labelledBy="transfers"
                   title={t("pay.transfers")}
                   count={data.bank_transactions.length}
                   padding="none"
@@ -50,7 +51,12 @@ export default function PaymentExceptions() {
                 </Card>
               </Show>
               <Show when={data.orders.length}>
-                <Card title={t("pay.ordersWithMoney")} count={data.orders.length} padding="none">
+                <Card
+                  labelledBy="orders-money"
+                  title={t("pay.ordersWithMoney")}
+                  count={data.orders.length}
+                  padding="none"
+                >
                   <div class="overflow-x-auto">
                     <table class={tableClass}>
                       <thead>

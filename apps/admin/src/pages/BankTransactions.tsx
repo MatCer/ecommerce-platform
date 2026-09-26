@@ -228,7 +228,12 @@ function StatementUpload() {
     },
   }));
   return (
-    <Card class="mb-6" title={t("pay.upload")} description={t("pay.uploadDesc")}>
+    <Card
+      labelledBy="upload-heading"
+      class="mb-6"
+      title={t("pay.upload")}
+      description={t("pay.uploadDesc")}
+    >
       <Show
         when={available().length}
         fallback={<p class="text-sm text-muted-foreground">{t("pay.noAccount")}</p>}

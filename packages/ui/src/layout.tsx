@@ -51,8 +51,6 @@ export interface CardProps {
   labelledBy?: string;
   /** Makes the card a `region` with this name (when the title is not the right name). */
   "aria-label"?: string;
-  /** Id of the title heading without making the card a region (e.g. for a table's name). */
-  titleId?: string;
 }
 
 /**
@@ -74,7 +72,7 @@ export function Card(props: CardProps) {
             <div class="flex items-center gap-3">
               <Show when={props.title !== undefined}>
                 <h2
-                  id={props.labelledBy ?? props.titleId}
+                  id={props.labelledBy}
                   class="text-sm font-semibold text-heading"
                 >
                   {props.title}
