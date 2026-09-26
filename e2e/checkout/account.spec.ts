@@ -149,14 +149,29 @@ test("adds an address", async () => {
 });
 
 test("sets a password right after the email-link sign-in, then signs out", async () => {
-  await page.goto(`${checkout}/account/security`);
+  const releasePassword = await deferHydration(page);
+  try {
+    await page.goto(`${checkout}/account/security`, { waitUntil: "commit" });
+    await expect(page.locator('input[autocomplete="new-password"]')).toBeVisible();
+    await expect(page.locator('input[autocomplete="new-password"]')).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Uložit heslo" })).toBeDisabled();
+  } finally {
+    releasePassword();
+  }
   await expect(page.getByLabel("Současné heslo")).toHaveCount(0);
   await page.getByLabel("Nové heslo").fill(password);
   await page.getByRole("button", { name: "Uložit heslo" }).click();
   await expect(page.getByRole("status")).toContainText("Heslo je uložené");
   await expectAccessible(page, "security");
 
-  await page.goto(`${checkout}/account`);
+  const releaseSignOut = await deferHydration(page);
+  try {
+    await page.goto(`${checkout}/account`, { waitUntil: "commit" });
+    await expect(page.getByRole("button", { name: "Odhlásit se" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Odhlásit se" })).toBeDisabled();
+  } finally {
+    releaseSignOut();
+  }
   await page.getByRole("button", { name: "Odhlásit se" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Přihlášení" })).toBeVisible();
   // Account pages need a session again.

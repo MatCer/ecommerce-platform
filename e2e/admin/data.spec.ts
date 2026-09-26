@@ -115,11 +115,42 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
   await nav(page, "Export and privacy").click();
   await expect(page.getByRole("heading", { name: "Export and privacy", level: 1 })).toBeVisible();
   await expectAccessible(page, "export and privacy");
+  const creation = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/admin/v1/data-exports") && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Prepare export" }).click();
+  const created = await creation;
+  expect(created.status()).toBe(202);
+  const { id: exportId } = (await created.json()) as { id: string };
+  const sent = created.request().headers();
+  // Old exports remain on repeated runs. Wait for this job, not any "Ready" row.
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get(`${created.url()}/${exportId}`, {
+          headers: {
+            authorization: sent.authorization ?? "",
+            "x-tenant-id": sent["x-tenant-id"] ?? "",
+          },
+        });
+        expect(response.ok()).toBe(true);
+        return ((await response.json()) as { status: string }).status;
+      },
+      { timeout: 60_000 },
+    )
+    .toBe("ready");
+  await page.reload();
   const exports = page.getByRole("table", { name: "Export all shop data" });
-  await expect(exports.getByText("Ready").first()).toBeVisible({ timeout: 60_000 });
+  const newest = exports.getByRole("row").nth(1);
+  await expect(newest.getByText("Ready", { exact: true })).toBeVisible();
   const zip = page.waitForEvent("download");
-  await exports.getByRole("button", { name: "Download" }).first().click();
+  const requested = page.waitForRequest(
+    (request) =>
+      request.url().endsWith(`/data-exports/${exportId}/download`) && request.method() === "POST",
+  );
+  await newest.getByRole("button", { name: "Download" }).click();
+  await requested;
   expect((await zip).suggestedFilename()).toMatch(/\.zip$/);
 
   // GDPR: the person's data as JSON, then erasure with a typed confirmation.
@@ -152,7 +183,14 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
     await page.getByLabel("Person's email").fill(email);
     await page.getByRole("button", { name: "Erase their data" }).click();
     await page.getByRole("dialog").getByLabel("Email again").fill(email);
+    const erased = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/admin/v1/privacy/erasure") &&
+        response.request().method() === "POST",
+    );
     await page.getByRole("dialog").getByRole("button", { name: "Erase their data" }).click();
+    expect((await erased).status()).toBe(200);
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText(/^Erased:/).first()).toBeVisible();
   }
 });

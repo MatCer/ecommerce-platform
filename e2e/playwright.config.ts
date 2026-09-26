@@ -3,6 +3,15 @@ import { defineConfig, devices } from "@playwright/test";
 // End-to-end suites against the running compose stack (`make up`, then `make e2e`).
 // Ports come from the environment / .env (HTTP_PORT, MAILPIT_UI_PORT).
 const port = process.env.HTTP_PORT ?? "8080";
+// These suites mutate/read the demo tenant's flow clock, flow definitions or
+// newsletter confirmation template. File-local serial mode cannot isolate them.
+const sharedState = [
+  "admin/flows.spec.ts",
+  "checkout/flows.spec.ts",
+  "checkout/reviews.spec.ts",
+  "admin/newsletter.spec.ts",
+  "storefront/newsletter.spec.ts",
+];
 
 export default defineConfig({
   testDir: ".",
@@ -23,8 +32,21 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "chromium-setup",
+      testMatch: "fixtures.setup.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
+    },
+    {
       name: "chromium",
-      testIgnore: ["admin/themes.spec.ts", "admin/theme-ai.spec.ts"],
+      testIgnore: [...sharedState, "admin/themes.spec.ts", "admin/theme-ai.spec.ts"],
+      dependencies: ["chromium-setup"],
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
+    },
+    {
+      name: "chromium-shared-state",
+      testMatch: sharedState,
+      dependencies: ["chromium"],
+      workers: 1,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
     },
     {
@@ -33,7 +55,7 @@ export default defineConfig({
       // readers in the regular project. Global concurrency remains capped at four.
       name: "chromium-themes",
       testMatch: ["admin/themes.spec.ts", "admin/theme-ai.spec.ts"],
-      dependencies: ["chromium"],
+      dependencies: ["chromium-shared-state"],
       workers: 1,
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
     },

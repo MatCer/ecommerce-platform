@@ -2,6 +2,7 @@ import { t } from "@platform/storefront-sdk/format";
 import { Button, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import HydratedControls from "./HydratedControls";
 import { problemText } from "./SignIn";
 
 type M = Record<string, string>;
@@ -68,7 +69,7 @@ export default function PasswordForm(props: {
   }
 
   return (
-    <div class="grid gap-4">
+    <HydratedControls class="grid gap-4">
       <p class="text-sm text-muted-foreground">{t(m, "password.set_intro")}</p>
       <Show
         when={!blocked()}
@@ -121,6 +122,6 @@ export default function PasswordForm(props: {
           </p>
         </Show>
       </div>
-    </div>
+    </HydratedControls>
   );
 }

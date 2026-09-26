@@ -15,8 +15,9 @@ import {
   type Page,
   test,
 } from "@playwright/test";
+import { checkoutReady } from "../checkout/support";
 import { testContext } from "../rate-client";
-import { expectAccessible, magicLink, run, useEnglish } from "./support.ts";
+import { expectAccessible, magicLink, run, sql, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -109,6 +110,7 @@ async function placeOrder(p: Page, email: string): Promise<void> {
       form.submit();
     }),
   ]);
+  await checkoutReady(p);
   await p.locator('input[autocomplete="email"]').fill(email);
   await p.locator('input[autocomplete="tel"]').first().fill("606 666 666");
   await p.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
@@ -172,6 +174,15 @@ async function expectDelivery(row: RegExp) {
   }).toPass({ timeout: 90_000 });
 }
 
+// A matching row from a previous run must not satisfy an asynchronous assertion.
+function purchaseDelivery(email: string, platform: string) {
+  return sql(`SELECT d.status || ':' || coalesce(d.response_code::text, '')
+    FROM ad_deliveries d JOIN orders o ON o.id=d.order_id AND o.tenant_id=d.tenant_id
+    JOIN platform.tenants t ON t.id=d.tenant_id
+    WHERE t.slug='demo' AND o.email='${email}' AND d.platform='${platform}'
+      AND d.event_name='purchase'`);
+}
+
 test.beforeAll(async ({ browser, request }) => {
   for (const p of ["meta", "ga4", "google", "sklik"])
     await request.delete(`${MOCKS}/ads/${p}/requests`);
@@ -186,7 +197,8 @@ test.beforeAll(async ({ browser, request }) => {
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 });
 
-test.afterAll(async () => {
+test.afterAll(async ({ request }) => {
+  await request.delete(`${MOCKS}/ads/sklik/requests`);
   await admin.close();
 });
 
@@ -316,11 +328,12 @@ test("withdrawing consent cancels what a paused platform still holds", async ({
 
   await withdrawAds(p);
   await p.context().close();
+  await expect.poll(() => purchaseDelivery(email, "meta")).toBe("cancelled:");
   await expectDelivery(/purchases.*Cancelled/);
   await meta.getByRole("button", { name: /^Resume/ }).click();
   await expect(meta).toContainText("Sending");
-  // Resuming sends nothing of the withdrawn visitor.
-  await page.waitForTimeout(3_000);
+  // Cancellation is terminal; resume only queues paused rows. No arbitrary worker sleep.
+  expect(purchaseDelivery(email, "meta")).toBe("cancelled:");
   expect(await accepted(request, "meta")).not.toContain(sha(email));
 });
 
@@ -330,14 +343,19 @@ test("a failing platform is retried and ends as a failed delivery", async ({
 }) => {
   await request.put(`${MOCKS}/ads/sklik/config`, { data: { status: 503, fail_times: null } });
   const p = await shopper(browser, true);
-  await placeOrder(p, `ads-fail-${run}@example.test`);
+  const email = `ads-fail-${run}@example.test`;
+  await placeOrder(p, email);
   await p.context().close();
 
   await openAdTracking();
   await page.getByRole("combobox", { name: "Platform" }).selectOption({ label: "Sklik (Seznam)" });
+  await expect
+    .poll(() => purchaseDelivery(email, "sklik"), { timeout: 90_000 })
+    .toBe("retrying:503");
   await expectDelivery(/purchases.*Retrying.*503/);
   // A rejected payload is not retried: the next attempt fails for good.
   await request.put(`${MOCKS}/ads/sklik/config`, { data: { status: 400, fail_times: null } });
+  await expect.poll(() => purchaseDelivery(email, "sklik"), { timeout: 90_000 }).toBe("dead:400");
   await expectDelivery(/purchases.*Failed.*400/);
   await request.delete(`${MOCKS}/ads/sklik/requests`);
 });

@@ -261,6 +261,12 @@ test("RUM: a consented, sampled visit beacons its Web Vitals on leave; no consen
     await decideConsent(ctx, CZ, consent);
     await ctx.addInitScript(() => {
       Math.random = () => 0; // inside the 10 % sample
+      // Observe the reporter's last subscription, including its lazy module load.
+      const observe = PerformanceObserver.prototype.observe;
+      PerformanceObserver.prototype.observe = function (options) {
+        observe.call(this, options);
+        if (options?.type === "event") document.documentElement.dataset.rumReady = "true";
+      };
     });
     const beacons: string[] = [];
     ctx.on("request", (r) => {
@@ -269,11 +275,25 @@ test("RUM: a consented, sampled visit beacons its Web Vitals on leave; no consen
     const page = await ctx.newPage();
     await page.goto(`${CZ}/p/mikina-fleece`);
     await hydrated(page);
-    await page.waitForTimeout(500); // the reporter loads lazily after hydration
+    if (consent) {
+      await page.waitForFunction(() => document.documentElement.dataset.rumReady === "true");
+      // Let buffered paint entries reach the reporter before its one-shot flush.
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) => {
+            const observer = new PerformanceObserver(() => {
+              observer.disconnect();
+              requestAnimationFrame(() => resolve());
+            });
+            observer.observe({ type: "largest-contentful-paint", buffered: true });
+          }),
+      );
+    }
     // Leaving the page (pagehide) sends one beacon; Playwright does not observe beacons sent
     // while a document unloads, so the event is dispatched in place.
     await page.evaluate(() => dispatchEvent(new Event("pagehide")));
-    await page.waitForTimeout(500);
+    if (consent)
+      await expect.poll(() => beacons.some((body) => body.includes('"web_vital"'))).toBe(true);
     const vitals = beacons
       .flatMap(
         (b) =>

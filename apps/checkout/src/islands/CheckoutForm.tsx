@@ -19,6 +19,8 @@ import {
   unknownOutcome,
 } from "../lib/placement";
 
+import HydratedControls from "./HydratedControls";
+
 type M = Record<string, string>;
 
 const blank = (country: string): CheckoutAddress => ({
@@ -342,321 +344,328 @@ export default function CheckoutForm(props: {
   };
 
   return (
-    <form class="grid gap-6 md:grid-cols-[1fr_20rem] md:items-start" noValidate onSubmit={place}>
-      <div class="grid min-w-0 gap-5">
-        <section aria-labelledby="co-contact" class={section}>
-          <h2 id="co-contact" class={h2}>
-            1. {t(m, "checkout.contact")}
-          </h2>
-          <Show
-            when={props.customerEmail}
-            fallback={
-              <p class="mb-3 text-sm">
-                <a href="/account?next=/" class="text-identity-ink underline">
-                  {t(m, "checkout.have_account")}
-                </a>
+    <form noValidate onSubmit={place}>
+      <HydratedControls class="grid gap-6 md:grid-cols-[1fr_20rem] md:items-start">
+        <div class="grid min-w-0 gap-5">
+          <section aria-labelledby="co-contact" class={section}>
+            <h2 id="co-contact" class={h2}>
+              1. {t(m, "checkout.contact")}
+            </h2>
+            <Show
+              when={props.customerEmail}
+              fallback={
+                <p class="mb-3 text-sm">
+                  <a href="/account?next=/" class="text-identity-ink underline">
+                    {t(m, "checkout.have_account")}
+                  </a>
+                </p>
+              }
+            >
+              <p class="mb-3 text-sm text-muted-foreground">
+                {t(m, "checkout.signed_in", { email: props.customerEmail ?? "" })}
               </p>
-            }
-          >
-            <p class="mb-3 text-sm text-muted-foreground">
-              {t(m, "checkout.signed_in", { email: props.customerEmail ?? "" })}
-            </p>
-          </Show>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <TextField
-              label={t(m, "account.email")}
-              type="email"
-              autocomplete="email"
-              required
-              value={email()}
-              onChange={setEmail}
-              description={t(m, "checkout.email_hint")}
-              error={touched() && !emailValid() ? t(m, "account.invalid_email") : undefined}
-            />
-            <TextField
-              label={t(m, "address.phone")}
-              type="tel"
-              autocomplete="tel"
-              value={phone()}
-              onChange={setPhone}
-            />
-          </div>
-        </section>
+            </Show>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <TextField
+                label={t(m, "account.email")}
+                type="email"
+                autocomplete="email"
+                required
+                value={email()}
+                onChange={setEmail}
+                description={t(m, "checkout.email_hint")}
+                error={touched() && !emailValid() ? t(m, "account.invalid_email") : undefined}
+              />
+              <TextField
+                label={t(m, "address.phone")}
+                type="tel"
+                autocomplete="tel"
+                value={phone()}
+                onChange={setPhone}
+              />
+            </div>
+          </section>
 
-        <section aria-labelledby="co-address" class={section}>
-          <h2 id="co-address" class={h2}>
-            2. {t(m, "checkout.address")}
-          </h2>
-          <Show when={props.saved.length > 0}>
-            <SelectField
-              class="mb-3"
-              label={t(m, "checkout.saved_address")}
-              value=""
-              options={[
-                { value: "", label: t(m, "checkout.saved_address_none") },
-                ...props.saved.map((a) => ({
-                  value: a.id,
-                  label: `${a.name}, ${a.street}, ${a.city}`,
-                })),
-              ]}
-              onChange={(id) => {
-                const a = props.saved.find((s) => s.id === id);
-                if (a) setBilling(fromSaved(a));
-              }}
+          <section aria-labelledby="co-address" class={section}>
+            <h2 id="co-address" class={h2}>
+              2. {t(m, "checkout.address")}
+            </h2>
+            <Show when={props.saved.length > 0}>
+              <SelectField
+                class="mb-3"
+                label={t(m, "checkout.saved_address")}
+                value=""
+                options={[
+                  { value: "", label: t(m, "checkout.saved_address_none") },
+                  ...props.saved.map((a) => ({
+                    value: a.id,
+                    label: `${a.name}, ${a.street}, ${a.city}`,
+                  })),
+                ]}
+                onChange={(id) => {
+                  const a = props.saved.find((s) => s.id === id);
+                  if (a) setBilling(fromSaved(a));
+                }}
+              />
+            </Show>
+            {addressFields(billing, setBilling, "billing")}
+            <Checkbox
+              class="mt-4"
+              label={t(m, "checkout.ship_elsewhere")}
+              checked={elsewhere()}
+              onChange={setElsewhere}
             />
-          </Show>
-          {addressFields(billing, setBilling, "billing")}
-          <Checkbox
-            class="mt-4"
-            label={t(m, "checkout.ship_elsewhere")}
-            checked={elsewhere()}
-            onChange={setElsewhere}
-          />
-          <Show when={elsewhere()}>
-            <fieldset class="mt-4 border-t border-border pt-4">
-              <legend class="mb-2 text-sm font-semibold">
-                {t(m, "checkout.delivery_address")}
-              </legend>
-              {addressFields(delivery, setDelivery, "shipping")}
-            </fieldset>
-          </Show>
-        </section>
+            <Show when={elsewhere()}>
+              <fieldset class="mt-4 border-t border-border pt-4">
+                <legend class="mb-2 text-sm font-semibold">
+                  {t(m, "checkout.delivery_address")}
+                </legend>
+                {addressFields(delivery, setDelivery, "shipping")}
+              </fieldset>
+            </Show>
+          </section>
 
-        <section aria-labelledby="co-shipping" class={section}>
-          <h2 id="co-shipping" class={h2}>
-            3. {t(m, "checkout.shipping")}
-          </h2>
-          <fieldset class="grid gap-2" aria-labelledby="co-shipping" disabled={saving()}>
-            <For each={view().shipping_methods}>
-              {(s) => (
-                <label class={option}>
-                  <input
-                    type="radio"
-                    name="shipping"
-                    class="mt-1 size-4 accent-[var(--color-identity)]"
-                    value={s.id}
-                    checked={(pendingPickup() ?? view().shipping_method_id) === s.id}
-                    disabled={s.price == null}
-                    onChange={(e) => void keepChoiceFocus(e.currentTarget, () => chooseShipping(s))}
-                  />
-                  <span class="grid flex-1 gap-0.5">
-                    <span class="flex justify-between gap-2 font-semibold">
-                      <span>{s.name}</span>
-                      <span class="tabular-nums">
-                        {s.price == null
-                          ? t(m, "checkout.shipping_unavailable")
-                          : s.price.amount_minor === 0
-                            ? t(m, "checkout.free")
-                            : s.price.formatted}
+          <section aria-labelledby="co-shipping" class={section}>
+            <h2 id="co-shipping" class={h2}>
+              3. {t(m, "checkout.shipping")}
+            </h2>
+            <fieldset class="grid gap-2" aria-labelledby="co-shipping" disabled={saving()}>
+              <For each={view().shipping_methods}>
+                {(s) => (
+                  <label class={option}>
+                    <input
+                      type="radio"
+                      name="shipping"
+                      class="mt-1 size-4 accent-[var(--color-identity)]"
+                      value={s.id}
+                      checked={(pendingPickup() ?? view().shipping_method_id) === s.id}
+                      disabled={s.price == null}
+                      onChange={(e) =>
+                        void keepChoiceFocus(e.currentTarget, () => chooseShipping(s))
+                      }
+                    />
+                    <span class="grid flex-1 gap-0.5">
+                      <span class="flex justify-between gap-2 font-semibold">
+                        <span>{s.name}</span>
+                        <span class="tabular-nums">
+                          {s.price == null
+                            ? t(m, "checkout.shipping_unavailable")
+                            : s.price.amount_minor === 0
+                              ? t(m, "checkout.free")
+                              : s.price.formatted}
+                        </span>
                       </span>
-                    </span>
-                    <Show when={s.description}>
-                      <span class="text-sm text-muted-foreground">{s.description}</span>
-                    </Show>
-                  </span>
-                </label>
-              )}
-            </For>
-          </fieldset>
-          <Show when={pickupMethod(view(), pendingPickup())}>
-            {(method) => (
-              <div class="mt-3 grid gap-2 rounded-md bg-muted p-3 text-sm">
-                <Show
-                  when={!pendingPickup() && view().pickup_point}
-                  fallback={<p>{t(m, "checkout.pickup_missing")}</p>}
-                >
-                  {(p) => (
-                    <p data-testid="pickup-point">
-                      <span class="font-semibold">{t(m, "checkout.pickup_selected")}:</span>{" "}
-                      {p().name}, {p().street}, {p().zip} {p().city}
-                    </p>
-                  )}
-                </Show>
-                <div>
-                  <Button variant="secondary" onClick={() => void openWidget(method().id)}>
-                    {view().pickup_point && !pendingPickup()
-                      ? t(m, "checkout.pickup_change")
-                      : t(m, "checkout.pickup_choose")}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </Show>
-        </section>
-
-        <section aria-labelledby="co-payment" class={section}>
-          <h2 id="co-payment" class={h2}>
-            4. {t(m, "checkout.payment")}
-          </h2>
-          <fieldset class="grid gap-2" aria-labelledby="co-payment" disabled={saving()}>
-            <For each={view().payment_methods}>
-              {(p) => (
-                <label class={option}>
-                  <input
-                    type="radio"
-                    name="payment"
-                    class="mt-1 size-4 accent-[var(--color-identity)]"
-                    value={p.kind}
-                    checked={view().payment_method === p.kind}
-                    disabled={!p.selectable}
-                    onChange={(e) =>
-                      void keepChoiceFocus(e.currentTarget, () => choosePayment(p.kind))
-                    }
-                  />
-                  <span class="grid flex-1 gap-0.5">
-                    <span class="flex justify-between gap-2 font-semibold">
-                      <span>{p.name}</span>
-                      <Show when={p.fee.amount_minor > 0}>
-                        <span class="tabular-nums">+{p.fee.formatted}</span>
+                      <Show when={s.description}>
+                        <span class="text-sm text-muted-foreground">{s.description}</span>
                       </Show>
                     </span>
-                    <Show when={!p.selectable}>
-                      <span class="text-sm text-muted-foreground">
-                        {t(m, "checkout.cod_needs_shipping")}
+                  </label>
+                )}
+              </For>
+            </fieldset>
+            <Show when={pickupMethod(view(), pendingPickup())}>
+              {(method) => (
+                <div class="mt-3 grid gap-2 rounded-md bg-muted p-3 text-sm">
+                  <Show
+                    when={!pendingPickup() && view().pickup_point}
+                    fallback={<p>{t(m, "checkout.pickup_missing")}</p>}
+                  >
+                    {(p) => (
+                      <p data-testid="pickup-point">
+                        <span class="font-semibold">{t(m, "checkout.pickup_selected")}:</span>{" "}
+                        {p().name}, {p().street}, {p().zip} {p().city}
+                      </p>
+                    )}
+                  </Show>
+                  <div>
+                    <Button variant="secondary" onClick={() => void openWidget(method().id)}>
+                      {view().pickup_point && !pendingPickup()
+                        ? t(m, "checkout.pickup_change")
+                        : t(m, "checkout.pickup_choose")}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Show>
+          </section>
+
+          <section aria-labelledby="co-payment" class={section}>
+            <h2 id="co-payment" class={h2}>
+              4. {t(m, "checkout.payment")}
+            </h2>
+            <fieldset class="grid gap-2" aria-labelledby="co-payment" disabled={saving()}>
+              <For each={view().payment_methods}>
+                {(p) => (
+                  <label class={option}>
+                    <input
+                      type="radio"
+                      name="payment"
+                      class="mt-1 size-4 accent-[var(--color-identity)]"
+                      value={p.kind}
+                      checked={view().payment_method === p.kind}
+                      disabled={!p.selectable}
+                      onChange={(e) =>
+                        void keepChoiceFocus(e.currentTarget, () => choosePayment(p.kind))
+                      }
+                    />
+                    <span class="grid flex-1 gap-0.5">
+                      <span class="flex justify-between gap-2 font-semibold">
+                        <span>{p.name}</span>
+                        <Show when={p.fee.amount_minor > 0}>
+                          <span class="tabular-nums">+{p.fee.formatted}</span>
+                        </Show>
                       </span>
+                      <Show when={!p.selectable}>
+                        <span class="text-sm text-muted-foreground">
+                          {t(m, "checkout.cod_needs_shipping")}
+                        </span>
+                      </Show>
+                    </span>
+                  </label>
+                )}
+              </For>
+            </fieldset>
+          </section>
+
+          <section aria-labelledby="co-review" class={section}>
+            <h2 id="co-review" class={h2}>
+              5. {t(m, "checkout.review")}
+            </h2>
+            <div class="grid gap-3">
+              <div class="flex flex-wrap items-start gap-x-2">
+                <Checkbox
+                  label={t(m, "checkout.accept_terms")}
+                  checked={terms()}
+                  onChange={setTerms}
+                />
+                <a
+                  href={view().legal.terms_url}
+                  target="_blank"
+                  rel="noopener"
+                  class="text-sm text-identity-ink underline"
+                >
+                  {t(m, "legal.terms")}
+                </a>
+              </div>
+              <div class="flex flex-wrap items-start gap-x-2">
+                <Checkbox
+                  label={t(m, "checkout.accept_withdrawal")}
+                  checked={withdrawal()}
+                  onChange={setWithdrawal}
+                />
+                <a
+                  href={view().legal.withdrawal_url}
+                  target="_blank"
+                  rel="noopener"
+                  class="text-sm text-identity-ink underline"
+                >
+                  {t(m, "checkout.withdrawal_info")}
+                </a>
+              </div>
+              <fieldset class="grid gap-3 border-t border-border pt-3">
+                <legend class="mb-1 text-sm text-muted-foreground">
+                  {t(m, "checkout.optional")}
+                </legend>
+                <Checkbox
+                  label={t(m, "checkout.marketing")}
+                  description={t(m, "consent.email_marketing_hint")}
+                  checked={marketing()}
+                  onChange={setMarketing}
+                />
+                <Checkbox
+                  label={t(m, "checkout.reviews")}
+                  checked={reviews()}
+                  onChange={setReviews}
+                />
+              </fieldset>
+              <TextField
+                label={t(m, "checkout.note")}
+                multiline
+                rows={2}
+                maxLength={1000}
+                value={note()}
+                onChange={setNote}
+              />
+            </div>
+          </section>
+        </div>
+
+        <aside aria-labelledby="co-summary" class={`${section} md:sticky md:top-4`}>
+          <h2 id="co-summary" class={h2}>
+            {t(m, "checkout.summary")}
+          </h2>
+          <ul class="grid gap-2 text-sm">
+            <For each={view().cart.lines}>
+              {(l) => (
+                <li class="flex justify-between gap-2">
+                  <span>
+                    {l.quantity}× {l.product_name}
+                    <Show when={l.variant_label}>
+                      <span class="text-muted-foreground"> ({l.variant_label})</span>
                     </Show>
                   </span>
-                </label>
+                  <span class="tabular-nums">{l.total.formatted}</span>
+                </li>
               )}
             </For>
-          </fieldset>
-        </section>
-
-        <section aria-labelledby="co-review" class={section}>
-          <h2 id="co-review" class={h2}>
-            5. {t(m, "checkout.review")}
-          </h2>
-          <div class="grid gap-3">
-            <div class="flex flex-wrap items-start gap-x-2">
-              <Checkbox
-                label={t(m, "checkout.accept_terms")}
-                checked={terms()}
-                onChange={setTerms}
-              />
-              <a
-                href={view().legal.terms_url}
-                target="_blank"
-                rel="noopener"
-                class="text-sm text-identity-ink underline"
-              >
-                {t(m, "legal.terms")}
-              </a>
-            </div>
-            <div class="flex flex-wrap items-start gap-x-2">
-              <Checkbox
-                label={t(m, "checkout.accept_withdrawal")}
-                checked={withdrawal()}
-                onChange={setWithdrawal}
-              />
-              <a
-                href={view().legal.withdrawal_url}
-                target="_blank"
-                rel="noopener"
-                class="text-sm text-identity-ink underline"
-              >
-                {t(m, "checkout.withdrawal_info")}
-              </a>
-            </div>
-            <fieldset class="grid gap-3 border-t border-border pt-3">
-              <legend class="mb-1 text-sm text-muted-foreground">
-                {t(m, "checkout.optional")}
-              </legend>
-              <Checkbox
-                label={t(m, "checkout.marketing")}
-                description={t(m, "consent.email_marketing_hint")}
-                checked={marketing()}
-                onChange={setMarketing}
-              />
-              <Checkbox
-                label={t(m, "checkout.reviews")}
-                checked={reviews()}
-                onChange={setReviews}
-              />
-            </fieldset>
-            <TextField
-              label={t(m, "checkout.note")}
-              multiline
-              rows={2}
-              maxLength={1000}
-              value={note()}
-              onChange={setNote}
-            />
-          </div>
-        </section>
-      </div>
-
-      <aside aria-labelledby="co-summary" class={`${section} md:sticky md:top-4`}>
-        <h2 id="co-summary" class={h2}>
-          {t(m, "checkout.summary")}
-        </h2>
-        <ul class="grid gap-2 text-sm">
-          <For each={view().cart.lines}>
-            {(l) => (
-              <li class="flex justify-between gap-2">
-                <span>
-                  {l.quantity}× {l.product_name}
-                  <Show when={l.variant_label}>
-                    <span class="text-muted-foreground"> ({l.variant_label})</span>
-                  </Show>
-                </span>
-                <span class="tabular-nums">{l.total.formatted}</span>
-              </li>
-            )}
-          </For>
-        </ul>
-        <a href={props.shopUrl} class="mt-2 inline-block text-sm text-identity-ink underline">
-          {t(m, "checkout.edit_cart")}
-        </a>
-        <dl class="mt-3 grid gap-1 border-t border-border pt-3 text-sm">
-          <Row label={t(m, "checkout.subtotal")} value={view().totals.subtotal.formatted} />
-          <Show when={view().totals.discount.amount_minor > 0}>
-            <Row
-              class="text-sale"
-              label={`${t(m, "cart.discount")}${view().cart.coupon ? ` (${view().cart.coupon?.code})` : ""}`}
-              value={`−${view().totals.discount.formatted}`}
-            />
-          </Show>
-          <Row label={t(m, "checkout.shipping")} value={view().totals.shipping.formatted} />
-          <Show when={view().totals.payment_fee.amount_minor !== 0}>
-            <Row label={t(m, "checkout.payment_fee")} value={view().totals.payment_fee.formatted} />
-          </Show>
-          <For each={view().totals.vat}>
-            {(r) => (
+          </ul>
+          <a href={props.shopUrl} class="mt-2 inline-block text-sm text-identity-ink underline">
+            {t(m, "checkout.edit_cart")}
+          </a>
+          <dl class="mt-3 grid gap-1 border-t border-border pt-3 text-sm">
+            <Row label={t(m, "checkout.subtotal")} value={view().totals.subtotal.formatted} />
+            <Show when={view().totals.discount.amount_minor > 0}>
               <Row
-                class="text-muted-foreground"
-                label={t(m, "checkout.vat", { rate: r.rate })}
-                value={r.vat.formatted}
+                class="text-sale"
+                label={`${t(m, "cart.discount")}${view().cart.coupon ? ` (${view().cart.coupon?.code})` : ""}`}
+                value={`−${view().totals.discount.formatted}`}
               />
-            )}
-          </For>
-          <div class="mt-1 flex justify-between border-t border-border pt-2 text-base font-bold">
-            <dt>{t(m, "cart.total")}</dt>
-            <dd class="tabular-nums" data-testid="checkout-total">
-              {view().totals.total.formatted}
-            </dd>
+            </Show>
+            <Row label={t(m, "checkout.shipping")} value={view().totals.shipping.formatted} />
+            <Show when={view().totals.payment_fee.amount_minor !== 0}>
+              <Row
+                label={t(m, "checkout.payment_fee")}
+                value={view().totals.payment_fee.formatted}
+              />
+            </Show>
+            <For each={view().totals.vat}>
+              {(r) => (
+                <Row
+                  class="text-muted-foreground"
+                  label={t(m, "checkout.vat", { rate: r.rate })}
+                  value={r.vat.formatted}
+                />
+              )}
+            </For>
+            <div class="mt-1 flex justify-between border-t border-border pt-2 text-base font-bold">
+              <dt>{t(m, "cart.total")}</dt>
+              <dd class="tabular-nums" data-testid="checkout-total">
+                {view().totals.total.formatted}
+              </dd>
+            </div>
+          </dl>
+          <div aria-live="polite" class="mt-3 text-sm">
+            <Show when={notice()}>
+              <p role="status" class="rounded-md bg-identity-wash p-2">
+                {notice()}
+              </p>
+            </Show>
           </div>
-        </dl>
-        <div aria-live="polite" class="mt-3 text-sm">
-          <Show when={notice()}>
-            <p role="status" class="rounded-md bg-identity-wash p-2">
-              {notice()}
+          <Show when={error()}>
+            <p role="alert" class="mt-3 rounded-md border border-sale p-2 text-sm text-sale">
+              {error()}
             </p>
           </Show>
-        </div>
-        <Show when={error()}>
-          <p role="alert" class="mt-3 rounded-md border border-sale p-2 text-sm text-sale">
-            {error()}
-          </p>
-        </Show>
-        <button
-          type="submit"
-          class="mt-4 h-12 w-full rounded-md bg-buy px-4 font-display font-bold hover:bg-buy-hover disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={placing()}
-          aria-busy={placing() || undefined}
-        >
-          {placing() ? t(m, "checkout.placing") : t(m, "checkout.place")}
-        </button>
-      </aside>
+          <button
+            type="submit"
+            class="mt-4 h-12 w-full rounded-md bg-buy px-4 font-display font-bold hover:bg-buy-hover disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={placing() || saving()}
+            aria-busy={placing() || undefined}
+          >
+            {placing() ? t(m, "checkout.placing") : t(m, "checkout.place")}
+          </button>
+        </aside>
+      </HydratedControls>
     </form>
   );
 }

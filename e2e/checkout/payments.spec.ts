@@ -16,6 +16,7 @@ import {
   CZ,
   checkoutOf,
   choosePickupPoint,
+  deferHydration,
   fillContactAndAddress,
   newPage,
   type OrderModel,
@@ -112,6 +113,14 @@ test("Stripe simulator: declined, retried, paid; a redelivered event changes not
   await expect(page.getByTestId("payment-status")).toHaveText("Platba se nezdařila", {
     timeout: 20_000,
   });
+  const release = await deferHydration(page);
+  try {
+    await page.reload({ waitUntil: "commit" });
+    await expect(page.getByRole("button", { name: "Zaplatit znovu" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zaplatit znovu" })).toBeDisabled();
+  } finally {
+    release();
+  }
   await page.getByRole("button", { name: "Zaplatit znovu" }).click();
   await expect(simulator).toBeVisible();
   await simulator.getByRole("button", { name: "Simulovat úspěšnou platbu" }).click();

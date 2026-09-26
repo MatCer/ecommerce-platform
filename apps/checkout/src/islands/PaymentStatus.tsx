@@ -5,6 +5,8 @@ import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js"
 import { call } from "../lib/client";
 import { loadStripe, type StripeElements, type StripeJs } from "../lib/stripe";
 
+import HydratedControls from "./HydratedControls";
+
 type M = Record<string, string>;
 
 const POLL_MS = 2000;
@@ -89,7 +91,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
   };
 
   return (
-    <div class="grid gap-3">
+    <HydratedControls class="grid gap-3">
       <p class="text-sm">
         <span class="font-semibold">{t(m, "order.payment")}:</span>{" "}
         <span data-testid="payment-status">{t(m, `order.payment_status.${p().status}`)}</span>
@@ -162,7 +164,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
           {error()}
         </p>
       </Show>
-    </div>
+    </HydratedControls>
   );
 }
 
