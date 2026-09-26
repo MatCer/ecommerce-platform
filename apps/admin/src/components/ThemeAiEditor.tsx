@@ -4,7 +4,7 @@
  * The run's progress, the agent's summary, the diff and the last check report are shown here;
  * accepting makes its revision publishable through the normal preview/publish flow above.
  */
-import { Badge, Button, Spinner, TextField } from "@platform/ui";
+import { Alert, Badge, Button, Card, Icon, linkClass, Spinner, TextField } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
@@ -17,7 +17,7 @@ import { QueryState, Th, tableClass, tdClass } from "./Page.tsx";
 type Run = Schemas["AiThemeRunSummary"];
 
 const lineClass = {
-  file: "font-semibold text-foreground",
+  file: "font-semibold text-heading",
   hunk: "text-muted-foreground",
   add: "bg-success-50 text-success-700",
   del: "bg-error-50 text-error-700",
@@ -33,9 +33,9 @@ export function DiffView(props: { diff: string; label: string }) {
       aria-label={props.label}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrollable region must be reachable by keyboard
       tabIndex={0}
-      class="max-h-[32rem] overflow-auto rounded-md border border-border bg-card p-2"
+      class="max-h-[32rem] overflow-auto rounded-md border border-border bg-background p-2"
     >
-      <pre class="text-xs leading-5">
+      <pre class="font-mono text-xs leading-5">
         <For each={lines()}>
           {(l) => (
             <div class={`${lineClass[l.kind]} whitespace-pre-wrap break-all`}>{l.text || " "}</div>
@@ -60,11 +60,16 @@ export function RevisionChanges(props: { id: string }) {
       ),
   }));
   return (
-    <details class="text-sm" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary class="cursor-pointer text-accent-700 hover:underline">
+    // Native disclosure styled like the Pajamas Collapse (which cannot report its toggle yet).
+    <details class="group text-sm" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary class="flex min-h-control cursor-pointer list-none items-center gap-1 rounded-md font-semibold text-heading [&::-webkit-details-marker]:hidden">
+        <Icon
+          name="chevron-right"
+          class="text-muted-foreground transition-transform group-open:rotate-90"
+        />
         {t("themes.ai.showChanges")}
       </summary>
-      <div class="mt-2">
+      <div class="pt-2 pl-5">
         <Show when={open()}>
           <QueryState query={diff}>
             {(d) => (
@@ -160,113 +165,125 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
   };
 
   return (
-    <section aria-labelledby="ai-edit-h" class="mt-10 max-w-5xl">
-      <h2 id="ai-edit-h" class="flex flex-wrap items-center gap-2 text-sm font-semibold">
-        {t("themes.ai.title")}
-        <Show when={runs.data?.provider === "fake"}>
-          <Badge tone="info">{t("ai.demo")}</Badge>
+    <section aria-labelledby="ai-edit-h" class="mt-4 max-w-5xl">
+      <Card
+        title={
+          <span id="ai-edit-h" class="flex flex-wrap items-center gap-2">
+            {t("themes.ai.title")}
+            <Show when={runs.data?.provider === "fake"}>
+              <Badge tone="info">{t("ai.demo")}</Badge>
+            </Show>
+          </span>
+        }
+        description={t("themes.ai.hint")}
+      >
+        <Show when={props.canEdit && runs.data?.provider !== "disabled"}>
+          <form
+            class="mb-4 flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (prompt().trim() && !busy()) start.mutate();
+            }}
+          >
+            <TextField
+              label={t("themes.ai.prompt")}
+              description={t("themes.ai.promptHint")}
+              multiline
+              rows={3}
+              maxLength={4000}
+              value={prompt()}
+              onChange={setPrompt}
+              disabled={start.isPending}
+            />
+            <div>
+              <Button
+                type="submit"
+                variant="confirm"
+                loading={start.isPending}
+                disabled={!prompt().trim() || busy()}
+              >
+                {t("themes.ai.start")}
+              </Button>
+            </div>
+          </form>
         </Show>
-      </h2>
-      <p class="mb-3 text-sm text-muted-foreground">{t("themes.ai.hint")}</p>
-      <Show when={props.canEdit && runs.data?.provider !== "disabled"}>
-        <form
-          class="mb-4 flex flex-col gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (prompt().trim() && !busy()) start.mutate();
-          }}
-        >
-          <TextField
-            label={t("themes.ai.prompt")}
-            description={t("themes.ai.promptHint")}
-            multiline
-            rows={3}
-            maxLength={4000}
-            value={prompt()}
-            onChange={setPrompt}
-            disabled={start.isPending}
-          />
-          <div>
-            <Button
-              type="submit"
-              variant="confirm"
-              loading={start.isPending}
-              disabled={!prompt().trim() || busy()}
-            >
-              {t("themes.ai.start")}
-            </Button>
-          </div>
-        </form>
-      </Show>
-      <Show when={error()}>
-        <div role="alert" class="mb-4 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700">
-          <Show when={quotaExceeded()} fallback={errorMessage(error())}>
-            {t("ai.quotaExceeded")}{" "}
-            <A href="/settings/ai" class="underline">
-              {t("ai.seeUsage")}
-            </A>
-          </Show>
-        </div>
-      </Show>
-      <QueryState query={runs}>
-        {() => (
-          <Show when={items().length}>
-            <table class={tableClass}>
-              <caption class="mb-1 text-left text-xs text-muted-foreground">
-                {t("themes.ai.runs")}
-              </caption>
-              <thead>
-                <tr>
-                  <Th>{t("themes.ai.request")}</Th>
-                  <Th>{t("themes.status")}</Th>
-                  <Th>{t("themes.created")}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={items()}>
-                  {(r) => (
-                    <tr classList={{ "bg-muted": r.id === current() }}>
-                      <td class={`${tdClass} max-w-md`}>
-                        <button
-                          type="button"
-                          class="line-clamp-2 text-left text-accent-700 hover:underline"
-                          aria-pressed={r.id === current()}
-                          onClick={() => setSelected(r.id)}
-                        >
-                          {r.prompt}
-                        </button>
-                      </td>
-                      <td class={tdClass}>
-                        <Badge tone={runTone(r.status)}>
-                          {t(`themes.ai.statuses.${r.status as "queued"}`)}
-                        </Badge>
-                      </td>
-                      <td class={`${tdClass} text-muted-foreground`}>
-                        {formatDateTime(r.created_at)}
-                      </td>
+        <Show when={error()}>
+          <Alert tone="error" class="mb-4">
+            <Show when={quotaExceeded()} fallback={errorMessage(error())}>
+              {t("ai.quotaExceeded")}{" "}
+              <A href="/settings/ai" class={linkClass}>
+                {t("ai.seeUsage")}
+              </A>
+            </Show>
+          </Alert>
+        </Show>
+        <QueryState query={runs}>
+          {() => (
+            <Show when={items().length}>
+              <div class="overflow-x-auto rounded-md border border-border">
+                <table class={tableClass}>
+                  <caption class="border-b border-border px-3 py-2 text-left text-sm font-semibold text-heading">
+                    {t("themes.ai.runs")}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <Th>{t("themes.ai.request")}</Th>
+                      <Th>{t("themes.status")}</Th>
+                      <Th>{t("themes.created")}</Th>
                     </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </Show>
-        )}
-      </QueryState>
-      <Show when={current()}>
-        <div class="mt-6">
-          <QueryState query={detail}>
-            {(d) => (
-              <RunView
-                detail={d}
-                canEdit={props.canEdit}
-                pending={act.isPending}
-                onAction={(action) => act.mutate({ id: d.run.id, action })}
-                onShowRevision={props.onShowRevision}
-              />
-            )}
-          </QueryState>
-        </div>
-      </Show>
+                  </thead>
+                  <tbody>
+                    <For each={items()}>
+                      {(r) => (
+                        <tr
+                          classList={{
+                            "bg-subtle": r.id === current(),
+                            "hover:bg-subtle": r.id !== current(),
+                          }}
+                        >
+                          <td class={`${tdClass} max-w-md`}>
+                            <button
+                              type="button"
+                              class="line-clamp-2 rounded-sm text-left font-semibold text-heading hover:text-accent-700 hover:underline aria-pressed:text-accent-700"
+                              aria-pressed={r.id === current()}
+                              onClick={() => setSelected(r.id)}
+                            >
+                              {r.prompt}
+                            </button>
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={runTone(r.status)}>
+                              {t(`themes.ai.statuses.${r.status as "queued"}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {formatDateTime(r.created_at)}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Show>
+          )}
+        </QueryState>
+        <Show when={current()}>
+          <div class="mt-4 rounded-md border border-border p-4">
+            <QueryState query={detail}>
+              {(d) => (
+                <RunView
+                  detail={d}
+                  canEdit={props.canEdit}
+                  pending={act.isPending}
+                  onAction={(action) => act.mutate({ id: d.run.id, action })}
+                  onShowRevision={props.onShowRevision}
+                />
+              )}
+            </QueryState>
+          </div>
+        </Show>
+      </Card>
     </section>
   );
 }
@@ -283,13 +300,16 @@ function RunView(props: {
   const active = () => RUN_ACTIVE.has(run().status);
   return (
     <article aria-labelledby="ai-run-h" class="flex flex-col gap-4">
-      <h3 id="ai-run-h" class="flex flex-wrap items-center gap-2 text-sm font-semibold">
+      <h3
+        id="ai-run-h"
+        class="flex flex-wrap items-center gap-2 text-base font-semibold text-heading"
+      >
         <span class="break-words">{run().prompt}</span>
         <Badge tone={runTone(run().status)}>
           {t(`themes.ai.statuses.${run().status as "queued"}`)}
         </Badge>
       </h3>
-      <p class="text-xs text-muted-foreground" aria-live="polite">
+      <p class="figures -mt-2 text-xs text-muted-foreground" aria-live="polite">
         {t("themes.ai.progress", {
           turns: run().turns,
           maxTurns: props.detail.limits.max_turns,
@@ -306,27 +326,21 @@ function RunView(props: {
         </p>
       </Show>
       <Show when={run().error}>
-        <div role="alert" class="rounded-md bg-error-50 px-3 py-2 text-sm text-error-700">
-          {run().error}
-        </div>
+        <Alert tone="error">{run().error}</Alert>
       </Show>
       <Show when={props.detail.summary}>
         <div>
-          <h4 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
-            {t("themes.ai.summary")}
-          </h4>
+          <h4 class="mb-2 text-sm font-semibold text-heading">{t("themes.ai.summary")}</h4>
           <p class="text-sm whitespace-pre-wrap break-words">{props.detail.summary}</p>
         </div>
       </Show>
       <div>
-        <h4 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
-          {t("themes.ai.steps")}
-        </h4>
+        <h4 class="mb-2 text-sm font-semibold text-heading">{t("themes.ai.steps")}</h4>
         <Show
           when={props.detail.steps.length}
           fallback={<p class="text-sm text-muted-foreground">{t("themes.ai.noSteps")}</p>}
         >
-          <ol class="flex flex-col gap-1 text-sm">
+          <ol class="flex flex-col gap-1.5 text-sm">
             <For each={props.detail.steps}>
               {(s) => (
                 <li class="flex flex-wrap items-baseline gap-2">
@@ -334,7 +348,7 @@ function RunView(props: {
                     {t(`themes.ai.tools.${s.tool as "read_file"}`)}
                   </Badge>
                   <Show when={s.path}>
-                    <code class="text-xs">{s.path}</code>
+                    <code class="font-mono text-xs">{s.path}</code>
                   </Show>
                   <Show when={!s.ok || s.tool === "run_checks"}>
                     <span
@@ -352,13 +366,12 @@ function RunView(props: {
       </div>
       <Show when={props.detail.report}>
         <div>
-          <h4 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
-            {t("themes.ai.checks")}
-          </h4>
+          <h4 class="mb-2 text-sm font-semibold text-heading">{t("themes.ai.checks")}</h4>
           <Show
             when={report().failures.length}
             fallback={
-              <p class="text-sm text-success-700">
+              <p class="flex items-center gap-1.5 text-sm text-success-700">
+                <Icon name="check-circle" class="text-success-600" />
                 {t("themes.ai.checksPassed", { number: run().revision_number ?? 0 })}
               </p>
             }
@@ -374,28 +387,30 @@ function RunView(props: {
       <Show when={props.detail.diff}>
         {(diff) => (
           <div>
-            <h4 class="mb-1 text-xs font-semibold uppercase text-muted-foreground">
-              {t("themes.ai.diff")}
-            </h4>
+            <h4 class="mb-2 text-sm font-semibold text-heading">{t("themes.ai.diff")}</h4>
             <DiffView diff={diff()} label={t("themes.ai.diff")} />
           </div>
         )}
       </Show>
       <Show when={run().status === "accepted" && run().revision_id}>
         {(id) => (
-          <p role="status" class="flex flex-wrap items-center gap-2 text-sm text-success-700">
+          <Alert
+            tone="success"
+            actions={
+              <Button onClick={() => props.onShowRevision(id())}>
+                {t("themes.ai.showRevision", { number: run().revision_number ?? 0 })}
+              </Button>
+            }
+          >
             {t("themes.ai.accepted", { number: run().revision_number ?? 0 })}
-            <Button category="tertiary" onClick={() => props.onShowRevision(id())}>
-              {t("themes.ai.showRevision", { number: run().revision_number ?? 0 })}
-            </Button>
-          </p>
+          </Alert>
         )}
       </Show>
       <Show when={run().status === "discarded"}>
         <p class="text-sm text-muted-foreground">{t("themes.ai.discarded")}</p>
       </Show>
       <Show when={props.canEdit}>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2 border-t border-border pt-4 empty:hidden">
           <Show when={active() && !run().cancel_requested}>
             <Button loading={props.pending} onClick={() => props.onAction("cancel")}>
               {t("themes.ai.cancel")}
