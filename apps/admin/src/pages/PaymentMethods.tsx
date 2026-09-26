@@ -227,6 +227,10 @@ function BankAccountFields(props: {
         }}
       >
         <fieldset disabled={save.isPending} class="flex flex-col gap-4">
+          {/* The card title shows the name; the legend keeps the group named for assistive tech. */}
+          <legend class="sr-only">
+            {t("pay.bankAccount")} ({props.market.currency})
+          </legend>
           <Alert tone="info">{t("pay.ibanChange")}</Alert>
           <div class="grid gap-4 sm:grid-cols-3">
             <TextField label={t("pay.iban")} required value={iban()} onChange={setIban} />
@@ -354,6 +358,7 @@ function PaymentRow(props: { method: Schemas["PaymentMethod"] }) {
         }}
       >
         <fieldset disabled={save.isPending} class="flex flex-col gap-4">
+          <legend class="sr-only">{t(`paymentKinds.${props.method.kind}`)}</legend>
           <Show when={!props.method.available}>
             <Alert tone="warning">{unavailableText(props.method.unavailable_reason)}</Alert>
           </Show>

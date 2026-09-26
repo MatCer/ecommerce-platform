@@ -71,10 +71,7 @@ export function Card(props: CardProps) {
           <div class="flex min-w-0 flex-col gap-0.5">
             <div class="flex items-center gap-3">
               <Show when={props.title !== undefined}>
-                <h2
-                  id={props.labelledBy}
-                  class="text-sm font-semibold text-heading"
-                >
+                <h2 id={props.labelledBy} class="text-sm font-semibold text-heading">
                   {props.title}
                 </h2>
               </Show>
