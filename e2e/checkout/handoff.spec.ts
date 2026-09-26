@@ -26,7 +26,7 @@ test("the shop cart reaches the checkout, and the handoff link is single use", a
   ])
     await expect(page.locator(`input[name="${name}"]`).first()).toHaveAttribute(
       "autocomplete",
-      new RegExp(`${token}$`),
+      `section-billing ${token}`,
     );
 
   expect(handoff).not.toBe("");
