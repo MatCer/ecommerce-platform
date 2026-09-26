@@ -20,4 +20,5 @@ export {
   Tabs,
   ToastRegion,
 } from "./overlay.tsx";
+export { Icon, type IconName } from "./icon.tsx";
 export { EmptyState, ErrorState, LoadingState, PermissionDenied, Spinner } from "./states.tsx";
