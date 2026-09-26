@@ -175,9 +175,7 @@ test("checkout input survives delayed island hydration", async ({ browser }) => 
   const email = `hydration-${run}@example.test`;
   await fillContactAndAddress(page, email);
   await expect(page.locator('input[autocomplete="email"]')).toHaveValue(email);
-  await expect(page.locator('input[autocomplete="name"]')).toHaveValue(
-    "Jana Nováková",
-  );
+  await expect(page.locator('input[autocomplete="name"]')).toHaveValue("Jana Nováková");
   await page.context().close();
 });
 
