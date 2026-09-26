@@ -4,7 +4,7 @@
  * a campaign with a personalized products block (Admin API) → test send + real send → Mailpit
  * shows per-recipient products and RFC 8058 List-Unsubscribe headers → one-click unsubscribe
  * and the preference page work → the next campaign skips both → a simulated SES bounce
- * suppresses the address.
+ * suppresses the address; a complaint also suppresses its recipient.
  *
  * Runs on the seeded demo shop (`make seed`). The segment only matches addresses that
  * subscribed during this test, so parallel suites and earlier runs are never mailed.
@@ -368,6 +368,88 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
   ).json()) as { items: { email: string; reason: string }[] };
   expect(suppressed.items).toEqual([expect.objectContaining({ email: a, reason: "bounce" })]);
   expect((await subscriber(a))?.status).toBe("bounced");
+
+  // A complaint on an eligible address must prevent the next campaign from sending.
+  const c = `nl-complaint-${run}@example.com`;
+  await subscribe(page, c);
+  const beforeComplaint = await create(`Complaint source ${run}`, `Complaint source ${run}`);
+  expect(
+    (
+      await request.post(`${API}/admin/v1/campaigns/${beforeComplaint}/schedule`, {
+        headers: h,
+        data: {},
+      })
+    ).status(),
+  ).toBe(200);
+  const [mailC] = await mails(c, new RegExp(`^Complaint source ${run}$`));
+  await expect
+    .poll(
+      async () => {
+        const response = await request.get(`${API}/admin/v1/campaigns/${beforeComplaint}`, {
+          headers: h,
+        });
+        return ((await response.json()) as { status: string }).status;
+      },
+      { timeout: 60_000 },
+    )
+    .toBe("sent");
+  const complaint = await request.post(`${API}/webhooks/ses`, {
+    headers: {
+      authorization: `Basic ${Buffer.from(`ses:${secret}`).toString("base64")}`,
+      "content-type": "text/plain",
+    },
+    data: JSON.stringify({
+      Type: "Notification",
+      MessageId: `e2e-complaint-${run}`,
+      TopicArn: "arn:aws:sns:eu-central-1:000000000000:ses",
+      Message: JSON.stringify({
+        notificationType: "Complaint",
+        complaint: { complainedRecipients: [{ emailAddress: c }] },
+        mail: { commonHeaders: { messageId: `<${mailC?.MessageID ?? ""}>` } },
+      }),
+    }),
+  });
+  expect(complaint.status()).toBe(200);
+  expect(((await complaint.json()) as { applied: boolean }).applied).toBe(true);
+  const complaints = (await (
+    await request.get(`${API}/admin/v1/email-suppressions?q=${encodeURIComponent(c)}`, {
+      headers: h,
+    })
+  ).json()) as { items: { email: string; reason: string }[] };
+  expect(complaints.items).toEqual([expect.objectContaining({ email: c, reason: "complaint" })]);
+  const afterComplaint = await create(`Complaint blocked ${run}`, `Complaint blocked ${run}`);
+  expect(
+    (
+      await request.post(`${API}/admin/v1/campaigns/${afterComplaint}/schedule`, {
+        headers: h,
+        data: {},
+      })
+    ).status(),
+  ).toBe(200);
+  await expect
+    .poll(
+      async () => {
+        const response = await request.get(`${API}/admin/v1/campaigns/${afterComplaint}`, {
+          headers: h,
+        });
+        return ((await response.json()) as { status: string }).status;
+      },
+      { timeout: 60_000 },
+    )
+    .toBe("sent");
+  const afterStats = (await (
+    await request.get(`${API}/admin/v1/campaigns/${afterComplaint}`, {
+      headers: h,
+    })
+  ).json()) as { stats: { sent: number } };
+  expect(afterStats.stats.sent).toBe(0);
+  expect(
+    sql(`SELECT count(*) FROM campaign_sends WHERE campaign_id=${lit(afterComplaint)}
+    AND subscriber_id=(SELECT id FROM subscribers WHERE email=${lit(c)}) AND status='sent'`),
+  ).toBe("0");
+  const later = await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${c}"`)}`);
+  const laterMessages = ((await later.json()) as { messages: Summary[] }).messages;
+  expect(laterMessages.some((m) => m.Subject === `Complaint blocked ${run}`)).toBe(false);
 
   await shopper.close();
   await staff.close();
