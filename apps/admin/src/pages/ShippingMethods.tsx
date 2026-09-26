@@ -1,9 +1,13 @@
 import {
+  Alert,
+  Badge,
   Button,
+  Card,
   Checkbox,
   ConfirmDialog,
   Dialog,
   EmptyState,
+  labelClass,
   SelectField,
   showToast,
   TextField,
@@ -102,88 +106,105 @@ function Methods(props: { market: Schemas["Market"] }) {
       setDeleteError(error);
     },
   }));
+  const newButton = () => (
+    <Button variant="confirm" onClick={() => open("new")}>
+      {t("shipping.new")}
+    </Button>
+  );
   return (
     <>
-      <div class="mb-4">
-        <Button variant="confirm" onClick={() => open("new")}>
-          {t("shipping.new")}
-        </Button>
+      <Show when={methods.data?.items.length}>
+        <div class="mb-4 flex justify-end">{newButton()}</div>
+      </Show>
+      <div class="mb-4 empty:hidden">
+        <ApiProblem error={deleteError()} />
       </div>
-      <ApiProblem error={deleteError()} />
       <QueryState query={methods}>
         {(data) => (
           <Show
             when={data.items.length}
             fallback={
-              <EmptyState title={t("shipping.empty")} description={t("shipping.emptyDesc")} />
+              <EmptyState
+                icon="package"
+                title={t("shipping.empty")}
+                description={t("shipping.emptyDesc")}
+                action={newButton()}
+              />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <For
-                      each={[
-                        t("checkout.name"),
-                        t("shipping.carrier"),
-                        t("shipping.price"),
-                        t("shipping.freeOver"),
-                        t("shipping.cod"),
-                        t("shipping.active"),
-                        t("common.actions"),
-                      ]}
-                    >
-                      {(label) => <Th>{label}</Th>}
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("checkout.name")}</Th>
+                      <Th>{t("shipping.carrier")}</Th>
+                      <Th class="text-right">{t("shipping.price")}</Th>
+                      <Th class="text-right">{t("shipping.freeOver")}</Th>
+                      <Th>{t("shipping.cod")}</Th>
+                      <Th>{t("shipping.active")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(m) => (
+                        <tr>
+                          <td class={`${tdClass} font-semibold text-heading`}>{name(m)}</td>
+                          <td class={tdClass}>{t(`carriers.${m.carrier}`)}</td>
+                          <td class={`${tdClass} figures text-right`}>
+                            <Show when={m.weight_tiers.length} fallback={money(m.price_minor)}>
+                              <For each={m.weight_tiers}>
+                                {(tier) => (
+                                  <div>
+                                    {t("shipping.upTo", { grams: tier.up_to_g })}:{" "}
+                                    {money(tier.price_minor)}
+                                  </div>
+                                )}
+                              </For>
+                            </Show>
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>
+                            {m.free_over_minor == null
+                              ? t("common.none")
+                              : money(m.free_over_minor)}
+                          </td>
+                          <td class={`${tdClass} figures`}>
+                            {m.cod_allowed
+                              ? `${t("common.yes")} · ${money(m.cod_fee_minor)}`
+                              : t("common.no")}
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={m.active ? "success" : "neutral"}>
+                              {m.active ? t("common.yes") : t("common.no")}
+                            </Badge>
+                          </td>
+                          <td class={tdClass}>
+                            <div class="flex justify-end gap-1">
+                              <Button category="tertiary" size="small" onClick={() => open(m)}>
+                                {t("common.edit")}
+                              </Button>
+                              <Button
+                                variant="danger"
+                                category="tertiary"
+                                size="small"
+                                disabled={remove.isPending}
+                                onClick={() => {
+                                  setDeleteError(undefined);
+                                  setDeleting(m);
+                                }}
+                              >
+                                {t("common.delete")}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </For>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(m) => (
-                      <tr>
-                        <td class={tdClass}>{name(m)}</td>
-                        <td class={tdClass}>{t(`carriers.${m.carrier}`)}</td>
-                        <td class={tdClass}>
-                          <Show when={m.weight_tiers.length} fallback={money(m.price_minor)}>
-                            <For each={m.weight_tiers}>
-                              {(tier) => (
-                                <div>
-                                  {t("shipping.upTo", { grams: tier.up_to_g })}:{" "}
-                                  {money(tier.price_minor)}
-                                </div>
-                              )}
-                            </For>
-                          </Show>
-                        </td>
-                        <td class={tdClass}>
-                          {m.free_over_minor == null ? t("common.none") : money(m.free_over_minor)}
-                        </td>
-                        <td class={tdClass}>
-                          {m.cod_allowed
-                            ? `${t("common.yes")} · ${money(m.cod_fee_minor)}`
-                            : t("common.no")}
-                        </td>
-                        <td class={tdClass}>{m.active ? t("common.yes") : t("common.no")}</td>
-                        <td class={tdClass}>
-                          <div class="flex gap-2">
-                            <Button onClick={() => open(m)}>{t("common.edit")}</Button>
-                            <Button
-                              disabled={remove.isPending}
-                              onClick={() => {
-                                setDeleteError(undefined);
-                                setDeleting(m);
-                              }}
-                            >
-                              {t("common.delete")}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -195,7 +216,7 @@ function Methods(props: { market: Schemas["Market"] }) {
         title={editing() === "new" ? t("shipping.new") : t("shipping.edit")}
       >
         <form
-          class="flex flex-col gap-3"
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const body = shippingInput(form(), props.market.id);
@@ -205,7 +226,7 @@ function Methods(props: { market: Schemas["Market"] }) {
             if (body && target) save.mutate({ body, target });
           }}
         >
-          <fieldset disabled={save.isPending} class="flex flex-col gap-3">
+          <fieldset disabled={save.isPending} class="flex flex-col gap-4">
             <SelectField
               label={t("shipping.carrier")}
               value={form().carrier}
@@ -215,7 +236,7 @@ function Methods(props: { market: Schemas["Market"] }) {
                 if (carrier) set({ carrier });
               }}
             />
-            <p class="text-xs text-muted-foreground">{t("shipping.nameHint")}</p>
+            <p class="text-sm text-muted-foreground">{t("shipping.nameHint")}</p>
             <TranslationFields
               label={t("checkout.name")}
               values={form().names}
@@ -226,7 +247,7 @@ function Methods(props: { market: Schemas["Market"] }) {
               values={form().descriptions}
               onChange={(descriptions) => set({ descriptions })}
             />
-            <div class="grid gap-3 sm:grid-cols-2">
+            <div class="grid gap-4 sm:grid-cols-2">
               <TextField
                 label={`${t("shipping.price")} (${props.market.currency})`}
                 value={form().price}
@@ -242,8 +263,8 @@ function Methods(props: { market: Schemas["Market"] }) {
               />
             </div>
             <fieldset class="flex flex-col gap-2">
-              <legend class="text-sm font-medium">{t("shipping.tiers")}</legend>
-              <p class="text-xs text-muted-foreground">{t("shipping.tierHint")}</p>
+              <legend class={`${labelClass} mb-1`}>{t("shipping.tiers")}</legend>
+              <p class="text-sm text-muted-foreground">{t("shipping.tierHint")}</p>
               <Index each={form().tiers}>
                 {(row, index) => (
                   <div class="flex flex-wrap items-end gap-2">
@@ -268,6 +289,8 @@ function Methods(props: { market: Schemas["Market"] }) {
                       }
                     />
                     <Button
+                      category="tertiary"
+                      icon="remove"
                       onClick={() => set({ tiers: form().tiers.filter((_, i) => i !== index) })}
                     >
                       {t("common.remove")}
@@ -275,7 +298,11 @@ function Methods(props: { market: Schemas["Market"] }) {
                   </div>
                 )}
               </Index>
-              <Button onClick={() => set({ tiers: [...form().tiers, { grams: "", price: "" }] })}>
+              <Button
+                class="self-start"
+                icon="plus"
+                onClick={() => set({ tiers: [...form().tiers, { grams: "", price: "" }] })}
+              >
                 {t("shipping.addTier")}
               </Button>
             </fieldset>
@@ -303,16 +330,14 @@ function Methods(props: { market: Schemas["Market"] }) {
               onChange={(position) => set({ position })}
             />
             <Show when={invalid()}>
-              <p role="alert" class="text-sm text-error-700">
-                {t("shipping.invalid")}
-              </p>
+              <Alert tone="error">{t("shipping.invalid")}</Alert>
             </Show>
             <ApiProblem error={error()} />
-            <div class="flex gap-2">
+            <div class="flex justify-end gap-2">
+              <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
               <Button type="submit" variant="confirm" loading={save.isPending}>
                 {t("common.save")}
               </Button>
-              <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
             </div>
           </fieldset>
         </form>
