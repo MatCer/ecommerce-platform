@@ -3,6 +3,7 @@ import type { Address, AddressInput } from "@platform/storefront-sdk/types";
 import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import HydratedControls from "./HydratedControls";
 import { problemText } from "./SignIn";
 
 type M = Record<string, string>;
@@ -107,7 +108,7 @@ export default function Addresses(props: {
     }));
 
   return (
-    <div class="grid gap-4">
+    <HydratedControls class="grid gap-4">
       <div aria-live="polite">
         <Show when={status()}>
           <p role="status" class="rounded-md bg-identity-wash p-3 text-sm">
@@ -260,6 +261,6 @@ export default function Addresses(props: {
           </div>
         </form>
       </Show>
-    </div>
+    </HydratedControls>
   );
 }

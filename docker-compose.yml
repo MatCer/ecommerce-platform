@@ -344,6 +344,7 @@ services:
     command: ["/usr/local/bin/worker"]
     environment:
       <<: [*runtime-db, *ai]
+      # Default queue slots; media has one additional serial slot, AI its own two slots.
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
       METRICS_BIND: 0.0.0.0:9101
       MEILI_URL: http://meilisearch:7700

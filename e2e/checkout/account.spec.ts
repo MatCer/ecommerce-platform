@@ -8,6 +8,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, mailpit, run } from "../admin/support";
 import { rateHeaders, testContext } from "../rate-client";
+import { deferHydration } from "./support";
 
 const port = process.env.HTTP_PORT ?? "8080";
 const shop = `http://demo.localhost:${port}`;
@@ -106,6 +107,20 @@ test("email-link sign-in creates the account and attaches the cart", async () =>
   expect(sid?.httpOnly).toBe(true);
   expect(sid?.sameSite).toBe("Lax");
   expect((await page.context().cookies(shop)).some((c) => c.name === "__Host-sid")).toBe(false);
+});
+
+test("address controls wait for hydration", async () => {
+  const release = await deferHydration(page);
+  const add = page.getByRole("button", { name: "Přidat adresu" });
+  try {
+    await page.goto(`${checkout}/account/addresses`, { waitUntil: "commit" });
+    await expect(add).toBeVisible();
+    await expect(add).toBeDisabled();
+  } finally {
+    release();
+  }
+  await add.click();
+  await expect(page.getByLabel("Jméno a příjmení")).toBeVisible();
 });
 
 test("adds an address", async () => {

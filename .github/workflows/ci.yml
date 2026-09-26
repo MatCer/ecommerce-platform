@@ -206,10 +206,31 @@ jobs:
       - run: make up
       - run: make seed
       - run: make perf
-      - run: make e2e
+      - name: Browser acceptance with queue evidence
+        run: |
+          mkdir -p .acceptance
+          # Sample while tests run: a drained queue after failure cannot show starvation.
+          # No job payloads, mail contents, credentials or tokens are collected here.
+          (
+            while true; do
+              docker compose -p acceptance exec -T postgres psql -U postgres -d app -c \
+                'SELECT now() AS sampled_at, * FROM queue.stats(); SELECT now(), queue.outbox_lag_seconds();' \
+                >> .acceptance/queue.log 2>&1 || true
+              sleep 5
+            done
+          ) &
+          monitor_pid=$!
+          trap 'kill "$monitor_pid" 2>/dev/null || true; wait "$monitor_pid" 2>/dev/null || true' EXIT
+          make e2e
       - name: Capture Compose logs
         if: always()
-        run: docker compose -p acceptance logs --no-color --tail=200 > acceptance-compose.log 2>&1 || true
+        run: |
+          mkdir -p .acceptance
+          docker compose -p acceptance logs --no-color > acceptance-compose.log 2>&1 || true
+          docker compose -p acceptance ps --all > .acceptance/containers.log 2>&1 || true
+          docker compose -p acceptance ps -q | xargs -r docker inspect \
+            --format '{{.Name}} status={{.State.Status}} oom={{.State.OOMKilled}} restarts={{.RestartCount}}' \
+            >> .acceptance/containers.log 2>&1 || true
       - name: Upload acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -221,7 +242,9 @@ jobs:
             test-results/
             playwright-report/
             .perf/
+            .acceptance/
             acceptance-compose.log
+          include-hidden-files: true
           if-no-files-found: ignore
       - name: Stop acceptance stack
         if: always()

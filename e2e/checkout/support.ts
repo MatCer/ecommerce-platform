@@ -19,6 +19,19 @@ export async function checkoutReady(page: Page): Promise<void> {
   await page.waitForFunction(() => !document.querySelector('astro-island[client="load"][ssr]'));
 }
 
+/** Hold island modules to exercise visible SSR controls before event handlers attach. */
+export async function deferHydration(page: Page): Promise<() => void> {
+  let release!: () => void;
+  const scripts = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\.(?:js|mjs)(?:\?|$)/, async (route) => {
+    await scripts;
+    await route.fallback();
+  });
+  return release;
+}
+
 export interface Money {
   amount_minor: number;
   formatted: string;
