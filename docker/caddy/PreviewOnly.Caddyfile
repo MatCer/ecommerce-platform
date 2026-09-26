@@ -4,13 +4,13 @@
     admin off
 }
 
-# Only merchant preview pages and their public assets may leave the functional-check network.
+# The exact preview host is the boundary. The edge verifies the preview token and
+# owns its full route interface, including locale pages, cart reads and public assets.
 # A Host spoof for mail.localhost, auth.localhost, or the admin never reaches shared Caddy.
 https://*.localhost {
     tls internal
     @preview {
         header_regexp Host ^preview-[0-9]+--[a-z0-9-]+\.localhost(?::443)?$
-        path / /c/* /p/* /pages/* /blog /blog/* /search /_astro/* /media/* /favicon.ico /_p/public/*
     }
     handle @preview {
         reverse_proxy edge:8787

@@ -335,15 +335,26 @@ test("functional checks cannot reach Mailpit by spoofing Caddy's Host header", a
     Buffer.from(`
     import https from "node:https";
     import { expect, test } from "@playwright/test";
-    test("only preview pages are reachable", async ({ page }) => {
+    test("preview flows work while internal hosts remain blocked", async ({ page }) => {
       await page.goto("/");
       await expect(page.locator("main")).toBeVisible();
-      const status = await new Promise<number>((resolve, reject) => {
-        https.get({ hostname: "theme-functional-proxy", servername: "mail.localhost", port: 443, path: "/api/v1/messages",
-          headers: { Host: "mail.localhost" }, rejectUnauthorized: false },
+      for (const route of ["/_p/cart", "/_p/consent", "/_p/recommendations", "/fonts/OFL-Archivo.txt"]) {
+        const status = await page.evaluate(async (path) => (await fetch(path)).status, route);
+        expect(status, route).toBe(200);
+      }
+      const localized = new URL(page.url());
+      localized.hostname = localized.hostname.replace("--demo.localhost", "--demo-sk.localhost");
+      localized.pathname = "/cs/";
+      const localeResponse = await page.goto(localized.toString());
+      expect(localeResponse?.status(), "localized preview").toBe(200);
+      for (const host of ["mail.localhost", "auth.localhost", "admin.localhost"]) {
+        const status = await new Promise<number>((resolve, reject) => {
+        https.get({ hostname: "theme-functional-proxy", servername: host, port: 443, path: "/api/v1/messages",
+          headers: { Host: host }, rejectUnauthorized: false },
           (res) => { res.resume(); resolve(res.statusCode ?? 0); }).on("error", reject);
-      });
-      expect(status).toBe(403);
+        });
+        expect(status, host).toBe(403);
+      }
     });
   `),
   );
