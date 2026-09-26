@@ -2,8 +2,8 @@ import { SegmentedControl as KSegmented } from "@kobalte/core/segmented-control"
 import { For, type JSX, Show } from "solid-js";
 import { Icon, type IconName } from "./icon.tsx";
 
-/** Pajamas link colour; use on `<a>`/router `A` inside text and tables. */
-export const linkClass = "text-accent-700 underline-offset-2 hover:underline";
+/** Pajamas link: blue and underlined (axe link-in-text-block: colour alone is not enough). */
+export const linkClass = "text-accent-700 underline underline-offset-2 hover:decoration-2";
 
 /** Page title row: h1, optional description, actions on the right (Pajamas page heading). */
 export function PageHeading(props: {
