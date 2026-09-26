@@ -338,17 +338,19 @@ export default function Themes() {
                 document.getElementById("revisions-h")?.scrollIntoView({ behavior: "smooth" });
               }}
             />
-            <Show when={can("admin")}>
-              <TokenEditor
-                tokens={activeTokens.data?.tokens}
-                base={active()?.id}
-                onCreated={created}
-                onError={(e) => setError(reasons(e))}
-              />
-            </Show>
           </Show>
         )}
       </QueryState>
+      {/* Outside QueryState: its children are rebuilt whenever the (polled) list changes, which
+          would discard an unsaved draft. */}
+      <Show when={can("admin") && active()}>
+        <TokenEditor
+          tokens={activeTokens.data?.tokens}
+          base={active()?.id}
+          onCreated={created}
+          onError={(e) => setError(reasons(e))}
+        />
+      </Show>
       <ConfirmDialog
         open={Boolean(publishing())}
         onOpenChange={(o) => !o && setPublishing(undefined)}
@@ -510,10 +512,17 @@ function TokenEditor(props: {
   onError: (e: unknown) => void;
 }) {
   const [draft, setDraft] = createSignal<TokenGroups>({ colors: {}, fonts: {}, radius: {} });
-  createEffect(() => setDraft(tokenGroups(props.tokens)));
+  // Unsaved edits survive a refetch of the active tokens (e.g. another staff member publishing).
+  let dirty = false;
+  createEffect(() => {
+    const tokens = props.tokens;
+    if (!dirty) setDraft(tokenGroups(tokens));
+  });
   const errors = createMemo(() => tokenErrors(draft()));
-  const set = (group: keyof TokenGroups, key: string, value: string) =>
+  const set = (group: keyof TokenGroups, key: string, value: string) => {
+    dirty = true;
     setDraft((d) => ({ ...d, [group]: { ...d[group], [key]: value } }));
+  };
   const save = createMutation(() => ({
     mutationFn: () => {
       const body = { base_revision_id: props.base ?? null, tokens: draft() };
@@ -521,7 +530,10 @@ function TokenEditor(props: {
         api.POST("/admin/v1/themes/revisions/tokens", { params: { header: tenantHeader() }, body }),
       );
     },
-    onSuccess: props.onCreated,
+    onSuccess: (r) => {
+      dirty = false;
+      return props.onCreated(r);
+    },
     onError: props.onError,
   }));
   const message = (k: string) => {
