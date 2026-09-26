@@ -1,4 +1,4 @@
-import { Button, SelectField } from "@platform/ui";
+import { Alert, Button, fileInputClass, labelClass, ProgressBar, SelectField } from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
 import { createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { t } from "../i18n/index.ts";
@@ -67,7 +67,7 @@ export function ContentAsset(props: {
   };
   return (
     <fieldset class="flex min-w-0 flex-col gap-2">
-      <legend class="mb-2 text-sm font-medium">{props.label}</legend>
+      <legend class={`mb-2 ${labelClass}`}>{props.label}</legend>
       <QueryState query={assets}>
         {(data) => (
           <SelectField
@@ -99,7 +99,7 @@ export function ContentAsset(props: {
           />
         )}
       </Show>
-      <label for={id} class="text-xs font-medium">
+      <label for={id} class="text-sm text-muted-foreground">
         {t("content.upload")}
       </label>
       <input
@@ -111,21 +111,26 @@ export function ContentAsset(props: {
           void upload(e.currentTarget.files?.[0]);
           e.currentTarget.value = "";
         }}
-        class="max-w-full text-sm"
+        class={fileInputClass}
       />
       <Show when={props.value}>
-        <Button onClick={() => props.onChange("")}>{t("common.remove")}</Button>
+        <Button
+          class="self-start"
+          category="tertiary"
+          size="small"
+          icon="remove"
+          onClick={() => props.onChange("")}
+        >
+          {t("common.remove")}
+        </Button>
       </Show>
       <Show when={busy()}>
-        <div role="status">
-          <progress max={1} value={progress()} aria-label={t("content.upload")} />{" "}
-          {Math.round(progress() * 100)}%
+        <div role="status" class="max-w-sm">
+          <ProgressBar value={Math.round(progress() * 100)} label={t("content.upload")} showLabel />
         </div>
       </Show>
       <Show when={error()}>
-        <p role="alert" class="text-sm text-error-700">
-          {error()}
-        </p>
+        <Alert tone="error">{error()}</Alert>
       </Show>
     </fieldset>
   );

@@ -1,11 +1,12 @@
 import {
   Badge,
   Button,
+  Card,
   ConfirmDialog,
   EmptyState,
+  SearchBox,
   SelectField,
   showToast,
-  TextField,
   type Tone,
 } from "@platform/ui";
 import { createInfiniteQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
@@ -111,14 +112,20 @@ export default function Subscribers() {
         description={t("marketing.subscribersDesc")}
         actions={
           <Show when={can("admin")}>
-            <Button loading={exporting()} onClick={() => void exportCsv()}>
+            <Button icon="export" loading={exporting()} onClick={() => void exportCsv()}>
               {t("marketing.export")}
             </Button>
           </Show>
         }
       />
-      <div class="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <TextField type="search" label={t("marketing.searchEmail")} value={q()} onChange={setQ} />
+      <div class="mb-4 grid items-end gap-x-2 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(15rem,1fr)_repeat(3,12rem)]">
+        <SearchBox
+          label={t("marketing.searchEmail")}
+          placeholder={t("marketing.searchEmail")}
+          clearLabel={t("common.clearSearch")}
+          value={q()}
+          onChange={setQ}
+        />
         <SelectField
           label={t("marketing.status")}
           value={status()}
@@ -153,67 +160,82 @@ export default function Subscribers() {
             when={rows().length > 0}
             fallback={
               <EmptyState
+                icon="user"
                 title={t("marketing.noSubscribers")}
                 description={t("marketing.noSubscribersDesc")}
               />
             }
           >
-            <p role="status" class="mb-2 text-xs text-muted-foreground">
-              {t("marketing.total", { n: String(data.pages[0]?.total ?? 0) })}
-            </p>
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("marketing.email")}</Th>
-                    <Th>{t("marketing.status")}</Th>
-                    <Th>{t("marketing.language")}</Th>
-                    <Th>{t("marketing.market")}</Th>
-                    <Th>{t("marketing.source")}</Th>
-                    <Th>{t("marketing.since")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(s) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>{s.email}</td>
-                        <td class={tdClass}>
-                          <Badge tone={subscriberTone[s.status]}>
-                            {t(`marketing.status_${s.status}`)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-xs uppercase`}>{s.locale}</td>
-                        <td class={`${tdClass} text-xs`}>{marketName(s.market_id)}</td>
-                        <td class={`${tdClass} text-xs text-muted-foreground`}>{s.source}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                          title={t("marketing.consentVersion", { v: s.text_version })}
-                        >
-                          {formatDateTime(s.confirmed_at ?? s.requested_at)}
-                        </td>
-                        <td class={`${tdClass} text-right`}>
-                          <Show when={s.status === "subscribed" || s.status === "pending"}>
-                            <Button variant="ghost" onClick={() => setLeaving(s)}>
-                              {t("marketing.unsubscribe")}
-                              <span class="sr-only">: {s.email}</span>
-                            </Button>
-                          </Show>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={list.hasNextPage}>
-              <div class="mt-3">
-                <Button loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
-                  {t("common.loadMore")}
-                </Button>
+            <Card
+              padding="none"
+              footer={
+                <>
+                  <p role="status" class="figures text-sm text-muted-foreground">
+                    {t("marketing.total", { n: String(data.pages[0]?.total ?? 0) })}
+                  </p>
+                  <Show when={list.hasNextPage}>
+                    <Button
+                      class="ml-auto"
+                      loading={list.isFetchingNextPage}
+                      onClick={() => void list.fetchNextPage()}
+                    >
+                      {t("common.loadMore")}
+                    </Button>
+                  </Show>
+                </>
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("marketing.email")}</Th>
+                      <Th>{t("marketing.status")}</Th>
+                      <Th>{t("marketing.language")}</Th>
+                      <Th>{t("marketing.market")}</Th>
+                      <Th>{t("marketing.source")}</Th>
+                      <Th>{t("marketing.since")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(s) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{s.email}</td>
+                          <td class={tdClass}>
+                            <Badge tone={subscriberTone[s.status]}>
+                              {t(`marketing.status_${s.status}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} font-mono text-xs uppercase`}>{s.locale}</td>
+                          <td class={tdClass}>{marketName(s.market_id)}</td>
+                          <td class={`${tdClass} text-muted-foreground`}>{s.source}</td>
+                          <td
+                            class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                            title={t("marketing.consentVersion", { v: s.text_version })}
+                          >
+                            {formatDateTime(s.confirmed_at ?? s.requested_at)}
+                          </td>
+                          <td class={`${tdClass} text-right`}>
+                            <Show when={s.status === "subscribed" || s.status === "pending"}>
+                              <Button
+                                category="tertiary"
+                                size="small"
+                                onClick={() => setLeaving(s)}
+                              >
+                                {t("marketing.unsubscribe")}
+                                <span class="sr-only">: {s.email}</span>
+                              </Button>
+                            </Show>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
               </div>
-            </Show>
+            </Card>
           </Show>
         )}
       </QueryState>

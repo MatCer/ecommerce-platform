@@ -1,8 +1,8 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { Address, AddressInput } from "@platform/storefront-sdk/types";
-import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, Checkbox, SelectField, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 import { problemText } from "./SignIn";
 

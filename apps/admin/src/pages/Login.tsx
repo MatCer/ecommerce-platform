@@ -1,4 +1,4 @@
-import { Button, TextField } from "@platform/ui";
+import { Alert, Button, Icon, linkClass, TextField } from "@platform/ui";
 import { useNavigate, useSearchParams } from "@solidjs/router";
 import { createEffect, createSignal, type JSX, Match, Show, Switch } from "solid-js";
 import { t } from "../i18n/index.ts";
@@ -28,18 +28,24 @@ function safeNext(raw: string | string[] | undefined): string {
 
 type Step = "credentials" | "code" | "magic-sent" | "reset-sent";
 
+/** GitLab-style sign-in page: app mark and title on the chrome ground, the form in a card. */
 export function AuthLayout(props: { title: string; lead?: string; children: JSX.Element }) {
   return (
-    <main class="grid min-h-dvh place-items-center bg-background p-4">
-      <div class="flex w-full max-w-sm flex-col gap-5 rounded-lg border border-border bg-card p-6">
-        <div class="flex flex-col gap-1">
-          <p class="col-label">{t("app.name")}</p>
-          <h1 class="text-lg font-semibold tracking-tight">{props.title}</h1>
+    <main class="flex min-h-dvh flex-col items-center bg-subtle px-4 pt-16 pb-8 sm:pt-24">
+      <div class="flex w-full max-w-sm flex-col gap-6">
+        <div class="flex flex-col items-center gap-3 text-center">
+          <span class="grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
+            <Icon name="package" size={24} />
+          </span>
+          <p class="text-sm font-semibold text-muted-foreground">{t("app.name")}</p>
+          <h1 class="text-2xl font-semibold tracking-tight text-heading">{props.title}</h1>
           <Show when={props.lead}>
             <p class="text-sm text-muted-foreground">{props.lead}</p>
           </Show>
         </div>
-        {props.children}
+        <div class="flex flex-col gap-4 rounded-lg border border-border bg-background p-6">
+          {props.children}
+        </div>
       </div>
     </main>
   );
@@ -104,9 +110,7 @@ export function Login() {
 
   const errorBox = () => (
     <Show when={error()}>
-      <p role="alert" class="rounded-md bg-error-50 px-3 py-2 text-xs font-medium text-error-700">
-        {error()}
-      </p>
+      <Alert tone="error">{error()}</Alert>
     </Show>
   );
 
@@ -114,7 +118,7 @@ export function Login() {
     <Switch>
       <Match when={step() === "code"}>
         <AuthLayout title={t("auth.twoFactorTitle")} lead={t("auth.twoFactorLead")}>
-          <form class="flex flex-col gap-3" onSubmit={submitCode}>
+          <form class="flex flex-col gap-4" onSubmit={submitCode}>
             <TextField
               label={t("auth.code")}
               value={code()}
@@ -125,10 +129,10 @@ export function Login() {
               required
             />
             {errorBox()}
-            <Button type="submit" variant="primary" loading={pending() === "code"}>
+            <Button type="submit" variant="confirm" block loading={pending() === "code"}>
               {t("auth.verify")}
             </Button>
-            <Button variant="ghost" onClick={() => setStep("credentials")}>
+            <Button category="tertiary" onClick={() => setStep("credentials")}>
               {t("auth.backToSignIn")}
             </Button>
           </form>
@@ -136,19 +140,19 @@ export function Login() {
       </Match>
       <Match when={step() === "magic-sent" || step() === "reset-sent"}>
         <AuthLayout title={t("auth.magicSentTitle")}>
-          <p role="status" class="text-sm">
+          <Alert live tone="success">
             {step() === "magic-sent"
               ? t("auth.magicSentDesc", { email: email() })
               : t("auth.resetSent", { email: email() })}
-          </p>
-          <Button variant="ghost" onClick={() => setStep("credentials")}>
+          </Alert>
+          <Button category="tertiary" onClick={() => setStep("credentials")}>
             {t("auth.backToSignIn")}
           </Button>
         </AuthLayout>
       </Match>
       <Match when={true}>
         <AuthLayout title={t("auth.signInTitle")} lead={t("auth.signInLead")}>
-          <form class="flex flex-col gap-3" onSubmit={submitPassword}>
+          <form class="flex flex-col gap-4" onSubmit={submitPassword}>
             <TextField
               label={t("auth.email")}
               type="email"
@@ -168,7 +172,7 @@ export function Login() {
               required
             />
             {errorBox()}
-            <Button type="submit" variant="primary" loading={pending() === "password"}>
+            <Button type="submit" variant="confirm" block loading={pending() === "password"}>
               {t("auth.signIn")}
             </Button>
           </form>
@@ -179,6 +183,7 @@ export function Login() {
           </div>
           <div class="flex flex-col gap-2">
             <Button
+              block
               loading={pending() === "magic"}
               onClick={() => withEmail("magic", "magic-sent", sendMagicLink)}
             >
@@ -186,7 +191,7 @@ export function Login() {
             </Button>
             <button
               type="button"
-              class="self-center text-xs text-accent-700 underline-offset-2 hover:underline"
+              class={`self-center text-sm ${linkClass}`}
               onClick={() => withEmail("reset", "reset-sent", requestPasswordReset)}
             >
               {t("auth.forgot")}

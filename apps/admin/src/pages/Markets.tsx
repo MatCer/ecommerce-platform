@@ -1,6 +1,8 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   Checkbox,
   Dialog,
   EmptyState,
@@ -74,7 +76,7 @@ export default function Markets() {
 
   const newButton = () => (
     <Button
-      variant="primary"
+      variant="confirm"
       disabled={!can("admin")}
       onClick={() => {
         setForm(blank());
@@ -97,56 +99,60 @@ export default function Markets() {
         {(data) => (
           <Show
             when={data.items.length > 0}
-            fallback={<EmptyState title={t("markets.emptyTitle")} />}
+            fallback={<EmptyState icon="earth" title={t("markets.emptyTitle")} />}
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("markets.name")}</Th>
-                    <Th>{t("markets.code")}</Th>
-                    <Th>{t("markets.countries")}</Th>
-                    <Th>{t("markets.currency")}</Th>
-                    <Th>{t("markets.locales")}</Th>
-                    <Th>{t("markets.taxMode")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(m) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>
-                          {m.name}{" "}
-                          <Show when={m.is_default}>
-                            <Badge tone="info">{t("markets.defaultBadge")}</Badge>
-                          </Show>
-                        </td>
-                        <td class={`${tdClass} figures text-xs`}>{m.code}</td>
-                        <td class={`${tdClass} figures text-xs`}>{m.country_codes.join(", ")}</td>
-                        <td class={`${tdClass} figures text-xs`}>{m.currency}</td>
-                        <td class={`${tdClass} figures text-xs`}>
-                          {m.locales.map((l) => (l === m.default_locale ? `${l}*` : l)).join(", ")}
-                        </td>
-                        <td class={tdClass}>{t(`markets.${m.tax_mode}`)}</td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("markets.name")}</Th>
+                      <Th>{t("markets.code")}</Th>
+                      <Th>{t("markets.countries")}</Th>
+                      <Th>{t("markets.currency")}</Th>
+                      <Th>{t("markets.locales")}</Th>
+                      <Th>{t("markets.taxMode")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(m) => (
+                        <tr>
+                          <td class={`${tdClass} font-semibold text-heading`}>
+                            {m.name}{" "}
+                            <Show when={m.is_default}>
+                              <Badge tone="info">{t("markets.defaultBadge")}</Badge>
+                            </Show>
+                          </td>
+                          <td class={`${tdClass} font-mono text-xs`}>{m.code}</td>
+                          <td class={`${tdClass} figures text-xs`}>{m.country_codes.join(", ")}</td>
+                          <td class={`${tdClass} font-mono text-xs`}>{m.currency}</td>
+                          <td class={`${tdClass} figures text-xs`}>
+                            {m.locales
+                              .map((l) => (l === m.default_locale ? `${l}*` : l))
+                              .join(", ")}
+                          </td>
+                          <td class={tdClass}>{t(`markets.${m.tax_mode}`)}</td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
 
       <Dialog open={open()} onOpenChange={setOpen} title={t("markets.new")}>
         <form
-          class="flex flex-col gap-3"
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             create.mutate();
           }}
         >
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid gap-4 sm:grid-cols-2">
             <TextField
               label={t("markets.name")}
               value={form().name}
@@ -210,13 +216,11 @@ export default function Markets() {
             onChange={(is_default) => set({ is_default })}
           />
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={create.isPending}>
+            <Button type="submit" variant="confirm" loading={create.isPending}>
               {t("common.create")}
             </Button>
           </div>

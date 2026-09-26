@@ -98,215 +98,225 @@ export default function OrderDetail() {
               </div>
               <OrderActions data={data()} />
               <div class="flex flex-col gap-4">
-                <OrderSections data={data()} />
-                <Section title={t("orders.lines")}>
-                  <div class="overflow-x-auto">
-                    <table class={tableClass}>
-                      <thead>
-                        <tr>
-                          <For
-                            each={[
-                              t("orders.product"),
-                              t("orders.sku"),
-                              t("orders.quantity"),
-                              t("orders.unitPrice"),
-                              t("orders.discount"),
-                              t("orders.taxRate"),
-                              t("orders.total"),
-                            ]}
-                          >
-                            {(label) => <Th>{label}</Th>}
-                          </For>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={data().order.lines}>
-                          {(line) => (
+                <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                  <div class="flex min-w-0 flex-col gap-4">
+                    <OrderSections data={data()} />
+                    <Section title={t("orders.lines")} padding="none">
+                      <div class="overflow-x-auto">
+                        <table class={tableClass}>
+                          <thead>
                             <tr>
-                              <td class={tdClass}>
-                                {line.name}
-                                <p class="text-xs text-muted-foreground">{line.options_label}</p>
-                              </td>
-                              <td class={tdClass}>{line.sku}</td>
-                              <td class={tdClass}>{line.quantity}</td>
-                              <td class={tdClass}>{line.unit_price.formatted}</td>
-                              <td class={tdClass}>{line.discount.formatted}</td>
-                              <td class={tdClass}>{line.tax_rate} %</td>
-                              <td class={tdClass}>{line.total.formatted}</td>
+                              <For
+                                each={[
+                                  t("orders.product"),
+                                  t("orders.sku"),
+                                  t("orders.quantity"),
+                                  t("orders.unitPrice"),
+                                  t("orders.discount"),
+                                  t("orders.taxRate"),
+                                  t("orders.total"),
+                                ]}
+                              >
+                                {(label) => <Th>{label}</Th>}
+                              </For>
                             </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody>
+                            <For each={data().order.lines}>
+                              {(line) => (
+                                <tr>
+                                  <td class={tdClass}>
+                                    {line.name}
+                                    <p class="text-xs text-muted-foreground">
+                                      {line.options_label}
+                                    </p>
+                                  </td>
+                                  <td class={tdClass}>{line.sku}</td>
+                                  <td class={tdClass}>{line.quantity}</td>
+                                  <td class={tdClass}>{line.unit_price.formatted}</td>
+                                  <td class={tdClass}>{line.discount.formatted}</td>
+                                  <td class={tdClass}>{line.tax_rate} %</td>
+                                  <td class={tdClass}>{line.total.formatted}</td>
+                                </tr>
+                              )}
+                            </For>
+                          </tbody>
+                        </table>
+                      </div>
+                    </Section>
+                    <div class="grid gap-4 2xl:grid-cols-2">
+                      <Section title={t("orders.totals")}>
+                        <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm [&_dt]:text-muted-foreground">
+                          <For
+                            each={
+                              [
+                                "subtotal",
+                                "discount",
+                                "shipping_total",
+                                "payment_fee",
+                                "rounding",
+                                "vat_total",
+                                "total",
+                              ] as const
+                            }
+                          >
+                            {(key) => (
+                              <>
+                                <dt>{t(`orderTotals.${key}`)}</dt>
+                                <dd class="figures text-right">{data().order[key].formatted}</dd>
+                              </>
+                            )}
+                          </For>
+                          <Show when={data().order.coupon_code}>
+                            <dt>{t("orders.coupon")}</dt>
+                            <dd class="text-right">{data().order.coupon_code}</dd>
+                          </Show>
+                        </dl>
+                      </Section>
+                      <Section title={t("orders.vatRecap")} padding="none">
+                        <div class="overflow-x-auto">
+                          <table class={tableClass}>
+                            <thead>
+                              <tr>
+                                <Th>{t("orders.taxRate")}</Th>
+                                <Th>{t("orders.net")}</Th>
+                                <Th>{t("orders.vat")}</Th>
+                                <Th>{t("orders.gross")}</Th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <For each={data().order.vat}>
+                                {(row) => (
+                                  <tr>
+                                    <td class={tdClass}>{row.rate} %</td>
+                                    <td class={tdClass}>{row.net.formatted}</td>
+                                    <td class={tdClass}>{row.vat.formatted}</td>
+                                    <td class={tdClass}>{row.gross.formatted}</td>
+                                  </tr>
+                                )}
+                              </For>
+                            </tbody>
+                          </table>
+                        </div>
+                      </Section>
+                    </div>
+                    <Show when={data().order.charges.length}>
+                      <Section title={t("orders.charges")} padding="none">
+                        <div class="overflow-x-auto">
+                          <table class={tableClass}>
+                            <thead>
+                              <tr>
+                                <Th>{t("orders.kind")}</Th>
+                                <Th>{t("orders.vat")}</Th>
+                                <Th>{t("orders.total")}</Th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <For each={data().order.charges}>
+                                {(charge) => (
+                                  <tr>
+                                    <td class={tdClass}>{t(`chargeKinds.${charge.kind}`)}</td>
+                                    <td class={tdClass}>{charge.tax.formatted}</td>
+                                    <td class={tdClass}>{charge.total.formatted}</td>
+                                  </tr>
+                                )}
+                              </For>
+                            </tbody>
+                          </table>
+                        </div>
+                      </Section>
+                    </Show>
                   </div>
-                </Section>
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <Section title={t("orders.totals")}>
-                    <dl class="grid grid-cols-2 gap-2 text-sm">
-                      <For
-                        each={
-                          [
-                            "subtotal",
-                            "discount",
-                            "shipping_total",
-                            "payment_fee",
-                            "rounding",
-                            "vat_total",
-                            "total",
-                          ] as const
-                        }
-                      >
-                        {(key) => (
-                          <>
-                            <dt>{t(`orderTotals.${key}`)}</dt>
-                            <dd class="figures text-right">{data().order[key].formatted}</dd>
-                          </>
-                        )}
-                      </For>
-                      <Show when={data().order.coupon_code}>
-                        <dt>{t("orders.coupon")}</dt>
-                        <dd class="text-right">{data().order.coupon_code}</dd>
-                      </Show>
-                    </dl>
-                  </Section>
-                  <Section title={t("orders.vatRecap")}>
-                    <div class="overflow-x-auto">
-                      <table class={tableClass}>
-                        <thead>
-                          <tr>
-                            <Th>{t("orders.taxRate")}</Th>
-                            <Th>{t("orders.net")}</Th>
-                            <Th>{t("orders.vat")}</Th>
-                            <Th>{t("orders.gross")}</Th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={data().order.vat}>
-                            {(row) => (
-                              <tr>
-                                <td class={tdClass}>{row.rate} %</td>
-                                <td class={tdClass}>{row.net.formatted}</td>
-                                <td class={tdClass}>{row.vat.formatted}</td>
-                                <td class={tdClass}>{row.gross.formatted}</td>
-                              </tr>
-                            )}
-                          </For>
-                        </tbody>
-                      </table>
-                    </div>
-                  </Section>
-                </div>
-                <Show when={data().order.charges.length}>
-                  <Section title={t("orders.charges")}>
-                    <div class="overflow-x-auto">
-                      <table class={tableClass}>
-                        <thead>
-                          <tr>
-                            <Th>{t("orders.kind")}</Th>
-                            <Th>{t("orders.vat")}</Th>
-                            <Th>{t("orders.total")}</Th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={data().order.charges}>
-                            {(charge) => (
-                              <tr>
-                                <td class={tdClass}>{t(`chargeKinds.${charge.kind}`)}</td>
-                                <td class={tdClass}>{charge.tax.formatted}</td>
-                                <td class={tdClass}>{charge.total.formatted}</td>
-                              </tr>
-                            )}
-                          </For>
-                        </tbody>
-                      </table>
-                    </div>
-                  </Section>
-                </Show>
-                <div class="grid gap-4 md:grid-cols-3">
-                  <Section title={t("orders.customer")}>
-                    <div class="break-words text-sm">
-                      <p>{data().order.email}</p>
-                      <p>{data().order.phone}</p>
-                      <Show when={data().customer_id}>
-                        <p>
-                          {t("orders.customerId")}: {data().customer_id}
-                        </p>
-                      </Show>
-                      <p>
-                        {t("checkout.market")}: {data().market_id}
-                      </p>
-                      <p>
-                        {t("orders.country")}: {data().ship_to_country}
-                      </p>
-                    </div>
-                  </Section>
-                  <Section title={t("orders.billingAddress")}>
-                    <Address address={data().order.billing_address} />
-                  </Section>
-                  <Section title={t("orders.shippingAddress")}>
-                    <Address address={data().order.shipping_address} />
-                    <EditShippingAddress data={data()} />
-                  </Section>
-                </div>
-                <div class="grid gap-4 md:grid-cols-2">
-                  <Section title={t("shipping.title")}>
-                    <div class="text-sm">
-                      <p>{data().order.shipping.name}</p>
-                      <p>{t(`carriers.${data().order.shipping.carrier}`)}</p>
-                      <Show when={data().order.shipping.pickup_point}>
-                        {(point) => (
-                          <div class="mt-3">
-                            <h3 class="font-medium">{t("orders.pickupPoint")}</h3>
+                  <aside class="flex min-w-0 flex-col gap-4">
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+                      <Section title={t("orders.customer")}>
+                        <div class="break-words text-sm">
+                          <p>{data().order.email}</p>
+                          <p>{data().order.phone}</p>
+                          <Show when={data().customer_id}>
                             <p>
-                              {point().name} ({point().id})
+                              {t("orders.customerId")}: {data().customer_id}
                             </p>
-                            <p>{point().street}</p>
-                            <p>
-                              {point().zip} {point().city}
-                            </p>
-                            <p>{point().country}</p>
-                          </div>
-                        )}
-                      </Show>
+                          </Show>
+                          <p>
+                            {t("checkout.market")}: {data().market_id}
+                          </p>
+                          <p>
+                            {t("orders.country")}: {data().ship_to_country}
+                          </p>
+                        </div>
+                      </Section>
+                      <Section title={t("orders.billingAddress")}>
+                        <Address address={data().order.billing_address} />
+                      </Section>
+                      <Section title={t("orders.shippingAddress")}>
+                        <Address address={data().order.shipping_address} />
+                        <EditShippingAddress data={data()} />
+                      </Section>
                     </div>
-                  </Section>
-                  <Section title={t("payments.title")}>
-                    <dl class="grid grid-cols-2 gap-2 text-sm">
-                      <dt>{t("orders.method")}</dt>
-                      <dd>{t(`paymentKinds.${data().order.payment.method}`)}</dd>
-                      <dt>{t("orders.paymentStatus")}</dt>
-                      <dd>{t(`paymentStatuses.${data().order.payment.status}`)}</dd>
-                      <dt>{t("orders.canRetry")}</dt>
-                      <dd>{data().order.payment.can_retry ? t("common.yes") : t("common.no")}</dd>
-                      <Show when={data().order.payment.expires_at}>
-                        {(expires) => (
-                          <>
-                            <dt>{t("orders.expires")}</dt>
-                            <dd>{formatDateTime(expires())}</dd>
-                          </>
-                        )}
-                      </Show>
-                      <Show when={data().order.payment.attempt}>
-                        {(attempt) => (
-                          <>
-                            <dt>{t("orders.currentAttempt")}</dt>
-                            <dd class="break-all">
-                              {attempt().id} · {t(`attemptStatuses.${attempt().status}`)} ·{" "}
-                              {formatDateTime(attempt().created_at)}
-                            </dd>
-                          </>
-                        )}
-                      </Show>
-                    </dl>
-                  </Section>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+                      <Section title={t("shipping.title")}>
+                        <div class="text-sm">
+                          <p>{data().order.shipping.name}</p>
+                          <p>{t(`carriers.${data().order.shipping.carrier}`)}</p>
+                          <Show when={data().order.shipping.pickup_point}>
+                            {(point) => (
+                              <div class="mt-3">
+                                <h3 class="font-medium">{t("orders.pickupPoint")}</h3>
+                                <p>
+                                  {point().name} ({point().id})
+                                </p>
+                                <p>{point().street}</p>
+                                <p>
+                                  {point().zip} {point().city}
+                                </p>
+                                <p>{point().country}</p>
+                              </div>
+                            )}
+                          </Show>
+                        </div>
+                      </Section>
+                      <Section title={t("payments.title")}>
+                        <dl class="grid grid-cols-2 gap-2 text-sm">
+                          <dt>{t("orders.method")}</dt>
+                          <dd>{t(`paymentKinds.${data().order.payment.method}`)}</dd>
+                          <dt>{t("orders.paymentStatus")}</dt>
+                          <dd>{t(`paymentStatuses.${data().order.payment.status}`)}</dd>
+                          <dt>{t("orders.canRetry")}</dt>
+                          <dd>
+                            {data().order.payment.can_retry ? t("common.yes") : t("common.no")}
+                          </dd>
+                          <Show when={data().order.payment.expires_at}>
+                            {(expires) => (
+                              <>
+                                <dt>{t("orders.expires")}</dt>
+                                <dd>{formatDateTime(expires())}</dd>
+                              </>
+                            )}
+                          </Show>
+                          <Show when={data().order.payment.attempt}>
+                            {(attempt) => (
+                              <>
+                                <dt>{t("orders.currentAttempt")}</dt>
+                                <dd class="break-all">
+                                  {attempt().id} · {t(`attemptStatuses.${attempt().status}`)} ·{" "}
+                                  {formatDateTime(attempt().created_at)}
+                                </dd>
+                              </>
+                            )}
+                          </Show>
+                        </dl>
+                      </Section>
+                    </div>
+                  </aside>
                 </div>
                 <Show when={data().attempts.find((a) => a.method === "cod")}>
                   {(a) => <CodPanel orderId={data().order.id} attempt={a()} />}
                 </Show>
-                <Section title={t("orders.attempts")}>
+                <Section title={t("orders.attempts")} padding="none">
                   <Show
                     when={data().attempts.length}
-                    fallback={<p class="text-sm">{t("orders.noAttempts")}</p>}
+                    fallback={<p class="p-4 text-sm">{t("orders.noAttempts")}</p>}
                   >
                     <div class="overflow-x-auto">
                       <table class={tableClass}>
@@ -332,7 +342,9 @@ export default function OrderDetail() {
                           <For each={data().attempts}>
                             {(attempt) => (
                               <tr>
-                                <td class={tdClass}>{attempt.id}</td>
+                                <td class={`${tdClass} font-mono text-xs break-all`}>
+                                  {attempt.id}
+                                </td>
                                 <td class={tdClass}>{t(`paymentKinds.${attempt.method}`)}</td>
                                 <td class={tdClass}>{t(`attemptStatuses.${attempt.status}`)}</td>
                                 <td class={tdClass}>
@@ -349,7 +361,9 @@ export default function OrderDetail() {
                                     ? formatDateTime(attempt.completed_at)
                                     : t("common.none")}
                                 </td>
-                                <td class={tdClass}>{attempt.provider_ref ?? t("common.none")}</td>
+                                <td class={`${tdClass} break-all`}>
+                                  {attempt.provider_ref ?? t("common.none")}
+                                </td>
                               </tr>
                             )}
                           </For>
@@ -468,7 +482,7 @@ function CodPanel(props: { orderId: string; attempt: Schemas["Attempt"] }) {
               onChange={(v) => setCollector(collectors.find((x) => x === v) ?? "carrier")}
             />
             <div>
-              <Button type="submit" variant="primary" loading={act.isPending}>
+              <Button type="submit" variant="confirm" loading={act.isPending}>
                 {t("pay.collect")}
               </Button>
             </div>
@@ -489,7 +503,7 @@ function CodPanel(props: { orderId: string; attempt: Schemas["Attempt"] }) {
               maxLength={500}
             />
             <div>
-              <Button type="submit" variant="primary" loading={act.isPending}>
+              <Button type="submit" variant="confirm" loading={act.isPending}>
                 {t("pay.remit")}
               </Button>
             </div>

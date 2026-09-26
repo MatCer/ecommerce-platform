@@ -2,9 +2,10 @@ import {
   Badge,
   Button,
   buttonClass,
+  Card,
   EmptyState,
+  SearchBox,
   SelectField,
-  TextField,
   type Tone,
 } from "@platform/ui";
 import { A, useSearchParams } from "@solidjs/router";
@@ -80,21 +81,24 @@ export default function Products() {
       <PageHeader
         title={t("products.title")}
         actions={
-          <A href="/products/new" class={buttonClass("primary")}>
+          <A href="/products/new" class={buttonClass({ variant: "confirm" })}>
             {t("products.new")}
           </A>
         }
       />
-      <div class="mb-3 flex flex-wrap items-end gap-2">
-        <TextField
-          class="w-full sm:w-72"
-          type="search"
+      {/* Filter bar (Pajamas list page): search grows, selects keep their size. */}
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <SearchBox
+          class="min-w-60 flex-1"
           label={t("products.search")}
+          placeholder={t("products.search")}
+          clearLabel={t("common.clearSearch")}
           value={search()}
           onChange={setSearch}
         />
         <SelectField
-          class="w-40"
+          class="w-44"
+          hideLabel
           label={t("products.status")}
           value={str(params.status)}
           options={[
@@ -105,6 +109,7 @@ export default function Products() {
         />
         <SelectField
           class="w-56"
+          hideLabel
           label={t("products.category")}
           value={str(params.category)}
           options={[
@@ -115,7 +120,7 @@ export default function Products() {
         />
         <Show when={hasFilters()}>
           <Button
-            variant="ghost"
+            category="tertiary"
             onClick={() => {
               setSearch("");
               setParams({ q: undefined, status: undefined, category: undefined });
@@ -134,70 +139,77 @@ export default function Products() {
                 when={hasFilters()}
                 fallback={
                   <EmptyState
+                    icon="package"
                     title={t("products.emptyTitle")}
                     description={t("products.emptyDesc")}
                     action={
-                      <A href="/products/new" class={buttonClass("primary")}>
+                      <A href="/products/new" class={buttonClass({ variant: "confirm" })}>
                         {t("products.new")}
                       </A>
                     }
                   />
                 }
               >
-                <EmptyState title={t("products.noMatches")} />
+                <EmptyState icon="search" title={t("products.noMatches")} />
               </Show>
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("products.colName")}</Th>
-                    <Th>{t("products.colSku")}</Th>
-                    <Th class="text-right">{t("products.colVariants")}</Th>
-                    <Th>{t("products.colStatus")}</Th>
-                    <Th class="text-right">{t("products.colUpdated")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(p) => (
-                      <tr class="hover:bg-muted">
-                        <td class={`${tdClass} max-w-md`}>
-                          <A
-                            href={`/products/${p.id}`}
-                            class="block truncate font-medium text-accent-700 hover:underline"
-                          >
-                            {pickName(p.name)}
-                          </A>
-                          <Show when={p.brand}>
-                            <span class="text-xs text-muted-foreground">{p.brand}</span>
-                          </Show>
-                        </td>
-                        <td class={`${tdClass} figures text-xs`}>{p.default_sku ?? "—"}</td>
-                        <td class={`${tdClass} figures text-right`}>{p.variant_count}</td>
-                        <td class={tdClass}>
-                          <Badge tone={statusTone[p.status]}>{t(`status.${p.status}`)}</Badge>
-                        </td>
-                        <td class={`${tdClass} figures text-right text-xs text-faint-foreground`}>
-                          {formatDateTime(p.updated_at)}
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={products.hasNextPage}>
-              <div class="mt-3">
-                <Button
-                  loading={products.isFetchingNextPage}
-                  onClick={() => void products.fetchNextPage()}
-                >
-                  {t("common.loadMore")}
-                </Button>
+            <Card
+              padding="none"
+              footer={
+                products.hasNextPage ? (
+                  <Button
+                    loading={products.isFetchingNextPage}
+                    onClick={() => void products.fetchNextPage()}
+                  >
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("products.colName")}</Th>
+                      <Th>{t("products.colSku")}</Th>
+                      <Th class="text-right">{t("products.colVariants")}</Th>
+                      <Th>{t("products.colStatus")}</Th>
+                      <Th class="text-right">{t("products.colUpdated")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(p) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} max-w-md`}>
+                            <A
+                              href={`/products/${p.id}`}
+                              class="block truncate font-semibold text-heading hover:text-accent-700 hover:underline"
+                            >
+                              {pickName(p.name)}
+                            </A>
+                            <Show when={p.brand}>
+                              <span class="text-sm text-muted-foreground">{p.brand}</span>
+                            </Show>
+                          </td>
+                          <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>
+                            {p.default_sku ?? "—"}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>{p.variant_count}</td>
+                          <td class={tdClass}>
+                            <Badge tone={statusTone[p.status]}>{t(`status.${p.status}`)}</Badge>
+                          </td>
+                          <td class={`${tdClass} figures text-right text-muted-foreground`}>
+                            {formatDateTime(p.updated_at)}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
               </div>
-            </Show>
+            </Card>
           </Show>
         )}
       </QueryState>

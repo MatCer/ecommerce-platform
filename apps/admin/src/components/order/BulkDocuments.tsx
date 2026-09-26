@@ -1,4 +1,4 @@
-import { Button } from "@platform/ui";
+import { Alert, Button } from "@platform/ui";
 import { createSignal, For, onCleanup, Show } from "solid-js";
 import { locale, t } from "../../i18n/index.ts";
 import { ApiError, api, tenantHeader, unwrap } from "../../lib/api.ts";
@@ -77,6 +77,7 @@ export function BulkDocuments(props: { orders: { id: string; number: string }[] 
     <div class="mb-4 grid gap-2">
       <div class="flex flex-wrap items-center gap-2">
         <Button
+          icon="download"
           disabled={!props.orders.length || props.orders.length > 100}
           loading={pending()}
           onClick={() => void run("labels")}
@@ -84,31 +85,34 @@ export function BulkDocuments(props: { orders: { id: string; number: string }[] 
           {t("fulfillment.printLabels")}
         </Button>
         <Button
+          icon="download"
           disabled={!props.orders.length || props.orders.length > 100}
           loading={pending()}
           onClick={() => void run("packing_slips")}
         >
           {t("fulfillment.packingSlips")}
         </Button>
-        <span class="text-sm text-muted-foreground">
+        <span class="figures text-sm text-muted-foreground">
           {t("fulfillment.selected", { count: props.orders.length })}
         </span>
       </div>
-      <div role="status" aria-live="polite" class="text-sm">
+      <div role="status" aria-live="polite" class="text-sm text-muted-foreground">
         <Show when={pending()}>{t("fulfillment.generating")}</Show>
         <Show when={ready()}>{t("fulfillment.documentReady")}</Show>
       </div>
       <ApiProblem error={error()} />
       <Show when={failures().length}>
-        <ul class="text-sm text-error-700" aria-live="polite">
-          <For each={failures()}>
-            {(failure) => (
-              <li>
-                {failure.number}: {failure.error}
-              </li>
-            )}
-          </For>
-        </ul>
+        <Alert tone="error">
+          <ul>
+            <For each={failures()}>
+              {(failure) => (
+                <li>
+                  {failure.number}: {failure.error}
+                </li>
+              )}
+            </For>
+          </ul>
+        </Alert>
       </Show>
     </div>
   );

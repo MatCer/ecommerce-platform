@@ -1,4 +1,13 @@
-import { Badge, Button, ConfirmDialog, EmptyState, showToast, type Tone } from "@platform/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  linkClass,
+  showToast,
+  type Tone,
+} from "@platform/ui";
 import { A, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, type JSX, Show } from "solid-js";
@@ -69,46 +78,50 @@ export default function FlowRun() {
           const r = data.run;
           const status = asRunStatus(r.status);
           return (
-            <div class="grid gap-6">
-              <dl class="grid max-w-2xl grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-                <Row label={t("flows.flow")}>{kindLabel(r.kind)}</Row>
-                <Row label={t("flows.status")}>
-                  <Badge tone={status ? runTone[status] : "neutral"}>{statusLabel(r.status)}</Badge>
-                </Row>
-                <Row label={t("flows.source")}>
-                  {sourceLabel(r.source_kind)}{" "}
-                  <Show when={r.source_kind === "order"}>
-                    <A href={`/orders/${r.source_id}`} class="text-accent-700 underline">
-                      {t("flows.viewOrder")}
-                    </A>
-                  </Show>
-                </Row>
-                <Show when={r.status === "active"}>
-                  <Row label={t("flows.nextStep")}>
-                    {t("flows.step", { n: String(r.next_step + 1) })}
-                  </Row>
-                  <Row label={t("flows.due")}>{formatDateTime(r.due_at)}</Row>
-                </Show>
-                <Show when={r.exit_reason}>
-                  <Row label={t("flows.outcome")}>{reasonLabel(r.exit_reason)}</Row>
-                </Show>
-                <Show when={r.attempts > 0}>
-                  <Row label={t("flows.attempts")}>{String(r.attempts)}</Row>
-                </Show>
-                <Show when={r.last_error}>
-                  <Row label={t("flows.lastError")}>
-                    <code class="text-xs">{r.last_error}</code>
-                  </Row>
-                </Show>
-              </dl>
-
-              <section aria-labelledby="run-steps">
-                <h2 id="run-steps" class="mb-2 text-base font-semibold">
-                  {t("flows.steps")}
-                </h2>
+            <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <aside class="min-w-0 xl:order-last">
+                <Card title={t("flows.flow")}>
+                  <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm [&_dt]:text-muted-foreground">
+                    <Row label={t("flows.flow")}>{kindLabel(r.kind)}</Row>
+                    <Row label={t("flows.status")}>
+                      <Badge tone={status ? runTone[status] : "neutral"}>
+                        {statusLabel(r.status)}
+                      </Badge>
+                    </Row>
+                    <Row label={t("flows.source")}>
+                      {sourceLabel(r.source_kind)}{" "}
+                      <Show when={r.source_kind === "order"}>
+                        <A href={`/orders/${r.source_id}`} class={linkClass}>
+                          {t("flows.viewOrder")}
+                        </A>
+                      </Show>
+                    </Row>
+                    <Show when={r.status === "active"}>
+                      <Row label={t("flows.nextStep")}>
+                        {t("flows.step", { n: String(r.next_step + 1) })}
+                      </Row>
+                      <Row label={t("flows.due")}>{formatDateTime(r.due_at)}</Row>
+                    </Show>
+                    <Show when={r.exit_reason}>
+                      <Row label={t("flows.outcome")}>{reasonLabel(r.exit_reason)}</Row>
+                    </Show>
+                    <Show when={r.attempts > 0}>
+                      <Row label={t("flows.attempts")}>{String(r.attempts)}</Row>
+                    </Show>
+                    <Show when={r.last_error}>
+                      <Row label={t("flows.lastError")}>
+                        <code class="font-mono text-xs break-all text-error-700">
+                          {r.last_error}
+                        </code>
+                      </Row>
+                    </Show>
+                  </dl>
+                </Card>
+              </aside>
+              <Card labelledBy="run-steps" class="min-w-0" padding="none" title={t("flows.steps")}>
                 <Show
                   when={data.steps.length > 0}
-                  fallback={<EmptyState title={t("flows.noSteps")} />}
+                  fallback={<EmptyState icon="document" title={t("flows.noSteps")} />}
                 >
                   <div class="overflow-x-auto">
                     <table class={tableClass}>
@@ -124,7 +137,7 @@ export default function FlowRun() {
                         <For each={data.steps}>
                           {(s) => (
                             <tr>
-                              <td class={tdClass}>
+                              <td class={`${tdClass} font-semibold text-heading`}>
                                 {t("flows.step", { n: String(s.step_number + 1) })}
                               </td>
                               <td class={tdClass}>
@@ -133,7 +146,9 @@ export default function FlowRun() {
                                 </Badge>
                               </td>
                               <td class={tdClass}>{reasonLabel(s.reason) || "—"}</td>
-                              <td class={`${tdClass} whitespace-nowrap`}>
+                              <td
+                                class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                              >
                                 {formatDateTime(s.executed_at)}
                               </td>
                             </tr>
@@ -143,7 +158,7 @@ export default function FlowRun() {
                     </table>
                   </div>
                 </Show>
-              </section>
+              </Card>
             </div>
           );
         }}
@@ -166,7 +181,7 @@ export default function FlowRun() {
 function Row(props: { label: string; children: JSX.Element }) {
   return (
     <>
-      <dt class="text-muted-foreground">{props.label}</dt>
+      <dt>{props.label}</dt>
       <dd>{props.children}</dd>
     </>
   );

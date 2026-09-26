@@ -1,4 +1,4 @@
-import { Badge, Button } from "@platform/ui";
+import { Badge, Button, type ButtonSize, Card, type Tone } from "@platform/ui";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, type JSX, onCleanup } from "solid-js";
 import { t } from "../../i18n/index.ts";
@@ -7,12 +7,25 @@ import { safeDownloadUrl } from "../../lib/fulfillment.ts";
 import { tenantKey } from "../../lib/me.ts";
 import { ApiProblem } from "../CheckoutSettings.tsx";
 
-export function Section(props: { title: string; children: JSX.Element }) {
+/** An order-page block: a Pajamas card (use `padding="none"` around full-bleed tables). */
+export function Section(props: {
+  title: string;
+  children: JSX.Element;
+  padding?: "none" | "normal";
+  actions?: JSX.Element;
+  description?: JSX.Element;
+  count?: number;
+}) {
   return (
-    <section class="min-w-0 rounded-md border border-border p-4">
-      <h2 class="mb-3 font-semibold">{props.title}</h2>
+    <Card
+      title={props.title}
+      padding={props.padding}
+      actions={props.actions}
+      description={props.description}
+      count={props.count}
+    >
       {props.children}
-    </section>
+    </Card>
   );
 }
 
@@ -34,7 +47,14 @@ export function FulfillmentState(props: { value: string }) {
     const key = values.find((value) => value === props.value);
     return key ? t(`fulfillment.states.${key}`) : props.value;
   };
-  return <Badge tone={props.value === "failed" ? "warning" : "neutral"}>{label()}</Badge>;
+  const tone = (): Tone => {
+    if (props.value === "failed") return "warning";
+    if (["succeeded", "refunded", "delivered"].includes(props.value)) return "success";
+    if (["pending", "creating", "label_created", "shipped", "open"].includes(props.value))
+      return "info";
+    return "neutral";
+  };
+  return <Badge tone={tone()}>{label()}</Badge>;
 }
 
 export function useFulfillmentRefresh() {
@@ -63,6 +83,7 @@ export function showDownload(tab: Window, url: string) {
 export function DownloadButton(props: {
   label: string;
   disabled?: boolean;
+  size?: ButtonSize;
   read: (signal: AbortSignal) => Promise<{ url: string }>;
 }) {
   const [pending, setPending] = createSignal(false);
@@ -92,8 +113,14 @@ export function DownloadButton(props: {
     }
   };
   return (
-    <div class="grid gap-1">
-      <Button disabled={props.disabled} loading={pending()} onClick={() => void download()}>
+    <div class="grid justify-items-start gap-1">
+      <Button
+        size={props.size}
+        icon="download"
+        disabled={props.disabled}
+        loading={pending()}
+        onClick={() => void download()}
+      >
         {props.label}
       </Button>
       <ApiProblem error={error()} />

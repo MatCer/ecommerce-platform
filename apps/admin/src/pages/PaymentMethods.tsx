@@ -1,4 +1,4 @@
-import { Badge, Button, Checkbox, showToast, TextField } from "@platform/ui";
+import { Alert, Badge, Button, Card, Checkbox, showToast, TextField } from "@platform/ui";
 import { useSearchParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, onMount, Show } from "solid-js";
@@ -11,7 +11,7 @@ import { cleanTranslations } from "../lib/shipping-form.ts";
 
 export default function PaymentMethods() {
   return (
-    <>
+    <div class="max-w-4xl">
       <PageHeader title={t("payments.title")} />
       <StripeCard />
       <MarketSettings>
@@ -22,7 +22,7 @@ export default function PaymentMethods() {
           </div>
         )}
       </MarketSettings>
-    </>
+    </div>
   );
 }
 
@@ -76,21 +76,16 @@ function StripeCard() {
     }
   });
   return (
-    <section class="mb-6 rounded-md border border-border p-4" aria-labelledby="stripe-heading">
-      <h2 id="stripe-heading" class="mb-3 font-semibold">
-        {t("pay.stripeTitle")}
-      </h2>
+    <Card labelledBy="stripe-heading" class="mb-6" title={t("pay.stripeTitle")}>
       <QueryState query={status}>
         {(s) => (
           <Show
             when={s.mode}
             fallback={<p class="text-sm text-muted-foreground">{t("pay.stripeNotConfigured")}</p>}
           >
-            <div class="grid gap-3 text-sm">
+            <div class="flex flex-col gap-4 text-sm">
               <Show when={s.mode === "simulator"}>
-                <p class="rounded-md border border-warning-700 bg-warning-50 p-2">
-                  {t("pay.stripeSimulator")}
-                </p>
+                <Alert tone="warning">{t("pay.stripeSimulator")}</Alert>
               </Show>
               <Show
                 when={s.account}
@@ -98,14 +93,14 @@ function StripeCard() {
               >
                 {(a) => (
                   <>
-                    <p>
+                    <div>
                       <Badge tone={a().ready ? "success" : "warning"}>
                         {a().ready ? t("pay.stripeReady") : t("pay.stripeNotReady")}
                       </Badge>
-                    </p>
-                    <dl class="grid max-w-lg grid-cols-2 gap-1">
+                    </div>
+                    <dl class="grid max-w-lg grid-cols-2 gap-x-4 gap-y-2 [&_dt]:text-muted-foreground">
                       <dt>{t("pay.stripeAccount")}</dt>
-                      <dd class="break-all">{a().account_id}</dd>
+                      <dd class="font-mono text-xs break-all">{a().account_id}</dd>
                       <dt>{t("pay.stripeCharges")}</dt>
                       <dd>{a().charges_enabled ? t("common.yes") : t("common.no")}</dd>
                       <dt>{t("pay.stripeCards")}</dt>
@@ -123,7 +118,7 @@ function StripeCard() {
               <div class="flex flex-wrap gap-2">
                 <Show when={!s.account?.ready}>
                   <Button
-                    variant="primary"
+                    variant="confirm"
                     loading={onboard.isPending}
                     onClick={() => onboard.mutate()}
                   >
@@ -149,7 +144,7 @@ function StripeCard() {
           </Show>
         )}
       </QueryState>
-    </section>
+    </Card>
   );
 }
 
@@ -215,55 +210,59 @@ function BankAccountFields(props: {
     },
   }));
   return (
-    <form
-      class="rounded-md border border-border p-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        save.mutate({
-          iban: iban(),
-          bic: bic().trim() || null,
-          account_name: name(),
-          fio_token: token().trim() || null,
-          clear_fio_token: clear(),
-        });
-      }}
+    <Card
+      title={`${t("pay.bankAccount")} (${props.market.currency})`}
+      description={t("pay.bankAccountDesc")}
     >
-      <fieldset disabled={save.isPending} class="flex flex-col gap-3">
-        <legend class="mb-1 font-semibold">
-          {t("pay.bankAccount")} ({props.market.currency})
-        </legend>
-        <p class="text-sm text-muted-foreground">{t("pay.bankAccountDesc")}</p>
-        <p class="text-sm text-muted-foreground">{t("pay.ibanChange")}</p>
-        <div class="grid gap-3 sm:grid-cols-3">
-          <TextField label={t("pay.iban")} required value={iban()} onChange={setIban} />
-          <TextField label={t("pay.bic")} value={bic()} onChange={setBic} />
-          <TextField label={t("pay.accountName")} required value={name()} onChange={setName} />
-        </div>
-        <TextField
-          label={t("pay.fioToken")}
-          description={t("pay.fioTokenHint")}
-          type="password"
-          autocomplete="off"
-          value={token()}
-          onChange={setToken}
-        />
-        <Show when={props.current?.fio_connected}>
-          <p class="text-sm">
-            <Badge tone="success">{t("pay.fioConnected")}</Badge>{" "}
-            <Show when={props.current?.fio_synced_at}>
-              {(at) => t("pay.fioSynced", { at: formatDateTime(at()) })}
-            </Show>
-          </p>
-          <Checkbox label={t("pay.clearFio")} checked={clear()} onChange={setClear} />
-        </Show>
-        <ApiProblem error={save.error} />
-        <div>
-          <Button type="submit" variant="primary" loading={save.isPending}>
-            {t("pay.saveAccount")}
-          </Button>
-        </div>
-      </fieldset>
-    </form>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate({
+            iban: iban(),
+            bic: bic().trim() || null,
+            account_name: name(),
+            fio_token: token().trim() || null,
+            clear_fio_token: clear(),
+          });
+        }}
+      >
+        <fieldset disabled={save.isPending} class="flex flex-col gap-4">
+          {/* The card title shows the name; the legend keeps the group named for assistive tech. */}
+          <legend class="sr-only">
+            {t("pay.bankAccount")} ({props.market.currency})
+          </legend>
+          <Alert tone="info">{t("pay.ibanChange")}</Alert>
+          <div class="grid gap-4 sm:grid-cols-3">
+            <TextField label={t("pay.iban")} required value={iban()} onChange={setIban} />
+            <TextField label={t("pay.bic")} value={bic()} onChange={setBic} />
+            <TextField label={t("pay.accountName")} required value={name()} onChange={setName} />
+          </div>
+          <TextField
+            label={t("pay.fioToken")}
+            description={t("pay.fioTokenHint")}
+            type="password"
+            autocomplete="off"
+            value={token()}
+            onChange={setToken}
+          />
+          <Show when={props.current?.fio_connected}>
+            <p class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <Badge tone="success">{t("pay.fioConnected")}</Badge>
+              <Show when={props.current?.fio_synced_at}>
+                {(at) => t("pay.fioSynced", { at: formatDateTime(at()) })}
+              </Show>
+            </p>
+            <Checkbox label={t("pay.clearFio")} checked={clear()} onChange={setClear} />
+          </Show>
+          <ApiProblem error={save.error} />
+          <div class="border-t border-border pt-4">
+            <Button type="submit" variant="confirm" loading={save.isPending}>
+              {t("pay.saveAccount")}
+            </Button>
+          </div>
+        </fieldset>
+      </form>
+    </Card>
   );
 }
 
@@ -331,73 +330,72 @@ function PaymentRow(props: { method: Schemas["PaymentMethod"] }) {
     },
   }));
   return (
-    <form
-      class="rounded-md border border-border p-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const minutes =
-          props.method.kind === "cod" || timeout().trim() === "" ? null : Number(timeout());
-        const order = Number(position());
-        const valid =
-          (minutes === null ||
-            (/^\d+$/.test(timeout()) &&
-              Number.isInteger(minutes) &&
-              minutes >= 5 &&
-              minutes <= 43200)) &&
-          /^-?\d+$/.test(position()) &&
-          Number.isInteger(order) &&
-          order >= -2147483648 &&
-          order <= 2147483647;
-        setInvalid(!valid);
-        if (valid)
-          save.mutate({
-            enabled: enabled(),
-            name_i18n: cleanTranslations(names()),
-            timeout_minutes: minutes,
-            position: order,
-          });
-      }}
-    >
-      <fieldset disabled={save.isPending} class="flex flex-col gap-3">
-        <legend class="mb-3 font-semibold">{t(`paymentKinds.${props.method.kind}`)}</legend>
-        <Show when={!props.method.available}>
-          <p class="text-sm text-warning-700">{unavailableText(props.method.unavailable_reason)}</p>
-        </Show>
-        <Checkbox label={t("payments.enabled")} checked={enabled()} onChange={setEnabled} />
-        <TranslationFields
-          label={t("payments.nameOverride")}
-          values={names()}
-          onChange={setNames}
-        />
-        <div class="grid gap-3 sm:grid-cols-2">
-          <Show when={props.method.kind !== "cod"}>
-            <TextField
-              label={t("payments.timeout")}
-              description={t("payments.timeoutHint")}
-              value={timeout()}
-              inputMode="numeric"
-              onChange={setTimeout}
-            />
+    <Card title={t(`paymentKinds.${props.method.kind}`)}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const minutes =
+            props.method.kind === "cod" || timeout().trim() === "" ? null : Number(timeout());
+          const order = Number(position());
+          const valid =
+            (minutes === null ||
+              (/^\d+$/.test(timeout()) &&
+                Number.isInteger(minutes) &&
+                minutes >= 5 &&
+                minutes <= 43200)) &&
+            /^-?\d+$/.test(position()) &&
+            Number.isInteger(order) &&
+            order >= -2147483648 &&
+            order <= 2147483647;
+          setInvalid(!valid);
+          if (valid)
+            save.mutate({
+              enabled: enabled(),
+              name_i18n: cleanTranslations(names()),
+              timeout_minutes: minutes,
+              position: order,
+            });
+        }}
+      >
+        <fieldset disabled={save.isPending} class="flex flex-col gap-4">
+          <legend class="sr-only">{t(`paymentKinds.${props.method.kind}`)}</legend>
+          <Show when={!props.method.available}>
+            <Alert tone="warning">{unavailableText(props.method.unavailable_reason)}</Alert>
           </Show>
-          <TextField
-            label={t("checkout.position")}
-            value={position()}
-            inputMode="numeric"
-            onChange={setPosition}
+          <Checkbox label={t("payments.enabled")} checked={enabled()} onChange={setEnabled} />
+          <TranslationFields
+            label={t("payments.nameOverride")}
+            values={names()}
+            onChange={setNames}
           />
-        </div>
-        <Show when={invalid()}>
-          <p role="alert" class="text-sm text-error-700">
-            {t("payments.invalid")}
-          </p>
-        </Show>
-        <ApiProblem error={save.error} />
-        <div>
-          <Button type="submit" variant="primary" loading={save.isPending}>
-            {t("common.save")}
-          </Button>
-        </div>
-      </fieldset>
-    </form>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <Show when={props.method.kind !== "cod"}>
+              <TextField
+                label={t("payments.timeout")}
+                description={t("payments.timeoutHint")}
+                value={timeout()}
+                inputMode="numeric"
+                onChange={setTimeout}
+              />
+            </Show>
+            <TextField
+              label={t("checkout.position")}
+              value={position()}
+              inputMode="numeric"
+              onChange={setPosition}
+            />
+          </div>
+          <Show when={invalid()}>
+            <Alert tone="error">{t("payments.invalid")}</Alert>
+          </Show>
+          <ApiProblem error={save.error} />
+          <div class="border-t border-border pt-4">
+            <Button type="submit" variant="confirm" loading={save.isPending}>
+              {t("common.save")}
+            </Button>
+          </div>
+        </fieldset>
+      </form>
+    </Card>
   );
 }

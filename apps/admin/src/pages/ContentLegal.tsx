@@ -1,4 +1,13 @@
-import { Badge, Button, Checkbox, showToast, TextField } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  linkClass,
+  showToast,
+  TextField,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Show } from "solid-js";
@@ -105,38 +114,43 @@ export default function ContentLegal() {
   return (
     <>
       <PageHeader title={t("content.legal")} />
-      <div class="flex max-w-4xl flex-col gap-6">
+      <div class="flex max-w-4xl flex-col gap-4">
         <QueryState query={report}>
           {(data) => (
-            <section
+            <Card
               aria-label={t("content.checklist")}
-              class="rounded-md border border-border bg-card p-4"
+              padding="none"
+              title={t("content.checklist")}
+              actions={
+                <Badge tone={data.ready ? "success" : "warning"}>
+                  {t(data.ready ? "content.ready" : "content.notReady")}
+                </Badge>
+              }
+              footer={<p class="text-sm text-muted-foreground">{data.notice}</p>}
             >
-              <h2 class="mb-3 font-semibold">{t("content.checklist")}</h2>
-              <Badge tone={data.ready ? "success" : "warning"}>
-                {t(data.ready ? "content.ready" : "content.notReady")}
-              </Badge>
-              <ul class="mt-3 divide-y divide-border">
+              <ul class="divide-y divide-border">
                 <For each={data.checks}>
                   {(check) => (
-                    <li class="py-3">
+                    <li class="px-4 py-3">
                       <div class="flex flex-wrap items-center gap-2">
-                        <h3 class="text-sm font-semibold">{t(`content.${check.code}`)}</h3>
+                        <h3 class="text-sm font-semibold text-heading">
+                          {t(`content.${check.code}`)}
+                        </h3>
                         <Badge tone={check.ok ? "success" : "warning"}>
                           {t(check.ok ? "content.ok" : "content.missing")}
                         </Badge>
-                        <A class="text-sm text-accent-700 hover:underline" href={FIX[check.code]}>
+                        <A class={`ml-auto text-sm ${linkClass}`} href={FIX[check.code]}>
                           {t("content.fix")}
                           <span class="sr-only">: {t(`content.${check.code}`)}</span>
                         </A>
                       </div>
-                      <ul class="mt-1 list-inside list-disc text-sm">
+                      <ul class="mt-1 list-inside list-disc text-sm text-muted-foreground">
                         <For each={check.missing}>
                           {(value) => <li>{missingLabel(value, labels())}</li>}
                         </For>
                       </ul>
                       <Show when={check.missing_count > check.missing.length}>
-                        <p class="text-sm">
+                        <p class="text-sm text-muted-foreground">
                           {t("content.truncated")} ({check.missing_count})
                         </p>
                       </Show>
@@ -144,19 +158,21 @@ export default function ContentLegal() {
                   )}
                 </For>
               </ul>
-              <p class="mt-3 text-sm">{data.notice}</p>
-            </section>
+            </Card>
           )}
         </QueryState>
         <Show when={error()}>
-          <p role="alert" class="text-error-700">
-            {error()}
-          </p>
+          <Alert tone="error">{error()}</Alert>
         </Show>
-        <section id="legal-entity" aria-label={t("content.legal_entity")}>
-          <h2 class="mb-3 font-semibold">{t("content.legal_entity")}</h2>
+        <Card
+          id="legal-entity"
+          aria-label={t("content.legal_entity")}
+          title={t("content.legal_entity")}
+        >
           <Show when={!can("admin")}>
-            <p class="mb-3 text-sm">{t("content.readOnly")}</p>
+            <Alert tone="info" class="mb-4">
+              {t("content.readOnly")}
+            </Alert>
           </Show>
           <QueryState query={entity}>
             {() => (
@@ -165,9 +181,9 @@ export default function ContentLegal() {
                   e.preventDefault();
                   if (can("admin")) save.mutate();
                 }}
-                class="flex flex-col gap-3"
+                class="flex flex-col gap-5"
               >
-                <div class="grid gap-3 sm:grid-cols-2">
+                <div class="grid gap-5 sm:grid-cols-2">
                   <For each={FIELDS}>
                     {(field) => (
                       <TextField
@@ -187,8 +203,8 @@ export default function ContentLegal() {
                   </For>
                 </div>
                 <Show when={can("admin")}>
-                  <div>
-                    <Button type="submit" variant="primary" loading={save.isPending}>
+                  <div class="border-t border-border pt-4">
+                    <Button type="submit" variant="confirm" loading={save.isPending}>
                       {t("common.save")}
                     </Button>
                   </div>
@@ -196,54 +212,57 @@ export default function ContentLegal() {
               </form>
             )}
           </QueryState>
-        </section>
-        <section aria-label={t("content.install")}>
-          <h2 class="mb-3 font-semibold">{t("content.install")}</h2>
-          <p
-            role="note"
-            class="mb-3 rounded-md border border-warning-700 bg-warning-50 p-3 text-sm"
-          >
-            {t("content.notice")}
-          </p>
-          <Show when={can("admin")}>
-            <div class="mb-3 flex flex-wrap gap-4">
-              <For each={CONTENT_LOCALES}>
-                {(l) => (
-                  <Checkbox
-                    label={l.toUpperCase()}
-                    checked={locales().includes(l)}
-                    onChange={(on) =>
-                      setLocales((ls) => (on ? [...ls, l] : ls.filter((x) => x !== l)))
-                    }
-                  />
-                )}
-              </For>
-            </div>
-            <Button
-              disabled={!locales().length}
-              loading={install.isPending}
-              onClick={() => install.mutate()}
-            >
-              {t("content.install")}
-            </Button>
-          </Show>
-          <Show when={installed()}>
-            {(result) => (
-              <div role="status" class="my-3 text-sm">
-                <p>
-                  {t("content.installed", {
+        </Card>
+        <Card
+          aria-label={t("content.install")}
+          title={t("content.install")}
+          footer={
+            <A href="/content/pages" class={`text-sm ${linkClass}`}>
+              {t("content.pages")} →
+            </A>
+          }
+        >
+          <div class="flex flex-col gap-4">
+            <Alert tone="warning">{t("content.notice")}</Alert>
+            <Show when={can("admin")}>
+              <div class="flex flex-wrap gap-4">
+                <For each={CONTENT_LOCALES}>
+                  {(l) => (
+                    <Checkbox
+                      label={l.toUpperCase()}
+                      checked={locales().includes(l)}
+                      onChange={(on) =>
+                        setLocales((ls) => (on ? [...ls, l] : ls.filter((x) => x !== l)))
+                      }
+                    />
+                  )}
+                </For>
+              </div>
+              <Button
+                class="self-start"
+                disabled={!locales().length}
+                loading={install.isPending}
+                onClick={() => install.mutate()}
+              >
+                {t("content.install")}
+              </Button>
+            </Show>
+            <Show when={installed()}>
+              {(result) => (
+                <Alert
+                  live
+                  tone="success"
+                  title={t("content.installed", {
                     created: result().created.length,
                     skipped: result().skipped.length,
                   })}
-                </p>
-                <p class="mt-2 font-medium">{result().notice}</p>
-              </div>
-            )}
-          </Show>
-          <A href="/content/pages" class="mt-3 block text-sm text-accent-700 hover:underline">
-            {t("content.pages")} →
-          </A>
-        </section>
+                >
+                  {result().notice}
+                </Alert>
+              )}
+            </Show>
+          </div>
+        </Card>
       </div>
     </>
   );

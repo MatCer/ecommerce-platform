@@ -4,9 +4,9 @@ import type {
   WithdrawalForm as Form,
   WithdrawalReceipt,
 } from "@platform/storefront-sdk/types";
-import { Button, TextField } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 
 export default function WithdrawalForm(props: {

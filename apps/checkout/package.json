@@ -10,8 +10,8 @@
   "dependencies": {
     "@astrojs/cloudflare": "catalog:",
     "@astrojs/solid-js": "catalog:",
+    "@kobalte/core": "0.13.14",
     "@platform/storefront-sdk": "workspace:*",
-    "@platform/ui": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "astro": "catalog:",
     "solid-js": "catalog:",

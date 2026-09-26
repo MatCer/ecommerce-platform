@@ -1,6 +1,14 @@
-import { Button, Checkbox, Dialog, TextField } from "@platform/ui";
+import { Alert, Button, Checkbox, Dialog, TextField } from "@platform/ui";
 import { createMutation } from "@tanstack/solid-query";
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  For,
+  onCleanup,
+  Show,
+} from "solid-js";
 import { t } from "../../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../../lib/api.ts";
 import { needsRefundIban, type RefundForm, refundInput } from "../../lib/fulfillment.ts";
@@ -9,14 +17,14 @@ import { useFulfillmentRefresh } from "./shared.tsx";
 
 export function RefundResult(props: { result: Schemas["RefundOutcome"] }) {
   return (
-    <div role="status" aria-live="polite" class="grid gap-1 text-sm">
+    <Alert live tone="success">
       <p>{t("fulfillment.refundResult", { amount: props.result.plan.amount.formatted })}</p>
       <Show when={props.result.credit_note_id}>
         <p class="break-all">
           {t("fulfillment.creditNote")}: {props.result.credit_note_id}
         </p>
       </Show>
-    </div>
+    </Alert>
   );
 }
 
@@ -87,28 +95,51 @@ export function RefundDialog(props: { order: Schemas["OrderView"]; onClose: () =
       void refresh();
     },
   }));
+  const formId = createUniqueId();
   return (
     <Dialog
       open
       onOpenChange={(open) => !open && !submit.isPending && props.onClose()}
       title={t("fulfillment.refund")}
+      footer={
+        <Show
+          when={result()}
+          fallback={
+            <>
+              <Button disabled={submit.isPending} onClick={props.onClose}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="submit"
+                form={formId}
+                variant="confirm"
+                loading={submit.isPending}
+                disabled={!input() || !currentPreview() || previewPending()}
+              >
+                {t("fulfillment.refund")}
+              </Button>
+            </>
+          }
+        >
+          <Button onClick={props.onClose}>{t("common.close")}</Button>
+        </Show>
+      }
     >
       <Show
         when={result()}
         fallback={
           <form
-            class="grid gap-3"
+            id={formId}
+            class="grid gap-4"
             onSubmit={(event) => {
               event.preventDefault();
               const body = input();
               if (body && currentPreview() && !submit.isPending) submit.mutate(body);
             }}
           >
-            <fieldset disabled={submit.isPending} class="grid min-w-0 gap-3">
+            <fieldset disabled={submit.isPending} class="grid min-w-0 gap-4">
               <Show when={lines().some((line) => !line.id)}>
-                <p role="alert" class="text-sm text-warning-700">
-                  {t("fulfillment.missingLineIds")}
-                </p>
+                <Alert tone="warning">{t("fulfillment.missingLineIds")}</Alert>
               </Show>
               <For each={props.order.lines}>
                 {(line, index) => (
@@ -158,8 +189,12 @@ export function RefundDialog(props: { order: Schemas["OrderView"]; onClose: () =
                 maxLength={42}
               />
             </fieldset>
-            <div role="status" aria-live="polite" class="grid gap-2 text-sm">
-              <h3 class="font-medium">{t("fulfillment.preview")}</h3>
+            <div
+              role="status"
+              aria-live="polite"
+              class="grid gap-1 rounded-md border border-border bg-subtle p-3 text-sm"
+            >
+              <h3 class="font-semibold text-heading">{t("fulfillment.preview")}</h3>
               <Show when={previewPending()}>{t("common.loading")}</Show>
               <Show
                 when={currentPreview()}
@@ -174,7 +209,7 @@ export function RefundDialog(props: { order: Schemas["OrderView"]; onClose: () =
                         </p>
                       )}
                     </For>
-                    <p class="font-semibold">
+                    <p class="figures font-semibold text-heading">
                       {t("orders.total")}: {plan().amount.formatted}
                     </p>
                     <Show when={plan().full}>
@@ -186,28 +221,10 @@ export function RefundDialog(props: { order: Schemas["OrderView"]; onClose: () =
             </div>
             <ApiProblem error={previewError()} />
             <ApiProblem error={submit.error} />
-            <div class="flex justify-end gap-2">
-              <Button disabled={submit.isPending} onClick={props.onClose}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                loading={submit.isPending}
-                disabled={!input() || !currentPreview() || previewPending()}
-              >
-                {t("fulfillment.refund")}
-              </Button>
-            </div>
           </form>
         }
       >
-        {(outcome) => (
-          <>
-            <RefundResult result={outcome()} />
-            <Button onClick={props.onClose}>{t("common.close")}</Button>
-          </>
-        )}
+        {(outcome) => <RefundResult result={outcome()} />}
       </Show>
     </Dialog>
   );

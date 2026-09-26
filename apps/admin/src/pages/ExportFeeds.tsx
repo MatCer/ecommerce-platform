@@ -1,4 +1,4 @@
-import { Button, EmptyState, showToast } from "@platform/ui";
+import { Alert, Button, Card, EmptyState, linkClass, showToast } from "@platform/ui";
 import { createMutation, createQuery } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -39,75 +39,84 @@ export default function ExportFeeds() {
         title={t("content.feeds")}
         actions={
           <Show when={can("admin")}>
-            <Button loading={regenerate.isPending} onClick={() => regenerate.mutate()}>
+            <Button icon="retry" loading={regenerate.isPending} onClick={() => regenerate.mutate()}>
               {t("content.regenerate")}
             </Button>
           </Show>
         }
       />
       <Show when={error()}>
-        <p role="alert" class="text-error-700">
+        <Alert tone="error" class="mb-4">
           {error()}
-        </p>
+        </Alert>
       </Show>
       <QueryState query={query}>
         {(data) => (
-          <Show when={data.items.length} fallback={<EmptyState title={t("content.noEntries")} />}>
-            <div class="overflow-x-auto">
-              <table class={tableClass} aria-label={t("content.feeds")}>
-                <thead>
-                  <tr>
-                    <Th>{t("content.market")}</Th>
-                    <Th>{t("content.channel")}</Th>
-                    <Th>{t("content.url")}</Th>
-                    <Th>{t("content.items")}</Th>
-                    <Th>{t("content.size")}</Th>
-                    <Th>{t("content.generated")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(f) => (
-                      <tr>
-                        <td class={tdClass}>{f.market_code}</td>
-                        <td class={tdClass}>{CHANNELS[f.channel]}</td>
-                        <td class={`${tdClass} max-w-80 break-all`}>
-                          <Show when={f.url} fallback={t("content.noDomain")}>
-                            {(url) => (
-                              <>
-                                <a
-                                  href={url()}
-                                  class="text-accent-700 hover:underline"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {url()}
-                                </a>
-                                <Button
-                                  aria-label={`${t("content.copy")}: ${f.market_code} ${CHANNELS[f.channel]}`}
-                                  onClick={() => void copy(url())}
-                                >
-                                  {t("content.copy")}
-                                </Button>
-                              </>
-                            )}
-                          </Show>
-                        </td>
-                        <td class={tdClass}>{f.items ?? "—"}</td>
-                        <td class={tdClass}>
-                          {f.bytes == null ? "—" : `${f.bytes.toLocaleString()} B`}
-                        </td>
-                        <td class={tdClass}>
-                          {f.generated_at
-                            ? formatDateTime(f.generated_at)
-                            : t("content.notGenerated")}
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+          <Show
+            when={data.items.length}
+            fallback={<EmptyState icon="export" title={t("content.noEntries")} />}
+          >
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass} aria-label={t("content.feeds")}>
+                  <thead>
+                    <tr>
+                      <Th>{t("content.market")}</Th>
+                      <Th>{t("content.channel")}</Th>
+                      <Th>{t("content.url")}</Th>
+                      <Th class="text-right">{t("content.items")}</Th>
+                      <Th class="text-right">{t("content.size")}</Th>
+                      <Th class="text-right">{t("content.generated")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(f) => (
+                        <tr>
+                          <td class={`${tdClass} font-mono text-xs uppercase`}>{f.market_code}</td>
+                          <td class={`${tdClass} font-semibold text-heading`}>
+                            {CHANNELS[f.channel]}
+                          </td>
+                          <td class={`${tdClass} max-w-96`}>
+                            <Show when={f.url} fallback={t("content.noDomain")}>
+                              {(url) => (
+                                <div class="flex items-center gap-2">
+                                  <a
+                                    href={url()}
+                                    class={`min-w-0 break-all ${linkClass}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    {url()}
+                                  </a>
+                                  <Button
+                                    category="tertiary"
+                                    size="small"
+                                    aria-label={`${t("content.copy")}: ${f.market_code} ${CHANNELS[f.channel]}`}
+                                    onClick={() => void copy(url())}
+                                  >
+                                    {t("content.copy")}
+                                  </Button>
+                                </div>
+                              )}
+                            </Show>
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>{f.items ?? "—"}</td>
+                          <td class={`${tdClass} figures text-right whitespace-nowrap`}>
+                            {f.bytes == null ? "—" : `${f.bytes.toLocaleString()} B`}
+                          </td>
+                          <td class={`${tdClass} figures text-right text-muted-foreground`}>
+                            {f.generated_at
+                              ? formatDateTime(f.generated_at)
+                              : t("content.notGenerated")}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>

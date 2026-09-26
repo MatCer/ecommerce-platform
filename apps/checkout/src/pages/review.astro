@@ -1,8 +1,8 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import { Button, controlClass } from "@platform/ui";
 import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../lib/api";
+import { Button, controlClass } from "../ui.tsx";
 
 // Review form (WP16), reached through a review link (one per delivered order line, single
 // use). A plain POST form, no JS: `/_p/reviews` submits it and 303s back here with `done=1`,

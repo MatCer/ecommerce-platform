@@ -1,4 +1,4 @@
-import { Badge, Button, Dialog, PermissionDenied, showToast, TextField } from "@platform/ui";
+import { Badge, Button, Card, Dialog, PermissionDenied, showToast, TextField } from "@platform/ui";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { ApiProblem } from "../components/CheckoutSettings.tsx";
@@ -96,29 +96,39 @@ function CarrierForm(props: {
   }));
   const pending = () => save.isPending || remove.isPending;
   return (
-    <section class="rounded-md border border-border p-4">
-      <h2 class="mb-3 font-semibold">{packeta() ? "Packeta" : "PPL"}</h2>
-      <div class="mb-3 grid gap-2 text-sm">
+    <Card
+      title={packeta() ? "Packeta" : "PPL"}
+      actions={
         <Badge tone={props.account?.configured ? "success" : "neutral"}>
           {props.account?.configured ? t("fulfillment.configured") : t("fulfillment.notConfigured")}
         </Badge>
-        <Show when={props.account?.public_key}>
-          <p class="break-all">
-            {t("fulfillment.publicKey")}: {props.account?.public_key}
-          </p>
-        </Show>
-        <Show when={props.account?.updated_at}>
-          {(at) => <time dateTime={at()}>{formatDateTime(at())}</time>}
-        </Show>
-      </div>
+      }
+    >
+      <Show when={props.account?.public_key || props.account?.updated_at}>
+        <div class="mb-4 flex flex-col gap-1 text-sm text-muted-foreground">
+          <Show when={props.account?.public_key}>
+            <p class="break-all">
+              {t("fulfillment.publicKey")}:{" "}
+              <span class="font-mono text-xs text-foreground">{props.account?.public_key}</span>
+            </p>
+          </Show>
+          <Show when={props.account?.updated_at}>
+            {(at) => (
+              <time class="figures" dateTime={at()}>
+                {formatDateTime(at())}
+              </time>
+            )}
+          </Show>
+        </div>
+      </Show>
       <form
-        class="grid gap-3"
+        class="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           if (passwordValid() && !pending()) save.mutate();
         }}
       >
-        <fieldset disabled={pending()} class="grid min-w-0 gap-3">
+        <fieldset disabled={pending()} class="flex min-w-0 flex-col gap-4">
           <TextField
             label={t("fulfillment.senderLabel")}
             required
@@ -160,14 +170,14 @@ function CarrierForm(props: {
             />
           </Show>
           <Show when={props.account?.configured}>
-            <p class="text-xs text-muted-foreground">{t("fulfillment.secretHint")}</p>
+            <p class="text-sm text-muted-foreground">{t("fulfillment.secretHint")}</p>
           </Show>
         </fieldset>
         <ApiProblem error={save.error} />
-        <div class="flex gap-2">
+        <div class="flex gap-2 border-t border-border pt-4">
           <Button
             type="submit"
-            variant="primary"
+            variant="confirm"
             loading={save.isPending}
             disabled={pending() || !passwordValid()}
           >
@@ -175,6 +185,8 @@ function CarrierForm(props: {
           </Button>
           <Show when={props.account?.configured}>
             <Button
+              variant="danger"
+              category="secondary"
               disabled={pending()}
               onClick={() => {
                 remove.reset();
@@ -202,6 +214,6 @@ function CarrierForm(props: {
           </Button>
         </div>
       </Dialog>
-    </section>
+    </Card>
   );
 }

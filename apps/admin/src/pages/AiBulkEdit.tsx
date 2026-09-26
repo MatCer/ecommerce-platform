@@ -3,7 +3,17 @@
  * allowlisted operations, the API resolves the products and shows a count + preview (the dry
  * run), and only a confirmation applies it (a job with progress).
  */
-import { Badge, Button, ConfirmDialog, Spinner, TextField } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  linkClass,
+  ProgressBar,
+  Spinner,
+  TextField,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
@@ -130,39 +140,41 @@ export default function AiBulkEdit() {
         }
       />
       <div class="flex max-w-4xl flex-col gap-5">
-        <form
-          class="flex flex-col gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!planning() && prompt().trim()) create.mutate();
-          }}
-        >
-          <TextField
-            label={t("ai.prompt")}
-            description={t("ai.promptHint")}
-            multiline
-            rows={3}
-            maxLength={2000}
-            value={prompt()}
-            onChange={setPrompt}
-            disabled={planning()}
-          />
-          <div class="flex flex-wrap gap-2">
-            <Button
-              type="submit"
-              variant="primary"
-              loading={planning()}
-              disabled={!prompt().trim()}
-            >
-              {t("ai.plan")}
-            </Button>
-            <Show when={planId()}>
-              <Button onClick={reset}>{t("ai.newPlan")}</Button>
-            </Show>
-          </div>
-        </form>
+        <Card>
+          <form
+            class="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!planning() && prompt().trim()) create.mutate();
+            }}
+          >
+            <TextField
+              label={t("ai.prompt")}
+              description={t("ai.promptHint")}
+              multiline
+              rows={3}
+              maxLength={2000}
+              value={prompt()}
+              onChange={setPrompt}
+              disabled={planning()}
+            />
+            <div class="flex flex-wrap gap-2">
+              <Button
+                type="submit"
+                variant="confirm"
+                loading={planning()}
+                disabled={!prompt().trim()}
+              >
+                {t("ai.plan")}
+              </Button>
+              <Show when={planId()}>
+                <Button onClick={reset}>{t("ai.newPlan")}</Button>
+              </Show>
+            </div>
+          </form>
+        </Card>
 
-        <div aria-live="polite">
+        <div aria-live="polite" class="empty:hidden">
           <Show when={planning()}>
             <p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner size="sm" />
@@ -172,147 +184,147 @@ export default function AiBulkEdit() {
         </div>
 
         <Show when={error()}>
-          <div role="alert" class="rounded-md bg-error-50 px-3 py-2 text-sm text-error-700">
+          <Alert tone="error">
             <Show when={quotaExceeded()} fallback={errorMessage(error())}>
               {t("ai.quotaExceeded")}{" "}
-              <A href="/settings/ai" class="underline">
+              <A href="/settings/ai" class={linkClass}>
                 {t("ai.seeUsage")}
               </A>
             </Show>
-          </div>
+          </Alert>
         </Show>
 
         <Show when={plan.isError}>
-          <div
-            role="alert"
-            class="flex flex-wrap items-center gap-2 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700"
+          <Alert
+            tone="error"
+            actions={<Button onClick={() => void plan.refetch()}>{t("common.retry")}</Button>}
           >
             {errorMessage(plan.error)}
-            <Button onClick={() => void plan.refetch()}>{t("common.retry")}</Button>
-          </div>
+          </Alert>
         </Show>
 
         <Show when={plan.data && plan.data.status !== "pending" ? plan.data : undefined}>
           {(p) => (
-            <section aria-labelledby="plan-h" class="flex flex-col gap-4">
-              <h2 id="plan-h" class="text-base font-semibold">
-                {t("ai.explanation")}
-              </h2>
-              <Show when={p().plan}>
-                {(pl) => (
-                  <div class="grid gap-4 md:grid-cols-2">
-                    <div class="flex flex-col gap-1">
-                      <p class="text-sm">{pl().explanation}</p>
-                      <h3 class="mt-2 text-sm font-medium">{t("ai.operations")}</h3>
-                      <ul class="ml-4 list-disc text-sm">
-                        <For each={pl().operations}>{(op) => <li>{describe(op)}</li>}</For>
-                      </ul>
+            <Card labelledBy="plan-h" title={t("ai.explanation")}>
+              <div class="flex flex-col gap-4">
+                <Show when={p().plan}>
+                  {(pl) => (
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <div class="flex flex-col gap-1">
+                        <p class="text-sm">{pl().explanation}</p>
+                        <h3 class="mt-2 text-sm font-semibold text-heading">
+                          {t("ai.operations")}
+                        </h3>
+                        <ul class="ml-4 list-disc text-sm">
+                          <For each={pl().operations}>{(op) => <li>{describe(op)}</li>}</For>
+                        </ul>
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-semibold text-heading">{t("ai.selection")}</h3>
+                        <ul class="ml-4 list-disc text-sm">
+                          <For each={selection(pl().selector)}>{(s) => <li>{s}</li>}</For>
+                        </ul>
+                      </div>
                     </div>
-                    <div class="flex flex-col gap-1">
-                      <h3 class="text-sm font-medium">{t("ai.selection")}</h3>
-                      <ul class="ml-4 list-disc text-sm">
-                        <For each={selection(pl().selector)}>{(s) => <li>{s}</li>}</For>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </Show>
+                  )}
+                </Show>
 
-              <Switch>
-                <Match when={p().status === "rejected" || p().status === "failed"}>
-                  <div role="alert" class="rounded-md bg-error-50 px-3 py-2 text-sm text-error-700">
-                    <p class="font-medium">{t("ai.rejected")}</p>
-                    <ul class="ml-4 list-disc">
-                      <For each={p().errors}>
-                        {(e) => (
-                          <li>{e.startsWith("ai_") ? errorMessage(new ApiError(422, e)) : e}</li>
-                        )}
-                      </For>
-                    </ul>
-                  </div>
-                </Match>
-                <Match when={p().status === "ready"}>
-                  <p class="text-sm font-medium">{t("ai.matching", { count: p().target_count })}</p>
-                  <div class="overflow-x-auto">
-                    <table class={tableClass} aria-label={t("ai.preview")}>
-                      <caption class="mb-1 text-left text-xs text-muted-foreground">
-                        {t("ai.preview")}
-                      </caption>
-                      <thead>
-                        <tr>
-                          <Th>{t("ai.product")}</Th>
-                          <Th>{t("ai.what")}</Th>
-                          <Th>{t("ai.before")}</Th>
-                          <Th>{t("ai.after")}</Th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={p().sample}>
-                          {(row) => (
-                            <For each={row.changes}>
-                              {(c, i) => (
-                                <tr>
-                                  <td class={tdClass}>
-                                    <Show when={i() === 0}>
-                                      <A
-                                        href={`/products/${row.product_id}`}
-                                        class="hover:underline"
-                                      >
-                                        {row.name}
-                                      </A>
-                                    </Show>
-                                  </td>
-                                  <td class={tdClass}>{c.what}</td>
-                                  <td class={`${tdClass} figures text-muted-foreground`}>
-                                    {c.before || "–"}
-                                  </td>
-                                  <td class={`${tdClass} figures font-medium`}>{c.after}</td>
-                                </tr>
-                              )}
-                            </For>
+                <Switch>
+                  <Match when={p().status === "rejected" || p().status === "failed"}>
+                    <Alert tone="error" title={t("ai.rejected")}>
+                      <ul class="ml-4 list-disc">
+                        <For each={p().errors}>
+                          {(e) => (
+                            <li>{e.startsWith("ai_") ? errorMessage(new ApiError(422, e)) : e}</li>
                           )}
                         </For>
-                      </tbody>
-                    </table>
-                  </div>
-                  <Show when={p().needs_fresh_auth}>
-                    <p class="text-xs text-muted-foreground">{t("ai.freshAuthHint")}</p>
-                  </Show>
-                  <div>
-                    <Button variant="primary" onClick={() => setConfirming(true)}>
-                      {t("ai.apply", { count: p().target_count })}
-                    </Button>
-                  </div>
-                </Match>
-                <Match when={p().status === "applying"}>
-                  <div class="flex flex-col gap-1" role="status">
-                    <p class="text-sm">
-                      {t("ai.applying", {
-                        done: (p().progress.done ?? 0) + (p().progress.skipped ?? 0),
-                        total: p().progress.total ?? p().target_count,
-                      })}
+                      </ul>
+                    </Alert>
+                  </Match>
+                  <Match when={p().status === "ready"}>
+                    <p class="text-sm font-semibold text-heading">
+                      {t("ai.matching", { count: p().target_count })}
                     </p>
-                    <progress
-                      class="h-2 w-full max-w-md accent-accent-600"
-                      max={p().progress.total || 1}
-                      value={(p().progress.done ?? 0) + (p().progress.skipped ?? 0)}
-                      aria-label={t("ai.progress")}
-                    />
-                  </div>
-                </Match>
-                <Match when={p().status === "applied"}>
-                  <p
-                    role="status"
-                    class="rounded-md bg-success-50 px-3 py-2 text-sm text-success-700"
-                  >
-                    {t("ai.applied", {
-                      done: p().progress.done ?? 0,
-                      skipped: p().progress.skipped ?? 0,
-                    })}
-                  </p>
-                </Match>
-              </Switch>
-            </section>
+                    <div class="overflow-x-auto rounded-md border border-border">
+                      <table class={tableClass} aria-label={t("ai.preview")}>
+                        <caption class="border-b border-border bg-subtle px-3 py-2 text-left text-sm font-semibold text-heading">
+                          {t("ai.preview")}
+                        </caption>
+                        <thead>
+                          <tr>
+                            <Th>{t("ai.product")}</Th>
+                            <Th>{t("ai.what")}</Th>
+                            <Th>{t("ai.before")}</Th>
+                            <Th>{t("ai.after")}</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <For each={p().sample}>
+                            {(row) => (
+                              <For each={row.changes}>
+                                {(c, i) => (
+                                  <tr>
+                                    <td class={tdClass}>
+                                      <Show when={i() === 0}>
+                                        <A
+                                          href={`/products/${row.product_id}`}
+                                          class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                                        >
+                                          {row.name}
+                                        </A>
+                                      </Show>
+                                    </td>
+                                    <td class={tdClass}>{c.what}</td>
+                                    <td class={`${tdClass} figures text-muted-foreground`}>
+                                      {c.before || "–"}
+                                    </td>
+                                    <td class={`${tdClass} figures font-semibold text-heading`}>
+                                      {c.after}
+                                    </td>
+                                  </tr>
+                                )}
+                              </For>
+                            )}
+                          </For>
+                        </tbody>
+                      </table>
+                    </div>
+                    <Show when={p().needs_fresh_auth}>
+                      <p class="text-sm text-muted-foreground">{t("ai.freshAuthHint")}</p>
+                    </Show>
+                    <div class="border-t border-border pt-4">
+                      <Button variant="confirm" onClick={() => setConfirming(true)}>
+                        {t("ai.apply", { count: p().target_count })}
+                      </Button>
+                    </div>
+                  </Match>
+                  <Match when={p().status === "applying"}>
+                    <div class="flex max-w-md flex-col gap-2" role="status">
+                      <p class="text-sm">
+                        {t("ai.applying", {
+                          done: (p().progress.done ?? 0) + (p().progress.skipped ?? 0),
+                          total: p().progress.total ?? p().target_count,
+                        })}
+                      </p>
+                      <ProgressBar
+                        tone="info"
+                        label={t("ai.progress")}
+                        max={p().progress.total || 1}
+                        value={(p().progress.done ?? 0) + (p().progress.skipped ?? 0)}
+                      />
+                    </div>
+                  </Match>
+                  <Match when={p().status === "applied"}>
+                    <Alert live tone="success">
+                      {t("ai.applied", {
+                        done: p().progress.done ?? 0,
+                        skipped: p().progress.skipped ?? 0,
+                      })}
+                    </Alert>
+                  </Match>
+                </Switch>
+              </div>
+            </Card>
           )}
         </Show>
       </div>

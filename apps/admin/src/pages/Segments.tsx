@@ -1,9 +1,12 @@
 import {
+  Alert,
   Button,
+  Card,
   Checkbox,
   ConfirmDialog,
   Dialog,
   EmptyState,
+  labelClass,
   SelectField,
   showToast,
   TextField,
@@ -49,7 +52,7 @@ function CheckList(props: {
 }) {
   return (
     <fieldset class="flex max-h-48 flex-col gap-1 overflow-y-auto">
-      <legend class="mb-1 text-xs font-medium text-muted-foreground">{props.legend}</legend>
+      <legend class={`mb-2 ${labelClass}`}>{props.legend}</legend>
       <For each={props.options}>
         {(o) => (
           <Checkbox
@@ -85,7 +88,7 @@ function ConditionFields(props: { c: ConditionForm; onChange: (c: ConditionForm)
     />
   );
   const range = (label: string, hint: string, money: boolean): JSX.Element => (
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-2 gap-3">
       <TextField
         label={`${label}: ${t("marketing.min")}`}
         inputMode={money ? "decimal" : "numeric"}
@@ -120,7 +123,7 @@ function ConditionFields(props: { c: ConditionForm; onChange: (c: ConditionForm)
         />
       </Match>
       <Match when={props.c.field === "subscribed" || props.c.field === "last_order"}>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 gap-3">
           <DateTimeField
             label={t("marketing.after")}
             value={props.c.after}
@@ -169,7 +172,7 @@ function ConditionFields(props: { c: ConditionForm; onChange: (c: ConditionForm)
         <Show when={props.c.dim === "category"} fallback={brands()}>
           {categoryList()}
         </Show>
-        <p class="text-xs text-muted-foreground">{t("marketing.affinityHint")}</p>
+        <p class="text-sm text-muted-foreground">{t("marketing.affinityHint")}</p>
       </Match>
     </Switch>
   );
@@ -185,7 +188,7 @@ export function RulesEditor(props: {
   const [adding, setAdding] = createSignal<ConditionField>("locale");
   const markets = useMarkets();
   return (
-    <section class="flex flex-col gap-3" aria-label={t("marketing.conditions")}>
+    <section class="flex flex-col gap-4" aria-label={t("marketing.conditions")}>
       <SelectField
         label={t("marketing.match")}
         value={props.match}
@@ -196,18 +199,18 @@ export function RulesEditor(props: {
         onChange={(v) => props.onChange(v === "any" ? "any" : "all", props.conditions)}
       />
       <Show when={props.conditions.length === 0}>
-        <p class="text-xs text-muted-foreground">{t("marketing.noConditions")}</p>
+        <p class="text-sm text-muted-foreground">{t("marketing.noConditions")}</p>
       </Show>
       <Index each={props.conditions}>
         {(c, i) => (
           <fieldset
-            class="flex min-w-0 flex-col gap-2 rounded-md border p-3"
+            class="flex min-w-0 flex-col gap-3 rounded-lg border p-4 pt-2"
             classList={{
               "border-error-600": props.invalid === i,
               "border-border": props.invalid !== i,
             }}
           >
-            <legend class="px-1 text-sm font-medium">
+            <legend class="px-1 text-sm font-semibold text-heading">
               {i + 1}. {t(`marketing.field_${c().field}`)}
             </legend>
             <ConditionFields
@@ -220,12 +223,15 @@ export function RulesEditor(props: {
               }
             />
             <Show when={props.invalid === i}>
-              <p role="alert" class="text-xs font-medium text-error-700">
+              <p role="alert" class="text-sm text-error-700">
                 {t("marketing.conditionIncomplete")}
               </p>
             </Show>
             <div>
               <Button
+                category="tertiary"
+                size="small"
+                icon="remove"
                 aria-label={`${t("common.remove")}: ${i + 1}. ${t(`marketing.field_${c().field}`)}`}
                 onClick={() => props.onChange(props.match, removeItem(props.conditions, i))}
               >
@@ -243,6 +249,7 @@ export function RulesEditor(props: {
           onChange={(v) => setAdding(CONDITION_FIELDS.find((f) => f === v) ?? "locale")}
         />
         <Button
+          icon="plus"
           disabled={props.conditions.length >= MAX_CONDITIONS}
           onClick={() =>
             props.onChange(props.match, [
@@ -262,28 +269,30 @@ export function RulesEditor(props: {
 export function PreviewResult(props: { data: Preview }) {
   return (
     <div class="flex flex-col gap-2">
-      <p role="status" class="text-sm font-medium">
+      <p role="status" class="text-sm font-semibold text-heading">
         {t("marketing.matching", { n: String(props.data.count) })}
       </p>
       <Show when={props.data.sample.length > 0}>
-        <table class={tableClass} aria-label={t("marketing.sample")}>
-          <thead>
-            <tr>
-              <Th>{t("marketing.email")}</Th>
-              <Th>{t("marketing.language")}</Th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={props.data.sample}>
-              {(m) => (
-                <tr>
-                  <td class={tdClass}>{m.email}</td>
-                  <td class={`${tdClass} text-xs uppercase`}>{m.locale}</td>
-                </tr>
-              )}
-            </For>
-          </tbody>
-        </table>
+        <div class="overflow-hidden rounded-md border border-border">
+          <table class={tableClass} aria-label={t("marketing.sample")}>
+            <thead>
+              <tr>
+                <Th>{t("marketing.email")}</Th>
+                <Th>{t("marketing.language")}</Th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={props.data.sample}>
+                {(m) => (
+                  <tr>
+                    <td class={tdClass}>{m.email}</td>
+                    <td class={`${tdClass} font-mono text-xs uppercase`}>{m.locale}</td>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
       </Show>
     </div>
   );
@@ -373,7 +382,7 @@ export default function Segments() {
     setEditing(s);
   };
   const newButton = () => (
-    <Button variant="primary" onClick={() => open("new")}>
+    <Button variant="confirm" onClick={() => open("new")}>
       {t("marketing.newSegment")}
     </Button>
   );
@@ -391,51 +400,52 @@ export default function Segments() {
             when={data.items.length > 0}
             fallback={
               <EmptyState
+                icon="filter"
                 title={t("marketing.noSegments")}
                 description={t("marketing.noSegmentsDesc")}
                 action={newButton()}
               />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("marketing.name")}</Th>
-                    <Th class="text-right">{t("marketing.conditions")}</Th>
-                    <Th>{t("marketing.updated")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(s) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>{s.name}</td>
-                        <td class={`${tdClass} figures text-right`}>
-                          {s.rules.conditions?.length ?? 0}
-                        </td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {formatDateTime(s.updated_at)}
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => open(s)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {s.name}</span>
-                          </Button>
-                          <Button variant="ghost" onClick={() => setDeleting(s)}>
-                            {t("common.delete")}
-                            <span class="sr-only">: {s.name}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("marketing.name")}</Th>
+                      <Th class="text-right">{t("marketing.conditions")}</Th>
+                      <Th>{t("marketing.updated")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(s) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{s.name}</td>
+                          <td class={`${tdClass} figures text-right`}>
+                            {s.rules.conditions?.length ?? 0}
+                          </td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {formatDateTime(s.updated_at)}
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => open(s)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {s.name}</span>
+                            </Button>
+                            <Button category="tertiary" size="small" onClick={() => setDeleting(s)}>
+                              {t("common.delete")}
+                              <span class="sr-only">: {s.name}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -447,7 +457,7 @@ export default function Segments() {
         size="md"
       >
         <form
-          class="flex flex-col gap-3"
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const target = editing();
@@ -472,7 +482,7 @@ export default function Segments() {
               setInvalid(undefined);
             }}
           />
-          <div class="flex flex-col gap-2 rounded-md bg-muted p-3">
+          <div class="flex flex-col gap-3 rounded-md border border-border bg-subtle p-3">
             <div>
               <Button
                 loading={runPreview.isPending}
@@ -488,15 +498,13 @@ export default function Segments() {
             <Show when={preview()}>{(p) => <PreviewResult data={p()} />}</Show>
           </div>
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={save.isPending}
               disabled={!form().name.trim()}
             >

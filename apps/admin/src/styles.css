@@ -1,8 +1,30 @@
 @import "tailwindcss";
 @import "@platform/config/tailwind/theme.css";
-@import "@fontsource-variable/inter";
 
 @source "../../../packages/ui/src";
+
+/* GitLab Sans (Inter-based) and GitLab Mono, variable fonts from @gitlab/fonts (OFL-1.1). */
+@font-face {
+  font-family: "GitLab Sans";
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("../node_modules/@gitlab/fonts/gitlab-sans/GitLabSans.woff2") format("woff2");
+}
+@font-face {
+  font-family: "GitLab Sans";
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+  src: url("../node_modules/@gitlab/fonts/gitlab-sans/GitLabSans-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "GitLab Mono";
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("../node_modules/@gitlab/fonts/gitlab-mono/GitLabMono.woff2") format("woff2");
+}
 
 /* Rich text inside the product/category editors and previews. */
 @layer components {

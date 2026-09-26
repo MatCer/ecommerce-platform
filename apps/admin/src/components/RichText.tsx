@@ -6,6 +6,7 @@
  * supported and has no replacement for this use; a full editor (Tiptap/ProseMirror, ~150 kB)
  * is disproportionate here.
  */
+import { labelClass } from "@platform/ui";
 import DOMPurify from "dompurify";
 import { createEffect, createSignal, createUniqueId, For, onCleanup, onMount } from "solid-js";
 import { t } from "../i18n/index.ts";
@@ -147,23 +148,23 @@ export function RichText(props: {
   };
 
   return (
-    <div class="flex flex-col gap-1">
-      <span id={`${id}-label`} class="text-xs font-medium text-muted-foreground">
+    <div class="flex flex-col gap-2">
+      <span id={`${id}-label`} class={labelClass}>
         {props.label}
       </span>
-      <div class="rounded-md border border-input bg-card focus-within:outline-2 focus-within:outline-ring">
+      <div class="overflow-hidden rounded-md border border-input bg-control hover:border-input-hover focus-within:border-heading focus-within:outline-2 focus-within:outline-ring">
         <div
           role="toolbar"
           aria-label={t("rte.toolbar")}
           aria-controls={id}
-          class="flex flex-wrap gap-0.5 border-b border-border p-1"
+          class="flex flex-wrap gap-0.5 border-b border-border bg-subtle p-1"
         >
           <For each={commands}>
             {(c) => (
               <button
                 type="button"
-                class="grid h-7 min-w-7 place-items-center rounded-sm px-1.5 text-xs font-semibold text-muted-foreground
-                  hover:bg-muted hover:text-foreground aria-pressed:bg-accent-50 aria-pressed:text-accent-700"
+                class="grid h-control-sm min-w-control-sm place-items-center rounded-sm px-1.5 text-xs font-semibold text-muted-foreground
+                  hover:bg-muted hover:text-heading aria-pressed:bg-primary aria-pressed:text-primary-foreground"
                 classList={{ italic: c.id === "italic" }}
                 aria-label={c.label()}
                 title={c.label()}
@@ -186,7 +187,7 @@ export function RichText(props: {
           aria-labelledby={`${id}-label`}
           tabIndex={0}
           contentEditable
-          class="prose-admin min-h-32 px-2.5 py-2 text-sm outline-none"
+          class="prose-admin min-h-32 px-3 py-2 text-sm text-foreground outline-none"
           onInput={emit}
           onPaste={onPaste}
           onKeyDown={onKeyDown}

@@ -1,8 +1,8 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import { Button } from "@platform/ui";
 import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../lib/api";
+import { Button } from "../ui.tsx";
 
 // Abandoned-cart reminder link (WP19). A GET never consumes the capability, so mail scanners
 // can open this page safely; the button's POST restores the cart once.

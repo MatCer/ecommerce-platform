@@ -1,4 +1,4 @@
-import { EmptyState, SelectField, TextField } from "@platform/ui";
+import { Alert, EmptyState, SelectField, TextField } from "@platform/ui";
 import { createSignal, For, type JSX, Show } from "solid-js";
 import { errorMessage, LOCALES, t } from "../i18n/index.ts";
 import { ApiError, type Schemas } from "../lib/api.ts";
@@ -17,7 +17,11 @@ export function MarketSettings(props: { children: (market: Schemas["Market"]) =>
         <Show
           when={market()}
           fallback={
-            <EmptyState title={t("checkout.noMarkets")} description={t("checkout.noMarketsDesc")} />
+            <EmptyState
+              icon="earth"
+              title={t("checkout.noMarkets")}
+              description={t("checkout.noMarketsDesc")}
+            />
           }
         >
           <div class="mb-4 max-w-sm">
@@ -46,7 +50,7 @@ export function TranslationFields(props: {
   onChange: (values: Record<string, string>) => void;
 }) {
   return (
-    <div class="grid gap-3 sm:grid-cols-3">
+    <div class="grid gap-4 sm:grid-cols-3">
       <For each={LOCALES}>
         {(l) => (
           <TextField
@@ -63,11 +67,11 @@ export function TranslationFields(props: {
 export function ApiProblem(props: { error: unknown }) {
   return (
     <Show when={Boolean(props.error)}>
-      <p role="alert" class="text-sm text-error-700">
+      <Alert tone="error">
         {props.error instanceof ApiError && props.error.detail
           ? props.error.detail
           : errorMessage(props.error)}
-      </p>
+      </Alert>
     </Show>
   );
 }

@@ -1,4 +1,4 @@
-import { Badge } from "@platform/ui";
+import { Badge, Collapse } from "@platform/ui";
 import { For, Show } from "solid-js";
 import { t } from "../i18n/index.ts";
 import type { Schemas } from "../lib/api.ts";
@@ -34,9 +34,9 @@ export function ExplainResult(props: { data: Explain }) {
       </Show>
       <Show
         when={r().items.length > 0}
-        fallback={<p class="text-sm">{t("recommendations.noResults")}</p>}
+        fallback={<p class="text-sm text-muted-foreground">{t("recommendations.noResults")}</p>}
       >
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto rounded-md border border-border">
           <table class={tableClass}>
             <caption class="sr-only">{t("recommendations.results")}</caption>
             <thead>
@@ -51,7 +51,7 @@ export function ExplainResult(props: { data: Explain }) {
               <For each={r().items}>
                 {(i) => (
                   <tr>
-                    <td class={`${tdClass} font-medium`}>{i.product.name}</td>
+                    <td class={`${tdClass} font-semibold text-heading`}>{i.product.name}</td>
                     <td class={`${tdClass} figures text-right`}>{i.product.price.formatted}</td>
                     <td class={tdClass}>
                       <Badge tone="info">{t(`recommendations.strategy_${i.strategy}`)}</Badge>
@@ -65,11 +65,8 @@ export function ExplainResult(props: { data: Explain }) {
         </div>
       </Show>
       <Show when={r().skipped.length > 0}>
-        <details>
-          <summary class="cursor-pointer text-sm font-medium">
-            {t("recommendations.skipped", { n: String(r().skipped.length) })}
-          </summary>
-          <ul class="mt-2 flex flex-col gap-1 text-sm">
+        <Collapse summary={t("recommendations.skipped", { n: String(r().skipped.length) })}>
+          <ul class="flex flex-col gap-1 text-sm">
             <For each={r().skipped}>
               {(s) => (
                 <li class="flex flex-wrap items-center gap-2">
@@ -82,7 +79,7 @@ export function ExplainResult(props: { data: Explain }) {
               )}
             </For>
           </ul>
-        </details>
+        </Collapse>
       </Show>
     </div>
   );
