@@ -1,40 +1,18 @@
-# Handoff: WP25 working state (2026-09-26)
+# Handoff: final state (2026-09-26)
 
-WP25 runs in worktree `chore/wp25-m3-acceptance`, based on `db1fae8` (WP15 M1 acceptance).
-The Git administrative path is read-only here: fetch, rebase, staging and commits fail. No push
-or PR was requested. This handoff describes worktree state; it does not claim a merge.
+`main` = WP25 merge. All work packages WP0–WP25 are merged (PRs #1–#31). No open PRs, no running
+agents, no leftover worktrees. M1, M2 and M3 acceptance suites run in the CI `acceptance` job
+(on push to main, or on PRs labelled `acceptance`): full Playwright e2e at 4 workers + `make perf`.
 
-## Implemented in this worktree
+| Milestone | Acceptance | Traceability |
+|---|---|---|
+| M1 local pilot | WP15 | README, `docs/runbook.md`, `docs/research/wp15-ci-round*.md` |
+| M2 marketing | WP21 | `docs/acceptance/m2.md` |
+| M3 AI | WP25 | `docs/acceptance/m3.md`, `docs/security/2026-09-final-review.md` |
 
-- The supplied security review is preserved in `docs/security/2026-09-final-review.md`, followed
-  by a finding-by-finding disposition. API logs use route templates; edge error logs do not echo
-  capabilities or exception text. Operators must purge/revoke historical exposures in existing
-  deployments.
-- Merchant functional checks run on `theme-functional`, with only a preview-only proxy attached.
-  Build and browser gates retain their existing network. A browser acceptance check attempts to
-  spoof `mail.localhost` from inside a sandbox and requires HTTP 403.
-- Withdrawal link issuance locks its order row for count, insert and enqueue. A concurrent
-  database regression requests 12 links and requires exactly three emails.
-- The local Miniflare runtime evicts a timed-out tenant instance, caps admitted instances and has
-  a Compose-level resource backstop. It still lacks enforceable per-instance OS limits;
-  `APP_ENV=prod` refuses this entrypoint. Deploy managed Workers or isolated gVisor/Firecracker
-  instances before production traffic. Production also refuses SES ingestion until SNS signature,
-  topic, freshness and replay verification is implemented; subscription URLs are no longer logged.
-- `docs/acceptance/m3.md` maps M3 criteria to real browser flows and integration limits; the
-  existing CI `acceptance` job runs the full browser and perf suites.
-
-## Verification and environment
-
-Local Compose project: `wp25`; ports 22500–22508; default subnet `10.213.25.0/24`.
-`/tmp/wp25-docker-config` is used because the host's Docker buildx activity directory is
-read-only. Only `wp25` was used; `wp21` and other projects were not touched.
-
-Verification: `make lint test` passed (686 Rust tests, 360 TypeScript tests; nine existing Rust
-ignores). Three consecutive full Playwright runs at four workers passed 106/106 each in 9.1,
-9.1 and 9.2 minutes, with no skips or retries. `make perf` passed four pages over local HTTPS;
-`scripts/smoke-images.sh wp25-rust:local wp25-mocks:local wp25-theme-builder:local
-wp25-auth:local` passed. The docs/runbook pre-launch checklist retains real-provider,
-production sandbox, legal/accounting and cloud verification as launch gates.
+Open gaps with owners: `docs/follow-ups.md`. Pre-launch checklist: `docs/runbook.md`.
+Last measured PDP LCP on CI: ~1430 ms against the 1500 ms budget; PDP JS 29.3 kB of 30 kB.
+Keep an eye on both when touching the product page.
 
 ## Remaining launch blocks
 
