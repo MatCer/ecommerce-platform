@@ -175,3 +175,9 @@ test("a failing receiver shows a retrying delivery; a succeeded one can be redel
   await expect(page.getByText("Redelivery queued")).toBeVisible();
   await expect.poll(copies, { timeout: 60_000, intervals: [1_000] }).toBe(2);
 });
+
+// SCRATCH (never merge): proves verify-merge reports a failing spec and refuses to merge.
+test("scratch: deliberately broken", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page).toHaveTitle("definitely not the admin title", { timeout: 2_000 });
+});
