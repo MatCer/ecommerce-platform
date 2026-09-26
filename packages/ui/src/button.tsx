@@ -19,29 +19,31 @@ export interface ButtonStyle {
   block?: boolean;
 }
 
+// Filled/outlined buttons grey out when disabled; tertiary ones keep no chrome (only muted text).
+const filledDisabled = "disabled:border-border disabled:bg-subtle";
+
 // No colour transitions: state changes are instant (and axe never samples a half-faded colour).
 const base =
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm " +
-  "disabled:cursor-not-allowed disabled:border-border disabled:bg-subtle " +
-  "disabled:text-faint-foreground aria-disabled:cursor-not-allowed aria-[pressed=true]:border-primary " +
+  "disabled:cursor-not-allowed disabled:text-faint-foreground aria-disabled:cursor-not-allowed aria-[pressed=true]:border-primary " +
   "aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground";
 
 const styles: Record<ButtonVariant, Record<ButtonCategory, string>> = {
   default: {
-    primary: "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
-    secondary: "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
-    tertiary: "border-transparent text-foreground hover:bg-muted active:bg-muted",
+    primary: `border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50 ${filledDisabled}`,
+    secondary: `border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50 ${filledDisabled}`,
+    tertiary:
+      "border-transparent text-foreground not-disabled:hover:bg-muted not-disabled:active:bg-muted",
   },
   confirm: {
-    primary:
-      "border-primary bg-primary text-primary-foreground hover:border-primary-hover hover:bg-primary-hover",
-    secondary: "border-primary bg-card text-foreground hover:bg-muted",
-    tertiary: "border-transparent text-foreground hover:bg-muted",
+    primary: `border-primary bg-primary text-primary-foreground hover:border-primary-hover hover:bg-primary-hover ${filledDisabled}`,
+    secondary: `border-primary bg-card text-foreground hover:bg-muted ${filledDisabled}`,
+    tertiary: "border-transparent text-foreground not-disabled:hover:bg-muted",
   },
   danger: {
-    primary: "border-error-600 bg-error-600 text-danger-foreground hover:brightness-95",
-    secondary: "border-error-600 bg-card text-error-700 hover:bg-error-50",
-    tertiary: "border-transparent text-error-700 hover:bg-error-50",
+    primary: `border-error-600 bg-error-600 text-danger-foreground hover:brightness-95 ${filledDisabled}`,
+    secondary: `border-error-600 bg-card text-error-700 hover:bg-error-50 ${filledDisabled}`,
+    tertiary: "border-transparent text-error-700 not-disabled:hover:bg-error-50",
   },
 };
 
