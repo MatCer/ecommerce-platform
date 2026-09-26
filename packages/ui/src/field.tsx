@@ -37,8 +37,12 @@ export interface TextFieldProps {
 
 /** Labelled text input with description and error wired to the input (Kobalte TextField). */
 export function TextField(props: TextFieldProps) {
+  // Explicit ids: Kobalte leaves the label without `for`, and autofill (password managers)
+  // reads the field's label through that association.
+  const id = createUniqueId();
   return (
     <KTextField
+      id={id}
       class={`flex flex-col gap-1 ${props.class ?? ""}`}
       value={props.value}
       onChange={props.onChange}
@@ -48,7 +52,7 @@ export function TextField(props: TextFieldProps) {
       readOnly={props.readOnly}
       validationState={props.error ? "invalid" : "valid"}
     >
-      <KTextField.Label class={props.hideLabel ? "sr-only" : labelClass}>
+      <KTextField.Label for={`${id}-input`} class={props.hideLabel ? "sr-only" : labelClass}>
         {props.label}
         <Show when={props.required}>
           <span aria-hidden="true"> *</span>
@@ -58,6 +62,7 @@ export function TextField(props: TextFieldProps) {
         when={props.multiline}
         fallback={
           <KTextField.Input
+            id={`${id}-input`}
             ref={props.ref}
             type={props.type ?? "text"}
             placeholder={props.placeholder}
@@ -69,6 +74,7 @@ export function TextField(props: TextFieldProps) {
         }
       >
         <KTextField.TextArea
+          id={`${id}-input`}
           rows={props.rows ?? 3}
           placeholder={props.placeholder}
           maxLength={props.maxLength}
@@ -100,6 +106,7 @@ export interface SelectFieldProps {
   hideLabel?: boolean;
   class?: string;
   name?: string;
+  autocomplete?: string;
 }
 
 /** Native select: the most robust accessible picker for short option lists. */
@@ -114,6 +121,7 @@ export function SelectField(props: SelectFieldProps) {
       <select
         id={id}
         name={props.name}
+        autocomplete={props.autocomplete}
         class={`${controlClass} pr-7`}
         value={props.value}
         disabled={props.disabled}

@@ -18,16 +18,25 @@ test("the shop cart reaches the checkout, and the handoff link is single use", a
   await toCheckout(page, SK, "tricko-oversize");
   await expect(page.getByRole("heading", { level: 1, name: "Pokladňa" })).toBeVisible();
   await expect(page.getByTestId("checkout-total")).toContainText("€");
-  // Password-manager autofill (Bitwarden) matches on names, not `section-*` autocomplete.
-  for (const [name, token] of [
-    ["street-address", "street-address"],
-    ["postal-code", "postal-code"],
-    ["city", "address-level2"],
-  ])
-    await expect(page.locator(`input[name="${name}"]`).first()).toHaveAttribute(
-      "autocomplete",
-      `section-billing ${token}`,
-    );
+  // Autofill (Bitwarden and other keyword matchers, browsers): plain names, standard tokens
+  // without `section-`/`billing` (they made Bitwarden fill the city with the street), and
+  // labels bound with `for`. Verified against the real extension by scripts/autofill-check.mjs.
+  for (const [name, token, label] of [
+    ["email", "email", "E-mail *"],
+    ["tel", "tel", "Telefón (nepovinné)"],
+    ["name", "name", "Meno a priezvisko"],
+    ["street-address", "street-address", "Ulica a číslo domu"],
+    ["postal-code", "postal-code", "PSČ"],
+    ["city", "address-level2", "Mesto"],
+    ["country", "country", "Krajina"],
+  ] as const) {
+    const field = page.locator(`[name="${name}"]`).first();
+    await expect(field).toHaveAttribute("autocomplete", token);
+    const labelled = page.locator("label").filter({ hasText: label }).first();
+    expect(
+      await labelled.evaluate((l) => (l as HTMLLabelElement).control?.getAttribute("name")),
+    ).toBe(name);
+  }
 
   expect(handoff).not.toBe("");
   await page.goto(handoff);
