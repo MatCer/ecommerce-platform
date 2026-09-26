@@ -4,7 +4,7 @@
  * a campaign with a personalized products block (Admin API) → test send + real send → Mailpit
  * shows per-recipient products and RFC 8058 List-Unsubscribe headers → one-click unsubscribe
  * and the preference page work → the next campaign skips both → a simulated SES bounce
- * suppresses the address.
+ * suppresses the address; a complaint also suppresses its recipient.
  *
  * Runs on the seeded demo shop (`make seed`). The segment only matches addresses that
  * subscribed during this test, so parallel suites and earlier runs are never mailed.
@@ -368,6 +368,33 @@ test("newsletter: double opt-in, personalized campaign, unsubscribe, bounce", as
   ).json()) as { items: { email: string; reason: string }[] };
   expect(suppressed.items).toEqual([expect.objectContaining({ email: a, reason: "bounce" })]);
   expect((await subscriber(a))?.status).toBe("bounced");
+
+  // A complaint must suppress B even though B already used the preference-page opt-out.
+  // The provider event is keyed to this campaign message, not an older test run.
+  const complaint = await request.post(`${API}/webhooks/ses`, {
+    headers: {
+      authorization: `Basic ${Buffer.from(`ses:${secret}`).toString("base64")}`,
+      "content-type": "text/plain",
+    },
+    data: JSON.stringify({
+      Type: "Notification",
+      MessageId: `e2e-complaint-${run}`,
+      TopicArn: "arn:aws:sns:eu-central-1:000000000000:ses",
+      Message: JSON.stringify({
+        notificationType: "Complaint",
+        complaint: { complainedRecipients: [{ emailAddress: b }] },
+        mail: { commonHeaders: { messageId: `<${mailB?.MessageID ?? ""}>` } },
+      }),
+    }),
+  });
+  expect(complaint.status()).toBe(200);
+  expect(((await complaint.json()) as { applied: boolean }).applied).toBe(true);
+  const complaints = (await (
+    await request.get(`${API}/admin/v1/email-suppressions?q=${encodeURIComponent(b)}`, {
+      headers: h,
+    })
+  ).json()) as { items: { email: string; reason: string }[] };
+  expect(complaints.items).toEqual([expect.objectContaining({ email: b, reason: "complaint" })]);
 
   await shopper.close();
   await staff.close();
