@@ -1,9 +1,12 @@
 import {
+  Alert,
   Button,
+  Card,
   Checkbox,
   ConfirmDialog,
   ErrorState,
   FieldGroup,
+  linkClass,
   SelectField,
   showToast,
   Tabs,
@@ -58,18 +61,18 @@ function variantLabel(
 const STATUSES: ProductStatus[] = ["draft", "active", "archived"];
 const UNITS: UnitMeasure[] = ["kg", "l", "m", "m2", "pcs"];
 
-/** A titled section with an anchor for the in-page section navigation. */
-function Section(props: { id: string; title: string; children: JSX.Element }) {
+/** A titled card with an anchor id; the wrapper keeps it a named region (landmark). */
+function Section(props: {
+  id: string;
+  title: string;
+  description?: string;
+  children: JSX.Element;
+}) {
   return (
-    <section
-      id={props.id}
-      aria-labelledby={`${props.id}-h`}
-      class="scroll-mt-16 border-b border-border py-5"
-    >
-      <h2 id={`${props.id}-h`} class="mb-3 text-base font-semibold">
-        {props.title}
-      </h2>
-      {props.children}
+    <section id={props.id} aria-label={props.title} class="min-w-0 scroll-mt-16">
+      <Card title={props.title} description={props.description}>
+        {props.children}
+      </Card>
     </section>
   );
 }
@@ -82,7 +85,7 @@ function PartyFields(props: {
 }) {
   return (
     <FieldGroup legend={props.legend} description={props.description ?? t("editor.contactHint")}>
-      <div class="grid gap-2 sm:grid-cols-2">
+      <div class="grid gap-4 sm:grid-cols-2">
         <TextField
           label={t("editor.partyName")}
           value={props.value.name}
@@ -248,283 +251,283 @@ export default function ProductEditor() {
   const categoriesFor = (country: string) =>
     (taxCategories.data?.items ?? []).filter((c) => c.country === country);
 
-  const sections = () => [
-    ["general", t("editor.general")],
-    ["content", t("editor.content")],
-    ...(isNew() ? [] : [["ai", t("ai.panel")]]),
-    ["media", t("editor.media")],
-    ["variants", t("editor.variants")],
-    ["prices", t("prices.title")],
-    ["categories", t("editor.categories")],
-    ["parameters", t("editor.parameters")],
-    ["pricing", t("editor.pricing")],
-    ["compliance", t("editor.compliance")],
-    ["feeds", t("editor.feeds")],
-  ];
-
   const form = () => (
-    <form onSubmit={submit} class="flex flex-col lg:flex-row lg:gap-8" novalidate>
-      <nav aria-label={t("editor.sections")} class="hidden shrink-0 lg:block lg:w-44">
-        <ul class="sticky top-16 flex flex-col gap-0.5 pt-5">
-          <For each={sections()}>
-            {([id, title]) => (
-              <li>
-                <a
-                  href={`#${id}`}
-                  class="block rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {title}
-                </a>
-              </li>
-            )}
-          </For>
-        </ul>
-      </nav>
-      <div class="min-w-0 max-w-4xl flex-1">
-        <Show when={saveError()}>
-          <div
-            id="save-error"
-            tabindex="-1"
-            role="alert"
-            class="mt-4 rounded-md bg-error-50 px-3 py-2 text-sm font-medium text-error-700"
+    <form id="product-form" onSubmit={submit} class="flex flex-col gap-4" novalidate>
+      <Show when={saveError()}>
+        <div id="save-error" tabindex="-1" class="outline-none">
+          <Alert tone="error">{saveError()}</Alert>
+        </div>
+      </Show>
+
+      <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div class="flex min-w-0 flex-col gap-4">
+          <Section
+            id="content"
+            title={t("editor.content")}
+            description={t("editor.translationHint")}
           >
-            {saveError()}
-          </div>
-        </Show>
-
-        <Section id="general" title={t("editor.general")}>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <SelectField
-              label={t("editor.status")}
-              value={draft.status}
-              options={STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) }))}
-              onChange={(v) => setDraft("status", v as ProductStatus)}
-            />
-            <TextField
-              label={t("editor.brand")}
-              value={draft.brand}
-              onChange={(v) => setDraft("brand", v)}
-              maxLength={200}
-            />
-          </div>
-        </Section>
-
-        <Section id="content" title={t("editor.content")}>
-          <p class="mb-3 text-xs text-muted-foreground">{t("editor.translationHint")}</p>
-          <Tabs
-            label={t("editor.languages")}
-            items={CONTENT_LOCALES.map((l: ContentLocale) => ({
-              value: l,
-              label: (
-                <>
-                  {t(`common.locale_${l}`)}
-                  <Show when={draft.translations[l].name.trim()}>
-                    <span class="ml-1 text-success-700" aria-hidden="true">
-                      •
-                    </span>
-                  </Show>
-                </>
-              ),
-              content: () => (
-                <div class="flex flex-col gap-3">
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <TextField
-                      label={t("editor.name")}
-                      value={draft.translations[l].name}
-                      onChange={(v) => setDraft("translations", l, "name", v)}
-                      maxLength={300}
-                      required={l === "cs"}
-                    />
-                    <div
-                      onFocusIn={() => {
-                        if (!draft.translations[l].slug && draft.translations[l].name) {
-                          setDraft("translations", l, "slug", slugify(draft.translations[l].name));
-                        }
-                      }}
-                    >
+            <Tabs
+              label={t("editor.languages")}
+              items={CONTENT_LOCALES.map((l: ContentLocale) => ({
+                value: l,
+                label: (
+                  <>
+                    {t(`common.locale_${l}`)}
+                    <Show when={draft.translations[l].name.trim()}>
+                      <span class="ml-1 text-success-700" aria-hidden="true">
+                        •
+                      </span>
+                    </Show>
+                  </>
+                ),
+                content: () => (
+                  <div class="flex flex-col gap-4">
+                    <div class="grid gap-4 sm:grid-cols-2">
                       <TextField
-                        label={t("editor.slug")}
-                        description={t("editor.slugHint")}
-                        value={draft.translations[l].slug}
-                        onChange={(v) => setDraft("translations", l, "slug", v)}
-                        inputClass="figures"
+                        label={t("editor.name")}
+                        value={draft.translations[l].name}
+                        onChange={(v) => setDraft("translations", l, "name", v)}
+                        maxLength={300}
+                        required={l === "cs"}
+                      />
+                      <div
+                        onFocusIn={() => {
+                          if (!draft.translations[l].slug && draft.translations[l].name) {
+                            setDraft(
+                              "translations",
+                              l,
+                              "slug",
+                              slugify(draft.translations[l].name),
+                            );
+                          }
+                        }}
+                      >
+                        <TextField
+                          label={t("editor.slug")}
+                          description={t("editor.slugHint")}
+                          value={draft.translations[l].slug}
+                          onChange={(v) => setDraft("translations", l, "slug", v)}
+                          inputClass="figures"
+                          maxLength={200}
+                        />
+                      </div>
+                    </div>
+                    <TextField
+                      label={t("editor.shortDescription")}
+                      value={draft.translations[l].short_description}
+                      onChange={(v) => setDraft("translations", l, "short_description", v)}
+                      multiline
+                      rows={2}
+                      maxLength={1000}
+                    />
+                    <RichText
+                      label={t("editor.description")}
+                      value={draft.translations[l].description_html}
+                      onChange={(v) => setDraft("translations", l, "description_html", v)}
+                    />
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <TextField
+                        label={t("editor.seoTitle")}
+                        value={draft.translations[l].seo_title}
+                        onChange={(v) => setDraft("translations", l, "seo_title", v)}
                         maxLength={200}
+                      />
+                      <TextField
+                        label={t("editor.seoDescription")}
+                        value={draft.translations[l].seo_description}
+                        onChange={(v) => setDraft("translations", l, "seo_description", v)}
+                        maxLength={500}
                       />
                     </div>
                   </div>
-                  <TextField
-                    label={t("editor.shortDescription")}
-                    value={draft.translations[l].short_description}
-                    onChange={(v) => setDraft("translations", l, "short_description", v)}
-                    multiline
-                    rows={2}
-                    maxLength={1000}
-                  />
-                  <RichText
-                    label={t("editor.description")}
-                    value={draft.translations[l].description_html}
-                    onChange={(v) => setDraft("translations", l, "description_html", v)}
-                  />
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <TextField
-                      label={t("editor.seoTitle")}
-                      value={draft.translations[l].seo_title}
-                      onChange={(v) => setDraft("translations", l, "seo_title", v)}
-                      maxLength={200}
-                    />
-                    <TextField
-                      label={t("editor.seoDescription")}
-                      value={draft.translations[l].seo_description}
-                      onChange={(v) => setDraft("translations", l, "seo_description", v)}
-                      maxLength={500}
-                    />
-                  </div>
-                </div>
-              ),
-            }))}
-          />
-        </Section>
+                ),
+              }))}
+            />
+          </Section>
 
-        <Show when={params.id}>
-          {(id) => (
-            <div id="ai" class="scroll-mt-16 border-b border-border py-5">
-              <AiPanel
-                entityType="product"
-                entityId={id()}
-                onAccepted={() => void reloadProduct()}
-                acceptHint={t("ai.unsavedHint")}
-              />
-            </div>
-          )}
-        </Show>
-
-        <Section id="media" title={t("editor.media")}>
-          <MediaManager
-            media={draft.media}
-            skus={skus()}
-            onChange={(m) => setDraft("media", reconcile(m))}
-          />
-        </Section>
-
-        <Section id="variants" title={t("editor.variants")}>
-          <VariantsEditor
-            options={draft.options}
-            variants={draft.variants}
-            skuBase={skuBase()}
-            onOptions={(o) => setDraft("options", reconcile(o))}
-            onVariants={(v) => setDraft("variants", reconcile(v))}
-          />
-        </Section>
-
-        <Section id="prices" title={t("prices.title")}>
-          <p class="mb-3 text-xs text-muted-foreground">{t("prices.lead")}</p>
-          <Show
-            when={!isNew() && product.data}
-            fallback={<p class="text-sm text-muted-foreground">{t("prices.saveFirst")}</p>}
-          >
-            {(p) => (
-              <>
-                <ProductPrices
-                  productId={p().id}
-                  variants={p().variants.map((v) => ({
-                    id: v.id,
-                    sku: v.sku,
-                    label: variantLabel(p().options, v.option_values) || v.sku,
-                  }))}
+          <Show when={params.id}>
+            {(id) => (
+              <div id="ai" class="scroll-mt-16">
+                <AiPanel
+                  entityType="product"
+                  entityId={id()}
+                  onAccepted={() => void reloadProduct()}
+                  acceptHint={t("ai.unsavedHint")}
                 />
-                <A
-                  href={`/inventory?product=${p().id}`}
-                  class="mt-3 inline-block text-sm text-accent-700 hover:underline"
-                >
-                  {t("inventory.openInventory")}
-                </A>
-              </>
+              </div>
             )}
           </Show>
-        </Section>
 
-        <Section id="categories" title={t("editor.categories")}>
-          <QueryState query={categories}>
-            {(tree) => (
-              <Show
-                when={tree.items.length > 0}
-                fallback={<p class="text-sm text-muted-foreground">{t("editor.noCategories")}</p>}
-              >
-                <fieldset>
-                  <legend class="sr-only">{t("editor.assigned")}</legend>
-                  <ul class="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
-                    <For each={flatten(tree.items)}>
-                      {(row) => (
-                        <li style={{ "padding-left": `${row.depth * 1.25}rem` }}>
-                          <Checkbox
-                            label={categoryName(row.node, contentLocales())}
-                            checked={draft.category_ids.includes(row.node.id)}
-                            onChange={(on) =>
-                              setDraft(
-                                "category_ids",
-                                on
-                                  ? [...draft.category_ids, row.node.id]
-                                  : draft.category_ids.filter((id) => id !== row.node.id),
-                              )
-                            }
-                          />
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </fieldset>
-              </Show>
-            )}
-          </QueryState>
-        </Section>
+          <Section id="media" title={t("editor.media")}>
+            <MediaManager
+              media={draft.media}
+              skus={skus()}
+              onChange={(m) => setDraft("media", reconcile(m))}
+            />
+          </Section>
+        </div>
 
-        <Section id="parameters" title={t("editor.parameters")}>
-          <QueryState query={parameters}>
-            {(page) => (
-              <>
-                <Show when={page.truncated}>
-                  <p role="status" class="mb-2 text-xs text-warning-700">
-                    {t("parameters.truncated", { count: page.items.length })}
-                  </p>
+        <aside class="flex min-w-0 flex-col gap-4">
+          <Section id="general" title={t("editor.general")}>
+            <div class="flex flex-col gap-4">
+              <SelectField
+                label={t("editor.status")}
+                value={draft.status}
+                options={STATUSES.map((s) => ({ value: s, label: t(`status.${s}`) }))}
+                onChange={(v) => setDraft("status", v as ProductStatus)}
+              />
+              <TextField
+                label={t("editor.brand")}
+                value={draft.brand}
+                onChange={(v) => setDraft("brand", v)}
+                maxLength={200}
+              />
+            </div>
+          </Section>
+
+          <Section id="categories" title={t("editor.categories")}>
+            <QueryState query={categories}>
+              {(tree) => (
+                <Show
+                  when={tree.items.length > 0}
+                  fallback={<p class="text-sm text-muted-foreground">{t("editor.noCategories")}</p>}
+                >
+                  <fieldset>
+                    <legend class="sr-only">{t("editor.assigned")}</legend>
+                    <ul class="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
+                      <For each={flatten(tree.items)}>
+                        {(row) => (
+                          <li style={{ "padding-left": `${row.depth * 1.25}rem` }}>
+                            <Checkbox
+                              label={categoryName(row.node, contentLocales())}
+                              checked={draft.category_ids.includes(row.node.id)}
+                              onChange={(on) =>
+                                setDraft(
+                                  "category_ids",
+                                  on
+                                    ? [...draft.category_ids, row.node.id]
+                                    : draft.category_ids.filter((id) => id !== row.node.id),
+                                )
+                              }
+                            />
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </fieldset>
                 </Show>
-                <ParameterValues
-                  parameters={page.items}
-                  values={draft.parameters}
-                  skus={skus()}
-                  onChange={(v) => setDraft("parameters", reconcile(v))}
-                />
-              </>
-            )}
-          </QueryState>
-        </Section>
+              )}
+            </QueryState>
+          </Section>
 
-        <Section id="pricing" title={t("editor.pricing")}>
-          <div class="grid max-w-md gap-3 sm:grid-cols-2">
-            <SelectField
-              label={t("editor.unitMeasure")}
-              value={draft.unit_measure}
-              options={[
-                { value: "", label: t("common.none") },
-                ...UNITS.map((u) => ({ value: u, label: t(`units.${u}`) })),
-              ]}
-              onChange={(v) => setDraft("unit_measure", v as UnitMeasure | "")}
-            />
-            <TextField
-              label={t("editor.unitQuantity")}
-              inputMode="decimal"
-              inputClass="figures text-right"
-              value={draft.unit_quantity}
-              onChange={(v) => setDraft("unit_quantity", v)}
-              disabled={draft.unit_measure === ""}
-            />
+          <Section id="feeds" title={t("editor.feeds")}>
+            <div class="flex flex-col gap-4">
+              <TextField
+                label={t("editor.googleCategory")}
+                value={draft.google_category}
+                onChange={(v) => setDraft("google_category", v)}
+                maxLength={500}
+              />
+              <TextField
+                label={t("editor.heurekaCategory")}
+                value={draft.heureka_category}
+                onChange={(v) => setDraft("heureka_category", v)}
+                maxLength={500}
+              />
+            </div>
+          </Section>
+        </aside>
+      </div>
+
+      {/* Wide tables and long forms span the full width (no sideways scrolling at 1280px). */}
+      <Section id="variants" title={t("editor.variants")}>
+        <VariantsEditor
+          options={draft.options}
+          variants={draft.variants}
+          skuBase={skuBase()}
+          onOptions={(o) => setDraft("options", reconcile(o))}
+          onVariants={(v) => setDraft("variants", reconcile(v))}
+        />
+      </Section>
+
+      <Section id="prices" title={t("prices.title")} description={t("prices.lead")}>
+        <Show
+          when={!isNew() && product.data}
+          fallback={<p class="text-sm text-muted-foreground">{t("prices.saveFirst")}</p>}
+        >
+          {(p) => (
+            <>
+              <ProductPrices
+                productId={p().id}
+                variants={p().variants.map((v) => ({
+                  id: v.id,
+                  sku: v.sku,
+                  label: variantLabel(p().options, v.option_values) || v.sku,
+                }))}
+              />
+              <A
+                href={`/inventory?product=${p().id}`}
+                class={`${linkClass} mt-4 inline-block text-sm`}
+              >
+                {t("inventory.openInventory")}
+              </A>
+            </>
+          )}
+        </Show>
+      </Section>
+
+      <Section id="parameters" title={t("editor.parameters")}>
+        <QueryState query={parameters}>
+          {(page) => (
+            <>
+              <Show when={page.truncated}>
+                <Alert tone="warning" class="mb-4">
+                  {t("parameters.truncated", { count: page.items.length })}
+                </Alert>
+              </Show>
+              <ParameterValues
+                parameters={page.items}
+                values={draft.parameters}
+                skus={skus()}
+                onChange={(v) => setDraft("parameters", reconcile(v))}
+              />
+            </>
+          )}
+        </QueryState>
+      </Section>
+
+      <Section id="pricing" title={t("editor.pricing")}>
+        <div class="flex flex-col gap-6">
+          <div class="flex flex-col gap-2">
+            <div class="grid max-w-md gap-4 sm:grid-cols-2">
+              <SelectField
+                label={t("editor.unitMeasure")}
+                value={draft.unit_measure}
+                options={[
+                  { value: "", label: t("common.none") },
+                  ...UNITS.map((u) => ({ value: u, label: t(`units.${u}`) })),
+                ]}
+                onChange={(v) => setDraft("unit_measure", v as UnitMeasure | "")}
+              />
+              <TextField
+                label={t("editor.unitQuantity")}
+                inputMode="decimal"
+                inputClass="figures text-right"
+                value={draft.unit_quantity}
+                onChange={(v) => setDraft("unit_quantity", v)}
+                disabled={draft.unit_measure === ""}
+              />
+            </div>
+            <p class="text-sm text-muted-foreground">{t("editor.unitHint")}</p>
           </div>
-          <p class="mt-1 text-xs text-faint-foreground">{t("editor.unitHint")}</p>
 
           <FieldGroup legend={t("editor.taxTitle")} description={t("editor.taxHint")}>
             <For each={Object.keys(draft.tax_categories).sort()}>
               {(country) => (
                 <div class="flex flex-wrap items-end gap-2">
-                  <span class="figures w-10 pb-1.5 font-medium">{country}</span>
+                  <span class="w-10 pb-1.5 font-mono text-sm font-semibold text-heading">
+                    {country}
+                  </span>
                   <SelectField
                     class="w-64"
                     label={`${t("editor.taxCategory")} (${country})`}
@@ -537,16 +540,16 @@ export default function ProductEditor() {
                   />
                   <Button
                     category="tertiary"
+                    iconOnly
+                    icon="remove"
+                    aria-label={`${t("common.remove")}: ${country}`}
                     onClick={() => {
                       const rest = Object.entries(draft.tax_categories).filter(
                         ([c]) => c !== country,
                       );
                       setDraft("tax_categories", reconcile(Object.fromEntries(rest)));
                     }}
-                  >
-                    {t("common.remove")}
-                    <span class="sr-only">: {country}</span>
-                  </Button>
+                  />
                 </div>
               )}
             </For>
@@ -576,86 +579,54 @@ export default function ProductEditor() {
               </Button>
             </div>
           </FieldGroup>
-        </Section>
-
-        <Section id="compliance" title={t("editor.compliance")}>
-          <div class="flex flex-col gap-4">
-            <PartyFields
-              legend={t("editor.manufacturer")}
-              value={draft.manufacturer}
-              onChange={(k, v) => setDraft("manufacturer", k, v)}
-            />
-            <PartyFields
-              legend={t("editor.euResponsible")}
-              description={`${t("editor.euResponsibleHint")} ${t("editor.contactHint")}`}
-              value={draft.eu_responsible_person}
-              onChange={(k, v) => setDraft("eu_responsible_person", k, v)}
-            />
-            <FieldGroup legend={t("editor.safetyInfo")}>
-              <div class="grid gap-2 sm:grid-cols-3">
-                <For each={CONTENT_LOCALES}>
-                  {(l) => (
-                    <TextField
-                      label={`${t("editor.safetyInfo")} (${l})`}
-                      value={draft.safety_info[l]}
-                      onChange={(v) => setDraft("safety_info", l, v)}
-                      multiline
-                      rows={3}
-                    />
-                  )}
-                </For>
-              </div>
-            </FieldGroup>
-            <FieldGroup legend={t("editor.warnings")}>
-              <div class="grid gap-2 sm:grid-cols-3">
-                <For each={CONTENT_LOCALES}>
-                  {(l) => (
-                    <TextField
-                      label={`${t("editor.warnings")} (${l})`}
-                      value={draft.warnings[l]}
-                      onChange={(v) => setDraft("warnings", l, v)}
-                      multiline
-                      rows={3}
-                    />
-                  )}
-                </For>
-              </div>
-            </FieldGroup>
-          </div>
-        </Section>
-
-        <Section id="feeds" title={t("editor.feeds")}>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <TextField
-              label={t("editor.googleCategory")}
-              value={draft.google_category}
-              onChange={(v) => setDraft("google_category", v)}
-              maxLength={500}
-            />
-            <TextField
-              label={t("editor.heurekaCategory")}
-              value={draft.heureka_category}
-              onChange={(v) => setDraft("heureka_category", v)}
-              maxLength={500}
-            />
-          </div>
-        </Section>
-
-        <div class="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-3 py-3 md:-mx-6 md:px-6">
-          <Show when={!isNew()} fallback={<span />}>
-            <Button
-              category="tertiary"
-              class="text-error-700"
-              onClick={() => setConfirmDelete(true)}
-            >
-              {t("editor.deleteProduct")}
-            </Button>
-          </Show>
-          <Button type="submit" variant="confirm" loading={save.isPending}>
-            {t("editor.save")}
-          </Button>
         </div>
-      </div>
+      </Section>
+
+      <Section id="compliance" title={t("editor.compliance")}>
+        <div class="flex flex-col gap-6">
+          <PartyFields
+            legend={t("editor.manufacturer")}
+            value={draft.manufacturer}
+            onChange={(k, v) => setDraft("manufacturer", k, v)}
+          />
+          <PartyFields
+            legend={t("editor.euResponsible")}
+            description={`${t("editor.euResponsibleHint")} ${t("editor.contactHint")}`}
+            value={draft.eu_responsible_person}
+            onChange={(k, v) => setDraft("eu_responsible_person", k, v)}
+          />
+          <FieldGroup legend={t("editor.safetyInfo")}>
+            <div class="grid gap-4 sm:grid-cols-3">
+              <For each={CONTENT_LOCALES}>
+                {(l) => (
+                  <TextField
+                    label={`${t("editor.safetyInfo")} (${l})`}
+                    value={draft.safety_info[l]}
+                    onChange={(v) => setDraft("safety_info", l, v)}
+                    multiline
+                    rows={3}
+                  />
+                )}
+              </For>
+            </div>
+          </FieldGroup>
+          <FieldGroup legend={t("editor.warnings")}>
+            <div class="grid gap-4 sm:grid-cols-3">
+              <For each={CONTENT_LOCALES}>
+                {(l) => (
+                  <TextField
+                    label={`${t("editor.warnings")} (${l})`}
+                    value={draft.warnings[l]}
+                    onChange={(v) => setDraft("warnings", l, v)}
+                    multiline
+                    rows={3}
+                  />
+                )}
+              </For>
+            </div>
+          </FieldGroup>
+        </div>
+      </Section>
     </form>
   );
 
@@ -664,6 +635,18 @@ export default function ProductEditor() {
       <PageHeader
         title={isNew() ? t("editor.titleNew") : t("editor.titleEdit")}
         back={{ href: "/products", label: t("nav.products") }}
+        actions={
+          <Show when={isNew() || product.data}>
+            <Show when={!isNew()}>
+              <Button variant="danger" category="secondary" onClick={() => setConfirmDelete(true)}>
+                {t("editor.deleteProduct")}
+              </Button>
+            </Show>
+            <Button type="submit" form="product-form" variant="confirm" loading={save.isPending}>
+              {t("editor.save")}
+            </Button>
+          </Show>
+        }
       />
       <Show when={!isNew()} fallback={form()}>
         <Show

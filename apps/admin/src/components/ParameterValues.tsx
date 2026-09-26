@@ -1,4 +1,4 @@
-import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
+import { Button, Checkbox, linkClass, SelectField, TextField } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { For, Index, Show } from "solid-js";
 import { contentLocales, t } from "../i18n/index.ts";
@@ -36,18 +36,18 @@ export function ParameterValues(props: {
       fallback={
         <p class="text-sm text-muted-foreground">
           {t("editor.noParameters")}{" "}
-          <A href="/parameters" class="text-accent-700 underline">
+          <A href="/parameters" class={linkClass}>
             {t("nav.parameters")}
           </A>
         </p>
       }
     >
-      <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-4">
         <Index each={props.values}>
           {(v, i) => {
             const param = () => byId(v().parameter_id);
             return (
-              <div class="flex flex-wrap items-end gap-2 border-b border-border pb-2">
+              <div class="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-border pb-4">
                 <SelectField
                   class="w-48"
                   label={t("editor.parameter")}
@@ -117,17 +117,18 @@ export function ParameterValues(props: {
                 </Show>
                 <Button
                   category="tertiary"
+                  iconOnly
+                  icon="remove"
+                  aria-label={`${t("common.remove")}: ${param() ? name(param() as Parameter) : ""}`}
                   onClick={() => props.onChange(props.values.filter((_, j) => j !== i))}
-                >
-                  {t("common.remove")}
-                  <span class="sr-only">: {param() ? name(param() as Parameter) : ""}</span>
-                </Button>
+                />
               </div>
             );
           }}
         </Index>
         <div>
           <Button
+            icon="plus"
             onClick={() => {
               const first = props.parameters[0];
               if (first) {

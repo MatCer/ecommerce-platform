@@ -1,4 +1,4 @@
-import { Button, showToast, TextField } from "@platform/ui";
+import { Alert, Button, showToast, TextField } from "@platform/ui";
 import { createMutation, createQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, Show } from "solid-js";
 import { PageHeader, QueryState } from "../components/Page.tsx";
@@ -47,14 +47,19 @@ export default function SearchSynonyms() {
       <QueryState query={query}>
         {() => (
           <form
-            class="flex max-w-2xl flex-col gap-3"
+            class="flex max-w-2xl flex-col gap-6"
             onSubmit={(e) => {
               e.preventDefault();
               if (can("admin") && !parsed().error) save.mutate();
             }}
           >
+            <Show when={!can("admin")}>
+              <Alert tone="info">{t("content.readOnly")}</Alert>
+            </Show>
             <TextField
               label={t("content.synonymGroups")}
+              description={t("content.synonymDelay")}
+              inputClass="font-mono"
               multiline
               rows={12}
               value={text()}
@@ -66,17 +71,11 @@ export default function SearchSynonyms() {
                   : undefined
               }
             />
-            <p class="text-sm text-muted-foreground">{t("content.synonymDelay")}</p>
-            <Show when={!can("admin")}>
-              <p class="text-sm">{t("content.readOnly")}</p>
-            </Show>
             <Show when={error()}>
-              <p role="alert" class="text-error-700">
-                {error()}
-              </p>
+              <Alert tone="error">{error()}</Alert>
             </Show>
             <Show when={can("admin")}>
-              <div>
+              <div class="border-t border-border pt-5">
                 <Button
                   type="submit"
                   variant="confirm"
