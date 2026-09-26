@@ -1,4 +1,4 @@
-import { Badge, Button, Dialog, showToast } from "@platform/ui";
+import { Badge, Button, Collapse, Dialog, showToast } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
@@ -14,7 +14,7 @@ export function WithdrawalTable(props: { items: Schemas["Withdrawal"][] }) {
   return (
     <Show
       when={props.items.length}
-      fallback={<p class="text-sm text-muted-foreground">{t("fulfillment.noWithdrawals")}</p>}
+      fallback={<p class="p-4 text-sm text-muted-foreground">{t("fulfillment.noWithdrawals")}</p>}
     >
       <div class="overflow-x-auto">
         <table class={tableClass}>
@@ -37,38 +37,40 @@ export function WithdrawalTable(props: { items: Schemas["Withdrawal"][] }) {
                   <tr>
                     <td class={tdClass}>
                       <A
-                        class="font-medium text-accent-700 hover:underline"
+                        class="font-semibold text-heading hover:text-accent-700 hover:underline"
                         href={`/orders/${withdrawal.order_id}`}
                       >
                         {withdrawal.order_number}
                       </A>
-                      <p class="text-xs">{withdrawal.email}</p>
+                      <p class="text-xs text-muted-foreground">{withdrawal.email}</p>
                     </td>
-                    <td class={tdClass}>
-                      {formatDateTime(withdrawal.declared_at)}
-                      <Show when={withdrawal.late}>
-                        <Badge tone="warning">{t("fulfillment.late")}</Badge>
-                      </Show>
+                    <td class={`${tdClass} figures`}>
+                      <div class="flex flex-wrap items-center gap-1">
+                        {formatDateTime(withdrawal.declared_at)}
+                        <Show when={withdrawal.late}>
+                          <Badge tone="warning">{t("fulfillment.late")}</Badge>
+                        </Show>
+                      </div>
                     </td>
-                    <td class={tdClass}>
+                    <td class={`${tdClass} figures`}>
                       <span classList={{ "font-semibold text-error-700": withdrawal.overdue }}>
                         {formatDateTime(withdrawal.refund_due_at)}
                       </span>
                       <Show when={withdrawal.overdue}>
-                        <p class="text-error-700">{t("fulfillment.overdue")}</p>
+                        <p class="text-xs text-error-700">{t("fulfillment.overdue")}</p>
                       </Show>
                     </td>
                     <td class={tdClass}>
                       <FulfillmentState value={withdrawal.status} />
                       <Show when={withdrawal.refunded_at}>
                         {(at) => (
-                          <p>
+                          <p class="mt-1 text-xs text-muted-foreground">
                             {t("fulfillment.refundedAt")}: {formatDateTime(at())}
                           </p>
                         )}
                       </Show>
                     </td>
-                    <td class={tdClass}>
+                    <td class={`${tdClass} text-xs text-muted-foreground`}>
                       <p>
                         {t("fulfillment.goodsReceived")}:{" "}
                         {withdrawal.goods_received_at
@@ -87,12 +89,11 @@ export function WithdrawalTable(props: { items: Schemas["Withdrawal"][] }) {
                     </td>
                   </tr>
                   <tr>
-                    <td colSpan={6} class="px-2 py-3">
-                      <details>
-                        <summary class="cursor-pointer text-sm font-medium">
-                          {t("fulfillment.declaration")} · {withdrawal.order_number}
-                        </summary>
-                        <div class="mt-2 grid gap-2 text-sm">
+                    <td colSpan={6} class="px-3 py-1">
+                      <Collapse
+                        summary={`${t("fulfillment.declaration")} · ${withdrawal.order_number}`}
+                      >
+                        <div class="grid gap-2 pb-2 text-sm">
                           <p class="max-w-prose whitespace-pre-wrap break-words">
                             {withdrawal.declaration}
                           </p>
@@ -119,7 +120,7 @@ export function WithdrawalTable(props: { items: Schemas["Withdrawal"][] }) {
                           <ul>
                             <For each={withdrawal.lines}>
                               {(line) => (
-                                <li>
+                                <li class="flex flex-wrap items-center gap-1">
                                   {line.name} ({line.sku}) × {line.quantity} ·{" "}
                                   <FulfillmentState value={line.status} />
                                 </li>
@@ -127,7 +128,7 @@ export function WithdrawalTable(props: { items: Schemas["Withdrawal"][] }) {
                             </For>
                           </ul>
                         </div>
-                      </details>
+                      </Collapse>
                     </td>
                   </tr>
                 </>
@@ -180,20 +181,24 @@ function WithdrawalActions(props: { withdrawal: Schemas["Withdrawal"] }) {
     setAction(value);
   };
   return (
-    <div class="grid gap-2 py-2">
+    <div class="grid gap-2 py-1">
       <div class="flex flex-wrap gap-2">
         <Show when={!props.withdrawal.goods_received_at}>
-          <Button disabled={mutation.isPending} onClick={() => open("receive")}>
+          <Button size="small" disabled={mutation.isPending} onClick={() => open("receive")}>
             {t("fulfillment.receive")}
           </Button>
         </Show>
         <Show when={props.withdrawal.status === "open" && !props.withdrawal.return_proof_at}>
-          <Button disabled={mutation.isPending} onClick={() => open("proof")}>
+          <Button size="small" disabled={mutation.isPending} onClick={() => open("proof")}>
             {t("fulfillment.proof")}
           </Button>
         </Show>
         <Show when={props.withdrawal.status === "open" && can("admin")}>
-          <Button disabled={!allowedRefund() || mutation.isPending} onClick={() => open("refund")}>
+          <Button
+            size="small"
+            disabled={!allowedRefund() || mutation.isPending}
+            onClick={() => open("refund")}
+          >
             {t("fulfillment.refundWithdrawal")}
           </Button>
         </Show>
@@ -205,25 +210,28 @@ function WithdrawalActions(props: { withdrawal: Schemas["Withdrawal"] }) {
       <Dialog
         open={Boolean(action())}
         onOpenChange={(open) => !open && !mutation.isPending && setAction(undefined)}
+        size="sm"
         title={label()}
         description={t("fulfillment.withdrawalConfirm", { number: props.withdrawal.order_number })}
+        footer={
+          <>
+            <Button disabled={mutation.isPending} onClick={() => setAction(undefined)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="confirm"
+              loading={mutation.isPending}
+              onClick={() => {
+                const value = action();
+                if (value && (value !== "refund" || allowedRefund())) mutation.mutate(value);
+              }}
+            >
+              {label()}
+            </Button>
+          </>
+        }
       >
         <ApiProblem error={mutation.error} />
-        <div class="flex justify-end gap-2">
-          <Button disabled={mutation.isPending} onClick={() => setAction(undefined)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            variant="confirm"
-            loading={mutation.isPending}
-            onClick={() => {
-              const value = action();
-              if (value && (value !== "refund" || allowedRefund())) mutation.mutate(value);
-            }}
-          >
-            {label()}
-          </Button>
-        </div>
       </Dialog>
     </div>
   );

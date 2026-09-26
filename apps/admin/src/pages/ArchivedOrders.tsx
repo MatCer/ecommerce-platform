@@ -1,4 +1,4 @@
-import { Button, EmptyState, TextField } from "@platform/ui";
+import { Button, Card, EmptyState, SearchBox } from "@platform/ui";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -27,15 +27,37 @@ export default function ArchivedOrders() {
   const rows = () => list.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <>
-      <PageHeader title={t("data.archive")} />
-      <p class="mb-4 max-w-2xl text-sm text-muted-foreground">{t("data.archiveHint")}</p>
-      <div class="mb-4 max-w-sm">
-        <TextField type="search" label={t("data.archiveSearch")} value={q()} onChange={setQ} />
+      <PageHeader title={t("data.archive")} description={t("data.archiveHint")} />
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <SearchBox
+          class="min-w-60 max-w-md flex-1"
+          label={t("data.archiveSearch")}
+          placeholder={t("data.archiveSearch")}
+          clearLabel={t("common.clearSearch")}
+          value={q()}
+          onChange={setQ}
+        />
       </div>
       <QueryState query={list}>
         {() => (
-          <Show when={rows().length} fallback={<EmptyState title={t("data.archiveEmpty")} />}>
-            <div class="overflow-x-auto">
+          <Show
+            when={rows().length}
+            fallback={<EmptyState icon="archive" title={t("data.archiveEmpty")} />}
+          >
+            <Card
+              padding="none"
+              footer={
+                list.hasNextPage ? (
+                  <Button
+                    loading={list.isFetchingNextPage}
+                    onClick={() => void list.fetchNextPage()}
+                  >
+                    {t("data.more")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
               <table class={tableClass} aria-label={t("data.archive")}>
                 <thead>
                   <tr>
@@ -43,7 +65,7 @@ export default function ArchivedOrders() {
                     <Th>{t("data.placed")}</Th>
                     <Th>{t("data.customer")}</Th>
                     <Th>{t("data.oldStatus")}</Th>
-                    <Th>{t("data.items")}</Th>
+                    <Th class="text-right">{t("data.items")}</Th>
                     <Th class="text-right">{t("data.total")}</Th>
                   </tr>
                 </thead>
@@ -51,14 +73,14 @@ export default function ArchivedOrders() {
                   <For each={rows()}>
                     {(o) => (
                       <tr>
-                        <td class={`${tdClass} figures`}>{o.number}</td>
-                        <td class={tdClass}>{formatDateTime(o.placed_at)}</td>
+                        <td class={`${tdClass} font-mono text-xs`}>{o.number}</td>
+                        <td class={`${tdClass} figures text-muted-foreground`}>{formatDateTime(o.placed_at)}</td>
                         <td class={tdClass}>
                           {o.name ? `${o.name} · ` : ""}
                           {o.email}
                         </td>
                         <td class={tdClass}>{o.status_label ?? "—"}</td>
-                        <td class={`${tdClass} figures`}>
+                        <td class={`${tdClass} figures text-right`}>
                           {Array.isArray(o.lines) ? o.lines.length : 0}
                         </td>
                         <td class={`${tdClass} figures text-right`}>
@@ -69,14 +91,8 @@ export default function ArchivedOrders() {
                   </For>
                 </tbody>
               </table>
-            </div>
-            <Show when={list.hasNextPage}>
-              <div class="mt-4">
-                <Button loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
-                  {t("data.more")}
-                </Button>
               </div>
-            </Show>
+            </Card>
           </Show>
         )}
       </QueryState>

@@ -66,3 +66,4 @@ export {
   Spinner,
 } from "./states.tsx";
 export { Th, tableClass, tdClass } from "./table.tsx";
+export { fileInputClass } from "./file-input.tsx";
