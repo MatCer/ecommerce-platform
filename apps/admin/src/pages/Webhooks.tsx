@@ -1,12 +1,17 @@
 import {
+  Alert,
   Badge,
   Button,
+  buttonClass,
+  Card,
   Checkbox,
   ConfirmDialog,
   Dialog,
   EmptyState,
   ErrorState,
   FieldGroup,
+  Icon,
+  Menu,
   PermissionDenied,
   SelectField,
   showToast,
@@ -258,6 +263,7 @@ export default function Webhooks() {
                 when={data.items.length > 0}
                 fallback={
                   <EmptyState
+                    icon="bullhorn"
                     title={t("webhooks.emptyTitle")}
                     description={t("webhooks.emptyDesc")}
                     action={
@@ -268,104 +274,144 @@ export default function Webhooks() {
                   />
                 }
               >
-                <div class="overflow-x-auto">
-                  <table class={tableClass}>
-                    <thead>
-                      <tr>
-                        <Th>{t("webhooks.url")}</Th>
-                        <Th>{t("webhooks.events")}</Th>
-                        <Th>{t("webhooks.status")}</Th>
-                        <Th>{t("webhooks.secret")}</Th>
-                        <Th srOnly>{t("common.actions")}</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={data.items}>
-                        {(s) => (
-                          <tr class="align-top">
-                            <td class={`${tdClass} py-2`}>
-                              <span class="figures block max-w-80 text-xs break-all">{s.url}</span>
-                              <Show when={s.description}>
-                                <span class="block text-xs text-muted-foreground">
-                                  {s.description}
+                <Card padding="none">
+                  <div class="overflow-x-auto">
+                    <table class={tableClass}>
+                      <thead>
+                        <tr>
+                          <Th>{t("webhooks.url")}</Th>
+                          <Th>{t("webhooks.events")}</Th>
+                          <Th>{t("webhooks.status")}</Th>
+                          <Th>{t("webhooks.secret")}</Th>
+                          <Th srOnly>{t("common.actions")}</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={data.items}>
+                          {(s) => (
+                            <tr class="align-top">
+                              <td class={`${tdClass} py-2`}>
+                                <span class="block max-w-80 font-mono text-xs font-semibold break-all text-heading">
+                                  {s.url}
                                 </span>
-                              </Show>
-                            </td>
-                            <td class={`${tdClass} py-2`}>
-                              <ul class="figures flex max-w-72 flex-wrap gap-x-2 text-xs">
-                                <For each={s.events}>{(e) => <li>{e}</li>}</For>
-                              </ul>
-                            </td>
-                            <td class={`${tdClass} py-2`}>
-                              <Badge tone={s.active ? "success" : "neutral"}>
-                                {s.active ? t("webhooks.active") : t("webhooks.inactive")}
-                              </Badge>
-                            </td>
-                            <td
-                              class={`${tdClass} py-2 text-xs whitespace-nowrap text-muted-foreground`}
-                            >
-                              {t("webhooks.secretEnding", { hint: s.secret_hint })}
-                            </td>
-                            <td class={`${tdClass} py-1 text-right whitespace-nowrap`}>
-                              <Button
-                                category="tertiary"
-                                onClick={() => setParams({ subscription: s.id })}
-                              >
-                                {t("webhooks.showDeliveries")}
-                                <span class="sr-only">: {s.url}</span>
-                              </Button>
-                              <Button category="tertiary" onClick={() => openForm(s)}>
-                                {t("common.edit")}
-                                <span class="sr-only">: {s.url}</span>
-                              </Button>
-                              <Button category="tertiary" onClick={() => setRotating(s)}>
-                                {t("webhooks.rotate")}
-                                <span class="sr-only">: {s.url}</span>
-                              </Button>
-                              <Button category="tertiary" onClick={() => setRemoving(s)}>
-                                {t("common.delete")}
-                                <span class="sr-only">: {s.url}</span>
-                              </Button>
-                            </td>
-                          </tr>
-                        )}
-                      </For>
-                    </tbody>
-                  </table>
-                </div>
+                                <Show when={s.description}>
+                                  <span class="block text-sm text-muted-foreground">
+                                    {s.description}
+                                  </span>
+                                </Show>
+                              </td>
+                              <td class={`${tdClass} py-2`}>
+                                <ul class="flex max-w-80 flex-wrap gap-1">
+                                  <For each={s.events}>
+                                    {(e) => (
+                                      <li class="rounded-sm bg-subtle px-1.5 font-mono text-xs">
+                                        {e}
+                                      </li>
+                                    )}
+                                  </For>
+                                </ul>
+                              </td>
+                              <td class={`${tdClass} py-2`}>
+                                <Badge tone={s.active ? "success" : "neutral"}>
+                                  {s.active ? t("webhooks.active") : t("webhooks.inactive")}
+                                </Badge>
+                              </td>
+                              <td class={`${tdClass} py-2 whitespace-nowrap text-muted-foreground`}>
+                                {t("webhooks.secretEnding", { hint: s.secret_hint })}
+                              </td>
+                              <td class={`${tdClass} py-1 text-right whitespace-nowrap`}>
+                                <span class="inline-flex items-center gap-1">
+                                  <Button
+                                    category="tertiary"
+                                    size="small"
+                                    onClick={() => setParams({ subscription: s.id })}
+                                  >
+                                    {t("webhooks.showDeliveries")}
+                                    <span class="sr-only">: {s.url}</span>
+                                  </Button>
+                                  <Menu
+                                    triggerLabel={`${t("common.actions")}: ${s.url}`}
+                                    triggerClass={buttonClass({
+                                      category: "tertiary",
+                                      size: "small",
+                                      iconOnly: true,
+                                    })}
+                                    trigger={<Icon name="ellipsis_v" />}
+                                    items={[
+                                      {
+                                        label: t("common.edit"),
+                                        icon: "pencil",
+                                        onSelect: () => openForm(s),
+                                      },
+                                      {
+                                        label: t("webhooks.rotate"),
+                                        icon: "retry",
+                                        onSelect: () => setRotating(s),
+                                      },
+                                      {
+                                        label: t("common.delete"),
+                                        icon: "remove",
+                                        danger: true,
+                                        separatorBefore: true,
+                                        onSelect: () => setRemoving(s),
+                                      },
+                                    ]}
+                                  />
+                                </span>
+                              </td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
               </Show>
 
-              <section aria-labelledby="deliveries" class="flex flex-col gap-3">
-                <div class="flex flex-col gap-0.5">
-                  <h2 id="deliveries" class="text-sm font-semibold">
-                    {t("webhooks.deliveries")}
-                  </h2>
-                  <p class="text-xs text-muted-foreground">{t("webhooks.deliveriesDesc")}</p>
-                </div>
-                <div class="flex flex-wrap items-end gap-2">
-                  <SelectField
-                    class="w-72 max-w-full"
-                    label={t("webhooks.subscription")}
-                    value={filter() ?? ""}
-                    options={[
-                      { value: "", label: t("webhooks.allSubscriptions") },
-                      ...data.items.map((s) => ({ value: s.id, label: s.url })),
-                    ]}
-                    onChange={(v) => setParams({ subscription: v || undefined })}
-                  />
-                  <Button
-                    loading={deliveries.isRefetching && !deliveries.isFetchingNextPage}
-                    onClick={() => void deliveries.refetch()}
-                  >
-                    {t("webhooks.refresh")}
-                  </Button>
-                </div>
+              <Card
+                padding="none"
+                title={<span id="deliveries">{t("webhooks.deliveries")}</span>}
+                description={t("webhooks.deliveriesDesc")}
+                actions={
+                  <>
+                    <SelectField
+                      class="w-72 max-w-full"
+                      hideLabel
+                      label={t("webhooks.subscription")}
+                      value={filter() ?? ""}
+                      options={[
+                        { value: "", label: t("webhooks.allSubscriptions") },
+                        ...data.items.map((s) => ({ value: s.id, label: s.url })),
+                      ]}
+                      onChange={(v) => setParams({ subscription: v || undefined })}
+                    />
+                    <Button
+                      icon="retry"
+                      loading={deliveries.isRefetching && !deliveries.isFetchingNextPage}
+                      onClick={() => void deliveries.refetch()}
+                    >
+                      {t("webhooks.refresh")}
+                    </Button>
+                  </>
+                }
+                footer={
+                  rows().length > 0 && deliveries.hasNextPage ? (
+                    <Button
+                      loading={deliveries.isFetchingNextPage}
+                      onClick={() => void deliveries.fetchNextPage()}
+                    >
+                      {t("common.loadMore")}
+                    </Button>
+                  ) : undefined
+                }
+              >
                 <QueryState query={deliveries}>
                   {() => (
                     <Show
                       when={rows().length > 0}
                       fallback={
                         <EmptyState
+                          icon="list-task"
                           title={t("webhooks.noDeliveries")}
                           description={t("webhooks.noDeliveriesDesc")}
                         />
@@ -393,14 +439,18 @@ export default function Webhooks() {
                               {(d) => (
                                 <tr>
                                   <td
-                                    class={`${tdClass} figures text-xs whitespace-nowrap text-faint-foreground`}
+                                    class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
                                   >
                                     {formatDateTime(d.created_at)}
                                   </td>
-                                  <td class={`${tdClass} figures text-xs`}>{d.event_type}</td>
+                                  <td
+                                    class={`${tdClass} font-mono text-xs font-semibold text-heading`}
+                                  >
+                                    {d.event_type}
+                                  </td>
                                   <Show when={!filter()}>
                                     <td
-                                      class={`${tdClass} figures max-w-48 truncate text-xs`}
+                                      class={`${tdClass} max-w-48 truncate font-mono text-xs`}
                                       title={urlOf(d.subscription_id)}
                                     >
                                       {urlOf(d.subscription_id)}
@@ -414,19 +464,25 @@ export default function Webhooks() {
                                     {d.response_code ?? "—"}
                                   </td>
                                   <td
-                                    class={`${tdClass} max-w-56 truncate text-xs`}
+                                    class={`${tdClass} max-w-56 truncate text-muted-foreground`}
                                     title={d.last_error ?? ""}
                                   >
                                     {d.last_error ?? "—"}
                                   </td>
-                                  <td class={`${tdClass} text-xs whitespace-nowrap`}>
+                                  <td
+                                    class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                                  >
                                     {d.next_at &&
                                     (d.status === "retrying" || d.status === "pending")
                                       ? formatDateTime(d.next_at)
                                       : "—"}
                                   </td>
                                   <td class={`${tdClass} text-right whitespace-nowrap`}>
-                                    <Button category="tertiary" onClick={() => setPayload(d)}>
+                                    <Button
+                                      category="tertiary"
+                                      size="small"
+                                      onClick={() => setPayload(d)}
+                                    >
                                       {t("webhooks.payload")}
                                       <span class="sr-only">
                                         : {d.event_type}, {formatDateTime(d.created_at)}
@@ -435,6 +491,8 @@ export default function Webhooks() {
                                     <Show when={d.status === "succeeded" || d.status === "dead"}>
                                       <Button
                                         category="tertiary"
+                                        size="small"
+                                        class="ml-1"
                                         loading={
                                           redeliver.isPending && redeliver.variables === d.id
                                         }
@@ -453,20 +511,10 @@ export default function Webhooks() {
                           </tbody>
                         </table>
                       </div>
-                      <Show when={deliveries.hasNextPage}>
-                        <div>
-                          <Button
-                            loading={deliveries.isFetchingNextPage}
-                            onClick={() => void deliveries.fetchNextPage()}
-                          >
-                            {t("common.loadMore")}
-                          </Button>
-                        </div>
-                      </Show>
                     </Show>
                   )}
                 </QueryState>
-              </section>
+              </Card>
 
               <Dialog
                 open={editing() !== null}
@@ -474,7 +522,7 @@ export default function Webhooks() {
                 title={editing() === "new" ? t("webhooks.new") : t("webhooks.edit")}
               >
                 <form
-                  class="flex flex-col gap-3"
+                  class="flex flex-col gap-4"
                   onSubmit={(e) => {
                     e.preventDefault();
                     save.mutate();
@@ -497,17 +545,17 @@ export default function Webhooks() {
                     maxLength={200}
                   />
                   <FieldGroup legend={t("webhooks.events")} description={t("webhooks.eventsHint")}>
-                    <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="grid gap-4 sm:grid-cols-2">
                       <For each={groupEvents(data.event_types)}>
                         {(g) => (
                           <fieldset class="flex flex-col gap-1.5">
-                            <legend class="mb-1 text-xs font-medium text-muted-foreground">
+                            <legend class="mb-1 text-sm font-semibold text-heading">
                               {groupLabel(g.group)}
                             </legend>
                             <For each={g.events}>
                               {(e) => (
                                 <Checkbox
-                                  label={<span class="figures text-xs">{e}</span>}
+                                  label={<span class="font-mono text-xs">{e}</span>}
                                   checked={form().events.includes(e)}
                                   onChange={(on) => toggleEvent(e, on)}
                                 />
@@ -525,9 +573,7 @@ export default function Webhooks() {
                     onChange={(active) => setForm((f) => ({ ...f, active }))}
                   />
                   <Show when={error()}>
-                    <p role="alert" class="text-xs font-medium text-error-700">
-                      {error()}
-                    </p>
+                    <Alert tone="error">{error()}</Alert>
                   </Show>
                   <div class="flex justify-end gap-2">
                     <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
@@ -553,11 +599,11 @@ export default function Webhooks() {
         title={t("webhooks.secretTitle")}
         description={t("webhooks.secretOnce")}
       >
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-4">
           <div class="flex items-end gap-2">
             <TextField
               class="min-w-0 flex-1"
-              inputClass="figures"
+              inputClass="font-mono"
               label={t("webhooks.secret")}
               value={secret() ?? ""}
               onChange={() => undefined}
@@ -565,10 +611,9 @@ export default function Webhooks() {
             />
             <Button onClick={() => void copySecret()}>{t("webhooks.copy")}</Button>
           </div>
-          <div class="flex flex-col gap-1 rounded-md bg-muted p-3 text-xs">
-            <p class="font-semibold">{t("webhooks.verifyTitle")}</p>
-            <p class="text-muted-foreground">{t("webhooks.verifyText")}</p>
-          </div>
+          <Alert tone="info" title={t("webhooks.verifyTitle")}>
+            {t("webhooks.verifyText")}
+          </Alert>
           <div class="flex justify-end">
             <Button variant="confirm" onClick={() => setSecret(null)}>
               {t("webhooks.secretStored")}
@@ -581,13 +626,11 @@ export default function Webhooks() {
         open={payload() !== null}
         onOpenChange={(o) => !o && setPayload(null)}
         title={t("webhooks.payloadTitle", { event: payload()?.event_type ?? "" })}
+        footer={<Button onClick={() => setPayload(null)}>{t("common.close")}</Button>}
       >
-        <pre class="figures max-h-96 overflow-auto rounded-sm bg-muted p-2 text-xs">
+        <pre class="max-h-96 overflow-auto rounded-md border border-border bg-subtle p-3 font-mono text-xs">
           {JSON.stringify(payload()?.payload, null, 2)}
         </pre>
-        <div class="flex justify-end">
-          <Button onClick={() => setPayload(null)}>{t("common.close")}</Button>
-        </div>
       </Dialog>
 
       <ConfirmDialog
