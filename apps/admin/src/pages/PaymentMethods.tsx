@@ -11,7 +11,7 @@ import { cleanTranslations } from "../lib/shipping-form.ts";
 
 export default function PaymentMethods() {
   return (
-    <>
+    <div class="max-w-4xl">
       <PageHeader title={t("payments.title")} />
       <StripeCard />
       <MarketSettings>
@@ -22,7 +22,7 @@ export default function PaymentMethods() {
           </div>
         )}
       </MarketSettings>
-    </>
+    </div>
   );
 }
 

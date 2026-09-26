@@ -37,7 +37,7 @@ function Usage(props: { u: Schemas["UsageSummary"] }) {
     <section aria-labelledby="ai-usage-h" class="max-w-3xl">
       <Card title={<span id="ai-usage-h">{t("ai.usage")}</span>} padding="none">
         <div class="flex flex-col gap-4 p-4">
-          <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr_auto_1fr] [&_dt]:text-muted-foreground">
+          <dl class="grid max-w-md grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm [&_dt]:text-muted-foreground">
             <dt class="text-muted-foreground">{t("ai.provider")}</dt>
             <dd>
               <Show when={props.u.provider === "fake"} fallback={props.u.provider}>
