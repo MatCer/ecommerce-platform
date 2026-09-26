@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE orders o\n         SET shipping_method_id = m.id,\n             shipping_method_snapshot = jsonb_build_object(\n                 'id', m.id, 'carrier', m.carrier,\n                 'name', COALESCE(m.name_i18n->>o.locale, m.name_i18n->>'cs', ''),\n                 'price_minor', o.shipping_minor)\n         FROM shipping_methods m\n         WHERE o.email LIKE '%@history.example.com' AND o.shipping_method_snapshot = '{}'\n           AND m.market_id = o.market_id AND m.carrier = 'packeta_home'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "4e00ac4595a5cbd7e28814f33d7bd48fad3ade426300be34068863812c475431"
+}

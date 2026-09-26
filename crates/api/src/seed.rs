@@ -296,6 +296,25 @@ fn eur_minor(czk: i64) -> i64 {
     (czk / 25) * 100 + 90
 }
 
+/// Demo history ships with the market's Packeta home delivery, free like its totals. The order
+/// detail reads the snapshot as placed by the checkout (`orders::MethodSnapshot`).
+async fn ship_history(tx: &mut TenantTx) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE orders o
+         SET shipping_method_id = m.id,
+             shipping_method_snapshot = jsonb_build_object(
+                 'id', m.id, 'carrier', m.carrier,
+                 'name', COALESCE(m.name_i18n->>o.locale, m.name_i18n->>'cs', ''),
+                 'price_minor', o.shipping_minor)
+         FROM shipping_methods m
+         WHERE o.email LIKE '%@history.example.com' AND o.shipping_method_snapshot = '{}'
+           AND m.market_id = o.market_id AND m.carrier = 'packeta_home'"
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 /// What the seed printed at the end.
 #[derive(Debug, Default)]
 pub struct Summary {
@@ -1084,6 +1103,9 @@ impl Seeder<'_> {
         .fetch_one(&mut *tx)
         .await?;
         if exists {
+            // A rerun repairs history seeded without a shipping method (before WP26).
+            ship_history(&mut tx).await?;
+            tx.commit().await?;
             return Ok(());
         }
         // (product index in PRODUCTS, default variant, product id, sku, cs name)
@@ -1252,6 +1274,7 @@ impl Seeder<'_> {
         );
         job.tenant_id = Some(tenant_id);
         platform::queue::enqueue(&mut *tx, &job).await?;
+        ship_history(&mut tx).await?;
         tx.commit().await?;
         Ok(())
     }
@@ -1649,6 +1672,46 @@ impl Seeder<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// WP26: demo history used to carry an empty shipping snapshot, so its order detail was a
+    /// 500. The seed (and a rerun over such history) writes the market's Packeta home method.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn history_orders_get_a_shipping_snapshot_the_order_detail_reads(db: sqlx::PgPool) {
+        let runtime = testkit::runtime_pool(&db, 2).await;
+        let shop = testkit::storefront::shop(&runtime, "hist").await;
+        let order =
+            testkit::storefront::raw_order(&runtime, &shop, shop.cz, "CZK", 10_000, 1, "confirmed")
+                .await;
+        let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+        sqlx::query(
+            "INSERT INTO shipping_methods (tenant_id, market_id, carrier, name_i18n, price_minor)
+             VALUES ($1, $2, 'packeta_home', '{\"cs\": \"Zásilkovna – na adresu\"}', 11900)",
+        )
+        .bind(shop.tenant)
+        .bind(shop.cz)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE orders SET email = 'zakaznik1@history.example.com' WHERE id = $1")
+            .bind(order)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        assert!(
+            commerce::orders::admin_detail(&mut tx, order)
+                .await
+                .is_err()
+        );
+
+        ship_history(&mut tx).await.unwrap();
+        let shipping = commerce::orders::admin_detail(&mut tx, order)
+            .await
+            .unwrap()
+            .order
+            .shipping;
+        assert_eq!(shipping.carrier, commerce::shipping::Carrier::PacketaHome);
+        assert_eq!(shipping.name, "Zásilkovna – na adresu");
+    }
 
     #[test]
     fn legacy_review_copy_is_detected_without_overwriting_current_copy() {

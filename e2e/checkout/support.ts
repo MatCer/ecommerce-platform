@@ -115,10 +115,10 @@ export async function toCheckout(
 export async function fillContactAndAddress(page: Page, email: string | null, city = "Praha") {
   await checkoutReady(page);
   if (email !== null) await page.locator('input[autocomplete="email"]').fill(email);
-  await page.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
-  await page.locator('input[autocomplete="section-billing street-address"]').fill("Dlouhá 12");
-  await page.locator('input[autocomplete="section-billing postal-code"]').fill("110 00");
-  await page.locator('input[autocomplete="section-billing address-level2"]').fill(city);
+  await page.locator('input[autocomplete="name"]').fill("Jana Nováková");
+  await page.locator('input[autocomplete="street-address"]').fill("Dlouhá 12");
+  await page.locator('input[autocomplete="postal-code"]').fill("110 00");
+  await page.locator('input[autocomplete="address-level2"]').fill(city);
 }
 
 /** Chooses the Packeta pickup method and a point in the (mock) widget. */

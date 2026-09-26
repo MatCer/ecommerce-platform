@@ -44,6 +44,13 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 860 } },
     },
     {
+      // WP26: the cross-subdomain checkout handoff must also work in Firefox.
+      name: "firefox",
+      testMatch: "checkout/handoff.spec.ts",
+      dependencies: ["chromium-setup"],
+      use: { ...devices["Desktop Firefox"], viewport: { width: 1280, height: 860 } },
+    },
+    {
       name: "chromium-shared-state",
       testMatch: sharedState,
       dependencies: ["chromium"],

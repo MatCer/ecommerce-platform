@@ -126,10 +126,10 @@ test("keyboard only: product to cart to COD checkout", async ({ browser }) => {
     await page.keyboard.type(value);
   };
   await typeInto('input[autocomplete="email"]', `keyboard-${run}@example.test`);
-  await typeInto('input[autocomplete="section-billing name"]', "Jana Nováková");
-  await typeInto('input[autocomplete="section-billing street-address"]', "Dlouhá 12");
-  await typeInto('input[autocomplete="section-billing postal-code"]', "110 00");
-  await typeInto('input[autocomplete="section-billing address-level2"]', "Praha");
+  await typeInto('input[autocomplete="name"]', "Jana Nováková");
+  await typeInto('input[autocomplete="street-address"]', "Dlouhá 12");
+  await typeInto('input[autocomplete="postal-code"]', "110 00");
+  await typeInto('input[autocomplete="address-level2"]', "Praha");
   const shipping = page.getByRole("radio", { name: /PPL/ }).first();
   await tabTo(page, page.getByRole("radio", { name: /Zásilkovna – výdejní místo/ }));
   await page.keyboard.press("ArrowRight");
@@ -175,9 +175,7 @@ test("checkout input survives delayed island hydration", async ({ browser }) => 
   const email = `hydration-${run}@example.test`;
   await fillContactAndAddress(page, email);
   await expect(page.locator('input[autocomplete="email"]')).toHaveValue(email);
-  await expect(page.locator('input[autocomplete="section-billing name"]')).toHaveValue(
-    "Jana Nováková",
-  );
+  await expect(page.locator('input[autocomplete="name"]')).toHaveValue("Jana Nováková");
   await page.context().close();
 });
 
