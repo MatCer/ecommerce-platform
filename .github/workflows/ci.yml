@@ -170,7 +170,7 @@ jobs:
       - run: pnpm test
 
   acceptance:
-    name: M1 browser, accessibility and performance
+    name: M1–M3 browser, accessibility and performance
     if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'acceptance')
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -202,6 +202,10 @@ jobs:
               ipam:
                 config:
                   - subnet: 10.213.115.0/24
+            theme-functional:
+              ipam:
+                config:
+                  - subnet: 10.213.215.0/24
           EOF
       - run: make up
       - run: make seed

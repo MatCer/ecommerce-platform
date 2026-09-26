@@ -74,8 +74,11 @@ export interface PipelineConfig {
   workDir: string;
   /** Internal network for the browser steps (reaches only the public proxy). */
   checkNetwork: string;
+  /** Separate network for merchant-authored Node checks; only the preview proxy is attached. */
+  functionalNetwork: string;
   /** Host the preview hosts are mapped to inside the check network (`caddy`). */
   proxyHost: string;
+  functionalProxyHost: string;
   lighthouseRuns: number;
   log?: (e: Record<string, unknown>) => void;
 }
@@ -404,11 +407,11 @@ export async function runPipeline(cfg: PipelineConfig, tenant: string, revision:
           PREVIEW_BASE: `https://${check.preview_host}`,
           PREVIEW_COOKIE: `__Host-preview=${check.preview_token}`,
           THEME_KIT_CHROMIUM_ARGS: JSON.stringify([
-            `--host-resolver-rules=MAP *.localhost ${cfg.proxyHost}`,
+            `--host-resolver-rules=MAP *.localhost ${cfg.functionalProxyHost}`,
           ]),
           HOME: "/tmp",
         },
-        network: cfg.checkNetwork,
+        network: cfg.functionalNetwork,
         mounts: [inMount],
         memoryBytes: 2 * GiB,
         cpus: 2,

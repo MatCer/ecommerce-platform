@@ -21,7 +21,10 @@ prod), §13 (background processing), §15 (operations), §17 (M1 = local pilot a
 degraded component, A27). The edge has `/_edge/healthz` on its internal port 8788.
 
 **Logs.** `tracing` JSON lines on stdout. Every API response carries `x-request-id` (generated
-unless the caller sent one); search logs for it. Logs contain ids, never PII, tokens or secrets.
+unless the caller sent one); search logs for it. API request logs use route templates, and edge
+error logs use safe path labels. For any historical logs retained from before WP25, search for
+`/storefront/v1/orders/` and `/storefront/v1/withdrawals/` and purge matching entries; revoke
+exposed order/withdrawal capabilities before granting log access. Do not export raw matches.
 
 ### Local pilot and verification
 
@@ -50,6 +53,7 @@ separate buckets. Auth and edge reject `E2E_RATE_SECRET` unless `APP_ENV=dev`; n
 keeps the peer-IP rate limit.
 CI runs the same seeded browser and performance gates on `main` and on PRs labelled
 `acceptance` (`.github/workflows/ci.yml`).
+The M3 criterion-to-test map is [`docs/acceptance/m3.md`](acceptance/m3.md).
 
 ## 2. Metrics
 
@@ -166,6 +170,14 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 | Logs | worker `ai turn` (model, stop reason, tokens, cache reads, ms) and `ai theme run finished` (status, turns, checks, tokens, cost); never prompt or file content. |
 | Manual smoke with a real key | `.env`: `ANTHROPIC_API_KEY=sk-ant-...`, `make up && make seed`, then in the admin run a few prompts from `docs/decisions/ai-edit-prompts.md` on the demo shop; check `cache_read` > 0 from the second turn on, the diff, the report, accept → preview → publish → rollback. |
 
+Keep `ANTHROPIC_API_KEY` in the secret manager, never in source or browser configuration. Set
+`AI_PLAN_QUOTAS` for each plan and review the monthly token and USD-micro cost counters in
+Admin → Settings → AI. The theme agent has server-side per-run ceilings (table above); set a
+monthly tenant override with `api admin set-ai-quota --tenant <slug> --tokens <n>` when needed.
+Test refusals, truncated responses, repair exhaustion and cancellation with a real provider on
+a disposable shop before enabling the feature for merchants. A successful fake-provider run
+does not measure model quality or production cost.
+
 ## 7. Backups and restore
 
 ### Local (A29)
@@ -246,8 +258,9 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
 - [ ] **SES**: domain verified with DKIM, SPF, DMARC; production access granted; a
       configuration set per stream publishes Bounce + Complaint to an SNS topic with an HTTPS
       subscription `https://ses:<MAIL_EVENTS_SECRET>@api.<domain>/webhooks/ses` (confirm the
-      subscription by hand: its `SubscribeURL` is logged, never followed). Build the SNS
-      signature check first (design in `commerce::marketing::deliverability`). Verify:
+      subscription by hand; confirmation URLs are never logged). Production boot refuses
+      `MAIL_EVENTS_SECRET` until SNS signature, pinned certificate URL, authorized TopicArn,
+      freshness and MessageId replay checks are implemented. Verify:
       mail-tester score, a bounce to `bounce@simulator.amazonses.com` shows in Admin → Emails →
       Suppressions; a campaign to Gmail shows the one-click "Unsubscribe" (RFC 8058).
 - [ ] **QR payments**: SPAYD and PAY by square codes scanned with several CZ/SK banking apps
@@ -269,6 +282,16 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
       from `.env.example`; stored in the secret manager.
 - [ ] **Prod mode**: `APP_ENV=prod` refuses the fake payment gateway (boot fails) and ignores
       `SAFE_FETCH_ALLOW_HOSTS` (warning in the log). Verify both.
+- [ ] **Theme runtime**: run merchant-authored themes on managed Workers with verified CPU,
+      memory and wall-clock enforcement, or isolate each runtime in a separate gVisor/Firecracker
+      process with hard per-instance limits, kill-on-deadline and bounded admission. The local
+      Miniflare entrypoint refuses `APP_ENV=prod` because it does not provide these guarantees;
+      deploy a managed runtime before exposing themes to production traffic. Build sandboxes
+      likewise need gVisor/Firecracker on separate hosts;
+      plain Docker is a local-development implementation only.
+- [ ] **AI provider**: provision a scoped real API key in the secret manager, set tenant monthly
+      quotas and a cost budget, and run the §6d real-provider prompt table and review/publish
+      workflow on a disposable tenant. Verify the feature is disabled without a key in prod.
 - [ ] **Backups**: PITR enabled, nightly dump running, a restore drill done (§7).
 - [ ] **Monitoring**: `/metrics` scraped, the alerts of §2 routed to on-call.
 - [ ] **Rate limits** reviewed for the expected traffic (storefront, auth, admin).

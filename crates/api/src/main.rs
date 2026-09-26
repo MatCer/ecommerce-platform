@@ -136,12 +136,27 @@ fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
 
 /// `MAIL_EVENTS_SECRET` (at least 32 characters): the HTTP Basic password SNS sends with SES
 /// bounce/complaint notifications. Unset: the endpoint is off.
-fn mail_events_secret() -> anyhow::Result<Option<api::auth::ServiceToken>> {
-    match std::env::var("MAIL_EVENTS_SECRET") {
-        Ok(v) if v.trim().is_empty() => Ok(None),
-        Ok(v) if v.len() < 32 => anyhow::bail!("MAIL_EVENTS_SECRET must be at least 32 characters"),
-        Ok(v) => Ok(Some(api::auth::ServiceToken::new(&v))),
-        Err(_) => {
+fn mail_events_secret(
+    env: platform::config::AppEnv,
+) -> anyhow::Result<Option<api::auth::ServiceToken>> {
+    let raw = std::env::var("MAIL_EVENTS_SECRET").ok();
+    mail_events_token(env, raw.as_deref())
+}
+
+fn mail_events_token(
+    env: platform::config::AppEnv,
+    raw: Option<&str>,
+) -> anyhow::Result<Option<api::auth::ServiceToken>> {
+    match raw {
+        Some(v) if v.trim().is_empty() => Ok(None),
+        Some(v) if v.len() < 32 => {
+            anyhow::bail!("MAIL_EVENTS_SECRET must be at least 32 characters")
+        }
+        Some(_) if env == platform::config::AppEnv::Prod => anyhow::bail!(
+            "SES/SNS ingestion is disabled in production until signature, topic, freshness and replay verification is implemented"
+        ),
+        Some(v) => Ok(Some(api::auth::ServiceToken::new(v))),
+        None => {
             tracing::warn!("MAIL_EVENTS_SECRET not set: bounce/complaint ingestion is off");
             Ok(None)
         }
@@ -240,7 +255,7 @@ async fn serve() -> anyhow::Result<()> {
         )?),
         checkout,
         ai: ai_helpers()?,
-        mail_events: mail_events_secret()?,
+        mail_events: mail_events_secret(cfg.env)?,
         themes: theme_cfg
             .secret
             .as_deref()
@@ -310,4 +325,23 @@ async fn healthcheck() -> anyhow::Result<()> {
         .await?
         .error_for_status()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod mail_events_tests {
+    use super::mail_events_token;
+    use platform::config::AppEnv;
+
+    #[test]
+    fn production_refuses_unsigned_sns_even_with_a_long_shared_secret() {
+        let secret = "local-mail-events-secret-0123456789abcdef";
+        assert!(
+            mail_events_token(AppEnv::Dev, Some(secret))
+                .unwrap()
+                .is_some()
+        );
+        let err = mail_events_token(AppEnv::Prod, Some(secret)).err().unwrap();
+        assert!(err.to_string().contains("disabled in production"));
+        assert!(mail_events_token(AppEnv::Prod, None).unwrap().is_none());
+    }
 }

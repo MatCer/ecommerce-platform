@@ -327,6 +327,38 @@ test("hostile archives are refused at upload with every reason", async () => {
   expect(latest()).toBe(count);
 });
 
+test("functional checks cannot reach Mailpit by spoofing Caddy's Host header", async () => {
+  test.setTimeout(10 * 60_000);
+  const files = defaultTheme();
+  files.set(
+    "checks/network.spec.ts",
+    Buffer.from(`
+    import https from "node:https";
+    import { expect, test } from "@playwright/test";
+    test("only preview pages are reachable", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.locator("main")).toBeVisible();
+      const status = await new Promise<number>((resolve, reject) => {
+        https.get({ hostname: "theme-functional-proxy", servername: "mail.localhost", port: 443, path: "/api/v1/messages",
+          headers: { Host: "mail.localhost" }, rejectUnauthorized: false },
+          (res) => { res.resume(); resolve(res.statusCode ?? 0); }).on("error", reject);
+      });
+      expect(status).toBe(403);
+    });
+  `),
+  );
+  const number = latest() + 1;
+  await upload("functional-network.tar.gz", archive(files));
+  await expect(page.getByText(`Revision #${number} is being built and checked.`)).toBeVisible();
+  const result = await settled(number);
+  expect(result.failures).toEqual([]);
+  expect(result.status).toBe("ready");
+  const [functional] = sql(`SELECT s->>'status' FROM theme_revisions r,
+    jsonb_array_elements(r.checks->'steps') s
+    WHERE r.tenant_id = ${DEMO} AND r.number = ${number} AND s->>'name' = 'functional'`);
+  expect(functional).toBe("passed");
+});
+
 test("contract violations and a network attempt fail the build with reasons", async () => {
   test.setTimeout(6 * 60_000);
   const cases: [string, (f: Map<string, Buffer>) => void, RegExp][] = [

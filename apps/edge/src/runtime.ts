@@ -49,6 +49,7 @@ async function toMfResponse(res: Response): Promise<MfResponse> {
 }
 
 const EGRESS_DENY = "egress-deny";
+const MAX_INSTANCES = 32;
 // Answers every outbound fetch with 403 and reports it; has no `connect` handler, so TCP
 // sockets fail to open.
 const DENY_WORKER = `export default {
@@ -164,6 +165,9 @@ export class WorkerPool {
     const key = WorkerPool.key(id, scope);
     let pending = this.#instances.get(key);
     if (!pending) {
+      // Bound total admission independently of idle eviction. Every instance owns a
+      // workerd isolate and a malicious tenant must not grow them without limit.
+      if (this.#instances.size >= MAX_INSTANCES) throw new Error("theme runtime capacity reached");
       pending = createInstance(this.#opts, id, scope);
       this.#instances.set(key, pending);
       pending.catch(() => this.#instances.delete(key));
@@ -197,6 +201,11 @@ export class WorkerPool {
   async evict(id: string) {
     const keys = [...this.#instances.keys()].filter((k) => k === id || k.startsWith(`${id}@`));
     await Promise.all(keys.map((k) => this.#evictKey(k)));
+  }
+
+  /** Stop one tenant's timed-out instance without interrupting other tenants. */
+  async evictScope(id: string, scope?: string) {
+    await this.#evictKey(WorkerPool.key(id, scope));
   }
 
   async #evictKey(key: string) {

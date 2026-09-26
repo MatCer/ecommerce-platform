@@ -169,6 +169,11 @@ services:
   edge:
     profiles: [full]
     restart: unless-stopped
+    # Host-level backstop for the local Miniflare process; production still requires a
+    # managed Workers runtime or per-instance microVM limits (runbook §9).
+    mem_limit: 4g
+    cpus: 2
+    pids_limit: 256
     build:
       context: .
       dockerfile: apps/edge/Dockerfile
@@ -257,6 +262,16 @@ services:
     # WP23: the theme builder's browser checks reach the shops (previews) only through Caddy,
     # the one peer on the internal (no-egress) `theme-check` network.
     networks: [default, theme-check]
+
+  # Merchant-authored functional checks run arbitrary Node. Their network has only this proxy,
+  # which accepts preview hosts and public page/asset paths, never Caddy's mail/admin routes.
+  theme-functional-proxy:
+    profiles: [full]
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    volumes:
+      - ./docker/caddy/PreviewOnly.Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [default, theme-functional]
 
   # Applies migrations as the owner role, then exits. api and worker wait for it.
   migrate:
@@ -415,8 +430,10 @@ services:
       SANDBOX_IMAGE: ${COMPOSE_PROJECT_NAME:-ecommerce}-theme-builder:local
       SANDBOX_LABEL: ${COMPOSE_PROJECT_NAME:-ecommerce}
       SANDBOX_VOLUME: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-work
-      SANDBOX_NETWORKS: none,${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check
+      SANDBOX_NETWORKS: none,${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check,${COMPOSE_PROJECT_NAME:-ecommerce}_theme-functional
       CHECK_NETWORK: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check
+      FUNCTIONAL_NETWORK: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-functional
+      FUNCTIONAL_PROXY_HOST: theme-functional-proxy
       PROXY_HOST: caddy
       LIGHTHOUSE_RUNS: ${THEME_LIGHTHOUSE_RUNS:-3}
     volumes: [theme-work:/work]
@@ -464,4 +481,7 @@ networks:
   # the only other member.
   theme-check:
     name: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-check
+    internal: true
+  theme-functional:
+    name: ${COMPOSE_PROJECT_NAME:-ecommerce}_theme-functional
     internal: true

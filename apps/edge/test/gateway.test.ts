@@ -140,6 +140,12 @@ describe("WP12 withdrawal routes", () => {
       expect(entries).toHaveLength(1);
       expect(JSON.stringify(entries)).toContain("/_p/withdraw/[redacted]");
       expect(JSON.stringify(entries)).not.toContain(token);
+      expect(JSON.stringify(entries)).not.toContain("upstream offline");
+      for (const route of [`/o/${token}`, `/orders/${token}`, `/unmatched/${token}`]) {
+        entries.length = 0;
+        await proxy.fetch(new Request(`${checkout}${route}`));
+        expect(JSON.stringify(entries)).not.toContain(token);
+      }
     } finally {
       await proxy.dispose();
     }
@@ -371,6 +377,7 @@ describe("header hygiene (A2)", () => {
 
   test("a never-ending body times out (504) and an oversized one is cut off (502)", async () => {
     expect((await get("http://demo.localhost/c/endless")).status).toBe(504);
+    expect(gw.pool.has(v1, "t-demo")).toBe(false);
     expect((await get("http://demo.localhost/c/huge")).status).toBe(502);
     expect(gw.registry.size).toBe(0);
   });

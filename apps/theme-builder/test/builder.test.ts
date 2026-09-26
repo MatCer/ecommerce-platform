@@ -239,7 +239,9 @@ describe("pipeline", () => {
           api,
           workDir,
           checkNetwork: "net",
+          functionalNetwork: "functional-net",
           proxyHost: "caddy",
+          functionalProxyHost: "preview-only",
           lighthouseRuns: 1,
           log: () => {},
         },
@@ -381,7 +383,7 @@ describe("pipeline", () => {
       ["static", "none"],
       ["build", "none"],
       ["check", "net"],
-      ["functional", "net"],
+      ["functional", "functional-net"],
     ]);
     // The job directory is gone afterwards.
     await expect(readFile(path.join(h.workDir, h.revision, "in/source.tar.gz"))).rejects.toThrow();

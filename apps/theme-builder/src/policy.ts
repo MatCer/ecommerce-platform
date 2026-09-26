@@ -18,7 +18,7 @@ export interface Policy {
   labelValue: string;
   /** The named volume holding job inputs/outputs (mounted through subpaths only). */
   volume: string;
-  /** Allowed `NetworkMode`s: `none` and the internal check network. */
+  /** Allowed `NetworkMode`s: `none`, platform gates and isolated functional checks. */
   networks: string[];
   maxMemory: number;
   maxNanoCpus: number;
