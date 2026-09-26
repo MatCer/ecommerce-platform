@@ -343,12 +343,12 @@ export default function AdTracking() {
                             </Show>
                           </td>
                           <td class={`${tdClass} py-1 text-right whitespace-nowrap`}>
-                            <Button variant="ghost" onClick={() => openForm(c)}>
+                            <Button category="tertiary" onClick={() => openForm(c)}>
                               {t("adTracking.configure")}
                               <span class="sr-only">: {platformName(c.platform)}</span>
                             </Button>
                             <Button
-                              variant="ghost"
+                              category="tertiary"
                               disabled={!c.complete}
                               loading={test.isPending && test.variables === c.platform}
                               onClick={() => test.mutate(c.platform)}
@@ -358,7 +358,7 @@ export default function AdTracking() {
                             </Button>
                             <Show when={c.enabled}>
                               <Button
-                                variant="ghost"
+                                category="tertiary"
                                 loading={
                                   pause.isPending && pause.variables?.platform === c.platform
                                 }
@@ -590,7 +590,7 @@ export default function AdTracking() {
               </Show>
               <div class="flex justify-end gap-2">
                 <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-                <Button type="submit" variant="primary" loading={save.isPending}>
+                <Button type="submit" variant="confirm" loading={save.isPending}>
                   {t("common.save")}
                 </Button>
               </div>

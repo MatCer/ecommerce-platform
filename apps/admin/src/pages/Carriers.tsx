@@ -167,7 +167,7 @@ function CarrierForm(props: {
         <div class="flex gap-2">
           <Button
             type="submit"
-            variant="primary"
+            variant="confirm"
             loading={save.isPending}
             disabled={pending() || !passwordValid()}
           >

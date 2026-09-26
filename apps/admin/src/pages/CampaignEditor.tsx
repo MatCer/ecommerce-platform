@@ -419,7 +419,7 @@ export default function CampaignEditor() {
         </p>
       </Show>
       <div>
-        <Button type="submit" variant="primary" loading={save.isPending} disabled={!name().trim()}>
+        <Button type="submit" variant="confirm" loading={save.isPending} disabled={!name().trim()}>
           {t("common.save")}
         </Button>
       </div>
@@ -502,7 +502,7 @@ export default function CampaignEditor() {
           </Button>
           <Show when={c().status === "draft" || c().status === "scheduled"}>
             <Button
-              variant="primary"
+              variant="confirm"
               disabled={isDraft() && dirty()}
               onClick={() => {
                 setDialogError(undefined);
@@ -598,7 +598,7 @@ export default function CampaignEditor() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setTesting(false)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={sendTest.isPending}>
+            <Button type="submit" variant="confirm" loading={sendTest.isPending}>
               {t("marketing.send")}
             </Button>
           </div>
@@ -648,7 +648,7 @@ export default function CampaignEditor() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setScheduling(false)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={schedule.isPending}>
+            <Button type="submit" variant="confirm" loading={schedule.isPending}>
               {when() === "now" ? t("marketing.sendNow") : t("marketing.schedule")}
             </Button>
           </div>

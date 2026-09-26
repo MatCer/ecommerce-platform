@@ -105,7 +105,7 @@ function Methods(props: { market: Schemas["Market"] }) {
   return (
     <>
       <div class="mb-4">
-        <Button variant="primary" onClick={() => open("new")}>
+        <Button variant="confirm" onClick={() => open("new")}>
           {t("shipping.new")}
         </Button>
       </div>
@@ -309,7 +309,7 @@ function Methods(props: { market: Schemas["Market"] }) {
             </Show>
             <ApiProblem error={error()} />
             <div class="flex gap-2">
-              <Button type="submit" variant="primary" loading={save.isPending}>
+              <Button type="submit" variant="confirm" loading={save.isPending}>
                 {t("common.save")}
               </Button>
               <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>

@@ -80,7 +80,7 @@ export default function Products() {
       <PageHeader
         title={t("products.title")}
         actions={
-          <A href="/products/new" class={buttonClass("primary")}>
+          <A href="/products/new" class={buttonClass({ variant: "confirm" })}>
             {t("products.new")}
           </A>
         }
@@ -115,7 +115,7 @@ export default function Products() {
         />
         <Show when={hasFilters()}>
           <Button
-            variant="ghost"
+            category="tertiary"
             onClick={() => {
               setSearch("");
               setParams({ q: undefined, status: undefined, category: undefined });
@@ -137,7 +137,7 @@ export default function Products() {
                     title={t("products.emptyTitle")}
                     description={t("products.emptyDesc")}
                     action={
-                      <A href="/products/new" class={buttonClass("primary")}>
+                      <A href="/products/new" class={buttonClass({ variant: "confirm" })}>
                         {t("products.new")}
                       </A>
                     }

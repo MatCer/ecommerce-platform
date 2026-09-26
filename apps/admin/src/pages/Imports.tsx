@@ -137,7 +137,7 @@ function RunDetail() {
             <div class="flex flex-wrap gap-2">
               <Show when={run.status === "analyzed"}>
                 <Button
-                  variant="primary"
+                  variant="confirm"
                   disabled={action.isPending}
                   onClick={() => setConfirm(true)}
                 >
@@ -324,7 +324,7 @@ function ImportList() {
           </p>
         </Show>
         <div>
-          <Button type="submit" variant="primary" disabled={!marketId()} loading={start.isPending}>
+          <Button type="submit" variant="confirm" disabled={!marketId()} loading={start.isPending}>
             {t("content.startImport")}
           </Button>
         </div>

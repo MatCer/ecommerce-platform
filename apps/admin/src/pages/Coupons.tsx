@@ -215,7 +215,7 @@ export default function Coupons() {
     setEditing(c);
   };
   const newButton = () => (
-    <Button variant="primary" onClick={() => open("new")}>
+    <Button variant="confirm" onClick={() => open("new")}>
       {t("coupons.new")}
     </Button>
   );
@@ -269,11 +269,11 @@ export default function Coupons() {
                           </Badge>
                         </td>
                         <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => open(c)}>
+                          <Button category="tertiary" onClick={() => open(c)}>
                             {t("common.edit")}
                             <span class="sr-only">: {c.code}</span>
                           </Button>
-                          <Button variant="ghost" onClick={() => setDeleting(c)}>
+                          <Button category="tertiary" onClick={() => setDeleting(c)}>
                             {t("common.delete")}
                             <span class="sr-only">: {c.code}</span>
                           </Button>
@@ -419,7 +419,7 @@ export default function Coupons() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={save.isPending} disabled={!valid()}>
+            <Button type="submit" variant="confirm" loading={save.isPending} disabled={!valid()}>
               {editing() === "new" ? t("common.create") : t("common.save")}
             </Button>
           </div>

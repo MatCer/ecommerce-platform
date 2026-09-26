@@ -161,12 +161,12 @@ export default function PlatformJobs() {
                                 {formatDateTime(j.finished_at ?? j.run_at)}
                               </td>
                               <td class={`${tdClass} text-right whitespace-nowrap`}>
-                                <Button variant="ghost" onClick={() => setPayload(j)}>
+                                <Button category="tertiary" onClick={() => setPayload(j)}>
                                   {t("jobs.payload")}
                                   <span class="sr-only">: {j.id}</span>
                                 </Button>
                                 <Show when={j.status === "dead"}>
-                                  <Button variant="ghost" onClick={() => setRequeueing(j)}>
+                                  <Button category="tertiary" onClick={() => setRequeueing(j)}>
                                     {t("jobs.requeue")}
                                     <span class="sr-only">: {j.id}</span>
                                   </Button>

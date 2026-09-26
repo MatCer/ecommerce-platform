@@ -189,7 +189,7 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
           <div>
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={start.isPending}
               disabled={!prompt().trim() || busy()}
             >
@@ -385,7 +385,7 @@ function RunView(props: {
         {(id) => (
           <p role="status" class="flex flex-wrap items-center gap-2 text-sm text-success-700">
             {t("themes.ai.accepted", { number: run().revision_number ?? 0 })}
-            <Button variant="ghost" onClick={() => props.onShowRevision(id())}>
+            <Button category="tertiary" onClick={() => props.onShowRevision(id())}>
               {t("themes.ai.showRevision", { number: run().revision_number ?? 0 })}
             </Button>
           </p>
@@ -403,7 +403,7 @@ function RunView(props: {
           </Show>
           <Show when={run().status === "succeeded"}>
             <Button
-              variant="primary"
+              variant="confirm"
               loading={props.pending}
               onClick={() => props.onAction("accept")}
             >

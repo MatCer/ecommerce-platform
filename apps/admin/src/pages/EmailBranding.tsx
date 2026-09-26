@@ -69,7 +69,7 @@ function Logo(props: { admin: boolean }) {
             <ContentAsset label={t("emails.logo")} value={current()} onChange={setLogo} />
             <Show when={props.admin}>
               <div>
-                <Button type="submit" variant="primary" loading={save.isPending}>
+                <Button type="submit" variant="confirm" loading={save.isPending}>
                   {t("emails.saveLogo")}
                 </Button>
               </div>
@@ -186,7 +186,7 @@ function Texts(props: { admin: boolean }) {
             <p class="text-xs text-muted-foreground">{t("emails.emptyDefault")}</p>
             <Show when={props.admin}>
               <div>
-                <Button type="submit" variant="primary" loading={save.isPending}>
+                <Button type="submit" variant="confirm" loading={save.isPending}>
                   {t("emails.saveTexts")}
                 </Button>
               </div>

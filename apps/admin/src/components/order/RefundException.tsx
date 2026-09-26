@@ -45,7 +45,7 @@ export function RefundException(props: { orderId: string }) {
           <Button disabled={refund.isPending} onClick={() => setOpen(false)}>
             {t("common.cancel")}
           </Button>
-          <Button variant="primary" loading={refund.isPending} onClick={() => refund.mutate()}>
+          <Button variant="confirm" loading={refund.isPending} onClick={() => refund.mutate()}>
             {t("fulfillment.refundException")}
           </Button>
         </div>

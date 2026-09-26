@@ -298,7 +298,7 @@ function FlowCard(props: { definition: Definition; editable: boolean }) {
       </Show>
       <Show when={props.editable}>
         <div>
-          <Button type="submit" variant="primary" loading={save.isPending}>
+          <Button type="submit" variant="confirm" loading={save.isPending}>
             {t("flows.save")}
             <span class="sr-only">: {kindLabel(kind())}</span>
           </Button>

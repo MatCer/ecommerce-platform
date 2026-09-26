@@ -29,7 +29,7 @@ export default function ContentPages() {
     },
   }));
   const newLink = () => (
-    <A class={buttonClass("primary")} href={`${base()}/new`}>
+    <A class={buttonClass({ variant: "confirm" })} href={`${base()}/new`}>
       {t(blog() ? "content.newPost" : "content.newPage")}
     </A>
   );

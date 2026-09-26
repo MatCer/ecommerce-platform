@@ -171,7 +171,7 @@ export default function Themes() {
             <Show
               when={items().some((r) => r.origin === "custom")}
               fallback={
-                <Button variant="primary" loading={fork.isPending} onClick={() => fork.mutate()}>
+                <Button variant="confirm" loading={fork.isPending} onClick={() => fork.mutate()}>
                   {t("themes.fork")}
                 </Button>
               }
@@ -257,7 +257,7 @@ export default function Themes() {
                             <span class="inline-flex flex-wrap justify-end gap-1">
                               <Show when={r.artifact_id}>
                                 <Button
-                                  variant="ghost"
+                                  category="tertiary"
                                   loading={
                                     openPreview.isPending && openPreview.variables?.id === r.id
                                   }
@@ -274,7 +274,7 @@ export default function Themes() {
                                 }
                               >
                                 <Button
-                                  variant={r.status === "ready" ? "primary" : "secondary"}
+                                  variant={r.status === "ready" ? "confirm" : "default"}
                                   onClick={() => setPublishing(r)}
                                 >
                                   {r.status === "ready"
@@ -283,7 +283,7 @@ export default function Themes() {
                                 </Button>
                               </Show>
                               <Show when={can("admin") && r.has_source}>
-                                <Button variant="ghost" onClick={() => download.mutate(r.id)}>
+                                <Button category="tertiary" onClick={() => download.mutate(r.id)}>
                                   {t("themes.download")}
                                 </Button>
                               </Show>
@@ -315,7 +315,7 @@ export default function Themes() {
                       >
                         {t("themes.openTab")}
                       </a>
-                      <Button variant="ghost" onClick={() => setPreview(undefined)}>
+                      <Button category="tertiary" onClick={() => setPreview(undefined)}>
                         {t("common.close")}
                       </Button>
                     </span>
@@ -645,7 +645,7 @@ function TokenEditor(props: {
         </fieldset>
         <Button
           type="submit"
-          variant="primary"
+          variant="confirm"
           loading={save.isPending}
           disabled={conflict() || Object.keys(errors()).length > 0}
         >

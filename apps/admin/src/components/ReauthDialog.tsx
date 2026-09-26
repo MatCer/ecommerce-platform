@@ -138,7 +138,7 @@ export function ReauthDialog() {
         </Show>
         <div class="flex justify-end gap-2">
           <Button onClick={cancel}>{t("common.cancel")}</Button>
-          <Button type="submit" variant="primary" loading={pending()}>
+          <Button type="submit" variant="confirm" loading={pending()}>
             {step() === "code" ? t("auth.verify") : t("auth.reauthSubmit")}
           </Button>
         </div>

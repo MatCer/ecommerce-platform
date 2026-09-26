@@ -225,7 +225,7 @@ function MessageLog() {
                           </Badge>
                         </td>
                         <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" onClick={() => setOpen(m)}>
+                          <Button category="tertiary" onClick={() => setOpen(m)}>
                             {t("emails.details")}
                             <span class="sr-only">: {m.subject}</span>
                           </Button>
@@ -324,7 +324,7 @@ function Suppressions() {
           onChange={setQ}
         />
         <Button
-          variant="primary"
+          variant="confirm"
           onClick={() => {
             setEmail("");
             setNote("");
@@ -376,7 +376,7 @@ function Suppressions() {
                           {formatDateTime(s.created_at)}
                         </td>
                         <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" onClick={() => setRemoving(s)}>
+                          <Button category="tertiary" onClick={() => setRemoving(s)}>
                             {t("common.remove")}
                             <span class="sr-only">: {s.email}</span>
                           </Button>
@@ -428,7 +428,7 @@ function Suppressions() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setAdding(false)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={add.isPending}>
+            <Button type="submit" variant="confirm" loading={add.isPending}>
               {t("common.add")}
             </Button>
           </div>

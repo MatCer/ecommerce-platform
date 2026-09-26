@@ -246,7 +246,7 @@ function StatementUpload() {
             />
           </label>
           <div>
-            <Button type="submit" variant="primary" loading={upload.isPending}>
+            <Button type="submit" variant="confirm" loading={upload.isPending}>
               {t("pay.importButton")}
             </Button>
           </div>

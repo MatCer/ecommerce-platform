@@ -205,7 +205,7 @@ export function OrderActions(props: { data: Schemas["AdminOrder"] }) {
             </Button>
             <Button
               type="submit"
-              variant={dialog() === "cancel" ? "danger" : "primary"}
+              variant={dialog() === "cancel" ? "danger" : "confirm"}
               loading={pending()}
               disabled={dialog() === "create_label" && !validWeight()}
             >

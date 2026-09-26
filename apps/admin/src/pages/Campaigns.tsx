@@ -59,7 +59,7 @@ export default function Campaigns() {
   }));
 
   const newButton = () => (
-    <Button variant="primary" onClick={() => navigate("/marketing/campaigns/new")}>
+    <Button variant="confirm" onClick={() => navigate("/marketing/campaigns/new")}>
       {t("marketing.newCampaign")}
     </Button>
   );
@@ -129,7 +129,7 @@ export default function Campaigns() {
                         <td class={`${tdClass} figures text-right`}>{c.stats.bounced}</td>
                         <td class={`${tdClass} text-right`}>
                           <Show when={c.status === "draft"}>
-                            <Button variant="ghost" onClick={() => setDeleting(c)}>
+                            <Button category="tertiary" onClick={() => setDeleting(c)}>
                               {t("common.delete")}
                               <span class="sr-only">: {c.name}</span>
                             </Button>

@@ -206,7 +206,7 @@ export default function ContentEditor() {
         }))}
       />
       <div>
-        <Button type="submit" variant="primary" loading={save.isPending}>
+        <Button type="submit" variant="confirm" loading={save.isPending}>
           {t("common.save")}
         </Button>
       </div>

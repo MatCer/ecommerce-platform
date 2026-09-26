@@ -468,7 +468,7 @@ function CodPanel(props: { orderId: string; attempt: Schemas["Attempt"] }) {
               onChange={(v) => setCollector(collectors.find((x) => x === v) ?? "carrier")}
             />
             <div>
-              <Button type="submit" variant="primary" loading={act.isPending}>
+              <Button type="submit" variant="confirm" loading={act.isPending}>
                 {t("pay.collect")}
               </Button>
             </div>
@@ -489,7 +489,7 @@ function CodPanel(props: { orderId: string; attempt: Schemas["Attempt"] }) {
               maxLength={500}
             />
             <div>
-              <Button type="submit" variant="primary" loading={act.isPending}>
+              <Button type="submit" variant="confirm" loading={act.isPending}>
                 {t("pay.remit")}
               </Button>
             </div>

@@ -214,7 +214,7 @@ export default function Categories() {
     body: CategoryMove | null,
   ) => (
     <Button
-      variant="ghost"
+      category="tertiary"
       class="w-8 px-0"
       data-focus={`${row.node.id}:${action}`}
       aria-label={`${label}: ${name(row.node)}`}
@@ -231,7 +231,7 @@ export default function Categories() {
       <PageHeader
         title={t("categories.title")}
         actions={
-          <Button variant="primary" onClick={() => openCreate()}>
+          <Button variant="confirm" onClick={() => openCreate()}>
             {t("categories.new")}
           </Button>
         }
@@ -245,7 +245,7 @@ export default function Categories() {
                 title={t("categories.emptyTitle")}
                 description={t("categories.emptyDesc")}
                 action={
-                  <Button variant="primary" onClick={() => openCreate()}>
+                  <Button variant="confirm" onClick={() => openCreate()}>
                     {t("categories.new")}
                   </Button>
                 }
@@ -383,7 +383,7 @@ export default function Categories() {
             <Button onClick={close}>{t("common.cancel")}</Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={create.isPending || update.isPending}
               disabled={!CONTENT_LOCALES.some((l) => names()[l].name.trim())}
             >
@@ -426,7 +426,7 @@ export default function Categories() {
               />
               <div class="flex justify-end gap-2">
                 <Button onClick={close}>{t("common.cancel")}</Button>
-                <Button type="submit" variant="primary" loading={move.isPending}>
+                <Button type="submit" variant="confirm" loading={move.isPending}>
                   {t("common.save")}
                 </Button>
               </div>

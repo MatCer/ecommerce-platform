@@ -275,7 +275,7 @@ export function AiPanel(props: {
         </Show>
         <div>
           <Button
-            variant="primary"
+            variant="confirm"
             loading={busy()}
             disabled={kind() === "translate" && targets().length === 0}
             onClick={() => {
@@ -372,7 +372,7 @@ export function AiPanel(props: {
             </Show>
             <div class="flex flex-wrap gap-2">
               <Button
-                variant="primary"
+                variant="confirm"
                 loading={accept.isPending}
                 disabled={chosen().size === 0}
                 onClick={() => accept.mutate()}

@@ -536,7 +536,7 @@ export default function ProductEditor() {
                     onChange={(v) => setDraft("tax_categories", country, v)}
                   />
                   <Button
-                    variant="ghost"
+                    category="tertiary"
                     onClick={() => {
                       const rest = Object.entries(draft.tax_categories).filter(
                         ([c]) => c !== country,
@@ -643,11 +643,11 @@ export default function ProductEditor() {
 
         <div class="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-3 py-3 md:-mx-6 md:px-6">
           <Show when={!isNew()} fallback={<span />}>
-            <Button variant="ghost" class="text-error-700" onClick={() => setConfirmDelete(true)}>
+            <Button category="tertiary" class="text-error-700" onClick={() => setConfirmDelete(true)}>
               {t("editor.deleteProduct")}
             </Button>
           </Show>
-          <Button type="submit" variant="primary" loading={save.isPending}>
+          <Button type="submit" variant="confirm" loading={save.isPending}>
             {t("editor.save")}
           </Button>
         </div>

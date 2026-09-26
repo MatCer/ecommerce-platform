@@ -1,9 +1,17 @@
-import { Button, ErrorState, LoadingState, PermissionDenied } from "@platform/ui";
+import {
+  Button,
+  ErrorState,
+  Icon,
+  LoadingState,
+  PageHeading,
+  PermissionDenied,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { errorMessage, t } from "../i18n/index.ts";
 import { ApiError } from "../lib/api.ts";
 
+/** Page title row (Pajamas page heading) with an optional back link above the title. */
 export function PageHeader(props: {
   title: string;
   description?: string;
@@ -11,24 +19,24 @@ export function PageHeader(props: {
   back?: { href: string; label: string };
 }) {
   return (
-    <header class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
-      <div class="flex min-w-0 flex-col gap-0.5">
+    <PageHeading
+      title={props.title}
+      description={props.description}
+      actions={props.actions}
+      before={
         <Show when={props.back}>
           {(b) => (
-            <A href={b().href} class="text-xs text-accent-700 hover:underline">
-              ← {b().label}
+            <A
+              href={b().href}
+              class="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-heading hover:underline"
+            >
+              <Icon name="arrow-left" size={14} />
+              {b().label}
             </A>
           )}
         </Show>
-        <h1 class="text-lg font-semibold tracking-tight">{props.title}</h1>
-        <Show when={props.description}>
-          <p class="text-sm text-muted-foreground">{props.description}</p>
-        </Show>
-      </div>
-      <Show when={props.actions}>
-        <div class="flex flex-wrap items-center gap-2">{props.actions}</div>
-      </Show>
-    </header>
+      }
+    />
   );
 }
 
@@ -70,17 +78,5 @@ export function QueryState<T>(props: {
   );
 }
 
-/** Table header cell (11px uppercase label). */
-export function Th(props: { children?: JSX.Element; class?: string; srOnly?: boolean }) {
-  return (
-    <th scope="col" class={`col-label h-8 px-2 text-left align-middle ${props.class ?? ""}`}>
-      <Show when={props.srOnly} fallback={props.children}>
-        <span class="sr-only">{props.children}</span>
-      </Show>
-    </th>
-  );
-}
-
-export const tableClass =
-  "w-full border-collapse text-sm [&_tbody_tr]:border-b [&_tbody_tr]:border-border [&_thead_tr]:border-b [&_thead_tr]:border-border-strong";
-export const tdClass = "h-row px-2 align-middle";
+// Table styles live in @platform/ui; re-exported so existing pages keep their imports.
+export { Th, tableClass, tdClass } from "@platform/ui";

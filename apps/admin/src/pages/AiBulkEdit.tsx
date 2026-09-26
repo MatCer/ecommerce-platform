@@ -150,7 +150,7 @@ export default function AiBulkEdit() {
           <div class="flex flex-wrap gap-2">
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={planning()}
               disabled={!prompt().trim()}
             >
@@ -279,7 +279,7 @@ export default function AiBulkEdit() {
                     <p class="text-xs text-muted-foreground">{t("ai.freshAuthHint")}</p>
                   </Show>
                   <div>
-                    <Button variant="primary" onClick={() => setConfirming(true)}>
+                    <Button variant="confirm" onClick={() => setConfirming(true)}>
                       {t("ai.apply", { count: p().target_count })}
                     </Button>
                   </div>

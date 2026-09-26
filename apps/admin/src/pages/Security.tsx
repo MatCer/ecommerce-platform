@@ -160,7 +160,7 @@ export default function Security() {
                       autocomplete="one-time-code"
                       required
                     />
-                    <Button type="submit" variant="primary" loading={pending()}>
+                    <Button type="submit" variant="confirm" loading={pending()}>
                       {t("security.activate")}
                     </Button>
                   </form>
@@ -196,7 +196,7 @@ export default function Security() {
                   />
                   <Button
                     type="submit"
-                    variant={s.twoFactor ? "secondary" : "primary"}
+                    variant={s.twoFactor ? "default" : "confirm"}
                     loading={pending()}
                   >
                     {s.twoFactor ? t("security.disable") : t("security.enable")}

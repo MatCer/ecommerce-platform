@@ -61,7 +61,7 @@ export function ResetPassword() {
             />
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={pending()}
               disabled={password().length < 12}
             >

@@ -219,7 +219,7 @@ function ReviewCard(props: {
           <For each={actions[r().status]}>
             {(to) => (
               <Button
-                variant={to === "published" ? "primary" : "secondary"}
+                variant={to === "published" ? "confirm" : "default"}
                 loading={props.busy}
                 onClick={() => props.onModerate(to)}
               >

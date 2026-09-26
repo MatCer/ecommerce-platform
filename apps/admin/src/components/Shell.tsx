@@ -227,7 +227,7 @@ export function Shell(props: { children: JSX.Element }) {
                 <div class="flex min-w-0 flex-1 flex-col">
                   <header class="sticky top-0 z-10 flex h-12 items-center justify-between gap-2 border-b border-border bg-card px-3 md:px-5">
                     <Button
-                      variant="ghost"
+                      category="tertiary"
                       class="md:invisible"
                       aria-expanded={navOpen()}
                       onClick={() => setNavOpen(!navOpen())}

@@ -113,7 +113,7 @@ export default function Redirects() {
           ]}
           onChange={setCode}
         />
-        <Button type="submit" variant="primary" loading={create.isPending}>
+        <Button type="submit" variant="confirm" loading={create.isPending}>
           {t("common.create")}
         </Button>
       </form>
@@ -148,7 +148,7 @@ export default function Redirects() {
                         <td class={`${tdClass} figures break-all text-xs`}>{r.to_path}</td>
                         <td class={`${tdClass} figures text-xs`}>{r.code}</td>
                         <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" onClick={() => setDeleting(r)}>
+                          <Button category="tertiary" onClick={() => setDeleting(r)}>
                             {t("common.delete")}
                             <span class="sr-only">: {r.from_path}</span>
                           </Button>

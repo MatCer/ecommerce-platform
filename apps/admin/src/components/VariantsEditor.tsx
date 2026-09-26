@@ -107,7 +107,7 @@ function OptionEditor(props: {
                 <td class={`${tdClass} figures text-xs text-muted-foreground`}>{val().code}</td>
                 <td class={`${tdClass} text-right`}>
                   <Button
-                    variant="ghost"
+                    category="tertiary"
                     disabled={props.option.values.length <= 1}
                     onClick={() =>
                       props.onChange({
@@ -129,7 +129,7 @@ function OptionEditor(props: {
         <Button onClick={addValue} disabled={props.option.values.length >= 100}>
           {t("common.add")}
         </Button>
-        <Button variant="ghost" onClick={props.onRemove}>
+        <Button category="tertiary" onClick={props.onRemove}>
           {t("editor.removeOption")}
         </Button>
       </div>
@@ -233,7 +233,7 @@ export function VariantsEditor(props: {
             </Show>
           }
         >
-          <Button variant="primary" onClick={regenerate}>
+          <Button variant="confirm" onClick={regenerate}>
             {t("editor.regenerate")}
           </Button>
         </Show>
@@ -314,7 +314,7 @@ export function VariantsEditor(props: {
                       </td>
                       <td class={`${tdClass} text-right`}>
                         <Button
-                          variant="ghost"
+                          category="tertiary"
                           onClick={() => props.onVariants(props.variants.filter((_, j) => j !== i))}
                         >
                           {t("common.remove")}

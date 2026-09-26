@@ -125,10 +125,10 @@ export function Login() {
               required
             />
             {errorBox()}
-            <Button type="submit" variant="primary" loading={pending() === "code"}>
+            <Button type="submit" variant="confirm" loading={pending() === "code"}>
               {t("auth.verify")}
             </Button>
-            <Button variant="ghost" onClick={() => setStep("credentials")}>
+            <Button category="tertiary" onClick={() => setStep("credentials")}>
               {t("auth.backToSignIn")}
             </Button>
           </form>
@@ -141,7 +141,7 @@ export function Login() {
               ? t("auth.magicSentDesc", { email: email() })
               : t("auth.resetSent", { email: email() })}
           </p>
-          <Button variant="ghost" onClick={() => setStep("credentials")}>
+          <Button category="tertiary" onClick={() => setStep("credentials")}>
             {t("auth.backToSignIn")}
           </Button>
         </AuthLayout>
@@ -168,7 +168,7 @@ export function Login() {
               required
             />
             {errorBox()}
-            <Button type="submit" variant="primary" loading={pending() === "password"}>
+            <Button type="submit" variant="confirm" loading={pending() === "password"}>
               {t("auth.signIn")}
             </Button>
           </form>

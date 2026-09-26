@@ -82,7 +82,7 @@ export default function PriceLists() {
   }));
 
   const newButton = () => (
-    <Button variant="primary" disabled={!can("admin")} onClick={() => open("new")}>
+    <Button variant="confirm" disabled={!can("admin")} onClick={() => open("new")}>
       {t("priceLists.new")}
     </Button>
   );
@@ -128,7 +128,7 @@ export default function PriceLists() {
                           {l.market_ids.map(marketName).join(", ") || "—"}
                         </td>
                         <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" disabled={!can("admin")} onClick={() => open(l)}>
+                          <Button category="tertiary" disabled={!can("admin")} onClick={() => open(l)}>
                             {t("common.edit")}
                             <span class="sr-only">: {l.name}</span>
                           </Button>
@@ -218,7 +218,7 @@ export default function PriceLists() {
             <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={save.isPending}
               disabled={!name().trim()}
             >

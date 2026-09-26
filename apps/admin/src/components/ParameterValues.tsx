@@ -116,7 +116,7 @@ export function ParameterValues(props: {
                   />
                 </Show>
                 <Button
-                  variant="ghost"
+                  category="tertiary"
                   onClick={() => props.onChange(props.values.filter((_, j) => j !== i))}
                 >
                   {t("common.remove")}

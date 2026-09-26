@@ -366,7 +366,7 @@ export function EditShippingAddress(props: { data: Schemas["AdminOrder"] }) {
             <Button disabled={save.isPending} onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="primary" loading={save.isPending}>
+            <Button type="submit" variant="confirm" loading={save.isPending}>
               {t("common.save")}
             </Button>
           </div>

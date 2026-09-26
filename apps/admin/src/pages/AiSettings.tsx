@@ -189,7 +189,7 @@ function GlossaryEditor() {
                         )}
                       </For>
                       <Button
-                        variant="ghost"
+                        category="tertiary"
                         onClick={() => setEntries(entries().filter((_, j) => j !== i))}
                         aria-label={t("ai.removeTerm", { term: e().term || String(i + 1) })}
                       >
@@ -209,7 +209,7 @@ function GlossaryEditor() {
               <Button onClick={() => setEntries([...entries(), { term: "", translations: {} }])}>
                 {t("ai.addTerm")}
               </Button>
-              <Button type="submit" variant="primary" loading={save.isPending}>
+              <Button type="submit" variant="confirm" loading={save.isPending}>
                 {t("common.save")}
               </Button>
             </div>

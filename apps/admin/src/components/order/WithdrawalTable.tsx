@@ -214,7 +214,7 @@ function WithdrawalActions(props: { withdrawal: Schemas["Withdrawal"] }) {
             {t("common.cancel")}
           </Button>
           <Button
-            variant="primary"
+            variant="confirm"
             loading={mutation.isPending}
             onClick={() => {
               const value = action();

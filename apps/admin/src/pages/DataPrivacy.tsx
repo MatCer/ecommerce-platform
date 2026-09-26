@@ -67,7 +67,7 @@ function Exports() {
       </h2>
       <p class="text-sm text-muted-foreground">{t("data.exportHint")}</p>
       <div>
-        <Button variant="primary" loading={start.isPending} onClick={() => start.mutate()}>
+        <Button variant="confirm" loading={start.isPending} onClick={() => start.mutate()}>
           {t("data.exportStart")}
         </Button>
       </div>

@@ -8,7 +8,7 @@ export default function NotFound() {
       title={t("common.notFoundTitle")}
       description={t("common.notFoundDesc")}
       action={
-        <A href="/" class={buttonClass("secondary")}>
+        <A href="/" class={buttonClass()}>
           {t("common.goHome")}
         </A>
       }

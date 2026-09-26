@@ -111,7 +111,7 @@ export default function Parameters() {
   }));
 
   const newButton = () => (
-    <Button variant="primary" onClick={() => open("new")}>
+    <Button variant="confirm" onClick={() => open("new")}>
       {t("parameters.new")}
     </Button>
   );
@@ -165,11 +165,11 @@ export default function Parameters() {
                           </Show>
                         </td>
                         <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => open(p)}>
+                          <Button category="tertiary" onClick={() => open(p)}>
                             {t("common.edit")}
                             <span class="sr-only">: {displayName(p)}</span>
                           </Button>
-                          <Button variant="ghost" onClick={() => setDeleting(p)}>
+                          <Button category="tertiary" onClick={() => setDeleting(p)}>
                             {t("common.delete")}
                             <span class="sr-only">: {displayName(p)}</span>
                           </Button>
@@ -246,7 +246,7 @@ export default function Parameters() {
             <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={save.isPending}
               disabled={Object.keys(compactI18n(form().name_i18n)).length === 0}
             >

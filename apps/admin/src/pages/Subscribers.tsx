@@ -195,7 +195,7 @@ export default function Subscribers() {
                         </td>
                         <td class={`${tdClass} text-right`}>
                           <Show when={s.status === "subscribed" || s.status === "pending"}>
-                            <Button variant="ghost" onClick={() => setLeaving(s)}>
+                            <Button category="tertiary" onClick={() => setLeaving(s)}>
                               {t("marketing.unsubscribe")}
                               <span class="sr-only">: {s.email}</span>
                             </Button>

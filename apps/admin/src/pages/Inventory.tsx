@@ -277,11 +277,11 @@ export default function Inventory() {
                           />
                         </td>
                         <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => openAdjust(r)}>
+                          <Button category="tertiary" onClick={() => openAdjust(r)}>
                             {t("inventory.adjust")}
                             <span class="sr-only">: {r.sku}</span>
                           </Button>
-                          <Button variant="ghost" onClick={() => setViewing(r)}>
+                          <Button category="tertiary" onClick={() => setViewing(r)}>
                             {t("inventory.movements")}
                             <span class="sr-only">: {r.sku}</span>
                           </Button>
@@ -350,7 +350,7 @@ export default function Inventory() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setAdjusting(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={adjust.isPending}>
+            <Button type="submit" variant="confirm" loading={adjust.isPending}>
               {t("common.save")}
             </Button>
           </div>

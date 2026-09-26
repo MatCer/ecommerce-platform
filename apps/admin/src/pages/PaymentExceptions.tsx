@@ -179,7 +179,7 @@ function ResolveTransaction(props: { tx: Schemas["BankTransaction"] }) {
           />
           <ApiProblem error={resolve.error} />
           <div>
-            <Button type="submit" variant="primary" loading={resolve.isPending}>
+            <Button type="submit" variant="confirm" loading={resolve.isPending}>
               {t("pay.resolve")}
             </Button>
           </div>
@@ -230,7 +230,7 @@ export function ResolveOrderException(props: { orderId: string }) {
           />
           <ApiProblem error={resolve.error} />
           <div>
-            <Button type="submit" variant="primary" loading={resolve.isPending}>
+            <Button type="submit" variant="confirm" loading={resolve.isPending}>
               {t("pay.resolve")}
             </Button>
           </div>

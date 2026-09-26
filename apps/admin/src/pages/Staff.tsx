@@ -108,7 +108,7 @@ export default function Staff() {
         title={t("staff.title")}
         actions={
           <Button
-            variant="primary"
+            variant="confirm"
             onClick={() => {
               setEmail("");
               setRole("staff");
@@ -154,7 +154,7 @@ export default function Staff() {
                       </td>
                       <td class={`${tdClass} text-right whitespace-nowrap`}>
                         <Button
-                          variant="ghost"
+                          category="tertiary"
                           disabled={!editable(m)}
                           title={editable(m) ? undefined : t("staff.ownerOnly")}
                           onClick={() => {
@@ -167,7 +167,7 @@ export default function Staff() {
                           <span class="sr-only">: {m.email}</span>
                         </Button>
                         <Button
-                          variant="ghost"
+                          category="tertiary"
                           disabled={!editable(m)}
                           title={editable(m) ? undefined : t("staff.ownerOnly")}
                           onClick={() => setRemoving(m)}
@@ -225,7 +225,7 @@ export default function Staff() {
             <Button onClick={() => setInviting(false)}>{t("common.cancel")}</Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
               loading={invite.isPending}
               disabled={!email().includes("@")}
             >
@@ -263,7 +263,7 @@ export default function Staff() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setChanging(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={change.isPending}>
+            <Button type="submit" variant="confirm" loading={change.isPending}>
               {t("common.save")}
             </Button>
           </div>

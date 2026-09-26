@@ -117,7 +117,7 @@ function MediaRow(props: {
       </div>
       <div class="flex gap-1">
         <Button
-          variant="ghost"
+          category="tertiary"
           aria-label={`${t("common.moveUp")}: ${label()}`}
           disabled={props.index === 0}
           onClick={() => props.onMove(-1)}
@@ -125,14 +125,14 @@ function MediaRow(props: {
           ↑
         </Button>
         <Button
-          variant="ghost"
+          category="tertiary"
           aria-label={`${t("common.moveDown")}: ${label()}`}
           disabled={props.index === props.count - 1}
           onClick={() => props.onMove(1)}
         >
           ↓
         </Button>
-        <Button variant="ghost" onClick={props.onRemove}>
+        <Button category="tertiary" onClick={props.onRemove}>
           {t("common.remove")}
           <span class="sr-only">: {label()}</span>
         </Button>

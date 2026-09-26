@@ -79,7 +79,7 @@ export default function SearchSynonyms() {
               <div>
                 <Button
                   type="submit"
-                  variant="primary"
+                  variant="confirm"
                   disabled={!!parsed().error}
                   loading={save.isPending}
                 >

@@ -236,7 +236,7 @@ export default function Webhooks() {
         description={t("webhooks.lead")}
         actions={
           <Show when={list.isSuccess}>
-            <Button variant="primary" onClick={() => openForm("new")}>
+            <Button variant="confirm" onClick={() => openForm("new")}>
               {t("webhooks.new")}
             </Button>
           </Show>
@@ -261,7 +261,7 @@ export default function Webhooks() {
                     title={t("webhooks.emptyTitle")}
                     description={t("webhooks.emptyDesc")}
                     action={
-                      <Button variant="primary" onClick={() => openForm("new")}>
+                      <Button variant="confirm" onClick={() => openForm("new")}>
                         {t("webhooks.new")}
                       </Button>
                     }
@@ -308,21 +308,21 @@ export default function Webhooks() {
                             </td>
                             <td class={`${tdClass} py-1 text-right whitespace-nowrap`}>
                               <Button
-                                variant="ghost"
+                                category="tertiary"
                                 onClick={() => setParams({ subscription: s.id })}
                               >
                                 {t("webhooks.showDeliveries")}
                                 <span class="sr-only">: {s.url}</span>
                               </Button>
-                              <Button variant="ghost" onClick={() => openForm(s)}>
+                              <Button category="tertiary" onClick={() => openForm(s)}>
                                 {t("common.edit")}
                                 <span class="sr-only">: {s.url}</span>
                               </Button>
-                              <Button variant="ghost" onClick={() => setRotating(s)}>
+                              <Button category="tertiary" onClick={() => setRotating(s)}>
                                 {t("webhooks.rotate")}
                                 <span class="sr-only">: {s.url}</span>
                               </Button>
-                              <Button variant="ghost" onClick={() => setRemoving(s)}>
+                              <Button category="tertiary" onClick={() => setRemoving(s)}>
                                 {t("common.delete")}
                                 <span class="sr-only">: {s.url}</span>
                               </Button>
@@ -426,7 +426,7 @@ export default function Webhooks() {
                                       : "—"}
                                   </td>
                                   <td class={`${tdClass} text-right whitespace-nowrap`}>
-                                    <Button variant="ghost" onClick={() => setPayload(d)}>
+                                    <Button category="tertiary" onClick={() => setPayload(d)}>
                                       {t("webhooks.payload")}
                                       <span class="sr-only">
                                         : {d.event_type}, {formatDateTime(d.created_at)}
@@ -434,7 +434,7 @@ export default function Webhooks() {
                                     </Button>
                                     <Show when={d.status === "succeeded" || d.status === "dead"}>
                                       <Button
-                                        variant="ghost"
+                                        category="tertiary"
                                         loading={
                                           redeliver.isPending && redeliver.variables === d.id
                                         }
@@ -533,7 +533,7 @@ export default function Webhooks() {
                     <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
                     <Button
                       type="submit"
-                      variant="primary"
+                      variant="confirm"
                       loading={save.isPending}
                       disabled={form().url.trim() === "" || form().events.length === 0}
                     >
@@ -570,7 +570,7 @@ export default function Webhooks() {
             <p class="text-muted-foreground">{t("webhooks.verifyText")}</p>
           </div>
           <div class="flex justify-end">
-            <Button variant="primary" onClick={() => setSecret(null)}>
+            <Button variant="confirm" onClick={() => setSecret(null)}>
               {t("webhooks.secretStored")}
             </Button>
           </div>

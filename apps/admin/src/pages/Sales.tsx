@@ -202,7 +202,7 @@ export default function Sales() {
     setEditing(s);
   };
   const newButton = () => (
-    <Button variant="primary" onClick={() => open("new")}>
+    <Button variant="confirm" onClick={() => open("new")}>
       {t("sales.new")}
     </Button>
   );
@@ -260,11 +260,11 @@ export default function Sales() {
                           </Badge>
                         </td>
                         <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => open(s)}>
+                          <Button category="tertiary" onClick={() => open(s)}>
                             {t("common.edit")}
                             <span class="sr-only">: {s.name}</span>
                           </Button>
-                          <Button variant="ghost" onClick={() => setDeleting(s)}>
+                          <Button category="tertiary" onClick={() => setDeleting(s)}>
                             {t("common.delete")}
                             <span class="sr-only">: {s.name}</span>
                           </Button>
@@ -420,7 +420,7 @@ export default function Sales() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={save.isPending} disabled={!valid()}>
+            <Button type="submit" variant="confirm" loading={save.isPending} disabled={!valid()}>
               {editing() === "new" ? t("common.create") : t("common.save")}
             </Button>
           </div>

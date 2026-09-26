@@ -123,7 +123,7 @@ function StripeCard() {
               <div class="flex flex-wrap gap-2">
                 <Show when={!s.account?.ready}>
                   <Button
-                    variant="primary"
+                    variant="confirm"
                     loading={onboard.isPending}
                     onClick={() => onboard.mutate()}
                   >
@@ -258,7 +258,7 @@ function BankAccountFields(props: {
         </Show>
         <ApiProblem error={save.error} />
         <div>
-          <Button type="submit" variant="primary" loading={save.isPending}>
+          <Button type="submit" variant="confirm" loading={save.isPending}>
             {t("pay.saveAccount")}
           </Button>
         </div>
@@ -393,7 +393,7 @@ function PaymentRow(props: { method: Schemas["PaymentMethod"] }) {
         </Show>
         <ApiProblem error={save.error} />
         <div>
-          <Button type="submit" variant="primary" loading={save.isPending}>
+          <Button type="submit" variant="confirm" loading={save.isPending}>
             {t("common.save")}
           </Button>
         </div>

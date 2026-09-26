@@ -74,7 +74,7 @@ export default function Markets() {
 
   const newButton = () => (
     <Button
-      variant="primary"
+      variant="confirm"
       disabled={!can("admin")}
       onClick={() => {
         setForm(blank());
@@ -216,7 +216,7 @@ export default function Markets() {
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={create.isPending}>
+            <Button type="submit" variant="confirm" loading={create.isPending}>
               {t("common.create")}
             </Button>
           </div>

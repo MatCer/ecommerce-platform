@@ -252,7 +252,7 @@ function RunDetail() {
             <div class="flex flex-wrap gap-2">
               <Show when={run.status === "analyzed" && (run.report?.records ?? 0) > 0}>
                 <Button
-                  variant="primary"
+                  variant="confirm"
                   disabled={action.isPending}
                   onClick={() => setConfirm(true)}
                 >
@@ -435,7 +435,7 @@ function NewImport() {
       <div>
         <Button
           type="submit"
-          variant="primary"
+          variant="confirm"
           disabled={!marketId() || missing().length > 0}
           loading={start.isPending}
         >

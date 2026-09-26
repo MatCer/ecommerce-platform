@@ -187,7 +187,7 @@ function ListPrices(props: {
                     <td class={`${tdClass} text-right`}>
                       <Show when={h()?.price}>
                         <Button
-                          variant="ghost"
+                          category="tertiary"
                           loading={stop.isPending && stop.variables === v.id}
                           onClick={() => stop.mutate(v.id)}
                         >

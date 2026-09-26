@@ -192,7 +192,7 @@ export function RefundDialog(props: { order: Schemas["OrderView"]; onClose: () =
               </Button>
               <Button
                 type="submit"
-                variant="primary"
+                variant="confirm"
                 loading={submit.isPending}
                 disabled={!input() || !currentPreview() || previewPending()}
               >

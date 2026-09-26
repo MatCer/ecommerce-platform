@@ -231,7 +231,7 @@ export default function TaxProfile() {
             <div>
               <Button
                 type="submit"
-                variant="primary"
+                variant="confirm"
                 loading={save.isPending}
                 disabled={readOnly()}
               >
