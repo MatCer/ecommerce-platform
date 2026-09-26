@@ -1,6 +1,9 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
+  Collapse,
   ConfirmDialog,
   Dialog,
   SelectField,
@@ -109,11 +112,8 @@ function CampaignPreview(props: { campaign: Campaign }) {
       ),
   }));
   return (
-    <section class="flex flex-col gap-3" aria-labelledby="campaign-preview">
-      <h2 id="campaign-preview" class="text-sm font-semibold">
-        {t("marketing.preview")}
-      </h2>
-      <div class="grid gap-2 sm:grid-cols-3">
+    <Card title={t("marketing.preview")}>
+      <div class="mb-4 grid gap-3 sm:grid-cols-3">
         <SelectField
           label={t("marketing.language")}
           value={lang()}
@@ -139,10 +139,10 @@ function CampaignPreview(props: { campaign: Campaign }) {
       </div>
       <QueryState query={rendered}>
         {(r) => (
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-col gap-3">
             <p class="text-sm">
               <span class="text-muted-foreground">{t("marketing.subject")}: </span>
-              <span class="font-medium">{r.subject}</span>
+              <span class="font-semibold text-heading">{r.subject}</span>
             </p>
             <iframe
               title={t("marketing.previewFrame")}
@@ -150,18 +150,15 @@ function CampaignPreview(props: { campaign: Campaign }) {
               srcdoc={r.html}
               class="h-[36rem] w-full rounded-md border border-border bg-white"
             />
-            <details>
-              <summary class="cursor-pointer text-xs text-accent-700">
-                {t("marketing.plainText")}
-              </summary>
-              <pre class="mt-1 max-h-96 overflow-auto rounded-sm bg-muted p-2 text-xs whitespace-pre-wrap">
+            <Collapse summary={t("marketing.plainText")}>
+              <pre class="max-h-96 overflow-auto rounded-md border border-border bg-subtle p-3 font-mono text-xs whitespace-pre-wrap">
                 {r.text}
               </pre>
-            </details>
+            </Collapse>
           </div>
         )}
       </QueryState>
-    </section>
+    </Card>
   );
 }
 
@@ -346,13 +343,13 @@ export default function CampaignEditor() {
 
   const editor = () => (
     <form
-      class="flex max-w-4xl flex-col gap-4"
+      class="flex max-w-4xl flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
         submit();
       }}
     >
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-5 sm:grid-cols-2">
         <TextField
           label={t("marketing.name")}
           description={t("marketing.nameHint")}
@@ -371,7 +368,7 @@ export default function CampaignEditor() {
           onChange={setSegmentId}
         />
       </div>
-      <p class="text-xs text-muted-foreground">{t("marketing.languagesHint")}</p>
+      <p class="-mb-3 text-sm text-muted-foreground">{t("marketing.languagesHint")}</p>
       <Tabs
         label={t("marketing.languages")}
         value={locale()}
@@ -380,7 +377,7 @@ export default function CampaignEditor() {
           value: l,
           label: l.toUpperCase(),
           content: () => (
-            <div class="flex flex-col gap-3">
+            <div class="flex flex-col gap-5 pt-2">
               <TextField
                 label={t("marketing.subject")}
                 value={content()[l]?.subject ?? ""}
@@ -406,19 +403,11 @@ export default function CampaignEditor() {
           ),
         }))}
       />
-      <Show when={problem()}>
-        {(p) => (
-          <p role="alert" class="text-sm font-medium text-error-700">
-            {problemText(p())}
-          </p>
-        )}
-      </Show>
+      <Show when={problem()}>{(p) => <Alert tone="error">{problemText(p())}</Alert>}</Show>
       <Show when={error()}>
-        <p role="alert" class="text-sm font-medium text-error-700">
-          {error()}
-        </p>
+        <Alert tone="error">{error()}</Alert>
       </Show>
-      <div>
+      <div class="border-t border-border pt-5">
         <Button type="submit" variant="confirm" loading={save.isPending} disabled={!name().trim()}>
           {t("common.save")}
         </Button>
@@ -428,60 +417,59 @@ export default function CampaignEditor() {
 
   const summary = (c: Campaign) => (
     <div class="flex max-w-4xl flex-col gap-4">
-      <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-        <dt class="text-muted-foreground">{t("marketing.recipients")}</dt>
-        <dd>{segmentName(c.segment_id)}</dd>
-        <Show when={c.scheduled_at}>
-          {(s) => (
-            <>
-              <dt class="text-muted-foreground">{t("marketing.scheduledAt")}</dt>
-              <dd class="figures">{formatDateTime(s())}</dd>
-            </>
-          )}
-        </Show>
-        <Show when={c.started_at}>
-          {(s) => (
-            <>
-              <dt class="text-muted-foreground">{t("marketing.startedAt")}</dt>
-              <dd class="figures">{formatDateTime(s())}</dd>
-            </>
-          )}
-        </Show>
-        <Show when={c.finished_at}>
-          {(s) => (
-            <>
-              <dt class="text-muted-foreground">{t("marketing.finishedAt")}</dt>
-              <dd class="figures">{formatDateTime(s())}</dd>
-            </>
-          )}
-        </Show>
-        <For each={Object.entries(c.content)}>
-          {([l, lc]) => (
-            <>
-              <dt class="text-muted-foreground">
-                {t("marketing.subject")} ({l.toUpperCase()})
-              </dt>
-              <dd>{lc.subject}</dd>
-            </>
-          )}
-        </For>
-      </dl>
-      <p class="text-xs text-muted-foreground">{t("marketing.notEditable")}</p>
-      <section aria-labelledby="campaign-stats" class="flex flex-col gap-2">
-        <h2 id="campaign-stats" class="text-sm font-semibold">
-          {t("marketing.stats")}
-        </h2>
-        <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+      <Card>
+        <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr] [&_dt]:text-muted-foreground">
+          <dt class="text-muted-foreground">{t("marketing.recipients")}</dt>
+          <dd>{segmentName(c.segment_id)}</dd>
+          <Show when={c.scheduled_at}>
+            {(s) => (
+              <>
+                <dt class="text-muted-foreground">{t("marketing.scheduledAt")}</dt>
+                <dd class="figures">{formatDateTime(s())}</dd>
+              </>
+            )}
+          </Show>
+          <Show when={c.started_at}>
+            {(s) => (
+              <>
+                <dt class="text-muted-foreground">{t("marketing.startedAt")}</dt>
+                <dd class="figures">{formatDateTime(s())}</dd>
+              </>
+            )}
+          </Show>
+          <Show when={c.finished_at}>
+            {(s) => (
+              <>
+                <dt class="text-muted-foreground">{t("marketing.finishedAt")}</dt>
+                <dd class="figures">{formatDateTime(s())}</dd>
+              </>
+            )}
+          </Show>
+          <For each={Object.entries(c.content)}>
+            {([l, lc]) => (
+              <>
+                <dt class="text-muted-foreground">
+                  {t("marketing.subject")} ({l.toUpperCase()})
+                </dt>
+                <dd>{lc.subject}</dd>
+              </>
+            )}
+          </For>
+        </dl>
+        <p class="mt-4 text-sm text-muted-foreground">{t("marketing.notEditable")}</p>
+      </Card>
+      <Card title={t("marketing.stats")}>
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-6">
           <For each={STATS}>
             {(k) => (
-              <div class="rounded-md border border-border p-2">
-                <dt class="col-label">{t(`marketing.stat_${k}`)}</dt>
-                <dd class="figures text-lg font-semibold">{c.stats[k]}</dd>
+              <div class="flex min-w-0 flex-col gap-1">
+                <dt class="truncate text-sm text-muted-foreground">{t(`marketing.stat_${k}`)}</dt>
+                <dd class="figures text-2xl font-semibold text-heading">{c.stats[k]}</dd>
               </div>
             )}
           </For>
         </dl>
-      </section>
+      </Card>
     </div>
   );
 
@@ -538,13 +526,13 @@ export default function CampaignEditor() {
         <Match when={true}>
           <QueryState query={campaign}>
             {(c) => (
-              <div class="flex flex-col gap-6">
+              <div class="flex flex-col gap-4">
                 <Show when={c.status === "draft"} fallback={summary(c)}>
                   {editor()}
                   <Show when={dirty()}>
-                    <p role="status" class="text-xs text-warning-700">
+                    <Alert tone="info" class="max-w-4xl">
                       {t("marketing.unsavedHint")}
-                    </p>
+                    </Alert>
                   </Show>
                 </Show>
                 <CampaignPreview campaign={c} />
@@ -592,9 +580,7 @@ export default function CampaignEditor() {
             onChange={setTestLocale}
           />
           <Show when={dialogError()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {dialogError()}
-            </p>
+            <Alert tone="error">{dialogError()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setTesting(false)}>{t("common.cancel")}</Button>
@@ -642,9 +628,7 @@ export default function CampaignEditor() {
             <DateTimeField label={t("marketing.sendAt")} value={at()} onChange={setAt} />
           </Show>
           <Show when={dialogError()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {dialogError()}
-            </p>
+            <Alert tone="error">{dialogError()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setScheduling(false)}>{t("common.cancel")}</Button>

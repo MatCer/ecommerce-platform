@@ -1,4 +1,4 @@
-import { Button, SelectField, showToast, TextField } from "@platform/ui";
+import { Alert, Button, Card, SelectField, showToast, TextField } from "@platform/ui";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, Show } from "solid-js";
 import { ContentAsset } from "../components/ContentAsset.tsx";
@@ -52,31 +52,32 @@ function Logo(props: { admin: boolean }) {
     onError: toastError,
   }));
   return (
-    <section aria-labelledby="email-logo" class="flex max-w-2xl flex-col gap-3">
-      <h2 id="email-logo" class="text-sm font-semibold">
-        {t("emails.logo")}
-      </h2>
-      <p class="text-sm text-muted-foreground">{t("emails.logoDesc")}</p>
-      <QueryState query={branding}>
-        {() => (
-          <form
-            class="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              save.mutate();
-            }}
-          >
-            <ContentAsset label={t("emails.logo")} value={current()} onChange={setLogo} />
-            <Show when={props.admin}>
-              <div>
-                <Button type="submit" variant="confirm" loading={save.isPending}>
-                  {t("emails.saveLogo")}
-                </Button>
-              </div>
-            </Show>
-          </form>
-        )}
-      </QueryState>
+    <section aria-labelledby="email-logo" class="max-w-2xl">
+      <Card
+        title={<span id="email-logo">{t("emails.logo")}</span>}
+        description={t("emails.logoDesc")}
+      >
+        <QueryState query={branding}>
+          {() => (
+            <form
+              class="flex flex-col gap-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                save.mutate();
+              }}
+            >
+              <ContentAsset label={t("emails.logo")} value={current()} onChange={setLogo} />
+              <Show when={props.admin}>
+                <div class="border-t border-border pt-4">
+                  <Button type="submit" variant="confirm" loading={save.isPending}>
+                    {t("emails.saveLogo")}
+                  </Button>
+                </div>
+              </Show>
+            </form>
+          )}
+        </QueryState>
+      </Card>
     </section>
   );
 }
@@ -126,74 +127,75 @@ function Texts(props: { admin: boolean }) {
   }));
 
   return (
-    <section aria-labelledby="email-texts" class="flex max-w-2xl flex-col gap-3">
-      <h2 id="email-texts" class="text-sm font-semibold">
-        {t("emails.texts")}
-      </h2>
-      <p class="text-sm text-muted-foreground">{t("emails.textsDesc")}</p>
-      <QueryState query={texts}>
-        {() => (
-          <form
-            class="flex flex-col gap-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              save.mutate({
-                template: template(),
-                locale: locale(),
-                input: { subject: subject().trim() || null, intro: intro().trim() || null },
-              });
-            }}
-          >
-            <div class="grid gap-2 sm:grid-cols-2">
-              <SelectField
-                label={t("emails.templateSelect")}
-                value={template()}
-                options={templates().map((x) => ({ value: x, label: templateLabel(x) }))}
-                onChange={setTemplate}
-              />
-              <SelectField
-                label={t("marketing.language")}
-                value={locale()}
-                options={LOCALES.map((l) => ({ value: l, label: t(`common.locale_${l}`) }))}
-                onChange={setLocale}
-              />
-            </div>
-            <p class="text-xs text-muted-foreground">
-              {ORDER_TEMPLATES.has(template())
-                ? t("emails.placeholdersOrder")
-                : t("emails.placeholders")}
-            </p>
-            <TextField
-              label={t("emails.subject")}
-              value={subject()}
-              onChange={setSubject}
-              placeholder={item()?.default_subject}
-              description={t("emails.default", { text: item()?.default_subject ?? "" })}
-              maxLength={200}
-              disabled={!props.admin}
-            />
-            <TextField
-              label={t("emails.intro")}
-              multiline
-              rows={4}
-              value={intro()}
-              onChange={setIntro}
-              placeholder={item()?.default_intro}
-              description={t("emails.default", { text: item()?.default_intro ?? "" })}
-              maxLength={1000}
-              disabled={!props.admin}
-            />
-            <p class="text-xs text-muted-foreground">{t("emails.emptyDefault")}</p>
-            <Show when={props.admin}>
-              <div>
-                <Button type="submit" variant="confirm" loading={save.isPending}>
-                  {t("emails.saveTexts")}
-                </Button>
+    <section aria-labelledby="email-texts" class="max-w-2xl">
+      <Card
+        title={<span id="email-texts">{t("emails.texts")}</span>}
+        description={t("emails.textsDesc")}
+      >
+        <QueryState query={texts}>
+          {() => (
+            <form
+              class="flex flex-col gap-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                save.mutate({
+                  template: template(),
+                  locale: locale(),
+                  input: { subject: subject().trim() || null, intro: intro().trim() || null },
+                });
+              }}
+            >
+              <div class="grid gap-5 sm:grid-cols-2">
+                <SelectField
+                  label={t("emails.templateSelect")}
+                  value={template()}
+                  options={templates().map((x) => ({ value: x, label: templateLabel(x) }))}
+                  onChange={setTemplate}
+                />
+                <SelectField
+                  label={t("marketing.language")}
+                  value={locale()}
+                  options={LOCALES.map((l) => ({ value: l, label: t(`common.locale_${l}`) }))}
+                  onChange={setLocale}
+                />
               </div>
-            </Show>
-          </form>
-        )}
-      </QueryState>
+              <p class="-mt-2 text-sm text-muted-foreground">
+                {ORDER_TEMPLATES.has(template())
+                  ? t("emails.placeholdersOrder")
+                  : t("emails.placeholders")}
+              </p>
+              <TextField
+                label={t("emails.subject")}
+                value={subject()}
+                onChange={setSubject}
+                placeholder={item()?.default_subject}
+                description={t("emails.default", { text: item()?.default_subject ?? "" })}
+                maxLength={200}
+                disabled={!props.admin}
+              />
+              <TextField
+                label={t("emails.intro")}
+                multiline
+                rows={4}
+                value={intro()}
+                onChange={setIntro}
+                placeholder={item()?.default_intro}
+                description={t("emails.default", { text: item()?.default_intro ?? "" })}
+                maxLength={1000}
+                disabled={!props.admin}
+              />
+              <p class="text-sm text-muted-foreground">{t("emails.emptyDefault")}</p>
+              <Show when={props.admin}>
+                <div class="border-t border-border pt-4">
+                  <Button type="submit" variant="confirm" loading={save.isPending}>
+                    {t("emails.saveTexts")}
+                  </Button>
+                </div>
+              </Show>
+            </form>
+          )}
+        </QueryState>
+      </Card>
     </section>
   );
 }
@@ -205,11 +207,11 @@ export default function EmailBranding() {
     <>
       <PageHeader title={t("emails.branding")} description={t("emails.brandingDesc")} />
       <Show when={!can("admin")}>
-        <p role="note" class="mb-4 text-sm text-muted-foreground">
+        <Alert tone="info" class="mb-4 max-w-2xl">
           {t("emails.adminOnly")}
-        </p>
+        </Alert>
       </Show>
-      <div class="flex flex-col gap-8">
+      <div class="flex flex-col gap-4">
         <Logo admin={can("admin")} />
         <Texts admin={can("admin")} />
       </div>

@@ -1,7 +1,26 @@
-import { Badge, controlClass, EmptyState, SelectField, type Tone } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Card,
+  Collapse,
+  controlClass,
+  EmptyState,
+  FormGroup,
+  SelectField,
+  type Tone,
+} from "@platform/ui";
 import { A, useSearchParams } from "@solidjs/router";
 import { createQuery } from "@tanstack/solid-query";
-import { createEffect, createMemo, createSignal, For, type JSX, on, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  For,
+  type JSX,
+  on,
+  Show,
+} from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { locale, t } from "../i18n/index.ts";
 import {
@@ -150,7 +169,7 @@ function Filters(props: {
   };
 
   return (
-    <fieldset class="mb-5 flex min-w-0 flex-wrap items-start gap-3">
+    <fieldset class="mb-4 flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2">
       <legend class="sr-only">{t("dashboard.filters")}</legend>
       <SelectField
         class="w-44"
@@ -190,13 +209,13 @@ function Filters(props: {
         ]}
         onChange={props.onMarket}
       />
-      <div class="flex w-full flex-col gap-0.5 text-xs">
+      <div class="flex w-full flex-col gap-2">
         <Show when={props.range.preset === null && invalid()}>
-          <p id="range-error" role="alert" class="font-medium text-error-700">
-            {t("errors.invalid_range")}
-          </p>
+          <div id="range-error" class="max-w-xl">
+            <Alert tone="error">{t("errors.invalid_range")}</Alert>
+          </div>
         </Show>
-        <p class="text-faint-foreground">{t("dashboard.utcNote")}</p>
+        <p class="text-xs text-muted-foreground">{t("dashboard.utcNote")}</p>
       </div>
     </fieldset>
   );
@@ -210,12 +229,13 @@ function DateInput(props: {
   invalid: boolean;
   onChange: (v: string) => void;
 }) {
+  const id = createUniqueId();
   return (
-    <label class="flex w-40 flex-col gap-1 text-xs font-medium text-muted-foreground">
-      {props.label}
+    <FormGroup class="w-40" label={props.label} for={id}>
       <input
+        id={id}
         type="date"
-        class={`${controlClass} font-normal`}
+        class={controlClass}
         value={props.value}
         min={props.min}
         max={props.max}
@@ -224,7 +244,7 @@ function DateInput(props: {
         aria-describedby={props.invalid ? "range-error" : undefined}
         onChange={(e) => props.onChange(e.currentTarget.value)}
       />
-    </label>
+    </FormGroup>
   );
 }
 
@@ -237,61 +257,80 @@ function EmptyDashboard() {
     { href: "/account/security", label: () => t("dashboard.stepSecurity"), min: "staff" },
   ];
   return (
-    <div class="flex max-w-xl flex-col gap-6">
-      <EmptyState title={t("dashboard.emptyTitle")} description={t("dashboard.emptyDesc")} />
-      <section aria-labelledby="next-steps">
-        <h2 id="next-steps" class="col-label mb-2">
-          {t("dashboard.nextSteps")}
-        </h2>
-        <ol class="flex flex-col border-t border-border">
+    <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <Card>
+        <EmptyState
+          icon="list-task"
+          title={t("dashboard.emptyTitle")}
+          description={t("dashboard.emptyDesc")}
+        />
+      </Card>
+      <Panel id="next-steps" title={t("dashboard.nextSteps")} padding="none">
+        <ol class="flex flex-col">
           <For each={steps.filter((s) => can(s.min))}>
             {(s, i) => (
-              <li class="border-b border-border">
-                <A href={s.href} class="flex h-10 items-center gap-3 px-1 text-sm hover:bg-muted">
-                  <span class="figures w-5 text-faint-foreground">{i() + 1}</span>
+              <li class="border-b border-border last:border-b-0">
+                <A href={s.href} class="flex h-row items-center gap-3 px-4 text-sm hover:bg-muted">
+                  <span class="figures grid size-6 place-items-center rounded-full bg-subtle text-xs font-semibold text-muted-foreground">
+                    {i() + 1}
+                  </span>
                   <span class="text-accent-700">{s.label()}</span>
                 </A>
               </li>
             )}
           </For>
         </ol>
-      </section>
+      </Panel>
     </div>
   );
 }
 
-function Section(props: {
+/** A dashboard panel: a Pajamas card that is also a named region (its title labels it). */
+function Panel(props: {
   id: string;
   title: string;
   description?: string;
+  actions?: JSX.Element;
+  padding?: "none" | "normal";
+  class?: string;
   children: JSX.Element;
 }) {
   return (
-    <section aria-labelledby={props.id} class="flex min-w-0 flex-col gap-3">
-      <div class="flex flex-col gap-0.5">
-        <h2 id={props.id} class="text-sm font-semibold">
-          {props.title}
-        </h2>
-        <Show when={props.description}>
-          <p class="max-w-prose text-xs text-muted-foreground">{props.description}</p>
-        </Show>
-      </div>
-      {props.children}
+    <section aria-labelledby={props.id} class={`flex min-w-0 flex-col ${props.class ?? ""}`}>
+      <Card
+        class="flex-1"
+        title={<span id={props.id}>{props.title}</span>}
+        description={props.description}
+        actions={props.actions}
+        padding={props.padding}
+      >
+        {props.children}
+      </Card>
     </section>
   );
 }
 
+/** Nothing to show inside a full-bleed panel. */
+function Nothing() {
+  return <p class="p-4 text-sm text-muted-foreground">{t("dashboard.nothing")}</p>;
+}
+
+/** Single-stat tile (GitLab analytics style): caption, big figure, optional hint. */
 function Stat(props: { label: string; value: string; hint?: string }) {
   return (
-    <div class="flex min-w-0 flex-col gap-1 border-t border-border pt-2">
-      <dt class="text-xs text-muted-foreground">{props.label}</dt>
-      <dd class="text-lg font-semibold tracking-tight">{props.value}</dd>
+    <div class="flex min-w-0 flex-col gap-1">
+      <dt class="text-sm text-muted-foreground">{props.label}</dt>
+      <dd class="figures truncate text-2xl font-semibold tracking-tight text-heading">
+        {props.value}
+      </dd>
       <Show when={props.hint}>
-        <dd class="text-xs text-faint-foreground">{props.hint}</dd>
+        <dd class="text-xs text-muted-foreground">{props.hint}</dd>
       </Show>
     </div>
   );
 }
+
+const statGrid = "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3";
 
 function Overview(props: { data: Dashboard }) {
   const d = () => props.data;
@@ -308,51 +347,86 @@ function Overview(props: { data: Dashboard }) {
   const templates = () => [...d().traffic.by_template].sort((a, b) => b.requests - a.requests);
 
   return (
-    <div class="flex flex-col gap-8">
-      <Section
-        id="sales"
-        title={t("dashboard.sales")}
-        description={d().sales.length > 1 ? t("dashboard.perCurrency") : undefined}
-      >
-        <Show
-          when={d().sales.length > 0}
-          fallback={
-            <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-              <Stat label={t("dashboard.revenue")} value="—" />
-              <Stat label={t("dashboard.orders")} value={num(0)} />
-              <Stat label={t("dashboard.aov")} value="—" />
-            </dl>
-          }
+    <div class="flex flex-col gap-4">
+      <div class="grid gap-4 xl:grid-cols-2">
+        <Panel
+          id="sales"
+          title={t("dashboard.sales")}
+          description={d().sales.length > 1 ? t("dashboard.perCurrency") : undefined}
         >
-          <For each={d().sales}>
-            {(s) => (
-              <div class="flex flex-col gap-1">
-                <Show when={d().sales.length > 1}>
-                  <p class="col-label">{s.currency}</p>
-                </Show>
-                <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-                  <Stat label={t("dashboard.revenue")} value={money(s.revenue_minor, s.currency)} />
-                  <Stat label={t("dashboard.orders")} value={num(s.orders)} />
-                  <Stat label={t("dashboard.aov")} value={money(s.aov_minor, s.currency)} />
-                </dl>
-              </div>
-            )}
-          </For>
-        </Show>
-      </Section>
+          <Show
+            when={d().sales.length > 0}
+            fallback={
+              <dl class={statGrid}>
+                <Stat label={t("dashboard.revenue")} value="—" />
+                <Stat label={t("dashboard.orders")} value={num(0)} />
+                <Stat label={t("dashboard.aov")} value="—" />
+              </dl>
+            }
+          >
+            <div class="flex flex-col gap-4 divide-y divide-border">
+              <For each={d().sales}>
+                {(s) => (
+                  <div class="flex flex-col gap-2 [&:not(:first-child)]:pt-4">
+                    <Show when={d().sales.length > 1}>
+                      <p class="col-label">{s.currency}</p>
+                    </Show>
+                    <dl class={statGrid}>
+                      <Stat
+                        label={t("dashboard.revenue")}
+                        value={money(s.revenue_minor, s.currency)}
+                      />
+                      <Stat label={t("dashboard.orders")} value={num(s.orders)} />
+                      <Stat label={t("dashboard.aov")} value={money(s.aov_minor, s.currency)} />
+                    </dl>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+        </Panel>
+
+        <Panel id="traffic" title={t("dashboard.traffic")}>
+          <dl class={statGrid}>
+            <Stat
+              label={t("dashboard.pageRequests")}
+              value={num(d().traffic.page_requests)}
+              hint={t("dashboard.pageRequestsHint")}
+            />
+            <Stat
+              label={t("dashboard.consentedSessions")}
+              value={num(d().traffic.consented_sessions)}
+              hint={t("dashboard.consentedSessionsHint")}
+            />
+            <Stat
+              label={t("dashboard.conversionRate")}
+              value={
+                d().traffic.conversion_rate == null ? "—" : pct(d().traffic.conversion_rate ?? 0)
+              }
+              hint={t("dashboard.conversionHint")}
+            />
+          </dl>
+        </Panel>
+      </div>
 
       <Show when={series().length > 0}>
-        <Section id="over-time" title={t("dashboard.overTime")}>
-          <SelectField
-            class="w-44"
-            label={t("dashboard.metric")}
-            value={metric()}
-            options={[
-              { value: "revenue", label: t("dashboard.revenue") },
-              { value: "orders", label: t("dashboard.orders") },
-            ]}
-            onChange={(v) => setMetric(v === "orders" ? "orders" : "revenue")}
-          />
+        <Panel
+          id="over-time"
+          title={t("dashboard.overTime")}
+          actions={
+            <SelectField
+              class="w-44"
+              hideLabel
+              label={t("dashboard.metric")}
+              value={metric()}
+              options={[
+                { value: "revenue", label: t("dashboard.revenue") },
+                { value: "orders", label: t("dashboard.orders") },
+              ]}
+              onChange={(v) => setMetric(v === "orders" ? "orders" : "revenue")}
+            />
+          }
+        >
           <Show
             when={metric() === "revenue"}
             fallback={
@@ -377,33 +451,11 @@ function Overview(props: { data: Dashboard }) {
               </For>
             </div>
           </Show>
-        </Section>
+        </Panel>
       </Show>
 
-      <Section id="traffic" title={t("dashboard.traffic")}>
-        <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
-          <Stat
-            label={t("dashboard.pageRequests")}
-            value={num(d().traffic.page_requests)}
-            hint={t("dashboard.pageRequestsHint")}
-          />
-          <Stat
-            label={t("dashboard.consentedSessions")}
-            value={num(d().traffic.consented_sessions)}
-            hint={t("dashboard.consentedSessionsHint")}
-          />
-          <Stat
-            label={t("dashboard.conversionRate")}
-            value={
-              d().traffic.conversion_rate == null ? "—" : pct(d().traffic.conversion_rate ?? 0)
-            }
-            hint={t("dashboard.conversionHint")}
-          />
-        </dl>
-      </Section>
-
-      <div class="grid gap-8 lg:grid-cols-2">
-        <Section
+      <div class="grid gap-4 lg:grid-cols-2">
+        <Panel
           id="funnel"
           title={t("dashboard.funnelTitle")}
           description={t("dashboard.funnelDesc")}
@@ -420,8 +472,8 @@ function Overview(props: { data: Dashboard }) {
                   : undefined,
             }))}
           />
-        </Section>
-        <Section id="by-template" title={t("dashboard.byTemplate")}>
+        </Panel>
+        <Panel id="by-template" title={t("dashboard.byTemplate")}>
           <Show
             when={templates().length > 0}
             fallback={<p class="text-sm text-muted-foreground">{t("dashboard.nothing")}</p>}
@@ -434,10 +486,14 @@ function Overview(props: { data: Dashboard }) {
               }))}
             />
           </Show>
-        </Section>
+        </Panel>
       </div>
 
-      <Section id="top-products" title={t("dashboard.topProducts")}>
+      <Panel
+        id="top-products"
+        title={t("dashboard.topProducts")}
+        padding={d().top_products.length > 0 ? "none" : "normal"}
+      >
         <Show
           when={d().top_products.length > 0}
           fallback={<p class="text-sm text-muted-foreground">{t("dashboard.nothing")}</p>}
@@ -454,13 +510,13 @@ function Overview(props: { data: Dashboard }) {
               <tbody>
                 <For each={d().top_products}>
                   {(p) => (
-                    <tr>
+                    <tr class="hover:bg-subtle">
                       <td class={tdClass}>
                         <Show when={p.product_id} fallback={p.name}>
                           {(id) => (
                             <A
                               href={`/products/${id()}`}
-                              class="font-medium text-accent-700 hover:underline"
+                              class="font-semibold text-heading hover:text-accent-700 hover:underline"
                             >
                               {p.name}
                             </A>
@@ -478,24 +534,25 @@ function Overview(props: { data: Dashboard }) {
             </table>
           </div>
         </Show>
-      </Section>
+      </Panel>
 
-      <div class="grid gap-8 lg:grid-cols-2">
-        <Section id="top-searches" title={t("dashboard.topSearches")}>
+      <div class="grid gap-4 lg:grid-cols-2">
+        <Panel id="top-searches" title={t("dashboard.topSearches")} padding="none">
           <SearchTable id="top-searches" rows={d().top_searches} />
-        </Section>
-        <Section id="zero-searches" title={t("dashboard.zeroSearches")}>
+        </Panel>
+        <Panel id="zero-searches" title={t("dashboard.zeroSearches")} padding="none">
           <SearchTable id="zero-searches" rows={d().zero_result_searches} />
-        </Section>
+        </Panel>
       </div>
 
-      <Section
+      <Panel
         id="web-vitals"
         title={t("dashboard.webVitals")}
         description={t("dashboard.webVitalsDesc")}
+        padding="none"
       >
         <VitalsTable rows={d().web_vitals} />
-      </Section>
+      </Panel>
     </div>
   );
 }
@@ -536,7 +593,7 @@ function ColumnChart(props: {
 
   return (
     <figure class="flex min-w-0 flex-col gap-2">
-      <figcaption class="text-xs font-medium text-muted-foreground">{props.title}</figcaption>
+      <figcaption class="text-sm font-semibold text-heading">{props.title}</figcaption>
       <div role="img" aria-label={summary()} class="grid grid-cols-[auto_1fr] gap-x-2">
         <div class={`${tick} flex h-40 flex-col justify-between text-right`} aria-hidden="true">
           <span>{props.format(max())}</span>
@@ -569,9 +626,8 @@ function ColumnChart(props: {
           <span>{props.days.at(-1) ? day(props.days.at(-1)?.date ?? "") : ""}</span>
         </div>
       </div>
-      <details>
-        <summary class="cursor-pointer text-xs text-accent-700">{t("dashboard.showTable")}</summary>
-        <div class="mt-2 max-h-72 overflow-auto">
+      <Collapse summary={t("dashboard.showTable")}>
+        <div class="max-h-72 overflow-auto rounded-md border border-border">
           <table class={tableClass}>
             <caption class="sr-only">{props.title}</caption>
             <thead>
@@ -592,7 +648,7 @@ function ColumnChart(props: {
             </tbody>
           </table>
         </div>
-      </details>
+      </Collapse>
     </figure>
   );
 }
@@ -611,9 +667,9 @@ function BarList(props: {
           <span class="truncate" title={item.label}>
             {item.label}
           </span>
-          <span class="h-2.5 rounded-sm bg-muted" aria-hidden="true">
+          <span class="h-2 rounded-full bg-subtle" aria-hidden="true">
             <span
-              class="block h-full rounded-sm bg-accent-600"
+              class="block h-full rounded-full bg-accent-600"
               style={{ width: `${(item.value / max()) * 100}%` }}
             />
           </span>
@@ -645,10 +701,7 @@ function BarList(props: {
 
 function SearchTable(props: { id: string; rows: readonly Schemas["QueryCount"][] }) {
   return (
-    <Show
-      when={props.rows.length > 0}
-      fallback={<p class="text-sm text-muted-foreground">{t("dashboard.nothing")}</p>}
-    >
+    <Show when={props.rows.length > 0} fallback={<Nothing />}>
       <table class={tableClass} aria-labelledby={props.id}>
         <thead>
           <tr>
@@ -687,10 +740,7 @@ function VitalsTable(props: { rows: readonly Schemas["VitalP75"][] }) {
       : `${num(Math.round(r.p75))} ms`;
 
   return (
-    <Show
-      when={props.rows.length > 0}
-      fallback={<p class="text-sm text-muted-foreground">{t("dashboard.nothing")}</p>}
-    >
+    <Show when={props.rows.length > 0} fallback={<Nothing />}>
       <div class="overflow-x-auto">
         <table class={tableClass} aria-labelledby="web-vitals">
           <thead>

@@ -1,4 +1,4 @@
-import { Button, Menu, SelectField, TextField } from "@platform/ui";
+import { Button, buttonClass, Icon, Menu, SelectField, TextField } from "@platform/ui";
 import { Index, Match, Switch } from "solid-js";
 import { t } from "../i18n/index.ts";
 import {
@@ -106,7 +106,7 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 value={b().title ?? ""}
                 onChange={(title) => props.onChange({ ...b(), title })}
               />
-              <p class="text-xs">
+              <p class="text-sm text-muted-foreground">
                 {t("content.gridLimit")} ({b().product_ids.length}/24)
               </p>
               <ProductPicker
@@ -126,8 +126,8 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
             <>
               <Index each={b().items}>
                 {(item, i) => (
-                  <fieldset class="flex min-w-0 flex-col gap-2 border-b border-border pb-3">
-                    <legend class="text-sm">
+                  <fieldset class="flex min-w-0 flex-col gap-3 rounded-md border border-border p-3">
+                    <legend class="px-1 text-sm font-semibold text-heading">
                       {t("content.question")} {i + 1}
                     </legend>
                     <TextField
@@ -151,6 +151,10 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                       }
                     />
                     <Button
+                      class="self-start"
+                      category="tertiary"
+                      size="small"
+                      icon="remove"
                       aria-label={`${t("common.remove")}: ${t("content.question")} ${i + 1}`}
                       onClick={() => props.onChange({ ...b(), items: removeItem(b().items, i) })}
                     >
@@ -160,6 +164,8 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
                 )}
               </Index>
               <Button
+                class="self-start"
+                icon="plus"
                 onClick={() =>
                   props.onChange({
                     ...b(),
@@ -179,36 +185,42 @@ function BlockFields(props: { block: Block; onChange: (block: Block) => void }) 
 export function BlockEditor(props: { blocks: Block[]; onChange: (blocks: Block[]) => void }) {
   return (
     <section class="flex flex-col gap-3" aria-label={t("content.blocks")}>
-      <h2 class="text-sm font-semibold">{t("content.blocks")}</h2>
+      <h2 class="text-base font-semibold text-heading">{t("content.blocks")}</h2>
       <Index each={props.blocks}>
         {(block, i) => (
-          <fieldset class="min-w-0 rounded-md border border-border p-3">
-            <legend class="px-1 text-sm font-medium">
+          <fieldset class="relative min-w-0 overflow-hidden rounded-lg border border-border bg-background">
+            <legend class="float-left flex h-10 w-full items-center border-b border-border bg-subtle pr-28 pl-4 text-sm font-semibold text-heading">
               {i + 1}. {t(`content.${block().type}`)}
             </legend>
-            <div class="mb-3 flex flex-wrap gap-1">
+            <div class="absolute top-2 right-2 flex gap-1">
               <Button
+                category="tertiary"
+                size="small"
+                iconOnly
+                icon="chevron-up"
                 disabled={i === 0}
                 aria-label={`${t("common.moveUp")}: ${i + 1}`}
                 onClick={() => props.onChange(moveItem(props.blocks, i, -1))}
-              >
-                {t("common.moveUp")}
-              </Button>
+              />
               <Button
+                category="tertiary"
+                size="small"
+                iconOnly
+                icon="chevron-down"
                 disabled={i === props.blocks.length - 1}
                 aria-label={`${t("common.moveDown")}: ${i + 1}`}
                 onClick={() => props.onChange(moveItem(props.blocks, i, 1))}
-              >
-                {t("common.moveDown")}
-              </Button>
+              />
               <Button
+                category="tertiary"
+                size="small"
+                iconOnly
+                icon="remove"
                 aria-label={`${t("common.remove")}: ${i + 1}`}
                 onClick={() => props.onChange(removeItem(props.blocks, i))}
-              >
-                {t("common.remove")}
-              </Button>
+              />
             </div>
-            <div class="flex flex-col gap-3">
+            <div class="clear-both flex flex-col gap-4 p-4">
               <BlockFields
                 block={block()}
                 onChange={(next) =>
@@ -219,14 +231,24 @@ export function BlockEditor(props: { blocks: Block[]; onChange: (blocks: Block[]
           </fieldset>
         )}
       </Index>
-      <Menu
-        trigger={t("content.addBlock")}
-        triggerLabel={t("content.addBlock")}
-        items={BLOCK_TYPES.map((type) => ({
-          label: t(`content.${type}`),
-          onSelect: () => props.onChange([...props.blocks, blankBlock(type)]),
-        }))}
-      />
+      <div>
+        <Menu
+          placement="bottom-start"
+          triggerClass={buttonClass({})}
+          trigger={
+            <>
+              <Icon name="plus" />
+              {t("content.addBlock")}
+              <Icon name="chevron-down" />
+            </>
+          }
+          triggerLabel={t("content.addBlock")}
+          items={BLOCK_TYPES.map((type) => ({
+            label: t(`content.${type}`),
+            onSelect: () => props.onChange([...props.blocks, blankBlock(type)]),
+          }))}
+        />
+      </div>
     </section>
   );
 }
