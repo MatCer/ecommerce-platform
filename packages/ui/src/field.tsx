@@ -304,7 +304,7 @@ export function Toggle(props: ToggleProps) {
     >
       <KSwitch.Input class="peer" />
       <KSwitch.Control
-        class="inline-flex h-6 w-10 shrink-0 items-center rounded-full border border-input bg-control p-0.5 transition-colors
+        class="inline-flex h-6 w-10 shrink-0 items-center rounded-full border border-input bg-control p-0.5
           data-[checked]:border-primary data-[checked]:bg-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1
           peer-focus-visible:outline-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
       >

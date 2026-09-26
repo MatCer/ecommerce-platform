@@ -19,9 +19,10 @@ export interface ButtonStyle {
   block?: boolean;
 }
 
+// No colour transitions: state changes are instant (and axe never samples a half-faded colour).
 const base =
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border text-sm " +
-  "transition-colors duration-100 disabled:cursor-not-allowed disabled:border-border disabled:bg-subtle " +
+  "disabled:cursor-not-allowed disabled:border-border disabled:bg-subtle " +
   "disabled:text-faint-foreground aria-disabled:cursor-not-allowed aria-[pressed=true]:border-primary " +
   "aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground";
 
