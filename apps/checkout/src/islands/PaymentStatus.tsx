@@ -113,14 +113,14 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
                 <p class="text-sm text-muted-foreground">{t(m, "order.stripe_sim_note")}</p>
                 <div class="flex flex-wrap gap-2">
                   <Button
-                    variant="primary"
+                    variant="confirm"
                     loading={busy()}
                     onClick={() => void simulate("succeeded")}
                   >
                     {t(m, "order.stripe_sim_succeed")}
                   </Button>
                   <Button
-                    variant="secondary"
+                   
                     disabled={busy()}
                     onClick={() => void simulate("failed")}
                   >
@@ -138,7 +138,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
       <Show when={p().can_retry}>
         <div>
           <Button
-            variant="primary"
+            variant="confirm"
             loading={busy()}
             onClick={() => void go(`${base}/payment-attempts`)}
           >
@@ -150,7 +150,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
         {(a) => (
           <div>
             <Button
-              variant="secondary"
+             
               loading={busy()}
               onClick={() => void go(`${base}/payment-attempts/${a().id}/init`)}
             >
@@ -206,7 +206,7 @@ function StripePayment(props: { m: M; action: StripeAction; onError: (e: string)
       </Show>
       <div ref={host} />
       <div>
-        <Button type="submit" variant="primary" loading={paying()} disabled={!ready()}>
+        <Button type="submit" variant="confirm" loading={paying()} disabled={!ready()}>
           {t(props.m, "order.stripe_pay")}
         </Button>
       </div>

@@ -29,20 +29,20 @@ const base =
 const styles: Record<ButtonVariant, Record<ButtonCategory, string>> = {
   default: {
     primary:
-      "border-border-strong bg-background text-foreground hover:bg-subtle active:bg-neutral-50",
+      "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
     secondary:
-      "border-border-strong bg-background text-foreground hover:bg-subtle active:bg-neutral-50",
+      "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
     tertiary: "border-transparent text-foreground hover:bg-muted active:bg-muted",
   },
   confirm: {
     primary:
       "border-primary bg-primary text-primary-foreground hover:border-primary-hover hover:bg-primary-hover",
-    secondary: "border-primary bg-background text-foreground hover:bg-muted",
+    secondary: "border-primary bg-card text-foreground hover:bg-muted",
     tertiary: "border-transparent text-foreground hover:bg-muted",
   },
   danger: {
     primary: "border-error-600 bg-error-600 text-danger-foreground hover:brightness-95",
-    secondary: "border-error-600 bg-background text-error-700 hover:bg-error-50",
+    secondary: "border-error-600 bg-card text-error-700 hover:bg-error-50",
     tertiary: "border-transparent text-error-700 hover:bg-error-50",
   },
 };

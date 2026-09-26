@@ -149,14 +149,14 @@ export default function Addresses(props: {
                 </address>
                 <div class="flex gap-2">
                   <Button
-                    variant="secondary"
+                   
                     onClick={() => open(a)}
                     aria-label={`${t(m, "address.edit")}: ${a.name}, ${a.street}`}
                   >
                     {t(m, "address.edit")}
                   </Button>
                   <Button
-                    variant="ghost"
+                    category="tertiary"
                     onClick={() => remove(a)}
                     aria-label={`${t(m, "address.delete")}: ${a.name}, ${a.street}`}
                   >
@@ -173,7 +173,7 @@ export default function Addresses(props: {
         when={editing() !== undefined}
         fallback={
           <div>
-            <Button variant="primary" onClick={() => open()}>
+            <Button variant="confirm" onClick={() => open()}>
               {t(m, "address.add")}
             </Button>
           </div>
@@ -252,10 +252,10 @@ export default function Addresses(props: {
             </p>
           </Show>
           <div class="flex gap-2 sm:col-span-2">
-            <Button type="submit" variant="primary" loading={busy()}>
+            <Button type="submit" variant="confirm" loading={busy()}>
               {t(m, "address.save")}
             </Button>
-            <Button variant="ghost" onClick={() => setEditing(undefined)}>
+            <Button category="tertiary" onClick={() => setEditing(undefined)}>
               {t(m, "address.cancel")}
             </Button>
           </div>

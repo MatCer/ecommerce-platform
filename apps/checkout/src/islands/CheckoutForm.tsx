@@ -478,7 +478,7 @@ export default function CheckoutForm(props: {
                     )}
                   </Show>
                   <div>
-                    <Button variant="secondary" onClick={() => void openWidget(method().id)}>
+                    <Button onClick={() => void openWidget(method().id)}>
                       {view().pickup_point && !pendingPickup()
                         ? t(m, "checkout.pickup_change")
                         : t(m, "checkout.pickup_choose")}

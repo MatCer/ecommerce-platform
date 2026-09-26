@@ -76,7 +76,7 @@ export default function PasswordForm(props: {
         fallback={
           <div class="grid gap-3">
             <p class="text-sm">{t(m, "password.reauth")}</p>
-            <Button variant="primary" onClick={sendLink}>
+            <Button variant="confirm" onClick={sendLink}>
               {t(m, "account.send_link")}
             </Button>
           </div>
@@ -105,7 +105,7 @@ export default function PasswordForm(props: {
             value={next()}
             onChange={setNext}
           />
-          <Button type="submit" variant="primary" loading={busy()}>
+          <Button type="submit" variant="confirm" loading={busy()}>
             {t(m, "password.save")}
           </Button>
         </form>

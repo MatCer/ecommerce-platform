@@ -49,7 +49,7 @@ export default function WithdrawalRequest(props: { m: Record<string, string> }) 
               value={email()}
               onChange={setEmail}
             />
-            <Button type="submit" variant="primary" loading={busy()}>
+            <Button type="submit" variant="confirm" loading={busy()}>
               {t(props.m, "withdraw.send")}
             </Button>
           </HydratedControls>

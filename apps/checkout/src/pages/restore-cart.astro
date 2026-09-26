@@ -26,7 +26,7 @@ const m = shop?.messages ?? {};
         <form method="post" action="/_p/flows/restore-cart" class="grid justify-items-start gap-4">
           <p>{t(m, "flows.restore_intro")}</p>
           <input type="hidden" name="token" value={token} />
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="confirm">
             {t(m, "flows.restore_button")}
           </Button>
         </form>

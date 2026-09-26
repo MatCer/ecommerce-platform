@@ -31,7 +31,7 @@ const m = shop?.messages ?? {};
         <form method="post" action="/_p/watch/confirm" class="grid justify-items-start gap-4">
           <p>{t(m, "watch.confirm_intro")}</p>
           <input type="hidden" name="token" value={token} />
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="confirm">
             {t(m, "watch.confirm_button")}
           </Button>
         </form>

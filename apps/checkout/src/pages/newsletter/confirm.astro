@@ -34,7 +34,7 @@ const m = shop?.messages ?? {};
         <form method="post" action="/_p/newsletter/confirm" class="grid justify-items-start gap-4">
           <p>{t(m, "nl.confirm_intro", { email: pending.email })}</p>
           <input type="hidden" name="token" value={token} />
-          <Button type="submit" variant="primary">
+          <Button type="submit" variant="confirm">
             {t(m, "nl.confirm_button")}
           </Button>
         </form>

@@ -76,7 +76,7 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
           value={email()}
           onChange={setEmail}
         />
-        <Button type="submit" variant="primary" loading={busy() === "link"}>
+        <Button type="submit" variant="confirm" loading={busy() === "link"}>
           {t(m, "account.send_link")}
         </Button>
       </form>
@@ -117,7 +117,7 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
             value={password()}
             onChange={setPassword}
           />
-          <Button type="submit" variant="secondary" loading={busy() === "password"}>
+          <Button type="submit" loading={busy() === "password"}>
             {t(m, "account.sign_in_button")}
           </Button>
         </form>

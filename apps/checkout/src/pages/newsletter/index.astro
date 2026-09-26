@@ -55,7 +55,7 @@ const canResubscribe = status === "unsubscribed" && done !== "resubscribed";
           {canUnsubscribe && (
             <form method="post" action="/_p/newsletter/unsubscribe" class="grid justify-items-start">
               <input type="hidden" name="t" value={token} />
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="confirm">
                 {t(m, "nl.unsubscribe_button")}
               </Button>
             </form>

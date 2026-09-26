@@ -28,7 +28,7 @@ export default function VerifyLink(props: { m: Record<string, string>; token: st
 
   return (
     <HydratedControls class="grid gap-3">
-      <Button variant="primary" loading={busy()} onClick={consume}>
+      <Button variant="confirm" loading={busy()} onClick={consume}>
         {t(m, "account.verify_button")}
       </Button>
       <Show when={error()}>

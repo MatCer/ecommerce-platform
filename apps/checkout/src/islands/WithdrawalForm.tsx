@@ -159,7 +159,7 @@ export default function WithdrawalForm(props: {
                     </Show>
                     <Button
                       type="button"
-                      variant="primary"
+                      variant="confirm"
                       loading={busy()}
                       disabled={expired()}
                       onClick={confirm}
@@ -248,7 +248,7 @@ export default function WithdrawalForm(props: {
                       onInput={(e) => setNote(e.currentTarget.value)}
                     />
                   </label>
-                  <Button type="submit" variant="primary" disabled={expired()}>
+                  <Button type="submit" variant="confirm" disabled={expired()}>
                     {t(m, "withdraw.continue")}
                   </Button>
                 </form>

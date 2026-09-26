@@ -65,7 +65,7 @@ export default function ConsentForm(props: {
           </For>
         </fieldset>
         <div>
-          <Button type="submit" variant="primary" loading={busy()}>
+          <Button type="submit" variant="confirm" loading={busy()}>
             {t(m, "consent.save")}
           </Button>
         </div>
