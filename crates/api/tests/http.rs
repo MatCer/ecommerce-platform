@@ -2,6 +2,10 @@
 #![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
+use std::{
+    io::Write,
+    sync::{Arc, Mutex},
+};
 
 use api::{AppState, BODY_LIMIT_BYTES, app};
 use axum::body::Body;
@@ -11,6 +15,42 @@ use http_body_util::BodyExt;
 use serde_json::Value;
 use sqlx::PgPool;
 use tower::ServiceExt;
+
+#[derive(Clone)]
+struct LogBuffer(Arc<Mutex<Vec<u8>>>);
+
+impl Write for LogBuffer {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn request_logs_use_route_templates_and_never_capability_values() {
+    let captured = Arc::new(Mutex::new(Vec::new()));
+    let subscriber = tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::NEW)
+        .with_writer({
+            let captured = captured.clone();
+            move || LogBuffer(captured.clone())
+        })
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    let token = "secret-order-capability-0123456789";
+    let app = app(state(dead_db()), false);
+    let _ = get(app.clone(), &format!("/storefront/v1/orders/{token}")).await;
+    let _ = get(app, &format!("/unmatched/{token}")).await;
+    let logs = String::from_utf8(captured.lock().unwrap().clone()).unwrap();
+    assert!(logs.contains("/storefront/v1/orders/{token}"), "{logs}");
+    assert!(logs.contains("<unmatched>"), "{logs}");
+    assert!(!logs.contains(token), "{logs}");
+}
 
 /// Nothing listens on port 1, so these dependencies are reliably down.
 const DEAD_DB: &str = "postgres://nobody:nothing@127.0.0.1:1/none";

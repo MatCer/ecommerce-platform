@@ -27,7 +27,8 @@ pub const WIDTHS: &[u32] = &[160, 320, 480, 640, 720, 960, 1280, 1920];
 
 /// rav1e speed 0-10 (10 fastest) and quality; speed 8 keeps a 1920 px encode around a second.
 const AVIF_SPEED: u8 = 8;
-const AVIF_QUALITY: f32 = 60.0;
+// Balance photo detail against mobile transfer size; see docs/acceptance/wp25-perf.md.
+const AVIF_QUALITY: f32 = 50.0;
 const WEBP_QUALITY: f32 = 75.0;
 const JPEG_QUALITY: u8 = 80;
 

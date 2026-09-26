@@ -198,6 +198,13 @@ pub async fn request_link(
     if !matches!(o.status.as_str(), "shipped" | "delivered") {
         return Ok(());
     }
+    // Serialize every issuance for this order, including the count, token and email enqueue.
+    // SELECT FOR UPDATE on the stable order row is tenant-scoped under RLS and releases at
+    // transaction commit. PostgreSQL READ COMMITTED refreshes the count after waiting.
+    sqlx::query("SELECT id FROM orders WHERE id = $1 FOR UPDATE")
+        .bind(o.id)
+        .fetch_one(&mut **tx)
+        .await?;
     let recent = sqlx::query_scalar!(
         r#"SELECT count(*) AS "n!" FROM withdrawal_tokens
            WHERE order_id = $1 AND created_at > now() - interval '1 hour'"#,

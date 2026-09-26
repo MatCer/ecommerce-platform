@@ -376,7 +376,16 @@ export function createGateway(opts: GatewayOptions) {
           return { res, body: await readCapped(res.body, MAX_RENDER_BYTES, abort.signal) };
         })(),
         opts.renderTimeoutMs ?? 10_000,
-        () => abort.abort(),
+        () => {
+          abort.abort();
+          // Body cancellation does not stop worker computation. Dispose the offending
+          // instance so workerd cannot keep it alive after the gateway returns 504.
+          void pool
+            .evictScope(artifactId, extra.scope)
+            .catch(() =>
+              log({ level: "error", msg: "timed-out theme instance could not be disposed" }),
+            );
+        },
       );
       const ctx = registry.get(ctxId, artifactId);
       return {
@@ -1739,7 +1748,13 @@ ${
     try {
       response = await handle(request);
     } catch (err) {
-      log({ level: "error", msg: "request failed", path: safePath(request.url), err: String(err) });
+      // An upstream error may quote its request URL or a theme-controlled token.
+      log({
+        level: "error",
+        msg: "request failed",
+        path: safePath(request.url),
+        error: err instanceof TimeoutError ? "timeout" : "upstream",
+      });
       response = text(err instanceof TimeoutError ? 504 : 502, "Shop temporarily unavailable");
     }
     // Even rejected requests and render failures must not leak a withdrawal capability.
@@ -1921,7 +1936,12 @@ function safeHost(url: string) {
 
 function safePath(url: string) {
   try {
-    return new URL(url).pathname.replace(/^\/_p\/withdraw\/[^/]+/, "/_p/withdraw/[redacted]");
+    const path = new URL(url).pathname;
+    const capability = /^(\/(?:_p\/)?(?:withdraw|orders|o))(?:\/|$)/.exec(path);
+    if (capability) return `${capability[1]}/[redacted]`;
+    // Unknown paths may themselves contain a capability, so do not echo them.
+    if (!/^\/(?:_p\/public|_astro|p|c|pages|blog|search)(?:\/|$)/.test(path)) return "<unmatched>";
+    return path;
   } catch {
     return "invalid";
   }

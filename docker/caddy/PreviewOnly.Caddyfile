@@ -1,0 +1,19 @@
+{
+    auto_https disable_redirects
+    skip_install_trust
+    admin off
+}
+
+# The exact preview host is the boundary. The edge verifies the preview token and
+# owns its full route interface, including locale pages, cart reads and public assets.
+# A Host spoof for mail.localhost, auth.localhost, or the admin never reaches shared Caddy.
+https://*.localhost {
+    tls internal
+    @preview {
+        header_regexp Host ^preview-[0-9]+--[a-z0-9-]+\.localhost(?::443)?$
+    }
+    handle @preview {
+        reverse_proxy edge:8787
+    }
+    respond "forbidden" 403
+}

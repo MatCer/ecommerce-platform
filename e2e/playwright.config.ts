@@ -11,6 +11,7 @@ const sharedState = [
   "checkout/reviews.spec.ts",
   "admin/newsletter.spec.ts",
   "storefront/newsletter.spec.ts",
+  "admin/ai.spec.ts",
 ];
 
 export default defineConfig({

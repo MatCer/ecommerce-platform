@@ -49,6 +49,8 @@ async function toMfResponse(res: Response): Promise<MfResponse> {
 }
 
 const EGRESS_DENY = "egress-deny";
+const MAX_THEME_INSTANCES = 28;
+const MAX_CHECKOUT_INSTANCES = 4;
 // Answers every outbound fetch with 403 and reports it; has no `connect` handler, so TCP
 // sockets fail to open.
 const DENY_WORKER = `export default {
@@ -62,6 +64,7 @@ async function createInstance(
   opts: PoolOptions,
   id: string,
   scope: string | undefined,
+  onCreated: (mf: Miniflare) => void,
 ): Promise<Instance> {
   const manifest = await readManifest(opts.artifactRoot, id);
   const serverDir = path.resolve(opts.artifactRoot, id, "server");
@@ -120,13 +123,19 @@ async function createInstance(
       },
     ],
   });
-  try {
-    await mf.ready;
-  } catch (err) {
-    await mf.dispose().catch(() => {});
-    throw err;
-  }
+  // Publish the handle before waiting for startup. A deadline can dispose a workerd
+  // whose ready promise never settles.
+  onCreated(mf);
+  await mf.ready;
   return { manifest, mf, lastUsed: Date.now() };
+}
+
+interface PoolEntry {
+  instance: Promise<Instance>;
+  created: Promise<Miniflare | undefined>;
+  active: number;
+  lastUsed: number;
+  stopping?: Promise<void>;
 }
 
 /**
@@ -136,7 +145,8 @@ async function createInstance(
  */
 export class WorkerPool {
   readonly #opts: PoolOptions;
-  readonly #instances = new Map<string, Promise<Instance>>();
+  readonly #instances = new Map<string, PoolEntry>();
+  #admission: Promise<void> = Promise.resolve();
 
   constructor(opts: PoolOptions) {
     this.#opts = opts;
@@ -152,7 +162,8 @@ export class WorkerPool {
   }
 
   has(id: string, scope?: string) {
-    return this.#instances.has(WorkerPool.key(id, scope));
+    const entry = this.#instances.get(WorkerPool.key(id, scope));
+    return Boolean(entry && !entry.stopping);
   }
 
   /** Artifact ids with a running instance (any scope). */
@@ -160,17 +171,69 @@ export class WorkerPool {
     return new Set([...this.#instances.keys()].map((k) => k.split("@")[0] ?? k));
   }
 
-  async #instance(id: string, scope: string | undefined): Promise<Instance> {
+  async #instance(
+    id: string,
+    scope: string | undefined,
+  ): Promise<{ inst: Instance; entry: PoolEntry }> {
     const key = WorkerPool.key(id, scope);
-    let pending = this.#instances.get(key);
-    if (!pending) {
-      pending = createInstance(this.#opts, id, scope);
-      this.#instances.set(key, pending);
-      pending.catch(() => this.#instances.delete(key));
+    let entry = this.#instances.get(key);
+    if (!entry) {
+      // Serialize admission, including eviction: concurrent cold requests cannot each
+      // observe a free slot and exceed the process bound.
+      const previous = this.#admission;
+      let release = () => {};
+      this.#admission = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await previous;
+      try {
+        entry = this.#instances.get(key);
+        if (!entry) {
+          const limit = scope === undefined ? MAX_CHECKOUT_INSTANCES : MAX_THEME_INSTANCES;
+          const category = (candidate: string) => candidate.includes("@") === (scope !== undefined);
+          const members = [...this.#instances].filter(([candidate]) => category(candidate));
+          if (members.length >= limit) {
+            const idle = members
+              .filter(([, value]) => value.active === 0 && !value.stopping)
+              .sort((a, b) => a[1].lastUsed - b[1].lastUsed)[0];
+            if (!idle) throw new Error("theme runtime capacity reached");
+            await this.#evictKey(idle[0]);
+          }
+          let signalCreated = (_mf: Miniflare | undefined) => {};
+          const created = new Promise<Miniflare | undefined>((resolve) => {
+            signalCreated = resolve;
+          });
+          const value: PoolEntry = {
+            created,
+            active: 0,
+            lastUsed: Date.now(),
+            instance: createInstance(this.#opts, id, scope, signalCreated),
+          };
+          this.#instances.set(key, value);
+          void value.instance.catch(() => {
+            signalCreated(undefined);
+            return this.#evictKey(key);
+          });
+          entry = value;
+        }
+      } finally {
+        release();
+      }
     }
-    const inst = await pending;
-    inst.lastUsed = Date.now();
-    return inst;
+    if (entry.stopping) {
+      // Keep the slot charged until workerd exits, then let this request retry.
+      await entry.stopping;
+      return this.#instance(id, scope);
+    }
+    entry.active++;
+    try {
+      const inst = await entry.instance;
+      entry.lastUsed = inst.lastUsed = Date.now();
+      return { inst, entry };
+    } catch (err) {
+      entry.active--;
+      throw err;
+    }
   }
 
   /**
@@ -179,18 +242,26 @@ export class WorkerPool {
    * context and replay it while serving another tenant (WP2 review finding).
    */
   async fetch(id: string, request: Request, scope?: string): Promise<Response> {
-    const { mf } = await this.#instance(id, scope);
-    const res = await mf.dispatchFetch(request.url, {
-      method: request.method,
-      headers: [...request.headers],
-      body: hasBody(request.method) ? await request.arrayBuffer() : undefined,
-      redirect: "manual",
-    });
-    return new Response(res.body as ReadableStream<Uint8Array> | null, {
-      status: res.status,
-      statusText: res.statusText,
-      headers: [...res.headers],
-    });
+    const {
+      inst: { mf },
+      entry,
+    } = await this.#instance(id, scope);
+    try {
+      const res = await mf.dispatchFetch(request.url, {
+        method: request.method,
+        headers: [...request.headers],
+        body: hasBody(request.method) ? await request.arrayBuffer() : undefined,
+        redirect: "manual",
+      });
+      return new Response(res.body as ReadableStream<Uint8Array> | null, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: [...res.headers],
+      });
+    } finally {
+      entry.active--;
+      entry.lastUsed = Date.now();
+    }
   }
 
   /** Disposes every instance of artifact `id` (all scopes). */
@@ -199,19 +270,30 @@ export class WorkerPool {
     await Promise.all(keys.map((k) => this.#evictKey(k)));
   }
 
+  /** Stop one tenant's timed-out instance without interrupting other tenants. */
+  async evictScope(id: string, scope?: string) {
+    await this.#evictKey(WorkerPool.key(id, scope));
+  }
+
   async #evictKey(key: string) {
-    const pending = this.#instances.get(key);
-    if (!pending) return;
-    this.#instances.delete(key);
-    const inst = await pending.catch(() => undefined);
-    await inst?.mf.dispose();
+    const entry = this.#instances.get(key);
+    if (!entry) return;
+    if (!entry.stopping) {
+      entry.stopping = (async () => {
+        const mf = await entry.created;
+        await mf?.dispose();
+        // A failed termination must keep occupying its slot; otherwise a hostile
+        // startup can force unbounded replacements.
+        if (this.#instances.get(key) === entry) this.#instances.delete(key);
+      })();
+    }
+    await entry.stopping;
   }
 
   /** Disposes instances unused for `idleMs`; they are recreated on the next request. */
   async evictIdle(idleMs: number, now = Date.now()) {
-    for (const [id, pending] of this.#instances) {
-      const inst = await pending.catch(() => undefined);
-      if (inst && now - inst.lastUsed >= idleMs) await this.#evictKey(id);
+    for (const [id, entry] of this.#instances) {
+      if (entry.active === 0 && now - entry.lastUsed >= idleMs) await this.#evictKey(id);
     }
   }
 

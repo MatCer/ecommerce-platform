@@ -327,6 +327,49 @@ test("hostile archives are refused at upload with every reason", async () => {
   expect(latest()).toBe(count);
 });
 
+test("functional checks cannot reach Mailpit by spoofing Caddy's Host header", async () => {
+  test.setTimeout(10 * 60_000);
+  const files = defaultTheme();
+  files.set(
+    "checks/network.spec.ts",
+    Buffer.from(`
+    import https from "node:https";
+    import { expect, test } from "@playwright/test";
+    test("preview flows work while internal hosts remain blocked", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.locator("main")).toBeVisible();
+      for (const route of ["/_p/cart", "/_p/consent", "/_p/recommendations", "/fonts/OFL-Archivo.txt"]) {
+        const status = await page.evaluate(async (path) => (await fetch(path)).status, route);
+        expect(status, route).toBe(200);
+      }
+      const localized = new URL(page.url());
+      localized.hostname = localized.hostname.replace("--demo.localhost", "--demo-sk.localhost");
+      localized.pathname = "/cs/";
+      const localeResponse = await page.goto(localized.toString());
+      expect(localeResponse?.status(), "localized preview").toBe(200);
+      for (const host of ["mail.localhost", "auth.localhost", "admin.localhost"]) {
+        const status = await new Promise<number>((resolve, reject) => {
+        https.get({ hostname: "theme-functional-proxy", servername: host, port: 443, path: "/api/v1/messages",
+          headers: { Host: host }, rejectUnauthorized: false },
+          (res) => { res.resume(); resolve(res.statusCode ?? 0); }).on("error", reject);
+        });
+        expect(status, host).toBe(403);
+      }
+    });
+  `),
+  );
+  const number = latest() + 1;
+  await upload("functional-network.tar.gz", archive(files));
+  await expect(page.getByText(`Revision #${number} is being built and checked.`)).toBeVisible();
+  const result = await settled(number);
+  expect(result.failures).toEqual([]);
+  expect(result.status).toBe("ready");
+  const [functional] = sql(`SELECT s->>'status' FROM theme_revisions r,
+    jsonb_array_elements(r.checks->'steps') s
+    WHERE r.tenant_id = ${DEMO} AND r.number = ${number} AND s->>'name' = 'functional'`);
+  expect(functional).toBe("passed");
+});
+
 test("contract violations and a network attempt fail the build with reasons", async () => {
   test.setTimeout(6 * 60_000);
   const cases: [string, (f: Map<string, Buffer>) => void, RegExp][] = [

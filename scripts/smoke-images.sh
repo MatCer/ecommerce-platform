@@ -94,7 +94,9 @@ fi
 
 if [[ -n $builder_image ]]; then
   sandbox_env=(-e SANDBOX_IMAGE="$builder_image" -e SANDBOX_LABEL=smoke -e SANDBOX_VOLUME=smoke_theme-work
-    -e SANDBOX_NETWORKS=none -e CHECK_NETWORK=smoke_theme-check)
+    -e SANDBOX_NETWORKS=none,smoke_theme-check,smoke_theme-functional
+    -e CHECK_NETWORK=smoke_theme-check -e FUNCTIONAL_NETWORK=smoke_theme-functional
+    -e FUNCTIONAL_PROXY_HOST=preview-only)
   docker run -d --name "$builder" -p 127.0.0.1::4020 "${sandbox_env[@]}" \
     -e API_ORIGIN=http://127.0.0.1:1 -e THEME_BUILDER_TOKEN=smoke-builder-token-0123456789abcdef0123 \
     -e DOCKER_PROXY_URL=http://127.0.0.1:1 "$builder_image" >/dev/null

@@ -19,6 +19,7 @@ packages/         shared TS config, generated API clients, storefront SDK, theme
 apps/auth         Better Auth (Hono): staff sign-in, magic links, TOTP, EdDSA JWTs + JWKS
 apps/mocks        third-party API stand-ins (incl. a DNS TXT stub)
 apps/edge         storefront edge: Node + Miniflare gateway (tenancy, cache, headers, checkout handoff)
+apps/theme-builder disposable theme build/check pipeline and Docker policy proxy
 apps/checkout     platform checkout app (Astro + Solid) served on checkout.<shop>
 themes/default    default Astro + Solid theme (the template merchants fork)
 docker/           Dockerfiles, Caddyfile, Postgres init script
@@ -71,6 +72,10 @@ after the method's payment window (fake: 60 min) and release their stock.
 AI helpers (WP22) use the Anthropic API when `ANTHROPIC_API_KEY` is set in `.env`; without it
 the admin runs them against a deterministic fake provider ("Demo AI"). Quotas, the threat model
 and a manual smoke test with a real key: [`docs/decisions/ai-helpers.md`](docs/decisions/ai-helpers.md).
+Theme editing uses the fake agent locally: Admin → Theme → Edit with AI creates a checked
+revision, shows its diff and report, then requires acceptance before publish. M3 acceptance
+coverage is mapped in [`docs/acceptance/m3.md`](docs/acceptance/m3.md); production sandbox and
+provider requirements are in [`docs/runbook.md`](docs/runbook.md).
 
 Payment adapters (WP11):
 - **Stripe**: without `STRIPE_SECRET_KEY` the API talks to stripe-mock and the order page shows

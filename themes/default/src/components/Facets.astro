@@ -89,7 +89,9 @@ const clearHref = page.category
   <!-- Without JS sort needs a submit; with JS it submits on change (no button, no layout shift). -->
   <noscript><button type="submit" class="btn btn-secondary min-h-10">{t("listing.apply")}</button></noscript>
 </form>
-<FacetForm client:idle form="facets" />
+{/* client:load, not idle: until it runs, Escape / outside click cannot close an open
+    dropdown, which then covers the active-filter chips below the bar. */}
+<FacetForm client:load form="facets" />
 
 {
   selected.length > 0 && (

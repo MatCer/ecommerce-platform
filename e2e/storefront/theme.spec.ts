@@ -89,19 +89,27 @@ test.describe("browsing", () => {
 
 test("filters are a GET form: facet, active chip, noindex, removal", async ({ page, context }) => {
   await decideConsent(context);
+  // A main thread that never goes idle (slow phone, busy CI): the filter behaviour must still
+  // arrive, or an open dropdown can never be dismissed and covers the active-filter chips.
+  await context.addInitScript(() => {
+    window.requestIdleCallback = () => 0;
+  });
+  const enhanced = () => expect(page.locator("#facets")).toHaveAttribute("data-enhanced", "");
   await page.goto(`${CZ}/c/obleceni`);
-  await hydrated(page);
+  await enhanced();
   const size = page.getByRole("group", { name: "Velikost" });
   await page.locator("summary", { hasText: "Velikost" }).click();
   await size.getByText("M", { exact: true }).click();
   await expect(page).toHaveURL(/f\.opt\.velikost=m/);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex,follow");
   await expect(page.getByRole("link", { name: "Odebrat filtr: Velikost M" })).toBeVisible();
+  await enhanced();
   // Zero-match values are disabled, never hidden (A23).
   await page.locator("summary", { hasText: "Barva" }).click();
   const colours = page.getByRole("group", { name: "Barva" }).getByRole("checkbox");
   expect(await colours.count()).toBeGreaterThan(1);
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("group", { name: "Barva" })).toBeHidden();
   await page.getByRole("link", { name: "Odebrat filtr: Velikost M" }).click();
   await expect(page).toHaveURL(`${CZ}/c/obleceni`);
   await expect(page.locator('meta[name="robots"]')).toHaveCount(0);

@@ -191,7 +191,6 @@ async fn ses_webhook(
             tracing::warn!(
                 kind = %envelope.kind,
                 topic = %envelope.topic_arn,
-                subscribe_url = envelope.subscribe_url.as_deref().unwrap_or_default(),
                 "SNS subscription message: confirm it manually if the topic is ours"
             );
             Ok(Json(MailEventReceived { applied: false }))

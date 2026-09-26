@@ -645,6 +645,46 @@ async fn cancelling_a_paid_order_releases_stock_refunds_and_issues_a_credit_note
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_withdrawal_requests_issue_only_three_emails(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 16).await;
+    let s = setup(&runtime, "wp25-withdraw-quota").await;
+    let tenant = s.shop.tenant;
+    let (order, attempt) = place(&runtime, &s, MethodKind::BankTransfer).await;
+    pay(&runtime, tenant, attempt).await;
+    ship_and_deliver(&runtime, &s, order).await;
+    let number = run(&runtime, tenant, async |tx| {
+        Ok(orders::view(tx, order).await?.number)
+    })
+    .await
+    .unwrap();
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..12 {
+        let pool = runtime.clone();
+        let number = number.clone();
+        let market = s.shop.cz;
+        tasks.spawn(async move {
+            run(&pool, tenant, async |tx| {
+                let c = ctx(tx, market).await;
+                withdrawals::request_link(
+                    tx,
+                    &c,
+                    &LinkRequest {
+                        order_number: number,
+                        email: "jana@example.test".into(),
+                    },
+                )
+                .await
+            })
+            .await
+        });
+    }
+    while let Some(outcome) = tasks.join_next().await {
+        outcome.unwrap().unwrap();
+    }
+    assert_eq!(emails(&runtime, tenant, "withdrawal_link").await.len(), 3);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn withdrawal_link_declaration_receipt_restock_and_refund(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let s = setup(&runtime, "wp12-withdraw").await;

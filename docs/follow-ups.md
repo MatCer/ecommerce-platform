@@ -9,14 +9,14 @@
 | WP4 | A sale change recomputes every priced variant of the tenant; narrow it for very large catalogs | later (perf) |
 | WP4 | Price history returns the full timeline per variant (no pagination) | later |
 | WP5 | The staff table has no invitation-accepted state: §5.3 defines no invitation lifecycle, and acceptance happens in the auth service (its own schema and DB role), so the API would need a first-sign-in marker on `staff_members` written from the staff extractor. | later (staff UX) |
-| WP5 | Moved: a deterministic >15 min reauth / tenant-switch-in-flight browser test needs an auth test clock and request barrier; unit freshness and tenant RLS tests exist, but this browser race remains for security acceptance. | WP25 |
+| WP5 | Deterministic >15 min reauth / tenant-switch-in-flight browser race remains. API integration tests cover stale JWT denial and tenant membership/RLS; a browser race needs a dev auth clock plus request barrier. | deferred: identity/security owner, before launch |
 | WP5 | ~~Quick e2e reruns share the auth IP bucket~~: signed per-context local identities separate buckets; the secret is refused outside `APP_ENV=dev`. | done (WP15) |
 | WP6 | ~~Artifact builds are not reproducible~~ done in WP23: fixed `ASTRO_KEY` for the default artifact, per-tenant HMAC-derived key for tenant builds | done |
 | WP6 | Moved: cart creation and handoff still lack `Idempotency-Key` replay after a lost response. One order per cart and idempotent placement prevent duplicate charges; retrying a lost handoff needs a new cart. This is recovery work beyond the local happy-path gate. | later (checkout reliability) |
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | ~~Payment/carrier marks in `/shop` are generic catalog text~~: `trust.payment_methods`/`trust.carriers` list what checkout offers in the market (text marks, no logos). Still open: the checkout links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale | WP12 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
-| WP9/WP18 | Bounces/complaints arrive at `POST /webhooks/ses` (SNS envelope, HTTP Basic `MAIL_EVENTS_SECRET`); SNS message signature verification (SignatureVersion 2, cert URL pinned to `sns.<region>.amazonaws.com`, TopicArn check) is designed in `commerce::marketing::deliverability` but not built; subscription confirmations are only logged | pre-launch |
+| WP9/WP18/WP25 | Local SES/SNS fixture ingestion is Basic-authenticated. Production boot refuses `MAIL_EVENTS_SECRET` until signature, certificate URL, authorized topic, freshness and replay checks exist. Confirmation URLs are not logged. | deferred: mail integration owner, before SES launch |
 | WP10 | Stripe and bank transfer are configurable but not offered at checkout (no adapter); the order email has a bank-transfer placeholder | WP11 |
 | WP10 | COD cash rounding is not applied at placement (the tender is unknown until collection, A16) | WP11 |
 | WP10 | The Packeta widget key is a platform setting (`PACKETA_API_KEY`); per-tenant carrier credentials and verifying the chosen point against the Packeta API | WP12 |
@@ -53,7 +53,7 @@
 | WP22 | One entity per proposal: no "translate every product missing sk" batch job (bulk plans cover non-text fields) | later |
 | WP22 | The AI quota is a soft limit (concurrent calls may overshoot by one call); no superadmin UI for quotas (CLI `set-ai-quota`) | later (only if it matters) |
 | WP22 | Old `ai_proposals` / `ai_bulk_plans` rows are never purged | later (ops) |
-| WP23 | Sandboxes run under runc on the app host; prod should use gVisor/Firecracker on dedicated build hosts (the proxy would pin `Runtime`) | pre-launch |
+| WP23/WP25 | Build sandboxes run under runc on the app host; prod requires gVisor/Firecracker on dedicated build hosts (proxy-pinned `Runtime`). Functional checks now have a separate preview-only internal network in Compose. | deferred: platform infrastructure owner, before theme launch |
 | WP23 | Builder queue is in memory (concurrency 1): a builder restart drops queued builds; they fail after 30 min and must be re-created (no retry button yet) | later |
 | WP23 | Theme source archives and screenshots of old revisions are never deleted (small; artifacts are GC'd) | later (ops) |
 | WP23 | ~~`client:visible` lint~~ done in WP24 (`client-visible`, every use in `.astro`); still open: stale-preload lint, image-bytes budget, desktop CLS run in the gates | later |
@@ -70,7 +70,9 @@
 | WP18 | The marketing rate is one platform constant (500 messages per tenant and minute) and limits how fast campaign messages are queued, not SMTP itself (a backlog after an outage drains faster); per-tenant quotas, a delivery-time rate limit | later |
 | WP18 | ~~Subscriber import (CSV)~~ done in WP13b; the AI copy assist per segment (§11.5) | M3 |
 | WP18 | Segment purchase conditions use placed orders of the same address or linked customer; refunds are not netted in `total_spent` | later |
-| WP24 | The agent loop was exercised only with the scripted fake agent; run the manual smoke with a real `ANTHROPIC_API_KEY` (runbook §6d) and record pass rate, turns, repairs, tokens and cost per prompt (the `ai-edit-prompts.md` table) | pre-launch / WP25 |
+| WP24/WP25 | The agent loop is acceptance-tested with the scripted fake. Run the real `ANTHROPIC_API_KEY` smoke (runbook §6d) and record pass rate, turns, repairs, tokens and cost per prompt in `ai-edit-prompts.md`. | deferred: AI owner, before enabling real provider |
+| WP25 | Miniflare render timeout evicts the tenant instance; admission and the local edge container are bounded. Per-instance OS CPU/memory/process enforcement is unavailable, so this entrypoint refuses `APP_ENV=prod`. | deferred: platform infrastructure owner, before theme launch |
+| WP25 | Existing deployment logs from before WP25 may contain order/withdrawal capabilities. Locate and purge matching retained entries and revoke affected capabilities; the new log-capture regression proves current paths are safe. | deferred: deployment operations owner, before pilot access |
 | WP24 | AI runs have their own queue with 2 loops per worker process (constant); more concurrent runs wait queued. Make it configurable / a separate worker when many shops edit at once | later (scale-out) |
 | WP24 | A refused or cut-off (`max_tokens`) model response is metered but its content is not kept in the transcript | later |
 | WP24 | `ai_theme_runs` transcripts (the full API history, can be MBs) are kept indefinitely; add a retention rule to `ops.sweep` | later (ops) |

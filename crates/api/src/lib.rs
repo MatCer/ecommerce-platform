@@ -300,11 +300,17 @@ pub fn app(state: AppState, docs: bool) -> Router {
                                 .get(REQUEST_ID)
                                 .and_then(|v| v.to_str().ok())
                                 .unwrap_or_default();
-                            // Path only: query strings may carry tokens.
+                            // Route templates never include order/withdrawal capabilities.
+                            // Unmatched paths are attacker-controlled, so use a fixed label.
+                            let route = req
+                                .extensions()
+                                .get::<MatchedPath>()
+                                .map(MatchedPath::as_str)
+                                .unwrap_or("<unmatched>");
                             tracing::info_span!(
                                 "request",
                                 method = %req.method(),
-                                path = %req.uri().path(),
+                                path = route,
                                 request_id,
                             )
                         })

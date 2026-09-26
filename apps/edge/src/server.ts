@@ -13,6 +13,13 @@ function required(name: string): string {
 const artifactRoot = required("ARTIFACT_ROOT");
 const apiOrigin = required("API_ORIGIN");
 const serviceToken = required("INTERNAL_API_TOKEN");
+// Miniflare is the local test runtime. It cannot enforce per-isolate OS resource limits,
+// so production must use the managed Workers deployment instead of this Node entrypoint.
+if (process.env.APP_ENV !== "dev") {
+  throw new Error(
+    "Miniflare edge is local-only; production requires managed Workers runtime limits",
+  );
+}
 const e2eRateSecret = process.env.E2E_RATE_SECRET?.trim() || undefined;
 if (e2eRateSecret && process.env.APP_ENV !== "dev") {
   throw new Error("E2E_RATE_SECRET is allowed only when APP_ENV=dev");

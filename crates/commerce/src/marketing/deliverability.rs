@@ -15,14 +15,13 @@
 //!
 //! Authentication (API layer): the SNS subscription URL carries HTTP Basic credentials
 //! (`https://ses:<MAIL_EVENTS_SECRET>@api.example/webhooks/ses`, a documented SNS feature), and
-//! the endpoint is off without the secret. Production design, before real SES is enabled
-//! (pre-launch checklist): additionally verify the SNS message signature: accept only
+//! the endpoint is off without the secret. Production refuses to start with the secret until
+//! full SNS verification is implemented: accept only
 //! `SignatureVersion` 2 (RSA-SHA256), fetch `SigningCertURL` only when it is
 //! `https://sns.<region>.amazonaws.com/...pem` (through the SSRF-safe client, cached per URL),
 //! verify the signature over the canonical string of the message type, check `TopicArn`
 //! against the configured topic, and reject messages older than an hour. Subscription
-//! confirmations are never followed automatically: the `SubscribeURL` is logged for the
-//! operator.
+//! confirmations are never followed automatically; subscription URLs are never logged.
 
 use platform::Error;
 use platform::db::tenant_tx;

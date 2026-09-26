@@ -84,7 +84,8 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
     heavier file); change the grid → change the `sizes` line;
   - one web font (Archivo, headings + prices); body text uses the system stack;
   - prefer HTML/CSS (`<details>`, `popover`, `<dialog>`, `:has()`) over an island; an island
-    that renders nothing on the server must use `client:idle`, never `client:visible`;
+    that renders nothing on the server must use `client:idle` (or `client:load` when it
+    handles input the user can hit straight away, like `FacetForm`), never `client:visible`;
   - UI most visitors never open loads on demand with a plain `import()` (see `MiniCart` →
     `CartDrawer`); not Solid's `lazy()`, which adds ~1 kB of runtime to every page, and no
     CSS import inside the lazy module (it would pull in Vite's preload runtime);
