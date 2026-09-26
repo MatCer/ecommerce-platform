@@ -209,6 +209,7 @@ jobs:
           EOF
       - run: make up
       - run: make seed
+      - run: bash scripts/seed-m2-perf-review.sh
       - run: make perf
       - name: Browser acceptance with queue evidence
         run: |

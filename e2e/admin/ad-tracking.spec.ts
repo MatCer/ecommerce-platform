@@ -86,7 +86,7 @@ async function withdrawAds(p: Page) {
 }
 
 /** A paid CZ order with home delivery (Czech crowns, so Sklik takes it too). */
-async function placeOrder(p: Page, email: string): Promise<void> {
+async function placeOrder(p: Page, email: string): Promise<string> {
   const model = (await (
     await p.request.get(`${CZ}/_p/public/pages/product/tricko-henley`)
   ).json()) as { product: { variants: { id: string }[] } };
@@ -128,6 +128,7 @@ async function placeOrder(p: Page, email: string): Promise<void> {
   await p.waitForURL(/\/_p\/fake-pay\//);
   await p.getByRole("button", { name: "Pay", exact: true }).click();
   await p.waitForURL(/\/o\/[0-9a-f]{64}$/);
+  return sql(`SELECT number FROM orders WHERE email='${email}' ORDER BY placed_at DESC LIMIT 1`);
 }
 
 const platformRow = (name: RegExp) =>
@@ -248,7 +249,7 @@ test("only a visitor who allowed ads reaches the platforms, with hashed identifi
   const refused = `ads-no-${run}@example.test`;
   const allowed = `ads-yes-${run}@example.test`;
   const no = await shopper(browser, false);
-  await placeOrder(no, refused);
+  const refusedOrder = await placeOrder(no, refused);
   await no.context().close();
 
   const yes = await shopper(browser, true);
@@ -258,30 +259,29 @@ test("only a visitor who allowed ads reaches the platforms, with hashed identifi
     return (await fetch("/_p/e", { method: "POST", body })).status;
   });
   expect(beacon).toBe(204);
-  await placeOrder(yes, allowed);
+  const allowedOrder = await placeOrder(yes, allowed);
   await yes.context().close();
 
-  await expect
-    .poll(async () => (await accepted(request, "sklik")).includes(sha(allowed)), {
-      timeout: 90_000,
-      intervals: [1_000],
-    })
-    .toBe(true);
-  await expect
-    .poll(async () => (await accepted(request, "meta")).includes(sha(allowed)), {
-      timeout: 60_000,
-      intervals: [1_000],
-    })
-    .toBe(true);
-  await expect
-    .poll(async () => (await accepted(request, "google")).includes(sha(allowed)), {
-      timeout: 60_000,
-      intervals: [1_000],
-    })
-    .toBe(true);
+  for (const platform of ["sklik", "meta", "google", "ga4"]) {
+    await expect
+      .poll(() => purchaseDelivery(allowed, platform === "google" ? "google_ads" : platform), {
+        timeout: 90_000,
+        intervals: [1_000],
+      })
+      .toBe(`succeeded:${platform === "ga4" ? 204 : 200}`);
+  }
+  const purchaseFor = (platform: string, number: string) =>
+    recorded(request, platform).then((rows) =>
+      rows.filter((r) => r.status < 300 && JSON.stringify(r.body).includes(`"${number}"`)),
+    );
+  for (const platform of ["sklik", "meta", "google", "ga4"]) {
+    await expect.poll(async () => (await purchaseFor(platform, allowedOrder)).length).toBe(1);
+    expect(purchaseDelivery(refused, platform === "google" ? "google_ads" : platform)).toBe("");
+    expect(await purchaseFor(platform, refusedOrder)).toEqual([]);
+  }
 
   const meta = (await recorded(request, "meta")).filter((r) => r.status < 300);
-  const purchase = meta
+  const purchase = (await purchaseFor("meta", allowedOrder))
     .map((r) => (r.body.data as Record<string, unknown>[])[0] ?? {})
     .find((e) => e.event_name === "Purchase");
   expect(purchase).toMatchObject({ action_source: "website" });
@@ -290,15 +290,16 @@ test("only a visitor who allowed ads reaches the platforms, with hashed identifi
   expect(user.ph).toEqual([sha("420606666666")]); // Meta: digits with the country code
   expect(user.client_user_agent).toBeTruthy();
   expect(meta.some((r) => JSON.stringify(r.body).includes('"PageView"'))).toBe(true);
-  const sklik = (await recorded(request, "sklik")).find((r) => r.status < 300);
+  const sklik = (await purchaseFor("sklik", allowedOrder))[0];
   // Seznam: E.164 with +.
   expect(JSON.stringify(sklik?.body)).toContain(`"ph":"${sha("+420606666666")}"`);
-  const ga4 = await accepted(request, "ga4");
+  const ga4 = JSON.stringify((await purchaseFor("ga4", allowedOrder))[0]?.body);
   expect(ga4).toContain('"purchase"');
+  expect(ga4).toContain(`"transaction_id":"${allowedOrder}"`);
   expect(ga4).not.toContain("@"); // no PII to GA4
 
   // Nothing of the visitor who refused ads, and no raw addresses anywhere.
-  for (const p of ["meta", "google", "sklik"]) {
+  for (const p of ["meta", "google", "sklik", "ga4"]) {
     const all = await accepted(request, p);
     expect(all).not.toContain(sha(refused));
     expect(all).not.toContain(allowed);

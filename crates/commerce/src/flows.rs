@@ -468,7 +468,7 @@ async fn execute_cart(
         .bind(tx.tenant_id()).bind(&minted.hash).bind(cart_id).bind(now+Duration::days(30)).execute(&mut **tx).await?;
     let coupon = if step as usize == config.delays_hours.len() - 1 {
         if let Some(percent) = config.coupon_percent {
-            Some(issue_coupon(tx, id, percent, now).await?)
+            Some(issue_coupon(tx, id, percent).await?)
         } else {
             None
         }
@@ -665,12 +665,7 @@ pub async fn delivery_refusal(
     Ok(None)
 }
 
-async fn issue_coupon(
-    tx: &mut TenantTx,
-    run: Uuid,
-    percent: i32,
-    now: DateTime<Utc>,
-) -> Result<String, Error> {
+async fn issue_coupon(tx: &mut TenantTx, run: Uuid, percent: i32) -> Result<String, Error> {
     if let Some(code) = sqlx::query_scalar("SELECT coupon_code FROM flow_runs WHERE id=$1")
         .bind(run)
         .fetch_one(&mut **tx)
@@ -678,6 +673,9 @@ async fn issue_coupon(
     {
         return Ok(code);
     }
+    // The dev test clock schedules the flow, but checkout validates coupons against wall time.
+    // Start the redemption window when the code is actually issued, including in time-travel tests.
+    let issued_at = Utc::now();
     for _ in 0..5 {
         let code = format!(
             "FLOW{}",
@@ -686,7 +684,7 @@ async fn issue_coupon(
         let inserted: Option<String> = sqlx::query_scalar("INSERT INTO coupons(tenant_id,code,kind,value,usage_limit,starts_at,ends_at,published)
             VALUES($1,$2,'percent',$3,1,$4,$5,false) ON CONFLICT(tenant_id,code) DO NOTHING RETURNING code")
             .bind(tx.tenant_id()).bind(&code).bind(i64::from(percent)*100)
-            .bind(now).bind(now+Duration::days(14)).fetch_optional(&mut **tx).await?;
+            .bind(issued_at).bind(issued_at+Duration::days(14)).fetch_optional(&mut **tx).await?;
         if let Some(code) = inserted {
             sqlx::query("UPDATE flow_runs SET coupon_code=$2 WHERE id=$1")
                 .bind(run)

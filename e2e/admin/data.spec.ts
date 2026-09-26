@@ -6,7 +6,9 @@
  */
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { expectAccessible, magicLink, run, useEnglish } from "./support.ts";
+import { CZ, mail, newPage } from "../checkout/support";
+import { rateHeaders } from "../rate-client";
+import { expectAccessible, magicLink, run, sql, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -192,5 +194,60 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
     expect((await erased).status()).toBe(200);
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText(/^Erased:/).first()).toBeVisible();
+  }
+});
+
+test("GDPR access and erasure include an M2 product watch", async ({ page, browser }) => {
+  const email = `privacy-watch-${run}@example.test`;
+  const variant = sql(`SELECT v.id FROM variants v JOIN product_translations t
+    ON t.product_id=v.product_id WHERE t.slug='cepice-s-bambuli' AND t.locale='cs'
+    ORDER BY v.position LIMIT 1`);
+  const shopper = await newPage(browser);
+  try {
+    const watch = await shopper.request.post(`${CZ}/_p/watch`, {
+      headers: { origin: CZ, ...rateHeaders(shopper) },
+      data: { variant_id: variant, kind: "back_in_stock", email },
+    });
+    expect(watch.status()).toBe(202);
+    const confirmation = await mail(email, "Potvrďte upozornění na produkt");
+    const link = confirmation.Text.match(
+      /https?:\/\/[^\s]+\/watch\/confirm\?token=[0-9a-f]{64}/,
+    )?.[0];
+    if (!link) throw new Error("watch confirmation link missing");
+    await shopper.goto(link);
+    await shopper.getByRole("button", { name: "Potvrdit" }).click();
+    await expect(shopper.getByRole("status")).toContainText("potvrzené");
+
+    await signIn(page, "owner@lnen.example");
+    await nav(page, "Export and privacy").click();
+    await page.getByLabel("Person's email").fill(email);
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download their data" }).click();
+    const doc = JSON.parse(readFileSync(await (await download).path(), "utf8")) as {
+      flow_watches: { email: string; kind: string; status: string }[];
+    };
+    expect(doc.flow_watches).toEqual([
+      expect.objectContaining({ email, kind: "back_in_stock", status: "confirmed" }),
+    ]);
+
+    await page.getByRole("button", { name: "Erase their data" }).click();
+    const dialog = page.getByRole("dialog", { name: "Erase personal data?" });
+    await dialog.getByLabel("Email again").fill(email);
+    const response = page.waitForResponse(
+      (r) => r.url().endsWith("/admin/v1/privacy/erasure") && r.request().method() === "POST",
+    );
+    await dialog.getByRole("button", { name: "Erase their data" }).click();
+    expect((await response).status()).toBe(200);
+    await expect(dialog).toBeHidden();
+    expect(sql(`SELECT count(*) FROM flow_watches WHERE email='${email}'`)).toBe("0");
+    await page.getByLabel("Person's email").fill(email);
+    const after = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download their data" }).click();
+    const erased = JSON.parse(readFileSync(await (await after).path(), "utf8")) as {
+      flow_watches: unknown[];
+    };
+    expect(erased.flow_watches).toEqual([]);
+  } finally {
+    await shopper.context().close();
   }
 });
