@@ -144,6 +144,15 @@ const MAX_EVENTS_BODY = 64 * 1024;
 const MAX_RECOMMENDATIONS_QUERY = 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
+/**
+ * Binds a checkout handoff to the browser that started it (WP26). Scoped to the shop host so
+ * `checkout.<shop_host>` receives it; a cross-site page cannot plant it, so a link carrying an
+ * attacker's `h` finds no matching cookie. Sec-Fetch-Site cannot do this: Firefox sends
+ * `cross-site` or nothing on the shop's own 303.
+ */
+const HANDOFF_COOKIE = "__Secure-handoff";
+const handoffCookie = (shopHost: string, value: string, maxAge: number) =>
+  `${HANDOFF_COOKIE}=${value}; Domain=${shopHost}; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 /** Customer session (A1): checkout origin only, host-only via the `__Host-` prefix. */
 const SESSION_COOKIE = "__Host-sid";
 const SESSION_MAX_AGE = 30 * 86_400;
@@ -965,16 +974,15 @@ ${
       });
     }
     const checkoutHost = `checkout.${site.shop_host}`;
-    return new Response(null, {
-      status: 303,
-      headers: {
-        location: `${scheme}://${checkoutHost}${port}/start?h=${h}`,
-        "cache-control": "no-store",
-        "referrer-policy": "no-referrer",
-        // The API rotated the capability (A4); the shop-side token is dead now.
-        "set-cookie": CLEAR_CART_COOKIE,
-      },
+    const headers = new Headers({
+      location: `${scheme}://${checkoutHost}${port}/start?h=${h}`,
+      "cache-control": "no-store",
+      "referrer-policy": "no-referrer",
     });
+    // The API rotated the capability (A4); the shop-side token is dead now.
+    headers.append("set-cookie", CLEAR_CART_COOKIE);
+    headers.append("set-cookie", handoffCookie(site.shop_host, h, 120));
+    return new Response(null, { status: 303, headers });
   }
 
   async function publicProxy(site: Site, req: Request, url: URL, rest: string): Promise<Response> {
@@ -1558,12 +1566,13 @@ ${
     if (nl?.[1]) return newsletterLinks(site, req, url, nl[1], host, port);
     if (p === "/start") {
       const h = url.searchParams.get("h") ?? "";
-      // Only the shop's own 303 (a same-site navigation) may redeem a handoff. A link planted by
-      // another site (cross-site) or pasted/opened from mail (none) is refused, so an attacker
-      // cannot push their cart into a victim's checkout.
-      const fetchSite = req.headers.get("sec-fetch-site");
+      // Only the browser that got the shop's 303 holds the matching handoff cookie. A link
+      // planted by another site or pasted from mail is refused without burning the token, so an
+      // attacker cannot push their cart into a victim's checkout.
+      const bound = Buffer.from(readCookie(req.headers, HANDOFF_COOKIE) ?? "");
+      const given = Buffer.from(h);
       const redeemable =
-        req.method === "GET" && (fetchSite === "same-site" || fetchSite === "same-origin");
+        req.method === "GET" && given.length === bound.length && timingSafeEqual(given, bound);
       let cartToken: string | undefined;
       if (redeemable && TOKEN_RE.test(h)) {
         // Bound to this tenant and market by the API: another shop's checkout cannot redeem it.
@@ -1586,19 +1595,22 @@ ${
               "content-type": "text/html; charset=utf-8",
               "cache-control": "no-store",
               "referrer-policy": "no-referrer",
+              "set-cookie": handoffCookie(site.shop_host, "", 0),
             },
           },
         );
       }
-      return new Response(null, {
-        status: 303,
-        headers: {
-          location: "/",
-          "set-cookie": `${CHECKOUT_CART_COOKIE}=${cartToken}; Path=/; HttpOnly; Secure; SameSite=Lax`,
-          "cache-control": "no-store",
-          "referrer-policy": "no-referrer",
-        },
+      const headers = new Headers({
+        location: "/",
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
       });
+      headers.append(
+        "set-cookie",
+        `${CHECKOUT_CART_COOKIE}=${cartToken}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+      );
+      headers.append("set-cookie", handoffCookie(site.shop_host, "", 0));
+      return new Response(null, { status: 303, headers });
     }
     if (p === "/_p/tokens.css") {
       if (!site.theme_artifact) return text(404, "Not found");

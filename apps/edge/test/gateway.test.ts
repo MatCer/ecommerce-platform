@@ -514,7 +514,6 @@ describe("artifacts: assets, publish, rollback, eviction, restart (A22)", () => 
 describe("cart capability and checkout handoff (A1, A4)", () => {
   const shop = "http://demo.localhost:8280";
   const origin = { origin: shop };
-  const sameSite = { "sec-fetch-site": "same-site" };
 
   test("state-changing /_p requests must be same-origin", async () => {
     const res = await get(
@@ -600,22 +599,38 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     });
     expect(api.calls.at(-1)?.headers["x-cart-token"]).toBe("carttoken_00000000000000000001");
     expect(start.headers.get("cache-control")).toBe("no-store");
-    expect(start.headers.get("set-cookie")).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
-
-    // Wrong host cannot redeem it.
+    const setCookies = start.headers.getSetCookie();
+    expect(setCookies[0]).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
     const h = new URL(location).searchParams.get("h");
-    // Planted links (cross-site) and pasted/mail links (none) cannot redeem, and do not burn it.
+    // WP26: the handoff is bound to this browser by a cookie the checkout subdomain receives.
+    expect(setCookies[1]).toBe(
+      `__Secure-handoff=${h}; Domain=demo.localhost; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=120`,
+    );
+    const bound = { cookie: `__Secure-handoff=${h}` };
+
+    // Planted links (no or another handoff cookie) cannot redeem, and do not burn it.
+    const calls = api.calls.length;
     expect((await get(location, { "sec-fetch-site": "cross-site" })).status).toBe(400);
-    expect((await get(location, { "sec-fetch-site": "none" })).status).toBe(400);
-    expect((await get(location)).status).toBe(400);
-    const exchanged = await get(location, sameSite);
+    expect((await get(location, { "sec-fetch-site": "same-site" })).status).toBe(400);
+    const planted = await get(location, {
+      cookie: "__Secure-handoff=handofftoken_99999999999999999999",
+    });
+    expect(planted.status).toBe(400);
+    expect(planted.headers.get("set-cookie")).toMatch(
+      /^__Secure-handoff=; Domain=demo\.localhost; Path=\/start; .*Max-Age=0$/,
+    );
+    expect(api.calls.length).toBe(calls);
+    // Firefox sends no (or a `cross-site`) Sec-Fetch-Site on the shop's 303: the cookie decides.
+    const exchanged = await get(location, bound);
     expect(exchanged.status).toBe(303);
     expect(exchanged.headers.get("location")).toBe("/");
-    expect(exchanged.headers.get("set-cookie")).toBe(
+    expect(exchanged.headers.getSetCookie()).toEqual([
       "__Host-cart=checkouttoken_000000000001; Path=/; HttpOnly; Secure; SameSite=Lax",
-    );
-    expect((await get(location, sameSite)).status).toBe(400); // single use
-    expect((await get(`http://checkout.other.localhost/start?h=${h}`, sameSite)).status).toBe(400);
+      "__Secure-handoff=; Domain=demo.localhost; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+    ]);
+    expect((await get(location, bound)).status).toBe(400); // single use
+    // Wrong host cannot redeem it.
+    expect((await get(`http://checkout.other.localhost/start?h=${h}`, bound)).status).toBe(400);
 
     // The checkout app reads the cart through its own binding with the checkout-scoped token.
     api.calls.length = 0;
