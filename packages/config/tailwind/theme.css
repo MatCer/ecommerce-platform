@@ -1,153 +1,273 @@
 /*
- * Platform UI design tokens (admin SPA, later the checkout app), as a Tailwind 4 theme.
+ * Platform UI design tokens (admin SPA), as a Tailwind 4 theme.
  * Usage in an app stylesheet:
  *   @import "tailwindcss";
  *   @import "@platform/config/tailwind/theme.css";
  *
- * Direction: "control room" (operator UI optimised for the hundredth visit), tuned calmer:
- * cool neutral surfaces, colour only as meaning (one interactive blue + five status hues,
- * each with ONE meaning: success = complete/active, warning = needs attention,
- * error = broken/failed, info = in progress, neutral = inactive/draft), 1px rules instead of
- * shadows, a 4px grid, 32px controls and rows, instant state changes.
+ * Direction: GitLab's Pajamas design system (design.gitlab.com, values from @gitlab/ui 137 /
+ * @gitlab/svgs tokens). Light neutral chrome (#f7f7f5 sidebar and top bar) around a white
+ * content panel; warm neutrals for text; near-black primary actions and selected controls;
+ * blue only for links, focus and "info"; four status hues with one meaning each
+ * (success = complete/active, warning = needs attention, error = broken/failed,
+ * info = in progress, neutral = inactive/draft). 1px borders, 8px control radius,
+ * 12px cards, 16px modals, shadows only on overlays. 4px/8px grid, 32px medium and 24px small
+ * controls, 14px body text. See docs/design/pajamas.md.
  * Light and dark are peers: `.dark` on <html> re-points the semantic tokens.
- * Contrast ratios in the comments are WCAG 2.x against the page ground of the same mode.
+ * Contrast (WCAG 2.x) is noted against --background, and against --subtle where the token
+ * also sits on the chrome. Verified with scripts in the design doc.
  */
 
 :root {
-  --radius: 0.375rem;
-
   /* Rhythm (4px grid). */
-  --control-h: 2rem; /* 32px buttons, inputs; >= 24px target size (WCAG 2.2 SC 2.5.8) */
-  --row-h: 2.25rem; /* 36px table rows */
-  --sidebar-w: 15rem;
+  --control-h: 2rem; /* 32px medium buttons, inputs; >= 24px target size (WCAG 2.2 SC 2.5.8) */
+  --control-h-sm: 1.5rem; /* 24px small buttons */
+  --row-h: 2.5rem; /* 40px table rows */
+  --sidebar-w: 16rem; /* super sidebar */
 
-  /* Light surfaces */
-  --background: oklch(0.985 0.002 260); /* page ground */
-  --foreground: oklch(0.205 0.006 260); /* ink, 17.2:1 */
-  --card: oklch(1 0 0); /* sidebar, panels, inputs */
-  --muted: oklch(0.967 0.003 260); /* header rows, hover */
-  --muted-foreground: oklch(0.5 0.012 260); /* labels, 5.8:1 */
-  --faint-foreground: oklch(0.52 0.012 260); /* timestamps, hints; 5.3:1 */
-  --border: oklch(0.905 0.004 260);
-  --border-strong: oklch(0.82 0.006 260);
-  --input: oklch(0.72 0.008 260); /* control outline, 3.1:1 (SC 1.4.11) */
+  /* Surfaces (light). Pajamas neutral scale: 0 #fff, 10 #f7f7f5, 50 #ecebea, 100 #dcdbd9,
+   * 200 #c1bfbe, 400 #8a8888, 500 #747273, 600 #646163, 700 #4d4b4e, 800 #3a383d, 950 #18171d */
+  --background: #fff; /* content panel, cards */
+  --subtle: #f7f7f5; /* chrome: sidebar, top bar, card headers, table heads */
+  --card: #fff; /* raised surfaces: dropdowns, modals, popovers */
+  --control-bg: #fff; /* inputs, selects, checkboxes */
+  --muted: rgb(5 5 6 / 0.06); /* hover/active wash (Pajamas action-neutral hover) */
+  --selected: #dcdbd9; /* selected nav item */
+  --foreground: #3a383d; /* body text, 11.6:1 (10.8:1 on subtle) */
+  --heading: #18171d; /* headings, strong text, 17.9:1 */
+  --muted-foreground: #646163; /* secondary text, labels, 6.1:1 (5.7:1 on subtle) */
+  --faint-foreground: #6f6d6e; /* metadata, placeholders, 5.1:1 (4.8:1 on subtle); neutral-500 nudged darker for AA on the chrome */
+  --border: #dcdbd9; /* dividers, card outlines */
+  --border-strong: #c1bfbe; /* dropdown outline, default button outline */
+  --input: #8a8888; /* control outline, 3.5:1 (SC 1.4.11) */
+  --input-hover: #646163;
 
-  /* The only non-status colour: links, primary buttons, focus, selection. */
-  --accent-50: oklch(0.965 0.012 255);
-  --accent-600: oklch(0.545 0.155 255); /* fills, white label 5.0:1 */
-  --accent-700: oklch(0.47 0.145 255); /* link text, 6.6:1 */
-  --ring: oklch(0.545 0.155 255); /* focus ring, 4.8:1 */
+  /* Primary actions and selected controls (Pajamas "confirm"). */
+  --primary: #3a383d; /* white label 11.6:1 */
+  --primary-hover: #18171d;
+  --primary-foreground: #fff;
 
-  /* Status: 700 text on 50 fill (pills), 600 solid fill with white label. */
-  --success-50: oklch(0.965 0.022 150);
-  --success-600: oklch(0.545 0.125 150);
-  --success-700: oklch(0.47 0.105 150); /* 6.2:1 */
-  --warning-50: oklch(0.97 0.03 85);
-  --warning-700: oklch(0.5 0.105 65); /* 5.9:1 */
-  --error-50: oklch(0.965 0.016 20);
-  --error-600: oklch(0.55 0.19 25); /* destructive fill, white label 5.4:1 */
-  --error-700: oklch(0.49 0.16 25); /* 6.5:1 */
+  /* Blue: links, focus, info. */
+  --accent-50: #e9f3fc;
+  --accent-100: #cbe2f9;
+  --accent-600: #1f75cb; /* focus ring 4.7:1, rare fills */
+  --accent-700: #2f5ca0; /* link text, 6.7:1 (6.2:1 on subtle) */
+  --ring: #1f75cb;
+
+  /* Status: 700 text on 50 fill (alerts, inline notes, >= 5.9:1), 200 alert borders,
+   * 600 solid fills / icons. */
+  --success-50: #ecf4ee;
+  --success-200: #91d4a8;
+  --success-600: #108548;
+  --success-700: #306440;
+  --warning-50: #fdf1dd;
+  --warning-200: #e9be74;
+  --warning-600: #ab6100;
+  --warning-700: #894b16;
+  --error-50: #fcf1ef;
+  --error-200: #fcb5aa;
+  --error-600: #dd2b0e; /* destructive fill, white label 4.7:1 */
+  --error-700: #a32c12;
+  --danger-foreground: #fff;
   --info-50: var(--accent-50);
+  --info-200: #9dc7f1;
+  --info-600: #1f75cb;
   --info-700: var(--accent-700);
-  --neutral-50: oklch(0.955 0.003 260);
-  --neutral-700: oklch(0.47 0.01 260); /* 6.5:1 */
+  --neutral-50: #ecebea;
+  --neutral-200: #c1bfbe;
+  --neutral-600: #646163;
+  --neutral-700: #4d4b4e;
 
-  --shadow-overlay: 0 4px 16px oklch(0.205 0.006 260 / 0.16);
+  /* Badges (Pajamas): 100 fill with 700 text in light, >= 5.0:1. */
+  --badge-success-bg: #c3e6cd;
+  --badge-success-fg: #306440;
+  --badge-warning-bg: #f5d9a8;
+  --badge-warning-fg: #894b16;
+  --badge-error-bg: #fdd4cd;
+  --badge-error-fg: #a32c12;
+  --badge-info-bg: #cbe2f9;
+  --badge-info-fg: #2f5ca0;
+  --badge-neutral-bg: #dcdbd9;
+  --badge-neutral-fg: #4d4b4e;
+
+  /* Toasts are always dark (Pajamas). */
+  --toast-bg: #28272d;
+  --toast-fg: #fff;
+
+  --overlay: rgb(5 5 6 / 0.24); /* modal backdrop */
+  --shadow-overlay:
+    0 0 2px 0 rgb(5 5 6 / 0.16), 0 0 2px 0 rgb(5 5 6 / 0.16), 0 4px 12px 0 rgb(5 5 6 / 0.16);
 }
 
 .dark {
   color-scheme: dark;
-  --background: oklch(0.185 0.006 260);
-  --foreground: oklch(0.925 0.004 260); /* 14.9:1 */
-  --card: oklch(0.215 0.006 260);
-  --muted: oklch(0.25 0.007 260);
-  --muted-foreground: oklch(0.715 0.01 260); /* 7.4:1 */
-  --faint-foreground: oklch(0.62 0.01 260); /* 5.1:1 */
-  --border: oklch(0.29 0.008 260);
-  --border-strong: oklch(0.37 0.01 260);
-  --input: oklch(0.5 0.01 260); /* 3.2:1 */
+  --background: #18171d;
+  --subtle: #202025;
+  --card: #28272d;
+  --control-bg: rgb(5 5 6 / 0.4);
+  --muted: rgb(255 255 255 / 0.08);
+  --selected: #3a383d;
+  --foreground: #ecebea; /* 15.0:1 (13.6:1 on subtle) */
+  --heading: #fff;
+  --muted-foreground: #c1bfbe; /* 9.7:1 (8.9:1 on subtle) */
+  --faint-foreground: #a5a3a3; /* 7.1:1 (6.5:1 on subtle) */
+  --border: #3a383d;
+  --border-strong: #4d4b4e;
+  --input: #747273; /* 3.7:1 */
+  --input-hover: #a5a3a3;
 
-  --accent-50: oklch(0.27 0.035 255);
-  --accent-700: oklch(0.7 0.13 255); /* 7.0:1 */
-  --ring: oklch(0.7 0.13 255);
+  --primary: #ecebea; /* dark label 15.0:1 */
+  --primary-hover: #fff;
+  --primary-foreground: #18171d;
 
-  --success-50: oklch(0.26 0.03 150);
-  --success-700: oklch(0.76 0.15 150);
-  --warning-50: oklch(0.27 0.03 80);
-  --warning-700: oklch(0.79 0.13 80);
-  --error-50: oklch(0.26 0.035 25);
-  --error-700: oklch(0.72 0.16 25);
-  --info-50: oklch(0.27 0.035 255);
-  --info-700: oklch(0.7 0.13 255);
-  --neutral-50: oklch(0.25 0.007 260);
-  --neutral-700: oklch(0.72 0.01 260);
+  --accent-50: #1d283e;
+  --accent-100: #284779;
+  --accent-600: #428fdc; /* focus ring 5.3:1 */
+  --accent-700: #9dc7f1; /* link text 10.1:1 */
+  --ring: #428fdc;
 
-  --shadow-overlay: 0 4px 16px oklch(0 0 0 / 0.5);
+  --success-50: #1e3e28;
+  --success-200: #2f7549;
+  --success-600: #52b87a;
+  --success-700: #91d4a8; /* 6.9:1 on its 50 */
+  --warning-50: #532e16;
+  --warning-200: #995715;
+  --warning-600: #d99530;
+  --warning-700: #e9be74; /* 6.8:1 on its 50 */
+  --error-50: #582014;
+  --error-200: #f6806d;
+  --error-600: #f6806d; /* destructive fill, dark label 7.0:1 */
+  --error-700: #fcb5aa; /* 7.6:1 on its 50 */
+  --danger-foreground: #18171d;
+  --info-50: #1d283e;
+  --info-200: #2f68b4;
+  --info-600: #63a6e9;
+  --info-700: #9dc7f1;
+  --neutral-50: #28272d;
+  --neutral-200: #646163;
+  --neutral-600: #a5a3a3;
+  --neutral-700: #c1bfbe;
+
+  /* Badges: bright 300 fill with 950 text in dark, >= 5.7:1. */
+  --badge-success-bg: #52b87a;
+  --badge-success-fg: #17291c;
+  --badge-warning-bg: #d99530;
+  --badge-warning-fg: #382315;
+  --badge-error-bg: #f6806d;
+  --badge-error-fg: #3e1a14;
+  --badge-info-bg: #63a6e9;
+  --badge-info-fg: #1d283e;
+  --badge-neutral-bg: #a5a3a3;
+  --badge-neutral-fg: #18171d;
+
+  --toast-bg: #3a383d;
+  --toast-fg: #fff;
+
+  --overlay: rgb(0 0 0 / 0.64);
+  --shadow-overlay:
+    0 0 2px 0 rgb(5 5 6 / 0.4), 0 0 2px 0 rgb(5 5 6 / 0.4), 0 4px 12px 0 rgb(5 5 6 / 0.4);
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-subtle: var(--subtle);
   --color-card: var(--card);
+  --color-control: var(--control-bg);
   --color-muted: var(--muted);
+  --color-selected: var(--selected);
+  --color-foreground: var(--foreground);
+  --color-heading: var(--heading);
   --color-muted-foreground: var(--muted-foreground);
   --color-faint-foreground: var(--faint-foreground);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-input: var(--input);
+  --color-input-hover: var(--input-hover);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
   --color-accent-600: var(--accent-600);
   --color-accent-700: var(--accent-700);
   --color-ring: var(--ring);
   --color-success-50: var(--success-50);
+  --color-success-200: var(--success-200);
   --color-success-600: var(--success-600);
   --color-success-700: var(--success-700);
   --color-warning-50: var(--warning-50);
+  --color-warning-200: var(--warning-200);
+  --color-warning-600: var(--warning-600);
   --color-warning-700: var(--warning-700);
   --color-error-50: var(--error-50);
+  --color-error-200: var(--error-200);
   --color-error-600: var(--error-600);
   --color-error-700: var(--error-700);
+  --color-danger-foreground: var(--danger-foreground);
   --color-info-50: var(--info-50);
+  --color-info-200: var(--info-200);
+  --color-info-600: var(--info-600);
   --color-info-700: var(--info-700);
   --color-neutral-50: var(--neutral-50);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-600: var(--neutral-600);
   --color-neutral-700: var(--neutral-700);
+  --color-toast: var(--toast-bg);
+  --color-toast-foreground: var(--toast-fg);
+  --color-overlay: var(--overlay);
 
-  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  --font-sans:
+    "GitLab Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Ubuntu,
+    sans-serif;
+  --font-mono: "GitLab Mono", "JetBrains Mono", Menlo, "DejaVu Sans Mono", Consolas, monospace;
 
-  /* 13px is the working size; 12px the floor (metadata); 11px uppercase column labels only. */
+  /* Pajamas type scale: 14px body; 12px metadata; 16px h4 / modal titles; 24px page title. */
   --text-xs: 0.75rem;
-  --text-xs--line-height: 1.4;
-  --text-sm: 0.8125rem;
-  --text-sm--line-height: 1.45;
-  --text-base: 0.875rem;
-  --text-base--line-height: 1.5;
-  --text-lg: 1.25rem;
-  --text-lg--line-height: 1.3;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
 
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) * 1.5);
+  /* 4px chips, 8px controls/buttons/alerts/dropdowns, 12px cards, 16px modals. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 
   --shadow-overlay: var(--shadow-overlay);
 
   --spacing-control: var(--control-h);
+  --spacing-control-sm: var(--control-h-sm);
   --spacing-row: var(--row-h);
   --spacing-sidebar: var(--sidebar-w);
 }
 
 @layer base {
   html {
-    background: var(--background);
+    background: var(--subtle);
     color: var(--foreground);
     font-family: var(--font-sans);
     font-size: 100%;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
     font-size: var(--text-sm);
-    line-height: 1.45;
+    line-height: 1.25rem;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--heading);
   }
 
   :focus-visible {
@@ -172,15 +292,15 @@
   }
 }
 
+/* Numbers that line up in columns (prices, counts, dates). Pajamas keeps them in the text face. */
 @utility figures {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
+/* Small group label (sidebar sections, stat captions). */
 @utility col-label {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--muted-foreground);
 }
