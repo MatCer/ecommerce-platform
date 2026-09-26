@@ -149,7 +149,6 @@ export default function Addresses(props: {
                 </address>
                 <div class="flex gap-2">
                   <Button
-                   
                     onClick={() => open(a)}
                     aria-label={`${t(m, "address.edit")}: ${a.name}, ${a.street}`}
                   >

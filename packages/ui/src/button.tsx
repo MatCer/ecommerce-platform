@@ -28,10 +28,8 @@ const base =
 
 const styles: Record<ButtonVariant, Record<ButtonCategory, string>> = {
   default: {
-    primary:
-      "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
-    secondary:
-      "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
+    primary: "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
+    secondary: "border-border-strong bg-card text-foreground hover:bg-subtle active:bg-neutral-50",
     tertiary: "border-transparent text-foreground hover:bg-muted active:bg-muted",
   },
   confirm: {

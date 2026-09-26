@@ -8,7 +8,6 @@ export default function SignOut(props: { label: string }) {
   return (
     <HydratedControls class="inline-block">
       <Button
-       
         loading={busy()}
         onClick={async () => {
           setBusy(true);

@@ -119,11 +119,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
                   >
                     {t(m, "order.stripe_sim_succeed")}
                   </Button>
-                  <Button
-                   
-                    disabled={busy()}
-                    onClick={() => void simulate("failed")}
-                  >
+                  <Button disabled={busy()} onClick={() => void simulate("failed")}>
                     {t(m, "order.stripe_sim_fail")}
                   </Button>
                 </div>
@@ -150,7 +146,6 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
         {(a) => (
           <div>
             <Button
-             
               loading={busy()}
               onClick={() => void go(`${base}/payment-attempts/${a().id}/init`)}
             >
