@@ -3,7 +3,7 @@ import {
   Button,
   EmptyState,
   linkClass,
-  SegmentedControl,
+  SelectField,
   showToast,
   TextField,
   type Tone,
@@ -90,8 +90,9 @@ export default function Reviews() {
     <>
       <PageHeader title={t("reviews.title")} description={t("reviews.description")} />
       <div class="mb-4 flex flex-col gap-2">
-        <SegmentedControl
+        <SelectField
           hideLabel
+          class="w-full sm:w-60"
           label={t("reviews.status")}
           value={status()}
           options={[
