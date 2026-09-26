@@ -24,7 +24,9 @@ const { chromium } = createRequire(new URL("../e2e/package.json", import.meta.ur
   "@playwright/test",
 );
 const SHOP = "http://demo-sk.localhost:8080";
-const VW = "https://localhost:18222";
+// Unique per run: never touch another run's container; Docker picks a free loopback port.
+const CONTAINER = `autofill-vaultwarden-${process.pid}-${crypto.randomBytes(3).toString("hex")}`;
+let VW = "";
 const EMAIL = "jan@example.com";
 const PASSWORD = "Test-Password-123!";
 const ID = {
@@ -97,9 +99,9 @@ async function vault() {
     "run",
     "-d",
     "--name",
-    "wp26-vaultwarden",
+    CONTAINER,
     "-p",
-    "127.0.0.1:18222:80",
+    "127.0.0.1::80",
     "-v",
     `${dir}:/ssl:ro`,
     "-e",
@@ -110,12 +112,17 @@ async function vault() {
     'ROCKET_TLS={certs="/ssl/cert.pem",key="/ssl/key.pem"}',
     "vaultwarden/server",
   ]);
-  for (let i = 0; ; i++) {
+  created = true;
+  const port = spawnSync("docker", ["port", CONTAINER, "80/tcp"], { encoding: "utf8" })
+    .stdout.trim()
+    .split(":")
+    .pop();
+  VW = `https://localhost:${port}`;
+  for (const deadline = Date.now() + 60_000; ; ) {
     try {
-      if ((await fetch(`${VW}/alive`)).ok) break;
-    } catch {
-      if (i > 60) throw new Error("vaultwarden did not start");
-    }
+      if ((await fetch(`${VW}/alive`, { signal: AbortSignal.timeout(2000) })).ok) break;
+    } catch {}
+    if (Date.now() > deadline) throw new Error("vaultwarden did not start within 60 s");
     await new Promise((r) => setTimeout(r, 500));
   }
   const master = crypto.pbkdf2Sync(PASSWORD, EMAIL, 600000, 32, "sha256");
@@ -297,6 +304,17 @@ async function native() {
       selector: ship ? 'input[autocomplete="shipping name"]' : "input[name=name]",
     });
     const { node } = await cdp.send("DOM.describeNode", { nodeId });
+    const snapshot = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll("form input[name], form select[name]")]
+          .filter((e) => !["radio", "checkbox", "hidden"].includes(e.type))
+          .map((e) => ({
+            name: e.name,
+            autocomplete: e.getAttribute("autocomplete"),
+            value: e.value,
+          })),
+      );
+    const before = ship ? await snapshot() : [];
     const fields = {
       NAME_FULL: WANT.name,
       ADDRESS_HOME_STREET_ADDRESS: ID.address1,
@@ -313,21 +331,13 @@ async function native() {
     await page.waitForTimeout(1500);
     // With a delivery address, Chromium fills only the focused section: billing stays empty.
     if (ship) {
-      const rows = await page.evaluate(() =>
-        [...document.querySelectorAll("form input[name], form select[name]")]
-          .filter((e) => !["radio", "checkbox", "hidden"].includes(e.type))
-          .map((e) => ({
-            name: e.name,
-            autocomplete: e.getAttribute("autocomplete"),
-            value: e.value,
-          })),
-      );
+      const rows = await snapshot();
       console.log("Chromium native autofill, delivery section:");
       console.table(rows);
-      failed ||= rows.some((r) =>
+      failed ||= rows.some((r, i) =>
         r.autocomplete?.startsWith("shipping ")
           ? r.value !== WANT[r.name]
-          : r.name !== "country" && r.value !== "",
+          : r.value !== before[i]?.value,
       );
     } else await report("Chromium native address autofill:", page);
   } finally {
@@ -335,13 +345,29 @@ async function native() {
   }
 }
 
+let created = false;
+let cleaned = false;
+function cleanup() {
+  if (cleaned) return;
+  cleaned = true;
+  if (created) {
+    const rm = spawnSync("docker", ["rm", "-f", CONTAINER], { encoding: "utf8" });
+    if (rm.status !== 0) console.error(`could not remove ${CONTAINER}: ${rm.stderr.trim()}`);
+  }
+  rmSync(dir, { recursive: true, force: true });
+}
+for (const sig of ["SIGINT", "SIGTERM"])
+  process.on(sig, () => {
+    cleanup();
+    process.exit(130);
+  });
+
 try {
   await vault();
   await bitwarden();
   await native();
 } finally {
-  spawnSync("docker", ["rm", "-f", "wp26-vaultwarden"], { stdio: "ignore" });
-  rmSync(dir, { recursive: true, force: true });
+  cleanup();
 }
 console.log(failed ? "FAIL" : "PASS");
 process.exit(failed ? 1 : 0);
