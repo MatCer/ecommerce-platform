@@ -303,6 +303,7 @@ export default function CheckoutForm(props: {
         <TextField
           class="sm:col-span-2"
           label={t(m, "address.company")}
+          name="organization"
           autocomplete={`section-${idPrefix} organization`}
           value={a().company ?? ""}
           onChange={(v) => upd("company", v || null)}
@@ -310,6 +311,9 @@ export default function CheckoutForm(props: {
         <TextField
           class="sm:col-span-2"
           label={t(m, "address.street")}
+          // Plain names: Bitwarden ignores `section-*` autocomplete and would put the street
+          // into the city field (it matches on name/id/label keywords).
+          name="street-address"
           autocomplete={`section-${idPrefix} street-address`}
           required
           value={a().street}
@@ -318,6 +322,7 @@ export default function CheckoutForm(props: {
         />
         <TextField
           label={t(m, "address.postal_code")}
+          name="postal-code"
           autocomplete={`section-${idPrefix} postal-code`}
           required
           value={a().postal_code}
@@ -326,6 +331,7 @@ export default function CheckoutForm(props: {
         />
         <TextField
           label={t(m, "address.city")}
+          name="city"
           autocomplete={`section-${idPrefix} address-level2`}
           required
           value={a().city}

@@ -18,6 +18,16 @@ test("the shop cart reaches the checkout, and the handoff link is single use", a
   await toCheckout(page, SK, "tricko-oversize");
   await expect(page.getByRole("heading", { level: 1, name: "Pokladňa" })).toBeVisible();
   await expect(page.getByTestId("checkout-total")).toContainText("€");
+  // Password-manager autofill (Bitwarden) matches on names, not `section-*` autocomplete.
+  for (const [name, token] of [
+    ["street-address", "street-address"],
+    ["postal-code", "postal-code"],
+    ["city", "address-level2"],
+  ])
+    await expect(page.locator(`input[name="${name}"]`).first()).toHaveAttribute(
+      "autocomplete",
+      new RegExp(`${token}$`),
+    );
 
   expect(handoff).not.toBe("");
   await page.goto(handoff);
