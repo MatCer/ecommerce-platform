@@ -4,8 +4,8 @@
 export { Badge, type Tone } from "./badge.tsx";
 export {
   Button,
-  ButtonGroup,
   type ButtonCategory,
+  ButtonGroup,
   type ButtonProps,
   type ButtonSize,
   type ButtonStyle,
@@ -38,8 +38,8 @@ export {
   Collapse,
   linkClass,
   PageHeading,
-  type SegmentOption,
   SegmentedControl,
+  type SegmentOption,
 } from "./layout.tsx";
 export {
   ConfirmDialog,

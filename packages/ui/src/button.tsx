@@ -27,12 +27,15 @@ const base =
 
 const styles: Record<ButtonVariant, Record<ButtonCategory, string>> = {
   default: {
-    primary: "border-border-strong bg-background text-foreground hover:bg-subtle active:bg-neutral-50",
-    secondary: "border-border-strong bg-background text-foreground hover:bg-subtle active:bg-neutral-50",
+    primary:
+      "border-border-strong bg-background text-foreground hover:bg-subtle active:bg-neutral-50",
+    secondary:
+      "border-border-strong bg-background text-foreground hover:bg-subtle active:bg-neutral-50",
     tertiary: "border-transparent text-foreground hover:bg-muted active:bg-muted",
   },
   confirm: {
-    primary: "border-primary bg-primary text-primary-foreground hover:border-primary-hover hover:bg-primary-hover",
+    primary:
+      "border-primary bg-primary text-primary-foreground hover:border-primary-hover hover:bg-primary-hover",
     secondary: "border-primary bg-background text-foreground hover:bg-muted",
     tertiary: "border-transparent text-foreground hover:bg-muted",
   },
@@ -107,12 +110,11 @@ export function Button(props: ButtonProps) {
 /** Joined buttons (Pajamas button group): related actions or a small toggle set. */
 export function ButtonGroup(props: { label?: string; children: JSX.Element; class?: string }) {
   return (
-    <div
-      role="group"
+    <fieldset
       aria-label={props.label}
       class={`inline-flex [&>*:not(:first-child)]:-ml-px [&>*:not(:first-child)]:rounded-l-none [&>*:not(:last-child)]:rounded-r-none [&>*:focus-visible]:z-10 ${props.class ?? ""}`}
     >
       {props.children}
-    </div>
+    </fieldset>
   );
 }

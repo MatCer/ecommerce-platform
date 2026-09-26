@@ -1,45 +1,46 @@
 // GitLab icons (@gitlab/svgs, MIT). Only the icons listed here are bundled: add an import and
 // an entry to use another one (browse https://gitlab-org.gitlab.io/gitlab-svgs/).
-import homeSvg from "@gitlab/svgs/dist/sprite_icons/home.svg?raw";
-import listTaskSvg from "@gitlab/svgs/dist/sprite_icons/list-task.svg?raw";
-import packageSvg from "@gitlab/svgs/dist/sprite_icons/package.svg?raw";
-import tagSvg from "@gitlab/svgs/dist/sprite_icons/tag.svg?raw";
-import bullhornSvg from "@gitlab/svgs/dist/sprite_icons/bullhorn.svg?raw";
-import documentSvg from "@gitlab/svgs/dist/sprite_icons/document.svg?raw";
-import exportSvg from "@gitlab/svgs/dist/sprite_icons/export.svg?raw";
-import archiveSvg from "@gitlab/svgs/dist/sprite_icons/archive.svg?raw";
-import settingsSvg from "@gitlab/svgs/dist/sprite_icons/settings.svg?raw";
+
 import adminSvg from "@gitlab/svgs/dist/sprite_icons/admin.svg?raw";
-import chevronDownSvg from "@gitlab/svgs/dist/sprite_icons/chevron-down.svg?raw";
-import chevronRightSvg from "@gitlab/svgs/dist/sprite_icons/chevron-right.svg?raw";
-import chevronLeftSvg from "@gitlab/svgs/dist/sprite_icons/chevron-left.svg?raw";
-import chevronUpSvg from "@gitlab/svgs/dist/sprite_icons/chevron-up.svg?raw";
-import closeSvg from "@gitlab/svgs/dist/sprite_icons/close.svg?raw";
-import searchSvg from "@gitlab/svgs/dist/sprite_icons/search.svg?raw";
+import archiveSvg from "@gitlab/svgs/dist/sprite_icons/archive.svg?raw";
+import arrowLeftSvg from "@gitlab/svgs/dist/sprite_icons/arrow-left.svg?raw";
+import bullhornSvg from "@gitlab/svgs/dist/sprite_icons/bullhorn.svg?raw";
 import checkSvg from "@gitlab/svgs/dist/sprite_icons/check.svg?raw";
 import checkCircleSvg from "@gitlab/svgs/dist/sprite_icons/check-circle.svg?raw";
-import informationOSvg from "@gitlab/svgs/dist/sprite_icons/information-o.svg?raw";
-import warningSvg from "@gitlab/svgs/dist/sprite_icons/warning.svg?raw";
-import errorSvg from "@gitlab/svgs/dist/sprite_icons/error.svg?raw";
-import sidebarSvg from "@gitlab/svgs/dist/sprite_icons/sidebar.svg?raw";
-import hamburgerSvg from "@gitlab/svgs/dist/sprite_icons/hamburger.svg?raw";
-import ellipsisVSvg from "@gitlab/svgs/dist/sprite_icons/ellipsis_v.svg?raw";
-import arrowLeftSvg from "@gitlab/svgs/dist/sprite_icons/arrow-left.svg?raw";
-import plusSvg from "@gitlab/svgs/dist/sprite_icons/plus.svg?raw";
-import externalLinkSvg from "@gitlab/svgs/dist/sprite_icons/external-link.svg?raw";
-import sunSvg from "@gitlab/svgs/dist/sprite_icons/sun.svg?raw";
-import moonSvg from "@gitlab/svgs/dist/sprite_icons/moon.svg?raw";
-import earthSvg from "@gitlab/svgs/dist/sprite_icons/earth.svg?raw";
-import powerSvg from "@gitlab/svgs/dist/sprite_icons/power.svg?raw";
-import lockSvg from "@gitlab/svgs/dist/sprite_icons/lock.svg?raw";
-import userSvg from "@gitlab/svgs/dist/sprite_icons/user.svg?raw";
+import chevronDownSvg from "@gitlab/svgs/dist/sprite_icons/chevron-down.svg?raw";
+import chevronLeftSvg from "@gitlab/svgs/dist/sprite_icons/chevron-left.svg?raw";
+import chevronRightSvg from "@gitlab/svgs/dist/sprite_icons/chevron-right.svg?raw";
+import chevronUpSvg from "@gitlab/svgs/dist/sprite_icons/chevron-up.svg?raw";
 import clearSvg from "@gitlab/svgs/dist/sprite_icons/clear.svg?raw";
-import retrySvg from "@gitlab/svgs/dist/sprite_icons/retry.svg?raw";
-import removeSvg from "@gitlab/svgs/dist/sprite_icons/remove.svg?raw";
-import pencilSvg from "@gitlab/svgs/dist/sprite_icons/pencil.svg?raw";
+import closeSvg from "@gitlab/svgs/dist/sprite_icons/close.svg?raw";
+import documentSvg from "@gitlab/svgs/dist/sprite_icons/document.svg?raw";
 import downloadSvg from "@gitlab/svgs/dist/sprite_icons/download.svg?raw";
-import uploadSvg from "@gitlab/svgs/dist/sprite_icons/upload.svg?raw";
+import earthSvg from "@gitlab/svgs/dist/sprite_icons/earth.svg?raw";
+import ellipsisVSvg from "@gitlab/svgs/dist/sprite_icons/ellipsis_v.svg?raw";
+import errorSvg from "@gitlab/svgs/dist/sprite_icons/error.svg?raw";
+import exportSvg from "@gitlab/svgs/dist/sprite_icons/export.svg?raw";
+import externalLinkSvg from "@gitlab/svgs/dist/sprite_icons/external-link.svg?raw";
 import filterSvg from "@gitlab/svgs/dist/sprite_icons/filter.svg?raw";
+import hamburgerSvg from "@gitlab/svgs/dist/sprite_icons/hamburger.svg?raw";
+import homeSvg from "@gitlab/svgs/dist/sprite_icons/home.svg?raw";
+import informationOSvg from "@gitlab/svgs/dist/sprite_icons/information-o.svg?raw";
+import listTaskSvg from "@gitlab/svgs/dist/sprite_icons/list-task.svg?raw";
+import lockSvg from "@gitlab/svgs/dist/sprite_icons/lock.svg?raw";
+import moonSvg from "@gitlab/svgs/dist/sprite_icons/moon.svg?raw";
+import packageSvg from "@gitlab/svgs/dist/sprite_icons/package.svg?raw";
+import pencilSvg from "@gitlab/svgs/dist/sprite_icons/pencil.svg?raw";
+import plusSvg from "@gitlab/svgs/dist/sprite_icons/plus.svg?raw";
+import powerSvg from "@gitlab/svgs/dist/sprite_icons/power.svg?raw";
+import removeSvg from "@gitlab/svgs/dist/sprite_icons/remove.svg?raw";
+import retrySvg from "@gitlab/svgs/dist/sprite_icons/retry.svg?raw";
+import searchSvg from "@gitlab/svgs/dist/sprite_icons/search.svg?raw";
+import settingsSvg from "@gitlab/svgs/dist/sprite_icons/settings.svg?raw";
+import sidebarSvg from "@gitlab/svgs/dist/sprite_icons/sidebar.svg?raw";
+import sunSvg from "@gitlab/svgs/dist/sprite_icons/sun.svg?raw";
+import tagSvg from "@gitlab/svgs/dist/sprite_icons/tag.svg?raw";
+import uploadSvg from "@gitlab/svgs/dist/sprite_icons/upload.svg?raw";
+import userSvg from "@gitlab/svgs/dist/sprite_icons/user.svg?raw";
+import warningSvg from "@gitlab/svgs/dist/sprite_icons/warning.svg?raw";
 import { splitProps } from "solid-js";
 
 const sources = {
@@ -66,7 +67,7 @@ const sources = {
   error: errorSvg,
   sidebar: sidebarSvg,
   hamburger: hamburgerSvg,
-  "ellipsis_v": ellipsisVSvg,
+  ellipsis_v: ellipsisVSvg,
   "arrow-left": arrowLeftSvg,
   plus: plusSvg,
   "external-link": externalLinkSvg,

@@ -128,7 +128,11 @@ export default function PriceLists() {
                           {l.market_ids.map(marketName).join(", ") || "—"}
                         </td>
                         <td class={`${tdClass} text-right`}>
-                          <Button category="tertiary" disabled={!can("admin")} onClick={() => open(l)}>
+                          <Button
+                            category="tertiary"
+                            disabled={!can("admin")}
+                            onClick={() => open(l)}
+                          >
                             {t("common.edit")}
                             <span class="sr-only">: {l.name}</span>
                           </Button>

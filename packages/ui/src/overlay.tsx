@@ -178,9 +178,7 @@ export function showToast(opts: {
       duration={5000}
       class="flex items-start gap-3 rounded-md bg-toast py-3 pr-2 pl-4 text-toast-foreground shadow-overlay"
     >
-      <Show when={icon}>
-        {(i) => <Icon name={i().name} class={`mt-0.5 ${i().class}`} />}
-      </Show>
+      <Show when={icon}>{(i) => <Icon name={i().name} class={`mt-0.5 ${i().class}`} />}</Show>
       <div class="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
         <Toast.Title class="text-sm">{opts.title}</Toast.Title>
         <Show when={opts.description}>

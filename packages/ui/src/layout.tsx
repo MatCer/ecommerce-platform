@@ -98,7 +98,10 @@ export interface BreadcrumbItem {
   href?: string;
 }
 
-/** Pajamas breadcrumb; the last item is the current page. Plain links (the router intercepts). */
+/**
+ * Pajamas breadcrumb. Items with `href` are plain links (the router intercepts them); a last item
+ * without `href` is the current page.
+ */
 export function Breadcrumb(props: { label: string; items: readonly BreadcrumbItem[] }) {
   return (
     <nav aria-label={props.label} class="min-w-0">
@@ -114,7 +117,7 @@ export function Breadcrumb(props: { label: string; items: readonly BreadcrumbIte
                   </span>
                 </Show>
                 <Show
-                  when={item.href && !last()}
+                  when={item.href}
                   fallback={
                     <span
                       class="truncate"
@@ -227,7 +230,10 @@ export function SegmentedControl(props: {
       <KSegmented.Label class={props.hideLabel ? "sr-only" : "text-sm font-semibold text-heading"}>
         {props.label}
       </KSegmented.Label>
-      <div role="presentation" class="inline-flex w-fit rounded-md border border-border-strong p-0.5">
+      <div
+        role="presentation"
+        class="inline-flex w-fit rounded-md border border-border-strong p-0.5"
+      >
         <For each={props.options}>
           {(o) => (
             <KSegmented.Item value={o.value} disabled={o.disabled} class="relative">

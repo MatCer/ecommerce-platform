@@ -116,29 +116,29 @@ export function SelectField(props: SelectFieldProps) {
         {props.label}
       </label>
       <div class="relative">
-      <select
-        id={id}
-        name={props.name}
-        class={`${controlClass} appearance-none truncate pr-8`}
-        value={props.value}
-        disabled={props.disabled}
-        required={props.required}
-        aria-invalid={props.error ? true : undefined}
-        aria-describedby={hint()}
-        onChange={(e) => props.onChange(e.currentTarget.value)}
-      >
-        <For each={props.options}>
-          {(o) => (
-            <option value={o.value} selected={o.value === props.value}>
-              {o.label}
-            </option>
-          )}
-        </For>
-      </select>
-      <Icon
-        name="chevron-down"
-        class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
-      />
+        <select
+          id={id}
+          name={props.name}
+          class={`${controlClass} appearance-none truncate pr-8`}
+          value={props.value}
+          disabled={props.disabled}
+          required={props.required}
+          aria-invalid={props.error ? true : undefined}
+          aria-describedby={hint()}
+          onChange={(e) => props.onChange(e.currentTarget.value)}
+        >
+          <For each={props.options}>
+            {(o) => (
+              <option value={o.value} selected={o.value === props.value}>
+                {o.label}
+              </option>
+            )}
+          </For>
+        </select>
+        <Icon
+          name="chevron-down"
+          class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
+        />
       </div>
       <Show when={props.description && !props.error}>
         <p id={`${id}-desc`} class={hintClass}>
@@ -341,7 +341,11 @@ export interface SearchBoxProps {
 /** Pajamas search box: magnifier, input, clear button. */
 export function SearchBox(props: SearchBoxProps) {
   return (
-    <KTextField class={`relative ${props.class ?? ""}`} value={props.value} onChange={props.onChange}>
+    <KTextField
+      class={`relative ${props.class ?? ""}`}
+      value={props.value}
+      onChange={props.onChange}
+    >
       <KTextField.Label class="sr-only">{props.label}</KTextField.Label>
       <Icon
         name="search"
