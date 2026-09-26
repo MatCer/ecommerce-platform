@@ -205,130 +205,126 @@ export default function AiBulkEdit() {
 
         <Show when={plan.data && plan.data.status !== "pending" ? plan.data : undefined}>
           {(p) => (
-            <section aria-labelledby="plan-h">
-              <Card title={<span id="plan-h">{t("ai.explanation")}</span>}>
-                <div class="flex flex-col gap-4">
-                  <Show when={p().plan}>
-                    {(pl) => (
-                      <div class="grid gap-4 md:grid-cols-2">
-                        <div class="flex flex-col gap-1">
-                          <p class="text-sm">{pl().explanation}</p>
-                          <h3 class="mt-2 text-sm font-semibold text-heading">
-                            {t("ai.operations")}
-                          </h3>
-                          <ul class="ml-4 list-disc text-sm">
-                            <For each={pl().operations}>{(op) => <li>{describe(op)}</li>}</For>
-                          </ul>
-                        </div>
-                        <div class="flex flex-col gap-1">
-                          <h3 class="text-sm font-semibold text-heading">{t("ai.selection")}</h3>
-                          <ul class="ml-4 list-disc text-sm">
-                            <For each={selection(pl().selector)}>{(s) => <li>{s}</li>}</For>
-                          </ul>
-                        </div>
+            <Card labelledBy="plan-h" title={t("ai.explanation")}>
+              <div class="flex flex-col gap-4">
+                <Show when={p().plan}>
+                  {(pl) => (
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <div class="flex flex-col gap-1">
+                        <p class="text-sm">{pl().explanation}</p>
+                        <h3 class="mt-2 text-sm font-semibold text-heading">
+                          {t("ai.operations")}
+                        </h3>
+                        <ul class="ml-4 list-disc text-sm">
+                          <For each={pl().operations}>{(op) => <li>{describe(op)}</li>}</For>
+                        </ul>
                       </div>
-                    )}
-                  </Show>
+                      <div class="flex flex-col gap-1">
+                        <h3 class="text-sm font-semibold text-heading">{t("ai.selection")}</h3>
+                        <ul class="ml-4 list-disc text-sm">
+                          <For each={selection(pl().selector)}>{(s) => <li>{s}</li>}</For>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </Show>
 
-                  <Switch>
-                    <Match when={p().status === "rejected" || p().status === "failed"}>
-                      <Alert tone="error" title={t("ai.rejected")}>
-                        <ul class="ml-4 list-disc">
-                          <For each={p().errors}>
-                            {(e) => (
-                              <li>
-                                {e.startsWith("ai_") ? errorMessage(new ApiError(422, e)) : e}
-                              </li>
+                <Switch>
+                  <Match when={p().status === "rejected" || p().status === "failed"}>
+                    <Alert tone="error" title={t("ai.rejected")}>
+                      <ul class="ml-4 list-disc">
+                        <For each={p().errors}>
+                          {(e) => (
+                            <li>{e.startsWith("ai_") ? errorMessage(new ApiError(422, e)) : e}</li>
+                          )}
+                        </For>
+                      </ul>
+                    </Alert>
+                  </Match>
+                  <Match when={p().status === "ready"}>
+                    <p class="text-sm font-semibold text-heading">
+                      {t("ai.matching", { count: p().target_count })}
+                    </p>
+                    <div class="overflow-x-auto rounded-md border border-border">
+                      <table class={tableClass} aria-label={t("ai.preview")}>
+                        <caption class="border-b border-border bg-subtle px-3 py-2 text-left text-sm font-semibold text-heading">
+                          {t("ai.preview")}
+                        </caption>
+                        <thead>
+                          <tr>
+                            <Th>{t("ai.product")}</Th>
+                            <Th>{t("ai.what")}</Th>
+                            <Th>{t("ai.before")}</Th>
+                            <Th>{t("ai.after")}</Th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <For each={p().sample}>
+                            {(row) => (
+                              <For each={row.changes}>
+                                {(c, i) => (
+                                  <tr>
+                                    <td class={tdClass}>
+                                      <Show when={i() === 0}>
+                                        <A
+                                          href={`/products/${row.product_id}`}
+                                          class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                                        >
+                                          {row.name}
+                                        </A>
+                                      </Show>
+                                    </td>
+                                    <td class={tdClass}>{c.what}</td>
+                                    <td class={`${tdClass} figures text-muted-foreground`}>
+                                      {c.before || "–"}
+                                    </td>
+                                    <td class={`${tdClass} figures font-semibold text-heading`}>
+                                      {c.after}
+                                    </td>
+                                  </tr>
+                                )}
+                              </For>
                             )}
                           </For>
-                        </ul>
-                      </Alert>
-                    </Match>
-                    <Match when={p().status === "ready"}>
-                      <p class="text-sm font-semibold text-heading">
-                        {t("ai.matching", { count: p().target_count })}
-                      </p>
-                      <div class="overflow-x-auto rounded-md border border-border">
-                        <table class={tableClass} aria-label={t("ai.preview")}>
-                          <caption class="border-b border-border bg-subtle px-3 py-2 text-left text-sm font-semibold text-heading">
-                            {t("ai.preview")}
-                          </caption>
-                          <thead>
-                            <tr>
-                              <Th>{t("ai.product")}</Th>
-                              <Th>{t("ai.what")}</Th>
-                              <Th>{t("ai.before")}</Th>
-                              <Th>{t("ai.after")}</Th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <For each={p().sample}>
-                              {(row) => (
-                                <For each={row.changes}>
-                                  {(c, i) => (
-                                    <tr>
-                                      <td class={tdClass}>
-                                        <Show when={i() === 0}>
-                                          <A
-                                            href={`/products/${row.product_id}`}
-                                            class="font-semibold text-heading hover:text-accent-700 hover:underline"
-                                          >
-                                            {row.name}
-                                          </A>
-                                        </Show>
-                                      </td>
-                                      <td class={tdClass}>{c.what}</td>
-                                      <td class={`${tdClass} figures text-muted-foreground`}>
-                                        {c.before || "–"}
-                                      </td>
-                                      <td class={`${tdClass} figures font-semibold text-heading`}>
-                                        {c.after}
-                                      </td>
-                                    </tr>
-                                  )}
-                                </For>
-                              )}
-                            </For>
-                          </tbody>
-                        </table>
-                      </div>
-                      <Show when={p().needs_fresh_auth}>
-                        <p class="text-sm text-muted-foreground">{t("ai.freshAuthHint")}</p>
-                      </Show>
-                      <div class="border-t border-border pt-4">
-                        <Button variant="confirm" onClick={() => setConfirming(true)}>
-                          {t("ai.apply", { count: p().target_count })}
-                        </Button>
-                      </div>
-                    </Match>
-                    <Match when={p().status === "applying"}>
-                      <div class="flex max-w-md flex-col gap-2" role="status">
-                        <p class="text-sm">
-                          {t("ai.applying", {
-                            done: (p().progress.done ?? 0) + (p().progress.skipped ?? 0),
-                            total: p().progress.total ?? p().target_count,
-                          })}
-                        </p>
-                        <ProgressBar
-                          tone="info"
-                          label={t("ai.progress")}
-                          max={p().progress.total || 1}
-                          value={(p().progress.done ?? 0) + (p().progress.skipped ?? 0)}
-                        />
-                      </div>
-                    </Match>
-                    <Match when={p().status === "applied"}>
-                      <Alert tone="success">
-                        {t("ai.applied", {
-                          done: p().progress.done ?? 0,
-                          skipped: p().progress.skipped ?? 0,
+                        </tbody>
+                      </table>
+                    </div>
+                    <Show when={p().needs_fresh_auth}>
+                      <p class="text-sm text-muted-foreground">{t("ai.freshAuthHint")}</p>
+                    </Show>
+                    <div class="border-t border-border pt-4">
+                      <Button variant="confirm" onClick={() => setConfirming(true)}>
+                        {t("ai.apply", { count: p().target_count })}
+                      </Button>
+                    </div>
+                  </Match>
+                  <Match when={p().status === "applying"}>
+                    <div class="flex max-w-md flex-col gap-2" role="status">
+                      <p class="text-sm">
+                        {t("ai.applying", {
+                          done: (p().progress.done ?? 0) + (p().progress.skipped ?? 0),
+                          total: p().progress.total ?? p().target_count,
                         })}
-                      </Alert>
-                    </Match>
-                  </Switch>
-                </div>
-              </Card>
-            </section>
+                      </p>
+                      <ProgressBar
+                        tone="info"
+                        label={t("ai.progress")}
+                        max={p().progress.total || 1}
+                        value={(p().progress.done ?? 0) + (p().progress.skipped ?? 0)}
+                      />
+                    </div>
+                  </Match>
+                  <Match when={p().status === "applied"}>
+                    <Alert tone="success">
+                      {t("ai.applied", {
+                        done: p().progress.done ?? 0,
+                        skipped: p().progress.skipped ?? 0,
+                      })}
+                    </Alert>
+                  </Match>
+                </Switch>
+              </div>
+            </Card>
           )}
         </Show>
       </div>

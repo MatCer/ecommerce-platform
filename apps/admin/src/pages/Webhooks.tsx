@@ -370,7 +370,8 @@ export default function Webhooks() {
 
               <Card
                 padding="none"
-                title={<span id="deliveries">{t("webhooks.deliveries")}</span>}
+                titleId="deliveries"
+                title={t("webhooks.deliveries")}
                 description={t("webhooks.deliveriesDesc")}
                 actions={
                   <>

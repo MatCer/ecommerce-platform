@@ -120,46 +120,46 @@ export default function Flows() {
         )}
       </QueryState>
 
-      <section aria-labelledby="flow-runs" class="mt-4">
-        <Card
-          padding="none"
-          title={<span id="flow-runs">{t("flows.runsTitle")}</span>}
-          description={t("flows.runsDesc")}
-        >
-          <QueryState query={runs}>
-            {(data) => (
-              <Show
-                when={data.items.length > 0}
-                fallback={
-                  <EmptyState
-                    icon="list-task"
-                    title={t("flows.emptyRuns")}
-                    description={t("flows.emptyRunsDesc")}
-                  />
-                }
-              >
-                <div class="overflow-x-auto">
-                  <table class={tableClass}>
-                    <thead>
-                      <tr>
-                        <Th>{t("flows.flow")}</Th>
-                        <Th>{t("flows.source")}</Th>
-                        <Th>{t("flows.status")}</Th>
-                        <Th>{t("flows.due")}</Th>
-                        <Th>{t("flows.outcome")}</Th>
-                        <Th srOnly>{t("flows.open")}</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <For each={data.items}>{(r) => <RunRow run={r} />}</For>
-                    </tbody>
-                  </table>
-                </div>
-              </Show>
-            )}
-          </QueryState>
-        </Card>
-      </section>
+      <Card
+        labelledBy="flow-runs"
+        class="mt-4"
+        padding="none"
+        title={t("flows.runsTitle")}
+        description={t("flows.runsDesc")}
+      >
+        <QueryState query={runs}>
+          {(data) => (
+            <Show
+              when={data.items.length > 0}
+              fallback={
+                <EmptyState
+                  icon="list-task"
+                  title={t("flows.emptyRuns")}
+                  description={t("flows.emptyRunsDesc")}
+                />
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("flows.flow")}</Th>
+                      <Th>{t("flows.source")}</Th>
+                      <Th>{t("flows.status")}</Th>
+                      <Th>{t("flows.due")}</Th>
+                      <Th>{t("flows.outcome")}</Th>
+                      <Th srOnly>{t("flows.open")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>{(r) => <RunRow run={r} />}</For>
+                  </tbody>
+                </table>
+              </div>
+            </Show>
+          )}
+        </QueryState>
+      </Card>
     </>
   );
 }

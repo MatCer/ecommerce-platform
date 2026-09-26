@@ -202,85 +202,85 @@ export default function Recommendations() {
         )}
       </QueryState>
 
-      <section aria-labelledby="why" class="mt-8 max-w-3xl">
-        <Card
-          title={<span id="why">{t("recommendations.whyTitle")}</span>}
-          description={t("recommendations.whyDesc")}
-        >
-          <div class="flex flex-col gap-5">
-            <form
-              class="flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                run();
-              }}
-            >
-              <div class="grid gap-4 sm:grid-cols-2">
-                <SelectField
-                  label={t("recommendations.market")}
-                  value={marketId()}
-                  options={(markets.data?.items ?? []).map((m) => ({ value: m.id, label: m.name }))}
-                  onChange={setMarket}
-                />
-                <SelectField
-                  label={t("recommendations.context")}
-                  value={context()}
-                  options={(["home", "product", "category", "cart", "collection"] as const).map(
-                    (c) => ({ value: c, label: t(`recommendations.context_${c}`) }),
-                  )}
-                  onChange={(v) => setContext(v as Context)}
-                />
-              </div>
-              <Show when={context() === "product" || context() === "cart"}>
-                <ProductPicker value={products()} onChange={setProducts} />
-              </Show>
-              <Show when={context() === "category"}>
-                <SelectField
-                  label={t("recommendations.category")}
-                  value={category()}
-                  options={[
-                    { value: "", label: "—" },
-                    ...categoryOptions(categories.data?.items ?? [], contentLocales()),
-                  ]}
-                  onChange={setCategory}
-                />
-              </Show>
-              <Show when={context() === "collection"}>
-                <SelectField
-                  label={t("recommendations.collection")}
-                  value={collection()}
-                  options={[
-                    { value: "", label: "—" },
-                    ...(collections.data?.items ?? []).map((c) => ({ value: c.id, label: c.name })),
-                  ]}
-                  onChange={setCollection}
-                />
-              </Show>
-              <TextField
-                label={t("recommendations.customer")}
-                description={t("recommendations.customerHint")}
-                value={customer()}
-                onChange={setCustomer}
-                error={customerOk() ? undefined : t("recommendations.customerInvalid")}
+      <Card
+        labelledBy="why"
+        class="mt-8 max-w-3xl"
+        title={t("recommendations.whyTitle")}
+        description={t("recommendations.whyDesc")}
+      >
+        <div class="flex flex-col gap-5">
+          <form
+            class="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              run();
+            }}
+          >
+            <div class="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label={t("recommendations.market")}
+                value={marketId()}
+                options={(markets.data?.items ?? []).map((m) => ({ value: m.id, label: m.name }))}
+                onChange={setMarket}
               />
-              <div>
-                <Button
-                  type="submit"
-                  disabled={contextValue() === null || !customerOk()}
-                  loading={explain.isFetching}
-                >
-                  {t("recommendations.explain")}
-                </Button>
-              </div>
-            </form>
-            <Show when={asked()}>
-              <div class="border-t border-border pt-5">
-                <QueryState query={explain}>{(data) => <ExplainResult data={data} />}</QueryState>
-              </div>
+              <SelectField
+                label={t("recommendations.context")}
+                value={context()}
+                options={(["home", "product", "category", "cart", "collection"] as const).map(
+                  (c) => ({ value: c, label: t(`recommendations.context_${c}`) }),
+                )}
+                onChange={(v) => setContext(v as Context)}
+              />
+            </div>
+            <Show when={context() === "product" || context() === "cart"}>
+              <ProductPicker value={products()} onChange={setProducts} />
             </Show>
-          </div>
-        </Card>
-      </section>
+            <Show when={context() === "category"}>
+              <SelectField
+                label={t("recommendations.category")}
+                value={category()}
+                options={[
+                  { value: "", label: "—" },
+                  ...categoryOptions(categories.data?.items ?? [], contentLocales()),
+                ]}
+                onChange={setCategory}
+              />
+            </Show>
+            <Show when={context() === "collection"}>
+              <SelectField
+                label={t("recommendations.collection")}
+                value={collection()}
+                options={[
+                  { value: "", label: "—" },
+                  ...(collections.data?.items ?? []).map((c) => ({ value: c.id, label: c.name })),
+                ]}
+                onChange={setCollection}
+              />
+            </Show>
+            <TextField
+              label={t("recommendations.customer")}
+              description={t("recommendations.customerHint")}
+              value={customer()}
+              onChange={setCustomer}
+              error={customerOk() ? undefined : t("recommendations.customerInvalid")}
+            />
+            <div>
+              <Button
+                type="submit"
+                disabled={contextValue() === null || !customerOk()}
+                loading={explain.isFetching}
+              >
+                {t("recommendations.explain")}
+              </Button>
+            </div>
+          </form>
+          <Show when={asked()}>
+            <div class="border-t border-border pt-5">
+              <QueryState query={explain}>{(data) => <ExplainResult data={data} />}</QueryState>
+            </div>
+          </Show>
+        </div>
+      </Card>
     </>
   );
 }

@@ -69,11 +69,15 @@ function Section(props: {
   children: JSX.Element;
 }) {
   return (
-    <section id={props.id} aria-label={props.title} class="min-w-0 scroll-mt-16">
-      <Card title={props.title} description={props.description}>
-        {props.children}
-      </Card>
-    </section>
+    <Card
+      id={props.id}
+      aria-label={props.title}
+      class="min-w-0 scroll-mt-16"
+      title={props.title}
+      description={props.description}
+    >
+      {props.children}
+    </Card>
   );
 }
 

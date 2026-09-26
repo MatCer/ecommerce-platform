@@ -221,148 +221,144 @@ export default function Themes() {
             }
           >
             <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-              <section aria-labelledby="revisions-h" class="min-w-0">
-                <Card
-                  padding="none"
-                  title={<span id="revisions-h">{t("themes.revisions")}</span>}
-                  count={data.items.length}
-                >
-                  <div class="overflow-x-auto">
-                    <table class={tableClass}>
-                      <thead>
-                        <tr>
-                          <Th>#</Th>
-                          <Th>{t("themes.status")}</Th>
-                          <Th>{t("themes.change")}</Th>
-                          <Th>{t("themes.created")}</Th>
-                          <Th srOnly>{t("common.actions")}</Th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <For each={data.items}>
-                          {(r) => (
-                            <tr
-                              classList={{
-                                "bg-subtle": r.id === current(),
-                                "hover:bg-subtle": r.id !== current(),
-                              }}
-                            >
-                              <td class={`${tdClass} figures`}>
-                                <button
-                                  type="button"
-                                  class="rounded-sm font-semibold text-heading hover:text-accent-700 hover:underline aria-pressed:text-accent-700 aria-pressed:underline"
-                                  aria-pressed={r.id === current()}
-                                  onClick={() => setSelected(r.id)}
-                                >
-                                  {t("themes.revision", { number: r.number })}
-                                </button>
-                              </td>
-                              <td class={tdClass}>
-                                <span class="flex flex-wrap gap-1">
-                                  <Badge tone={statusTone(r.status)}>
-                                    {t(`themes.statuses.${r.status as "ready"}`)}
-                                  </Badge>
-                                  <Show when={r.active}>
-                                    <Badge tone="success">{t("themes.live")}</Badge>
-                                  </Show>
-                                </span>
-                              </td>
-                              <td class={tdClass}>{t(`themes.changes.${r.change as "fork"}`)}</td>
-                              <td
-                                class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+              <Card
+                labelledBy="revisions-h"
+                class="min-w-0"
+                padding="none"
+                title={t("themes.revisions")}
+                count={data.items.length}
+              >
+                <div class="overflow-x-auto">
+                  <table class={tableClass}>
+                    <thead>
+                      <tr>
+                        <Th>#</Th>
+                        <Th>{t("themes.status")}</Th>
+                        <Th>{t("themes.change")}</Th>
+                        <Th>{t("themes.created")}</Th>
+                        <Th srOnly>{t("common.actions")}</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={data.items}>
+                        {(r) => (
+                          <tr
+                            classList={{
+                              "bg-subtle": r.id === current(),
+                              "hover:bg-subtle": r.id !== current(),
+                            }}
+                          >
+                            <td class={`${tdClass} figures`}>
+                              <button
+                                type="button"
+                                class="rounded-sm font-semibold text-heading hover:text-accent-700 hover:underline aria-pressed:text-accent-700 aria-pressed:underline"
+                                aria-pressed={r.id === current()}
+                                onClick={() => setSelected(r.id)}
                               >
-                                {formatDateTime(r.created_at)}
-                              </td>
-                              <td class={`${tdClass} text-right`}>
-                                <span class="inline-flex flex-wrap justify-end gap-1">
-                                  <Show when={r.artifact_id}>
-                                    <Button
-                                      category="tertiary"
-                                      size="small"
-                                      loading={
-                                        openPreview.isPending && openPreview.variables?.id === r.id
-                                      }
-                                      onClick={() => openPreview.mutate(r)}
-                                    >
-                                      {t("themes.preview")}
-                                    </Button>
-                                  </Show>
-                                  <Show
-                                    when={
-                                      can("admin") &&
-                                      !r.active &&
-                                      (r.status === "ready" || r.status === "superseded")
+                                {t("themes.revision", { number: r.number })}
+                              </button>
+                            </td>
+                            <td class={tdClass}>
+                              <span class="flex flex-wrap gap-1">
+                                <Badge tone={statusTone(r.status)}>
+                                  {t(`themes.statuses.${r.status as "ready"}`)}
+                                </Badge>
+                                <Show when={r.active}>
+                                  <Badge tone="success">{t("themes.live")}</Badge>
+                                </Show>
+                              </span>
+                            </td>
+                            <td class={tdClass}>{t(`themes.changes.${r.change as "fork"}`)}</td>
+                            <td
+                              class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                            >
+                              {formatDateTime(r.created_at)}
+                            </td>
+                            <td class={`${tdClass} text-right`}>
+                              <span class="inline-flex flex-wrap justify-end gap-1">
+                                <Show when={r.artifact_id}>
+                                  <Button
+                                    category="tertiary"
+                                    size="small"
+                                    loading={
+                                      openPreview.isPending && openPreview.variables?.id === r.id
                                     }
+                                    onClick={() => openPreview.mutate(r)}
                                   >
-                                    <Button size="small" onClick={() => setPublishing(r)}>
-                                      {r.status === "ready"
-                                        ? t("themes.publish")
-                                        : t("themes.rollback")}
-                                    </Button>
-                                  </Show>
-                                  <Show when={can("admin") && r.has_source}>
-                                    <Button
-                                      category="tertiary"
-                                      size="small"
-                                      icon="download"
-                                      onClick={() => download.mutate(r.id)}
-                                    >
-                                      {t("themes.download")}
-                                    </Button>
-                                  </Show>
-                                </span>
-                              </td>
-                            </tr>
-                          )}
-                        </For>
-                      </tbody>
-                    </table>
-                  </div>
-                </Card>
-              </section>
-              <section aria-labelledby="report-h" class="min-w-0">
-                <Show when={detail.data}>{(d) => <Report detail={d()} />}</Show>
-              </section>
+                                    {t("themes.preview")}
+                                  </Button>
+                                </Show>
+                                <Show
+                                  when={
+                                    can("admin") &&
+                                    !r.active &&
+                                    (r.status === "ready" || r.status === "superseded")
+                                  }
+                                >
+                                  <Button size="small" onClick={() => setPublishing(r)}>
+                                    {r.status === "ready"
+                                      ? t("themes.publish")
+                                      : t("themes.rollback")}
+                                  </Button>
+                                </Show>
+                                <Show when={can("admin") && r.has_source}>
+                                  <Button
+                                    category="tertiary"
+                                    size="small"
+                                    icon="download"
+                                    onClick={() => download.mutate(r.id)}
+                                  >
+                                    {t("themes.download")}
+                                  </Button>
+                                </Show>
+                              </span>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+              <Show when={detail.data}>{(d) => <Report detail={d()} />}</Show>
             </div>
             <Show when={preview()}>
               {(p) => (
-                <section aria-labelledby="preview-h" class="mt-4">
-                  <Card
-                    padding="none"
-                    title={
-                      <span id="preview-h">{t("themes.previewOf", { number: p().number })}</span>
-                    }
-                    actions={
-                      <>
-                        <a
-                          class={`inline-flex items-center gap-1 text-sm ${linkClass}`}
-                          href={p().url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {t("themes.openTab")}
-                          <Icon name="external-link" />
-                        </a>
-                        <Button
-                          category="tertiary"
-                          size="small"
-                          onClick={() => setPreview(undefined)}
-                        >
-                          {t("common.close")}
-                        </Button>
-                      </>
-                    }
-                  >
-                    {/* A21: the preview origin is sandboxed; it is never the admin's own origin. */}
-                    <iframe
-                      title={t("themes.previewOf", { number: p().number })}
-                      src={p().url}
-                      sandbox="allow-scripts allow-same-origin allow-forms"
-                      referrerpolicy="no-referrer"
-                      class="block h-[42rem] w-full bg-card"
-                    />
-                  </Card>
-                </section>
+                <Card
+                  labelledBy="preview-h"
+                  class="mt-4"
+                  padding="none"
+                  title={t("themes.previewOf", { number: p().number })}
+                  actions={
+                    <>
+                      <a
+                        class={`inline-flex items-center gap-1 text-sm ${linkClass}`}
+                        href={p().url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("themes.openTab")}
+                        <Icon name="external-link" />
+                      </a>
+                      <Button
+                        category="tertiary"
+                        size="small"
+                        onClick={() => setPreview(undefined)}
+                      >
+                        {t("common.close")}
+                      </Button>
+                    </>
+                  }
+                >
+                  {/* A21: the preview origin is sandboxed; it is never the admin's own origin. */}
+                  <iframe
+                    title={t("themes.previewOf", { number: p().number })}
+                    src={p().url}
+                    sandbox="allow-scripts allow-same-origin allow-forms"
+                    referrerpolicy="no-referrer"
+                    class="block h-[42rem] w-full bg-card"
+                  />
+                </Card>
               )}
             </Show>
             <ThemeAiEditor
@@ -415,8 +411,9 @@ function Report(props: { detail: Schemas["RevisionDetail"] }) {
   const ms = (v: number | null) => (v === null ? "–" : `${Math.round(v)}`);
   return (
     <Card
+      labelledBy="report-h"
       title={
-        <span id="report-h" class="flex flex-wrap items-center gap-2">
+        <span class="flex flex-wrap items-center gap-2">
           {t("themes.report", { number: r().number })}
           <Badge tone={statusTone(r().status)}>
             {t(`themes.statuses.${r().status as "ready"}`)}
@@ -595,109 +592,109 @@ function TokenEditor(props: {
     return e ? t(`themes.invalid.${e}`) : undefined;
   };
   return (
-    <section aria-labelledby="tokens-h" class="mt-4 max-w-5xl">
-      <Card
-        title={<span id="tokens-h">{t("themes.tokens")}</span>}
-        description={t("themes.tokensHint")}
-      >
-        <Show when={conflict()}>
-          <Alert
-            tone="warning"
-            class="mb-4"
-            actions={
-              <Button
-                type="button"
-                onClick={() => {
-                  setDirty(false);
-                  draftBase = props.base;
-                  setDraft(tokenGroups(props.tokens));
-                }}
-              >
-                {t("themes.loadLatestTokens")}
-              </Button>
-            }
-          >
-            {t("themes.draftConflict")}
-          </Alert>
-        </Show>
-        <form
-          class="flex flex-col gap-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!conflict() && Object.keys(errors()).length === 0) save.mutate();
-          }}
+    <Card
+      labelledBy="tokens-h"
+      class="mt-4 max-w-5xl"
+      title={t("themes.tokens")}
+      description={t("themes.tokensHint")}
+    >
+      <Show when={conflict()}>
+        <Alert
+          tone="warning"
+          class="mb-4"
+          actions={
+            <Button
+              type="button"
+              onClick={() => {
+                setDirty(false);
+                draftBase = props.base;
+                setDraft(tokenGroups(props.tokens));
+              }}
+            >
+              {t("themes.loadLatestTokens")}
+            </Button>
+          }
         >
-          <fieldset>
-            <legend class="mb-3 text-base font-semibold text-heading">{t("themes.colors")}</legend>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <For each={Object.keys(draft().colors)}>
-                {(k) => (
-                  <div class="flex items-end gap-2">
-                    <input
-                      type="color"
-                      aria-label={t("themes.pick", { name: k })}
-                      value={hexOf(draft().colors[k] ?? "") ?? "#000000"}
-                      onInput={(e) => set("colors", k, e.currentTarget.value)}
-                      class="h-control w-10 shrink-0 cursor-pointer rounded-md border border-input bg-control p-0.5 hover:border-input-hover"
-                    />
-                    <TextField
-                      class="grow"
-                      label={k}
-                      value={draft().colors[k] ?? ""}
-                      onChange={(v) => set("colors", k, v)}
-                      error={message(`colors.${k}`)}
-                      inputClass="figures"
-                    />
-                  </div>
-                )}
-              </For>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend class="mb-3 text-base font-semibold text-heading">
-              {t("themes.typography")}
-            </legend>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <For each={Object.keys(draft().fonts)}>
-                {(k) => (
-                  <TextField
-                    label={k}
-                    value={draft().fonts[k] ?? ""}
-                    onChange={(v) => set("fonts", k, v)}
-                    error={message(`fonts.${k}`)}
+          {t("themes.draftConflict")}
+        </Alert>
+      </Show>
+      <form
+        class="flex flex-col gap-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!conflict() && Object.keys(errors()).length === 0) save.mutate();
+        }}
+      >
+        <fieldset>
+          <legend class="mb-3 text-base font-semibold text-heading">{t("themes.colors")}</legend>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <For each={Object.keys(draft().colors)}>
+              {(k) => (
+                <div class="flex items-end gap-2">
+                  <input
+                    type="color"
+                    aria-label={t("themes.pick", { name: k })}
+                    value={hexOf(draft().colors[k] ?? "") ?? "#000000"}
+                    onInput={(e) => set("colors", k, e.currentTarget.value)}
+                    class="h-control w-10 shrink-0 cursor-pointer rounded-md border border-input bg-control p-0.5 hover:border-input-hover"
                   />
-                )}
-              </For>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend class="mb-3 text-base font-semibold text-heading">{t("themes.radius")}</legend>
-            <div class="grid gap-4 sm:grid-cols-4">
-              <For each={Object.keys(draft().radius)}>
-                {(k) => (
                   <TextField
+                    class="grow"
                     label={k}
-                    value={draft().radius[k] ?? ""}
-                    onChange={(v) => set("radius", k, v)}
-                    error={message(`radius.${k}`)}
+                    value={draft().colors[k] ?? ""}
+                    onChange={(v) => set("colors", k, v)}
+                    error={message(`colors.${k}`)}
                     inputClass="figures"
                   />
-                )}
-              </For>
-            </div>
-          </fieldset>
-          <div class="border-t border-border pt-4">
-            <Button
-              type="submit"
-              variant="confirm"
-              loading={save.isPending}
-              disabled={conflict() || Object.keys(errors()).length > 0}
-            >
-              {t("themes.saveTokens")}
-            </Button>
+                </div>
+              )}
+            </For>
           </div>
-        </form>
-      </Card>
-    </section>
+        </fieldset>
+        <fieldset>
+          <legend class="mb-3 text-base font-semibold text-heading">
+            {t("themes.typography")}
+          </legend>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <For each={Object.keys(draft().fonts)}>
+              {(k) => (
+                <TextField
+                  label={k}
+                  value={draft().fonts[k] ?? ""}
+                  onChange={(v) => set("fonts", k, v)}
+                  error={message(`fonts.${k}`)}
+                />
+              )}
+            </For>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend class="mb-3 text-base font-semibold text-heading">{t("themes.radius")}</legend>
+          <div class="grid gap-4 sm:grid-cols-4">
+            <For each={Object.keys(draft().radius)}>
+              {(k) => (
+                <TextField
+                  label={k}
+                  value={draft().radius[k] ?? ""}
+                  onChange={(v) => set("radius", k, v)}
+                  error={message(`radius.${k}`)}
+                  inputClass="figures"
+                />
+              )}
+            </For>
+          </div>
+        </fieldset>
+        <div class="border-t border-border pt-4">
+          <Button
+            type="submit"
+            variant="confirm"
+            loading={save.isPending}
+            disabled={conflict() || Object.keys(errors()).length > 0}
+          >
+            {t("themes.saveTokens")}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }

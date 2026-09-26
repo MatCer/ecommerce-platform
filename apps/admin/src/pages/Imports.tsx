@@ -118,24 +118,22 @@ function RunDetail() {
             </Show>
             <Show when={run.report}>{(report) => <ImportReport report={report()} />}</Show>
             <Show when={run.status === "applied" || run.status === "failed"}>
-              <section aria-label={t("content.finalCounts")}>
-                <Card title={t("content.finalCounts")}>
-                  <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                    <For each={PROGRESS}>
-                      {(key) => (
-                        <div class="flex flex-col gap-1">
-                          <dt class="text-sm text-muted-foreground">
-                            {key === "updated" ? t("content.updatedCount") : t(`content.${key}`)}
-                          </dt>
-                          <dd class="figures text-lg font-semibold text-heading">
-                            {run.progress[key]}
-                          </dd>
-                        </div>
-                      )}
-                    </For>
-                  </dl>
-                </Card>
-              </section>
+              <Card aria-label={t("content.finalCounts")} title={t("content.finalCounts")}>
+                <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  <For each={PROGRESS}>
+                    {(key) => (
+                      <div class="flex flex-col gap-1">
+                        <dt class="text-sm text-muted-foreground">
+                          {key === "updated" ? t("content.updatedCount") : t(`content.${key}`)}
+                        </dt>
+                        <dd class="figures text-lg font-semibold text-heading">
+                          {run.progress[key]}
+                        </dd>
+                      </div>
+                    )}
+                  </For>
+                </dl>
+              </Card>
             </Show>
             <div class="flex flex-wrap gap-2">
               <Show when={run.status === "analyzed"}>

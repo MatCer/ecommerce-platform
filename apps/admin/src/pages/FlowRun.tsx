@@ -118,49 +118,47 @@ export default function FlowRun() {
                   </dl>
                 </Card>
               </aside>
-              <section aria-labelledby="run-steps" class="min-w-0">
-                <Card padding="none" title={<span id="run-steps">{t("flows.steps")}</span>}>
-                  <Show
-                    when={data.steps.length > 0}
-                    fallback={<EmptyState icon="document" title={t("flows.noSteps")} />}
-                  >
-                    <div class="overflow-x-auto">
-                      <table class={tableClass}>
-                        <thead>
-                          <tr>
-                            <Th>{t("flows.steps")}</Th>
-                            <Th>{t("flows.status")}</Th>
-                            <Th>{t("flows.outcome")}</Th>
-                            <Th>{t("flows.executed")}</Th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <For each={data.steps}>
-                            {(s) => (
-                              <tr>
-                                <td class={`${tdClass} font-semibold text-heading`}>
-                                  {t("flows.step", { n: String(s.step_number + 1) })}
-                                </td>
-                                <td class={tdClass}>
-                                  <Badge tone={stepTone[s.status] ?? "neutral"}>
-                                    {stepLabel(s.status)}
-                                  </Badge>
-                                </td>
-                                <td class={tdClass}>{reasonLabel(s.reason) || "—"}</td>
-                                <td
-                                  class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
-                                >
-                                  {formatDateTime(s.executed_at)}
-                                </td>
-                              </tr>
-                            )}
-                          </For>
-                        </tbody>
-                      </table>
-                    </div>
-                  </Show>
-                </Card>
-              </section>
+              <Card labelledBy="run-steps" class="min-w-0" padding="none" title={t("flows.steps")}>
+                <Show
+                  when={data.steps.length > 0}
+                  fallback={<EmptyState icon="document" title={t("flows.noSteps")} />}
+                >
+                  <div class="overflow-x-auto">
+                    <table class={tableClass}>
+                      <thead>
+                        <tr>
+                          <Th>{t("flows.steps")}</Th>
+                          <Th>{t("flows.status")}</Th>
+                          <Th>{t("flows.outcome")}</Th>
+                          <Th>{t("flows.executed")}</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <For each={data.steps}>
+                          {(s) => (
+                            <tr>
+                              <td class={`${tdClass} font-semibold text-heading`}>
+                                {t("flows.step", { n: String(s.step_number + 1) })}
+                              </td>
+                              <td class={tdClass}>
+                                <Badge tone={stepTone[s.status] ?? "neutral"}>
+                                  {stepLabel(s.status)}
+                                </Badge>
+                              </td>
+                              <td class={tdClass}>{reasonLabel(s.reason) || "—"}</td>
+                              <td
+                                class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                              >
+                                {formatDateTime(s.executed_at)}
+                              </td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </Show>
+              </Card>
             </div>
           );
         }}

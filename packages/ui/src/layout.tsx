@@ -43,6 +43,16 @@ export interface CardProps {
   /** Body padding; use "none" when the body is a full-bleed table. */
   padding?: "none" | "normal";
   class?: string;
+  id?: string;
+  /**
+   * Makes the card a `region` named by its own title: the title heading gets this id and the
+   * card `aria-labelledby` it.
+   */
+  labelledBy?: string;
+  /** Makes the card a `region` with this name (when the title is not the right name). */
+  "aria-label"?: string;
+  /** Id of the title heading without making the card a region (e.g. for a table's name). */
+  titleId?: string;
 }
 
 /**
@@ -53,13 +63,23 @@ export function Card(props: CardProps) {
   const hasHeader = () => props.title !== undefined || props.actions !== undefined;
   return (
     <section
-      class={`min-w-0 overflow-hidden rounded-lg border border-border bg-subtle ${props.class ?? ""}`}
+      id={props.id}
+      aria-labelledby={props.labelledBy}
+      aria-label={props["aria-label"]}
+      class={`flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-subtle ${props.class ?? ""}`}
     >
       <Show when={hasHeader()}>
         <div class="flex min-h-12 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
           <div class="flex min-w-0 flex-col gap-0.5">
             <div class="flex items-center gap-3">
-              <h2 class="text-sm font-semibold text-heading">{props.title}</h2>
+              <Show when={props.title !== undefined}>
+                <h2
+                  id={props.labelledBy ?? props.titleId}
+                  class="text-sm font-semibold text-heading"
+                >
+                  {props.title}
+                </h2>
+              </Show>
               <Show when={props.count !== undefined}>
                 <span class="figures inline-flex items-center gap-1 text-sm text-muted-foreground">
                   <Show when={props.countIcon}>{(name) => <Icon name={name()} />}</Show>
@@ -77,7 +97,7 @@ export function Card(props: CardProps) {
         </div>
       </Show>
       <div
-        class="bg-background"
+        class="flex-1 bg-background"
         classList={{
           "p-4": props.padding !== "none",
           "border-t border-border": hasHeader(),

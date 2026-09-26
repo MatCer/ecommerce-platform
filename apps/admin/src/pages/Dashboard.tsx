@@ -296,16 +296,16 @@ function Panel(props: {
   children: JSX.Element;
 }) {
   return (
-    <section aria-labelledby={props.id} class={`flex min-w-0 flex-col ${props.class ?? ""}`}>
-      <Card
-        title={<span id={props.id}>{props.title}</span>}
-        description={props.description}
-        actions={props.actions}
-        padding={props.padding}
-      >
-        {props.children}
-      </Card>
-    </section>
+    <Card
+      labelledBy={props.id}
+      class={props.class}
+      title={props.title}
+      description={props.description}
+      actions={props.actions}
+      padding={props.padding}
+    >
+      {props.children}
+    </Card>
   );
 }
 

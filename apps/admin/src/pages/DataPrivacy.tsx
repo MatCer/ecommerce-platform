@@ -66,7 +66,8 @@ function Exports() {
     <Card
       class="mb-6 max-w-3xl"
       padding="none"
-      title={<span id="export-title">{t("data.exportTitle")}</span>}
+      titleId="export-title"
+      title={t("data.exportTitle")}
       description={t("data.exportHint")}
       actions={
         <Button variant="confirm" loading={start.isPending} onClick={() => start.mutate()}>

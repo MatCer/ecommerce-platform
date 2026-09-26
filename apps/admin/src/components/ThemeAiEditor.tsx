@@ -165,126 +165,126 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
   };
 
   return (
-    <section aria-labelledby="ai-edit-h" class="mt-4 max-w-5xl">
-      <Card
-        title={
-          <span id="ai-edit-h" class="flex flex-wrap items-center gap-2">
-            {t("themes.ai.title")}
-            <Show when={runs.data?.provider === "fake"}>
-              <Badge tone="info">{t("ai.demo")}</Badge>
-            </Show>
-          </span>
-        }
-        description={t("themes.ai.hint")}
-      >
-        <Show when={props.canEdit && runs.data?.provider !== "disabled"}>
-          <form
-            class="mb-4 flex flex-col gap-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (prompt().trim() && !busy()) start.mutate();
-            }}
-          >
-            <TextField
-              label={t("themes.ai.prompt")}
-              description={t("themes.ai.promptHint")}
-              multiline
-              rows={3}
-              maxLength={4000}
-              value={prompt()}
-              onChange={setPrompt}
-              disabled={start.isPending}
-            />
-            <div>
-              <Button
-                type="submit"
-                variant="confirm"
-                loading={start.isPending}
-                disabled={!prompt().trim() || busy()}
-              >
-                {t("themes.ai.start")}
-              </Button>
-            </div>
-          </form>
-        </Show>
-        <Show when={error()}>
-          <Alert tone="error" class="mb-4">
-            <Show when={quotaExceeded()} fallback={errorMessage(error())}>
-              {t("ai.quotaExceeded")}{" "}
-              <A href="/settings/ai" class={linkClass}>
-                {t("ai.seeUsage")}
-              </A>
-            </Show>
-          </Alert>
-        </Show>
-        <QueryState query={runs}>
-          {() => (
-            <Show when={items().length}>
-              <div class="overflow-x-auto rounded-md border border-border">
-                <table class={tableClass}>
-                  <caption class="border-b border-border px-3 py-2 text-left text-sm font-semibold text-heading">
-                    {t("themes.ai.runs")}
-                  </caption>
-                  <thead>
-                    <tr>
-                      <Th>{t("themes.ai.request")}</Th>
-                      <Th>{t("themes.status")}</Th>
-                      <Th>{t("themes.created")}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={items()}>
-                      {(r) => (
-                        <tr
-                          classList={{
-                            "bg-subtle": r.id === current(),
-                            "hover:bg-subtle": r.id !== current(),
-                          }}
-                        >
-                          <td class={`${tdClass} max-w-md`}>
-                            <button
-                              type="button"
-                              class="line-clamp-2 rounded-sm text-left font-semibold text-heading hover:text-accent-700 hover:underline aria-pressed:text-accent-700"
-                              aria-pressed={r.id === current()}
-                              onClick={() => setSelected(r.id)}
-                            >
-                              {r.prompt}
-                            </button>
-                          </td>
-                          <td class={tdClass}>
-                            <Badge tone={runTone(r.status)}>
-                              {t(`themes.ai.statuses.${r.status as "queued"}`)}
-                            </Badge>
-                          </td>
-                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
-                            {formatDateTime(r.created_at)}
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
-            </Show>
-          )}
-        </QueryState>
-        <Show when={current()}>
-          <div class="mt-4 rounded-md border border-border p-4">
-            <QueryState query={detail}>
-              {(d) => (
-                <RunView
-                  detail={d}
-                  canEdit={props.canEdit}
-                  pending={act.isPending}
-                  onAction={(action) => act.mutate({ id: d.run.id, action })}
-                  onShowRevision={props.onShowRevision}
-                />
-              )}
-            </QueryState>
+    <Card
+      labelledBy="ai-edit-h"
+      class="mt-4 max-w-5xl"
+      title={
+        <span class="flex flex-wrap items-center gap-2">
+          {t("themes.ai.title")}
+          <Show when={runs.data?.provider === "fake"}>
+            <Badge tone="info">{t("ai.demo")}</Badge>
+          </Show>
+        </span>
+      }
+      description={t("themes.ai.hint")}
+    >
+      <Show when={props.canEdit && runs.data?.provider !== "disabled"}>
+        <form
+          class="mb-4 flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (prompt().trim() && !busy()) start.mutate();
+          }}
+        >
+          <TextField
+            label={t("themes.ai.prompt")}
+            description={t("themes.ai.promptHint")}
+            multiline
+            rows={3}
+            maxLength={4000}
+            value={prompt()}
+            onChange={setPrompt}
+            disabled={start.isPending}
+          />
+          <div>
+            <Button
+              type="submit"
+              variant="confirm"
+              loading={start.isPending}
+              disabled={!prompt().trim() || busy()}
+            >
+              {t("themes.ai.start")}
+            </Button>
           </div>
-        </Show>
-      </Card>
-    </section>
+        </form>
+      </Show>
+      <Show when={error()}>
+        <Alert tone="error" class="mb-4">
+          <Show when={quotaExceeded()} fallback={errorMessage(error())}>
+            {t("ai.quotaExceeded")}{" "}
+            <A href="/settings/ai" class={linkClass}>
+              {t("ai.seeUsage")}
+            </A>
+          </Show>
+        </Alert>
+      </Show>
+      <QueryState query={runs}>
+        {() => (
+          <Show when={items().length}>
+            <div class="overflow-x-auto rounded-md border border-border">
+              <table class={tableClass}>
+                <caption class="border-b border-border px-3 py-2 text-left text-sm font-semibold text-heading">
+                  {t("themes.ai.runs")}
+                </caption>
+                <thead>
+                  <tr>
+                    <Th>{t("themes.ai.request")}</Th>
+                    <Th>{t("themes.status")}</Th>
+                    <Th>{t("themes.created")}</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <For each={items()}>
+                    {(r) => (
+                      <tr
+                        classList={{
+                          "bg-subtle": r.id === current(),
+                          "hover:bg-subtle": r.id !== current(),
+                        }}
+                      >
+                        <td class={`${tdClass} max-w-md`}>
+                          <button
+                            type="button"
+                            class="line-clamp-2 rounded-sm text-left font-semibold text-heading hover:text-accent-700 hover:underline aria-pressed:text-accent-700"
+                            aria-pressed={r.id === current()}
+                            onClick={() => setSelected(r.id)}
+                          >
+                            {r.prompt}
+                          </button>
+                        </td>
+                        <td class={tdClass}>
+                          <Badge tone={runTone(r.status)}>
+                            {t(`themes.ai.statuses.${r.status as "queued"}`)}
+                          </Badge>
+                        </td>
+                        <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                          {formatDateTime(r.created_at)}
+                        </td>
+                      </tr>
+                    )}
+                  </For>
+                </tbody>
+              </table>
+            </div>
+          </Show>
+        )}
+      </QueryState>
+      <Show when={current()}>
+        <div class="mt-4 rounded-md border border-border p-4">
+          <QueryState query={detail}>
+            {(d) => (
+              <RunView
+                detail={d}
+                canEdit={props.canEdit}
+                pending={act.isPending}
+                onAction={(action) => act.mutate({ id: d.run.id, action })}
+                onShowRevision={props.onShowRevision}
+              />
+            )}
+          </QueryState>
+        </div>
+      </Show>
+    </Card>
   );
 }
 

@@ -43,7 +43,7 @@ hex or `oklch` in pages.
 | `TooltipButton` | Icon-only button that needs a visible hint (hover + focus). |
 | `Badge` `tone`, `icon` | Status pill. success = done/active, warning = attention, error = failed, info = in progress, neutral = draft/inactive. Not clickable. |
 | `Alert` `tone`, `title`, `actions`, `onDismiss`+`dismissLabel` | Inline message about the page/section. error/warning are `role=alert`. Replaces coloured `<p>` boxes. |
-| `Card` `title`, `count`, `countIcon`, `description`, `actions`, `footer`, `padding="none"` | Every grouped block (Pajamas CRUD component). Tables go in `padding="none"`. |
+| `Card` `title`, `count`, `countIcon`, `description`, `actions`, `footer`, `padding="none"`, `id`, `labelledBy`, `aria-label`, `titleId` | Every grouped block (Pajamas CRUD component). Tables go in `padding="none"`. `labelledBy="x"` makes it a region named by its title (the h2 gets id `x`); `aria-label` names it explicitly; `titleId` only ids the h2 (e.g. for a table's `aria-labelledby`). Never wrap a Card in another `<section>`. The body stretches when the card is a full-height grid cell. |
 | `PageHeading` (admin `PageHeader` wraps it + `back`) | Once per page: h1, description, page actions. |
 | `Breadcrumb` | Shell only (derived from the nav). |
 | `TextField` (`multiline` = textarea), `SelectField` (native), `Checkbox`, `Radio`, `Toggle`, `SearchBox`, `FormGroup` + `describedBy` | Labels above controls, bold. Help text under the control; `error` replaces it. Radio for 2-5 exclusive options, select for more. Toggle only for settings that apply immediately; Checkbox inside forms with a Save button. `SearchBox` for list filters (its `clearLabel` must differ from any "Clear filters" button). `FormGroup` wraps raw inputs/pickers. |
