@@ -631,6 +631,18 @@ export default function ProductEditor() {
           </FieldGroup>
         </div>
       </Section>
+      {/* Form footer (Pajamas): Save comes after the fields in tab order, so a keyboard user
+          reaches it right after editing; the destructive action sits apart on the right. */}
+      <div class="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-background py-3">
+        <Button type="submit" variant="confirm" loading={save.isPending}>
+          {t("editor.save")}
+        </Button>
+        <Show when={!isNew()}>
+          <Button variant="danger" category="secondary" onClick={() => setConfirmDelete(true)}>
+            {t("editor.deleteProduct")}
+          </Button>
+        </Show>
+      </div>
     </form>
   );
 
@@ -639,18 +651,6 @@ export default function ProductEditor() {
       <PageHeader
         title={isNew() ? t("editor.titleNew") : t("editor.titleEdit")}
         back={{ href: "/products", label: t("nav.products") }}
-        actions={
-          <Show when={isNew() || product.data}>
-            <Show when={!isNew()}>
-              <Button variant="danger" category="secondary" onClick={() => setConfirmDelete(true)}>
-                {t("editor.deleteProduct")}
-              </Button>
-            </Show>
-            <Button type="submit" form="product-form" variant="confirm" loading={save.isPending}>
-              {t("editor.save")}
-            </Button>
-          </Show>
-        }
       />
       <Show when={!isNew()} fallback={form()}>
         <Show

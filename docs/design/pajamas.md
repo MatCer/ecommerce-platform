@@ -91,9 +91,10 @@ of fields (grids `gap-5`), radios in a `fieldset` with `legend class={labelClass
 `Alert tone="error"`, footer `div.border-t.border-border.pt-5` with one confirm Save.
 Long settings: one `FieldGroup` (or `Card`) per topic.
 
-**Editor page** (product/content editors): `PageHeader back actions={Save confirm}`; same
-two-column grid as the detail page with the form `Card`s in the main column and
-status/visibility/media cards in the aside; sticky nothing; one Save.
+**Editor page** (product/content editors): `PageHeader back`; same two-column grid as the
+detail page with the form `Card`s in the main column and status/visibility/media cards in the
+aside; one Save in a sticky form footer after the fields (keyboard users reach it by tabbing
+forward; e2e relies on it), destructive action on the right of that footer.
 
 ## Migration checklist (per page)
 
