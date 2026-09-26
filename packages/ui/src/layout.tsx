@@ -209,15 +209,24 @@ export function Avatar(props: {
   );
 }
 
-/** Pajamas collapse: native disclosure (details/summary) with a chevron. */
+/**
+ * Pajamas collapse: native disclosure (details/summary) with a chevron. `open` sets the state
+ * (controlled when paired with `onToggle`); `onToggle` reports every open/close, e.g. to load
+ * the body lazily.
+ */
 export function Collapse(props: {
   summary: JSX.Element;
   children: JSX.Element;
   open?: boolean;
+  onToggle?: (open: boolean) => void;
   class?: string;
 }) {
   return (
-    <details open={props.open} class={`group ${props.class ?? ""}`}>
+    <details
+      open={props.open}
+      onToggle={(e) => props.onToggle?.(e.currentTarget.open)}
+      class={`group ${props.class ?? ""}`}
+    >
       <summary class="flex min-h-control cursor-pointer list-none items-center gap-1 rounded-md text-sm font-semibold text-heading [&::-webkit-details-marker]:hidden">
         <Icon
           name="chevron-right"

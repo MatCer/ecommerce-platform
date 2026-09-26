@@ -54,7 +54,7 @@ hex or `oklch` in pages.
 | `Tabs` (`count`) | Sibling views of one object. |
 | `showToast` / `ToastRegion` | Short confirmation after an action (dark, bottom-left). Errors persist. |
 | `EmptyState` (`icon`), `ErrorState`, `PermissionDenied`, `LoadingState`, `Skeleton`, `Spinner`, `ProgressBar` | Empty = title + one sentence + one action. Prefer `Skeleton` for layout-shaped loads. |
-| `Collapse` | Optional detail (replaces raw `<details>`). |
+| `Collapse` `open`, `onToggle(open)` | Optional detail (replaces raw `<details>`); `onToggle` for lazy bodies. |
 | `Avatar` | Shop/user identity (decorative). |
 | `tableClass`, `tdClass`, `Th` | Plain `<table>`; wrap in `<div class="overflow-x-auto">`. |
 | `Icon name=` | Pajamas icons; decorative unless `label`. Add icons by importing the SVG in `icon.tsx`. |

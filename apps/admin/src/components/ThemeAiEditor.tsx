@@ -4,7 +4,17 @@
  * The run's progress, the agent's summary, the diff and the last check report are shown here;
  * accepting makes its revision publishable through the normal preview/publish flow above.
  */
-import { Alert, Badge, Button, Card, Icon, linkClass, Spinner, TextField } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Collapse,
+  Icon,
+  linkClass,
+  Spinner,
+  TextField,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
@@ -60,30 +70,20 @@ export function RevisionChanges(props: { id: string }) {
       ),
   }));
   return (
-    // Native disclosure styled like the Pajamas Collapse (which cannot report its toggle yet).
-    <details class="group text-sm" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary class="flex min-h-control cursor-pointer list-none items-center gap-1 rounded-md font-semibold text-heading [&::-webkit-details-marker]:hidden">
-        <Icon
-          name="chevron-right"
-          class="text-muted-foreground transition-transform group-open:rotate-90"
-        />
-        {t("themes.ai.showChanges")}
-      </summary>
-      <div class="pt-2 pl-5">
-        <Show when={open()}>
-          <QueryState query={diff}>
-            {(d) => (
-              <Show
-                when={d.diff}
-                fallback={<p class="text-muted-foreground">{t("themes.ai.noDiff")}</p>}
-              >
-                <DiffView diff={d.diff} label={t("themes.ai.diff")} />
-              </Show>
-            )}
-          </QueryState>
-        </Show>
-      </div>
-    </details>
+    <Collapse class="text-sm" summary={t("themes.ai.showChanges")} onToggle={setOpen}>
+      <Show when={open()}>
+        <QueryState query={diff}>
+          {(d) => (
+            <Show
+              when={d.diff}
+              fallback={<p class="text-muted-foreground">{t("themes.ai.noDiff")}</p>}
+            >
+              <DiffView diff={d.diff} label={t("themes.ai.diff")} />
+            </Show>
+          )}
+        </QueryState>
+      </Show>
+    </Collapse>
   );
 }
 
