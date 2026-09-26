@@ -64,22 +64,29 @@ pnpm verify-merge <PR#>          # tests for the areas the PR touches, then squa
 pnpm verify-merge <PR#> --full   # everything: release, or when in doubt
 ```
 
-It refuses drafts, unmergeable PRs, and a local PR branch that differs from the pushed head.
-It checks out the PR head in a temporary worktree (your checkout is untouched), maps changed
+It refuses drafts, unmergeable PRs, PRs behind `main` (`gh pr update-branch <n> --rebase`), and
+a local PR branch that differs from the pushed head. It checks out the PR head in a temporary
+worktree (your working tree is not touched; `gh pr merge` runs with `--repo`, so no local
+checkout or branch deletion either), maps changed
 files to areas via `scripts/verify-areas.txt`, and runs: vitest for changed TS (`--changed`),
 `cargo test` + the Meilisearch tests when Rust, migrations or fixtures change, and the e2e specs
 (with their axe checks) linked to each area. Shared code (UI kit, admin shell/i18n/API client,
 auth, edge, migrations, API core, compose, e2e support/config), a file no area maps, or
 `--full` runs everything: all Rust and TS tests, all e2e, the image smoke test and `make perf`.
-The stack is a separate compose project `ecommerce-verify` on ports 18080/18443/15432/…,
-seeded like the old CI acceptance job, and removed with its volumes on success, failure or
-Ctrl-C; it never touches the dev stack (`ecommerce`). One run at a time (lock in
+The stack is a separate compose project `ecommerce-verify` on ports 18080/18443/15432/…
+(caller `COMPOSE_*`, database, port and `E2E_*` variables are unset first), seeded like the old
+CI acceptance job (`make seed` + `scripts/seed-m2-perf-review.sh`), and removed with its
+containers, volumes and image tags on success, failure or Ctrl-C (a `kill -9` leftover is
+removed by the next run); it never touches the dev stack (`ecommerce`).
+Committed `.only` fails both runners. One run at a time (lock in
 `~/.cache/ecommerce-verify-merge/`; the persistent Cargo target dir lives there too).
 
 On success it posts `local-verify=success` on the PR head and runs
-`gh pr merge --squash --delete-branch --match-head-commit <sha>`. On failure it posts
-`failure`, does not merge, lists the failing specs with a `make e2e args="…"` line to rerun
-them against the dev stack, and keeps traces in `~/.cache/ecommerce-verify-merge/pr-<n>-test-results`.
+`gh pr merge --squash --delete-branch --match-head-commit <sha>`. If `main` moved during
+the run it refuses to merge (rerun after updating). On failure it posts `failure` (`error` if
+aborted), does not merge, lists the failing specs with a `make e2e args="…"` line to rerun
+them against the dev stack, and keeps each Playwright project's traces and JSON report in
+`~/.cache/ecommerce-verify-merge/pr-<n>-test-results/`; stack logs in `pr-<n>-stack.log`.
 
 `.githooks/pre-push` refuses pushes to `main` (enable with `git config core.hooksPath .githooks`;
 `pnpm install` does it). CI's `gate` job fails a `main` commit that did not come from a merged PR

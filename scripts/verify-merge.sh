@@ -30,6 +30,12 @@ done
 
 cd "$(git rev-parse --show-toplevel)"
 caller="$PWD"
+repo="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+# The caller's environment must not steer compose, make or the e2e helpers at the dev stack
+# (COMPOSE_ENV_FILES=.env, TEST_DATABASE_URL, HTTP_PORT, ...). Everything comes from the
+# throwaway worktree's .env below.
+while read -r v; do unset "$v"; done < <(compgen -e | grep -E \
+  '^(COMPOSE_|(TEST_|OWNER_)?DATABASE_URL$|APP_|PG_|MEILI_|MINIO_|MAILPIT_|STRIPE_|S3_|HTTPS?_PORT$|HOST_BIND$|E2E_|PLAYWRIGHT_|CI$)')
 
 # --- PR preconditions --------------------------------------------------------------------
 for _ in 1 2 3 4 5; do  # GitHub computes `mergeable` lazily; UNKNOWN settles in seconds.
@@ -59,20 +65,32 @@ flock -n 9 || die "another verify-merge is running"
 git fetch -q origin "$base_ref" "+refs/pull/$pr/head:refs/verify-merge/pr-$pr"
 [ "$(git rev-parse "refs/verify-merge/pr-$pr")" = "$sha" ] || die "fetched head differs from the PR head; retry"
 base="$(git merge-base "origin/$base_ref" "$sha")"
+# The squash result must be what gets tested: the PR has to contain the current base tip.
+[ "$base" = "$(git rev-parse "origin/$base_ref")" ] ||
+  die "PR #$pr is behind $base_ref; update it first (gh pr update-branch $pr --rebase)"
 
 # --- throwaway worktree + stack, removed on success, failure and Ctrl-C -------------------
 project=ecommerce-verify
 wt="$cache/pr-$pr"
-compose() { (cd "$wt" && COMPOSE_PROFILES=full docker compose "$@"); }
+reported=0 status_posted=0
+compose() { (cd "$wt" && COMPOSE_PROFILES=full docker compose -p "$project" --env-file "$wt/.env" "$@"); }
 cleanup() {
   local code=$?
   trap - EXIT INT TERM
+  # Install errors, Ctrl-C, ...: never leave the status pending.
+  if ((code != 0 && status_posted && !reported)); then status error "aborted (exit $code)" || true; fi
   if [ -f "$wt/.env" ]; then
     echo "verify-merge: removing stack $project" >&2
-    compose down -v --remove-orphans --timeout 5 >/dev/null 2>&1 || true
-    # Theme sandbox containers are started by the builder, outside compose.
+    # Sandbox containers (started by the builder, outside compose) hold the sandbox networks.
+    compose stop --timeout 5 theme-builder theme-sandbox-proxy >/dev/null 2>&1 || true
     docker ps -aq --filter "label=platform.theme-sandbox=$project" | xargs -r docker rm -f >/dev/null 2>&1 || true
-    docker images -q --filter "reference=$project-*:local" | xargs -r docker rmi -f >/dev/null 2>&1 || true
+    compose down -v --remove-orphans --timeout 5 >/dev/null 2>&1 || true
+    # Exact tags only: an unchanged build shares image IDs with the dev stack's images.
+    docker images --format '{{.Repository}}:{{.Tag}}' --filter "reference=$project-*:local" |
+      xargs -r docker rmi >/dev/null 2>&1 || true
+    if [ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$project")$(docker volume ls -q --filter "label=com.docker.compose.project=$project")" ]; then
+      echo "verify-merge: WARNING: $project containers/volumes left; the next run removes them" >&2
+    fi
   fi
   git -C "$caller" worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"
   git -C "$caller" update-ref -d "refs/verify-merge/pr-$pr" 2>/dev/null || true
@@ -83,14 +101,18 @@ trap 'exit 130' INT TERM
 
 # A leftover from a killed run (kill -9, reboot) would hold the ports.
 docker ps -aq --filter "label=com.docker.compose.project=$project" | xargs -r docker rm -f >/dev/null
+docker ps -aq --filter "label=platform.theme-sandbox=$project" | xargs -r docker rm -f >/dev/null
 docker volume ls -q --filter "label=com.docker.compose.project=$project" | xargs -r docker volume rm >/dev/null
+docker network ls -q --filter "label=com.docker.compose.project=$project" | xargs -r docker network rm >/dev/null
 git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"
 git worktree prune
 git worktree add -q --detach "$wt" "$sha"
 
 status() {  # state, description (GitHub caps it at 140 chars)
-  gh api -X POST "repos/{owner}/{repo}/statuses/$sha" -f state="$1" -f context=local-verify \
+  gh api -X POST "repos/$repo/statuses/$sha" -f state="$1" -f context=local-verify \
     -f description="${2:0:140}" >/dev/null
+  status_posted=1
+  [ "$1" = pending ] || reported=1
 }
 fail() {
   status failure "$1" || true
@@ -152,16 +174,15 @@ sed -e "s/^COMPOSE_PROJECT_NAME=.*/COMPOSE_PROJECT_NAME=$project/" \
   -e 's/^MINIO_PORT=.*/MINIO_PORT=19000/' -e 's/^MINIO_CONSOLE_PORT=.*/MINIO_CONSOLE_PORT=19001/' \
   -e 's/^MAILPIT_SMTP_PORT=.*/MAILPIT_SMTP_PORT=11025/' -e 's/^MAILPIT_UI_PORT=.*/MAILPIT_UI_PORT=18025/' \
   -e 's/^STRIPE_MOCK_PORT=.*/STRIPE_MOCK_PORT=12121/' .env.example >.env
-# Playwright/support helpers read the process env before .env; the caller's must not leak in.
-unset COMPOSE_PROJECT_NAME COMPOSE_PROFILES HTTP_PORT HTTPS_PORT MAILPIT_UI_PORT E2E_RATE_SECRET
 
 log="$cache/pr-$pr-stack.log"
 say "pnpm install"
 pnpm install --frozen-lockfile --silent
 
 say "vitest"
-if ((full)); then pnpm exec vitest run || fail "vitest failed"
-else pnpm exec vitest run --changed "$base" --passWithNoTests || fail "vitest failed (changed since ${base:0:7})"; fi
+# --allowOnly=false: a committed .only must fail, not silently shrink the suite.
+if ((full)); then pnpm exec vitest run --allowOnly=false || fail "vitest failed"
+else pnpm exec vitest run --allowOnly=false --changed "$base" --passWithNoTests || fail "vitest failed (changed since ${base:0:7})"; fi
 
 if ((e2e)); then
   say "stack: build + start (full profile)"
@@ -180,27 +201,30 @@ fi
 
 failed=()
 perf_ok=1
+e2e_rc=0
 if ((e2e)); then
   say "seed"
   make seed >>"$log" 2>&1 || fail "seed failed (log: $log)"
-  pnpm --filter @platform/e2e exec playwright install chromium firefox >/dev/null
+  bash scripts/seed-m2-perf-review.sh >>"$log" 2>&1 || fail "review fixture seed failed (log: $log)"
+  pnpm --filter @platform/e2e exec playwright install chromium firefox >/dev/null || fail "playwright install failed"
   results="$wt/.verify"
   mkdir -p "$results"
   # Specs run per project with --no-deps: a file filter would otherwise pull in every spec of
   # the dependency projects. Order and per-project workers match the config's dependency chain.
-  n=0
+  e2e_rc=0
   for p in chromium-setup chromium firefox chromium-shared-state chromium-themes; do
     say "e2e: $p"
-    args=(--project "$p" --no-deps --pass-with-no-tests --reporter=list,json)
+    # Own output dir per project (each run clears its own); CI=1 makes the config forbid .only.
+    args=(--project "$p" --no-deps --pass-with-no-tests --reporter=list,json --output "$results/$p")
     [ "$p" = chromium-setup ] || ((full)) || args+=("${spec_list[@]}")
-    n=$((n + 1))
-    PLAYWRIGHT_JSON_OUTPUT_NAME="$results/$n.json" make e2e args="${args[*]}" || true
-    if [ "$p" = chromium-setup ] && ! jq -e '.stats.unexpected == 0' "$results/$n.json" >/dev/null; then
-      fail "e2e fixture setup failed"
+    if ! CI=1 PLAYWRIGHT_JSON_OUTPUT_NAME="$results/$p.json" make e2e args="${args[*]}"; then
+      e2e_rc=1
+      if [ "$p" = chromium-setup ]; then fail "e2e fixture setup failed"; fi
     fi
   done
+  # Names for the report only; the exit codes above decide (load errors fail no single spec).
   mapfile -t failed < <(jq -r '.. | objects | select(has("specs")) | .specs[] | select(.ok == false) | .file' \
-    "$results"/*.json | sort -u)
+    "$results"/*.json 2>/dev/null | sort -u || true)
   if ((full)); then
     say "image smoke (degraded readiness)"
     i="$project-%s:local"
@@ -208,14 +232,14 @@ if ((e2e)); then
     scripts/smoke-images.sh "$(printf "$i" rust)" "$(printf "$i" mocks)" "$(printf "$i" theme-builder)" \
       "$(printf "$i" auth)" || fail "image smoke test failed"
     say "perf (lab budget + axe)"
-    bash scripts/seed-m2-perf-review.sh >/dev/null
     make perf || perf_ok=0
   fi
 fi
 
-if ((${#failed[@]})) || ! ((perf_ok)); then
-  cp -r e2e/test-results "$cache/pr-$pr-test-results" 2>/dev/null || true
-  what="${failed[*]}"; ((perf_ok)) || what="perf ${what}"
+if ((e2e_rc)) || ! ((perf_ok)); then
+  rm -rf "$cache/pr-$pr-test-results"
+  cp -r "$results" "$cache/pr-$pr-test-results" 2>/dev/null || true
+  what="${failed[*]:-e2e run errored (see output)}"; ((perf_ok)) || what="perf ${what}"
   status failure "failed: $what" || true
   printf '\n\033[31mverify-merge: FAILED\033[0m %s\n' "$what" >&2
   ((${#failed[@]} == 0)) || printf 'Rerun just those against your dev stack:\n  make e2e args="%s"\n' "${failed[*]}" >&2
@@ -229,7 +253,12 @@ else
   summary="rust=$rust vitest=changed e2e=${#spec_list[@]}: ${spec_list[*]}"
   ((e2e)) || summary="rust=$rust vitest=changed, no e2e (${area_list:-no areas})"
 fi
+cd "$caller"
+# main moved while the tests ran: the squash would contain untested code.
+git fetch -q origin "$base_ref"
+[ "$(git rev-parse "origin/$base_ref")" = "$base" ] ||
+  fail "$base_ref moved during verification; update the PR and rerun"
 say "passed in ${SECONDS}s; recording local-verify and merging"
 status success "$summary (${SECONDS}s)"
-cd "$caller"
-gh pr merge "$pr" --squash --delete-branch --match-head-commit "$sha"
+# --repo: gh leaves the local checkout alone (no base checkout, no local branch delete).
+gh pr merge "$pr" --repo "$repo" --squash --delete-branch --match-head-commit "$sha"
