@@ -59,9 +59,11 @@ export async function expectAccessible(page: Page, name: string) {
   expect(bad, `axe on ${name}`).toEqual([]);
 }
 
-/** Waits until every `client:idle` island has hydrated (Astro drops `ssr` when done). */
+/** Waits until every `client:idle`/`client:load` island has hydrated (Astro drops `ssr` when done). */
 export async function hydrated(page: Page) {
-  await page.waitForFunction(() => !document.querySelector('astro-island[client="idle"][ssr]'));
+  await page.waitForFunction(
+    () => !document.querySelector('astro-island[ssr]:is([client="idle"], [client="load"])'),
+  );
 }
 
 /** Screenshots for the PR (`WP8_SCREENSHOTS=1 make e2e args=storefront`). */

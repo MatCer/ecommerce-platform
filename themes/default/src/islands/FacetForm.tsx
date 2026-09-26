@@ -4,7 +4,9 @@ import { onCleanup, onMount } from "solid-js";
  * Behaviour for the server-rendered filter form (components/Facets.astro); renders nothing.
  * From 48rem a change submits at once and open dropdowns close on outside click or Escape.
  * In the phone sheet changes wait for "Show results", so the sheet does not reload per tap.
- * Hydrated with client:idle (a client:visible island with no box would never hydrate).
+ * Hydrated with client:load: dismissing a dropdown must work as soon as the page is usable,
+ * not once the main thread goes idle (an open dropdown covers the active-filter chips), and a
+ * client:visible island with no box would never hydrate.
  */
 export default function FacetForm(props: { form: string }) {
   onMount(() => {
