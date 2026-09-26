@@ -2,7 +2,8 @@ import {
   Badge,
   Button,
   EmptyState,
-  SelectField,
+  linkClass,
+  SegmentedControl,
   showToast,
   TextField,
   type Tone,
@@ -88,8 +89,9 @@ export default function Reviews() {
   return (
     <>
       <PageHeader title={t("reviews.title")} description={t("reviews.description")} />
-      <div class="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <SelectField
+      <div class="mb-4 flex flex-col gap-2">
+        <SegmentedControl
+          hideLabel
           label={t("reviews.status")}
           value={status()}
           options={[
@@ -98,17 +100,21 @@ export default function Reviews() {
           ]}
           onChange={(v) => setStatus(STATUSES.find((s) => s === v) ?? "")}
         />
+        <p class="max-w-prose text-sm text-muted-foreground">{t("reviews.policy")}</p>
       </div>
-      <p class="mb-4 max-w-prose text-xs text-muted-foreground">{t("reviews.policy")}</p>
       <QueryState query={list}>
         {() => (
           <Show
             when={rows().length > 0}
             fallback={
-              <EmptyState title={t("reviews.empty")} description={t("reviews.emptyDesc")} />
+              <EmptyState
+                icon="bullhorn"
+                title={t("reviews.empty")}
+                description={t("reviews.emptyDesc")}
+              />
             }
           >
-            <ul class="grid gap-3">
+            <ul class="flex flex-col gap-4">
               <For each={rows()}>
                 {(r) => (
                   <ReviewCard
@@ -121,7 +127,7 @@ export default function Reviews() {
               </For>
             </ul>
             <Show when={list.hasNextPage}>
-              <div class="mt-3">
+              <div class="mt-4">
                 <Button loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
                   {t("common.loadMore")}
                 </Button>
@@ -159,42 +165,62 @@ function ReviewCard(props: {
   }));
 
   return (
-    <li class="rounded-lg border border-border bg-card p-4">
-      <article aria-labelledby={`review-${r().id}`} class="grid gap-3">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span
-            role="img"
-            aria-label={t("reviews.rating", { n: String(r().rating) })}
-            class="text-accent-600"
-          >
-            {"★".repeat(r().rating)}
-            <span class="text-border">{"★".repeat(5 - r().rating)}</span>
-          </span>
-          <h2 id={`review-${r().id}`} class="font-semibold">
-            {r().title || r().customer_name}
-          </h2>
-          <Badge tone={tone[r().status]}>{t(`reviews.status_${r().status}`)}</Badge>
+    <li class="overflow-hidden rounded-lg border border-border bg-background">
+      <article aria-labelledby={`review-${r().id}`} class="flex flex-col">
+        <div class="flex flex-wrap items-start justify-between gap-3 p-4">
+          <div class="flex min-w-0 flex-col gap-2">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span
+                role="img"
+                aria-label={t("reviews.rating", { n: String(r().rating) })}
+                class="tracking-wider text-warning-600"
+              >
+                {"★".repeat(r().rating)}
+                <span class="text-faint-foreground">{"★".repeat(5 - r().rating)}</span>
+              </span>
+              <h2 id={`review-${r().id}`} class="text-base font-semibold text-heading">
+                {r().title || r().customer_name}
+              </h2>
+              <Badge tone={tone[r().status]}>{t(`reviews.status_${r().status}`)}</Badge>
+              <Show when={r().verified}>
+                <Badge tone="success" icon="check">
+                  {t("reviews.verified")}
+                </Badge>
+              </Show>
+            </div>
+            <p class="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <A href={`/products/${r().product_id}`} class={`font-semibold ${linkClass}`}>
+                {r().product_name}
+              </A>
+              <span>{r().customer_name}</span>
+              <span>{t("reviews.written", { date: formatDateTime(r().created_at) })}</span>
+              <Show when={r().order_id && r().order_number}>
+                <A href={`/orders/${r().order_id}`} class={linkClass}>
+                  {t("reviews.order", { n: String(r().order_number) })}
+                </A>
+              </Show>
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <For each={actions[r().status]}>
+              {(to) => (
+                <Button
+                  variant={to === "published" ? "confirm" : "default"}
+                  loading={props.busy}
+                  onClick={() => props.onModerate(to)}
+                >
+                  {t(actionLabel[to])}
+                  <span class="sr-only">: {r().title || r().customer_name}</span>
+                </Button>
+              )}
+            </For>
+          </div>
         </div>
-        <p class="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-          <A href={`/products/${r().product_id}`} class="font-medium text-foreground underline">
-            {r().product_name}
-          </A>
-          <span>{r().customer_name}</span>
-          <span>{t("reviews.written", { date: formatDateTime(r().created_at) })}</span>
-          <Show when={r().verified}>
-            <span class="font-medium text-success-700">{t("reviews.verified")}</span>
-          </Show>
-          <Show when={r().order_id && r().order_number}>
-            <A href={`/orders/${r().order_id}`} class="underline">
-              {t("reviews.order", { n: String(r().order_number) })}
-            </A>
-          </Show>
-        </p>
-        <p class="max-w-prose text-sm whitespace-pre-line" lang={r().locale}>
+        <p class="max-w-prose px-4 pb-4 text-sm whitespace-pre-line" lang={r().locale}>
           {r().body}
         </p>
         <form
-          class="grid max-w-prose gap-2"
+          class="flex flex-col gap-2 border-t border-border bg-subtle p-4 [&_label]:max-w-prose"
           onSubmit={(e) => {
             e.preventDefault();
             saveReply.mutate();
@@ -210,25 +236,11 @@ function ReviewCard(props: {
             maxLength={2000}
           />
           <div>
-            <Button type="submit" loading={saveReply.isPending}>
+            <Button type="submit" size="small" loading={saveReply.isPending}>
               {t("reviews.saveReply")}
             </Button>
           </div>
         </form>
-        <div class="flex flex-wrap gap-2">
-          <For each={actions[r().status]}>
-            {(to) => (
-              <Button
-                variant={to === "published" ? "confirm" : "default"}
-                loading={props.busy}
-                onClick={() => props.onModerate(to)}
-              >
-                {t(actionLabel[to])}
-                <span class="sr-only">: {r().title || r().customer_name}</span>
-              </Button>
-            )}
-          </For>
-        </div>
       </article>
     </li>
   );
