@@ -288,13 +288,18 @@ export default function CheckoutForm(props: {
     const upd = <K extends keyof CheckoutAddress>(k: K, v: CheckoutAddress[K]) =>
       set({ ...a(), [k]: v });
     const err = (v: string) => (touched() && !v.trim() ? t(m, "address.invalid") : undefined);
+    // Plain names and standard tokens: keyword-matching managers (Bitwarden) read name, id,
+    // label and autocomplete as one string, so `billing`/`section-*` there turns every field
+    // into an address match (city got the street). The separate delivery address carries the
+    // standard `shipping` token so browsers keep it apart.
+    const ac = (token: string) => (idPrefix === "shipping" ? `shipping ${token}` : token);
     return (
       <div class="grid gap-3 sm:grid-cols-2">
         <TextField
           class="sm:col-span-2"
           label={t(m, "address.name")}
-          name={`${idPrefix}-name`}
-          autocomplete={`section-${idPrefix} name`}
+          name="name"
+          autocomplete={ac("name")}
           required
           value={a().name}
           onChange={(v) => upd("name", v)}
@@ -303,14 +308,16 @@ export default function CheckoutForm(props: {
         <TextField
           class="sm:col-span-2"
           label={t(m, "address.company")}
-          autocomplete={`section-${idPrefix} organization`}
+          name="organization"
+          autocomplete={ac("organization")}
           value={a().company ?? ""}
           onChange={(v) => upd("company", v || null)}
         />
         <TextField
           class="sm:col-span-2"
           label={t(m, "address.street")}
-          autocomplete={`section-${idPrefix} street-address`}
+          name="street-address"
+          autocomplete={ac("street-address")}
           required
           value={a().street}
           onChange={(v) => upd("street", v)}
@@ -318,7 +325,8 @@ export default function CheckoutForm(props: {
         />
         <TextField
           label={t(m, "address.postal_code")}
-          autocomplete={`section-${idPrefix} postal-code`}
+          name="postal-code"
+          autocomplete={ac("postal-code")}
           required
           value={a().postal_code}
           onChange={(v) => upd("postal_code", v)}
@@ -326,7 +334,8 @@ export default function CheckoutForm(props: {
         />
         <TextField
           label={t(m, "address.city")}
-          autocomplete={`section-${idPrefix} address-level2`}
+          name="city"
+          autocomplete={ac("address-level2")}
           required
           value={a().city}
           onChange={(v) => upd("city", v)}
@@ -335,6 +344,8 @@ export default function CheckoutForm(props: {
         <SelectField
           class="sm:col-span-2"
           label={t(m, "address.country")}
+          name="country"
+          autocomplete={ac("country")}
           value={a().country}
           options={countries()}
           onChange={(v) => upd("country", v)}
@@ -369,6 +380,7 @@ export default function CheckoutForm(props: {
               <TextField
                 label={t(m, "account.email")}
                 type="email"
+                name="email"
                 autocomplete="email"
                 required
                 value={email()}
@@ -379,6 +391,7 @@ export default function CheckoutForm(props: {
               <TextField
                 label={t(m, "address.phone")}
                 type="tel"
+                name="tel"
                 autocomplete="tel"
                 value={phone()}
                 onChange={setPhone}

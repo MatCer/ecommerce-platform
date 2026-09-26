@@ -54,10 +54,10 @@ async function placeSkOrder(page: Page): Promise<void> {
   ]);
   await checkoutReady(page);
   await page.locator('input[autocomplete="email"]').fill(`analytics-${run}@example.test`);
-  await page.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
-  await page.locator('input[autocomplete="section-billing street-address"]').fill("Dlhá 12");
-  await page.locator('input[autocomplete="section-billing postal-code"]').fill("811 01");
-  await page.locator('input[autocomplete="section-billing address-level2"]').fill("Bratislava");
+  await page.locator('input[autocomplete="name"]').fill("Jana Nováková");
+  await page.locator('input[autocomplete="street-address"]').fill("Dlhá 12");
+  await page.locator('input[autocomplete="postal-code"]').fill("811 01");
+  await page.locator('input[autocomplete="address-level2"]').fill("Bratislava");
   await page.getByRole("radio", { name: /Packeta – na adresu/ }).check();
   await page.getByRole("radio", { name: /Testovacia platba/ }).check();
   for (const label of [/^Súhlasím s obchodn/, /^Beriem na vedomie/]) {

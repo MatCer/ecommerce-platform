@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -514,7 +514,6 @@ describe("artifacts: assets, publish, rollback, eviction, restart (A22)", () => 
 describe("cart capability and checkout handoff (A1, A4)", () => {
   const shop = "http://demo.localhost:8280";
   const origin = { origin: shop };
-  const sameSite = { "sec-fetch-site": "same-site" };
 
   test("state-changing /_p requests must be same-origin", async () => {
     const res = await get(
@@ -600,22 +599,41 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     });
     expect(api.calls.at(-1)?.headers["x-cart-token"]).toBe("carttoken_00000000000000000001");
     expect(start.headers.get("cache-control")).toBe("no-store");
-    expect(start.headers.get("set-cookie")).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
+    const setCookies = start.headers.getSetCookie();
+    expect(setCookies[0]).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
+    const h = new URL(location).searchParams.get("h") ?? "";
+    // WP26: the handoff is bound to this browser by a cookie the checkout subdomain receives.
+    // It carries SHA-256(h), never the redeemable token itself.
+    const digest = createHash("sha256").update(h).digest("hex");
+    const name = `__Secure-hf-${digest.slice(0, 16)}`;
+    expect(setCookies[1]).toBe(
+      `${name}=${digest}; Domain=demo.localhost; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=120`,
+    );
+    expect(setCookies[1]).not.toContain(h);
+    const bound = { cookie: `${name}=${digest}` };
 
-    // Wrong host cannot redeem it.
-    const h = new URL(location).searchParams.get("h");
-    // Planted links (cross-site) and pasted/mail links (none) cannot redeem, and do not burn it.
+    // Planted links (no, the raw token, or another digest) cannot redeem, and do not burn it.
+    const calls = api.calls.length;
     expect((await get(location, { "sec-fetch-site": "cross-site" })).status).toBe(400);
-    expect((await get(location, { "sec-fetch-site": "none" })).status).toBe(400);
-    expect((await get(location)).status).toBe(400);
-    const exchanged = await get(location, sameSite);
+    expect((await get(location, { "sec-fetch-site": "same-site" })).status).toBe(400);
+    expect((await get(location, { cookie: `${name}=${h}` })).status).toBe(400);
+    const planted = await get(location, { cookie: `${name}=${"0".repeat(64)}` });
+    expect(planted.status).toBe(400);
+    expect(planted.headers.getSetCookie()).toEqual([
+      `${name}=; Domain=demo.localhost; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+    ]);
+    expect(api.calls.length).toBe(calls);
+    // Firefox sends no (or a `cross-site`) Sec-Fetch-Site on the shop's 303: the cookie decides.
+    const exchanged = await get(location, bound);
     expect(exchanged.status).toBe(303);
     expect(exchanged.headers.get("location")).toBe("/");
-    expect(exchanged.headers.get("set-cookie")).toBe(
+    expect(exchanged.headers.getSetCookie()).toEqual([
       "__Host-cart=checkouttoken_000000000001; Path=/; HttpOnly; Secure; SameSite=Lax",
-    );
-    expect((await get(location, sameSite)).status).toBe(400); // single use
-    expect((await get(`http://checkout.other.localhost/start?h=${h}`, sameSite)).status).toBe(400);
+      `${name}=; Domain=demo.localhost; Path=/start; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+    ]);
+    expect((await get(location, bound)).status).toBe(400); // single use
+    // Wrong host cannot redeem it.
+    expect((await get(`http://checkout.other.localhost/start?h=${h}`, bound)).status).toBe(400);
 
     // The checkout app reads the cart through its own binding with the checkout-scoped token.
     api.calls.length = 0;
@@ -634,6 +652,43 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     });
     expect(account.headers.get("content-security-policy")).not.toContain("stripe.com");
     expect(api.calls[0]?.headers["x-cart-token"]).toBe("checkouttoken_000000000001");
+  });
+
+  test("handoffs are bound per token: interleaved tabs both redeem, stale links clear nothing else", async () => {
+    const begin = async (n: number) => {
+      const res = await get(
+        `${shop}/_p/checkout/start`,
+        { ...origin, cookie: `cart=carttoken_0000000000000000000${n}` },
+        { method: "POST" },
+      );
+      const location = res.headers.get("location") ?? "";
+      const binding = res.headers.getSetCookie()[1]?.split(";")[0] ?? "";
+      return { location, binding, name: binding.split("=")[0] ?? "" };
+    };
+    const a = await begin(1);
+    const b = await begin(2);
+    expect(a.location).not.toBe(b.location);
+    expect(a.name).not.toBe(b.name);
+    const jar = { cookie: `${a.binding}; ${b.binding}` };
+
+    // Replaying an invalid link while both are pending clears nothing.
+    const stale = await get(
+      "http://checkout.demo.localhost:8280/start?h=handofftoken_99999999999999999999",
+      jar,
+    );
+    expect(stale.status).toBe(400);
+    expect(stale.headers.getSetCookie()).toEqual([]);
+
+    const redeemB = await get(b.location, jar);
+    expect(redeemB.status).toBe(303);
+    const cleared = redeemB.headers.getSetCookie().filter((c) => c.startsWith("__Secure-hf-"));
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0]?.startsWith(`${b.name}=;`)).toBe(true);
+    // Replaying B's used link (its binding already gone) touches nothing; A still redeems.
+    const replay = await get(b.location, { cookie: a.binding });
+    expect(replay.status).toBe(400);
+    expect(replay.headers.getSetCookie()).toEqual([]);
+    expect((await get(a.location, { cookie: a.binding })).status).toBe(303);
   });
 
   test("checkout origin serves tenant tokens as CSS and is never cached", async () => {

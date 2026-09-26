@@ -1,6 +1,8 @@
 # Handoff: final state (2026-09-26)
 
-`main` = WP25 merge. All work packages WP0–WP25 are merged (PRs #1–#31). No open PRs, no running
+`main` = WP26 merge. All work packages WP0–WP26 are merged (PRs #1–#32). WP26 = fixes from manual
+local testing (Firefox checkout handoff, seeded order detail, password-manager autofill; `scripts/autofill-check.mjs`
+checks autofill with the real Bitwarden extension). No open PRs, no running
 agents, no leftover worktrees. M1, M2 and M3 acceptance suites run in the CI `acceptance` job
 (on push to main, or on PRs labelled `acceptance`): full Playwright e2e at 4 workers + `make perf`.
 

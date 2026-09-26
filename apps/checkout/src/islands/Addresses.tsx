@@ -187,6 +187,7 @@ export default function Addresses(props: {
           <TextField
             class="sm:col-span-2"
             label={t(m, "address.name")}
+            name="name"
             autocomplete="name"
             required
             value={form().name}
@@ -196,6 +197,7 @@ export default function Addresses(props: {
           <TextField
             class="sm:col-span-2"
             label={t(m, "address.company")}
+            name="organization"
             autocomplete="organization"
             value={form().company ?? ""}
             onChange={(v) => set("company", v || null)}
@@ -204,6 +206,7 @@ export default function Addresses(props: {
           <TextField
             class="sm:col-span-2"
             label={t(m, "address.street")}
+            name="street-address"
             autocomplete="street-address"
             required
             value={form().street}
@@ -212,6 +215,7 @@ export default function Addresses(props: {
           />
           <TextField
             label={t(m, "address.postal_code")}
+            name="postal-code"
             autocomplete="postal-code"
             required
             value={form().postal_code}
@@ -220,6 +224,7 @@ export default function Addresses(props: {
           />
           <TextField
             label={t(m, "address.city")}
+            name="city"
             autocomplete="address-level2"
             required
             value={form().city}
@@ -228,6 +233,8 @@ export default function Addresses(props: {
           />
           <SelectField
             label={t(m, "address.country")}
+            name="country"
+            autocomplete="country"
             value={form().country}
             options={countryOptions()}
             onChange={(v) => set("country", v)}
@@ -235,6 +242,7 @@ export default function Addresses(props: {
           <TextField
             label={t(m, "address.phone")}
             type="tel"
+            name="tel"
             autocomplete="tel"
             value={form().phone ?? ""}
             onChange={(v) => set("phone", v || null)}

@@ -113,10 +113,10 @@ async function placeOrder(p: Page, email: string): Promise<string> {
   await checkoutReady(p);
   await p.locator('input[autocomplete="email"]').fill(email);
   await p.locator('input[autocomplete="tel"]').first().fill("606 666 666");
-  await p.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
-  await p.locator('input[autocomplete="section-billing street-address"]').fill("Dlouhá 12");
-  await p.locator('input[autocomplete="section-billing postal-code"]').fill("110 00");
-  await p.locator('input[autocomplete="section-billing address-level2"]').fill("Praha");
+  await p.locator('input[autocomplete="name"]').fill("Jana Nováková");
+  await p.locator('input[autocomplete="street-address"]').fill("Dlouhá 12");
+  await p.locator('input[autocomplete="postal-code"]').fill("110 00");
+  await p.locator('input[autocomplete="address-level2"]').fill("Praha");
   await p.getByRole("radio", { name: /Zásilkovna – na adresu/ }).check();
   await p.getByRole("radio", { name: /Testovací platba/ }).check();
   for (const label of [/^Souhlasím s obchodn/, /^Beru na vědomí/]) {
