@@ -1,14 +1,17 @@
 import {
+  Alert,
   Button,
+  Card,
   Checkbox,
   Dialog,
   EmptyState,
+  labelClass,
   SelectField,
   showToast,
   TextField,
 } from "@platform/ui";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { errorMessage, t } from "../i18n/index.ts";
 import { api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
@@ -81,6 +84,7 @@ export default function PriceLists() {
     },
   }));
 
+  const formId = createUniqueId();
   const newButton = () => (
     <Button variant="confirm" disabled={!can("admin")} onClick={() => open("new")}>
       {t("priceLists.new")}
@@ -100,12 +104,14 @@ export default function PriceLists() {
             when={data.items.length > 0}
             fallback={
               <EmptyState
+                icon="tag"
                 title={t("priceLists.emptyTitle")}
                 description={t("priceLists.emptyDesc")}
                 action={can("admin") ? newButton() : undefined}
               />
             }
           >
+            <Card padding="none">
             <div class="overflow-x-auto">
               <table class={tableClass}>
                 <thead>
@@ -120,16 +126,17 @@ export default function PriceLists() {
                 <tbody>
                   <For each={data.items}>
                     {(l) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>{l.name}</td>
-                        <td class={`${tdClass} figures text-xs`}>{l.code}</td>
-                        <td class={`${tdClass} figures text-xs`}>{l.currency}</td>
-                        <td class={`${tdClass} text-xs`}>
+                      <tr class="hover:bg-subtle">
+                        <td class={`${tdClass} font-semibold text-heading`}>{l.name}</td>
+                        <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>{l.code}</td>
+                        <td class={`${tdClass} font-mono text-xs`}>{l.currency}</td>
+                        <td class={tdClass}>
                           {l.market_ids.map(marketName).join(", ") || "—"}
                         </td>
                         <td class={`${tdClass} text-right`}>
                           <Button
                             category="tertiary"
+                            size="small"
                             disabled={!can("admin")}
                             onClick={() => open(l)}
                           >
@@ -143,6 +150,7 @@ export default function PriceLists() {
                 </tbody>
               </table>
             </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -151,9 +159,24 @@ export default function PriceLists() {
         open={editing() !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         title={editing() === "new" ? t("priceLists.new") : t("priceLists.editTitle")}
+        footer={
+          <>
+            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
+            <Button
+              type="submit"
+              form={formId}
+              variant="confirm"
+              loading={save.isPending}
+              disabled={!name().trim()}
+            >
+              {editing() === "new" ? t("common.create") : t("common.save")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="flex flex-col gap-3"
+          id={formId}
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const current = editing();
@@ -167,7 +190,7 @@ export default function PriceLists() {
             required
             maxLength={200}
           />
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-4">
             <TextField
               label={t("priceLists.code")}
               description={t("priceLists.codeHint")}
@@ -189,15 +212,11 @@ export default function PriceLists() {
               disabled={editing() !== "new"}
             />
           </div>
-          <fieldset class="flex flex-col gap-1.5">
-            <legend class="mb-1 text-xs font-medium text-muted-foreground">
-              {t("priceLists.markets")}
-            </legend>
-            <p class="text-xs text-faint-foreground">{t("priceLists.marketsHint")}</p>
+          <fieldset class="flex flex-col gap-2">
+            <legend class={`${labelClass} mb-1`}>{t("priceLists.markets")}</legend>
+            <p class="text-sm text-muted-foreground">{t("priceLists.marketsHint")}</p>
             <Show when={markets.isError}>
-              <p role="alert" class="text-xs text-error-700">
-                {errorMessage(markets.error)}
-              </p>
+              <Alert tone="error">{errorMessage(markets.error)}</Alert>
             </Show>
             <For each={sameCurrency()}>
               {(m) => (
@@ -214,21 +233,8 @@ export default function PriceLists() {
             </For>
           </fieldset>
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
-          <div class="flex justify-end gap-2">
-            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-            <Button
-              type="submit"
-              variant="confirm"
-              loading={save.isPending}
-              disabled={!name().trim()}
-            >
-              {editing() === "new" ? t("common.create") : t("common.save")}
-            </Button>
-          </div>
         </form>
       </Dialog>
     </>
