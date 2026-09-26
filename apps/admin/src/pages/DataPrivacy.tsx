@@ -1,6 +1,8 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   Dialog,
   EmptyState,
   PermissionDenied,
@@ -61,26 +63,30 @@ function Exports() {
       showToast({ title: contentError(e), tone: "error", closeLabel: t("common.close") }),
   }));
   return (
-    <section aria-labelledby="export-title" class="mb-10 flex max-w-3xl flex-col gap-3">
-      <h2 id="export-title" class="font-semibold">
-        {t("data.exportTitle")}
-      </h2>
-      <p class="text-sm text-muted-foreground">{t("data.exportHint")}</p>
-      <div>
+    <Card
+      class="mb-6 max-w-3xl"
+      padding="none"
+      title={<span id="export-title">{t("data.exportTitle")}</span>}
+      description={t("data.exportHint")}
+      actions={
         <Button variant="confirm" loading={start.isPending} onClick={() => start.mutate()}>
           {t("data.exportStart")}
         </Button>
-      </div>
+      }
+    >
       <QueryState query={list}>
         {(data) => (
-          <Show when={data.items.length} fallback={<EmptyState title={t("data.exportEmpty")} />}>
+          <Show
+            when={data.items.length}
+            fallback={<EmptyState icon="download" title={t("data.exportEmpty")} />}
+          >
             <div class="overflow-x-auto">
               <table class={tableClass} aria-labelledby="export-title">
                 <thead>
                   <tr>
                     <Th>{t("data.created")}</Th>
                     <Th>{t("data.status")}</Th>
-                    <Th>{t("data.size")}</Th>
+                    <Th class="text-right">{t("data.size")}</Th>
                     <Th srOnly>{t("data.download")}</Th>
                   </tr>
                 </thead>
@@ -88,17 +94,19 @@ function Exports() {
                   <For each={data.items}>
                     {(e) => (
                       <tr>
-                        <td class={tdClass}>{formatDateTime(e.created_at)}</td>
+                        <td class={`${tdClass} figures`}>{formatDateTime(e.created_at)}</td>
                         <td class={tdClass}>
                           <Badge tone={tone[e.status]}>{t(`data.export_${e.status}`)}</Badge>
                           <Show when={e.error}>
                             <span class="ml-2 text-sm text-error-700">{e.error}</span>
                           </Show>
                         </td>
-                        <td class={`${tdClass} figures`}>{size(e.size_bytes)}</td>
-                        <td class={tdClass}>
+                        <td class={`${tdClass} figures text-right`}>{size(e.size_bytes)}</td>
+                        <td class={`${tdClass} text-right`}>
                           <Show when={e.status === "ready"}>
                             <Button
+                              size="small"
+                              icon="download"
                               loading={download.isPending && download.variables === e.id}
                               onClick={() => download.mutate(e.id)}
                             >
@@ -115,7 +123,7 @@ function Exports() {
           </Show>
         )}
       </QueryState>
-    </section>
+    </Card>
   );
 }
 
@@ -170,37 +178,38 @@ function PrivacyRequests() {
   }));
   const valid = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email().trim());
   return (
-    <section aria-labelledby="privacy-title" class="flex max-w-3xl flex-col gap-3">
-      <h2 id="privacy-title" class="font-semibold">
-        {t("data.privacyTitle")}
-      </h2>
-      <p class="text-sm text-muted-foreground">{t("data.privacyHint")}</p>
-      <div class="max-w-sm">
-        <TextField
-          type="email"
-          label={t("data.subjectEmail")}
-          value={email()}
-          onChange={setEmail}
-          autocomplete="off"
-        />
-      </div>
-      <Show when={error()}>
-        <p role="alert" class="text-error-700">
-          {error()}
-        </p>
-      </Show>
-      <div class="grid gap-4 sm:grid-cols-2">
-        <div class="flex flex-col items-start gap-2 rounded-md border border-border p-4">
-          <p class="text-sm">{t("data.accessHint")}</p>
-          <Button disabled={!valid()} loading={access.isPending} onClick={() => access.mutate()}>
-            {t("data.access")}
-          </Button>
+    <Card class="max-w-3xl" title={t("data.privacyTitle")} description={t("data.privacyHint")}>
+      <div class="flex flex-col gap-4">
+        <div class="max-w-sm">
+          <TextField
+            type="email"
+            label={t("data.subjectEmail")}
+            value={email()}
+            onChange={setEmail}
+            autocomplete="off"
+          />
         </div>
-        <div class="flex flex-col items-start gap-2 rounded-md border border-border p-4">
-          <p class="text-sm">{t("data.eraseHint")}</p>
-          <Button variant="danger" disabled={!valid()} onClick={() => setConfirmOpen(true)}>
-            {t("data.erase")}
-          </Button>
+        <Show when={error()}>
+          <Alert tone="error">{error()}</Alert>
+        </Show>
+        <div class="flex flex-col divide-y divide-border rounded-md border border-border">
+          <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p class="max-w-md text-sm text-muted-foreground">{t("data.accessHint")}</p>
+            <Button
+              icon="download"
+              disabled={!valid()}
+              loading={access.isPending}
+              onClick={() => access.mutate()}
+            >
+              {t("data.access")}
+            </Button>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p class="max-w-md text-sm text-muted-foreground">{t("data.eraseHint")}</p>
+            <Button variant="danger" disabled={!valid()} onClick={() => setConfirmOpen(true)}>
+              {t("data.erase")}
+            </Button>
+          </div>
         </div>
       </div>
       <Dialog
@@ -231,7 +240,7 @@ function PrivacyRequests() {
           autocomplete="off"
         />
       </Dialog>
-    </section>
+    </Card>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Button, Dialog, showToast, TextField } from "@platform/ui";
+import { Alert, Button, Dialog, linkClass, showToast, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { t } from "../i18n/index.ts";
 import { finishReauth, reauthOpen } from "../lib/reauth.ts";
@@ -93,7 +93,7 @@ export function ReauthDialog() {
       description={t("auth.reauthDesc")}
       size="sm"
     >
-      <form class="flex flex-col gap-3" onSubmit={submit}>
+      <form class="flex flex-col gap-4" onSubmit={submit}>
         <TextField
           label={t("auth.email")}
           value={claims()?.email ?? ""}
@@ -123,14 +123,12 @@ export function ReauthDialog() {
           />
         </Show>
         <Show when={error()}>
-          <p role="alert" class="text-xs font-medium text-error-700">
-            {error()}
-          </p>
+          <Alert tone="error">{error()}</Alert>
         </Show>
         <Show when={step() === "password"}>
           <button
             type="button"
-            class="self-start text-xs text-accent-700 underline-offset-2 hover:underline"
+            class={`self-start text-sm ${linkClass}`}
             onClick={() => void sendLink()}
           >
             {t("auth.reauthLink")}

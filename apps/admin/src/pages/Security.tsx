@@ -1,4 +1,4 @@
-import { Badge, Button, FieldGroup, showToast, TextField } from "@platform/ui";
+import { Alert, Badge, Button, Card, FieldGroup, showToast, TextField } from "@platform/ui";
 import { createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { renderSVG } from "uqr";
@@ -102,9 +102,7 @@ export default function Security() {
 
   const errorLine = () => (
     <Show when={error()}>
-      <p role="alert" class="text-xs font-medium text-error-700">
-        {error()}
-      </p>
+      <Alert tone="error">{error()}</Alert>
     </Show>
   );
 
@@ -113,99 +111,99 @@ export default function Security() {
       <PageHeader title={t("security.title")} />
       <QueryState query={state}>
         {(s) => (
-          <section class="flex max-w-xl flex-col gap-4" aria-labelledby="tfa-h">
-            <div class="flex items-center gap-2">
-              <h2 id="tfa-h" class="text-base font-semibold">
-                {t("security.twoFactor")}
-              </h2>
+          <Card
+            class="max-w-2xl"
+            title={t("security.twoFactor")}
+            description={t("security.lead")}
+            actions={
               <Badge tone={s.twoFactor ? "success" : "neutral"}>
                 {s.twoFactor ? t("security.on") : t("security.off")}
               </Badge>
-            </div>
-            <p class="text-sm text-muted-foreground">{t("security.lead")}</p>
-
-            <Show when={enrollment()}>
-              {(en) => (
-                <FieldGroup legend={t("security.enable")}>
-                  <p class="text-sm">{t("security.scan")}</p>
-                  {/* uqr renders plain SVG paths from the otpauth URI (no user HTML). */}
-                  <div
-                    role="img"
-                    aria-label={t("security.qrLabel")}
-                    class="size-44 rounded-md bg-white p-2"
-                    innerHTML={renderSVG(en().uri)}
-                  />
-                  <TextField
-                    label={t("security.secret")}
-                    value={en().secret}
-                    onChange={() => {}}
-                    readOnly
-                    inputClass="figures"
-                  />
-                  <div>
-                    <p class="text-xs font-medium text-muted-foreground">
-                      {t("security.backupCodes")}
-                    </p>
-                    <p class="text-xs text-faint-foreground">{t("security.backupHint")}</p>
-                    <ul class="figures mt-1 grid grid-cols-2 gap-1 text-sm">
-                      <For each={en().backupCodes}>{(c) => <li>{c}</li>}</For>
-                    </ul>
-                  </div>
-                  <form class="flex items-end gap-2" onSubmit={activate}>
+            }
+          >
+            <div class="flex flex-col gap-4">
+              <Show when={enrollment()}>
+                {(en) => (
+                  <FieldGroup legend={t("security.enable")}>
+                    <p class="text-sm">{t("security.scan")}</p>
+                    {/* uqr renders plain SVG paths from the otpauth URI (no user HTML). Always
+                      black on white, also in dark mode, so every authenticator can scan it. */}
+                    <div
+                      role="img"
+                      aria-label={t("security.qrLabel")}
+                      class="size-44 rounded-md border border-border bg-white p-2"
+                      innerHTML={renderSVG(en().uri)}
+                    />
                     <TextField
-                      label={t("security.confirmCode")}
-                      value={code()}
-                      onChange={setCode}
-                      inputMode="numeric"
-                      autocomplete="one-time-code"
+                      label={t("security.secret")}
+                      value={en().secret}
+                      onChange={() => {}}
+                      readOnly
+                      inputClass="figures"
+                    />
+                    <div class="flex flex-col gap-1">
+                      <p class="text-sm font-semibold text-heading">{t("security.backupCodes")}</p>
+                      <p class="text-sm text-muted-foreground">{t("security.backupHint")}</p>
+                      <ul class="mt-1 grid max-w-xs grid-cols-2 gap-1 rounded-md border border-border bg-subtle p-3 font-mono text-sm">
+                        <For each={en().backupCodes}>{(c) => <li>{c}</li>}</For>
+                      </ul>
+                    </div>
+                    <form class="flex items-end gap-2" onSubmit={activate}>
+                      <TextField
+                        label={t("security.confirmCode")}
+                        value={code()}
+                        onChange={setCode}
+                        inputMode="numeric"
+                        autocomplete="one-time-code"
+                        required
+                      />
+                      <Button type="submit" variant="confirm" loading={pending()}>
+                        {t("security.activate")}
+                      </Button>
+                    </form>
+                    {errorLine()}
+                  </FieldGroup>
+                )}
+              </Show>
+
+              <Show when={!enrollment()}>
+                <Show
+                  when={s.hasPassword}
+                  fallback={
+                    <div class="flex flex-col items-start gap-2">
+                      <p class="text-sm text-muted-foreground">{t("security.noPassword")}</p>
+                      <Button onClick={() => void sendSetPassword()} loading={pending()}>
+                        {t("security.sendSetPassword")}
+                      </Button>
+                      {errorLine()}
+                    </div>
+                  }
+                >
+                  <form
+                    class="flex flex-wrap items-end gap-2"
+                    onSubmit={s.twoFactor ? disable : enable}
+                  >
+                    <TextField
+                      label={t("security.currentPassword")}
+                      type="password"
+                      autocomplete="current-password"
+                      value={password()}
+                      onChange={setPassword}
                       required
                     />
-                    <Button type="submit" variant="confirm" loading={pending()}>
-                      {t("security.activate")}
+                    <Button
+                      type="submit"
+                      variant={s.twoFactor ? "default" : "confirm"}
+                      loading={pending()}
+                    >
+                      {s.twoFactor ? t("security.disable") : t("security.enable")}
                     </Button>
                   </form>
                   {errorLine()}
-                </FieldGroup>
-              )}
-            </Show>
-
-            <Show when={!enrollment()}>
-              <Show
-                when={s.hasPassword}
-                fallback={
-                  <div class="flex flex-col items-start gap-2">
-                    <p class="text-sm">{t("security.noPassword")}</p>
-                    <Button onClick={() => void sendSetPassword()} loading={pending()}>
-                      {t("security.sendSetPassword")}
-                    </Button>
-                    {errorLine()}
-                  </div>
-                }
-              >
-                <form
-                  class="flex flex-wrap items-end gap-2"
-                  onSubmit={s.twoFactor ? disable : enable}
-                >
-                  <TextField
-                    label={t("security.currentPassword")}
-                    type="password"
-                    autocomplete="current-password"
-                    value={password()}
-                    onChange={setPassword}
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    variant={s.twoFactor ? "default" : "confirm"}
-                    loading={pending()}
-                  >
-                    {s.twoFactor ? t("security.disable") : t("security.enable")}
-                  </Button>
-                </form>
-                {errorLine()}
+                </Show>
               </Show>
-            </Show>
-          </section>
+            </div>
+          </Card>
         )}
       </QueryState>
     </>

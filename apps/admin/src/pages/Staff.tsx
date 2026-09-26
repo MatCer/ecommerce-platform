@@ -1,6 +1,9 @@
 import {
+  Alert,
+  Avatar,
   Badge,
   Button,
+  Card,
   ConfirmDialog,
   Dialog,
   PermissionDenied,
@@ -122,67 +125,83 @@ export default function Staff() {
       />
       <QueryState query={staff}>
         {(data) => (
-          <div class="overflow-x-auto">
-            <table class={tableClass}>
-              <thead>
-                <tr>
-                  <Th>{t("staff.email")}</Th>
-                  <Th>{t("staff.role")}</Th>
-                  <Th class="text-right">{t("staff.added")}</Th>
-                  <Th srOnly>{t("common.actions")}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                <For each={data.items}>
-                  {(m) => (
+          <div class="flex flex-col gap-3">
+            <Card
+              title={t("staff.title")}
+              count={data.items.length}
+              countIcon="user"
+              padding="none"
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
                     <tr>
-                      <td class={`${tdClass} font-medium`}>
-                        {m.email}{" "}
-                        <Show when={m.user_id === claims()?.sub}>
-                          <span class="ml-1 text-xs font-normal text-muted-foreground">
-                            ({t("staff.you")})
-                          </span>
-                        </Show>
-                      </td>
-                      <td class={tdClass}>
-                        <Badge tone={m.role === "owner" ? "info" : "neutral"}>
-                          {t(`roles.${m.role}`)}
-                        </Badge>
-                      </td>
-                      <td class={`${tdClass} figures text-right text-xs text-faint-foreground`}>
-                        {formatDateTime(m.created_at)}
-                      </td>
-                      <td class={`${tdClass} text-right whitespace-nowrap`}>
-                        <Button
-                          category="tertiary"
-                          disabled={!editable(m)}
-                          title={editable(m) ? undefined : t("staff.ownerOnly")}
-                          onClick={() => {
-                            setError(undefined);
-                            setRole(m.role);
-                            setChanging(m);
-                          }}
-                        >
-                          {t("staff.changeRoleAction")}
-                          <span class="sr-only">: {m.email}</span>
-                        </Button>
-                        <Button
-                          category="tertiary"
-                          disabled={!editable(m)}
-                          title={editable(m) ? undefined : t("staff.ownerOnly")}
-                          onClick={() => setRemoving(m)}
-                        >
-                          {t("common.remove")}
-                          <span class="sr-only">: {m.email}</span>
-                        </Button>
-                      </td>
+                      <Th>{t("staff.email")}</Th>
+                      <Th>{t("staff.role")}</Th>
+                      <Th class="text-right">{t("staff.added")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
                     </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(m) => (
+                        <tr>
+                          <td class={tdClass}>
+                            <span class="flex items-center gap-2">
+                              <Avatar name={m.email} size={24} />
+                              <span class="font-semibold text-heading">{m.email}</span>
+                              <Show when={m.user_id === claims()?.sub}>
+                                <span class="text-sm text-muted-foreground">
+                                  ({t("staff.you")})
+                                </span>
+                              </Show>
+                            </span>
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={m.role === "owner" ? "info" : "neutral"}>
+                              {t(`roles.${m.role}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} figures text-right text-muted-foreground`}>
+                            {formatDateTime(m.created_at)}
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              disabled={!editable(m)}
+                              title={editable(m) ? undefined : t("staff.ownerOnly")}
+                              onClick={() => {
+                                setError(undefined);
+                                setRole(m.role);
+                                setChanging(m);
+                              }}
+                            >
+                              {t("staff.changeRoleAction")}
+                              <span class="sr-only">: {m.email}</span>
+                            </Button>
+                            <Button
+                              variant="danger"
+                              category="tertiary"
+                              size="small"
+                              class="ml-1"
+                              disabled={!editable(m)}
+                              title={editable(m) ? undefined : t("staff.ownerOnly")}
+                              onClick={() => setRemoving(m)}
+                            >
+                              {t("common.remove")}
+                              <span class="sr-only">: {m.email}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
             <Show when={!can("owner")}>
-              <p class="mt-2 text-xs text-muted-foreground">{t("staff.ownerOnly")}</p>
+              <p class="text-sm text-muted-foreground">{t("staff.ownerOnly")}</p>
             </Show>
           </div>
         )}
@@ -195,7 +214,7 @@ export default function Staff() {
         description={t("staff.inviteDesc")}
       >
         <form
-          class="flex flex-col gap-3"
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             invite.mutate();
@@ -217,9 +236,7 @@ export default function Staff() {
             onChange={(v) => setRole(v as Role)}
           />
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setInviting(false)}>{t("common.cancel")}</Button>
@@ -242,7 +259,7 @@ export default function Staff() {
         size="sm"
       >
         <form
-          class="flex flex-col gap-3"
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const m = changing();
@@ -257,9 +274,7 @@ export default function Staff() {
             onChange={(v) => setRole(v as Role)}
           />
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setChanging(null)}>{t("common.cancel")}</Button>
