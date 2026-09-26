@@ -112,44 +112,44 @@ export default function PriceLists() {
             }
           >
             <Card padding="none">
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("priceLists.name")}</Th>
-                    <Th>{t("priceLists.code")}</Th>
-                    <Th>{t("priceLists.currency")}</Th>
-                    <Th>{t("priceLists.markets")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(l) => (
-                      <tr class="hover:bg-subtle">
-                        <td class={`${tdClass} font-semibold text-heading`}>{l.name}</td>
-                        <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>{l.code}</td>
-                        <td class={`${tdClass} font-mono text-xs`}>{l.currency}</td>
-                        <td class={tdClass}>
-                          {l.market_ids.map(marketName).join(", ") || "—"}
-                        </td>
-                        <td class={`${tdClass} text-right`}>
-                          <Button
-                            category="tertiary"
-                            size="small"
-                            disabled={!can("admin")}
-                            onClick={() => open(l)}
-                          >
-                            {t("common.edit")}
-                            <span class="sr-only">: {l.name}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("priceLists.name")}</Th>
+                      <Th>{t("priceLists.code")}</Th>
+                      <Th>{t("priceLists.currency")}</Th>
+                      <Th>{t("priceLists.markets")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(l) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{l.name}</td>
+                          <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>
+                            {l.code}
+                          </td>
+                          <td class={`${tdClass} font-mono text-xs`}>{l.currency}</td>
+                          <td class={tdClass}>{l.market_ids.map(marketName).join(", ") || "—"}</td>
+                          <td class={`${tdClass} text-right`}>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              disabled={!can("admin")}
+                              onClick={() => open(l)}
+                            >
+                              {t("common.edit")}
+                              <span class="sr-only">: {l.name}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </Show>
         )}

@@ -78,55 +78,55 @@ function OptionEditor(props: {
         />
       </div>
       <div class="overflow-x-auto rounded-md border border-border">
-      <table class={tableClass}>
-        <thead>
-          <tr>
-            <For each={CONTENT_LOCALES}>
-              {(l) => <Th>{`${t("editor.optionValues")} (${l})`}</Th>}
-            </For>
-            <Th>{t("editor.optionCode")}</Th>
-            <Th srOnly>{t("common.actions")}</Th>
-          </tr>
-        </thead>
-        <tbody>
-          <Index each={props.option.values}>
-            {(val, vi) => (
-              <tr>
-                <For each={CONTENT_LOCALES}>
-                  {(l) => (
-                    <td class={`${tdClass} py-1`}>
-                      <TextField
-                        hideLabel
-                        label={`${heading()}: ${t("editor.optionValues")} ${vi + 1} (${l})`}
-                        value={val().name_i18n[l] ?? ""}
-                        onChange={(v) => setValue(vi, l, v)}
-                        maxLength={100}
-                      />
-                    </td>
-                  )}
-                </For>
-                <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>{val().code}</td>
-                <td class={`${tdClass} w-12 text-right`}>
-                  <Button
-                    category="tertiary"
-                    size="small"
-                    iconOnly
-                    icon="remove"
-                    aria-label={`${t("common.remove")}: ${label(val().name_i18n) || val().code}`}
-                    disabled={props.option.values.length <= 1}
-                    onClick={() =>
-                      props.onChange({
-                        ...props.option,
-                        values: props.option.values.filter((_, j) => j !== vi),
-                      })
-                    }
-                  />
-                </td>
-              </tr>
-            )}
-          </Index>
-        </tbody>
-      </table>
+        <table class={tableClass}>
+          <thead>
+            <tr>
+              <For each={CONTENT_LOCALES}>
+                {(l) => <Th>{`${t("editor.optionValues")} (${l})`}</Th>}
+              </For>
+              <Th>{t("editor.optionCode")}</Th>
+              <Th srOnly>{t("common.actions")}</Th>
+            </tr>
+          </thead>
+          <tbody>
+            <Index each={props.option.values}>
+              {(val, vi) => (
+                <tr>
+                  <For each={CONTENT_LOCALES}>
+                    {(l) => (
+                      <td class={`${tdClass} py-1`}>
+                        <TextField
+                          hideLabel
+                          label={`${heading()}: ${t("editor.optionValues")} ${vi + 1} (${l})`}
+                          value={val().name_i18n[l] ?? ""}
+                          onChange={(v) => setValue(vi, l, v)}
+                          maxLength={100}
+                        />
+                      </td>
+                    )}
+                  </For>
+                  <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>{val().code}</td>
+                  <td class={`${tdClass} w-12 text-right`}>
+                    <Button
+                      category="tertiary"
+                      size="small"
+                      iconOnly
+                      icon="remove"
+                      aria-label={`${t("common.remove")}: ${label(val().name_i18n) || val().code}`}
+                      disabled={props.option.values.length <= 1}
+                      onClick={() =>
+                        props.onChange({
+                          ...props.option,
+                          values: props.option.values.filter((_, j) => j !== vi),
+                        })
+                      }
+                    />
+                  </td>
+                </tr>
+              )}
+            </Index>
+          </tbody>
+        </table>
       </div>
       <div class="flex flex-wrap gap-2">
         <Button icon="plus" onClick={addValue} disabled={props.option.values.length >= 100}>

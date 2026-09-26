@@ -161,7 +161,9 @@ export function TransactionTable(props: {
                 <td class={tdClass}>
                   <Badge tone={txTone[tx.status]}>{t(`txStatuses.${tx.status}`)}</Badge>
                   <Show when={tx.reason}>
-                    {(r) => <p class="mt-1 text-xs text-muted-foreground">{t(`txReasons.${r()}`)}</p>}
+                    {(r) => (
+                      <p class="mt-1 text-xs text-muted-foreground">{t(`txReasons.${r()}`)}</p>
+                    )}
                   </Show>
                   <Show when={tx.note}>
                     <p class="mt-1 text-xs">{tx.note}</p>

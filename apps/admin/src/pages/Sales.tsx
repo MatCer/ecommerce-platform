@@ -247,57 +247,57 @@ export default function Sales() {
                 ) : undefined
               }
             >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("sales.name")}</Th>
-                    <Th class="text-right">{t("sales.discount")}</Th>
-                    <Th>{t("sales.targets")}</Th>
-                    <Th>{t("sales.schedule")}</Th>
-                    <Th>{t("sales.state")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(s) => (
-                      <tr class="hover:bg-subtle">
-                        <td class={`${tdClass} font-semibold text-heading`}>{s.name}</td>
-                        <td class={`${tdClass} figures text-right`}>{discountText(s)}</td>
-                        <td class={tdClass}>{targetText(s)}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {formatDateTime(s.starts_at)} –{" "}
-                          {s.ends_at ? formatDateTime(s.ends_at) : t("sales.untilStopped")}
-                        </td>
-                        <td class={tdClass}>
-                          <Badge tone={stateTone[saleState(s)]}>
-                            {t(`sales.state_${saleState(s)}`)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button category="tertiary" size="small" onClick={() => open(s)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {s.name}</span>
-                          </Button>
-                          <Button
-                            category="tertiary"
-                            size="small"
-                            iconOnly
-                            icon="remove"
-                            aria-label={`${t("common.delete")}: ${s.name}`}
-                            title={t("common.delete")}
-                            onClick={() => setDeleting(s)}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("sales.name")}</Th>
+                      <Th class="text-right">{t("sales.discount")}</Th>
+                      <Th>{t("sales.targets")}</Th>
+                      <Th>{t("sales.schedule")}</Th>
+                      <Th>{t("sales.state")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(s) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{s.name}</td>
+                          <td class={`${tdClass} figures text-right`}>{discountText(s)}</td>
+                          <td class={tdClass}>{targetText(s)}</td>
+                          <td
+                            class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
+                          >
+                            {formatDateTime(s.starts_at)} –{" "}
+                            {s.ends_at ? formatDateTime(s.ends_at) : t("sales.untilStopped")}
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={stateTone[saleState(s)]}>
+                              {t(`sales.state_${saleState(s)}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => open(s)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {s.name}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${s.name}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(s)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </Show>
         )}
@@ -414,21 +414,21 @@ export default function Sales() {
             <fieldset class="flex flex-col gap-2">
               <legend class={`${labelClass} mb-2`}>{t("sales.targetCategories")}</legend>
               <div class="flex max-h-48 flex-col gap-2 overflow-y-auto rounded-md border border-border px-3 py-2">
-              <For each={categoryOptions(categories.data?.items ?? [], contentLocales())}>
-                {(c) => (
-                  <Checkbox
-                    label={c.label}
-                    checked={form().categoryIds.includes(c.value)}
-                    onChange={(on) =>
-                      set({
-                        categoryIds: on
-                          ? [...form().categoryIds, c.value]
-                          : form().categoryIds.filter((x) => x !== c.value),
-                      })
-                    }
-                  />
-                )}
-              </For>
+                <For each={categoryOptions(categories.data?.items ?? [], contentLocales())}>
+                  {(c) => (
+                    <Checkbox
+                      label={c.label}
+                      checked={form().categoryIds.includes(c.value)}
+                      onChange={(on) =>
+                        set({
+                          categoryIds: on
+                            ? [...form().categoryIds, c.value]
+                            : form().categoryIds.filter((x) => x !== c.value),
+                        })
+                      }
+                    />
+                  )}
+                </For>
               </div>
             </fieldset>
           </Show>

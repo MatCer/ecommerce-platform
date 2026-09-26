@@ -264,96 +264,96 @@ export default function Categories() {
               const rows = () => flatten(data.items);
               return (
                 <Card class="max-w-3xl" padding="none">
-                <ul aria-label={t("categories.treeLabel")}>
-                  <For each={rows()}>
-                    {(row) => (
-                      <li
-                        class="flex h-row items-center gap-2 border-b border-border pr-2 last:border-b-0 hover:bg-subtle"
-                        style={{ "padding-left": `${1 + row.depth * 1.5}rem` }}
-                      >
-                        <span
-                          tabindex="-1"
-                          data-focus={`${row.node.id}:row`}
-                          class="min-w-0 flex-1 truncate rounded-sm text-sm"
-                          classList={{
-                            "font-semibold text-heading": row.depth === 0,
-                            "text-foreground": row.depth > 0,
-                          }}
+                  <ul aria-label={t("categories.treeLabel")}>
+                    <For each={rows()}>
+                      {(row) => (
+                        <li
+                          class="flex h-row items-center gap-2 border-b border-border pr-2 last:border-b-0 hover:bg-subtle"
+                          style={{ "padding-left": `${1 + row.depth * 1.5}rem` }}
                         >
-                          <Show when={row.depth > 0}>
-                            <span class="mr-1 text-muted-foreground" aria-hidden="true">
-                              └
+                          <span
+                            tabindex="-1"
+                            data-focus={`${row.node.id}:row`}
+                            class="min-w-0 flex-1 truncate rounded-sm text-sm"
+                            classList={{
+                              "font-semibold text-heading": row.depth === 0,
+                              "text-foreground": row.depth > 0,
+                            }}
+                          >
+                            <Show when={row.depth > 0}>
+                              <span class="mr-1 text-muted-foreground" aria-hidden="true">
+                                └
+                              </span>
+                            </Show>
+                            {name(row.node)}
+                            <span class="sr-only">
+                              {` (${t("categories.level", { n: row.depth + 1 })})`}
                             </span>
-                          </Show>
-                          {name(row.node)}
-                          <span class="sr-only">
-                            {` (${t("categories.level", { n: row.depth + 1 })})`}
                           </span>
-                        </span>
-                        <div class="flex shrink-0 items-center">
-                          {iconButton(row, "up", "chevron-up", t("common.moveUp"), moveUp(row))}
-                          {iconButton(
-                            row,
-                            "down",
-                            "chevron-down",
-                            t("common.moveDown"),
-                            moveDown(row),
-                          )}
-                          {iconButton(
-                            row,
-                            "outdent",
-                            "chevron-left",
-                            t("categories.outdent"),
-                            outdent(rows(), row),
-                          )}
-                          {iconButton(
-                            row,
-                            "indent",
-                            "chevron-right",
-                            t("categories.indent"),
-                            indent(rows(), row),
-                          )}
-                          <Menu
-                            triggerLabel={`${t("common.actions")}: ${name(row.node)}`}
-                            trigger={<Icon name="ellipsis_v" />}
-                            triggerClass={buttonClass({
-                              category: "tertiary",
-                              size: "small",
-                              iconOnly: true,
-                            })}
-                            items={[
-                              {
-                                label: t("common.edit"),
-                                onSelect: () => {
-                                  setNames(namesOf(row.node));
-                                  setFormError(undefined);
-                                  setEditing({ kind: "edit", node: row.node });
+                          <div class="flex shrink-0 items-center">
+                            {iconButton(row, "up", "chevron-up", t("common.moveUp"), moveUp(row))}
+                            {iconButton(
+                              row,
+                              "down",
+                              "chevron-down",
+                              t("common.moveDown"),
+                              moveDown(row),
+                            )}
+                            {iconButton(
+                              row,
+                              "outdent",
+                              "chevron-left",
+                              t("categories.outdent"),
+                              outdent(rows(), row),
+                            )}
+                            {iconButton(
+                              row,
+                              "indent",
+                              "chevron-right",
+                              t("categories.indent"),
+                              indent(rows(), row),
+                            )}
+                            <Menu
+                              triggerLabel={`${t("common.actions")}: ${name(row.node)}`}
+                              trigger={<Icon name="ellipsis_v" />}
+                              triggerClass={buttonClass({
+                                category: "tertiary",
+                                size: "small",
+                                iconOnly: true,
+                              })}
+                              items={[
+                                {
+                                  label: t("common.edit"),
+                                  onSelect: () => {
+                                    setNames(namesOf(row.node));
+                                    setFormError(undefined);
+                                    setEditing({ kind: "edit", node: row.node });
+                                  },
                                 },
-                              },
-                              {
-                                label: t("categories.moveTo"),
-                                onSelect: () => {
-                                  setParent(row.parentId ?? "");
-                                  setEditing({ kind: "move", row });
+                                {
+                                  label: t("categories.moveTo"),
+                                  onSelect: () => {
+                                    setParent(row.parentId ?? "");
+                                    setEditing({ kind: "move", row });
+                                  },
                                 },
-                              },
-                              {
-                                label: t("categories.new"),
-                                onSelect: () => openCreate(row.node.id),
-                              },
-                              {
-                                label: t("common.delete"),
-                                danger: true,
-                                separatorBefore: true,
-                                onSelect: () => setEditing({ kind: "delete", node: row.node }),
-                              },
-                            ]}
-                          />
-                        </div>
-                      </li>
-                    )}
-                  </For>
-                </ul>
+                                {
+                                  label: t("categories.new"),
+                                  onSelect: () => openCreate(row.node.id),
+                                },
+                                {
+                                  label: t("common.delete"),
+                                  danger: true,
+                                  separatorBefore: true,
+                                  onSelect: () => setEditing({ kind: "delete", node: row.node }),
+                                },
+                              ]}
+                            />
+                          </div>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
                 </Card>
               );
             })()}

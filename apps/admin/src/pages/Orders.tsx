@@ -1,4 +1,13 @@
-import { Badge, Button, Card, Checkbox, EmptyState, linkClass, SelectField, type Tone } from "@platform/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  linkClass,
+  SelectField,
+  type Tone,
+} from "@platform/ui";
 import { A, useSearchParams } from "@solidjs/router";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Show } from "solid-js";
@@ -144,77 +153,79 @@ export default function Orders() {
               }
             >
               <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th class="w-10">
-                      <Checkbox
-                        label={t("fulfillment.selectAll")}
-                        checked={rows().length > 0 && rows().every((row) => selected().has(row.id))}
-                        onChange={(checked) =>
-                          setSelected(new Set(checked ? rows().map((row) => row.id) : []))
-                        }
-                      />
-                    </Th>
-                    <For
-                      each={[
-                        t("orders.number"),
-                        t("orders.date"),
-                        t("orders.email"),
-                        t("orders.status"),
-                        t("orders.paymentStatus"),
-                      ]}
-                    >
-                      {(label) => <Th>{label}</Th>}
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th class="w-10">
+                        <Checkbox
+                          label={<span class="sr-only">{t("fulfillment.selectAll")}</span>}
+                          checked={
+                            rows().length > 0 && rows().every((row) => selected().has(row.id))
+                          }
+                          onChange={(checked) =>
+                            setSelected(new Set(checked ? rows().map((row) => row.id) : []))
+                          }
+                        />
+                      </Th>
+                      <For
+                        each={[
+                          t("orders.number"),
+                          t("orders.date"),
+                          t("orders.email"),
+                          t("orders.status"),
+                          t("orders.paymentStatus"),
+                        ]}
+                      >
+                        {(label) => <Th>{label}</Th>}
+                      </For>
+                      <Th class="text-right">{t("orders.total")}</Th>
+                      <Th>{t("orders.exception")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(order) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={tdClass}>
+                            <Checkbox
+                              label={
+                                <span class="sr-only">
+                                  {t("fulfillment.selectOrder", { number: order.number })}
+                                </span>
+                              }
+                              checked={selected().has(order.id)}
+                              onChange={(checked) => select(order.id, checked)}
+                            />
+                          </td>
+                          <td class={tdClass}>
+                            <A
+                              class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                              href={`/orders/${order.id}`}
+                            >
+                              {order.number}
+                            </A>
+                          </td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {formatDateTime(order.placed_at)}
+                          </td>
+                          <td class={tdClass}>{order.email}</td>
+                          <td class={tdClass}>
+                            <Badge tone={orderStatusTone[order.status]}>
+                              {t(`orderStatuses.${order.status}`)}
+                            </Badge>
+                          </td>
+                          <td class={tdClass}>{t(`paymentStatuses.${order.payment_status}`)}</td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-right`}>
+                            {order.total.formatted}
+                          </td>
+                          <td class={tdClass}>
+                            <OrderException exception={order.exception} />
+                          </td>
+                        </tr>
+                      )}
                     </For>
-                    <Th class="text-right">{t("orders.total")}</Th>
-                    <Th>{t("orders.exception")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(order) => (
-                      <tr class="hover:bg-subtle">
-                        <td class={tdClass}>
-                          <Checkbox
-                            label={
-                              <span class="sr-only">
-                                {t("fulfillment.selectOrder", { number: order.number })}
-                              </span>
-                            }
-                            checked={selected().has(order.id)}
-                            onChange={(checked) => select(order.id, checked)}
-                          />
-                        </td>
-                        <td class={tdClass}>
-                          <A
-                            class="font-semibold text-heading hover:text-accent-700 hover:underline"
-                            href={`/orders/${order.id}`}
-                          >
-                            {order.number}
-                          </A>
-                        </td>
-                        <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
-                          {formatDateTime(order.placed_at)}
-                        </td>
-                        <td class={tdClass}>{order.email}</td>
-                        <td class={tdClass}>
-                          <Badge tone={orderStatusTone[order.status]}>
-                            {t(`orderStatuses.${order.status}`)}
-                          </Badge>
-                        </td>
-                        <td class={tdClass}>{t(`paymentStatuses.${order.payment_status}`)}</td>
-                        <td class={`${tdClass} figures whitespace-nowrap text-right`}>
-                          {order.total.formatted}
-                        </td>
-                        <td class={tdClass}>
-                          <OrderException exception={order.exception} />
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
               </div>
             </Card>
           </Show>

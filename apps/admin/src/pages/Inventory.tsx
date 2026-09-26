@@ -197,11 +197,7 @@ export default function Inventory() {
       <Show when={productId()}>
         <p class="mb-4 text-sm text-muted-foreground">
           {t("inventory.filtered")}{" "}
-          <button
-            type="button"
-            class={linkClass}
-            onClick={() => setParams({ product: undefined })}
-          >
+          <button type="button" class={linkClass} onClick={() => setParams({ product: undefined })}>
             {t("inventory.showAll")}
           </button>
         </p>
@@ -231,85 +227,89 @@ export default function Inventory() {
                 ) : undefined
               }
             >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("inventory.sku")}</Th>
-                    <Th class="text-right">{t("inventory.onHand")}</Th>
-                    <Th class="text-right">{t("inventory.reserved")}</Th>
-                    <Th class="text-right">{t("inventory.available")}</Th>
-                    <Th>{t("inventory.tracked")}</Th>
-                    <Th>{t("inventory.backorder")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(r) => (
-                      <tr class="hover:bg-subtle">
-                        <th scope="row" class={`${tdClass} text-left font-normal`}>
-                          <A
-                            href={`/products/${r.product_id}`}
-                            class="font-mono text-xs font-semibold text-heading hover:text-accent-700 hover:underline"
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("inventory.sku")}</Th>
+                      <Th class="text-right">{t("inventory.onHand")}</Th>
+                      <Th class="text-right">{t("inventory.reserved")}</Th>
+                      <Th class="text-right">{t("inventory.available")}</Th>
+                      <Th>{t("inventory.tracked")}</Th>
+                      <Th>{t("inventory.backorder")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(r) => (
+                        <tr class="hover:bg-subtle">
+                          <th scope="row" class={`${tdClass} text-left font-normal`}>
+                            <A
+                              href={`/products/${r.product_id}`}
+                              class="font-mono text-xs font-semibold text-heading hover:text-accent-700 hover:underline"
+                            >
+                              {r.sku}
+                            </A>
+                          </th>
+                          <td class={`${tdClass} figures text-right`}>{r.on_hand}</td>
+                          <td class={`${tdClass} figures text-right`}>{r.reserved}</td>
+                          <td
+                            class={`${tdClass} figures text-right font-semibold`}
+                            classList={{ "text-error-700": r.track && r.available <= 0 }}
                           >
-                            {r.sku}
-                          </A>
-                        </th>
-                        <td class={`${tdClass} figures text-right`}>{r.on_hand}</td>
-                        <td class={`${tdClass} figures text-right`}>{r.reserved}</td>
-                        <td
-                          class={`${tdClass} figures text-right font-semibold`}
-                          classList={{ "text-error-700": r.track && r.available <= 0 }}
-                        >
-                          {r.available}
-                        </td>
-                        <td class={tdClass}>
-                          <Checkbox
-                            label={
-                              <span class="sr-only">{`${t("inventory.tracked")}: ${r.sku}`}</span>
-                            }
-                            checked={r.track}
-                            disabled={
-                              settings.isPending &&
-                              settings.variables?.row.variant_id === r.variant_id
-                            }
-                            onChange={(track) =>
-                              settings.mutate({ row: r, track, allow_backorder: r.allow_backorder })
-                            }
-                          />
-                        </td>
-                        <td class={tdClass}>
-                          <Checkbox
-                            label={
-                              <span class="sr-only">{`${t("inventory.backorder")}: ${r.sku}`}</span>
-                            }
-                            checked={r.allow_backorder}
-                            disabled={
-                              settings.isPending &&
-                              settings.variables?.row.variant_id === r.variant_id
-                            }
-                            onChange={(allow_backorder) =>
-                              settings.mutate({ row: r, track: r.track, allow_backorder })
-                            }
-                          />
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button category="tertiary" size="small" onClick={() => openAdjust(r)}>
-                            {t("inventory.adjust")}
-                            <span class="sr-only">: {r.sku}</span>
-                          </Button>
-                          <Button category="tertiary" size="small" onClick={() => setViewing(r)}>
-                            {t("inventory.movements")}
-                            <span class="sr-only">: {r.sku}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+                            {r.available}
+                          </td>
+                          <td class={tdClass}>
+                            <Checkbox
+                              label={
+                                <span class="sr-only">{`${t("inventory.tracked")}: ${r.sku}`}</span>
+                              }
+                              checked={r.track}
+                              disabled={
+                                settings.isPending &&
+                                settings.variables?.row.variant_id === r.variant_id
+                              }
+                              onChange={(track) =>
+                                settings.mutate({
+                                  row: r,
+                                  track,
+                                  allow_backorder: r.allow_backorder,
+                                })
+                              }
+                            />
+                          </td>
+                          <td class={tdClass}>
+                            <Checkbox
+                              label={
+                                <span class="sr-only">{`${t("inventory.backorder")}: ${r.sku}`}</span>
+                              }
+                              checked={r.allow_backorder}
+                              disabled={
+                                settings.isPending &&
+                                settings.variables?.row.variant_id === r.variant_id
+                              }
+                              onChange={(allow_backorder) =>
+                                settings.mutate({ row: r, track: r.track, allow_backorder })
+                              }
+                            />
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => openAdjust(r)}>
+                              {t("inventory.adjust")}
+                              <span class="sr-only">: {r.sku}</span>
+                            </Button>
+                            <Button category="tertiary" size="small" onClick={() => setViewing(r)}>
+                              {t("inventory.movements")}
+                              <span class="sr-only">: {r.sku}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </Show>
         )}

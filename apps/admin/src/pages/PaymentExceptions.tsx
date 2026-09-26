@@ -64,7 +64,9 @@ export default function PaymentExceptions() {
                               t("orders.exception"),
                             ]}
                           >
-                            {(label, i) => <Th class={i() === 3 ? "text-right" : undefined}>{label}</Th>}
+                            {(label, i) => (
+                              <Th class={i() === 3 ? "text-right" : undefined}>{label}</Th>
+                            )}
                           </For>
                           <Th srOnly>{t("common.actions")}</Th>
                         </tr>
@@ -81,7 +83,9 @@ export default function PaymentExceptions() {
                                   {o.number}
                                 </A>
                               </td>
-                              <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                              <td
+                                class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                              >
                                 {formatDateTime(o.placed_at)}
                               </td>
                               <td class={tdClass}>{o.email}</td>

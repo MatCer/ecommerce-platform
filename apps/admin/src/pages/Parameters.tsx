@@ -141,55 +141,57 @@ export default function Parameters() {
               </Alert>
             </Show>
             <Card padding="none">
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("products.colName")}</Th>
-                    <Th>{t("parameters.key")}</Th>
-                    <Th>{t("parameters.kind")}</Th>
-                    <Th>{t("parameters.unit")}</Th>
-                    <Th>{t("parameters.filterable")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={page.items}>
-                    {(p) => (
-                      <tr class="hover:bg-subtle">
-                        <td class={`${tdClass} font-semibold text-heading`}>{displayName(p)}</td>
-                        <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>{p.key}</td>
-                        <td class={tdClass}>{t(`parameters.kind_${p.kind}`)}</td>
-                        <td class={`${tdClass} font-mono text-xs`}>{p.unit ?? "—"}</td>
-                        <td class={tdClass}>
-                          <Show
-                            when={p.filterable}
-                            fallback={<span class="text-muted-foreground">{t("common.no")}</span>}
-                          >
-                            <Badge tone="info">{t("common.yes")}</Badge>
-                          </Show>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button category="tertiary" size="small" onClick={() => open(p)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {displayName(p)}</span>
-                          </Button>
-                          <Button
-                            category="tertiary"
-                            size="small"
-                            iconOnly
-                            icon="remove"
-                            aria-label={`${t("common.delete")}: ${displayName(p)}`}
-                            title={t("common.delete")}
-                            onClick={() => setDeleting(p)}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("products.colName")}</Th>
+                      <Th>{t("parameters.key")}</Th>
+                      <Th>{t("parameters.kind")}</Th>
+                      <Th>{t("parameters.unit")}</Th>
+                      <Th>{t("parameters.filterable")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={page.items}>
+                      {(p) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{displayName(p)}</td>
+                          <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>
+                            {p.key}
+                          </td>
+                          <td class={tdClass}>{t(`parameters.kind_${p.kind}`)}</td>
+                          <td class={`${tdClass} font-mono text-xs`}>{p.unit ?? "—"}</td>
+                          <td class={tdClass}>
+                            <Show
+                              when={p.filterable}
+                              fallback={<span class="text-muted-foreground">{t("common.no")}</span>}
+                            >
+                              <Badge tone="info">{t("common.yes")}</Badge>
+                            </Show>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => open(p)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {displayName(p)}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${displayName(p)}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(p)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </Show>
         )}

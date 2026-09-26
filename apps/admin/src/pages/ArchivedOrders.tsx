@@ -58,39 +58,41 @@ export default function ArchivedOrders() {
               }
             >
               <div class="overflow-x-auto">
-              <table class={tableClass} aria-label={t("data.archive")}>
-                <thead>
-                  <tr>
-                    <Th>{t("data.number")}</Th>
-                    <Th>{t("data.placed")}</Th>
-                    <Th>{t("data.customer")}</Th>
-                    <Th>{t("data.oldStatus")}</Th>
-                    <Th class="text-right">{t("data.items")}</Th>
-                    <Th class="text-right">{t("data.total")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(o) => (
-                      <tr>
-                        <td class={`${tdClass} font-mono text-xs`}>{o.number}</td>
-                        <td class={`${tdClass} figures text-muted-foreground`}>{formatDateTime(o.placed_at)}</td>
-                        <td class={tdClass}>
-                          {o.name ? `${o.name} · ` : ""}
-                          {o.email}
-                        </td>
-                        <td class={tdClass}>{o.status_label ?? "—"}</td>
-                        <td class={`${tdClass} figures text-right`}>
-                          {Array.isArray(o.lines) ? o.lines.length : 0}
-                        </td>
-                        <td class={`${tdClass} figures text-right`}>
-                          {formatMoney(o.total_minor, o.currency, locale())}
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
+                <table class={tableClass} aria-label={t("data.archive")}>
+                  <thead>
+                    <tr>
+                      <Th>{t("data.number")}</Th>
+                      <Th>{t("data.placed")}</Th>
+                      <Th>{t("data.customer")}</Th>
+                      <Th>{t("data.oldStatus")}</Th>
+                      <Th class="text-right">{t("data.items")}</Th>
+                      <Th class="text-right">{t("data.total")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(o) => (
+                        <tr>
+                          <td class={`${tdClass} font-mono text-xs`}>{o.number}</td>
+                          <td class={`${tdClass} figures text-muted-foreground`}>
+                            {formatDateTime(o.placed_at)}
+                          </td>
+                          <td class={tdClass}>
+                            {o.name ? `${o.name} · ` : ""}
+                            {o.email}
+                          </td>
+                          <td class={tdClass}>{o.status_label ?? "—"}</td>
+                          <td class={`${tdClass} figures text-right`}>
+                            {Array.isArray(o.lines) ? o.lines.length : 0}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>
+                            {formatMoney(o.total_minor, o.currency, locale())}
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
               </div>
             </Card>
           </Show>

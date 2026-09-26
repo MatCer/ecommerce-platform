@@ -29,6 +29,7 @@ export {
   TextField,
   Toggle,
 } from "./field.tsx";
+export { fileInputClass } from "./file-input.tsx";
 export { Icon, type IconName } from "./icon.tsx";
 export {
   Avatar,
@@ -66,4 +67,3 @@ export {
   Spinner,
 } from "./states.tsx";
 export { Th, tableClass, tdClass } from "./table.tsx";
-export { fileInputClass } from "./file-input.tsx";

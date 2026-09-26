@@ -252,60 +252,62 @@ export default function Coupons() {
                 ) : undefined
               }
             >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("coupons.code")}</Th>
-                    <Th class="text-right">{t("coupons.discount")}</Th>
-                    <Th>{t("coupons.validity")}</Th>
-                    <Th class="text-right">{t("coupons.used")}</Th>
-                    <Th>{t("sales.state")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(c) => (
-                      <tr class="hover:bg-subtle">
-                        <td class={`${tdClass} font-mono text-sm font-semibold text-heading`}>{c.code}</td>
-                        <td class={`${tdClass} figures text-right`}>{discountText(c)}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {c.starts_at || c.ends_at
-                            ? `${c.starts_at ? formatDateTime(c.starts_at) : "…"} – ${c.ends_at ? formatDateTime(c.ends_at) : "…"}`
-                            : t("coupons.always")}
-                        </td>
-                        <td class={`${tdClass} figures text-right`}>
-                          {c.used_count} / {c.usage_limit ?? "∞"}
-                        </td>
-                        <td class={tdClass}>
-                          <Badge tone={c.published ? "success" : "neutral"}>
-                            {c.published ? t("coupons.live") : t("coupons.private")}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button category="tertiary" size="small" onClick={() => open(c)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {c.code}</span>
-                          </Button>
-                          <Button
-                            category="tertiary"
-                            size="small"
-                            iconOnly
-                            icon="remove"
-                            aria-label={`${t("common.delete")}: ${c.code}`}
-                            title={t("common.delete")}
-                            onClick={() => setDeleting(c)}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("coupons.code")}</Th>
+                      <Th class="text-right">{t("coupons.discount")}</Th>
+                      <Th>{t("coupons.validity")}</Th>
+                      <Th class="text-right">{t("coupons.used")}</Th>
+                      <Th>{t("sales.state")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(c) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-mono text-sm font-semibold text-heading`}>
+                            {c.code}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>{discountText(c)}</td>
+                          <td
+                            class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
+                          >
+                            {c.starts_at || c.ends_at
+                              ? `${c.starts_at ? formatDateTime(c.starts_at) : "…"} – ${c.ends_at ? formatDateTime(c.ends_at) : "…"}`
+                              : t("coupons.always")}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>
+                            {c.used_count} / {c.usage_limit ?? "∞"}
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={c.published ? "success" : "neutral"}>
+                              {c.published ? t("coupons.live") : t("coupons.private")}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => open(c)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {c.code}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${c.code}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(c)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </Show>
         )}

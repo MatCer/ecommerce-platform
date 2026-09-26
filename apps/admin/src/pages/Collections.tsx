@@ -216,64 +216,64 @@ export default function Collections() {
             }
           >
             <Card padding="none">
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("collections.name")}</Th>
-                    <Th>{t("collections.kind")}</Th>
-                    <Th>{t("collections.schedule")}</Th>
-                    <Th class="text-right">{t("collections.products")}</Th>
-                    <Th>{t("collections.state")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(c) => (
-                      <tr class="hover:bg-subtle">
-                        <td class={`${tdClass} font-semibold text-heading`}>{c.name}</td>
-                        <td class={tdClass}>{t(`collections.kind_${c.kind}`)}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {schedule(c)}
-                        </td>
-                        <td class={`${tdClass} figures text-right`}>{c.product_ids.length}</td>
-                        <td class={tdClass}>
-                          <Badge tone={stateTone[collectionState(c)]}>
-                            {t(`collections.state_${collectionState(c)}`)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button
-                            category="tertiary"
-                            size="small"
-                            onClick={() => setPreviewing(c)}
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("collections.name")}</Th>
+                      <Th>{t("collections.kind")}</Th>
+                      <Th>{t("collections.schedule")}</Th>
+                      <Th class="text-right">{t("collections.products")}</Th>
+                      <Th>{t("collections.state")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(c) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{c.name}</td>
+                          <td class={tdClass}>{t(`collections.kind_${c.kind}`)}</td>
+                          <td
+                            class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
                           >
-                            {t("collections.preview")}
-                            <span class="sr-only">: {c.name}</span>
-                          </Button>
-                          <Button category="tertiary" size="small" onClick={() => open(c)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {c.name}</span>
-                          </Button>
-                          <Button
-                            category="tertiary"
-                            size="small"
-                            iconOnly
-                            icon="remove"
-                            aria-label={`${t("common.delete")}: ${c.name}`}
-                            title={t("common.delete")}
-                            onClick={() => setDeleting(c)}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+                            {schedule(c)}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>{c.product_ids.length}</td>
+                          <td class={tdClass}>
+                            <Badge tone={stateTone[collectionState(c)]}>
+                              {t(`collections.state_${collectionState(c)}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              onClick={() => setPreviewing(c)}
+                            >
+                              {t("collections.preview")}
+                              <span class="sr-only">: {c.name}</span>
+                            </Button>
+                            <Button category="tertiary" size="small" onClick={() => open(c)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {c.name}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${c.name}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(c)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
             </Card>
           </Show>
         )}
@@ -315,9 +315,7 @@ export default function Collections() {
             maxLength={200}
           />
           <fieldset class="grid grid-cols-3 gap-4">
-            <legend class={`${labelClass} mb-2`}>
-              {t("collections.heading")}
-            </legend>
+            <legend class={`${labelClass} mb-2`}>{t("collections.heading")}</legend>
             <For each={LOCALES}>
               {(l) => (
                 <TextField

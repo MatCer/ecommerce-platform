@@ -65,7 +65,10 @@ function MediaRow(props: {
       failed: t("editor.assetFailed"),
     })[s];
   return (
-    <li class="flex flex-wrap items-start gap-4 border-b border-border py-4 last:border-b-0" aria-label={label()}>
+    <li
+      class="flex flex-wrap items-start gap-4 border-b border-border py-4 last:border-b-0"
+      aria-label={label()}
+    >
       <div class="grid size-24 shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-subtle">
         <Show
           when={asset.data?.status === "ready" && asset.data}

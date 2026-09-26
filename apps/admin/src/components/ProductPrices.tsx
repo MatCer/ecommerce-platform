@@ -226,55 +226,59 @@ function ListPrices(props: {
         <Alert tone="error">{error()}</Alert>
       </Show>
       <div class="flex flex-col">
-      <For each={props.variants}>
-        {(v) => {
-          const h = () => entry(v.id);
-          return (
-            <Collapse
-              summary={
-                <span>
-                  {`${t("prices.history")}: ${v.label}`}{" "}
-                  <span class="sr-only">({props.list.name})</span>
-                </span>
-              }
-            >
-              <Show
-                when={(h()?.intervals.length ?? 0) > 0}
-                fallback={<p class="pb-2 text-sm text-muted-foreground">{t("prices.noHistory")}</p>}
+        <For each={props.variants}>
+          {(v) => {
+            const h = () => entry(v.id);
+            return (
+              <Collapse
+                summary={
+                  <span>
+                    {`${t("prices.history")}: ${v.label}`}{" "}
+                    <span class="sr-only">({props.list.name})</span>
+                  </span>
+                }
               >
-                <div class="mb-2 max-w-2xl overflow-x-auto rounded-md border border-border">
-                <table class={tableClass}>
-                  <thead>
-                    <tr>
-                      <Th>{t("prices.from")}</Th>
-                      <Th>{t("prices.to")}</Th>
-                      <Th class="text-right">{t("prices.amount")}</Th>
-                      <Th>{t("prices.cause")}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={h()?.intervals ?? []}>
-                      {(i) => (
+                <Show
+                  when={(h()?.intervals.length ?? 0) > 0}
+                  fallback={
+                    <p class="pb-2 text-sm text-muted-foreground">{t("prices.noHistory")}</p>
+                  }
+                >
+                  <div class="mb-2 max-w-2xl overflow-x-auto rounded-md border border-border">
+                    <table class={tableClass}>
+                      <thead>
                         <tr>
-                          <td class={`${tdClass} figures text-xs`}>
-                            {formatDateTime(i.valid_from)}
-                          </td>
-                          <td class={`${tdClass} figures text-xs`}>
-                            {i.valid_to ? formatDateTime(i.valid_to) : t("prices.now")}
-                          </td>
-                          <td class={`${tdClass} figures text-right`}>{money(i.amount_minor)}</td>
-                          <td class={tdClass}>{t(`prices.cause_${i.cause}`)}</td>
+                          <Th>{t("prices.from")}</Th>
+                          <Th>{t("prices.to")}</Th>
+                          <Th class="text-right">{t("prices.amount")}</Th>
+                          <Th>{t("prices.cause")}</Th>
                         </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-                </div>
-              </Show>
-            </Collapse>
-          );
-        }}
-      </For>
+                      </thead>
+                      <tbody>
+                        <For each={h()?.intervals ?? []}>
+                          {(i) => (
+                            <tr>
+                              <td class={`${tdClass} figures text-xs`}>
+                                {formatDateTime(i.valid_from)}
+                              </td>
+                              <td class={`${tdClass} figures text-xs`}>
+                                {i.valid_to ? formatDateTime(i.valid_to) : t("prices.now")}
+                              </td>
+                              <td class={`${tdClass} figures text-right`}>
+                                {money(i.amount_minor)}
+                              </td>
+                              <td class={tdClass}>{t(`prices.cause_${i.cause}`)}</td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </Show>
+              </Collapse>
+            );
+          }}
+        </For>
       </div>
       <Show when={props.at}>
         <p class="text-xs text-muted-foreground">
