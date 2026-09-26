@@ -1,4 +1,4 @@
-import { Badge, Button, buttonClass, ConfirmDialog, EmptyState } from "@platform/ui";
+import { Alert, Badge, Button, buttonClass, Card, ConfirmDialog, EmptyState } from "@platform/ui";
 import { A, useLocation } from "@solidjs/router";
 import { createMutation } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
@@ -29,7 +29,7 @@ export default function ContentPages() {
     },
   }));
   const newLink = () => (
-    <A class={buttonClass("primary")} href={`${base()}/new`}>
+    <A class={buttonClass({ variant: "confirm" })} href={`${base()}/new`}>
       {t(blog() ? "content.newPost" : "content.newPage")}
     </A>
   );
@@ -41,7 +41,9 @@ export default function ContentPages() {
     <>
       <PageHeader title={t(blog() ? "content.blog" : "content.pages")} actions={newLink()} />
       <Show when={error()}>
-        <p role="alert">{error()}</p>
+        <Alert tone="error" class="mb-4">
+          {error()}
+        </Alert>
       </Show>
       <QueryState query={pages}>
         {(data) => {
@@ -52,61 +54,82 @@ export default function ContentPages() {
               when={rows().length}
               fallback={
                 <EmptyState
+                  icon="document"
                   title={t("content.emptyPages")}
                   description={t("content.emptyPagesDesc")}
                   action={newLink()}
                 />
               }
             >
-              <div class="overflow-x-auto">
-                <table class={tableClass} aria-label={t(blog() ? "content.blog" : "content.pages")}>
-                  <thead>
-                    <tr>
-                      <Th>{t("content.title")}</Th>
-                      <Th>{t("content.slug")}</Th>
-                      <Th>{t("content.kind")}</Th>
-                      <Th>{t("content.status")}</Th>
-                      <Th>{t("content.updated")}</Th>
-                      <Th>{t("common.actions")}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={rows()}>
-                      {(p) => (
-                        <tr>
-                          <td class={tdClass}>
-                            <A class="text-accent-700 hover:underline" href={`${base()}/${p.id}`}>
-                              {firstContent(p.title)}
-                            </A>
-                          </td>
-                          <td class={tdClass}>{firstContent(p.slug)}</td>
-                          <td class={tdClass}>
-                            <Badge>
-                              {p.legal_type
-                                ? t(`content.${p.legal_type}`)
-                                : t(p.kind === "legal" ? "content.legalKind" : `content.${p.kind}`)}
-                            </Badge>
-                          </td>
-                          <td class={tdClass}>
-                            <Badge tone={status(p) === "published" ? "success" : "neutral"}>
-                              {t(`content.${status(p)}`)}
-                            </Badge>
-                          </td>
-                          <td class={tdClass}>{formatDateTime(p.updated_at)}</td>
-                          <td class={tdClass}>
-                            <Button
-                              aria-label={`${t("common.delete")}: ${firstContent(p.title)}`}
-                              onClick={() => setDeleting(p)}
+              <Card padding="none">
+                <div class="overflow-x-auto">
+                  <table
+                    class={tableClass}
+                    aria-label={t(blog() ? "content.blog" : "content.pages")}
+                  >
+                    <thead>
+                      <tr>
+                        <Th>{t("content.title")}</Th>
+                        <Th>{t("content.slug")}</Th>
+                        <Th>{t("content.kind")}</Th>
+                        <Th>{t("content.status")}</Th>
+                        <Th class="text-right">{t("content.updated")}</Th>
+                        <Th srOnly>{t("common.actions")}</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={rows()}>
+                        {(p) => (
+                          <tr class="hover:bg-subtle">
+                            <td class={tdClass}>
+                              <A
+                                class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                                href={`${base()}/${p.id}`}
+                              >
+                                {firstContent(p.title)}
+                              </A>
+                            </td>
+                            <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>
+                              {firstContent(p.slug)}
+                            </td>
+                            <td class={tdClass}>
+                              <Badge>
+                                {p.legal_type
+                                  ? t(`content.${p.legal_type}`)
+                                  : t(
+                                      p.kind === "legal"
+                                        ? "content.legalKind"
+                                        : `content.${p.kind}`,
+                                    )}
+                              </Badge>
+                            </td>
+                            <td class={tdClass}>
+                              <Badge tone={status(p) === "published" ? "success" : "neutral"}>
+                                {t(`content.${status(p)}`)}
+                              </Badge>
+                            </td>
+                            <td
+                              class={`${tdClass} figures text-right whitespace-nowrap text-muted-foreground`}
                             >
-                              {t("common.delete")}
-                            </Button>
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
+                              {formatDateTime(p.updated_at)}
+                            </td>
+                            <td class={`${tdClass} text-right`}>
+                              <Button
+                                category="tertiary"
+                                size="small"
+                                aria-label={`${t("common.delete")}: ${firstContent(p.title)}`}
+                                onClick={() => setDeleting(p)}
+                              >
+                                {t("common.delete")}
+                              </Button>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </Show>
           );
         }}

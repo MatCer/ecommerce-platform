@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-/* The shared accessible primitives (account forms). */
-@source "../../../../packages/ui/src";
-
 /* Same token names as the themes; values come from the tenant's /_p/tokens.css at runtime. */
 @theme reference {
   --color-background: #f5f7f9;
@@ -22,7 +19,7 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
 
-  /* Names used by @platform/ui, mapped onto the tenant's tokens below. */
+  /* Names used by src/ui.tsx, mapped onto the tenant's tokens below. */
   --color-accent-50: #eef3fa;
   --color-accent-600: #2b5aa8;
   --color-accent-700: #274c8a;
@@ -37,7 +34,7 @@
 }
 
 @layer base {
-  /* @platform/ui speaks the admin's token names; on the checkout they are the tenant's. */
+  /* src/ui.tsx speaks the admin's token names; on the checkout they are the tenant's. */
   :root {
     --color-accent-50: var(--color-identity-wash);
     --color-accent-600: var(--color-identity);

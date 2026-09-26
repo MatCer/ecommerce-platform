@@ -1,8 +1,8 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { SignInResult } from "@platform/storefront-sdk/types";
-import { Button, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 
 type M = Record<string, string>;

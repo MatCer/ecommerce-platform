@@ -1,4 +1,13 @@
-import { Badge, Button, Checkbox, EmptyState, SelectField } from "@platform/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  linkClass,
+  SelectField,
+  type Tone,
+} from "@platform/ui";
 import { A, useSearchParams } from "@solidjs/router";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Show } from "solid-js";
@@ -17,6 +26,16 @@ const statuses: Schemas["OrderStatus"][] = [
   "cancelled",
   "returned",
 ];
+
+export const orderStatusTone: Record<Schemas["OrderStatus"], Tone> = {
+  pending: "neutral",
+  confirmed: "info",
+  processing: "info",
+  shipped: "info",
+  delivered: "success",
+  cancelled: "neutral",
+  returned: "warning",
+};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -81,13 +100,16 @@ export default function Orders() {
       <Show when={customer()}>
         <p class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span>{t("customers.filtered")}</span>
-          <A class="font-medium text-accent-700 hover:underline" href="/orders">
+          <A class={linkClass} href="/orders">
             {t("customers.allOrders")}
           </A>
         </p>
       </Show>
-      <div class="mb-4 max-w-xs">
+      {/* Filter bar (Pajamas list page). */}
+      <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <SelectField
+          class="w-56"
+          hideLabel
           label={t("orders.status")}
           value={status() ?? ""}
           options={[
@@ -96,13 +118,12 @@ export default function Orders() {
           ]}
           onChange={(value) => setStatus(statuses.find((s) => s === value))}
         />
+        <Checkbox
+          label={t("fulfillment.exceptionOnly")}
+          checked={exception()}
+          onChange={setException}
+        />
       </div>
-      <Checkbox
-        class="mb-4"
-        label={t("fulfillment.exceptionOnly")}
-        checked={exception()}
-        onChange={setException}
-      />
       <Show keyed when={JSON.stringify(tenantKey("bulk-documents"))}>
         {(_key) => <BulkDocuments orders={rows().filter((row) => selected().has(row.id))} />}
       </Show>
@@ -110,86 +131,103 @@ export default function Orders() {
         {() => (
           <Show
             when={rows().length}
-            fallback={<EmptyState title={t("orders.empty")} description={t("orders.emptyDesc")} />}
+            fallback={
+              <EmptyState
+                icon="list-task"
+                title={t("orders.empty")}
+                description={t("orders.emptyDesc")}
+              />
+            }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>
-                      <Checkbox
-                        label={t("fulfillment.selectAll")}
-                        checked={rows().length > 0 && rows().every((row) => selected().has(row.id))}
-                        onChange={(checked) =>
-                          setSelected(new Set(checked ? rows().map((row) => row.id) : []))
-                        }
-                      />
-                    </Th>
-                    <For
-                      each={[
-                        t("orders.number"),
-                        t("orders.date"),
-                        t("orders.email"),
-                        t("orders.status"),
-                        t("orders.paymentStatus"),
-                        t("orders.total"),
-                        t("orders.exception"),
-                      ]}
-                    >
-                      {(label) => <Th>{label}</Th>}
+            <Card
+              padding="none"
+              footer={
+                orders.hasNextPage ? (
+                  <Button
+                    loading={orders.isFetchingNextPage}
+                    onClick={() => void orders.fetchNextPage()}
+                  >
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th class="w-10">
+                        <Checkbox
+                          label={<span class="sr-only">{t("fulfillment.selectAll")}</span>}
+                          checked={
+                            rows().length > 0 && rows().every((row) => selected().has(row.id))
+                          }
+                          onChange={(checked) =>
+                            setSelected(new Set(checked ? rows().map((row) => row.id) : []))
+                          }
+                        />
+                      </Th>
+                      <For
+                        each={[
+                          t("orders.number"),
+                          t("orders.date"),
+                          t("orders.email"),
+                          t("orders.status"),
+                          t("orders.paymentStatus"),
+                        ]}
+                      >
+                        {(label) => <Th>{label}</Th>}
+                      </For>
+                      <Th class="text-right">{t("orders.total")}</Th>
+                      <Th>{t("orders.exception")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(order) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={tdClass}>
+                            <Checkbox
+                              label={
+                                <span class="sr-only">
+                                  {t("fulfillment.selectOrder", { number: order.number })}
+                                </span>
+                              }
+                              checked={selected().has(order.id)}
+                              onChange={(checked) => select(order.id, checked)}
+                            />
+                          </td>
+                          <td class={tdClass}>
+                            <A
+                              class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                              href={`/orders/${order.id}`}
+                            >
+                              {order.number}
+                            </A>
+                          </td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {formatDateTime(order.placed_at)}
+                          </td>
+                          <td class={tdClass}>{order.email}</td>
+                          <td class={tdClass}>
+                            <Badge tone={orderStatusTone[order.status]}>
+                              {t(`orderStatuses.${order.status}`)}
+                            </Badge>
+                          </td>
+                          <td class={tdClass}>{t(`paymentStatuses.${order.payment_status}`)}</td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-right`}>
+                            {order.total.formatted}
+                          </td>
+                          <td class={tdClass}>
+                            <OrderException exception={order.exception} />
+                          </td>
+                        </tr>
+                      )}
                     </For>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(order) => (
-                      <tr>
-                        <td class={tdClass}>
-                          <Checkbox
-                            label={
-                              <span class="sr-only">
-                                {t("fulfillment.selectOrder", { number: order.number })}
-                              </span>
-                            }
-                            checked={selected().has(order.id)}
-                            onChange={(checked) => select(order.id, checked)}
-                          />
-                        </td>
-                        <td class={tdClass}>
-                          <A
-                            class="font-medium text-accent-700 hover:underline"
-                            href={`/orders/${order.id}`}
-                          >
-                            {order.number}
-                          </A>
-                        </td>
-                        <td class={`${tdClass} whitespace-nowrap`}>
-                          {formatDateTime(order.placed_at)}
-                        </td>
-                        <td class={tdClass}>{order.email}</td>
-                        <td class={tdClass}>{t(`orderStatuses.${order.status}`)}</td>
-                        <td class={tdClass}>{t(`paymentStatuses.${order.payment_status}`)}</td>
-                        <td class={`${tdClass} figures whitespace-nowrap`}>
-                          {order.total.formatted}
-                        </td>
-                        <td class={tdClass}>
-                          <OrderException exception={order.exception} />
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={orders.hasNextPage}>
-              <Button
-                class="mt-4"
-                loading={orders.isFetchingNextPage}
-                onClick={() => orders.fetchNextPage()}
-              >
-                {t("common.loadMore")}
-              </Button>
-            </Show>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>

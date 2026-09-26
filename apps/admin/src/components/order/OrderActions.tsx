@@ -1,6 +1,6 @@
 import { Button, Dialog, showToast, TextField } from "@platform/ui";
 import { createMutation } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { t } from "../../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../../lib/api.ts";
 import { needsRefundIban } from "../../lib/fulfillment.ts";
@@ -83,6 +83,7 @@ export function OrderActions(props: { data: Schemas["AdminOrder"] }) {
   const close = () => {
     if (!pending()) setDialog(null);
   };
+  const formId = createUniqueId();
   const open = (value: NonNullable<ReturnType<typeof dialog>>) => {
     transition.reset();
     label.reset();
@@ -115,7 +116,12 @@ export function OrderActions(props: { data: Schemas["AdminOrder"] }) {
           </Button>
         </Show>
         <Show when={props.data.actions.cancel && can("admin")}>
-          <Button disabled={pending()} onClick={() => open("cancel")}>
+          <Button
+            variant="danger"
+            category="secondary"
+            disabled={pending()}
+            onClick={() => open("cancel")}
+          >
             {t("fulfillment.cancel")}
           </Button>
         </Show>
@@ -149,9 +155,31 @@ export function OrderActions(props: { data: Schemas["AdminOrder"] }) {
               ? t("fulfillment.returnedConfirm")
               : undefined
         }
+        size="sm"
+        footer={
+          <>
+            <Button disabled={pending()} onClick={close}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="submit"
+              form={formId}
+              variant={dialog() === "cancel" ? "danger" : "confirm"}
+              loading={pending()}
+              disabled={dialog() === "create_label" && !validWeight()}
+            >
+              {dialog() === "cancel"
+                ? t("fulfillment.cancel")
+                : dialog() === "returned_to_sender"
+                  ? t("fulfillment.returned_to_sender")
+                  : t("fulfillment.create_label")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="grid gap-3"
+          id={formId}
+          class="grid gap-4 empty:hidden"
           onSubmit={(event) => {
             event.preventDefault();
             if (pending()) return;
@@ -199,23 +227,6 @@ export function OrderActions(props: { data: Schemas["AdminOrder"] }) {
             </Show>
           </Show>
           <ApiProblem error={transition.error ?? label.error ?? cancel.error} />
-          <div class="flex justify-end gap-2">
-            <Button disabled={pending()} onClick={close}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              variant={dialog() === "cancel" ? "danger" : "primary"}
-              loading={pending()}
-              disabled={dialog() === "create_label" && !validWeight()}
-            >
-              {dialog() === "cancel"
-                ? t("fulfillment.cancel")
-                : dialog() === "returned_to_sender"
-                  ? t("fulfillment.returned_to_sender")
-                  : t("fulfillment.create_label")}
-            </Button>
-          </div>
         </form>
       </Dialog>
     </div>

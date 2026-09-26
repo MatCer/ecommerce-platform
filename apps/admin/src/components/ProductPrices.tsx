@@ -1,7 +1,17 @@
-import { Badge, Button, showToast, TextField } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Collapse,
+  controlClass,
+  FormGroup,
+  linkClass,
+  showToast,
+  TextField,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { errorMessage, formatDateTime, locale, t } from "../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { tenantKey } from "../lib/me.ts";
@@ -111,12 +121,20 @@ function ListPrices(props: {
     setRows({ ...rows(), [id]: { ...(rows()[id] ?? { price: "", compareAt: "" }), ...patch } });
 
   return (
-    <section aria-labelledby={`pl-${props.list.id}`} class="flex flex-col gap-2">
-      <h3 id={`pl-${props.list.id}`} class="text-sm font-semibold">
-        {props.list.name}{" "}
-        <span class="figures text-xs font-normal text-muted-foreground">{props.list.currency}</span>
-      </h3>
-      <div class="overflow-x-auto">
+    <section aria-labelledby={`pl-${props.list.id}`} class="flex flex-col gap-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 id={`pl-${props.list.id}`} class="text-sm font-semibold text-heading">
+          {props.list.name}{" "}
+          <span class="font-mono text-xs font-normal text-muted-foreground">
+            {props.list.currency}
+          </span>
+        </h3>
+        <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty()}>
+          {t("prices.save")}
+          <span class="sr-only">: {props.list.name}</span>
+        </Button>
+      </div>
+      <div class="overflow-x-auto rounded-md border border-border">
         <table class={tableClass}>
           <thead>
             <tr>
@@ -134,9 +152,9 @@ function ListPrices(props: {
                 const h = () => entry(v.id);
                 return (
                   <tr>
-                    <th scope="row" class={`${tdClass} text-left font-medium`}>
+                    <th scope="row" class={`${tdClass} text-left font-semibold text-heading`}>
                       {v.label}{" "}
-                      <span class="figures block text-xs font-normal text-faint-foreground">
+                      <span class="block font-mono text-xs font-normal text-muted-foreground">
                         {v.sku}
                       </span>
                     </th>
@@ -187,7 +205,8 @@ function ListPrices(props: {
                     <td class={`${tdClass} text-right`}>
                       <Show when={h()?.price}>
                         <Button
-                          variant="ghost"
+                          category="tertiary"
+                          size="small"
                           loading={stop.isPending && stop.variables === v.id}
                           onClick={() => stop.mutate(v.id)}
                         >
@@ -204,61 +223,65 @@ function ListPrices(props: {
         </table>
       </div>
       <Show when={error()}>
-        <p role="alert" class="text-xs font-medium text-error-700">
-          {error()}
-        </p>
+        <Alert tone="error">{error()}</Alert>
       </Show>
-      <div>
-        <Button onClick={() => save.mutate()} loading={save.isPending} disabled={!dirty()}>
-          {t("prices.save")}
-          <span class="sr-only">: {props.list.name}</span>
-        </Button>
-      </div>
-      <For each={props.variants}>
-        {(v) => {
-          const h = () => entry(v.id);
-          return (
-            <details class="border-t border-border py-1.5 text-sm">
-              <summary class="cursor-pointer text-accent-700">
-                {t("prices.history")}: {v.label} <span class="sr-only">({props.list.name})</span>
-              </summary>
-              <Show
-                when={(h()?.intervals.length ?? 0) > 0}
-                fallback={<p class="py-1 text-xs text-muted-foreground">{t("prices.noHistory")}</p>}
+      <div class="flex flex-col">
+        <For each={props.variants}>
+          {(v) => {
+            const h = () => entry(v.id);
+            return (
+              <Collapse
+                summary={
+                  <span>
+                    {`${t("prices.history")}: ${v.label}`}{" "}
+                    <span class="sr-only">({props.list.name})</span>
+                  </span>
+                }
               >
-                <table class={`${tableClass} mt-1 max-w-2xl`}>
-                  <thead>
-                    <tr>
-                      <Th>{t("prices.from")}</Th>
-                      <Th>{t("prices.to")}</Th>
-                      <Th class="text-right">{t("prices.amount")}</Th>
-                      <Th>{t("prices.cause")}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={h()?.intervals ?? []}>
-                      {(i) => (
+                <Show
+                  when={(h()?.intervals.length ?? 0) > 0}
+                  fallback={
+                    <p class="pb-2 text-sm text-muted-foreground">{t("prices.noHistory")}</p>
+                  }
+                >
+                  <div class="mb-2 max-w-2xl overflow-x-auto rounded-md border border-border">
+                    <table class={tableClass}>
+                      <thead>
                         <tr>
-                          <td class={`${tdClass} figures text-xs`}>
-                            {formatDateTime(i.valid_from)}
-                          </td>
-                          <td class={`${tdClass} figures text-xs`}>
-                            {i.valid_to ? formatDateTime(i.valid_to) : t("prices.now")}
-                          </td>
-                          <td class={`${tdClass} figures text-right`}>{money(i.amount_minor)}</td>
-                          <td class={tdClass}>{t(`prices.cause_${i.cause}`)}</td>
+                          <Th>{t("prices.from")}</Th>
+                          <Th>{t("prices.to")}</Th>
+                          <Th class="text-right">{t("prices.amount")}</Th>
+                          <Th>{t("prices.cause")}</Th>
                         </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </Show>
-            </details>
-          );
-        }}
-      </For>
+                      </thead>
+                      <tbody>
+                        <For each={h()?.intervals ?? []}>
+                          {(i) => (
+                            <tr>
+                              <td class={`${tdClass} figures text-xs`}>
+                                {formatDateTime(i.valid_from)}
+                              </td>
+                              <td class={`${tdClass} figures text-xs`}>
+                                {i.valid_to ? formatDateTime(i.valid_to) : t("prices.now")}
+                              </td>
+                              <td class={`${tdClass} figures text-right`}>
+                                {money(i.amount_minor)}
+                              </td>
+                              <td class={tdClass}>{t(`prices.cause_${i.cause}`)}</td>
+                            </tr>
+                          )}
+                        </For>
+                      </tbody>
+                    </table>
+                  </div>
+                </Show>
+              </Collapse>
+            );
+          }}
+        </For>
+      </div>
       <Show when={props.at}>
-        <p class="text-xs text-faint-foreground">
+        <p class="text-xs text-muted-foreground">
           {t("prices.asOf")}: {formatDateTime(props.at ?? "")}
         </p>
       </Show>
@@ -270,6 +293,7 @@ function ListPrices(props: {
 export function ProductPrices(props: { productId: string; variants: PricedVariant[] }) {
   const lists = usePriceLists();
   const [asOf, setAsOf] = createSignal("");
+  const asOfId = createUniqueId();
   const history = createQuery(() => ({
     queryKey: tenantKey("price-history", props.productId, asOf()),
     queryFn: () =>
@@ -292,23 +316,23 @@ export function ProductPrices(props: { productId: string; variants: PricedVarian
           fallback={
             <p class="text-sm text-muted-foreground">
               {t("prices.noLists")}{" "}
-              <A href="/price-lists" class="text-accent-700 underline">
+              <A href="/price-lists" class={linkClass}>
                 {t("nav.priceLists")}
               </A>
             </p>
           }
         >
-          <div class="flex flex-col gap-5">
-            <label class="flex w-64 flex-col gap-1 text-xs font-medium text-muted-foreground">
-              {t("prices.asOf")}
+          <div class="flex flex-col gap-6">
+            <FormGroup class="w-64" label={t("prices.asOf")} for={asOfId}>
               <input
+                id={asOfId}
                 type="datetime-local"
-                class="h-control rounded-md border border-input bg-card px-2.5 text-sm text-foreground"
+                class={`${controlClass} figures`}
                 value={asOf()}
                 max={toLocalInput(new Date(Date.now() + 365 * 86_400_000).toISOString())}
                 onChange={(e) => setAsOf(e.currentTarget.value)}
               />
-            </label>
+            </FormGroup>
             <QueryState query={history}>
               {(h) => (
                 <For each={data.items}>

@@ -1,9 +1,9 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { NextAction, OrderPayment, PaymentStart } from "@platform/storefront-sdk/types";
-import { Button } from "@platform/ui";
 import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { call } from "../lib/client";
 import { loadStripe, type StripeElements, type StripeJs } from "../lib/stripe";
+import { Button } from "../ui.tsx";
 
 import HydratedControls from "./HydratedControls";
 

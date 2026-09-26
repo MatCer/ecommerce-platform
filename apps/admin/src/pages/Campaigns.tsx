@@ -1,4 +1,4 @@
-import { Badge, Button, ConfirmDialog, EmptyState, showToast } from "@platform/ui";
+import { Badge, Button, Card, ConfirmDialog, EmptyState, showToast } from "@platform/ui";
 import { A, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
@@ -59,7 +59,7 @@ export default function Campaigns() {
   }));
 
   const newButton = () => (
-    <Button variant="primary" onClick={() => navigate("/marketing/campaigns/new")}>
+    <Button variant="confirm" onClick={() => navigate("/marketing/campaigns/new")}>
       {t("marketing.newCampaign")}
     </Button>
   );
@@ -77,70 +77,77 @@ export default function Campaigns() {
             when={data.items.length > 0}
             fallback={
               <EmptyState
+                icon="bullhorn"
                 title={t("marketing.noCampaigns")}
                 description={t("marketing.noCampaignsDesc")}
                 action={newButton()}
               />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("marketing.name")}</Th>
-                    <Th>{t("marketing.status")}</Th>
-                    <Th>{t("marketing.segment")}</Th>
-                    <Th>{t("marketing.when")}</Th>
-                    <Th class="text-right">{t("marketing.stat_sent")}</Th>
-                    <Th class="text-right">{t("marketing.stat_accepted")}</Th>
-                    <Th class="text-right">{t("marketing.stat_clicked")}</Th>
-                    <Th class="text-right">{t("marketing.stat_unsubscribed")}</Th>
-                    <Th class="text-right">{t("marketing.stat_bounced")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(c) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>
-                          <A
-                            href={`/marketing/campaigns/${c.id}`}
-                            class="text-accent-700 hover:underline"
-                          >
-                            {c.name}
-                          </A>
-                        </td>
-                        <td class={tdClass}>
-                          <Badge tone={campaignTone[c.status]}>
-                            {t(`marketing.cstatus_${c.status}`)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-xs`}>{segmentName(c.segment_id)}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {campaignWhen(c)}
-                        </td>
-                        <td class={`${tdClass} figures text-right`}>{c.stats.sent}</td>
-                        <td class={`${tdClass} figures text-right`}>{c.stats.accepted}</td>
-                        <td class={`${tdClass} figures text-right`}>{c.stats.clicked}</td>
-                        <td class={`${tdClass} figures text-right`}>{c.stats.unsubscribed}</td>
-                        <td class={`${tdClass} figures text-right`}>{c.stats.bounced}</td>
-                        <td class={`${tdClass} text-right`}>
-                          <Show when={c.status === "draft"}>
-                            <Button variant="ghost" onClick={() => setDeleting(c)}>
-                              {t("common.delete")}
-                              <span class="sr-only">: {c.name}</span>
-                            </Button>
-                          </Show>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("marketing.name")}</Th>
+                      <Th>{t("marketing.status")}</Th>
+                      <Th>{t("marketing.segment")}</Th>
+                      <Th>{t("marketing.when")}</Th>
+                      <Th class="text-right">{t("marketing.stat_sent")}</Th>
+                      <Th class="text-right">{t("marketing.stat_accepted")}</Th>
+                      <Th class="text-right">{t("marketing.stat_clicked")}</Th>
+                      <Th class="text-right">{t("marketing.stat_unsubscribed")}</Th>
+                      <Th class="text-right">{t("marketing.stat_bounced")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(c) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={tdClass}>
+                            <A
+                              href={`/marketing/campaigns/${c.id}`}
+                              class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                            >
+                              {c.name}
+                            </A>
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={campaignTone[c.status]}>
+                              {t(`marketing.cstatus_${c.status}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-muted-foreground`}>
+                            {segmentName(c.segment_id)}
+                          </td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {campaignWhen(c)}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>{c.stats.sent}</td>
+                          <td class={`${tdClass} figures text-right`}>{c.stats.accepted}</td>
+                          <td class={`${tdClass} figures text-right`}>{c.stats.clicked}</td>
+                          <td class={`${tdClass} figures text-right`}>{c.stats.unsubscribed}</td>
+                          <td class={`${tdClass} figures text-right`}>{c.stats.bounced}</td>
+                          <td class={`${tdClass} text-right`}>
+                            <Show when={c.status === "draft"}>
+                              <Button
+                                category="tertiary"
+                                size="small"
+                                onClick={() => setDeleting(c)}
+                              >
+                                {t("common.delete")}
+                                <span class="sr-only">: {c.name}</span>
+                              </Button>
+                            </Show>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>

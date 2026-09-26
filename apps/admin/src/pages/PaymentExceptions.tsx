@@ -1,7 +1,7 @@
-import { Button, Dialog, EmptyState, SelectField, showToast, TextField } from "@platform/ui";
+import { Button, Card, Dialog, EmptyState, SelectField, showToast, TextField } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { ApiProblem } from "../components/CheckoutSettings.tsx";
 import { RefundException } from "../components/order/RefundException.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -29,26 +29,34 @@ export default function PaymentExceptions() {
           <Show
             when={data.bank_transactions.length || data.orders.length}
             fallback={
-              <EmptyState title={t("pay.noExceptions")} description={t("pay.noExceptionsDesc")} />
+              <EmptyState
+                icon="check-circle"
+                title={t("pay.noExceptions")}
+                description={t("pay.noExceptionsDesc")}
+              />
             }
           >
             <div class="grid gap-6">
               <Show when={data.bank_transactions.length}>
-                <section aria-labelledby="transfers">
-                  <h2 id="transfers" class="mb-2 font-semibold">
-                    {t("pay.transfers")}
-                  </h2>
+                <Card
+                  labelledBy="transfers"
+                  title={t("pay.transfers")}
+                  count={data.bank_transactions.length}
+                  padding="none"
+                >
                   <TransactionTable
                     rows={data.bank_transactions}
                     actions={(tx) => <ResolveTransaction tx={tx} />}
                   />
-                </section>
+                </Card>
               </Show>
               <Show when={data.orders.length}>
-                <section aria-labelledby="orders-money">
-                  <h2 id="orders-money" class="mb-2 font-semibold">
-                    {t("pay.ordersWithMoney")}
-                  </h2>
+                <Card
+                  labelledBy="orders-money"
+                  title={t("pay.ordersWithMoney")}
+                  count={data.orders.length}
+                  padding="none"
+                >
                   <div class="overflow-x-auto">
                     <table class={tableClass}>
                       <thead>
@@ -62,7 +70,9 @@ export default function PaymentExceptions() {
                               t("orders.exception"),
                             ]}
                           >
-                            {(label) => <Th>{label}</Th>}
+                            {(label, i) => (
+                              <Th class={i() === 3 ? "text-right" : undefined}>{label}</Th>
+                            )}
                           </For>
                           <Th srOnly>{t("common.actions")}</Th>
                         </tr>
@@ -72,15 +82,20 @@ export default function PaymentExceptions() {
                           {(o) => (
                             <tr data-testid="exception-order">
                               <td class={tdClass}>
-                                <A class="text-accent-700 hover:underline" href={`/orders/${o.id}`}>
+                                <A
+                                  class="font-semibold text-heading hover:text-accent-700 hover:underline"
+                                  href={`/orders/${o.id}`}
+                                >
                                   {o.number}
                                 </A>
                               </td>
-                              <td class={`${tdClass} whitespace-nowrap`}>
+                              <td
+                                class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                              >
                                 {formatDateTime(o.placed_at)}
                               </td>
                               <td class={tdClass}>{o.email}</td>
-                              <td class={`${tdClass} figures`}>{o.total.formatted}</td>
+                              <td class={`${tdClass} figures text-right`}>{o.total.formatted}</td>
                               <td class={tdClass}>
                                 <OrderException exception={o.exception} />
                               </td>
@@ -96,7 +111,7 @@ export default function PaymentExceptions() {
                       </tbody>
                     </table>
                   </div>
-                </section>
+                </Card>
               </Show>
             </div>
           </Show>
@@ -142,12 +157,29 @@ function ResolveTransaction(props: { tx: Schemas["BankTransaction"] }) {
       invalidate();
     },
   }));
+  const formId = createUniqueId();
   return (
     <>
-      <Button onClick={() => setOpen(true)}>{t("pay.resolve")}</Button>
-      <Dialog open={open()} onOpenChange={setOpen} title={t("pay.resolve")}>
+      <Button size="small" onClick={() => setOpen(true)}>
+        {t("pay.resolve")}
+      </Button>
+      <Dialog
+        open={open()}
+        onOpenChange={setOpen}
+        title={t("pay.resolve")}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+            <Button type="submit" form={formId} variant="confirm" loading={resolve.isPending}>
+              {t("pay.resolve")}
+            </Button>
+          </>
+        }
+      >
         <form
-          class="grid gap-3"
+          id={formId}
+          class="grid gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             resolve.mutate();
@@ -178,11 +210,6 @@ function ResolveTransaction(props: { tx: Schemas["BankTransaction"] }) {
             onChange={setNote}
           />
           <ApiProblem error={resolve.error} />
-          <div>
-            <Button type="submit" variant="primary" loading={resolve.isPending}>
-              {t("pay.resolve")}
-            </Button>
-          </div>
         </form>
       </Dialog>
     </>
@@ -209,12 +236,27 @@ export function ResolveOrderException(props: { orderId: string }) {
       void qc.invalidateQueries({ queryKey: tenantKey("order", props.orderId) });
     },
   }));
+  const formId = createUniqueId();
   return (
     <>
       <Button onClick={() => setOpen(true)}>{t("pay.resolve")}</Button>
-      <Dialog open={open()} onOpenChange={setOpen} title={t("pay.resolve")}>
+      <Dialog
+        open={open()}
+        onOpenChange={setOpen}
+        title={t("pay.resolve")}
+        size="sm"
+        footer={
+          <>
+            <Button onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
+            <Button type="submit" form={formId} variant="confirm" loading={resolve.isPending}>
+              {t("pay.resolve")}
+            </Button>
+          </>
+        }
+      >
         <form
-          class="grid gap-3"
+          id={formId}
+          class="grid gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             resolve.mutate();
@@ -229,11 +271,6 @@ export function ResolveOrderException(props: { orderId: string }) {
             onChange={setNote}
           />
           <ApiProblem error={resolve.error} />
-          <div>
-            <Button type="submit" variant="primary" loading={resolve.isPending}>
-              {t("pay.resolve")}
-            </Button>
-          </div>
         </form>
       </Dialog>
     </>

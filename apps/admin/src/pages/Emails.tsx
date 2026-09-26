@@ -1,10 +1,14 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
+  Collapse,
   ConfirmDialog,
   Dialog,
   EmptyState,
   PermissionDenied,
+  SearchBox,
   SelectField,
   showToast,
   Tabs,
@@ -62,7 +66,7 @@ function MessageDetail(props: { id: string }) {
     <QueryState query={detail}>
       {(m) => (
         <div class="flex flex-col gap-3">
-          <dl class="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[max-content_1fr]">
+          <dl class="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[max-content_1fr] [&_dt]:text-muted-foreground">
             <dt class="text-muted-foreground">{t("emails.to")}</dt>
             <dd>{m.to_email}</dd>
             <dt class="text-muted-foreground">{t("emails.subject")}</dt>
@@ -97,7 +101,7 @@ function MessageDetail(props: { id: string }) {
               {(u) => (
                 <>
                   <dt class="text-muted-foreground">{t("emails.listUnsubscribe")}</dt>
-                  <dd class="break-all text-xs">{u()}</dd>
+                  <dd class="break-all font-mono text-xs">{u()}</dd>
                 </>
               )}
             </Show>
@@ -105,7 +109,7 @@ function MessageDetail(props: { id: string }) {
           <Show
             when={m.html}
             fallback={
-              <p role="note" class="rounded-md bg-muted p-3 text-sm">
+              <p role="note" class="rounded-md border border-border bg-subtle p-3 text-sm">
                 {m.sensitive ? t("emails.sensitive") : t("emails.noBody")}
               </p>
             }
@@ -121,14 +125,11 @@ function MessageDetail(props: { id: string }) {
           </Show>
           <Show when={m.text}>
             {(text) => (
-              <details>
-                <summary class="cursor-pointer text-xs text-accent-700">
-                  {t("marketing.plainText")}
-                </summary>
-                <pre class="mt-1 max-h-64 overflow-auto rounded-sm bg-muted p-2 text-xs whitespace-pre-wrap">
+              <Collapse summary={t("marketing.plainText")}>
+                <pre class="max-h-64 overflow-auto rounded-md border border-border bg-subtle p-3 font-mono text-xs whitespace-pre-wrap">
                   {text()}
                 </pre>
-              </details>
+              </Collapse>
             )}
           </Show>
         </div>
@@ -160,9 +161,15 @@ function MessageLog() {
   }));
   const rows = () => log.data?.pages.flatMap((p) => p.items) ?? [];
   return (
-    <div class="flex flex-col gap-3">
-      <div class="grid gap-2 sm:grid-cols-3">
-        <TextField type="search" label={t("emails.searchTo")} value={to()} onChange={setTo} />
+    <div class="flex flex-col gap-4 pt-4">
+      <div class="grid items-end gap-x-2 gap-y-3 sm:grid-cols-[minmax(15rem,1fr)_12rem_12rem]">
+        <SearchBox
+          label={t("emails.searchTo")}
+          placeholder={t("emails.searchTo")}
+          clearLabel={t("common.clearSearch")}
+          value={to()}
+          onChange={setTo}
+        />
         <SelectField
           label={t("emails.status")}
           value={status()}
@@ -186,63 +193,71 @@ function MessageLog() {
         {() => (
           <Show
             when={rows().length > 0}
-            fallback={<EmptyState title={t("emails.empty")} description={t("emails.emptyDesc")} />}
+            fallback={
+              <EmptyState
+                icon="document"
+                title={t("emails.empty")}
+                description={t("emails.emptyDesc")}
+              />
+            }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass} aria-label={t("emails.log")}>
-                <thead>
-                  <tr>
-                    <Th>{t("emails.created")}</Th>
-                    <Th>{t("emails.to")}</Th>
-                    <Th>{t("emails.subject")}</Th>
-                    <Th>{t("emails.template")}</Th>
-                    <Th>{t("emails.status")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(m) => (
-                      <tr>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {formatDateTime(m.created_at)}
-                        </td>
-                        <td class={`${tdClass} max-w-56 truncate`} title={m.to_email}>
-                          {m.to_email}
-                        </td>
-                        <td class={`${tdClass} max-w-72 truncate`} title={m.subject}>
-                          {m.subject}
-                        </td>
-                        <td class={`${tdClass} text-xs text-muted-foreground`}>
-                          {m.template}
-                          <span class="block">{streamLabel(m.stream)}</span>
-                        </td>
-                        <td class={tdClass}>
-                          <Badge tone={statusTone[m.status] ?? "neutral"}>
-                            {statusLabel(m.status)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" onClick={() => setOpen(m)}>
-                            {t("emails.details")}
-                            <span class="sr-only">: {m.subject}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={log.hasNextPage}>
-              <div>
-                <Button loading={log.isFetchingNextPage} onClick={() => void log.fetchNextPage()}>
-                  {t("common.loadMore")}
-                </Button>
+            <Card
+              padding="none"
+              footer={
+                log.hasNextPage ? (
+                  <Button loading={log.isFetchingNextPage} onClick={() => void log.fetchNextPage()}>
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass} aria-label={t("emails.log")}>
+                  <thead>
+                    <tr>
+                      <Th>{t("emails.created")}</Th>
+                      <Th>{t("emails.to")}</Th>
+                      <Th>{t("emails.subject")}</Th>
+                      <Th>{t("emails.template")}</Th>
+                      <Th>{t("emails.status")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(m) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {formatDateTime(m.created_at)}
+                          </td>
+                          <td class={`${tdClass} max-w-56 truncate`} title={m.to_email}>
+                            {m.to_email}
+                          </td>
+                          <td class={`${tdClass} max-w-72 truncate`} title={m.subject}>
+                            {m.subject}
+                          </td>
+                          <td class={`${tdClass} text-muted-foreground`}>
+                            <span class="block font-mono text-xs">{m.template}</span>
+                            <span class="block text-xs">{streamLabel(m.stream)}</span>
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={statusTone[m.status] ?? "neutral"}>
+                              {statusLabel(m.status)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-right`}>
+                            <Button category="tertiary" size="small" onClick={() => setOpen(m)}>
+                              {t("emails.details")}
+                              <span class="sr-only">: {m.subject}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
               </div>
-            </Show>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -314,17 +329,19 @@ function Suppressions() {
   }));
 
   return (
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-4 pt-4">
       <p class="text-sm text-muted-foreground">{t("emails.suppressionsDesc")}</p>
-      <div class="flex flex-wrap items-end gap-2">
-        <TextField
-          type="search"
+      <div class="flex flex-wrap items-center gap-2">
+        <SearchBox
+          class="min-w-60 flex-1"
           label={t("emails.searchSuppressions")}
+          placeholder={t("emails.searchSuppressions")}
+          clearLabel={t("common.clearSearch")}
           value={q()}
           onChange={setQ}
         />
         <Button
-          variant="primary"
+          variant="confirm"
           onClick={() => {
             setEmail("");
             setNote("");
@@ -341,59 +358,65 @@ function Suppressions() {
             when={rows().length > 0}
             fallback={
               <EmptyState
+                icon="lock"
                 title={t("emails.noSuppressions")}
                 description={t("emails.noSuppressionsDesc")}
               />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass} aria-label={t("emails.suppressions")}>
-                <thead>
-                  <tr>
-                    <Th>{t("emails.address")}</Th>
-                    <Th>{t("emails.reason")}</Th>
-                    <Th>{t("emails.note")}</Th>
-                    <Th>{t("emails.created")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(s) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>{s.email}</td>
-                        <td class={`${tdClass} text-xs`}>
-                          {s.reason === "bounce" ||
-                          s.reason === "complaint" ||
-                          s.reason === "manual"
-                            ? t(`emails.reason_${s.reason}`)
-                            : s.reason}
-                        </td>
-                        <td class={`${tdClass} text-xs text-muted-foreground`}>{s.note ?? ""}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {formatDateTime(s.created_at)}
-                        </td>
-                        <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" onClick={() => setRemoving(s)}>
-                            {t("common.remove")}
-                            <span class="sr-only">: {s.email}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={list.hasNextPage}>
-              <div>
-                <Button loading={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}>
-                  {t("common.loadMore")}
-                </Button>
+            <Card
+              padding="none"
+              footer={
+                list.hasNextPage ? (
+                  <Button
+                    loading={list.isFetchingNextPage}
+                    onClick={() => void list.fetchNextPage()}
+                  >
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass} aria-label={t("emails.suppressions")}>
+                  <thead>
+                    <tr>
+                      <Th>{t("emails.address")}</Th>
+                      <Th>{t("emails.reason")}</Th>
+                      <Th>{t("emails.note")}</Th>
+                      <Th>{t("emails.created")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(s) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{s.email}</td>
+                          <td class={tdClass}>
+                            {s.reason === "bounce" ||
+                            s.reason === "complaint" ||
+                            s.reason === "manual"
+                              ? t(`emails.reason_${s.reason}`)
+                              : s.reason}
+                          </td>
+                          <td class={`${tdClass} text-muted-foreground`}>{s.note ?? ""}</td>
+                          <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
+                            {formatDateTime(s.created_at)}
+                          </td>
+                          <td class={`${tdClass} text-right`}>
+                            <Button category="tertiary" size="small" onClick={() => setRemoving(s)}>
+                              {t("common.remove")}
+                              <span class="sr-only">: {s.email}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
               </div>
-            </Show>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -422,13 +445,11 @@ function Suppressions() {
           />
           <TextField label={t("emails.note")} value={note()} onChange={setNote} maxLength={500} />
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
           <div class="flex justify-end gap-2">
             <Button onClick={() => setAdding(false)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={add.isPending}>
+            <Button type="submit" variant="confirm" loading={add.isPending}>
               {t("common.add")}
             </Button>
           </div>

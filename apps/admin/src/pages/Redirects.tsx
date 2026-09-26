@@ -1,4 +1,14 @@
-import { Button, ConfirmDialog, EmptyState, SelectField, showToast, TextField } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  SelectField,
+  showToast,
+  TextField,
+} from "@platform/ui";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -80,90 +90,111 @@ export default function Redirects() {
   return (
     <>
       <PageHeader title={t("redirects.title")} description={t("redirects.description")} />
-      <form
-        aria-label={t("redirects.new")}
-        class="mb-6 grid max-w-3xl gap-3 sm:grid-cols-[1fr_1fr_8rem_auto] sm:items-end"
-        onSubmit={(e) => {
-          e.preventDefault();
-          create.mutate();
-        }}
-      >
-        <TextField
-          label={t("redirects.from")}
-          placeholder="/stary-produkt"
-          required
-          value={from()}
-          onChange={setFrom}
-          inputClass="figures"
-        />
-        <TextField
-          label={t("redirects.to")}
-          placeholder="/p/novy-produkt"
-          required
-          value={to()}
-          onChange={setTo}
-          inputClass="figures"
-        />
-        <SelectField
-          label={t("redirects.code")}
-          value={code()}
-          options={[
-            { value: "301", label: t("redirects.permanent") },
-            { value: "302", label: t("redirects.temporary") },
-          ]}
-          onChange={setCode}
-        />
-        <Button type="submit" variant="primary" loading={create.isPending}>
-          {t("common.create")}
-        </Button>
-      </form>
-      <Show when={error()}>
-        <p role="alert" class="mb-4 text-xs font-medium text-error-700">
-          {error()}
-        </p>
-      </Show>
+      <Card class="mb-6" title={t("redirects.new")}>
+        <form
+          aria-label={t("redirects.new")}
+          class="grid gap-4 sm:grid-cols-[1fr_1fr_12rem_auto] sm:items-start"
+          onSubmit={(e) => {
+            e.preventDefault();
+            create.mutate();
+          }}
+        >
+          <TextField
+            label={t("redirects.from")}
+            placeholder="/stary-produkt"
+            required
+            value={from()}
+            onChange={setFrom}
+            inputClass="figures"
+          />
+          <TextField
+            label={t("redirects.to")}
+            placeholder="/p/novy-produkt"
+            required
+            value={to()}
+            onChange={setTo}
+            inputClass="figures"
+          />
+          <SelectField
+            label={t("redirects.code")}
+            value={code()}
+            options={[
+              { value: "301", label: t("redirects.permanent") },
+              { value: "302", label: t("redirects.temporary") },
+            ]}
+            onChange={setCode}
+          />
+          <Button type="submit" variant="confirm" class="sm:mt-7" loading={create.isPending}>
+            {t("common.create")}
+          </Button>
+        </form>
+        <Show when={error()}>
+          <Alert tone="error" class="mt-4">
+            {error()}
+          </Alert>
+        </Show>
+      </Card>
       <QueryState query={list}>
         {(data) => (
           <Show
             when={data.items.length > 0}
             fallback={
-              <EmptyState title={t("redirects.empty")} description={t("redirects.emptyDesc")} />
+              <EmptyState
+                icon="external-link"
+                title={t("redirects.empty")}
+                description={t("redirects.emptyDesc")}
+              />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass} aria-label={t("redirects.title")}>
-                <thead>
-                  <tr>
-                    <Th>{t("redirects.from")}</Th>
-                    <Th>{t("redirects.to")}</Th>
-                    <Th>{t("redirects.code")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={data.items}>
-                    {(r) => (
-                      <tr>
-                        <td class={`${tdClass} figures break-all text-xs`}>{r.from_path}</td>
-                        <td class={`${tdClass} figures break-all text-xs`}>{r.to_path}</td>
-                        <td class={`${tdClass} figures text-xs`}>{r.code}</td>
-                        <td class={`${tdClass} text-right`}>
-                          <Button variant="ghost" onClick={() => setDeleting(r)}>
-                            {t("common.delete")}
-                            <span class="sr-only">: {r.from_path}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={data.more}>
-              <Button class="mt-3" onClick={() => setPages(pages() + 1)}>
-                {t("redirects.more")}
-              </Button>
-            </Show>
+            <Card
+              padding="none"
+              footer={
+                data.more ? (
+                  <Button onClick={() => setPages(pages() + 1)}>{t("redirects.more")}</Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass} aria-label={t("redirects.title")}>
+                  <thead>
+                    <tr>
+                      <Th>{t("redirects.from")}</Th>
+                      <Th>{t("redirects.to")}</Th>
+                      <Th>{t("redirects.code")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={data.items}>
+                      {(r) => (
+                        <tr>
+                          <td
+                            class={`${tdClass} font-mono text-xs font-semibold break-all text-heading`}
+                          >
+                            {r.from_path}
+                          </td>
+                          <td class={`${tdClass} font-mono text-xs break-all`}>{r.to_path}</td>
+                          <td class={tdClass}>
+                            <Badge tone={r.code === 301 ? "info" : "neutral"}>{r.code}</Badge>
+                          </td>
+                          <td class={`${tdClass} text-right`}>
+                            <Button
+                              variant="danger"
+                              category="tertiary"
+                              size="small"
+                              onClick={() => setDeleting(r)}
+                            >
+                              {t("common.delete")}
+                              <span class="sr-only">: {r.from_path}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>

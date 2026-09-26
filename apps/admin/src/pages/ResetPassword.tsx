@@ -1,4 +1,4 @@
-import { Button, TextField } from "@platform/ui";
+import { Alert, Button, linkClass, TextField } from "@platform/ui";
 import { A, useSearchParams } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
 import { t } from "../i18n/index.ts";
@@ -34,21 +34,17 @@ export function ResetPassword() {
     <AuthLayout title={t("auth.resetTitle")}>
       <Show
         when={token() && !params.error}
-        fallback={
-          <p role="alert" class="text-sm text-error-700">
-            {t("auth.resetInvalid")}
-          </p>
-        }
+        fallback={<Alert tone="error">{t("auth.resetInvalid")}</Alert>}
       >
         <Show
           when={!done()}
           fallback={
-            <p role="status" class="text-sm">
+            <Alert live tone="success">
               {t("auth.resetDone")}
-            </p>
+            </Alert>
           }
         >
-          <form class="flex flex-col gap-3" onSubmit={submit}>
+          <form class="flex flex-col gap-4" onSubmit={submit}>
             <TextField
               label={t("auth.newPassword")}
               description={t("auth.passwordHint")}
@@ -61,7 +57,8 @@ export function ResetPassword() {
             />
             <Button
               type="submit"
-              variant="primary"
+              variant="confirm"
+              block
               loading={pending()}
               disabled={password().length < 12}
             >
@@ -70,7 +67,7 @@ export function ResetPassword() {
           </form>
         </Show>
       </Show>
-      <A href="/login" class="self-center text-xs text-accent-700 hover:underline">
+      <A href="/login" class={`self-center text-sm ${linkClass}`}>
         {t("auth.backToSignIn")}
       </A>
     </AuthLayout>

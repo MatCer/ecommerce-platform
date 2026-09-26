@@ -1,4 +1,4 @@
-import { Checkbox } from "@platform/ui";
+import { Card, Checkbox } from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
 import { createSignal } from "solid-js";
 import { WithdrawalTable } from "../components/order/WithdrawalTable.tsx";
@@ -27,7 +27,13 @@ export default function Withdrawals() {
         checked={all()}
         onChange={setAll}
       />
-      <QueryState query={query}>{(data) => <WithdrawalTable items={data.items} />}</QueryState>
+      <QueryState query={query}>
+        {(data) => (
+          <Card padding="none">
+            <WithdrawalTable items={data.items} />
+          </Card>
+        )}
+      </QueryState>
     </>
   );
 }

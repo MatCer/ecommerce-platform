@@ -1,16 +1,19 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   ConfirmDialog,
   Dialog,
   EmptyState,
+  labelClass,
   SelectField,
   showToast,
   TextField,
   type Tone,
 } from "@platform/ui";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { DateTimeField } from "../components/DateTimeField.tsx";
 import { ExplainResult } from "../components/ExplainResult.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -177,10 +180,11 @@ export default function Collections() {
     setEditing(c);
   };
   const newButton = () => (
-    <Button variant="primary" onClick={() => open("new")}>
+    <Button variant="confirm" onClick={() => open("new")}>
       {t("collections.new")}
     </Button>
   );
+  const formId = createUniqueId();
   const valid = () => {
     const f = form();
     const scheduled = f.kind === "manual" || (f.startsAt !== "" && f.endsAt !== "");
@@ -204,61 +208,73 @@ export default function Collections() {
             when={rows().length > 0}
             fallback={
               <EmptyState
+                icon="tag"
                 title={t("collections.emptyTitle")}
                 description={t("collections.emptyDesc")}
                 action={newButton()}
               />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("collections.name")}</Th>
-                    <Th>{t("collections.kind")}</Th>
-                    <Th>{t("collections.schedule")}</Th>
-                    <Th class="text-right">{t("collections.products")}</Th>
-                    <Th>{t("collections.state")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(c) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>{c.name}</td>
-                        <td class={`${tdClass} text-xs`}>{t(`collections.kind_${c.kind}`)}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {schedule(c)}
-                        </td>
-                        <td class={`${tdClass} figures text-right`}>{c.product_ids.length}</td>
-                        <td class={tdClass}>
-                          <Badge tone={stateTone[collectionState(c)]}>
-                            {t(`collections.state_${collectionState(c)}`)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => setPreviewing(c)}>
-                            {t("collections.preview")}
-                            <span class="sr-only">: {c.name}</span>
-                          </Button>
-                          <Button variant="ghost" onClick={() => open(c)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {c.name}</span>
-                          </Button>
-                          <Button variant="ghost" onClick={() => setDeleting(c)}>
-                            {t("common.delete")}
-                            <span class="sr-only">: {c.name}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("collections.name")}</Th>
+                      <Th>{t("collections.kind")}</Th>
+                      <Th>{t("collections.schedule")}</Th>
+                      <Th class="text-right">{t("collections.products")}</Th>
+                      <Th>{t("collections.state")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(c) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{c.name}</td>
+                          <td class={tdClass}>{t(`collections.kind_${c.kind}`)}</td>
+                          <td
+                            class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
+                          >
+                            {schedule(c)}
+                          </td>
+                          <td class={`${tdClass} figures text-right`}>{c.product_ids.length}</td>
+                          <td class={tdClass}>
+                            <Badge tone={stateTone[collectionState(c)]}>
+                              {t(`collections.state_${collectionState(c)}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              onClick={() => setPreviewing(c)}
+                            >
+                              {t("collections.preview")}
+                              <span class="sr-only">: {c.name}</span>
+                            </Button>
+                            <Button category="tertiary" size="small" onClick={() => open(c)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {c.name}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${c.name}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(c)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -267,9 +283,24 @@ export default function Collections() {
         open={editing() !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         title={editing() === "new" ? t("collections.new") : t("collections.editTitle")}
+        footer={
+          <>
+            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
+            <Button
+              type="submit"
+              form={formId}
+              variant="confirm"
+              loading={save.isPending}
+              disabled={!valid()}
+            >
+              {editing() === "new" ? t("common.create") : t("common.save")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="flex flex-col gap-3"
+          id={formId}
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const target = editing();
@@ -283,10 +314,8 @@ export default function Collections() {
             required
             maxLength={200}
           />
-          <fieldset class="grid grid-cols-3 gap-2">
-            <legend class="mb-1 text-xs font-medium text-muted-foreground">
-              {t("collections.heading")}
-            </legend>
+          <fieldset class="grid grid-cols-3 gap-4">
+            <legend class={`${labelClass} mb-2`}>{t("collections.heading")}</legend>
             <For each={LOCALES}>
               {(l) => (
                 <TextField
@@ -308,7 +337,7 @@ export default function Collections() {
             description={t(`collections.kindHint_${form().kind}`)}
             onChange={(v) => set({ kind: v as Kind })}
           />
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-4">
             <DateTimeField
               label={t("collections.startsAt")}
               value={form().startsAt}
@@ -321,20 +350,12 @@ export default function Collections() {
             />
           </div>
           <ProductPicker value={form().productIds} onChange={(productIds) => set({ productIds })} />
-          <p class="text-xs text-muted-foreground">
+          <p class="text-sm text-muted-foreground">
             {t("collections.nSelected", { n: String(form().productIds.length) })}
           </p>
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
-          <div class="flex justify-end gap-2">
-            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="primary" loading={save.isPending} disabled={!valid()}>
-              {editing() === "new" ? t("common.create") : t("common.save")}
-            </Button>
-          </div>
         </form>
       </Dialog>
 
@@ -343,8 +364,9 @@ export default function Collections() {
         onOpenChange={(o) => !o && setPreviewing(null)}
         title={t("collections.previewTitle", { name: previewing()?.name ?? "" })}
         description={t("collections.previewDesc")}
+        closeLabel={t("common.close")}
       >
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col gap-4">
           <SelectField
             label={t("recommendations.market")}
             value={market() ?? ""}

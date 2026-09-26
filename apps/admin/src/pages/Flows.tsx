@@ -1,4 +1,16 @@
-import { Badge, Button, Checkbox, EmptyState, showToast, TextField, type Tone } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  Icon,
+  linkClass,
+  showToast,
+  TextField,
+  type Tone,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, For, Index, Show } from "solid-js";
@@ -87,14 +99,16 @@ export default function Flows() {
   return (
     <>
       <PageHeader title={t("flows.title")} description={t("flows.description")} />
-      <p class="mb-4 max-w-prose text-xs text-muted-foreground">{t("flows.consentNote")}</p>
+      <p class="mb-4 max-w-3xl text-sm text-muted-foreground">{t("flows.consentNote")}</p>
       <QueryState query={flows}>
         {(data) => (
           <>
             <Show when={!can("admin")}>
-              <p class="mb-3 text-sm text-muted-foreground">{t("flows.readOnly")}</p>
+              <Alert tone="info" class="mb-4">
+                {t("flows.readOnly")}
+              </Alert>
             </Show>
-            <div class="grid gap-3 lg:grid-cols-3">
+            <div class="grid items-start gap-4 lg:grid-cols-3">
               <For each={data.items.filter((d) => isKind(d.kind))}>
                 {(d) => <FlowCard definition={d} editable={can("admin")} />}
               </For>
@@ -106,17 +120,23 @@ export default function Flows() {
         )}
       </QueryState>
 
-      <section aria-labelledby="flow-runs" class="mt-8">
-        <h2 id="flow-runs" class="text-base font-semibold">
-          {t("flows.runsTitle")}
-        </h2>
-        <p class="mb-3 text-sm text-muted-foreground">{t("flows.runsDesc")}</p>
+      <Card
+        labelledBy="flow-runs"
+        class="mt-4"
+        padding="none"
+        title={t("flows.runsTitle")}
+        description={t("flows.runsDesc")}
+      >
         <QueryState query={runs}>
           {(data) => (
             <Show
               when={data.items.length > 0}
               fallback={
-                <EmptyState title={t("flows.emptyRuns")} description={t("flows.emptyRunsDesc")} />
+                <EmptyState
+                  icon="list-task"
+                  title={t("flows.emptyRuns")}
+                  description={t("flows.emptyRunsDesc")}
+                />
               }
             >
               <div class="overflow-x-auto">
@@ -139,7 +159,7 @@ export default function Flows() {
             </Show>
           )}
         </QueryState>
-      </section>
+      </Card>
     </>
   );
 }
@@ -148,20 +168,20 @@ function RunRow(props: { run: Run }) {
   const r = () => props.run;
   const status = () => asRunStatus(r().status);
   return (
-    <tr>
-      <td class={tdClass}>{kindLabel(r().kind)}</td>
+    <tr class="hover:bg-subtle">
+      <td class={`${tdClass} font-semibold text-heading`}>{kindLabel(r().kind)}</td>
       <td class={tdClass}>{sourceLabel(r().source_kind)}</td>
       <td class={tdClass}>
         <Badge tone={status() ? runTone[status() as RunStatus] : "neutral"}>
           {statusLabel(r().status)}
         </Badge>
       </td>
-      <td class={`${tdClass} whitespace-nowrap`}>
+      <td class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}>
         {r().status === "active" ? formatDateTime(r().due_at) : "—"}
       </td>
       <td class={tdClass}>{reasonLabel(r().exit_reason) || "—"}</td>
       <td class={`${tdClass} text-right`}>
-        <A href={`/marketing/flows/runs/${r().id}`} class="text-accent-700 underline">
+        <A href={`/marketing/flows/runs/${r().id}`} class={linkClass}>
           {t("flows.open")}
           <span class="sr-only">
             : {kindLabel(r().kind)}, {formatDateTime(r().due_at)}
@@ -223,82 +243,86 @@ function FlowCard(props: { definition: Definition; editable: boolean }) {
 
   return (
     <form
-      class="grid content-start gap-3 rounded-lg border border-border bg-card p-4"
+      class="min-w-0 overflow-hidden rounded-lg border border-border bg-subtle"
       aria-labelledby={id()}
       onSubmit={submit}
       noValidate
     >
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={id()} class="font-semibold">
-          {kindLabel(kind())}
-        </h2>
-        <Badge tone={d().enabled ? "success" : "neutral"}>
-          {d().enabled ? t("flows.enabled") : t("flows.disabled")}
-        </Badge>
+      <div class="flex min-h-12 flex-col justify-center gap-0.5 px-4 py-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 id={id()} class="text-sm font-semibold text-heading">
+            {kindLabel(kind())}
+          </h2>
+          <Badge tone={d().enabled ? "success" : "neutral"}>
+            {d().enabled ? t("flows.enabled") : t("flows.disabled")}
+          </Badge>
+        </div>
+        <p class="text-sm text-muted-foreground">{t(`flows.desc_${kind()}`)}</p>
       </div>
-      <p class="text-sm text-muted-foreground">{t(`flows.desc_${kind()}`)}</p>
-      <Checkbox
-        label={t("flows.enabled")}
-        checked={enabled()}
-        onChange={setEnabled}
-        disabled={!props.editable}
-      />
-      <Show when={kind() !== "watchdog"}>
-        <fieldset class="grid gap-2" aria-describedby={error() ? `${id()}-err` : undefined}>
-          <legend class="sr-only">{kindLabel(kind())}</legend>
-          <Index each={delays()}>
-            {(value, i) => (
-              <TextField
-                label={
-                  kind() === "abandoned_cart"
-                    ? t("flows.stepDelay", { n: String(i + 1) })
-                    : t("flows.reviewDelay")
-                }
-                description={
-                  i === delays().length - 1
-                    ? kind() === "abandoned_cart"
-                      ? t("flows.cartDelayHint")
-                      : t("flows.reviewDelayHint")
-                    : undefined
-                }
-                value={value()}
-                onChange={(v) => setDelays(delays().map((x, j) => (j === i ? v : x)))}
-                inputMode="numeric"
-                maxLength={4}
-                disabled={!props.editable}
-              />
-            )}
-          </Index>
-        </fieldset>
-      </Show>
-      <Show when={kind() === "abandoned_cart"}>
+      <div class="grid gap-4 border-t border-border bg-background p-4">
         <Checkbox
-          label={t("flows.coupon")}
-          checked={couponOn()}
-          onChange={setCouponOn}
+          label={t("flows.enabled")}
+          checked={enabled()}
+          onChange={setEnabled}
           disabled={!props.editable}
         />
-        <Show when={couponOn()}>
-          <TextField
-            label={t("flows.couponPercent")}
-            description={t("flows.couponHint")}
-            value={coupon()}
-            onChange={setCoupon}
-            inputMode="numeric"
-            maxLength={2}
-            disabled={!props.editable}
-            error={error() === "flows.errCoupon" ? t("flows.errCoupon") : undefined}
-          />
+        <Show when={kind() !== "watchdog"}>
+          <fieldset class="grid gap-4" aria-describedby={error() ? `${id()}-err` : undefined}>
+            <legend class="sr-only">{kindLabel(kind())}</legend>
+            <Index each={delays()}>
+              {(value, i) => (
+                <TextField
+                  label={
+                    kind() === "abandoned_cart"
+                      ? t("flows.stepDelay", { n: String(i + 1) })
+                      : t("flows.reviewDelay")
+                  }
+                  description={
+                    i === delays().length - 1
+                      ? kind() === "abandoned_cart"
+                        ? t("flows.cartDelayHint")
+                        : t("flows.reviewDelayHint")
+                      : undefined
+                  }
+                  value={value()}
+                  onChange={(v) => setDelays(delays().map((x, j) => (j === i ? v : x)))}
+                  inputMode="numeric"
+                  maxLength={4}
+                  disabled={!props.editable}
+                />
+              )}
+            </Index>
+          </fieldset>
         </Show>
-      </Show>
-      <Show when={error() === "flows.errDelays"}>
-        <p id={`${id()}-err`} role="alert" class="text-xs font-medium text-error-700">
-          {t("flows.errDelays")}
-        </p>
-      </Show>
+        <Show when={kind() === "abandoned_cart"}>
+          <Checkbox
+            label={t("flows.coupon")}
+            checked={couponOn()}
+            onChange={setCouponOn}
+            disabled={!props.editable}
+          />
+          <Show when={couponOn()}>
+            <TextField
+              label={t("flows.couponPercent")}
+              description={t("flows.couponHint")}
+              value={coupon()}
+              onChange={setCoupon}
+              inputMode="numeric"
+              maxLength={2}
+              disabled={!props.editable}
+              error={error() === "flows.errCoupon" ? t("flows.errCoupon") : undefined}
+            />
+          </Show>
+        </Show>
+        <Show when={error() === "flows.errDelays"}>
+          <p id={`${id()}-err`} role="alert" class="text-sm text-error-700">
+            {t("flows.errDelays")}
+          </p>
+        </Show>
+      </div>
       <Show when={props.editable}>
-        <div>
-          <Button type="submit" variant="primary" loading={save.isPending}>
+        <div class="border-t border-border px-4 py-3">
+          <Button type="submit" variant="confirm" loading={save.isPending}>
             {t("flows.save")}
             <span class="sr-only">: {kindLabel(kind())}</span>
           </Button>
@@ -335,13 +359,14 @@ function TestClock(props: { now: string; editable: boolean }) {
   return (
     <section
       aria-labelledby="flow-clock"
-      class="mt-4 grid gap-2 rounded-lg border border-dashed border-border-strong bg-warning-50 p-4"
+      class="mt-4 grid gap-3 rounded-lg border border-dashed border-warning-600 bg-warning-50 p-4"
     >
-      <h2 id="flow-clock" class="font-semibold">
+      <h2 id="flow-clock" class="flex items-center gap-2 text-sm font-semibold text-warning-700">
+        <Icon name="warning" class="text-warning-600" />
         {t("flows.clockTitle")}
       </h2>
-      <p class="max-w-prose text-sm">{t("flows.clockDesc")}</p>
-      <p class="text-sm font-medium" data-testid="flow-clock-now">
+      <p class="max-w-3xl text-sm text-foreground">{t("flows.clockDesc")}</p>
+      <p class="figures text-sm font-semibold text-heading" data-testid="flow-clock-now">
         {t("flows.clockNow", { time: formatDateTime(props.now) })}
       </p>
       <Show when={props.editable}>

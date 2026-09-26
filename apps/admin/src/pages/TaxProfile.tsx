@@ -1,6 +1,15 @@
-import { Button, Checkbox, SelectField, showToast, TextField } from "@platform/ui";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  labelClass,
+  Radio,
+  SelectField,
+  showToast,
+  TextField,
+} from "@platform/ui";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState } from "../components/Page.tsx";
 import { errorMessage, formatDateTime, locale, t } from "../i18n/index.ts";
 import { ApiError, api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
@@ -9,6 +18,7 @@ import { tenantKey, useMembership } from "../lib/me.ts";
 type Profile = Schemas["TaxProfile"];
 type Input = Schemas["TaxProfileInput"];
 type Mode = Schemas["DistanceSalesMode"];
+const DISTANCE_MODES: readonly Mode[] = ["destination", "origin_threshold"];
 
 /** EU-27 (the platform sells within the EU). */
 export const EU_COUNTRIES = [
@@ -143,21 +153,19 @@ export default function TaxProfile() {
       <QueryState query={profile}>
         {(p) => (
           <form
-            class="flex max-w-xl flex-col gap-4"
+            class="flex max-w-2xl flex-col gap-6"
             onSubmit={(e) => {
               e.preventDefault();
               save.mutate();
             }}
           >
             <Show when={p === null}>
-              <p role="status" class="rounded-md bg-warning-50 px-3 py-2 text-sm text-warning-700">
-                {t("taxProfile.notSet")}
-              </p>
+              <Alert tone="warning">{t("taxProfile.notSet")}</Alert>
             </Show>
             <Show when={readOnly()}>
-              <p class="text-sm text-muted-foreground">{t("taxProfile.adminOnly")}</p>
+              <Alert tone="info">{t("taxProfile.adminOnly")}</Alert>
             </Show>
-            <fieldset disabled={readOnly() || save.isPending} class="flex flex-col gap-3">
+            <fieldset disabled={readOnly() || save.isPending} class="flex flex-col gap-5">
               <Checkbox
                 label={t("taxProfile.vatPayer")}
                 checked={form().vat_payer}
@@ -171,7 +179,7 @@ export default function TaxProfile() {
                 onChange={(establishment_country) => set({ establishment_country })}
                 disabled={readOnly()}
               />
-              <div class="grid gap-3 sm:grid-cols-2">
+              <div class="grid gap-5 sm:grid-cols-2">
                 <TextField
                   label={t("taxProfile.vatId")}
                   value={form().vat_id ?? ""}
@@ -191,16 +199,24 @@ export default function TaxProfile() {
                   />
                 </Show>
               </div>
-              <SelectField
-                label={t("taxProfile.distanceMode")}
-                value={form().distance_sales_mode}
-                options={[
-                  { value: "destination", label: t("taxProfile.destination") },
-                  { value: "origin_threshold", label: t("taxProfile.origin") },
-                ]}
-                onChange={(v) => set({ distance_sales_mode: v as Mode })}
-                disabled={readOnly()}
-              />
+              {/* Two exclusive options: Pajamas radio group, not a select. */}
+              <fieldset class="flex flex-col gap-2">
+                <legend class={`${labelClass} mb-2`}>{t("taxProfile.distanceMode")}</legend>
+                <For each={DISTANCE_MODES}>
+                  {(mode) => (
+                    <Radio
+                      name="distance_sales_mode"
+                      value={mode}
+                      label={t(
+                        mode === "destination" ? "taxProfile.destination" : "taxProfile.origin",
+                      )}
+                      checked={form().distance_sales_mode === mode}
+                      disabled={readOnly()}
+                      onChange={() => set({ distance_sales_mode: mode })}
+                    />
+                  )}
+                </For>
+              </fieldset>
               <Show when={form().distance_sales_mode === "origin_threshold"}>
                 <Checkbox
                   label={t("taxProfile.confirmOrigin")}
@@ -224,14 +240,12 @@ export default function TaxProfile() {
               />
             </fieldset>
             <Show when={error()}>
-              <p role="alert" class="text-xs font-medium text-error-700">
-                {error()}
-              </p>
+              <Alert tone="error">{error()}</Alert>
             </Show>
-            <div>
+            <div class="border-t border-border pt-5">
               <Button
                 type="submit"
-                variant="primary"
+                variant="confirm"
                 loading={save.isPending}
                 disabled={readOnly()}
               >

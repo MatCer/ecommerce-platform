@@ -1,6 +1,8 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   Checkbox,
   ConfirmDialog,
   Dialog,
@@ -10,7 +12,7 @@ import {
   TextField,
 } from "@platform/ui";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
 import { api, idempotencyKey, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
@@ -110,8 +112,9 @@ export default function Parameters() {
     },
   }));
 
+  const formId = createUniqueId();
   const newButton = () => (
-    <Button variant="primary" onClick={() => open("new")}>
+    <Button variant="confirm" onClick={() => open("new")}>
       {t("parameters.new")}
     </Button>
   );
@@ -125,6 +128,7 @@ export default function Parameters() {
             when={page.items.length > 0}
             fallback={
               <EmptyState
+                icon="filter"
                 title={t("parameters.emptyTitle")}
                 description={t("parameters.emptyDesc")}
                 action={newButton()}
@@ -132,54 +136,63 @@ export default function Parameters() {
             }
           >
             <Show when={page.truncated}>
-              <p role="status" class="mb-2 text-xs text-warning-700">
+              <Alert tone="warning" class="mb-4">
                 {t("parameters.truncated", { count: page.items.length })}
-              </p>
+              </Alert>
             </Show>
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("products.colName")}</Th>
-                    <Th>{t("parameters.key")}</Th>
-                    <Th>{t("parameters.kind")}</Th>
-                    <Th>{t("parameters.unit")}</Th>
-                    <Th>{t("parameters.filterable")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={page.items}>
-                    {(p) => (
-                      <tr class="hover:bg-muted">
-                        <td class={`${tdClass} font-medium`}>{displayName(p)}</td>
-                        <td class={`${tdClass} figures text-xs`}>{p.key}</td>
-                        <td class={tdClass}>{t(`parameters.kind_${p.kind}`)}</td>
-                        <td class={`${tdClass} figures text-xs`}>{p.unit ?? "—"}</td>
-                        <td class={tdClass}>
-                          <Show
-                            when={p.filterable}
-                            fallback={<span class="text-faint-foreground">{t("common.no")}</span>}
-                          >
-                            <Badge tone="info">{t("common.yes")}</Badge>
-                          </Show>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button variant="ghost" onClick={() => open(p)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {displayName(p)}</span>
-                          </Button>
-                          <Button variant="ghost" onClick={() => setDeleting(p)}>
-                            {t("common.delete")}
-                            <span class="sr-only">: {displayName(p)}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
+            <Card padding="none">
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("products.colName")}</Th>
+                      <Th>{t("parameters.key")}</Th>
+                      <Th>{t("parameters.kind")}</Th>
+                      <Th>{t("parameters.unit")}</Th>
+                      <Th>{t("parameters.filterable")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={page.items}>
+                      {(p) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{displayName(p)}</td>
+                          <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>
+                            {p.key}
+                          </td>
+                          <td class={tdClass}>{t(`parameters.kind_${p.kind}`)}</td>
+                          <td class={`${tdClass} font-mono text-xs`}>{p.unit ?? "—"}</td>
+                          <td class={tdClass}>
+                            <Show
+                              when={p.filterable}
+                              fallback={<span class="text-muted-foreground">{t("common.no")}</span>}
+                            >
+                              <Badge tone="info">{t("common.yes")}</Badge>
+                            </Show>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => open(p)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {displayName(p)}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${displayName(p)}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(p)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -188,9 +201,24 @@ export default function Parameters() {
         open={editing() !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         title={editing() === "new" ? t("parameters.new") : t("parameters.editTitle")}
+        footer={
+          <>
+            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
+            <Button
+              type="submit"
+              form={formId}
+              variant="confirm"
+              loading={save.isPending}
+              disabled={Object.keys(compactI18n(form().name_i18n)).length === 0}
+            >
+              {editing() === "new" ? t("common.create") : t("common.save")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="flex flex-col gap-3"
+          id={formId}
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate();
@@ -206,7 +234,7 @@ export default function Parameters() {
               />
             )}
           </For>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-4">
             <TextField
               label={t("parameters.key")}
               description={t("parameters.keyHint")}
@@ -238,21 +266,8 @@ export default function Parameters() {
             onChange={(v) => setForm({ ...form(), filterable: v })}
           />
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
-          <div class="flex justify-end gap-2">
-            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={save.isPending}
-              disabled={Object.keys(compactI18n(form().name_i18n)).length === 0}
-            >
-              {editing() === "new" ? t("common.create") : t("common.save")}
-            </Button>
-          </div>
         </form>
       </Dialog>
 

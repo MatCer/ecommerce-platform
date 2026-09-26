@@ -1,6 +1,8 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   Checkbox,
   Dialog,
   EmptyState,
@@ -305,84 +307,90 @@ export default function AdTracking() {
       >
         <QueryState query={list}>
           {(data) => (
-            <div class="flex flex-col gap-8">
-              <div class="overflow-x-auto">
-                <table class={tableClass} aria-label={t("adTracking.platformsLabel")}>
-                  <thead>
-                    <tr>
-                      <Th>{t("adTracking.platform")}</Th>
-                      <Th>{t("adTracking.status")}</Th>
-                      <Th>{t("adTracking.markets")}</Th>
-                      <Th>{t("adTracking.forwards")}</Th>
-                      <Th>{t("adTracking.credentials")}</Th>
-                      <Th srOnly>{t("common.actions")}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <For each={data.items}>
-                      {(c) => (
-                        <tr class="align-top" data-platform={c.platform}>
-                          <td class={`${tdClass} py-2 font-medium`}>{platformName(c.platform)}</td>
-                          <td class={`${tdClass} py-2`}>
-                            <StateBadge config={c} />
-                          </td>
-                          <td class={`${tdClass} py-2 text-xs`}>{marketNames(c.market_ids)}</td>
-                          <td class={`${tdClass} max-w-64 py-2 text-xs text-muted-foreground`}>
-                            {c.events.map(eventName).join(", ")}
-                          </td>
-                          <td
-                            class={`${tdClass} py-2 text-xs whitespace-nowrap text-muted-foreground`}
-                          >
-                            <Show
-                              when={c.credential_fields.length > 0}
-                              fallback={t("adTracking.noCredentialsNeeded")}
-                            >
-                              {c.credentials_hint
-                                ? t("adTracking.credentialsEnding", { hint: c.credentials_hint })
-                                : t("adTracking.credentialsMissing")}
-                            </Show>
-                          </td>
-                          <td class={`${tdClass} py-1 text-right whitespace-nowrap`}>
-                            <Button variant="ghost" onClick={() => openForm(c)}>
-                              {t("adTracking.configure")}
-                              <span class="sr-only">: {platformName(c.platform)}</span>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              disabled={!c.complete}
-                              loading={test.isPending && test.variables === c.platform}
-                              onClick={() => test.mutate(c.platform)}
-                            >
-                              {t("adTracking.test")}
-                              <span class="sr-only">: {platformName(c.platform)}</span>
-                            </Button>
-                            <Show when={c.enabled}>
-                              <Button
-                                variant="ghost"
-                                loading={
-                                  pause.isPending && pause.variables?.platform === c.platform
-                                }
-                                onClick={() => pause.mutate(c)}
+            <div class="flex flex-col gap-4">
+              <Card
+                padding="none"
+                footer={<p class="text-sm text-muted-foreground">{t("adTracking.consentNote")}</p>}
+              >
+                <div class="overflow-x-auto">
+                  <table class={tableClass} aria-label={t("adTracking.platformsLabel")}>
+                    <thead>
+                      <tr>
+                        <Th>{t("adTracking.platform")}</Th>
+                        <Th>{t("adTracking.status")}</Th>
+                        <Th>{t("adTracking.markets")}</Th>
+                        <Th>{t("adTracking.forwards")}</Th>
+                        <Th>{t("adTracking.credentials")}</Th>
+                        <Th srOnly>{t("common.actions")}</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <For each={data.items}>
+                        {(c) => (
+                          <tr class="align-top hover:bg-subtle" data-platform={c.platform}>
+                            <td class={`${tdClass} font-semibold text-heading`}>
+                              {platformName(c.platform)}
+                            </td>
+                            <td class={tdClass}>
+                              <StateBadge config={c} />
+                            </td>
+                            <td class={tdClass}>{marketNames(c.market_ids)}</td>
+                            <td class={`${tdClass} max-w-64 text-muted-foreground`}>
+                              {c.events.map(eventName).join(", ")}
+                            </td>
+                            <td class={`${tdClass} whitespace-nowrap text-muted-foreground`}>
+                              <Show
+                                when={c.credential_fields.length > 0}
+                                fallback={t("adTracking.noCredentialsNeeded")}
                               >
-                                {c.paused ? t("adTracking.resume") : t("adTracking.pause")}
+                                {c.credentials_hint
+                                  ? t("adTracking.credentialsEnding", { hint: c.credentials_hint })
+                                  : t("adTracking.credentialsMissing")}
+                              </Show>
+                            </td>
+                            <td class={`${tdClass} text-right whitespace-nowrap`}>
+                              <Button size="small" onClick={() => openForm(c)}>
+                                {t("adTracking.configure")}
                                 <span class="sr-only">: {platformName(c.platform)}</span>
                               </Button>
-                            </Show>
-                          </td>
-                        </tr>
-                      )}
-                    </For>
-                  </tbody>
-                </table>
-              </div>
-              <p class="max-w-3xl text-xs text-muted-foreground">{t("adTracking.consentNote")}</p>
+                              <Button
+                                category="tertiary"
+                                size="small"
+                                disabled={!c.complete}
+                                loading={test.isPending && test.variables === c.platform}
+                                onClick={() => test.mutate(c.platform)}
+                              >
+                                {t("adTracking.test")}
+                                <span class="sr-only">: {platformName(c.platform)}</span>
+                              </Button>
+                              <Show when={c.enabled}>
+                                <Button
+                                  category="tertiary"
+                                  size="small"
+                                  loading={
+                                    pause.isPending && pause.variables?.platform === c.platform
+                                  }
+                                  onClick={() => pause.mutate(c)}
+                                >
+                                  {c.paused ? t("adTracking.resume") : t("adTracking.pause")}
+                                  <span class="sr-only">: {platformName(c.platform)}</span>
+                                </Button>
+                              </Show>
+                            </td>
+                          </tr>
+                        )}
+                      </For>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
 
-              <section aria-labelledby="ad-deliveries" class="flex flex-col gap-3">
-                <div class="flex flex-col gap-0.5">
-                  <h2 id="ad-deliveries" class="text-sm font-semibold">
+              <section aria-labelledby="ad-deliveries" class="flex min-w-0 flex-col gap-3 pt-4">
+                <div class="flex flex-col gap-1">
+                  <h2 id="ad-deliveries" class="text-base font-semibold text-heading">
                     {t("adTracking.deliveries")}
                   </h2>
-                  <p class="text-xs text-muted-foreground">{t("adTracking.deliveriesDesc")}</p>
+                  <p class="text-sm text-muted-foreground">{t("adTracking.deliveriesDesc")}</p>
                 </div>
                 <div class="flex flex-wrap items-end gap-2">
                   <SelectField
@@ -406,6 +414,7 @@ export default function AdTracking() {
                     onChange={(v) => setParams({ status: v || undefined })}
                   />
                   <Button
+                    icon="retry"
                     loading={deliveries.isRefetching && !deliveries.isFetchingNextPage}
                     onClick={() => void deliveries.refetch()}
                   >
@@ -418,64 +427,69 @@ export default function AdTracking() {
                       when={rows().length > 0}
                       fallback={
                         <EmptyState
+                          icon="export"
                           title={t("adTracking.noDeliveries")}
                           description={t("adTracking.noDeliveriesDesc")}
                         />
                       }
                     >
-                      <div class="overflow-x-auto">
-                        <table class={tableClass} aria-labelledby="ad-deliveries">
-                          <thead>
-                            <tr>
-                              <Th>{t("adTracking.time")}</Th>
-                              <Th>{t("adTracking.platform")}</Th>
-                              <Th>{t("adTracking.event")}</Th>
-                              <Th>{t("adTracking.status")}</Th>
-                              <Th class="text-right">{t("adTracking.attempts")}</Th>
-                              <Th class="text-right">{t("adTracking.response")}</Th>
-                              <Th>{t("adTracking.lastError")}</Th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <For each={rows()}>
-                              {(d) => (
-                                <tr data-status={d.status}>
-                                  <td
-                                    class={`${tdClass} figures text-xs whitespace-nowrap text-faint-foreground`}
-                                  >
-                                    {formatDateTime(d.occurred_at)}
-                                  </td>
-                                  <td class={`${tdClass} text-xs`}>{platformName(d.platform)}</td>
-                                  <td class={`${tdClass} text-xs`}>{eventName(d.event_name)}</td>
-                                  <td class={tdClass}>
-                                    <StatusBadge status={d.status} />
-                                  </td>
-                                  <td class={`${tdClass} figures text-right`}>{d.attempts}</td>
-                                  <td class={`${tdClass} figures text-right`}>
-                                    {d.response_code ?? "—"}
-                                  </td>
-                                  <td
-                                    class={`${tdClass} max-w-72 truncate text-xs`}
-                                    title={d.last_error ?? ""}
-                                  >
-                                    {d.last_error ?? "—"}
-                                  </td>
-                                </tr>
-                              )}
-                            </For>
-                          </tbody>
-                        </table>
-                      </div>
-                      <Show when={deliveries.hasNextPage}>
-                        <div>
-                          <Button
-                            loading={deliveries.isFetchingNextPage}
-                            onClick={() => void deliveries.fetchNextPage()}
-                          >
-                            {t("common.loadMore")}
-                          </Button>
+                      <Card
+                        padding="none"
+                        footer={
+                          deliveries.hasNextPage ? (
+                            <Button
+                              loading={deliveries.isFetchingNextPage}
+                              onClick={() => void deliveries.fetchNextPage()}
+                            >
+                              {t("common.loadMore")}
+                            </Button>
+                          ) : undefined
+                        }
+                      >
+                        <div class="overflow-x-auto">
+                          <table class={tableClass} aria-labelledby="ad-deliveries">
+                            <thead>
+                              <tr>
+                                <Th>{t("adTracking.time")}</Th>
+                                <Th>{t("adTracking.platform")}</Th>
+                                <Th>{t("adTracking.event")}</Th>
+                                <Th>{t("adTracking.status")}</Th>
+                                <Th class="text-right">{t("adTracking.attempts")}</Th>
+                                <Th class="text-right">{t("adTracking.response")}</Th>
+                                <Th>{t("adTracking.lastError")}</Th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <For each={rows()}>
+                                {(d) => (
+                                  <tr class="hover:bg-subtle" data-status={d.status}>
+                                    <td
+                                      class={`${tdClass} figures whitespace-nowrap text-muted-foreground`}
+                                    >
+                                      {formatDateTime(d.occurred_at)}
+                                    </td>
+                                    <td class={tdClass}>{platformName(d.platform)}</td>
+                                    <td class={tdClass}>{eventName(d.event_name)}</td>
+                                    <td class={tdClass}>
+                                      <StatusBadge status={d.status} />
+                                    </td>
+                                    <td class={`${tdClass} figures text-right`}>{d.attempts}</td>
+                                    <td class={`${tdClass} figures text-right`}>
+                                      {d.response_code ?? "—"}
+                                    </td>
+                                    <td
+                                      class={`${tdClass} max-w-72 truncate font-mono text-xs text-muted-foreground`}
+                                      title={d.last_error ?? ""}
+                                    >
+                                      {d.last_error ?? "—"}
+                                    </td>
+                                  </tr>
+                                )}
+                              </For>
+                            </tbody>
+                          </table>
                         </div>
-                      </Show>
+                      </Card>
                     </Show>
                   )}
                 </QueryState>
@@ -495,7 +509,7 @@ export default function AdTracking() {
         <Show when={editing()}>
           {(c) => (
             <form
-              class="flex flex-col gap-3"
+              class="flex flex-col gap-4"
               onSubmit={(e) => {
                 e.preventDefault();
                 save.mutate();
@@ -504,11 +518,7 @@ export default function AdTracking() {
               <For each={c().notices}>
                 {(n) => {
                   const k = known(NOTICES, n);
-                  return (
-                    <p class="rounded-md bg-muted p-2 text-xs text-muted-foreground">
-                      {k ? t(`adTracking.notices.${k}`) : n}
-                    </p>
-                  );
+                  return <Alert tone="info">{k ? t(`adTracking.notices.${k}`) : n}</Alert>;
                 }}
               </For>
               <For each={c().setting_fields}>
@@ -584,13 +594,11 @@ export default function AdTracking() {
                 onChange={(enabled) => setForm((f) => ({ ...f, enabled }))}
               />
               <Show when={error()}>
-                <p role="alert" class="text-xs font-medium text-error-700">
-                  {error()}
-                </p>
+                <Alert tone="error">{error()}</Alert>
               </Show>
               <div class="flex justify-end gap-2">
                 <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-                <Button type="submit" variant="primary" loading={save.isPending}>
+                <Button type="submit" variant="confirm" loading={save.isPending}>
                   {t("common.save")}
                 </Button>
               </div>

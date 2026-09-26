@@ -4,7 +4,17 @@
  * fields (saved through the regular services) or discard. Also lists the fields whose text is
  * AI-generated (AI Act transparency).
  */
-import { Badge, Button, Checkbox, SelectField, Spinner, showToast } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  labelClass,
+  linkClass,
+  SelectField,
+  Spinner,
+  showToast,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import { createMutation, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Show } from "solid-js";
@@ -63,10 +73,13 @@ function Value(props: { field: string; value: unknown; muted?: boolean }) {
   const text = () => displayValue(props.field, props.value);
   return (
     <div
-      class="min-h-8 rounded-md border border-border bg-card px-2 py-1 text-sm break-words [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-1"
+      class="min-h-control rounded-md border border-border bg-subtle px-3 py-1.5 text-sm break-words [&_li]:ml-4 [&_li]:list-disc [&_p]:mb-1"
       classList={{ "text-muted-foreground": props.muted }}
     >
-      <Show when={text()} fallback={<span class="italic">{t("ai.empty")}</span>}>
+      <Show
+        when={text()}
+        fallback={<span class="text-faint-foreground italic">{t("ai.empty")}</span>}
+      >
         <Show when={isHtml(props.field)} fallback={text()}>
           {/* Server-sanitized; sanitized again before rendering. */}
           <div innerHTML={sanitizeHtml(text())} />
@@ -195,197 +208,199 @@ export function AiPanel(props: {
   return (
     <section
       aria-labelledby={`ai-${props.entityType}-h`}
-      class="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3"
+      class="min-w-0 overflow-hidden rounded-lg border border-border bg-subtle"
     >
-      <div class="flex flex-wrap items-center gap-2">
-        <h3 id={`ai-${props.entityType}-h`} class="text-sm font-semibold">
-          {t("ai.panel")}
-        </h3>
+      <div class="flex min-h-12 flex-col justify-center gap-0.5 px-4 py-2.5">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 id={`ai-${props.entityType}-h`} class="text-sm font-semibold text-heading">
+            {t("ai.panel")}
+          </h3>
+          <Show when={usage.data?.provider === "fake"}>
+            <Badge tone="info">{t("ai.demo")}</Badge>
+          </Show>
+        </div>
         <Show when={usage.data?.provider === "fake"}>
-          <Badge tone="info">{t("ai.demo")}</Badge>
+          <p class="text-sm text-muted-foreground">{t("ai.demoHint")}</p>
         </Show>
       </div>
-      <Show when={usage.data?.provider === "fake"}>
-        <p class="text-xs text-muted-foreground">{t("ai.demoHint")}</p>
-      </Show>
-
-      <Show when={(marks.data?.items.length ?? 0) > 0}>
-        <div class="flex flex-col gap-1">
-          <p class="text-xs font-medium text-muted-foreground">{t("ai.marks")}</p>
-          <ul class="flex flex-wrap gap-1.5" aria-label={t("ai.marks")}>
-            <For each={marks.data?.items}>
-              {(m) => (
-                <li>
-                  <Badge tone="info">
-                    {t("ai.aiLabel")}: {fieldLabel(m.field, m.locale)}
-                  </Badge>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-      </Show>
-
-      <div class="flex flex-col gap-3">
-        <div class="grid gap-3 sm:grid-cols-2">
-          <SelectField
-            label={t("ai.task")}
-            value={kind()}
-            options={kinds().map((k) => ({ value: k, label: t(`ai.kind_${k}`) }))}
-            onChange={(v) => setKind(kinds().find((k) => k === v) ?? "translate")}
-          />
-          <SelectField
-            label={kind() === "translate" ? t("ai.sourceLanguage") : t("ai.language")}
-            value={locale()}
-            options={localeOptions()}
-            onChange={setLocale}
-          />
-          <Show when={describes()}>
-            <SelectField
-              label={t("ai.tone")}
-              value={tone()}
-              options={TONES.map((v) => ({ value: v, label: t(`ai.tone_${v}`) }))}
-              onChange={(v) => setTone(TONES.find((x) => x === v) ?? "neutral")}
-            />
-            <SelectField
-              label={t("ai.length")}
-              value={length()}
-              options={LENGTHS.map((v) => ({ value: v, label: t(`ai.length_${v}`) }))}
-              onChange={(v) => setLength(LENGTHS.find((x) => x === v) ?? "medium")}
-            />
-          </Show>
-        </div>
-        <Show when={kind() === "translate"}>
-          <fieldset class="flex flex-wrap gap-3">
-            <legend class="mb-1 text-xs font-medium text-muted-foreground">
-              {t("ai.targets")}
-            </legend>
-            <For each={CONTENT_LOCALES.filter((l) => l !== locale())}>
-              {(l) => (
-                <Checkbox
-                  label={t(`common.locale_${l}`)}
-                  checked={targets().includes(l)}
-                  onChange={(on) =>
-                    setTargets(on ? [...targets(), l] : targets().filter((x) => x !== l))
-                  }
-                />
-              )}
-            </For>
-          </fieldset>
-        </Show>
-        <div>
-          <Button
-            variant="primary"
-            loading={busy()}
-            disabled={kind() === "translate" && targets().length === 0}
-            onClick={() => {
-              if (!busy()) generate.mutate();
-            }}
-          >
-            {t("ai.generate")}
-          </Button>
-        </div>
-      </div>
-
-      <div aria-live="polite">
-        <Show when={busy()}>
-          <p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner size="sm" />
-            {proposal.data && proposal.data.progress.total > 1
-              ? t("ai.translatedOf", {
-                  done: proposal.data.progress.done,
-                  total: proposal.data.progress.total,
-                })
-              : t("ai.generating")}
-          </p>
-        </Show>
-      </div>
-
-      <Show when={error()}>
-        <div role="alert" class="rounded-md bg-error-50 px-3 py-2 text-sm text-error-700">
-          <Show when={quotaExceeded()} fallback={errorMessage(error())}>
-            {t("ai.quotaExceeded")}{" "}
-            <A href="/settings/ai" class="underline">
-              {t("ai.seeUsage")}
-            </A>
-          </Show>
-        </div>
-      </Show>
-
-      <Show when={proposal.isError}>
-        <div
-          role="alert"
-          class="flex flex-wrap items-center gap-2 rounded-md bg-error-50 px-3 py-2 text-sm text-error-700"
-        >
-          {errorMessage(proposal.error)}
-          <Button onClick={() => void proposal.refetch()}>{t("common.retry")}</Button>
-        </div>
-      </Show>
-
-      <Show when={proposal.data?.status === "failed"}>
-        <p role="alert" class="rounded-md bg-error-50 px-3 py-2 text-sm text-error-700">
-          {proposal.data?.error === "ai_quota_exceeded"
-            ? t("ai.quotaExceeded")
-            : t("ai.failed", {
-                reason: errorMessage(new ApiError(422, proposal.data?.error ?? "unknown")),
-              })}
-        </p>
-      </Show>
-
-      <Show when={proposal.data?.status === "ready" ? proposal.data : undefined}>
-        {(p) => (
-          <div class="flex flex-col gap-3">
-            <p class="text-xs text-muted-foreground">{t("ai.proposalHint")}</p>
-            <Show when={p().warnings.length > 0}>
-              <div class="rounded-md border border-warning-700 bg-warning-50 px-3 py-2 text-sm">
-                <p class="font-medium">{t("ai.warnings")}</p>
-                <ul class="ml-4 list-disc">
-                  <For each={p().warnings}>{(w) => <li>{w}</li>}</For>
-                </ul>
-              </div>
-            </Show>
-            <ul class="flex flex-col gap-3" aria-label={t("ai.proposal")}>
-              <For each={p().changes}>
-                {(c) => (
-                  <li class="flex flex-col gap-1.5 border-b border-border pb-3">
-                    <Checkbox
-                      label={fieldLabel(c.field, c.locale)}
-                      checked={chosen().has(key(c))}
-                      onChange={(on) => toggle(c, on)}
-                    />
-                    <div class="grid gap-2 md:grid-cols-2">
-                      <div class="flex flex-col gap-0.5">
-                        <span class="text-xs text-muted-foreground">{t("ai.before")}</span>
-                        <Value field={c.field} value={c.before} muted />
-                      </div>
-                      <div class="flex flex-col gap-0.5">
-                        <span class="text-xs text-muted-foreground">{t("ai.after")}</span>
-                        <Value field={c.field} value={c.after} />
-                      </div>
-                    </div>
+      <div class="flex flex-col gap-4 border-t border-border bg-background p-4">
+        <Show when={(marks.data?.items.length ?? 0) > 0}>
+          <div class="flex flex-col gap-1">
+            <p class="text-sm text-muted-foreground">{t("ai.marks")}</p>
+            <ul class="flex flex-wrap gap-1.5" aria-label={t("ai.marks")}>
+              <For each={marks.data?.items}>
+                {(m) => (
+                  <li>
+                    <Badge tone="info">
+                      {t("ai.aiLabel")}: {fieldLabel(m.field, m.locale)}
+                    </Badge>
                   </li>
                 )}
               </For>
             </ul>
-            <Show when={props.acceptHint}>
-              <p class="text-xs text-muted-foreground">{props.acceptHint}</p>
-            </Show>
-            <div class="flex flex-wrap gap-2">
-              <Button
-                variant="primary"
-                loading={accept.isPending}
-                disabled={chosen().size === 0}
-                onClick={() => accept.mutate()}
-              >
-                {t("ai.accept")}
-              </Button>
-              <Button loading={discard.isPending} onClick={() => discard.mutate()}>
-                {t("ai.discard")}
-              </Button>
-            </div>
           </div>
-        )}
-      </Show>
+        </Show>
+
+        <div class="flex flex-col gap-4">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <SelectField
+              label={t("ai.task")}
+              value={kind()}
+              options={kinds().map((k) => ({ value: k, label: t(`ai.kind_${k}`) }))}
+              onChange={(v) => setKind(kinds().find((k) => k === v) ?? "translate")}
+            />
+            <SelectField
+              label={kind() === "translate" ? t("ai.sourceLanguage") : t("ai.language")}
+              value={locale()}
+              options={localeOptions()}
+              onChange={setLocale}
+            />
+            <Show when={describes()}>
+              <SelectField
+                label={t("ai.tone")}
+                value={tone()}
+                options={TONES.map((v) => ({ value: v, label: t(`ai.tone_${v}`) }))}
+                onChange={(v) => setTone(TONES.find((x) => x === v) ?? "neutral")}
+              />
+              <SelectField
+                label={t("ai.length")}
+                value={length()}
+                options={LENGTHS.map((v) => ({ value: v, label: t(`ai.length_${v}`) }))}
+                onChange={(v) => setLength(LENGTHS.find((x) => x === v) ?? "medium")}
+              />
+            </Show>
+          </div>
+          <Show when={kind() === "translate"}>
+            <fieldset class="flex flex-wrap gap-3">
+              <legend class={`mb-2 ${labelClass}`}>{t("ai.targets")}</legend>
+              <For each={CONTENT_LOCALES.filter((l) => l !== locale())}>
+                {(l) => (
+                  <Checkbox
+                    label={t(`common.locale_${l}`)}
+                    checked={targets().includes(l)}
+                    onChange={(on) =>
+                      setTargets(on ? [...targets(), l] : targets().filter((x) => x !== l))
+                    }
+                  />
+                )}
+              </For>
+            </fieldset>
+          </Show>
+          <div>
+            <Button
+              loading={busy()}
+              disabled={kind() === "translate" && targets().length === 0}
+              onClick={() => {
+                if (!busy()) generate.mutate();
+              }}
+            >
+              {t("ai.generate")}
+            </Button>
+          </div>
+        </div>
+
+        <div aria-live="polite">
+          <Show when={busy()}>
+            <p role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              {proposal.data && proposal.data.progress.total > 1
+                ? t("ai.translatedOf", {
+                    done: proposal.data.progress.done,
+                    total: proposal.data.progress.total,
+                  })
+                : t("ai.generating")}
+            </p>
+          </Show>
+        </div>
+
+        <Show when={error()}>
+          <Alert tone="error">
+            <Show when={quotaExceeded()} fallback={errorMessage(error())}>
+              {t("ai.quotaExceeded")}{" "}
+              <A href="/settings/ai" class={linkClass}>
+                {t("ai.seeUsage")}
+              </A>
+            </Show>
+          </Alert>
+        </Show>
+
+        <Show when={proposal.isError}>
+          <Alert
+            tone="error"
+            actions={<Button onClick={() => void proposal.refetch()}>{t("common.retry")}</Button>}
+          >
+            {errorMessage(proposal.error)}
+          </Alert>
+        </Show>
+
+        <Show when={proposal.data?.status === "failed"}>
+          <Alert tone="error">
+            {proposal.data?.error === "ai_quota_exceeded"
+              ? t("ai.quotaExceeded")
+              : t("ai.failed", {
+                  reason: errorMessage(new ApiError(422, proposal.data?.error ?? "unknown")),
+                })}
+          </Alert>
+        </Show>
+
+        <Show when={proposal.data?.status === "ready" ? proposal.data : undefined}>
+          {(p) => (
+            <div class="flex flex-col gap-3">
+              <p class="text-sm text-muted-foreground">{t("ai.proposalHint")}</p>
+              <Show when={p().warnings.length > 0}>
+                <Alert live tone="warning" title={t("ai.warnings")}>
+                  <ul class="ml-4 list-disc">
+                    <For each={p().warnings}>{(w) => <li>{w}</li>}</For>
+                  </ul>
+                </Alert>
+              </Show>
+              <ul class="flex flex-col gap-3" aria-label={t("ai.proposal")}>
+                <For each={p().changes}>
+                  {(c) => (
+                    <li class="flex flex-col gap-1.5 border-b border-border pb-3">
+                      <Checkbox
+                        label={fieldLabel(c.field, c.locale)}
+                        checked={chosen().has(key(c))}
+                        onChange={(on) => toggle(c, on)}
+                      />
+                      <div class="grid gap-2 md:grid-cols-2">
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-xs font-semibold text-muted-foreground">
+                            {t("ai.before")}
+                          </span>
+                          <Value field={c.field} value={c.before} muted />
+                        </div>
+                        <div class="flex flex-col gap-0.5">
+                          <span class="text-xs font-semibold text-muted-foreground">
+                            {t("ai.after")}
+                          </span>
+                          <Value field={c.field} value={c.after} />
+                        </div>
+                      </div>
+                    </li>
+                  )}
+                </For>
+              </ul>
+              <Show when={props.acceptHint}>
+                <p class="text-sm text-muted-foreground">{props.acceptHint}</p>
+              </Show>
+              <div class="flex flex-wrap gap-2">
+                <Button
+                  variant="confirm"
+                  loading={accept.isPending}
+                  disabled={chosen().size === 0}
+                  onClick={() => accept.mutate()}
+                >
+                  {t("ai.accept")}
+                </Button>
+                <Button loading={discard.isPending} onClick={() => discard.mutate()}>
+                  {t("ai.discard")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Show>
+      </div>
     </section>
   );
 }

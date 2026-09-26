@@ -1,4 +1,5 @@
-import { Show } from "solid-js";
+import { controlClass, FormGroup } from "@platform/ui";
+import { createUniqueId } from "solid-js";
 
 /** Labelled `datetime-local` input (local time; callers convert to UTC for the API). */
 export function DateTimeField(props: {
@@ -8,19 +9,18 @@ export function DateTimeField(props: {
   onChange: (v: string) => void;
   disabled?: boolean;
 }) {
+  const id = createUniqueId();
   return (
-    <label class="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-      {props.label}
+    <FormGroup label={props.label} for={id} description={props.hint}>
       <input
+        id={id}
         type="datetime-local"
-        class="h-control rounded-md border border-input bg-card px-2.5 text-sm font-normal text-foreground"
+        class={`${controlClass} figures`}
         value={props.value}
         disabled={props.disabled}
+        aria-describedby={props.hint ? `${id}-desc` : undefined}
         onChange={(e) => props.onChange(e.currentTarget.value)}
       />
-      <Show when={props.hint}>
-        <span class="font-normal text-faint-foreground">{props.hint}</span>
-      </Show>
-    </label>
+    </FormGroup>
   );
 }

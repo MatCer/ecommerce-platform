@@ -1,4 +1,15 @@
-import { Badge, Button, EmptyState, SelectField, type Tone } from "@platform/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FormGroup,
+  fileInputClass,
+  linkClass,
+  SelectField,
+  type Tone,
+} from "@platform/ui";
 import { A } from "@solidjs/router";
 import {
   createInfiniteQuery,
@@ -6,7 +17,7 @@ import {
   createQuery,
   useQueryClient,
 } from "@tanstack/solid-query";
-import { createSignal, For, type JSX, Show } from "solid-js";
+import { createSignal, createUniqueId, For, type JSX, Show } from "solid-js";
 import { ApiProblem } from "../components/CheckoutSettings.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { formatDateTime, locale, t } from "../i18n/index.ts";
@@ -54,8 +65,10 @@ export default function BankTransactions() {
     <>
       <PageHeader title={t("pay.bankTitle")} description={t("pay.bankDesc")} />
       <StatementUpload />
-      <div class="mb-4 max-w-xs">
+      <div class="mb-4 flex flex-wrap items-center gap-2">
         <SelectField
+          class="w-56"
+          hideLabel
           label={t("pay.status")}
           value={status() ?? ""}
           options={[
@@ -71,21 +84,27 @@ export default function BankTransactions() {
             when={rows().length}
             fallback={
               <EmptyState
+                icon="document"
                 title={t("pay.noTransactions")}
                 description={t("pay.noTransactionsDesc")}
               />
             }
           >
-            <TransactionTable rows={rows()} />
-            <Show when={list.hasNextPage}>
-              <Button
-                class="mt-4"
-                loading={list.isFetchingNextPage}
-                onClick={() => list.fetchNextPage()}
-              >
-                {t("common.loadMore")}
-              </Button>
-            </Show>
+            <Card
+              padding="none"
+              footer={
+                list.hasNextPage ? (
+                  <Button
+                    loading={list.isFetchingNextPage}
+                    onClick={() => void list.fetchNextPage()}
+                  >
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <TransactionTable rows={rows()} />
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -113,7 +132,7 @@ export function TransactionTable(props: {
                 t("pay.source"),
               ]}
             >
-              {(label) => <Th>{label}</Th>}
+              {(label, i) => <Th class={i() === 1 ? "text-right" : undefined}>{label}</Th>}
             </For>
             <Show when={props.actions}>
               <Th srOnly>{t("common.actions")}</Th>
@@ -124,8 +143,8 @@ export function TransactionTable(props: {
           <For each={props.rows}>
             {(tx) => (
               <tr data-testid="bank-tx">
-                <td class={`${tdClass} whitespace-nowrap`}>{tx.booked_on}</td>
-                <td class={`${tdClass} figures whitespace-nowrap`}>
+                <td class={`${tdClass} figures whitespace-nowrap`}>{tx.booked_on}</td>
+                <td class={`${tdClass} figures whitespace-nowrap text-right`}>
                   {formatMoney(tx.amount_minor, tx.currency, locale())}
                   <Show when={tx.expected_minor != null && tx.status !== "matched"}>
                     <p class="text-xs text-muted-foreground">
@@ -134,7 +153,7 @@ export function TransactionTable(props: {
                     </p>
                   </Show>
                 </td>
-                <td class={tdClass}>{tx.variable_symbol ?? "—"}</td>
+                <td class={`${tdClass} font-mono text-xs`}>{tx.variable_symbol ?? "—"}</td>
                 <td class={tdClass}>
                   {tx.counterparty_name ?? ""}
                   <p class="text-xs text-muted-foreground">{tx.counterparty ?? ""}</p>
@@ -142,15 +161,17 @@ export function TransactionTable(props: {
                 <td class={tdClass}>
                   <Badge tone={txTone[tx.status]}>{t(`txStatuses.${tx.status}`)}</Badge>
                   <Show when={tx.reason}>
-                    {(r) => <p class="text-xs text-muted-foreground">{t(`txReasons.${r()}`)}</p>}
+                    {(r) => (
+                      <p class="mt-1 text-xs text-muted-foreground">{t(`txReasons.${r()}`)}</p>
+                    )}
                   </Show>
                   <Show when={tx.note}>
-                    <p class="text-xs">{tx.note}</p>
+                    <p class="mt-1 text-xs">{tx.note}</p>
                   </Show>
                 </td>
                 <td class={tdClass}>
                   <Show when={tx.order_id} fallback="—">
-                    <A class="text-accent-700 hover:underline" href={`/orders/${tx.order_id}`}>
+                    <A class={linkClass} href={`/orders/${tx.order_id}`}>
                       {tx.order_number}
                     </A>
                   </Show>
@@ -184,6 +205,7 @@ function StatementUpload() {
   const [format, setFormat] = createSignal<Format>("camt053");
   const [file, setFile] = createSignal<File>();
   const [report, setReport] = createSignal<Schemas["StatementImport"]>();
+  const fileId = createUniqueId();
   const upload = createMutation(() => ({
     mutationFn: async () => {
       const f = file();
@@ -206,14 +228,18 @@ function StatementUpload() {
     },
   }));
   return (
-    <section class="mb-6 rounded-md border border-border p-4" aria-labelledby="upload-heading">
-      <h2 id="upload-heading" class="font-semibold">
-        {t("pay.upload")}
-      </h2>
-      <p class="mb-3 text-sm text-muted-foreground">{t("pay.uploadDesc")}</p>
-      <Show when={available().length} fallback={<p class="text-sm">{t("pay.noAccount")}</p>}>
+    <Card
+      labelledBy="upload-heading"
+      class="mb-6"
+      title={t("pay.upload")}
+      description={t("pay.uploadDesc")}
+    >
+      <Show
+        when={available().length}
+        fallback={<p class="text-sm text-muted-foreground">{t("pay.noAccount")}</p>}
+      >
         <form
-          class="grid gap-3 sm:grid-cols-3 sm:items-end"
+          class="grid gap-4 sm:grid-cols-3 sm:items-start"
           onSubmit={(e) => {
             e.preventDefault();
             setReport(undefined);
@@ -235,18 +261,18 @@ function StatementUpload() {
             options={formats.map((f) => ({ value: f, label: t(`statementFormats.${f}`) }))}
             onChange={(v) => setFormat(formats.find((f) => f === v) ?? "camt053")}
           />
-          <label class="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            {t("pay.file")}
+          <FormGroup label={t("pay.file")} for={fileId}>
             <input
+              id={fileId}
               type="file"
               required
               accept=".xml,.csv,.gpc,.abo,.txt,text/xml,application/xml,text/csv,text/plain"
               onChange={(e) => setFile(e.currentTarget.files?.[0])}
-              class="max-w-full text-sm text-foreground"
+              class={fileInputClass}
             />
-          </label>
-          <div>
-            <Button type="submit" variant="primary" loading={upload.isPending}>
+          </FormGroup>
+          <div class="sm:col-span-3">
+            <Button type="submit" variant="confirm" loading={upload.isPending}>
               {t("pay.importButton")}
             </Button>
           </div>
@@ -254,18 +280,22 @@ function StatementUpload() {
       </Show>
       <Show when={report()}>
         {(r) => (
-          <p role="status" class="mt-3 text-sm" data-testid="import-report">
-            {t("pay.imported", {
-              imported: r().imported,
-              duplicates: r().duplicates,
-              debits: r().debits,
-              matched: r().matched,
-              exceptions: r().exceptions,
-            })}
-          </p>
+          <div class="mt-4" data-testid="import-report">
+            <Alert live tone="success">
+              {t("pay.imported", {
+                imported: r().imported,
+                duplicates: r().duplicates,
+                debits: r().debits,
+                matched: r().matched,
+                exceptions: r().exceptions,
+              })}
+            </Alert>
+          </div>
         )}
       </Show>
-      <ApiProblem error={upload.error} />
-    </section>
+      <div class="mt-3 empty:hidden">
+        <ApiProblem error={upload.error} />
+      </div>
+    </Card>
   );
 }
