@@ -3,7 +3,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { describe, expect, test } from "vitest";
 import { createApp } from "./app.ts";
 import { AUDIENCE, createAuth, staffClaims } from "./auth.ts";
-import type { Config } from "./config.ts";
+import { type Config, loadConfig } from "./config.ts";
 import type { Mail } from "./mail.ts";
 
 const cfg: Config = {
@@ -283,6 +283,29 @@ describe("rate limits", () => {
     expect((await signIn(app, spoof)).status).toBe(429);
     // ...but another client (another proxy-set IP) has its own.
     expect((await signIn(app, { "x-real-ip": "203.0.113.8" })).status).toBe(401);
+  });
+
+  test("signed local test contexts have separate buckets; a forged signature stays on the peer IP", async () => {
+    const secret = "test-e2e-rate-secret-0123456789abcdef";
+    const { app } = setup({ ...cfg, signInRateMax: 1, e2eRateSecret: secret });
+    const signed = (id: string) => `${id}.${createHmac("sha256", secret).update(id).digest("hex")}`;
+    const peer = { "x-real-ip": "203.0.113.77" };
+    const first = { ...peer, "x-e2e-rate-key": signed("00112233445566778899aabb") };
+    const second = { ...peer, "x-e2e-rate-key": signed("00112233445566778899aacc") };
+    expect((await signIn(app, first)).status).toBe(401);
+    expect((await signIn(app, first)).status).toBe(429);
+    expect((await signIn(app, second)).status).toBe(401);
+    const { app: ordinary } = setup({ ...cfg, signInRateMax: 1, e2eRateSecret: secret });
+    expect((await signIn(ordinary, peer)).status).toBe(401);
+    expect((await signIn(ordinary, { ...peer, "x-e2e-rate-key": "0".repeat(89) })).status).toBe(
+      429,
+    );
+  });
+
+  test("production configuration refuses the local test secret", () => {
+    expect(() => loadConfig({ APP_ENV: "prod", E2E_RATE_SECRET: "x".repeat(32) })).toThrow(
+      "E2E_RATE_SECRET is allowed only when APP_ENV=dev",
+    );
   });
 });
 

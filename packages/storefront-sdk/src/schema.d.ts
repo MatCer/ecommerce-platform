@@ -1289,6 +1289,11 @@ export interface components {
         };
         /** @enum {string} */
         Carrier: "packeta_pickup" | "packeta_home" | "ppl" | "personal_pickup";
+        CarrierMark: {
+            carrier: components["schemas"]["Carrier"];
+            /** @description The merchant's name of the shipping method. */
+            label: string;
+        };
         CartCoupon: {
             /** @description Whether it applies to the cart right now. */
             applied: boolean;
@@ -1874,6 +1879,11 @@ export interface components {
         PaymentInput: {
             method: components["schemas"]["MethodKind"];
         };
+        PaymentMark: {
+            kind: components["schemas"]["MethodKind"];
+            /** @description The name checkout shows (the merchant's own or the platform's). */
+            label: string;
+        };
         PaymentOption: {
             /** @description The fee charged with this method (COD: the shipping method's COD fee). */
             fee: components["schemas"]["MoneyView"];
@@ -2283,7 +2293,12 @@ export interface components {
             rum_sample_rate: number;
         };
         Trust: {
+            /** @description The delivery methods checkout offers in this market, in checkout order. */
+            carriers: components["schemas"]["CarrierMark"][];
             delivery: string;
+            /** @description The payment methods checkout offers in this market, in checkout order. */
+            payment_methods: components["schemas"]["PaymentMark"][];
+            /** @description The labels of `payment_methods` (kept for themes written before the marks). */
             payments: string[];
             returns: string;
         };

@@ -3,13 +3,34 @@
  * a shop cart handed to checkout, the address form, the pickup-point widget, placing the
  * order, the fake gateway and the order model.
  */
+
 import { type Browser, expect, type Page } from "@playwright/test";
 import { mailpit } from "../admin/support";
+import { tabTo } from "../keyboard";
+import { rateHeaders, testContext } from "../rate-client";
 
 const port = process.env.HTTP_PORT ?? "8080";
 export const CZ = `http://demo.localhost:${port}`;
 export const SK = `http://demo-sk.localhost:${port}`;
 export const checkoutOf = (shop: string) => shop.replace("://", "://checkout.");
+
+/** SSR controls are visible before the checkout island attaches its event handlers. */
+export async function checkoutReady(page: Page): Promise<void> {
+  await page.waitForFunction(() => !document.querySelector('astro-island[client="load"][ssr]'));
+}
+
+/** Hold island modules to exercise visible SSR controls before event handlers attach. */
+export async function deferHydration(page: Page): Promise<() => void> {
+  let release!: () => void;
+  const scripts = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\.(?:js|mjs)(?:\?|$)/, async (route) => {
+    await scripts;
+    await route.fallback();
+  });
+  return release;
+}
 
 export interface Money {
   amount_minor: number;
@@ -31,7 +52,7 @@ export interface OrderModel {
 }
 
 export async function newPage(browser: Browser, locale = "cs-CZ"): Promise<Page> {
-  const ctx = await browser.newContext({ locale });
+  const ctx = await testContext(browser, { locale });
   // A decided consent keeps the theme's banner closed.
   await ctx.addCookies([
     { name: "consent", value: "", url: CZ },
@@ -50,7 +71,9 @@ export async function toCheckout(
 ): Promise<CartModel> {
   await page.goto(`${shop}/`);
   const model = (await (
-    await page.request.get(`${shop}/_p/public/pages/product/${slug}`)
+    await page.request.get(`${shop}/_p/public/pages/product/${slug}`, {
+      headers: rateHeaders(page),
+    })
   ).json()) as {
     product: { variants: { id: string }[] };
   };
@@ -58,7 +81,7 @@ export async function toCheckout(
   let added = 0;
   for (const v of model.product.variants) {
     const res = await page.request.post(`${shop}/_p/cart/lines`, {
-      headers: { origin: shop },
+      headers: { origin: shop, ...rateHeaders(page) },
       data: { variant_id: v.id, quantity },
     });
     added = res.status();
@@ -67,12 +90,14 @@ export async function toCheckout(
   expect(added).toBe(200);
   if (coupon) {
     const applied = await page.request.post(`${shop}/_p/cart/coupons`, {
-      headers: { origin: shop },
+      headers: { origin: shop, ...rateHeaders(page) },
       data: { code: coupon },
     });
     expect(applied.status()).toBe(200);
   }
-  const cart = (await (await page.request.get(`${shop}/_p/cart`)).json()) as CartModel;
+  const cart = (await (
+    await page.request.get(`${shop}/_p/cart`, { headers: rateHeaders(page) })
+  ).json()) as CartModel;
   await Promise.all([
     page.waitForURL(`${checkoutOf(shop)}/`),
     page.evaluate(() => {
@@ -83,10 +108,12 @@ export async function toCheckout(
       form.submit();
     }),
   ]);
+  await checkoutReady(page);
   return cart;
 }
 
 export async function fillContactAndAddress(page: Page, email: string | null, city = "Praha") {
+  await checkoutReady(page);
   if (email !== null) await page.locator('input[autocomplete="email"]').fill(email);
   await page.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
   await page.locator('input[autocomplete="section-billing street-address"]').fill("Dlouhá 12");
@@ -105,12 +132,12 @@ export async function choosePickupPoint(page: Page, point: RegExp, keyboard = fa
   if (keyboard) {
     // Tab cycles inside the dialog; Enter chooses (A26: keyboard pickup-point selection).
     const first = widget.getByRole("button").first();
-    await first.focus();
+    await tabTo(page, first);
     await page.keyboard.press("Shift+Tab");
     await expect(widget.getByRole("button", { name: "Zavřít" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(first).toBeFocused();
-    await target.focus();
+    await tabTo(page, target);
     await page.keyboard.press("Enter");
   } else {
     // The widget removes its frame right after the choice; a plain click would wait on it.
@@ -139,7 +166,9 @@ export async function fakePay(page: Page, button: "Pay" | "Fail the payment"): P
 
 export async function order(page: Page, shop: string, token: string): Promise<OrderModel> {
   return (await (
-    await page.request.get(`${checkoutOf(shop)}/_p/orders/${token}`)
+    await page.request.get(`${checkoutOf(shop)}/_p/orders/${token}`, {
+      headers: rateHeaders(page),
+    })
   ).json()) as OrderModel;
 }
 

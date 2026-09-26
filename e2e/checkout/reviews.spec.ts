@@ -8,6 +8,7 @@
  */
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, run, signInOwner, sql } from "../admin/support";
+import { rateHeaders } from "../rate-client";
 import { CZ, mail, newPage } from "./support";
 
 const SLUG = "tricko-henley";
@@ -32,7 +33,9 @@ async function reviewLink(): Promise<string> {
                               vat_recap, shipping_method_snapshot, payment_method)
           SELECT (SELECT id FROM t), ${number}, (SELECT id FROM m), (SELECT id FROM c),
                  'wp16-${run}@example.test', 'cs', 'CZK', 'delivered', 'paid', 'delivered', 'CZ',
-                 true, 49900, 0, 0, 0, 0, 0, 49900, '[]', '{}', 'cod'
+                 true, 49900, 0, 0, 0, 0, 0, 49900, '[]',
+                 jsonb_build_object('id', gen_random_uuid(), 'carrier', 'personal_pickup',
+                                    'name', 'Personal pickup', 'price_minor', 0), 'cod'
           RETURNING id, tenant_id),
     l AS (INSERT INTO order_lines (tenant_id, order_id, position, variant_id, product_id, sku,
                                    name, quantity, unit_gross_minor, base_minor, discount_minor,
@@ -49,12 +52,20 @@ async function reviewLink(): Promise<string> {
                  '2026-09-25', 'checkout' FROM shipment RETURNING tenant_id)
     SELECT tenant_id FROM consent`);
 
-  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString());
+  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString(), {
+    headers: rateHeaders(admin),
+  });
   expect(auth.ok()).toBeTruthy();
   const { token } = (await auth.json()) as { token: string };
   const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
   const api = new URL(admin.url());
   api.hostname = api.hostname.replace(/^admin\./, "api.");
+  const fixtureId = sql(`SELECT id FROM orders WHERE number=${number} AND tenant_id='${tenant}'`);
+  api.pathname = `/admin/v1/orders/${fixtureId}`;
+  const detail = await admin.request.get(api.toString(), {
+    headers: { authorization: `Bearer ${token}`, "x-tenant-id": tenant },
+  });
+  expect(detail.status()).toBe(200);
   api.pathname = "/admin/v1/flows/test-clock/advance";
   const advanced = await admin.request.post(api.toString(), {
     headers: { authorization: `Bearer ${token}`, "x-tenant-id": tenant },

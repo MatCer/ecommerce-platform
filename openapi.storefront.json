@@ -6746,6 +6746,22 @@
           "personal_pickup"
         ]
       },
+      "CarrierMark": {
+        "type": "object",
+        "required": [
+          "carrier",
+          "label"
+        ],
+        "properties": {
+          "carrier": {
+            "$ref": "#/components/schemas/Carrier"
+          },
+          "label": {
+            "type": "string",
+            "description": "The merchant's name of the shipping method."
+          }
+        }
+      },
       "CartCoupon": {
         "type": "object",
         "required": [
@@ -8841,6 +8857,22 @@
         },
         "additionalProperties": false
       },
+      "PaymentMark": {
+        "type": "object",
+        "required": [
+          "kind",
+          "label"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/MethodKind"
+          },
+          "label": {
+            "type": "string",
+            "description": "The name checkout shows (the merchant's own or the platform's)."
+          }
+        }
+      },
       "PaymentOption": {
         "type": "object",
         "required": [
@@ -10198,17 +10230,34 @@
         "required": [
           "delivery",
           "returns",
-          "payments"
+          "payments",
+          "payment_methods",
+          "carriers"
         ],
         "properties": {
+          "carriers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarrierMark"
+            },
+            "description": "The delivery methods checkout offers in this market, in checkout order."
+          },
           "delivery": {
             "type": "string"
+          },
+          "payment_methods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentMark"
+            },
+            "description": "The payment methods checkout offers in this market, in checkout order."
           },
           "payments": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "The labels of `payment_methods` (kept for themes written before the marks)."
           },
           "returns": {
             "type": "string"

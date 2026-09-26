@@ -7,10 +7,11 @@
  *
  * One full build runs for real: the spec takes a few minutes.
  */
-import { execFileSync } from "node:child_process";
+
 import { randomBytes } from "node:crypto";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { magicLink, root, useEnglish } from "./support.ts";
+import { testContext } from "../rate-client";
+import { magicLink, sql as querySql, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
 const owner = "owner@lnen.example";
@@ -21,18 +22,14 @@ let context: BrowserContext;
 let page: Page;
 
 function sql(query: string): string[] {
-  return execFileSync(
-    "docker",
-    ["compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "app", "-tAc", query],
-    { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
-  )
+  return querySql(query)
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
 }
 
 test.beforeAll(async ({ browser }) => {
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
   await page.goto("/login");

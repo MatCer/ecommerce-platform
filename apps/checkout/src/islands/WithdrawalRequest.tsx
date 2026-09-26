@@ -2,6 +2,7 @@ import { t } from "@platform/storefront-sdk/format";
 import { Button, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import HydratedControls from "./HydratedControls";
 
 export default function WithdrawalRequest(props: { m: Record<string, string> }) {
   const [number, setNumber] = createSignal("");
@@ -32,24 +33,26 @@ export default function WithdrawalRequest(props: { m: Record<string, string> }) 
   return (
     <div class="grid gap-3" aria-live="polite">
       <Show when={!sent()} fallback={<p role="status">{t(props.m, "withdraw.sent")}</p>}>
-        <form class="grid gap-3" onSubmit={send}>
-          <TextField
-            label={t(props.m, "withdraw.order_number")}
-            required
-            value={number()}
-            onChange={setNumber}
-          />
-          <TextField
-            label={t(props.m, "withdraw.email")}
-            type="email"
-            autocomplete="email"
-            required
-            value={email()}
-            onChange={setEmail}
-          />
-          <Button type="submit" variant="primary" loading={busy()}>
-            {t(props.m, "withdraw.send")}
-          </Button>
+        <form onSubmit={send}>
+          <HydratedControls class="grid gap-3">
+            <TextField
+              label={t(props.m, "withdraw.order_number")}
+              required
+              value={number()}
+              onChange={setNumber}
+            />
+            <TextField
+              label={t(props.m, "withdraw.email")}
+              type="email"
+              autocomplete="email"
+              required
+              value={email()}
+              onChange={setEmail}
+            />
+            <Button type="submit" variant="primary" loading={busy()}>
+              {t(props.m, "withdraw.send")}
+            </Button>
+          </HydratedControls>
         </form>
       </Show>
       <Show when={error()}>

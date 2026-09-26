@@ -36,12 +36,15 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
 ```bash
 pnpm install
 make up          # builds images, starts everything, waits until healthy (creates .env on first run)
+make seed        # 60-product CZ/SK shop, images, legal pages, payments and published artifacts
 curl http://api.localhost:8080/healthz
 curl http://api.localhost:8080/readyz
 make down
 ```
 
-`*.localhost` resolves to loopback in browsers and curl, so no `/etc/hosts` edits are needed.
+`*.localhost` resolves to loopback without `/etc/hosts` edits. Open
+`http://demo.localhost:8080` and `http://admin.localhost:8080`; use the magic link for
+`owner@lnen.example` in Mailpit (`http://mail.localhost:8080`). `make seed` is safe to rerun.
 
 ## Local URLs (default ports)
 
@@ -56,9 +59,10 @@ make down
 | localhost:55432 | Postgres (`app` and `app_test` databases) |
 | http://localhost:57700 | Meilisearch |
 | http://localhost:12111 | stripe-mock |
-| http://demo.localhost:8080, http://demo-sk.localhost:8080 | Demo shop (CZ / SK market) via the edge, after `make seed theme-build` |
+| http://demo.localhost:8080, http://demo-sk.localhost:8080 | Demo shop (CZ / SK market), after `make seed` |
 | http://checkout.demo.localhost:8080 | Checkout origin (reached through the cart's "K pokladně"): one-page checkout, order pages `/o/<token>`, account |
 | http://mocks.localhost:8080/packeta/ | Packeta pickup-point widget mock (`PACKETA_WIDGET_URL`) |
+| https://demo.localhost:8443 | TLS + HTTP/2 shop (local CA; used by `make perf`) |
 
 Local checkout (WP10) pays through the fake gateway (`PAYMENTS_FAKE=1`, refused with
 `APP_ENV=prod`): its page `/_p/fake-pay/<attempt>` has Pay / Fail buttons. Unpaid orders expire
@@ -86,9 +90,8 @@ Payment adapters (WP11):
   payments wait under Admin → Payment exceptions. Reminders go out on day 3 and 6.
 - **Cash on delivery**: the order detail records delivered → collected (tender, collector; cash
   is rounded) → remitted; `POST /admin/v1/cod-reports` takes a carrier CSV.
-| https://demo.localhost:8443 | Same shop over TLS + HTTP/2 (Caddy local CA; used by `make perf`) |
 
-First run of the demo shop: `make up && make seed && make theme-build`. The seed owner
+First run of the demo shop: `make up && make seed`. The seed owner
 (`owner@lnen.example`) gets a magic link in Mailpit. `api.localhost` does not expose the
 Storefront API: browsers reach it only through the edge (`/_p/*`, spec A4).
 
@@ -119,10 +122,11 @@ trusted network.
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
-| `make seed` | Create or complete the demo shop (tenant `demo`, CZ + SK markets, 60 products); idempotent |
-| `make theme-build` | Build + pack the theme and checkout artifacts, upload and publish them for every tenant |
-| `make e2e` | Playwright suites (`e2e/`) against the running stack; `WP5_SCREENSHOTS=1` also writes `docs/screenshots/wp5/` |
-| `make perf` | Lab budget gate (Lighthouse mobile, A26 JS, axe) over HTTPS/h2 |
+| `make seed` | Create or complete the demo shop and publish theme/checkout artifacts; idempotent |
+| `make theme-build` | Rebuild and publish theme/checkout artifacts after changing their source |
+| `make e2e` | Full four-worker Playwright suite (`e2e/`) against `make up && make seed` |
+| `make perf` | Serial Lighthouse mobile, JS budget and axe gate over HTTPS/h2 |
+| `scripts/smoke-images.sh` | Boot built images with optional dependencies absent; assert degraded readiness |
 
 Running the API natively against `make dev-infra` (values from `.env.example`):
 
@@ -193,3 +197,20 @@ which sets the transaction-local `app.tenant_id`; without it, queries fail. The 
 - Errors are RFC 9457 `application/problem+json` with a stable `code`.
 - TS API clients are generated from the Rust OpenAPI document and committed; CI fails when stale.
 - Build and test parallelism is capped (`CARGO_BUILD_JOBS=6`).
+
+## Architecture and operations
+
+The edge resolves a shop domain, serves its immutable theme artifact and forwards only allowed
+storefront operations to the API. The API owns business logic and Postgres transactions; the
+worker handles outbox events, media, mail and scheduled jobs. Better Auth serves staff identity.
+Checkout and customer sessions stay on `checkout.<shop>`; theme code on the shop origin never gets
+those credentials. See [the runtime contract](docs/decisions/runtime-contract.md) and
+[the runbook](docs/runbook.md) for the request flow, health, metrics, backup, restore and incidents.
+
+## Known limits
+
+The local pilot uses Stripe, carrier, bank and mail mocks. Real provider credentials, signatures,
+QR scans, legal templates, invoice/VAT treatment and production backups require the
+[pre-launch checks](docs/runbook.md#9-pre-launch-checklist-real-providers). Search is temporarily
+degraded while Meilisearch is unavailable or being rebuilt; the rest of the shop stays available.
+The default theme has a lab performance gate, but field Web Vitals need real traffic.

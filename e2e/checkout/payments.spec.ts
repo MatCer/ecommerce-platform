@@ -6,14 +6,17 @@
  * in the exceptions queue, and cash on delivery delivered → collected in cash (rounding) →
  * remitted in the order detail.
  */
+
 import { createHmac } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, magicLink, run, useEnglish } from "../admin/support";
+import { testContext } from "../rate-client";
 import {
   acceptAndPlace,
   CZ,
   checkoutOf,
   choosePickupPoint,
+  deferHydration,
   fillContactAndAddress,
   newPage,
   type OrderModel,
@@ -64,7 +67,7 @@ function camt053(id: string, amountMinor: number, vs: string): Buffer {
 let admin: Page;
 
 test.beforeAll(async ({ browser }) => {
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   admin = await ctx.newPage();
   await useEnglish(admin);
   await admin.goto("/login");
@@ -110,6 +113,14 @@ test("Stripe simulator: declined, retried, paid; a redelivered event changes not
   await expect(page.getByTestId("payment-status")).toHaveText("Platba se nezdařila", {
     timeout: 20_000,
   });
+  const release = await deferHydration(page);
+  try {
+    await page.reload({ waitUntil: "commit" });
+    await expect(page.getByRole("button", { name: "Zaplatit znovu" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zaplatit znovu" })).toBeDisabled();
+  } finally {
+    release();
+  }
   await page.getByRole("button", { name: "Zaplatit znovu" }).click();
   await expect(simulator).toBeVisible();
   await simulator.getByRole("button", { name: "Simulovat úspěšnou platbu" }).click();

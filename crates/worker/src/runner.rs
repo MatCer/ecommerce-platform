@@ -81,6 +81,24 @@ impl RunnerConfig {
     }
 }
 
+/// Media gets one dedicated slot: waiting encoders must not occupy every ordinary slot.
+/// Queue routing (including jobs from older producers) lives in `queue.enqueue`.
+pub async fn run_background_jobs(
+    db: PgPool,
+    handlers: Handlers,
+    cfg: RunnerConfig,
+    shutdown: watch::Receiver<bool>,
+) {
+    let mut media = cfg.clone();
+    media.owner = format!("{}/media", cfg.owner);
+    media.queues = vec!["media".into()];
+    media.concurrency = 1;
+    tokio::join!(
+        run(db.clone(), handlers.clone(), cfg, shutdown.clone()),
+        run(db, handlers, media, shutdown),
+    );
+}
+
 /// Runs `cfg.concurrency` job loops until `shutdown` turns true. A job in progress finishes
 /// first; if the process is killed instead, its lease expires and another worker reclaims it.
 pub async fn run(
@@ -134,6 +152,7 @@ async fn job_loop(
 async fn process(ctx: &Ctx, handlers: &Handlers, cfg: &RunnerConfig, job: Job) {
     let span = tracing::info_span!("job", id = job.id, kind = %job.kind, attempt = job.attempts);
     let started = std::time::Instant::now();
+    tracing::info!(parent: &span, queue = %job.queue, "job started");
 
     // Spawned so a panicking handler fails the job instead of killing the loop.
     let mut task = match handlers.0.get(job.kind.as_str()) {
@@ -195,9 +214,14 @@ async fn process(ctx: &Ctx, handlers: &Handlers, cfg: &RunnerConfig, job: Job) {
         "outcome" => if outcome.is_ok() { "ok" } else { "error" },
     )
     .record(started.elapsed().as_secs_f64());
+    let elapsed_seconds = started.elapsed().as_secs_f64();
     match (recorded, outcome) {
-        (Ok(state), Ok(())) => tracing::info!(parent: &span, state, "job finished"),
-        (Ok(state), Err(e)) => tracing::warn!(parent: &span, state, error = %e, "job failed"),
+        (Ok(state), Ok(())) => {
+            tracing::info!(parent: &span, state, elapsed_seconds, "job finished")
+        }
+        (Ok(state), Err(e)) => {
+            tracing::warn!(parent: &span, state, elapsed_seconds, error = %e, "job failed")
+        }
         // The lease runs out and the job is retried; handlers are idempotent.
         (Err(e), _) => tracing::error!(parent: &span, error = %e, "recording job result failed"),
     }

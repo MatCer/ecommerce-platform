@@ -3,6 +3,7 @@ import type { SignInResult } from "@platform/storefront-sdk/types";
 import { Button } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import HydratedControls from "./HydratedControls";
 import { problemText } from "./SignIn";
 
 /**
@@ -26,7 +27,7 @@ export default function VerifyLink(props: { m: Record<string, string>; token: st
   }
 
   return (
-    <div class="grid gap-3">
+    <HydratedControls class="grid gap-3">
       <Button variant="primary" loading={busy()} onClick={consume}>
         {t(m, "account.verify_button")}
       </Button>
@@ -38,6 +39,6 @@ export default function VerifyLink(props: { m: Record<string, string>; token: st
           </a>
         </p>
       </Show>
-    </div>
+    </HydratedControls>
   );
 }

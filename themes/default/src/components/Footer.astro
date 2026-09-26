@@ -17,7 +17,15 @@ const { shop, alternates } = Astro.props;
 const { t } = i18n(shop);
 // Outcome of the no-JS newsletter form: the edge redirects back with ?newsletter=ok|invalid.
 const newsletter = Astro.url.searchParams.get("newsletter");
-const PAYMENT_ICONS = ["card", "bank", "cash"] as const;
+// Marks are the methods checkout offers in this market (own text marks, no third-party logos).
+const PAYMENT_ICON = { stripe: "card", fake: "card", bank_transfer: "bank", cod: "cash" } as const;
+const CARRIER_ICON = {
+  packeta_pickup: "pin",
+  personal_pickup: "pin",
+  packeta_home: "truck",
+  ppl: "truck",
+} as const;
+const { payment_methods: payments, carriers } = shop.trust;
 const same = (hreflang: string) => alternates.find((a) => a.locale === hreflang)?.href;
 const current = shop.markets.find((m) => m.current);
 const country = current?.locale.split("-")[1];
@@ -80,32 +88,36 @@ const link =
   <div class="border-t border-white/10">
     <div class="container-shop grid gap-6 py-6 lg:grid-cols-[1fr_auto] lg:items-center">
       <div class="flex flex-wrap gap-x-8 gap-y-3">
-        <div>
-          <h2 class="sr-only">{t("footer.payments")}</h2>
-          <ul class="flex flex-wrap gap-2" aria-label={t("footer.payments")}>
-            {
-              shop.trust.payments.map((p, i) => (
-                <li class="flex h-8 items-center gap-1.5 rounded-sm border border-white/15 px-2.5 text-xs font-semibold text-card">
-                  <Icon name={PAYMENT_ICONS[i] ?? "card"} class="size-4" />
-                  {p}
-                </li>
-              ))
-            }
-          </ul>
-        </div>
-        <div>
-          <h2 class="sr-only">{t("footer.delivery")}</h2>
-          <ul class="flex flex-wrap gap-2" aria-label={t("footer.delivery")}>
-            {
-              t("trust.carriers").split(" · ").map((c, i) => (
-                <li class="flex h-8 items-center gap-1.5 rounded-sm border border-white/15 px-2.5 text-xs font-semibold text-card">
-                  <Icon name={i === 0 ? "pin" : "truck"} class="size-4" />
-                  {c}
-                </li>
-              ))
-            }
-          </ul>
-        </div>
+        {
+          payments.length > 0 && (
+            <div>
+              <h2 id="footer-payments" class="sr-only">{t("footer.payments")}</h2>
+              <ul class="flex flex-wrap gap-2" aria-labelledby="footer-payments">
+                {payments.map((p) => (
+                  <li class="flex h-8 items-center gap-1.5 rounded-sm border border-white/15 px-2.5 text-xs font-semibold text-card">
+                    <Icon name={PAYMENT_ICON[p.kind]} class="size-4" />
+                    {p.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        }
+        {
+          carriers.length > 0 && (
+            <div>
+              <h2 id="footer-delivery" class="sr-only">{t("footer.delivery")}</h2>
+              <ul class="flex flex-wrap gap-2" aria-labelledby="footer-delivery">
+                {carriers.map((c) => (
+                  <li class="flex h-8 items-center gap-1.5 rounded-sm border border-white/15 px-2.5 text-xs font-semibold text-card">
+                    <Icon name={CARRIER_ICON[c.carrier]} class="size-4" />
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        }
       </div>
       {
         (shop.markets.length > 1 || shop.locales.length > 1) && (

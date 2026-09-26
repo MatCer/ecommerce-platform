@@ -80,8 +80,9 @@ openapi-check: ## Fail if openapi.json or the generated clients are stale
 admin: ## Superadmin CLI in the api container, e.g. make admin args="create-tenant --slug demo --name Demo --owner-email you@example.com"
 	$(COMPOSE_FULL) exec api /usr/local/bin/api admin $(args)
 
-seed: ## Create or complete the demo shop (demo.localhost CZ, demo-sk.localhost SK); idempotent
+seed: ## Create the demo shop and publish its theme and checkout; idempotent
 	$(COMPOSE_FULL) exec api /usr/local/bin/api admin seed-demo
+	$(MAKE) theme-build
 
 logs: ## Follow logs (`make logs s=api` for one service)
 	$(COMPOSE_FULL) logs -f --tail=100 $(s)

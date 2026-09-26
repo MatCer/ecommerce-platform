@@ -1,6 +1,7 @@
 /** WP19 watchdog through the shop edge, checkout-origin confirmation and inventory outbox. */
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, run, signInOwner, sql } from "../admin/support";
+import { rateHeaders, testContext } from "../rate-client";
 import { CZ, checkoutOf, mail, newPage } from "./support";
 
 let admin: Page;
@@ -14,11 +15,15 @@ test.afterAll(async () => {
 });
 
 test("back-in-stock watch confirms, fires once and can unsubscribe", async ({ browser }) => {
+  // A product no other spec orders: parallel checkouts would otherwise hold reservations on it
+  // and setting the stock to 0 would be refused (`below_reserved`).
   const variant =
     sql(`SELECT v.id FROM variants v JOIN product_translations t ON t.product_id=v.product_id
-    WHERE t.slug='tricko-henley' AND t.locale='cs' ORDER BY v.position LIMIT 1`);
+    WHERE t.slug='cepice-s-bambuli' AND t.locale='cs' ORDER BY v.position LIMIT 1`);
   const tenant = sql("SELECT id FROM platform.tenants WHERE slug='demo'");
-  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString());
+  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString(), {
+    headers: rateHeaders(admin),
+  });
   expect(auth.ok()).toBeTruthy();
   const { token } = (await auth.json()) as { token: string };
   const api = new URL(admin.url());
@@ -36,7 +41,7 @@ test("back-in-stock watch confirms, fires once and can unsubscribe", async ({ br
   const email = `watch-${run}@example.test`;
   const shopper = await newPage(browser);
   const subscribed = await shopper.request.post(`${CZ}/_p/watch`, {
-    headers: { origin: CZ, "content-type": "application/json" },
+    headers: { origin: CZ, "content-type": "application/json", ...rateHeaders(shopper) },
     data: { variant_id: variant, kind: "back_in_stock", email },
   });
   expect(subscribed.status()).toBe(202);
@@ -51,7 +56,7 @@ test("back-in-stock watch confirms, fires once and can unsubscribe", async ({ br
 
   await adjust(1);
   const alert = await mail(email, "Upozornění na produkt");
-  expect(alert.Text).toContain("tricko-henley");
+  expect(alert.Text).toContain("cepice-s-bambuli");
   const unsubscribe = alert.Text.match(
     /https?:\/\/[^\s]+\/watch\/unsubscribe\?token=[0-9a-f]{64}/,
   )?.[0];
@@ -79,7 +84,9 @@ test("abandoned cart mail restores checkout once through the dev clock", async (
   sql(`INSERT INTO consent_records(tenant_id,subject_type,subject_id,purpose,granted,text_version,source)
     VALUES('${tenant}','email','${email}','email_marketing',true,'2026-09-25','checkout')`);
 
-  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString());
+  const auth = await admin.request.get(new URL("/api/auth/token", admin.url()).toString(), {
+    headers: rateHeaders(admin),
+  });
   expect(auth.ok()).toBeTruthy();
   const { token } = (await auth.json()) as { token: string };
   const api = new URL(admin.url());
@@ -112,7 +119,7 @@ test("abandoned cart mail restores checkout once through the dev clock", async (
 test("price-drop watch form works without JavaScript and asks for confirmation", async ({
   browser,
 }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false, locale: "cs-CZ" });
+  const context = await testContext(browser, { javaScriptEnabled: false, locale: "cs-CZ" });
   const shopper = await context.newPage();
   await shopper.goto(`${CZ}/p/tricko-henley`);
   const watch = shopper.locator("#watch");

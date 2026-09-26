@@ -119,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
     let mut ai_runner = RunnerConfig::new(format!("{owner}/ai"), themes_ai::WORKER_LOOPS);
     ai_runner.queues = vec![themes_ai::QUEUE.into()];
     tokio::join!(
-        runner::run(
+        runner::run_background_jobs(
             db.clone(),
             handlers.clone(),
             RunnerConfig::new(owner, cfg.concurrency),

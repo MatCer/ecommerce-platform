@@ -131,7 +131,7 @@ pub struct AppState {
         (name = "themes", description = "Admin API: theme revisions (fork, tokens, upload, reset), previews, publish and rollback"),
         (name = "feeds", description = "Admin API: feed imports (Heureka, Google) and export feeds"),
         (name = "content", description = "Admin API: pages, blog, menus, legal entity and templates, go-live checklist"),
-        (name = "checkout", description = "Admin API: shipping and payment methods, orders"),
+        (name = "checkout", description = "Admin API: shipping and payment methods, orders, customers"),
         (name = "ai", description = "Admin API: AI helpers (proposals, glossary, bulk edit by prompt, usage)"),
         (name = "payments", description = "Admin API: bank accounts and statements, payment exceptions, Stripe Connect, cash on delivery"),
         (name = "fulfillment", description = "Admin API: order management, labels and shipments, invoices and credit notes, refunds, withdrawals, carrier accounts"),

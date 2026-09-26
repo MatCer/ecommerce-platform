@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
@@ -67,6 +67,8 @@ export interface GatewayOptions {
   previews?: PreviewResolver;
   /** The admin origin, the only one allowed to frame previews (A21). */
   adminOrigin?: string;
+  /** Signed rate identities for local Playwright contexts; never configured in production. */
+  e2eRateSecret?: string;
 }
 
 const SPECULATION_RULES = JSON.stringify({
@@ -161,6 +163,19 @@ const CONSENT_ID_RE = /^[0-9a-f]{32}$/;
 const CONSENT_SUMMARY_RE = /^([a-z_]{1,32}(,[a-z_]{1,32}){0,9})?$/;
 /** One address, as Caddy appends it to `X-Forwarded-For`. */
 const IP_RE = /^[0-9A-Fa-f:.]{2,45}$/;
+const E2E_RATE_ID = /^([0-9a-f]{24})\.([0-9a-f]{64})$/;
+
+function signedRateIp(header: string | null, secret: string | undefined): string | undefined {
+  if (!secret || !header) return undefined;
+  const match = E2E_RATE_ID.exec(header);
+  if (!match) return undefined;
+  const [, id, mac] = match;
+  if (!id || !mac) return undefined;
+  const expected = createHmac("sha256", secret).update(id).digest();
+  const supplied = Buffer.from(mac, "hex");
+  if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return undefined;
+  return `10.215.${expected[0]}.${expected[1]}`;
+}
 
 const text = (status: number, body: string, headers: Record<string, string> = {}) =>
   new Response(body, {
@@ -1650,7 +1665,9 @@ ${
     // Caddy appends the peer address to X-Forwarded-For; only that last entry is trustworthy.
     // It feeds rate limits and salted hashes (never stored raw) and is stripped with the rest.
     const lastHop = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
-    const clientIp = lastHop && IP_RE.test(lastHop) ? lastHop : undefined;
+    const clientIp =
+      signedRateIp(request.headers.get("x-e2e-rate-key"), opts.e2eRateSecret) ??
+      (lastHop && IP_RE.test(lastHop) ? lastHop : undefined);
     const req = new Request(request, { headers: stripUntrusted(request.headers) });
     // Canonical URL the worker sees: public scheme + the validated host.
     const publicUrl = new URL(`${url.pathname}${url.search}`, `${scheme}://${host}${port}`);

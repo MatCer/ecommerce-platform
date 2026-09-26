@@ -12,6 +12,7 @@ import {
   CZ,
   checkoutOf,
   choosePickupPoint,
+  deferHydration,
   fakePay,
   fillContactAndAddress,
   mail,
@@ -76,7 +77,14 @@ test("guest withdrawal: emailed link, explicit confirmation, receipt, restock an
   const linkMail = await mail(email, "Potvrďte odstoupení od smlouvy");
   const link = linkMail.Text.match(/https?:\/\/\S+\/withdraw\?t=[0-9a-f]{64}/)?.[0] ?? "";
   expect(link).not.toBe("");
-  await guest.goto(link);
+  const release = await deferHydration(guest);
+  try {
+    await guest.goto(link, { waitUntil: "commit" });
+    await expect(guest.getByRole("checkbox", { name: /Henley/ })).toBeVisible();
+    await expect(guest.getByRole("checkbox", { name: /Henley/ })).toBeDisabled();
+  } finally {
+    release();
+  }
   await guest.getByRole("checkbox", { name: /Henley/ }).check();
   await expectAccessible(guest, "withdrawal form");
   await guest.getByRole("button", { name: "Pokračovat" }).click();
@@ -119,6 +127,8 @@ test("guest withdrawal: emailed link, explicit confirmation, receipt, restock an
   await row.getByRole("button", { name: "Refund withdrawal" }).click();
   await admin.getByRole("dialog").getByRole("button", { name: "Refund withdrawal" }).click();
   await eventually(async () => (await order(page, CZ, token)).status === "returned");
+  // Return state commits before the refund job settles the payment; assert that transition too.
+  await eventually(async () => (await order(page, CZ, token)).payment.status === "refunded");
   const refunded = await order(page, CZ, token);
   expect(refunded.payment.status).toBe("refunded");
   const shipping = sql(

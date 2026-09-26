@@ -22,7 +22,7 @@ use platform::mail::Stream;
 use platform::queue;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::capability;
@@ -867,6 +867,88 @@ pub async fn delete_address(tx: &mut TenantTx, customer_id: Uuid, id: Uuid) -> R
         return Err(Error::NotFound);
     }
     Ok(())
+}
+
+// ---------------------------------------------------------------------------------------
+// Admin list (read-only)
+
+#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct CustomerFilter {
+    /// Part of the email address or name (case-insensitive).
+    pub q: Option<String>,
+    /// `next_cursor` of the previous page.
+    pub cursor: Option<Uuid>,
+    /// Page size, 1-100 (default 50).
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct CustomerSummary {
+    pub id: Uuid,
+    pub email: String,
+    pub name: Option<String>,
+    pub phone: Option<String>,
+    pub locale: String,
+    /// The customer has set a password (a full account, not only verified by email links).
+    pub has_password: bool,
+    pub email_verified: bool,
+    /// Orders placed by this customer account (guest orders of the same address excluded).
+    pub orders: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CustomerPage {
+    pub items: Vec<CustomerSummary>,
+    pub next_cursor: Option<Uuid>,
+    /// Matching customers in total (all pages).
+    pub total: i64,
+}
+
+/// Customer accounts of the tenant, newest first, searchable by email or name.
+pub async fn list(tx: &mut TenantTx, f: &CustomerFilter) -> Result<CustomerPage, Error> {
+    let limit = f.limit.unwrap_or(50);
+    if !(1..=100).contains(&limit) {
+        return Err(invalid("invalid_limit", "limit must be between 1 and 100"));
+    }
+    let pattern = crate::marketing::subscribers::like_pattern(f.q.as_deref());
+    let mut items = sqlx::query_as!(
+        CustomerSummary,
+        r#"SELECT c.id, c.email, c.name, c.phone, c.locale,
+                  c.password_hash IS NOT NULL AS "has_password!",
+                  c.email_verified_at IS NOT NULL AS "email_verified!",
+                  (SELECT count(*) FROM orders o WHERE o.customer_id = c.id) AS "orders!",
+                  c.created_at
+           FROM customers c
+           WHERE ($1::text IS NULL OR c.email LIKE $1 OR lower(c.name) LIKE $1)
+             AND ($2::uuid IS NULL OR c.id < $2)
+           ORDER BY c.id DESC LIMIT $3"#,
+        pattern,
+        f.cursor,
+        limit + 1
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let total = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM customers
+           WHERE ($1::text IS NULL OR email LIKE $1 OR lower(name) LIKE $1)"#,
+        pattern
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let limit = usize::try_from(limit).unwrap_or(50);
+    let more = items.len() > limit;
+    items.truncate(limit);
+    Ok(CustomerPage {
+        next_cursor: if more {
+            items.last().map(|c| c.id)
+        } else {
+            None
+        },
+        items,
+        total,
+    })
 }
 
 #[cfg(test)]

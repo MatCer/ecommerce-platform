@@ -2,7 +2,10 @@
  * WP5 acceptance: staff sign-in by magic link, catalog creation (category, product with
  * variants and an uploaded image), staff invitation, role-aware UI, axe on the main screens.
  */
+
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { tabTo } from "../keyboard";
+import { testContext } from "../rate-client";
 import {
   createTenant,
   expectAccessible,
@@ -42,7 +45,7 @@ async function signInWithLink(p: Page, email: string): Promise<void> {
 
 test.beforeAll(async ({ browser }) => {
   createTenant(`e2e-${run}`, shop, owner);
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
 });
@@ -168,6 +171,24 @@ test("creates a product with variants and an uploaded image", async () => {
   await page.setViewportSize({ width: 1280, height: 860 });
 });
 
+test("keyboard only: edits and saves a product", async () => {
+  await page.goto(productUrl);
+  const brand = page.getByLabel("Brand");
+  await tabTo(page, brand);
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.type("Acme Keyboard");
+  const save = page.getByRole("button", { name: "Save product" });
+  await tabTo(page, save);
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().includes("/admin/v1/products/") && response.request().method() === "PUT",
+  );
+  await page.keyboard.press("Enter");
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await expect(brand).toHaveValue("Acme Keyboard");
+});
+
 test("sets up tax, a price list, variant prices, a sale, a coupon and stock", async () => {
   // Tax settings (owner/admin, fresh sign-in).
   await nav(page, "Tax settings").click();
@@ -274,7 +295,7 @@ test("invites a staff member by email", async () => {
 });
 
 test("a staff member sees only what their role allows", async ({ browser }) => {
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   const p = await ctx.newPage();
   await useEnglish(p);
   await signInWithLink(p, clerk);
@@ -338,7 +359,7 @@ test("owner sets a password, turns on TOTP and signs in with password + code", a
   await expect(page.getByText("On", { exact: true })).toBeVisible();
 
   // A fresh browser: password, then the TOTP challenge; magic links are refused for 2FA users.
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   const p = await ctx.newPage();
   await useEnglish(p);
   await p.goto("/login");

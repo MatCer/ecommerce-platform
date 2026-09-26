@@ -483,7 +483,7 @@ pub struct SubscriberPage {
     pub total: i64,
 }
 
-fn like_pattern(q: Option<&str>) -> Option<String> {
+pub(crate) fn like_pattern(q: Option<&str>) -> Option<String> {
     q.map(str::trim).filter(|q| !q.is_empty()).map(|q| {
         let escaped = q
             .to_lowercase()

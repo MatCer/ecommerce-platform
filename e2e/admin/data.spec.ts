@@ -58,6 +58,10 @@ async function apply(page: Page): Promise<void> {
 }
 
 test("merchant imports, exports and answers a GDPR request", async ({ page }) => {
+  // CI run 36220248489: 62.7 s of progressing UI work, including five axe scans,
+  // six import polls (14.6 s) and export readiness (3.7 s). Budget this complete
+  // workflow at 2x measured latency; individual operation deadlines stay bounded.
+  test.setTimeout(120_000);
   const anna = `anna-${run}@example.com`;
   const news = `news-${run}@example.com`;
   const cold = `cold-${run}@example.com`;
@@ -74,6 +78,15 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
   await expect(errors.getByRole("row", { name: /3 .*not-an-email/ })).toBeVisible();
   await expectAccessible(page, "import report");
   await apply(page);
+
+  // The imported account is listed and found by name under Customers.
+  await nav(page, "Customers").click();
+  await expect(page.getByRole("heading", { name: "Customers", level: 1 })).toBeVisible();
+  await page.getByLabel("Search by email or name").fill("Anna Nová");
+  await expect(page.getByRole("row", { name: new RegExp(anna) })).toBeVisible();
+  await page.getByLabel("Search by email or name").fill(anna);
+  await expect(page.getByRole("status").getByText("Customers: 1")).toBeVisible();
+  await expectAccessible(page, "customers");
 
   // Historical orders land in the archive, nowhere else.
   await importCsv(
@@ -102,11 +115,42 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
   await nav(page, "Export and privacy").click();
   await expect(page.getByRole("heading", { name: "Export and privacy", level: 1 })).toBeVisible();
   await expectAccessible(page, "export and privacy");
+  const creation = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/admin/v1/data-exports") && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Prepare export" }).click();
+  const created = await creation;
+  expect(created.status()).toBe(202);
+  const { id: exportId } = (await created.json()) as { id: string };
+  const sent = created.request().headers();
+  // Old exports remain on repeated runs. Wait for this job, not any "Ready" row.
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get(`${created.url()}/${exportId}`, {
+          headers: {
+            authorization: sent.authorization ?? "",
+            "x-tenant-id": sent["x-tenant-id"] ?? "",
+          },
+        });
+        expect(response.ok()).toBe(true);
+        return ((await response.json()) as { status: string }).status;
+      },
+      { timeout: 60_000 },
+    )
+    .toBe("ready");
+  await page.reload();
   const exports = page.getByRole("table", { name: "Export all shop data" });
-  await expect(exports.getByText("Ready").first()).toBeVisible({ timeout: 60_000 });
+  const newest = exports.getByRole("row").nth(1);
+  await expect(newest.getByText("Ready", { exact: true })).toBeVisible();
   const zip = page.waitForEvent("download");
-  await exports.getByRole("button", { name: "Download" }).first().click();
+  const requested = page.waitForRequest(
+    (request) =>
+      request.url().endsWith(`/data-exports/${exportId}/download`) && request.method() === "POST",
+  );
+  await newest.getByRole("button", { name: "Download" }).click();
+  await requested;
   expect((await zip).suggestedFilename()).toMatch(/\.zip$/);
 
   // GDPR: the person's data as JSON, then erasure with a typed confirmation.
@@ -139,7 +183,14 @@ test("merchant imports, exports and answers a GDPR request", async ({ page }) =>
     await page.getByLabel("Person's email").fill(email);
     await page.getByRole("button", { name: "Erase their data" }).click();
     await page.getByRole("dialog").getByLabel("Email again").fill(email);
+    const erased = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/admin/v1/privacy/erasure") &&
+        response.request().method() === "POST",
+    );
     await page.getByRole("dialog").getByRole("button", { name: "Erase their data" }).click();
+    expect((await erased).status()).toBe(200);
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText(/^Erased:/).first()).toBeVisible();
   }
 });

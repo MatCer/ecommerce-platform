@@ -3,7 +3,10 @@
  * controls; the seeded demo shop (`make seed`) shows sales after an order is placed, the
  * "consented sessions" funnel label (A20), charts with text alternatives, and passes axe.
  */
+
 import { expect, type Page, test } from "@playwright/test";
+import { checkoutReady } from "../checkout/support";
+import { rateHeaders, testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, run, useEnglish } from "./support.ts";
 
 const port = process.env.HTTP_PORT ?? "8080";
@@ -25,12 +28,14 @@ async function placeSkOrder(page: Page): Promise<void> {
   await page.context().addCookies([{ name: "consent", value: "", url: SK }]);
   await page.goto(`${SK}/`);
   const model = (await (
-    await page.request.get(`${SK}/_p/public/pages/product/tricko-oversize`)
+    await page.request.get(`${SK}/_p/public/pages/product/tricko-oversize`, {
+      headers: rateHeaders(page),
+    })
   ).json()) as { product: { variants: { id: string }[] } };
   let added = 0;
   for (const v of model.product.variants) {
     const res = await page.request.post(`${SK}/_p/cart/lines`, {
-      headers: { origin: SK },
+      headers: { origin: SK, ...rateHeaders(page) },
       data: { variant_id: v.id, quantity: 1 },
     });
     added = res.status();
@@ -47,6 +52,7 @@ async function placeSkOrder(page: Page): Promise<void> {
       form.submit();
     }),
   ]);
+  await checkoutReady(page);
   await page.locator('input[autocomplete="email"]').fill(`analytics-${run}@example.test`);
   await page.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
   await page.locator('input[autocomplete="section-billing street-address"]').fill("Dlhá 12");
@@ -100,11 +106,11 @@ test("a new shop shows the empty state; the range controls drive the URL", async
 test("the demo shop dashboard shows sales, the consented-sessions funnel and passes axe", async ({
   browser,
 }) => {
-  const shopper = await (await browser.newContext({ locale: "sk-SK" })).newPage();
+  const shopper = await (await testContext(browser, { locale: "sk-SK" })).newPage();
   await placeSkOrder(shopper);
   await shopper.context().close();
 
-  const ctx = await browser.newContext();
+  const ctx = await testContext(browser);
   const page = await ctx.newPage();
   await signIn(page, "owner@lnen.example");
 

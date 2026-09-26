@@ -49,9 +49,11 @@ pub fn routes() -> OpenApiRouter<AppState> {
     )
 )]
 async fn shop(shopper: Shopper, State(s): State<AppState>) -> Result<Json<ShopModel>, Error> {
-    with_ctx(&s, &shopper, async |tx, ctx| pages::shop(tx, ctx).await)
-        .await
-        .map(Json)
+    with_ctx(&s, &shopper, async |tx, ctx| {
+        pages::shop(tx, ctx, &s.checkout.payments).await
+    })
+    .await
+    .map(Json)
 }
 
 #[utoipa::path(

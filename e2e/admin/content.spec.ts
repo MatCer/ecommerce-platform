@@ -1,6 +1,8 @@
 /** WP13a: owner content, legal readiness, feed migration and search settings. */
+
 import { join } from "node:path";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, root, run, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
@@ -28,7 +30,7 @@ async function addBlock(name: string) {
 
 test.beforeAll(async ({ browser }) => {
   createTenant(`content-${run}`, `Content ${run}`, owner);
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
 });
@@ -210,13 +212,23 @@ test("URL import goes live: storefront, search and old URLs", async ({ request }
   const old = await request.get(`${shop}/produkt/tricko-basic-cerna-s`, { maxRedirects: 0 });
   expect(old.status()).toBe(301);
   expect(old.headers().location).toMatch(/\/p\/tricko-basic$/);
-  // Indexed by the worker from the product events.
+  // Import application and indexing are separate jobs. Poll the live page model
+  // before the first HTML render: rendering too early caches an empty search for
+  // 60 seconds, and its stale-while-revalidate refresh outlives this readiness wait.
   await expect
     .poll(
-      async () => (await (await request.get(`${shop}/search?q=hrnek`)).text()).includes("Hrnek"),
+      async () => {
+        const response = await request.get(`${shop}/_p/public/pages/search?q=hrnek`);
+        expect(response.ok()).toBe(true);
+        const model = (await response.json()) as { products: { name: string }[] };
+        return model.products.some((product) => product.name.includes("Hrnek"));
+      },
       { timeout: 60_000 },
     )
     .toBe(true);
+  const search = await request.get(`${shop}/search?q=hrnek`);
+  expect(search.status()).toBe(200);
+  expect(await search.text()).toContain("Hrnek");
 });
 
 test("uploads 107 feed items, reviews the collision and applies the import", async () => {

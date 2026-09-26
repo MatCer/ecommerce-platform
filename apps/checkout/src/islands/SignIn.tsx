@@ -3,6 +3,7 @@ import type { SignInResult } from "@platform/storefront-sdk/types";
 import { Button, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import HydratedControls from "./HydratedControls";
 
 type M = Record<string, string>;
 
@@ -64,7 +65,7 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
   }
 
   return (
-    <div class="grid gap-5">
+    <HydratedControls class="grid gap-5">
       <form class="grid gap-3" noValidate onSubmit={sendLink} aria-describedby="sign-in-status">
         <TextField
           label={t(m, "account.email")}
@@ -121,6 +122,6 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
           </Button>
         </form>
       </details>
-    </div>
+    </HydratedControls>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * Content on the seeded demo shop (WP13a): legal pages from the footer, CMS pages with blocks,
  * the blog, the footer menu, sitemaps listing pages, export feeds and llms.txt.
- * Needs `make up && make seed && make theme-build`.
+ * Needs `make up && make seed`.
  */
 import { expect, type Page, test } from "@playwright/test";
 import { CZ, decideConsent, expectAccessible, SK } from "./support";
@@ -19,7 +19,7 @@ test("legal pages are linked from the footer and rendered from blocks", async ({
   await legal.getByRole("link", { name: "Obchodní podmínky" }).click();
   await expect(page).toHaveURL(`${CZ}/pages/obchodni-podminky`);
   await expect(page.getByRole("heading", { level: 1, name: "Obchodní podmínky" })).toBeVisible();
-  await expect(main(page).getByText("Demo Shop s.r.o.").first()).toBeVisible();
+  await expect(main(page).getByText("Lnen & Co. s.r.o.").first()).toBeVisible();
   await expect(main(page).getByRole("heading", { level: 2 }).first()).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     "href",

@@ -1,11 +1,14 @@
 /**
  * Customer account on the checkout origin (WP9, spec A1, A4, A5, A20) against the seeded demo
- * shop (`make up && make seed && make theme-build`): email-link sign-in via Mailpit, addresses,
+ * shop (`make up && make seed`): email-link sign-in via Mailpit, addresses,
  * password, sign-out, password sign-in, cart merge, the theme's consent banner → the platform
  * record → the preferences page.
  */
+
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible, mailpit, run } from "../admin/support";
+import { rateHeaders, testContext } from "../rate-client";
+import { deferHydration } from "./support";
 
 const port = process.env.HTTP_PORT ?? "8080";
 const shop = `http://demo.localhost:${port}`;
@@ -18,7 +21,7 @@ test.describe.configure({ mode: "serial" });
 let page: Page;
 
 test.beforeAll(async ({ browser }) => {
-  page = await (await browser.newContext({ locale: "cs-CZ" })).newPage();
+  page = await (await testContext(browser, { locale: "cs-CZ" })).newPage();
 });
 
 test.afterAll(async () => {
@@ -49,12 +52,14 @@ async function accountLink(to: string, since: Date): Promise<string> {
 /** Puts `quantity` of a seeded variant into a new shop-origin cart and hands it to checkout. */
 async function cartToCheckout(quantity: number): Promise<void> {
   await page.goto(`${shop}/`);
-  const product = await page.request.get(`${shop}/_p/public/pages/product/tricko-basic`);
+  const product = await page.request.get(`${shop}/_p/public/pages/product/tricko-basic`, {
+    headers: rateHeaders(page),
+  });
   expect(product.ok()).toBe(true);
   const model = (await product.json()) as { product: { variants: { id: string }[] } };
   const variant = model.product.variants[0]?.id;
   const added = await page.request.post(`${shop}/_p/cart/lines`, {
-    headers: { origin: shop },
+    headers: { origin: shop, ...rateHeaders(page) },
     data: { variant_id: variant, quantity },
   });
   expect(added.status()).toBe(200);
@@ -104,6 +109,20 @@ test("email-link sign-in creates the account and attaches the cart", async () =>
   expect((await page.context().cookies(shop)).some((c) => c.name === "__Host-sid")).toBe(false);
 });
 
+test("address controls wait for hydration", async () => {
+  const release = await deferHydration(page);
+  const add = page.getByRole("button", { name: "Přidat adresu" });
+  try {
+    await page.goto(`${checkout}/account/addresses`, { waitUntil: "commit" });
+    await expect(add).toBeVisible();
+    await expect(add).toBeDisabled();
+  } finally {
+    release();
+  }
+  await add.click();
+  await expect(page.getByLabel("Jméno a příjmení")).toBeVisible();
+});
+
 test("adds an address", async () => {
   await page.goto(`${checkout}/account`);
   await page.getByRole("link", { name: /Adresy/ }).click();
@@ -130,14 +149,29 @@ test("adds an address", async () => {
 });
 
 test("sets a password right after the email-link sign-in, then signs out", async () => {
-  await page.goto(`${checkout}/account/security`);
+  const releasePassword = await deferHydration(page);
+  try {
+    await page.goto(`${checkout}/account/security`, { waitUntil: "commit" });
+    await expect(page.locator('input[autocomplete="new-password"]')).toBeVisible();
+    await expect(page.locator('input[autocomplete="new-password"]')).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Uložit heslo" })).toBeDisabled();
+  } finally {
+    releasePassword();
+  }
   await expect(page.getByLabel("Současné heslo")).toHaveCount(0);
   await page.getByLabel("Nové heslo").fill(password);
   await page.getByRole("button", { name: "Uložit heslo" }).click();
   await expect(page.getByRole("status")).toContainText("Heslo je uložené");
   await expectAccessible(page, "security");
 
-  await page.goto(`${checkout}/account`);
+  const releaseSignOut = await deferHydration(page);
+  try {
+    await page.goto(`${checkout}/account`, { waitUntil: "commit" });
+    await expect(page.getByRole("button", { name: "Odhlásit se" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Odhlásit se" })).toBeDisabled();
+  } finally {
+    releaseSignOut();
+  }
   await page.getByRole("button", { name: "Odhlásit se" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Přihlášení" })).toBeVisible();
   // Account pages need a session again.

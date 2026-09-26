@@ -29,7 +29,12 @@ fn start(
     cfg: RunnerConfig,
 ) -> (watch::Sender<bool>, tokio::task::JoinHandle<()>) {
     let (stop, shutdown) = watch::channel(false);
-    let task = tokio::spawn(runner::run(runtime.clone(), handlers, cfg, shutdown));
+    let task = tokio::spawn(runner::run_background_jobs(
+        runtime.clone(),
+        handlers,
+        cfg,
+        shutdown,
+    ));
     (stop, task)
 }
 
@@ -47,6 +52,75 @@ async fn wait_for_status(owner: &PgPool, id: i64, want: &str) -> (i32, Option<St
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
     panic!("job {id} never reached {want}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn slow_media_does_not_occupy_mail_and_import_slots(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let gate = Arc::new(tokio::sync::Semaphore::new(0));
+    let blocked = gate.clone();
+    let started = Arc::new(tokio::sync::Notify::new());
+    let notify = started.clone();
+    let handlers = Handlers::default()
+        .register(commerce::media::PROCESS_JOB, move |_, _| {
+            let gate = blocked.clone();
+            let notify = notify.clone();
+            async move {
+                notify.notify_one();
+                let permit = gate.acquire().await.unwrap();
+                permit.forget();
+                Ok(())
+            }
+        })
+        .register("mail.send", |_, _| async { Ok(()) })
+        .register("data.import", |_, _| async { Ok(()) });
+    // Older API processes still enqueue media on "default" during a rolling upgrade.
+    // The queue must isolate them too, without dropping or consuming retry attempts.
+    let mut media = Vec::new();
+    for _ in 0..4 {
+        media.push(
+            queue::enqueue(
+                &runtime,
+                &NewJob::new(commerce::media::PROCESS_JOB, json!({})),
+            )
+            .await
+            .unwrap(),
+        );
+    }
+    let mail = queue::enqueue(&runtime, &NewJob::new("mail.send", json!({})))
+        .await
+        .unwrap();
+    let import = queue::enqueue(&runtime, &NewJob::new("data.import", json!({})))
+        .await
+        .unwrap();
+    let (stop, shutdown) = watch::channel(false);
+    let task = tokio::spawn(runner::run_background_jobs(
+        runtime,
+        handlers,
+        fast_config(),
+        shutdown,
+    ));
+    let progress = tokio::time::timeout(Duration::from_secs(2), async {
+        started.notified().await;
+        wait_for_status(&db, mail, "done").await;
+        wait_for_status(&db, import, "done").await;
+    })
+    .await;
+    let running: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM queue.jobs WHERE kind = 'media.process' AND status = 'running'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    // Always unblock and join, including on a regression.
+    gate.add_permits(media.len());
+    for id in media {
+        assert_eq!(wait_for_status(&db, id, "done").await, (1, None));
+    }
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert!(progress.is_ok(), "mail and imports stalled behind media");
+    assert_eq!(running, 1, "only one media job may hold a worker slot");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

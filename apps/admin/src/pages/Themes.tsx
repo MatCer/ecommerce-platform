@@ -12,7 +12,7 @@ import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { RevisionChanges, ThemeAiEditor } from "../components/ThemeAiEditor.tsx";
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
-import { ApiError, api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
+import { ApiError, api, type Schemas, tenantHeader, tenantId, unwrap } from "../lib/api.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
 import {
   hexOf,
@@ -167,7 +167,7 @@ export default function Themes() {
         title={t("themes.title")}
         description={t("themes.description")}
         actions={
-          <Show when={can("admin")}>
+          <Show when={can("admin") && list.isSuccess}>
             <Show
               when={items().some((r) => r.origin === "custom")}
               fallback={
@@ -338,17 +338,20 @@ export default function Themes() {
                 document.getElementById("revisions-h")?.scrollIntoView({ behavior: "smooth" });
               }}
             />
-            <Show when={can("admin")}>
-              <TokenEditor
-                tokens={activeTokens.data?.tokens}
-                base={active()?.id}
-                onCreated={created}
-                onError={(e) => setError(reasons(e))}
-              />
-            </Show>
           </Show>
         )}
       </QueryState>
+      {/* Outside QueryState: its children are rebuilt whenever the (polled) list changes, which
+          would discard an unsaved draft. */}
+      <Show when={can("admin") && active()}>
+        <TokenEditor
+          tokens={activeTokens.data?.tokens}
+          base={active()?.id}
+          tenant={tenantId()}
+          onCreated={created}
+          onError={(e) => setError(reasons(e))}
+        />
+      </Show>
       <ConfirmDialog
         open={Boolean(publishing())}
         onOpenChange={(o) => !o && setPublishing(undefined)}
@@ -506,22 +509,46 @@ function Report(props: { detail: Schemas["RevisionDetail"] }) {
 function TokenEditor(props: {
   tokens: unknown;
   base: string | undefined;
+  tenant: string | null;
   onCreated: (r: Revision) => Promise<void>;
   onError: (e: unknown) => void;
 }) {
   const [draft, setDraft] = createSignal<TokenGroups>({ colors: {}, fonts: {}, radius: {} });
-  createEffect(() => setDraft(tokenGroups(props.tokens)));
+  const [dirty, setDirty] = createSignal(false);
+  let draftBase = props.base;
+  let draftTenant = props.tenant;
+  // A refetch preserves edits, while a tenant change must discard the previous tenant's draft.
+  createEffect(() => {
+    const tokens = props.tokens;
+    const tenant = props.tenant;
+    const base = props.base;
+    if (tenant !== draftTenant) {
+      draftTenant = tenant;
+      setDirty(false);
+    }
+    if (!dirty()) {
+      draftBase = base;
+      setDraft(tokenGroups(tokens));
+    }
+  });
+  const conflict = () => dirty() && props.base !== draftBase;
   const errors = createMemo(() => tokenErrors(draft()));
-  const set = (group: keyof TokenGroups, key: string, value: string) =>
+  const set = (group: keyof TokenGroups, key: string, value: string) => {
+    setDirty(true);
     setDraft((d) => ({ ...d, [group]: { ...d[group], [key]: value } }));
+  };
   const save = createMutation(() => ({
     mutationFn: () => {
-      const body = { base_revision_id: props.base ?? null, tokens: draft() };
+      if (props.tenant !== draftTenant || conflict()) throw new Error(t("themes.draftConflict"));
+      const body = { base_revision_id: draftBase ?? null, tokens: draft() };
       return unwrap(
         api.POST("/admin/v1/themes/revisions/tokens", { params: { header: tenantHeader() }, body }),
       );
     },
-    onSuccess: props.onCreated,
+    onSuccess: (r) => {
+      setDirty(false);
+      return props.onCreated(r);
+    },
     onError: props.onError,
   }));
   const message = (k: string) => {
@@ -534,10 +561,23 @@ function TokenEditor(props: {
         {t("themes.tokens")}
       </h2>
       <p class="mb-3 text-sm text-muted-foreground">{t("themes.tokensHint")}</p>
+      <Show when={conflict()}>
+        <p role="alert">{t("themes.draftConflict")}</p>
+        <Button
+          type="button"
+          onClick={() => {
+            setDirty(false);
+            draftBase = props.base;
+            setDraft(tokenGroups(props.tokens));
+          }}
+        >
+          {t("themes.loadLatestTokens")}
+        </Button>
+      </Show>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (Object.keys(errors()).length === 0) save.mutate();
+          if (!conflict() && Object.keys(errors()).length === 0) save.mutate();
         }}
       >
         <fieldset class="mb-4">
@@ -607,7 +647,7 @@ function TokenEditor(props: {
           type="submit"
           variant="primary"
           loading={save.isPending}
-          disabled={Object.keys(errors()).length > 0}
+          disabled={conflict() || Object.keys(errors()).length > 0}
         >
           {t("themes.saveTokens")}
         </Button>

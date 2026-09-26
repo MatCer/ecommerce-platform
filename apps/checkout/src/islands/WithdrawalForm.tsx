@@ -7,6 +7,7 @@ import type {
 import { Button, TextField } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import HydratedControls from "./HydratedControls";
 
 export default function WithdrawalForm(props: {
   form: Form;
@@ -94,7 +95,7 @@ export default function WithdrawalForm(props: {
     );
   }
   return (
-    <section class="grid gap-4 rounded-lg border border-border bg-card p-4">
+    <HydratedControls class="grid gap-4 rounded-lg border border-border bg-card p-4">
       <h2 ref={stage} tabIndex={-1} class="font-display text-lg font-bold">
         {t(m, receipt() ? "withdraw.received" : review() ? "withdraw.review" : "withdraw.title")}
       </h2>
@@ -280,6 +281,6 @@ export default function WithdrawalForm(props: {
           {t(m, "withdraw.send")}
         </a>
       </Show>
-    </section>
+    </HydratedControls>
   );
 }

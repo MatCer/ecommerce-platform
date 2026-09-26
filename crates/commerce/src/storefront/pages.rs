@@ -63,7 +63,26 @@ pub struct Tracking {
 pub struct Trust {
     pub delivery: String,
     pub returns: String,
+    /// The labels of `payment_methods` (kept for themes written before the marks).
     pub payments: Vec<String>,
+    /// The payment methods checkout offers in this market, in checkout order.
+    pub payment_methods: Vec<PaymentMark>,
+    /// The delivery methods checkout offers in this market, in checkout order.
+    pub carriers: Vec<CarrierMark>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct PaymentMark {
+    pub kind: crate::payments::MethodKind,
+    /// The name checkout shows (the merchant's own or the platform's).
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct CarrierMark {
+    pub carrier: crate::shipping::Carrier,
+    /// The merchant's name of the shipping method.
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -154,7 +173,11 @@ async fn category_tree(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<CategoryR
     .await?)
 }
 
-pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> {
+pub async fn shop(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    payments: &crate::payments::Payments,
+) -> Result<ShopModel, Error> {
     use crate::content::menus;
     // The merchant's `main` menu, else the top two levels of the category tree.
     let main = match menus::entries(tx, "main").await? {
@@ -198,6 +221,25 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
         })
         .collect();
     let tokens = themes::active_tokens(tx).await?;
+    // Only what checkout really offers here: the footer must not promise other methods.
+    let payment_methods: Vec<PaymentMark> = crate::payments::methods(tx, payments, ctx.market.id)
+        .await?
+        .into_iter()
+        .filter(|m| m.enabled && m.available)
+        .map(|m| PaymentMark {
+            kind: m.kind,
+            label: crate::checkout::payment_name(ctx, &m),
+        })
+        .collect();
+    let carriers = crate::shipping::active(tx, ctx.market.id)
+        .await?
+        .into_iter()
+        .map(|m| CarrierMark {
+            carrier: m.carrier,
+            label: crate::checkout::i18n_text(ctx, &m.name_i18n).unwrap_or_default(),
+        })
+        .filter(|m| !m.label.is_empty())
+        .collect();
     Ok(ShopModel {
         name: ctx.shop_name.clone(),
         locale: ctx.locale.clone(),
@@ -235,10 +277,9 @@ pub async fn shop(tx: &mut TenantTx, ctx: &Context) -> Result<ShopModel, Error> 
         trust: Trust {
             delivery: t(ctx, "trust.delivery"),
             returns: t(ctx, "trust.returns"),
-            payments: t(ctx, "trust.payments")
-                .split(" · ")
-                .map(str::to_owned)
-                .collect(),
+            payments: payment_methods.iter().map(|m| m.label.clone()).collect(),
+            payment_methods,
+            carriers,
         },
         tokens,
         messages: messages::catalog(&ctx.locale).clone(),

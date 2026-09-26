@@ -769,6 +769,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer accounts, newest first, searchable by email or name (read-only; the orders list
+         *     filters by `customer_id` for a customer's orders).
+         */
+        get: operations["list_customers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/data-exports": {
         parameters: {
             query?: never;
@@ -5406,6 +5426,11 @@ export interface components {
         };
         /** @enum {string} */
         CarrierKind: "packeta" | "ppl";
+        CarrierMark: {
+            carrier: components["schemas"]["Carrier"];
+            /** @description The merchant's name of the shipping method. */
+            label: string;
+        };
         CartCoupon: {
             /** @description Whether it applies to the cart right now. */
             applied: boolean;
@@ -5904,6 +5929,34 @@ export interface components {
          * @enum {string}
          */
         Currency: "BGN" | "CZK" | "DKK" | "EUR" | "HUF" | "PLN" | "RON" | "SEK";
+        CustomerPage: {
+            items: components["schemas"]["CustomerSummary"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+            /**
+             * Format: int64
+             * @description Matching customers in total (all pages).
+             */
+            total: number;
+        };
+        CustomerSummary: {
+            /** Format: date-time */
+            created_at: string;
+            email: string;
+            email_verified: boolean;
+            /** @description The customer has set a password (a full account, not only verified by email links). */
+            has_password: boolean;
+            /** Format: uuid */
+            id: string;
+            locale: string;
+            name?: string | null;
+            /**
+             * Format: int64
+             * @description Orders placed by this customer account (guest orders of the same address excluded).
+             */
+            orders: number;
+            phone?: string | null;
+        };
         CustomerView: {
             email: string;
             email_verified: boolean;
@@ -7609,6 +7662,11 @@ export interface components {
         PaymentInput: {
             method: components["schemas"]["MethodKind"];
         };
+        PaymentMark: {
+            kind: components["schemas"]["MethodKind"];
+            /** @description The name checkout shows (the merchant's own or the platform's). */
+            label: string;
+        };
         PaymentMethod: {
             /** @description Whether the shop can take payments with it now (adapter present and configured). */
             available: boolean;
@@ -9185,7 +9243,12 @@ export interface components {
             page_requests: number;
         };
         Trust: {
+            /** @description The delivery methods checkout offers in this market, in checkout order. */
+            carriers: components["schemas"]["CarrierMark"][];
             delivery: string;
+            /** @description The payment methods checkout offers in this market, in checkout order. */
+            payment_methods: components["schemas"]["PaymentMark"][];
+            /** @description The labels of `payment_methods` (kept for themes written before the marks). */
             payments: string[];
             returns: string;
         };
@@ -11643,6 +11706,35 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_customers: {
+        parameters: {
+            query?: {
+                /** @description Part of the email address or name (case-insensitive). */
+                q?: string;
+                /** @description `next_cursor` of the previous page. */
+                cursor?: string;
+                /** @description Page size, 1-100 (default 50). */
+                limit?: number;
+            };
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerPage"];
                 };
             };
         };

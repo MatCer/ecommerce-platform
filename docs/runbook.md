@@ -12,7 +12,7 @@ prod), §13 (background processing), §15 (operations), §17 (M1 = local pilot a
 | Stop (volumes kept) / wipe data | `make down` / `docker compose down -v` |
 | Status / logs of one service | `make ps` / `make logs s=api` |
 | Migrations | applied by the one-shot `migrate` service on every `make up`; natively `make migrate` |
-| Demo shop (idempotent) | `make seed` |
+| Demo shop + published theme/checkout (idempotent) | `make seed` |
 | Build + publish theme and checkout artifacts for every tenant | `make theme-build` |
 | Superadmin CLI | `make admin args="<command>"` (in the api container) |
 
@@ -22,6 +22,34 @@ degraded component, A27). The edge has `/_edge/healthz` on its internal port 878
 
 **Logs.** `tracing` JSON lines on stdout. Every API response carries `x-request-id` (generated
 unless the caller sent one); search logs for it. Logs contain ids, never PII, tokens or secrets.
+
+### Local pilot and verification
+
+From a fresh checkout: `pnpm install && make up && make seed`. The demo has 60 products across
+CZ/SK markets; browse `demo.localhost:8080` and use the `owner@lnen.example` magic link in
+Mailpit for admin. Ports and local credentials are in `.env` (copied from `.env.example`); use
+`make ps`, `make logs s=api`, and `make down` for routine operation. `make seed` publishes the
+theme and checkout artifacts, so a separate `make theme-build` is needed only after source edits.
+
+| Layer | Command | Needs |
+|---|---|---|
+| Rust unit + database integration, TS unit | `make test` | `make dev-infra` or `make up` |
+| Search relevance integration | `make test-search` | Meilisearch + Postgres |
+| rustfmt, Clippy, Biome, TS typecheck | `make lint` | installed Rust/TS dependencies |
+| Full browser acceptance (four workers) | `make e2e` | `make up && make seed`, Playwright Chromium |
+| Serial Lighthouse + JS + axe gate | `make perf` | the seeded stack, local HTTPS port |
+| Built-image boot/degraded readiness | `scripts/smoke-images.sh` | freshly built images |
+
+Playwright covers keyboard browsing, cart and checkout, including pickup-point and payment
+selection, plus an admin product edit. For a manual keyboard pass, start on a product page and
+Tab through variant, cart and checkout; verify visible focus, the Packeta dialog's Tab trap and
+Escape, legal checkboxes, payment choice, and focus after the admin product save. Record any
+visual or interaction defects for the UI owner; automated axe checks cannot prove the full WCAG
+2.2 AA target. Local e2e contexts send a signed rate identity so concurrent browsers have
+separate buckets. Auth and edge reject `E2E_RATE_SECRET` unless `APP_ENV=dev`; normal traffic
+keeps the peer-IP rate limit.
+CI runs the same seeded browser and performance gates on `main` and on PRs labelled
+`acceptance` (`.github/workflows/ci.yml`).
 
 ## 2. Metrics
 
@@ -136,7 +164,7 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 | Stuck run | A run silent for 60 min is failed by the hourly `themes.maintenance` (`interrupted`); a worker restart mid-run does the same on the job retry. The merchant starts a new run. |
 | Cost | `ai_usage` rows with `feature = 'theme_edit'` (Admin → Settings → AI). Per-run caps: 25 turns, 4 check runs, 3 M tokens, USD 8, 45 min. |
 | Logs | worker `ai turn` (model, stop reason, tokens, cache reads, ms) and `ai theme run finished` (status, turns, checks, tokens, cost); never prompt or file content. |
-| Manual smoke with a real key | `.env`: `ANTHROPIC_API_KEY=sk-ant-...`, `make up && make seed && make theme-build`, then in the admin run a few prompts from `docs/decisions/ai-edit-prompts.md` on the demo shop; check `cache_read` > 0 from the second turn on, the diff, the report, accept → preview → publish → rollback. |
+| Manual smoke with a real key | `.env`: `ANTHROPIC_API_KEY=sk-ant-...`, `make up && make seed`, then in the admin run a few prompts from `docs/decisions/ai-edit-prompts.md` on the demo shop; check `cache_read` > 0 from the second turn on, the diff, the report, accept → preview → publish → rollback. |
 
 ## 7. Backups and restore
 

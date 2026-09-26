@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -16,7 +17,11 @@ let resolver: StaticResolver;
 let api: ReturnType<typeof fakeApi>;
 let gw: Gateway;
 
-const newGateway = (upstream = api.fn, log: (entry: unknown) => void = () => {}) =>
+const newGateway = (
+  upstream = api.fn,
+  log: (entry: unknown) => void = () => {},
+  e2eRateSecret?: string,
+) =>
   createGateway({
     artifactRoot: root,
     resolver,
@@ -28,6 +33,7 @@ const newGateway = (upstream = api.fn, log: (entry: unknown) => void = () => {})
     upstream,
     renderTimeoutMs: 1500,
     log,
+    e2eRateSecret,
   });
 
 const get = (url: string, headers: Record<string, string> = {}, init: RequestInit = {}) => {
@@ -69,6 +75,39 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await gw?.dispose();
+});
+
+test("only a signed local rate identity separates storefront buckets", async () => {
+  const secret = "test-e2e-rate-secret-0123456789abcdef";
+  const id = "00112233445566778899aabb";
+  const mac = createHmac("sha256", secret).update(id).digest("hex");
+  const ips: string[] = [];
+  const proxy = newGateway(
+    (request) => {
+      ips.push(request.headers.get("x-client-ip") ?? "");
+      return api.fn(request);
+    },
+    () => {},
+    secret,
+  );
+  const shop = "http://demo.localhost:8280/_p/public/shop";
+  try {
+    const fetchShop = (key: string) =>
+      proxy.fetch(
+        new Request(shop, {
+          headers: {
+            host: "demo.localhost:8280",
+            "x-forwarded-for": "203.0.113.7",
+            "x-e2e-rate-key": key,
+          },
+        }),
+      );
+    expect((await fetchShop(`${id}.${mac}`)).status).toBe(200);
+    expect((await fetchShop(`${id}.${"0".repeat(64)}`)).status).toBe(200);
+    expect(ips).toEqual([expect.stringMatching(/^10\.215\./), "203.0.113.7"]);
+  } finally {
+    await proxy.dispose();
+  }
 });
 
 describe("WP12 withdrawal routes", () => {

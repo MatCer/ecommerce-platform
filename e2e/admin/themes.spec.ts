@@ -7,13 +7,14 @@
  *
  * Builds run for real (one at a time): the suite takes several minutes.
  */
-import { execFileSync } from "node:child_process";
+
 import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { magicLink, root, useEnglish } from "./support.ts";
+import { testContext } from "../rate-client";
+import { magicLink, sql as querySql, root, useEnglish } from "./support.ts";
 
 test.describe.configure({ mode: "serial" });
 const owner = "owner@lnen.example";
@@ -26,11 +27,7 @@ let context: BrowserContext;
 let page: Page;
 
 function sql(query: string): string[] {
-  return execFileSync(
-    "docker",
-    ["compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "app", "-tAc", query],
-    { cwd: root, env: { ...process.env, COMPOSE_PROFILES: "full" }, encoding: "utf8" },
-  )
+  return querySql(query)
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
@@ -129,7 +126,7 @@ async function upload(name: string, bytes: Buffer): Promise<void> {
 }
 
 test.beforeAll(async ({ browser }) => {
-  context = await browser.newContext();
+  context = await testContext(browser);
   page = await context.newPage();
   await useEnglish(page);
   await page.goto("/login");
@@ -148,16 +145,45 @@ test.afterAll(async () => {
 let forked = 0;
 let tokens = 0;
 
+test("theme actions wait for the revision list", async () => {
+  let markRequested!: () => void;
+  let release!: () => void;
+  const requested = new Promise<void>((resolve) => {
+    markRequested = resolve;
+  });
+  const responseGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const url = "**/admin/v1/themes/revisions";
+  await page.route(url, async (route) => {
+    markRequested();
+    await responseGate;
+    await route.continue();
+  });
+  const action = page.getByRole("button", {
+    name: /^(Create my own theme|Reset to default theme)$/,
+  });
+  try {
+    await page.goto("/themes");
+    await requested;
+    await expect(page.getByRole("heading", { name: "Theme", exact: true })).toBeVisible();
+    await expect(action).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Upload archive" })).toHaveCount(0);
+  } finally {
+    release();
+  }
+  await expect(action).toBeVisible();
+  await page.unroute(url);
+});
+
 test("forking the default theme builds and passes every gate", async () => {
   test.setTimeout(10 * 60_000);
   await page.goto("/themes");
   await expect(page.getByRole("heading", { name: "Theme", exact: true })).toBeVisible();
   const start = latest();
-  const fork = page.getByRole("button", { name: "Create my own theme" });
-  await ((await fork.isVisible())
-    ? fork
-    : page.getByRole("button", { name: "Reset to default theme" })
-  ).click();
+  await page
+    .getByRole("button", { name: /^(Create my own theme|Reset to default theme)$/ })
+    .click({ timeout: 10_000 });
   await expect(page.getByText(/is being built and checked/)).toBeVisible();
   forked = start + 1;
   const result = await settled(forked);
@@ -242,11 +268,18 @@ test("publishing changes the storefront; rolling back restores it", async () => 
   const before = await buyColor(shopPage);
   expect(before).not.toBe(GREEN);
   await page.goto("/themes");
+  const editor = page.getByRole("region", { name: "Colours, fonts and corners" });
+  await editor.getByRole("textbox", { name: "buy", exact: true }).fill("#123456");
   const row = (n: number | string) =>
     page.getByRole("row").filter({ has: page.getByRole("button", { name: `#${n}`, exact: true }) });
   await row(tokens).getByRole("button", { name: "Publish" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText(`Revision #${tokens} is live.`)).toBeVisible();
+  await expect(editor.getByRole("alert")).toContainText("The active theme changed");
+  await expect(editor.getByRole("button", { name: "Create revision" })).toBeDisabled();
+  await editor.getByRole("button", { name: "Load latest tokens" }).click();
+  await expect(editor.getByRole("alert")).toHaveCount(0);
+  await expect(editor.getByRole("textbox", { name: "buy", exact: true })).toHaveValue(GREEN);
   await shopPage.reload();
   expect(await buyColor(shopPage)).toBe(GREEN);
   const audit = sql(
@@ -277,7 +310,7 @@ test("hostile archives are refused at upload with every reason", async () => {
       { name: "/root/.ssh/authorized_keys", body: "x" },
     ]),
   );
-  const alert = page.getByRole("alert");
+  const alert = page.getByRole("alert").filter({ hasText: "The archive was refused" });
   await expect(alert).toContainText("The archive was refused");
   await expect(alert).toContainText('"src/pages/index.astro": symbolic links are not allowed');
   await expect(alert).toContainText(`"../escape.astro": '..' is not allowed`);
@@ -290,7 +323,7 @@ test("hostile archives are refused at upload with every reason", async () => {
       { name: "public/big.bin", body: Buffer.alloc(51 * 1024 * 1024) },
     ]),
   );
-  await expect(page.getByRole("alert")).toContainText("larger than 50 MB");
+  await expect(page.getByRole("alert").filter({ hasText: "larger than 50 MB" })).toBeVisible();
   expect(latest()).toBe(count);
 });
 
@@ -356,7 +389,9 @@ test("contract violations and a network attempt fail the build with reasons", as
   // The failure reasons are shown in the admin.
   await page.goto("/themes");
   await page.getByRole("button", { name: `#${latest()}`, exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText(/NETWORK-PROBE: blocked|EAI_AGAIN/);
+  await expect(
+    page.getByRole("alert").filter({ hasText: /NETWORK-PROBE: blocked|EAI_AGAIN/ }),
+  ).toBeVisible();
 });
 
 test("a revision that blows the JS budget fails with the numbers", async () => {
