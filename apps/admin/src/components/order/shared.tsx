@@ -1,4 +1,4 @@
-import { Badge, Button } from "@platform/ui";
+import { Badge, Button, Card } from "@platform/ui";
 import { useQueryClient } from "@tanstack/solid-query";
 import { createSignal, type JSX, onCleanup } from "solid-js";
 import { t } from "../../i18n/index.ts";
@@ -7,12 +7,17 @@ import { safeDownloadUrl } from "../../lib/fulfillment.ts";
 import { tenantKey } from "../../lib/me.ts";
 import { ApiProblem } from "../CheckoutSettings.tsx";
 
-export function Section(props: { title: string; children: JSX.Element }) {
+/** An order-page block: a Pajamas card (use `padding="none"` around full-bleed tables). */
+export function Section(props: {
+  title: string;
+  children: JSX.Element;
+  padding?: "none" | "normal";
+  actions?: JSX.Element;
+}) {
   return (
-    <section class="min-w-0 rounded-md border border-border p-4">
-      <h2 class="mb-3 font-semibold">{props.title}</h2>
+    <Card title={props.title} padding={props.padding} actions={props.actions}>
       {props.children}
-    </section>
+    </Card>
   );
 }
 

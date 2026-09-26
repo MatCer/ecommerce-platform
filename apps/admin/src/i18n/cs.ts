@@ -900,6 +900,7 @@ export const cs: Dictionary = {
     edit: "Upravit",
     back: "Zpět",
     retry: "Zkusit znovu",
+    clearSearch: "Vymazat hledání",
     close: "Zavřít",
     loadMore: "Načíst další",
     loading: "Načítání…",

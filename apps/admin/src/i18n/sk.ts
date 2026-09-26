@@ -903,6 +903,7 @@ export const sk: Dictionary = {
     edit: "Upraviť",
     back: "Späť",
     retry: "Skúsiť znova",
+    clearSearch: "Vymazať hľadanie",
     close: "Zavrieť",
     loadMore: "Načítať ďalšie",
     loading: "Načítava sa…",

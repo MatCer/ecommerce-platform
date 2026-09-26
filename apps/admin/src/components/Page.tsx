@@ -1,11 +1,4 @@
-import {
-  Button,
-  ErrorState,
-  Icon,
-  LoadingState,
-  PageHeading,
-  PermissionDenied,
-} from "@platform/ui";
+import { Button, ErrorState, LoadingState, PageHeading, PermissionDenied } from "@platform/ui";
 import { A } from "@solidjs/router";
 import { type JSX, Match, Show, Switch } from "solid-js";
 import { errorMessage, t } from "../i18n/index.ts";
@@ -30,8 +23,7 @@ export function PageHeader(props: {
               href={b().href}
               class="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-heading hover:underline"
             >
-              <Icon name="arrow-left" size={14} />
-              {b().label}
+              ← {b().label}
             </A>
           )}
         </Show>

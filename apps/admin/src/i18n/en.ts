@@ -901,6 +901,7 @@ export const en = {
     edit: "Edit",
     back: "Back",
     retry: "Try again",
+    clearSearch: "Clear search",
     close: "Close",
     loadMore: "Load more",
     loading: "Loading…",

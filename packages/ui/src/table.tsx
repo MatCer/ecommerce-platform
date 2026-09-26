@@ -14,7 +14,7 @@ export function Th(props: { children?: JSX.Element; class?: string; srOnly?: boo
   return (
     <th
       scope="col"
-      class={`h-10 px-3 text-left align-middle text-sm font-semibold whitespace-nowrap text-heading ${props.class ?? ""}`}
+      class={`h-10 px-3 text-left align-middle text-sm font-semibold text-heading ${props.class ?? ""}`}
     >
       <Show when={props.srOnly} fallback={props.children}>
         <span class="sr-only">{props.children}</span>

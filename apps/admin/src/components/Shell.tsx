@@ -344,11 +344,11 @@ export function Shell(props: { children: JSX.Element }) {
                 if (location.pathname === "/") return [root, { label: t("nav.dashboard") }];
                 if (!hit) return [root];
                 const exact = location.pathname === hit.item.href;
-                return [
-                  root,
-                  { label: hit.group.label() },
-                  { label: hit.item.label(), href: exact ? undefined : hit.item.href },
-                ];
+                const item = { label: hit.item.label(), href: exact ? undefined : hit.item.href };
+                // "Orders / Orders" reads badly: skip the section when it names the page.
+                return hit.group.label() === item.label
+                  ? [root, item]
+                  : [root, { label: hit.group.label() }, item];
               };
               return (
                 <div class="flex min-h-dvh bg-subtle">

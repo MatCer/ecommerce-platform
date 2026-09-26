@@ -110,9 +110,13 @@ export function Breadcrumb(props: { label: string; items: readonly BreadcrumbIte
           {(item, i) => {
             const last = () => i() === props.items.length - 1;
             return (
-              <li class="flex min-w-0 items-center gap-1">
+              // Small screens show only the current page.
+              <li
+                class="min-w-0 items-center gap-1"
+                classList={{ flex: last(), "hidden sm:flex": !last() }}
+              >
                 <Show when={i() > 0}>
-                  <span aria-hidden="true" class="text-faint-foreground">
+                  <span aria-hidden="true" class="text-faint-foreground max-sm:hidden">
                     /
                   </span>
                 </Show>
