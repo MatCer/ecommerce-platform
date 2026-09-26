@@ -1,4 +1,4 @@
-import { Alert, Button, labelClass, ProgressBar, SelectField } from "@platform/ui";
+import { Alert, Button, fileInputClass, labelClass, ProgressBar, SelectField } from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
 import { createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { t } from "../i18n/index.ts";
@@ -8,11 +8,6 @@ import { contentError } from "../lib/content-api.ts";
 import { tenantKey } from "../lib/me.ts";
 import { ACCEPTED_TYPES, type Asset, checkFile, uploadImage } from "../lib/upload.ts";
 import { QueryState } from "./Page.tsx";
-
-/** Native file input with a Pajamas default-button look for its picker button. */
-export const fileInputClass =
-  "max-w-full text-sm text-muted-foreground file:mr-3 file:h-control file:cursor-pointer file:rounded-md " +
-  "file:border file:border-border-strong file:bg-card file:px-3 file:text-sm file:text-foreground hover:file:bg-subtle";
 
 export function ContentAsset(props: {
   value: string;
