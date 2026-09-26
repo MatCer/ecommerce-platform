@@ -1,16 +1,19 @@
 import {
+  Alert,
   Button,
+  Card,
   Checkbox,
   Dialog,
   EmptyState,
   LoadingState,
+  linkClass,
   SelectField,
   showToast,
   TextField,
 } from "@platform/ui";
 import { A, useSearchParams } from "@solidjs/router";
 import { createInfiniteQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
 import { api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
@@ -49,7 +52,7 @@ function Movements(props: { row: Row }) {
           when={items().length > 0}
           fallback={<p class="text-sm text-muted-foreground">{t("inventory.noMovements")}</p>}
         >
-          <div class="max-h-96 overflow-auto">
+          <div class="max-h-96 overflow-auto rounded-md border border-border">
             <table class={tableClass}>
               <thead>
                 <tr>
@@ -74,7 +77,7 @@ function Movements(props: { row: Row }) {
                       <td class={`${tdClass} figures text-right`}>{m.on_hand_after}</td>
                       <td class={`${tdClass} text-xs`}>
                         {m.note ?? ""}
-                        <span class="block text-faint-foreground">
+                        <span class="block text-muted-foreground">
                           {m.actor === claims()?.sub ? t("audit.you") : m.actor}
                         </span>
                       </td>
@@ -86,7 +89,7 @@ function Movements(props: { row: Row }) {
           </div>
           <Show when={movements.hasNextPage}>
             <Button
-              class="mt-2"
+              class="mt-3"
               loading={movements.isFetchingNextPage}
               onClick={() => void movements.fetchNextPage()}
             >
@@ -179,6 +182,7 @@ export default function Inventory() {
       ),
   }));
 
+  const formId = createUniqueId();
   const openAdjust = (row: Row) => {
     setMode("delta");
     setAmount("");
@@ -191,13 +195,9 @@ export default function Inventory() {
     <>
       <PageHeader title={t("inventory.title")} />
       <Show when={productId()}>
-        <p class="mb-3 text-sm text-muted-foreground">
+        <p class="mb-4 text-sm text-muted-foreground">
           {t("inventory.filtered")}{" "}
-          <button
-            type="button"
-            class="text-accent-700 underline"
-            onClick={() => setParams({ product: undefined })}
-          >
+          <button type="button" class={linkClass} onClick={() => setParams({ product: undefined })}>
             {t("inventory.showAll")}
           </button>
         </p>
@@ -208,99 +208,109 @@ export default function Inventory() {
             when={rows().length > 0}
             fallback={
               <EmptyState
+                icon="package"
                 title={t("inventory.emptyTitle")}
                 description={t("inventory.emptyDesc")}
               />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("inventory.sku")}</Th>
-                    <Th class="text-right">{t("inventory.onHand")}</Th>
-                    <Th class="text-right">{t("inventory.reserved")}</Th>
-                    <Th class="text-right">{t("inventory.available")}</Th>
-                    <Th>{t("inventory.tracked")}</Th>
-                    <Th>{t("inventory.backorder")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(r) => (
-                      <tr>
-                        <th scope="row" class={`${tdClass} text-left`}>
-                          <A
-                            href={`/products/${r.product_id}`}
-                            class="figures text-xs font-medium text-accent-700 hover:underline"
+            <Card
+              padding="none"
+              footer={
+                levels.hasNextPage ? (
+                  <Button
+                    loading={levels.isFetchingNextPage}
+                    onClick={() => void levels.fetchNextPage()}
+                  >
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("inventory.sku")}</Th>
+                      <Th class="text-right">{t("inventory.onHand")}</Th>
+                      <Th class="text-right">{t("inventory.reserved")}</Th>
+                      <Th class="text-right">{t("inventory.available")}</Th>
+                      <Th>{t("inventory.tracked")}</Th>
+                      <Th>{t("inventory.backorder")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(r) => (
+                        <tr class="hover:bg-subtle">
+                          <th scope="row" class={`${tdClass} text-left font-normal`}>
+                            <A
+                              href={`/products/${r.product_id}`}
+                              class="font-mono text-xs font-semibold text-heading hover:text-accent-700 hover:underline"
+                            >
+                              {r.sku}
+                            </A>
+                          </th>
+                          <td class={`${tdClass} figures text-right`}>{r.on_hand}</td>
+                          <td class={`${tdClass} figures text-right`}>{r.reserved}</td>
+                          <td
+                            class={`${tdClass} figures text-right font-semibold`}
+                            classList={{ "text-error-700": r.track && r.available <= 0 }}
                           >
-                            {r.sku}
-                          </A>
-                        </th>
-                        <td class={`${tdClass} figures text-right`}>{r.on_hand}</td>
-                        <td class={`${tdClass} figures text-right`}>{r.reserved}</td>
-                        <td
-                          class={`${tdClass} figures text-right font-medium`}
-                          classList={{ "text-error-700": r.track && r.available <= 0 }}
-                        >
-                          {r.available}
-                        </td>
-                        <td class={tdClass}>
-                          <Checkbox
-                            label={
-                              <span class="sr-only">{`${t("inventory.tracked")}: ${r.sku}`}</span>
-                            }
-                            checked={r.track}
-                            disabled={
-                              settings.isPending &&
-                              settings.variables?.row.variant_id === r.variant_id
-                            }
-                            onChange={(track) =>
-                              settings.mutate({ row: r, track, allow_backorder: r.allow_backorder })
-                            }
-                          />
-                        </td>
-                        <td class={tdClass}>
-                          <Checkbox
-                            label={
-                              <span class="sr-only">{`${t("inventory.backorder")}: ${r.sku}`}</span>
-                            }
-                            checked={r.allow_backorder}
-                            disabled={
-                              settings.isPending &&
-                              settings.variables?.row.variant_id === r.variant_id
-                            }
-                            onChange={(allow_backorder) =>
-                              settings.mutate({ row: r, track: r.track, allow_backorder })
-                            }
-                          />
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button category="tertiary" onClick={() => openAdjust(r)}>
-                            {t("inventory.adjust")}
-                            <span class="sr-only">: {r.sku}</span>
-                          </Button>
-                          <Button category="tertiary" onClick={() => setViewing(r)}>
-                            {t("inventory.movements")}
-                            <span class="sr-only">: {r.sku}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={levels.hasNextPage}>
-              <Button
-                class="mt-3"
-                loading={levels.isFetchingNextPage}
-                onClick={() => void levels.fetchNextPage()}
-              >
-                {t("common.loadMore")}
-              </Button>
-            </Show>
+                            {r.available}
+                          </td>
+                          <td class={tdClass}>
+                            <Checkbox
+                              label={
+                                <span class="sr-only">{`${t("inventory.tracked")}: ${r.sku}`}</span>
+                              }
+                              checked={r.track}
+                              disabled={
+                                settings.isPending &&
+                                settings.variables?.row.variant_id === r.variant_id
+                              }
+                              onChange={(track) =>
+                                settings.mutate({
+                                  row: r,
+                                  track,
+                                  allow_backorder: r.allow_backorder,
+                                })
+                              }
+                            />
+                          </td>
+                          <td class={tdClass}>
+                            <Checkbox
+                              label={
+                                <span class="sr-only">{`${t("inventory.backorder")}: ${r.sku}`}</span>
+                              }
+                              checked={r.allow_backorder}
+                              disabled={
+                                settings.isPending &&
+                                settings.variables?.row.variant_id === r.variant_id
+                              }
+                              onChange={(allow_backorder) =>
+                                settings.mutate({ row: r, track: r.track, allow_backorder })
+                              }
+                            />
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => openAdjust(r)}>
+                              {t("inventory.adjust")}
+                              <span class="sr-only">: {r.sku}</span>
+                            </Button>
+                            <Button category="tertiary" size="small" onClick={() => setViewing(r)}>
+                              {t("inventory.movements")}
+                              <span class="sr-only">: {r.sku}</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -310,9 +320,18 @@ export default function Inventory() {
         onOpenChange={(o) => !o && setAdjusting(null)}
         title={t("inventory.adjustTitle", { sku: adjusting()?.sku ?? "" })}
         size="sm"
+        footer={
+          <>
+            <Button onClick={() => setAdjusting(null)}>{t("common.cancel")}</Button>
+            <Button type="submit" form={formId} variant="confirm" loading={adjust.isPending}>
+              {t("common.save")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="flex flex-col gap-3"
+          id={formId}
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const row = adjusting();
@@ -344,16 +363,8 @@ export default function Inventory() {
             maxLength={500}
           />
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
-          <div class="flex justify-end gap-2">
-            <Button onClick={() => setAdjusting(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="confirm" loading={adjust.isPending}>
-              {t("common.save")}
-            </Button>
-          </div>
         </form>
       </Dialog>
 
@@ -361,6 +372,7 @@ export default function Inventory() {
         open={viewing() !== null}
         onOpenChange={(o) => !o && setViewing(null)}
         title={t("inventory.movementsTitle", { sku: viewing()?.sku ?? "" })}
+        closeLabel={t("common.close")}
       >
         <Show when={viewing()} fallback={<LoadingState label={t("common.loading")} />}>
           {(r) => <Movements row={r()} />}

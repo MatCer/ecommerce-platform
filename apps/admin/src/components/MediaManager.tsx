@@ -1,4 +1,12 @@
-import { Badge, Button, SelectField, showToast, TextField, type Tone } from "@platform/ui";
+import {
+  Badge,
+  Button,
+  ProgressBar,
+  SelectField,
+  showToast,
+  TextField,
+  type Tone,
+} from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
 import { createSignal, For, Index, onCleanup, Show } from "solid-js";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
@@ -57,8 +65,11 @@ function MediaRow(props: {
       failed: t("editor.assetFailed"),
     })[s];
   return (
-    <li class="flex flex-wrap items-start gap-3 border-b border-border py-3" aria-label={label()}>
-      <div class="grid size-24 shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-muted">
+    <li
+      class="flex flex-wrap items-start gap-4 border-b border-border py-4 last:border-b-0"
+      aria-label={label()}
+    >
+      <div class="grid size-24 shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-subtle">
         <Show
           when={asset.data?.status === "ready" && asset.data}
           fallback={<span class="text-xs text-muted-foreground">{label()}</span>}
@@ -75,12 +86,12 @@ function MediaRow(props: {
       </div>
       <div class="flex min-w-0 flex-1 flex-col gap-2">
         <div class="flex flex-wrap items-center gap-2">
-          <span class="text-sm font-medium">{label()}</span>
+          <span class="text-sm font-semibold text-heading">{label()}</span>
           <Show when={asset.data}>
             {(a) => (
               <>
                 <Badge tone={statusTone[a().status]}>{statusLabel(a().status)}</Badge>
-                <span class="truncate text-xs text-faint-foreground">{a().filename}</span>
+                <span class="truncate font-mono text-xs text-muted-foreground">{a().filename}</span>
               </>
             )}
           </Show>
@@ -88,7 +99,7 @@ function MediaRow(props: {
             <span class="text-xs text-error-700">{asset.data?.error}</span>
           </Show>
         </div>
-        <div class="grid gap-2 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-3">
           <For each={CONTENT_LOCALES}>
             {(l) => (
               <TextField
@@ -118,24 +129,27 @@ function MediaRow(props: {
       <div class="flex gap-1">
         <Button
           category="tertiary"
+          iconOnly
+          icon="chevron-up"
           aria-label={`${t("common.moveUp")}: ${label()}`}
           disabled={props.index === 0}
           onClick={() => props.onMove(-1)}
-        >
-          ↑
-        </Button>
+        />
         <Button
           category="tertiary"
+          iconOnly
+          icon="chevron-down"
           aria-label={`${t("common.moveDown")}: ${label()}`}
           disabled={props.index === props.count - 1}
           onClick={() => props.onMove(1)}
-        >
-          ↓
-        </Button>
-        <Button category="tertiary" onClick={props.onRemove}>
-          {t("common.remove")}
-          <span class="sr-only">: {label()}</span>
-        </Button>
+        />
+        <Button
+          category="tertiary"
+          iconOnly
+          icon="remove"
+          aria-label={`${t("common.remove")}: ${label()}`}
+          onClick={props.onRemove}
+        />
       </div>
     </li>
   );
@@ -197,7 +211,7 @@ export function MediaManager(props: {
   };
 
   return (
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-3">
       <div class="flex flex-wrap items-center gap-3">
         <input
           ref={input}
@@ -210,26 +224,26 @@ export function MediaManager(props: {
           class="sr-only"
           onChange={(e) => void onFiles(e.currentTarget.files)}
         />
-        <Button onClick={() => input.click()}>{t("editor.upload")}</Button>
-        <span class="text-xs text-muted-foreground">{t("editor.uploadHint")}</span>
+        <Button icon="upload" onClick={() => input.click()}>
+          {t("editor.upload")}
+        </Button>
+        <span class="text-sm text-muted-foreground">{t("editor.uploadHint")}</span>
       </div>
       <For each={uploads()}>
         {(u) => (
-          <div class="flex items-center gap-3 text-xs">
-            <span class="w-48 truncate">{t("editor.uploading", { name: u.name })}</span>
-            <progress
-              class="h-1.5 w-48 accent-accent-600"
+          <div class="max-w-md">
+            <ProgressBar
+              label={t("editor.uploading", { name: u.name })}
+              showLabel
               max={100}
               value={Math.round(u.progress * 100)}
-              aria-label={t("editor.uploading", { name: u.name })}
             />
-            <span class="figures">{Math.round(u.progress * 100)} %</span>
           </div>
         )}
       </For>
       <Show
         when={props.media.length > 0}
-        fallback={<p class="py-2 text-sm text-muted-foreground">{t("editor.noImages")}</p>}
+        fallback={<p class="text-sm text-muted-foreground">{t("editor.noImages")}</p>}
       >
         <ol class="border-t border-border">
           <Index each={props.media}>

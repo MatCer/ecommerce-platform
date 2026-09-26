@@ -1,17 +1,20 @@
 import {
+  Alert,
   Badge,
   Button,
+  Card,
   Checkbox,
   ConfirmDialog,
   Dialog,
   EmptyState,
+  labelClass,
   SelectField,
   showToast,
   TextField,
   type Tone,
 } from "@platform/ui";
 import { createInfiniteQuery, createMutation, useQueryClient } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { DateTimeField } from "../components/DateTimeField.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { ProductPicker } from "../components/ProductPicker.tsx";
@@ -201,6 +204,7 @@ export default function Sales() {
     setError(undefined);
     setEditing(s);
   };
+  const formId = createUniqueId();
   const newButton = () => (
     <Button variant="confirm" onClick={() => open("new")}>
       {t("sales.new")}
@@ -223,67 +227,78 @@ export default function Sales() {
             when={rows().length > 0}
             fallback={
               <EmptyState
+                icon="tag"
                 title={t("sales.emptyTitle")}
                 description={t("sales.emptyDesc")}
                 action={newButton()}
               />
             }
           >
-            <div class="overflow-x-auto">
-              <table class={tableClass}>
-                <thead>
-                  <tr>
-                    <Th>{t("sales.name")}</Th>
-                    <Th class="text-right">{t("sales.discount")}</Th>
-                    <Th>{t("sales.targets")}</Th>
-                    <Th>{t("sales.schedule")}</Th>
-                    <Th>{t("sales.state")}</Th>
-                    <Th srOnly>{t("common.actions")}</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <For each={rows()}>
-                    {(s) => (
-                      <tr>
-                        <td class={`${tdClass} font-medium`}>{s.name}</td>
-                        <td class={`${tdClass} figures text-right`}>{discountText(s)}</td>
-                        <td class={`${tdClass} text-xs`}>{targetText(s)}</td>
-                        <td
-                          class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
-                        >
-                          {formatDateTime(s.starts_at)} –{" "}
-                          {s.ends_at ? formatDateTime(s.ends_at) : t("sales.untilStopped")}
-                        </td>
-                        <td class={tdClass}>
-                          <Badge tone={stateTone[saleState(s)]}>
-                            {t(`sales.state_${saleState(s)}`)}
-                          </Badge>
-                        </td>
-                        <td class={`${tdClass} text-right whitespace-nowrap`}>
-                          <Button category="tertiary" onClick={() => open(s)}>
-                            {t("common.edit")}
-                            <span class="sr-only">: {s.name}</span>
-                          </Button>
-                          <Button category="tertiary" onClick={() => setDeleting(s)}>
-                            {t("common.delete")}
-                            <span class="sr-only">: {s.name}</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    )}
-                  </For>
-                </tbody>
-              </table>
-            </div>
-            <Show when={sales.hasNextPage}>
-              <Button
-                class="mt-3"
-                loading={sales.isFetchingNextPage}
-                onClick={() => void sales.fetchNextPage()}
-              >
-                {t("common.loadMore")}
-              </Button>
-            </Show>
+            <Card
+              padding="none"
+              footer={
+                sales.hasNextPage ? (
+                  <Button
+                    loading={sales.isFetchingNextPage}
+                    onClick={() => void sales.fetchNextPage()}
+                  >
+                    {t("common.loadMore")}
+                  </Button>
+                ) : undefined
+              }
+            >
+              <div class="overflow-x-auto">
+                <table class={tableClass}>
+                  <thead>
+                    <tr>
+                      <Th>{t("sales.name")}</Th>
+                      <Th class="text-right">{t("sales.discount")}</Th>
+                      <Th>{t("sales.targets")}</Th>
+                      <Th>{t("sales.schedule")}</Th>
+                      <Th>{t("sales.state")}</Th>
+                      <Th srOnly>{t("common.actions")}</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <For each={rows()}>
+                      {(s) => (
+                        <tr class="hover:bg-subtle">
+                          <td class={`${tdClass} font-semibold text-heading`}>{s.name}</td>
+                          <td class={`${tdClass} figures text-right`}>{discountText(s)}</td>
+                          <td class={tdClass}>{targetText(s)}</td>
+                          <td
+                            class={`${tdClass} figures text-xs whitespace-nowrap text-muted-foreground`}
+                          >
+                            {formatDateTime(s.starts_at)} –{" "}
+                            {s.ends_at ? formatDateTime(s.ends_at) : t("sales.untilStopped")}
+                          </td>
+                          <td class={tdClass}>
+                            <Badge tone={stateTone[saleState(s)]}>
+                              {t(`sales.state_${saleState(s)}`)}
+                            </Badge>
+                          </td>
+                          <td class={`${tdClass} text-right whitespace-nowrap`}>
+                            <Button category="tertiary" size="small" onClick={() => open(s)}>
+                              {t("common.edit")}
+                              <span class="sr-only">: {s.name}</span>
+                            </Button>
+                            <Button
+                              category="tertiary"
+                              size="small"
+                              iconOnly
+                              icon="remove"
+                              aria-label={`${t("common.delete")}: ${s.name}`}
+                              title={t("common.delete")}
+                              onClick={() => setDeleting(s)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </Show>
         )}
       </QueryState>
@@ -292,9 +307,24 @@ export default function Sales() {
         open={editing() !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         title={editing() === "new" ? t("sales.new") : t("sales.editTitle")}
+        footer={
+          <>
+            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
+            <Button
+              type="submit"
+              form={formId}
+              variant="confirm"
+              loading={save.isPending}
+              disabled={!valid()}
+            >
+              {editing() === "new" ? t("common.create") : t("common.save")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="flex flex-col gap-3"
+          id={formId}
+          class="flex flex-col gap-4"
           onSubmit={(e) => {
             e.preventDefault();
             const target = editing();
@@ -308,7 +338,7 @@ export default function Sales() {
             required
             maxLength={200}
           />
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-4">
             <SelectField
               label={t("sales.discount")}
               disabled={locked()}
@@ -333,7 +363,7 @@ export default function Sales() {
                 />
               }
             >
-              <div class="grid grid-cols-[1fr_6rem] gap-2">
+              <div class="grid grid-cols-[1fr_6rem] gap-4">
                 <TextField
                   label={t("sales.amount")}
                   disabled={locked()}
@@ -353,7 +383,7 @@ export default function Sales() {
               </div>
             </Show>
           </div>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-2 gap-4">
             <DateTimeField
               label={t("sales.startsAt")}
               disabled={locked()}
@@ -379,29 +409,27 @@ export default function Sales() {
           />
           <Show when={form().target === "selected"}>
             <Show when={categories.isError}>
-              <p role="alert" class="text-xs text-error-700">
-                {errorMessage(categories.error)}
-              </p>
+              <Alert tone="error">{errorMessage(categories.error)}</Alert>
             </Show>
-            <fieldset class="flex max-h-48 flex-col gap-1 overflow-y-auto">
-              <legend class="mb-1 text-xs font-medium text-muted-foreground">
-                {t("sales.targetCategories")}
-              </legend>
-              <For each={categoryOptions(categories.data?.items ?? [], contentLocales())}>
-                {(c) => (
-                  <Checkbox
-                    label={c.label}
-                    checked={form().categoryIds.includes(c.value)}
-                    onChange={(on) =>
-                      set({
-                        categoryIds: on
-                          ? [...form().categoryIds, c.value]
-                          : form().categoryIds.filter((x) => x !== c.value),
-                      })
-                    }
-                  />
-                )}
-              </For>
+            <fieldset class="flex flex-col gap-2">
+              <legend class={`${labelClass} mb-2`}>{t("sales.targetCategories")}</legend>
+              <div class="flex max-h-48 flex-col gap-2 overflow-y-auto rounded-md border border-border px-3 py-2">
+                <For each={categoryOptions(categories.data?.items ?? [], contentLocales())}>
+                  {(c) => (
+                    <Checkbox
+                      label={c.label}
+                      checked={form().categoryIds.includes(c.value)}
+                      onChange={(on) =>
+                        set({
+                          categoryIds: on
+                            ? [...form().categoryIds, c.value]
+                            : form().categoryIds.filter((x) => x !== c.value),
+                        })
+                      }
+                    />
+                  )}
+                </For>
+              </div>
             </fieldset>
           </Show>
           <Show when={form().target === "selected"}>
@@ -411,19 +439,11 @@ export default function Sales() {
             />
           </Show>
           <Show when={locked()}>
-            <p class="text-xs text-muted-foreground">{t("errors.sale_started")}</p>
+            <Alert tone="info">{t("errors.sale_started")}</Alert>
           </Show>
           <Show when={error()}>
-            <p role="alert" class="text-xs font-medium text-error-700">
-              {error()}
-            </p>
+            <Alert tone="error">{error()}</Alert>
           </Show>
-          <div class="flex justify-end gap-2">
-            <Button onClick={() => setEditing(null)}>{t("common.cancel")}</Button>
-            <Button type="submit" variant="confirm" loading={save.isPending} disabled={!valid()}>
-              {editing() === "new" ? t("common.create") : t("common.save")}
-            </Button>
-          </div>
         </form>
       </Dialog>
 

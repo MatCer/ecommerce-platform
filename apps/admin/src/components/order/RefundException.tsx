@@ -39,16 +39,19 @@ export function RefundException(props: { orderId: string }) {
         onOpenChange={(value) => !refund.isPending && setOpen(value)}
         title={t("fulfillment.refundException")}
         description={t("fulfillment.refundExceptionConfirm")}
+        size="sm"
+        footer={
+          <>
+            <Button disabled={refund.isPending} onClick={() => setOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="confirm" loading={refund.isPending} onClick={() => refund.mutate()}>
+              {t("fulfillment.refundException")}
+            </Button>
+          </>
+        }
       >
         <ApiProblem error={refund.error} />
-        <div class="flex justify-end gap-2">
-          <Button disabled={refund.isPending} onClick={() => setOpen(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button variant="confirm" loading={refund.isPending} onClick={() => refund.mutate()}>
-            {t("fulfillment.refundException")}
-          </Button>
-        </div>
       </Dialog>
     </Show>
   );

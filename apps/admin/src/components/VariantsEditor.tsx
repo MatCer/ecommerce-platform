@@ -1,4 +1,4 @@
-import { Button, TextField } from "@platform/ui";
+import { Alert, Button, radioClass, TextField } from "@platform/ui";
 import { createSignal, For, Index, Show } from "solid-js";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
 import {
@@ -56,9 +56,9 @@ function OptionEditor(props: {
     props.onChange({ ...props.option, values: [...props.option.values, { code, name_i18n: {} }] });
   };
   return (
-    <fieldset class="flex flex-col gap-2 rounded-md border border-border p-3">
-      <legend class="px-1 text-sm font-semibold">{heading()}</legend>
-      <div class="grid gap-2 sm:grid-cols-4">
+    <fieldset class="flex min-w-0 flex-col gap-4 rounded-lg border border-border p-4">
+      <legend class="px-1 text-sm font-semibold text-heading">{heading()}</legend>
+      <div class="grid gap-4 sm:grid-cols-4">
         <For each={CONTENT_LOCALES}>
           {(l) => (
             <TextField
@@ -77,59 +77,62 @@ function OptionEditor(props: {
           maxLength={64}
         />
       </div>
-      <table class={tableClass}>
-        <thead>
-          <tr>
-            <For each={CONTENT_LOCALES}>
-              {(l) => <Th>{`${t("editor.optionValues")} (${l})`}</Th>}
-            </For>
-            <Th>{t("editor.optionCode")}</Th>
-            <Th srOnly>{t("common.actions")}</Th>
-          </tr>
-        </thead>
-        <tbody>
-          <Index each={props.option.values}>
-            {(val, vi) => (
-              <tr>
-                <For each={CONTENT_LOCALES}>
-                  {(l) => (
-                    <td class={`${tdClass} py-1`}>
-                      <TextField
-                        hideLabel
-                        label={`${heading()}: ${t("editor.optionValues")} ${vi + 1} (${l})`}
-                        value={val().name_i18n[l] ?? ""}
-                        onChange={(v) => setValue(vi, l, v)}
-                        maxLength={100}
-                      />
-                    </td>
-                  )}
-                </For>
-                <td class={`${tdClass} figures text-xs text-muted-foreground`}>{val().code}</td>
-                <td class={`${tdClass} text-right`}>
-                  <Button
-                    category="tertiary"
-                    disabled={props.option.values.length <= 1}
-                    onClick={() =>
-                      props.onChange({
-                        ...props.option,
-                        values: props.option.values.filter((_, j) => j !== vi),
-                      })
-                    }
-                  >
-                    {t("common.remove")}
-                    <span class="sr-only">: {label(val().name_i18n) || val().code}</span>
-                  </Button>
-                </td>
-              </tr>
-            )}
-          </Index>
-        </tbody>
-      </table>
+      <div class="overflow-x-auto rounded-md border border-border">
+        <table class={tableClass}>
+          <thead>
+            <tr>
+              <For each={CONTENT_LOCALES}>
+                {(l) => <Th>{`${t("editor.optionValues")} (${l})`}</Th>}
+              </For>
+              <Th>{t("editor.optionCode")}</Th>
+              <Th srOnly>{t("common.actions")}</Th>
+            </tr>
+          </thead>
+          <tbody>
+            <Index each={props.option.values}>
+              {(val, vi) => (
+                <tr>
+                  <For each={CONTENT_LOCALES}>
+                    {(l) => (
+                      <td class={`${tdClass} py-1`}>
+                        <TextField
+                          hideLabel
+                          label={`${heading()}: ${t("editor.optionValues")} ${vi + 1} (${l})`}
+                          value={val().name_i18n[l] ?? ""}
+                          onChange={(v) => setValue(vi, l, v)}
+                          maxLength={100}
+                        />
+                      </td>
+                    )}
+                  </For>
+                  <td class={`${tdClass} font-mono text-xs text-muted-foreground`}>{val().code}</td>
+                  <td class={`${tdClass} w-12 text-right`}>
+                    <Button
+                      category="tertiary"
+                      size="small"
+                      iconOnly
+                      icon="remove"
+                      aria-label={`${t("common.remove")}: ${label(val().name_i18n) || val().code}`}
+                      disabled={props.option.values.length <= 1}
+                      onClick={() =>
+                        props.onChange({
+                          ...props.option,
+                          values: props.option.values.filter((_, j) => j !== vi),
+                        })
+                      }
+                    />
+                  </td>
+                </tr>
+              )}
+            </Index>
+          </tbody>
+        </table>
+      </div>
       <div class="flex flex-wrap gap-2">
-        <Button onClick={addValue} disabled={props.option.values.length >= 100}>
+        <Button icon="plus" onClick={addValue} disabled={props.option.values.length >= 100}>
           {t("common.add")}
         </Button>
-        <Button category="tertiary" onClick={props.onRemove}>
+        <Button category="tertiary" variant="danger" onClick={props.onRemove}>
           {t("editor.removeOption")}
         </Button>
       </div>
@@ -187,12 +190,10 @@ export function VariantsEditor(props: {
     props.onVariants(props.variants.map((v, j) => (j === i ? { ...v, ...patch } : v)));
 
   return (
-    <div class="flex flex-col gap-3">
-      <p class="text-xs text-muted-foreground">{t("editor.matrixHint")}</p>
+    <div class="flex flex-col gap-4">
+      <p class="text-sm text-muted-foreground">{t("editor.matrixHint")}</p>
       <Show when={matrixError()}>
-        <p role="alert" class="text-xs font-medium text-error-700">
-          {matrixError()}
-        </p>
+        <Alert tone="error">{matrixError()}</Alert>
       </Show>
       <Index each={props.options}>
         {(o, i) => (
@@ -207,6 +208,7 @@ export function VariantsEditor(props: {
       </Index>
       <div class="flex flex-wrap gap-2">
         <Button
+          icon="plus"
           disabled={props.options.length >= 5}
           onClick={() =>
             props.onOptions([
@@ -233,7 +235,7 @@ export function VariantsEditor(props: {
             </Show>
           }
         >
-          <Button variant="confirm" onClick={regenerate}>
+          <Button icon="retry" onClick={regenerate}>
             {t("editor.regenerate")}
           </Button>
         </Show>
@@ -242,7 +244,7 @@ export function VariantsEditor(props: {
         when={props.variants.length > 0}
         fallback={<p class="text-sm text-muted-foreground">{t("editor.noVariants")}</p>}
       >
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto rounded-md border border-border">
           <table class={tableClass}>
             <caption class="sr-only">{t("editor.variants")}</caption>
             <thead>
@@ -250,7 +252,7 @@ export function VariantsEditor(props: {
                 <Th>{t("editor.variant")}</Th>
                 <Th>{t("editor.sku")}</Th>
                 <Th>{t("editor.ean")}</Th>
-                <Th>{t("editor.weight")}</Th>
+                <Th class="text-right">{t("editor.weight")}</Th>
                 <Th>{t("editor.isDefault")}</Th>
                 <Th srOnly>{t("common.actions")}</Th>
               </tr>
@@ -262,7 +264,7 @@ export function VariantsEditor(props: {
                   const eanError = () => v().ean.trim() !== "" && !eanValid(v().ean.trim());
                   return (
                     <tr>
-                      <th scope="row" class={`${tdClass} text-left font-medium`}>
+                      <th scope="row" class={`${tdClass} text-left font-semibold text-heading`}>
                         {name()}
                       </th>
                       <td class={`${tdClass} py-1`}>
@@ -302,7 +304,7 @@ export function VariantsEditor(props: {
                         <input
                           type="radio"
                           name="default-variant"
-                          class="size-6 accent-accent-600"
+                          class={radioClass}
                           aria-label={`${t("editor.isDefault")}: ${name()}`}
                           checked={v().is_default}
                           onChange={() =>
@@ -312,14 +314,15 @@ export function VariantsEditor(props: {
                           }
                         />
                       </td>
-                      <td class={`${tdClass} text-right`}>
+                      <td class={`${tdClass} w-12 text-right`}>
                         <Button
                           category="tertiary"
+                          size="small"
+                          iconOnly
+                          icon="remove"
+                          aria-label={`${t("common.remove")}: ${name()}`}
                           onClick={() => props.onVariants(props.variants.filter((_, j) => j !== i))}
-                        >
-                          {t("common.remove")}
-                          <span class="sr-only">: {name()}</span>
-                        </Button>
+                        />
                       </td>
                     </tr>
                   );

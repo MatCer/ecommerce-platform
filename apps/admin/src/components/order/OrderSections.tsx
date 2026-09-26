@@ -1,6 +1,6 @@
-import { Button, Dialog, showToast, TextField } from "@platform/ui";
+import { Button, Dialog, linkClass, showToast, TextField } from "@platform/ui";
 import { createMutation } from "@tanstack/solid-query";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { formatDateTime, t } from "../../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../../lib/api.ts";
 import { eventContent, safeDownloadUrl } from "../../lib/fulfillment.ts";
@@ -13,11 +13,12 @@ import { WithdrawalTable } from "./WithdrawalTable.tsx";
 export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
   return (
     <>
-      <Section title={t("fulfillment.shipments")}>
-        <Show
-          when={props.data.shipments.length}
-          fallback={<p class="text-sm">{t("common.none")}</p>}
-        >
+      <Section
+        title={t("fulfillment.shipments")}
+        count={props.data.shipments.length}
+        padding="none"
+      >
+        <Show when={props.data.shipments.length} fallback={<Empty />}>
           <div class="overflow-x-auto">
             <table class={tableClass}>
               <thead>
@@ -47,7 +48,7 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
                               href={url()}
                               target="_blank"
                               rel="noopener noreferrer"
-                              class="text-accent-700 underline"
+                              class={linkClass}
                             >
                               {shipment.tracking_number ?? t("fulfillment.tracking")}
                             </a>
@@ -58,6 +59,7 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
                       <td class={tdClass}>
                         <Show when={shipment.has_label && shipment.status !== "cancelled"}>
                           <DownloadButton
+                            size="small"
                             label={t("fulfillment.downloadLabel")}
                             read={(signal) =>
                               unwrap(
@@ -81,11 +83,13 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
           </div>
         </Show>
       </Section>
-      <Section title={t("fulfillment.documents")}>
-        <Show
-          when={props.data.invoices.length}
-          fallback={<p class="text-sm">{t("common.none")}</p>}
-        >
+      <Section
+        title={t("fulfillment.documents")}
+        count={props.data.invoices.length}
+        description={t("fulfillment.accountantHint")}
+        padding="none"
+      >
+        <Show when={props.data.invoices.length} fallback={<Empty />}>
           <div class="overflow-x-auto">
             <table class={tableClass}>
               <thead>
@@ -94,7 +98,7 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
                   <Th>{t("orders.number")}</Th>
                   <Th>{t("fulfillment.issuedOn")}</Th>
                   <Th>{t("fulfillment.taxableSupply")}</Th>
-                  <Th>{t("orders.total")}</Th>
+                  <Th class="text-right">{t("orders.total")}</Th>
                   <Th>{t("common.actions")}</Th>
                 </tr>
               </thead>
@@ -107,12 +111,13 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
                           ? t("fulfillment.creditNote")
                           : t("fulfillment.invoice")}
                       </td>
-                      <td class={tdClass}>{invoice.number}</td>
-                      <td class={tdClass}>{invoice.issued_on}</td>
-                      <td class={tdClass}>{invoice.taxable_supply_date}</td>
-                      <td class={tdClass}>{invoice.total.formatted}</td>
-                      <td class={`${tdClass} py-2`}>
+                      <td class={`${tdClass} font-mono text-xs`}>{invoice.number}</td>
+                      <td class={`${tdClass} figures`}>{invoice.issued_on}</td>
+                      <td class={`${tdClass} figures`}>{invoice.taxable_supply_date}</td>
+                      <td class={`${tdClass} figures text-right`}>{invoice.total.formatted}</td>
+                      <td class={tdClass}>
                         <DownloadButton
+                          size="small"
                           label={t("fulfillment.downloadPdf")}
                           disabled={!invoice.pdf_ready}
                           read={(signal) =>
@@ -137,15 +142,14 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
             </table>
           </div>
         </Show>
-        <p class="mt-3 text-xs text-muted-foreground">{t("fulfillment.accountantHint")}</p>
       </Section>
-      <Section title={t("fulfillment.refunds")}>
-        <Show when={props.data.refunds.length} fallback={<p class="text-sm">{t("common.none")}</p>}>
+      <Section title={t("fulfillment.refunds")} count={props.data.refunds.length} padding="none">
+        <Show when={props.data.refunds.length} fallback={<Empty />}>
           <div class="overflow-x-auto">
             <table class={tableClass}>
               <thead>
                 <tr>
-                  <Th>{t("orders.total")}</Th>
+                  <Th class="text-right">{t("orders.total")}</Th>
                   <Th>{t("orders.status")}</Th>
                   <Th>{t("fulfillment.reason")}</Th>
                   <Th>{t("fulfillment.iban")}</Th>
@@ -159,21 +163,21 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
                 <For each={props.data.refunds}>
                   {(refund) => (
                     <tr>
-                      <td class={tdClass}>{refund.amount.formatted}</td>
+                      <td class={`${tdClass} figures text-right`}>{refund.amount.formatted}</td>
                       <td class={tdClass}>
                         <FulfillmentState value={refund.status} />
                       </td>
                       <td class={tdClass}>{refund.reason}</td>
-                      <td class={tdClass}>{refund.iban}</td>
+                      <td class={`${tdClass} font-mono text-xs`}>{refund.iban}</td>
                       <td class={tdClass}>
                         {props.data.invoices.find((i) => i.id === refund.credit_note_id)?.number ??
                           refund.credit_note_id ??
                           t("common.none")}
                       </td>
-                      <td class={`${tdClass} break-all`}>
+                      <td class={`${tdClass} font-mono text-xs break-all`}>
                         {refund.withdrawal_id ?? t("common.none")}
                       </td>
-                      <td class={tdClass}>{formatDateTime(refund.created_at)}</td>
+                      <td class={`${tdClass} figures`}>{formatDateTime(refund.created_at)}</td>
                       <td class={tdClass}>
                         <Show
                           when={
@@ -192,11 +196,19 @@ export function OrderSections(props: { data: Schemas["AdminOrder"] }) {
           </div>
         </Show>
       </Section>
-      <Section title={t("fulfillment.withdrawals")}>
+      <Section
+        title={t("fulfillment.withdrawals")}
+        count={props.data.withdrawals.length}
+        padding="none"
+      >
         <WithdrawalTable items={props.data.withdrawals} />
       </Section>
     </>
   );
+}
+
+function Empty() {
+  return <p class="p-4 text-sm text-muted-foreground">{t("common.none")}</p>;
 }
 
 function RetryRefund(props: { id: string }) {
@@ -216,7 +228,7 @@ function RetryRefund(props: { id: string }) {
   }));
   return (
     <Show when={can("admin")}>
-      <Button loading={retry.isPending} onClick={() => retry.mutate()}>
+      <Button size="small" icon="retry" loading={retry.isPending} onClick={() => retry.mutate()}>
         {t("common.retry")}
       </Button>
       <ApiProblem error={retry.error} />
@@ -274,18 +286,25 @@ export function TimelineEvent(props: { event: Schemas["OrderEventView"] }) {
     return key ? t(`fulfillment.events.${key}`) : props.event.kind;
   };
   return (
-    <li
-      class="border-l-2 border-border pl-3 text-sm"
-      classList={{ "text-warning-700": content().warning }}
-    >
-      <p class="font-medium">{title()}</p>
+    <li class="relative border-l-2 border-border pl-4 text-sm">
+      <span
+        aria-hidden="true"
+        class="absolute top-1.5 -left-[5px] size-2 rounded-full"
+        classList={{ "bg-warning-600": content().warning, "bg-border-strong": !content().warning }}
+      />
+      <p
+        class="font-semibold"
+        classList={{ "text-warning-700": content().warning, "text-heading": !content().warning }}
+      >
+        {title()}
+      </p>
       <Show when={content().detail}>
         <p class="whitespace-pre-wrap break-words">{content().detail}</p>
       </Show>
-      <p>
-        {t("orders.actor")}: {props.event.actor}
+      <p class="text-xs text-muted-foreground">
+        {t("orders.actor")}: {props.event.actor} ·{" "}
+        <time dateTime={props.event.at}>{formatDateTime(props.event.at)}</time>
       </p>
-      <time dateTime={props.event.at}>{formatDateTime(props.event.at)}</time>
     </li>
   );
 }
@@ -314,10 +333,13 @@ export function EditShippingAddress(props: { data: Schemas["AdminOrder"] }) {
       void refresh();
     },
   }));
+  const formId = createUniqueId();
   return (
     <Show when={props.data.actions.edit_address}>
       <Button
         class="mt-3"
+        size="small"
+        icon="pencil"
         onClick={() => {
           const current = props.data.order.shipping_address;
           setAddress({
@@ -339,9 +361,20 @@ export function EditShippingAddress(props: { data: Schemas["AdminOrder"] }) {
         open={open()}
         onOpenChange={(value) => !save.isPending && setOpen(value)}
         title={t("fulfillment.edit_address")}
+        footer={
+          <>
+            <Button disabled={save.isPending} onClick={() => setOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" form={formId} variant="confirm" loading={save.isPending}>
+              {t("common.save")}
+            </Button>
+          </>
+        }
       >
         <form
-          class="grid gap-3"
+          id={formId}
+          class="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             event.preventDefault();
             if (props.data.actions.edit_address && !save.isPending) save.mutate();
@@ -361,14 +394,8 @@ export function EditShippingAddress(props: { data: Schemas["AdminOrder"] }) {
               />
             )}
           </For>
-          <ApiProblem error={save.error} />
-          <div class="flex justify-end gap-2">
-            <Button disabled={save.isPending} onClick={() => setOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button type="submit" variant="confirm" loading={save.isPending}>
-              {t("common.save")}
-            </Button>
+          <div class="sm:col-span-2 empty:hidden">
+            <ApiProblem error={save.error} />
           </div>
         </form>
       </Dialog>

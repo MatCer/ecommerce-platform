@@ -1,4 +1,4 @@
-import { Checkbox, TextField } from "@platform/ui";
+import { Checkbox, SearchBox } from "@platform/ui";
 import { createQuery } from "@tanstack/solid-query";
 import { createSignal, For } from "solid-js";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
@@ -33,8 +33,14 @@ export function ProductPicker(props: { value: string[]; onChange: (ids: string[]
 
   return (
     <div class="flex flex-col gap-2">
-      <TextField type="search" label={t("sales.productSearch")} value={q()} onChange={setQ} />
-      <ul class="flex max-h-48 flex-col gap-1 overflow-y-auto">
+      <SearchBox
+        label={t("sales.productSearch")}
+        placeholder={t("sales.productSearch")}
+        clearLabel={t("common.clearSearch")}
+        value={q()}
+        onChange={setQ}
+      />
+      <ul class="flex max-h-48 flex-col gap-2 overflow-y-auto rounded-md border border-border px-3 py-2 empty:hidden">
         <For each={selectedOnly()}>
           {(id) => (
             <li>
