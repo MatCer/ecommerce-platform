@@ -1,4 +1,4 @@
-import { Button, Menu, SelectField, TextField } from "@platform/ui";
+import { Button, buttonClass, Icon, Menu, SelectField, TextField } from "@platform/ui";
 import { Index, Match, Show, Switch } from "solid-js";
 import { t } from "../i18n/index.ts";
 import { moveItem, removeItem, validContentHref } from "../lib/content-form.ts";
@@ -108,7 +108,7 @@ function BlockFields(props: { block: EmailBlock; onChange: (block: EmailBlock) =
                 maxLength={200}
                 onChange={(title) => props.onChange({ ...b(), title })}
               />
-              <p class="text-xs">
+              <p class="text-sm text-muted-foreground">
                 {t("marketing.gridLimit", { max: String(MAX_GRID) })} ({b().product_ids.length}/
                 {MAX_GRID})
               </p>
@@ -139,7 +139,7 @@ function BlockFields(props: { block: EmailBlock; onChange: (block: EmailBlock) =
                 options={[2, 3, 4, 5, 6, 7, 8].map((n) => ({ value: String(n), label: String(n) }))}
                 onChange={(v) => props.onChange({ ...b(), limit: Number(v) })}
               />
-              <p class="text-xs text-muted-foreground">{t("marketing.personalizedHint")}</p>
+              <p class="text-sm text-muted-foreground">{t("marketing.personalizedHint")}</p>
             </>
           );
         })()}
@@ -156,42 +156,48 @@ export function EmailBlockEditor(props: {
 }) {
   return (
     <section class="flex flex-col gap-3" aria-label={t("content.blocks")}>
-      <h2 class="text-sm font-semibold">{t("content.blocks")}</h2>
+      <h2 class="text-base font-semibold text-heading">{t("content.blocks")}</h2>
       <Index each={props.blocks}>
         {(block, i) => (
           <fieldset
-            class="min-w-0 rounded-md border p-3"
+            class="relative min-w-0 overflow-hidden rounded-lg border bg-background"
             classList={{
               "border-error-600": props.invalid === i,
               "border-border": props.invalid !== i,
             }}
           >
-            <legend class="px-1 text-sm font-medium">
+            <legend class="float-left flex h-10 w-full items-center border-b border-border bg-subtle pr-28 pl-4 text-sm font-semibold text-heading">
               {i + 1}. {t(`marketing.block_${block().type}`)}
             </legend>
-            <div class="mb-3 flex flex-wrap gap-1">
+            <div class="absolute top-2 right-2 flex gap-1">
               <Button
+                category="tertiary"
+                size="small"
+                iconOnly
+                icon="chevron-up"
                 disabled={i === 0}
                 aria-label={`${t("common.moveUp")}: ${i + 1}`}
                 onClick={() => props.onChange(moveItem(props.blocks, i, -1))}
-              >
-                {t("common.moveUp")}
-              </Button>
+              />
               <Button
+                category="tertiary"
+                size="small"
+                iconOnly
+                icon="chevron-down"
                 disabled={i === props.blocks.length - 1}
                 aria-label={`${t("common.moveDown")}: ${i + 1}`}
                 onClick={() => props.onChange(moveItem(props.blocks, i, 1))}
-              >
-                {t("common.moveDown")}
-              </Button>
+              />
               <Button
+                category="tertiary"
+                size="small"
+                iconOnly
+                icon="remove"
                 aria-label={`${t("common.remove")}: ${i + 1}`}
                 onClick={() => props.onChange(removeItem(props.blocks, i))}
-              >
-                {t("common.remove")}
-              </Button>
+              />
             </div>
-            <div class="flex flex-col gap-3">
+            <div class="clear-both flex flex-col gap-4 p-4">
               <BlockFields
                 block={block()}
                 onChange={(next) =>
@@ -200,7 +206,7 @@ export function EmailBlockEditor(props: {
               />
             </div>
             <Show when={props.invalid === i && !blockValid(block())}>
-              <p role="alert" class="mt-2 text-xs font-medium text-error-700">
+              <p role="alert" class="px-4 pb-4 text-sm text-error-700">
                 {t("marketing.blockIncomplete")}
               </p>
             </Show>
@@ -210,7 +216,15 @@ export function EmailBlockEditor(props: {
       <Show when={props.blocks.length < MAX_BLOCKS}>
         <div>
           <Menu
-            trigger={t("content.addBlock")}
+            placement="bottom-start"
+            triggerClass={buttonClass({})}
+            trigger={
+              <>
+                <Icon name="plus" />
+                {t("content.addBlock")}
+                <Icon name="chevron-down" />
+              </>
+            }
             triggerLabel={t("content.addBlock")}
             items={EMAIL_BLOCK_TYPES.map((type) => ({
               label: t(`marketing.block_${type}`),
