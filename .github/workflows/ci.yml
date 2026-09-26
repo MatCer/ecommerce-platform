@@ -165,6 +165,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run lint
       - run: pnpm run typecheck
+      # theme-kit's axe gate tests drive a real headless Chromium
+      - run: pnpm --filter @platform/theme-kit exec playwright install --with-deps chromium
       - run: pnpm test
 
   acceptance:
