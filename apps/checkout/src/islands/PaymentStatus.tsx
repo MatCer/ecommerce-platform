@@ -1,9 +1,9 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { NextAction, OrderPayment, PaymentStart } from "@platform/storefront-sdk/types";
-import { Button } from "@platform/ui";
 import { createSignal, Match, onCleanup, onMount, Show, Switch } from "solid-js";
 import { call } from "../lib/client";
 import { loadStripe, type StripeElements, type StripeJs } from "../lib/stripe";
+import { Button } from "../ui.tsx";
 
 import HydratedControls from "./HydratedControls";
 
@@ -113,13 +113,17 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
                 <p class="text-sm text-muted-foreground">{t(m, "order.stripe_sim_note")}</p>
                 <div class="flex flex-wrap gap-2">
                   <Button
-                    variant="confirm"
+                    variant="primary"
                     loading={busy()}
                     onClick={() => void simulate("succeeded")}
                   >
                     {t(m, "order.stripe_sim_succeed")}
                   </Button>
-                  <Button disabled={busy()} onClick={() => void simulate("failed")}>
+                  <Button
+                    variant="secondary"
+                    disabled={busy()}
+                    onClick={() => void simulate("failed")}
+                  >
                     {t(m, "order.stripe_sim_fail")}
                   </Button>
                 </div>
@@ -134,7 +138,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
       <Show when={p().can_retry}>
         <div>
           <Button
-            variant="confirm"
+            variant="primary"
             loading={busy()}
             onClick={() => void go(`${base}/payment-attempts`)}
           >
@@ -146,6 +150,7 @@ export default function PaymentStatus(props: { m: M; token: string; initial: Ord
         {(a) => (
           <div>
             <Button
+              variant="secondary"
               loading={busy()}
               onClick={() => void go(`${base}/payment-attempts/${a().id}/init`)}
             >
@@ -201,7 +206,7 @@ function StripePayment(props: { m: M; action: StripeAction; onError: (e: string)
       </Show>
       <div ref={host} />
       <div>
-        <Button type="submit" variant="confirm" loading={paying()} disabled={!ready()}>
+        <Button type="submit" variant="primary" loading={paying()} disabled={!ready()}>
           {t(props.m, "order.stripe_pay")}
         </Button>
       </div>

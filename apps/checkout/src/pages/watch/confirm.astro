@@ -1,8 +1,8 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import { Button } from "@platform/ui";
 import Checkout from "../../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../../lib/api";
+import { Button } from "../../ui.tsx";
 
 // Stock / price alert double opt-in (WP19, A20). Opening the link changes nothing; the button
 // confirms (a plain POST form, no JS), so mail scanners that follow links confirm nobody.
@@ -31,7 +31,7 @@ const m = shop?.messages ?? {};
         <form method="post" action="/_p/watch/confirm" class="grid justify-items-start gap-4">
           <p>{t(m, "watch.confirm_intro")}</p>
           <input type="hidden" name="token" value={token} />
-          <Button type="submit" variant="confirm">
+          <Button type="submit" variant="primary">
             {t(m, "watch.confirm_button")}
           </Button>
         </form>

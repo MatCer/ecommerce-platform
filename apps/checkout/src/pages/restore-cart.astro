@@ -1,8 +1,8 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import { Button } from "@platform/ui";
 import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../lib/api";
+import { Button } from "../ui.tsx";
 
 // Abandoned-cart reminder link (WP19). A GET never consumes the capability, so mail scanners
 // can open this page safely; the button's POST restores the cart once.
@@ -26,7 +26,7 @@ const m = shop?.messages ?? {};
         <form method="post" action="/_p/flows/restore-cart" class="grid justify-items-start gap-4">
           <p>{t(m, "flows.restore_intro")}</p>
           <input type="hidden" name="token" value={token} />
-          <Button type="submit" variant="confirm">
+          <Button type="submit" variant="primary">
             {t(m, "flows.restore_button")}
           </Button>
         </form>

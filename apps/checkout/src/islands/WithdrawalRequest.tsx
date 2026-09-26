@@ -1,7 +1,7 @@
 import { t } from "@platform/storefront-sdk/format";
-import { Button, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 
 export default function WithdrawalRequest(props: { m: Record<string, string> }) {
@@ -49,7 +49,7 @@ export default function WithdrawalRequest(props: { m: Record<string, string> }) 
               value={email()}
               onChange={setEmail}
             />
-            <Button type="submit" variant="confirm" loading={busy()}>
+            <Button type="submit" variant="primary" loading={busy()}>
               {t(props.m, "withdraw.send")}
             </Button>
           </HydratedControls>

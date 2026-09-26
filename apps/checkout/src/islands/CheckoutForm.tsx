@@ -7,7 +7,6 @@ import type {
   PickupPoint,
   ShippingOption,
 } from "@platform/storefront-sdk/types";
-import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
 import { createSignal, For, type JSX, onMount, Show } from "solid-js";
 import { call } from "../lib/client";
 import { loadPacketa, toPickupPoint } from "../lib/packeta";
@@ -18,6 +17,7 @@ import {
   sendPlacement,
   unknownOutcome,
 } from "../lib/placement";
+import { Button, Checkbox, SelectField, TextField } from "../ui.tsx";
 
 import HydratedControls from "./HydratedControls";
 
@@ -478,7 +478,7 @@ export default function CheckoutForm(props: {
                     )}
                   </Show>
                   <div>
-                    <Button onClick={() => void openWidget(method().id)}>
+                    <Button variant="secondary" onClick={() => void openWidget(method().id)}>
                       {view().pickup_point && !pendingPickup()
                         ? t(m, "checkout.pickup_change")
                         : t(m, "checkout.pickup_choose")}

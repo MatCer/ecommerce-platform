@@ -1,8 +1,8 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { ConsentPurposes } from "@platform/storefront-sdk/types";
-import { Button, Checkbox } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, Checkbox } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 import { problemText } from "./SignIn";
 
@@ -65,7 +65,7 @@ export default function ConsentForm(props: {
           </For>
         </fieldset>
         <div>
-          <Button type="submit" variant="confirm" loading={busy()}>
+          <Button type="submit" variant="primary" loading={busy()}>
             {t(m, "consent.save")}
           </Button>
         </div>

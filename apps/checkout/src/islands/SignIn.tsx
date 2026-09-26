@@ -1,8 +1,8 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { SignInResult } from "@platform/storefront-sdk/types";
-import { Button, TextField } from "@platform/ui";
 import { createSignal, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 
 type M = Record<string, string>;
@@ -76,7 +76,7 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
           value={email()}
           onChange={setEmail}
         />
-        <Button type="submit" variant="confirm" loading={busy() === "link"}>
+        <Button type="submit" variant="primary" loading={busy() === "link"}>
           {t(m, "account.send_link")}
         </Button>
       </form>
@@ -117,7 +117,7 @@ export default function SignIn(props: { m: M; redirect?: string | undefined }) {
             value={password()}
             onChange={setPassword}
           />
-          <Button type="submit" loading={busy() === "password"}>
+          <Button type="submit" variant="secondary" loading={busy() === "password"}>
             {t(m, "account.sign_in_button")}
           </Button>
         </form>

@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-/* The shared accessible primitives (account forms). */
-@source "../../../../packages/ui/src";
-
 /* Same token names as the themes; values come from the tenant's /_p/tokens.css at runtime. */
 @theme reference {
   --color-background: #f5f7f9;
@@ -22,7 +19,7 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
 
-  /* Names used by @platform/ui, mapped onto the tenant's tokens below. */
+  /* Names used by src/ui.tsx, mapped onto the tenant's tokens below. */
   --color-accent-50: #eef3fa;
   --color-accent-600: #2b5aa8;
   --color-accent-700: #274c8a;
@@ -34,20 +31,10 @@
   --color-ring: #2b5aa8;
   --radius-sm: 0.375rem;
   --spacing-control: 2.75rem;
-  --spacing-control-sm: 2rem;
-  --color-primary: #2b5aa8;
-  --color-primary-hover: #274c8a;
-  --color-primary-foreground: #fff;
-  --color-danger-foreground: #fff;
-  --color-heading: #1b1f2a;
-  --color-subtle: #eaedf1;
-  --color-control: #fff;
-  --color-input-hover: #1b1f2a;
-  --color-neutral-50: #eaedf1;
 }
 
 @layer base {
-  /* @platform/ui speaks the admin's token names; on the checkout they are the tenant's. */
+  /* src/ui.tsx speaks the admin's token names; on the checkout they are the tenant's. */
   :root {
     --color-accent-50: var(--color-identity-wash);
     --color-accent-600: var(--color-identity);
@@ -58,14 +45,6 @@
     --color-input: var(--color-muted-foreground);
     --color-border-strong: var(--color-muted-foreground);
     --color-faint-foreground: var(--color-muted-foreground);
-    /* Pajamas names used since the admin redesign: primary actions stay in the shop's identity. */
-    --color-primary: var(--color-identity);
-    --color-primary-hover: var(--color-identity-ink);
-    --color-heading: var(--color-foreground);
-    --color-subtle: var(--color-muted);
-    --color-control: var(--color-card);
-    --color-input-hover: var(--color-foreground);
-    --color-neutral-50: var(--color-muted);
     /* 44px targets for touch (WCAG 2.2 target size, comfortably). */
     --spacing-control: 2.75rem;
   }

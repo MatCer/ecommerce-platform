@@ -1,8 +1,8 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import { Button } from "@platform/ui";
 import Checkout from "../../layouts/Checkout.astro";
 import { checkoutApi, shopUrl } from "../../lib/api";
+import { Button } from "../../ui.tsx";
 
 // Newsletter double opt-in (WP18, A20). Opening the link only shows the address; the button
 // confirms (a plain POST form, no JS), so mail scanners that follow links subscribe nobody.
@@ -34,7 +34,7 @@ const m = shop?.messages ?? {};
         <form method="post" action="/_p/newsletter/confirm" class="grid justify-items-start gap-4">
           <p>{t(m, "nl.confirm_intro", { email: pending.email })}</p>
           <input type="hidden" name="token" value={token} />
-          <Button type="submit" variant="confirm">
+          <Button type="submit" variant="primary">
             {t(m, "nl.confirm_button")}
           </Button>
         </form>

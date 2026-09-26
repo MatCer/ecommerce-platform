@@ -59,10 +59,9 @@ hex or `oklch` in pages.
 | `tableClass`, `tdClass`, `Th` | Plain `<table>`; wrap in `<div class="overflow-x-auto">`. |
 | `Icon name=` | Pajamas icons; decorative unless `label`. Add icons by importing the SVG in `icon.tsx`. |
 
-`@platform/ui` is shared with `apps/checkout` (Button, TextField, SelectField, Checkbox,
-controlClass). The checkout maps the token names onto the shop's theme in
-`apps/checkout/src/styles/global.css`; a component that starts using a new token name needs
-a mapping there too, and API changes need its call sites updated.
+`@platform/ui` is admin-only. The checkout is a shop-branded storefront, not GitLab-styled:
+it keeps its own small form primitives in `apps/checkout/src/ui.tsx`, styled by the shop's
+tokens (`apps/checkout/src/styles/global.css`), so admin restyles never reach it.
 
 Deliberately not built (no admin use yet): numbered Pagination (lists use "Load more"),
 sortable headers, Popover, removable Token/Label, Combobox, tier badge. Add them to

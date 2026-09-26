@@ -1,8 +1,8 @@
 import { t } from "@platform/storefront-sdk/format";
 import type { Address, AddressInput } from "@platform/storefront-sdk/types";
-import { Button, Checkbox, SelectField, TextField } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, Checkbox, SelectField, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 import { problemText } from "./SignIn";
 
@@ -149,13 +149,14 @@ export default function Addresses(props: {
                 </address>
                 <div class="flex gap-2">
                   <Button
+                    variant="secondary"
                     onClick={() => open(a)}
                     aria-label={`${t(m, "address.edit")}: ${a.name}, ${a.street}`}
                   >
                     {t(m, "address.edit")}
                   </Button>
                   <Button
-                    category="tertiary"
+                    variant="ghost"
                     onClick={() => remove(a)}
                     aria-label={`${t(m, "address.delete")}: ${a.name}, ${a.street}`}
                   >
@@ -172,7 +173,7 @@ export default function Addresses(props: {
         when={editing() !== undefined}
         fallback={
           <div>
-            <Button variant="confirm" onClick={() => open()}>
+            <Button variant="primary" onClick={() => open()}>
               {t(m, "address.add")}
             </Button>
           </div>
@@ -251,10 +252,10 @@ export default function Addresses(props: {
             </p>
           </Show>
           <div class="flex gap-2 sm:col-span-2">
-            <Button type="submit" variant="confirm" loading={busy()}>
+            <Button type="submit" variant="primary" loading={busy()}>
               {t(m, "address.save")}
             </Button>
-            <Button category="tertiary" onClick={() => setEditing(undefined)}>
+            <Button variant="ghost" onClick={() => setEditing(undefined)}>
               {t(m, "address.cancel")}
             </Button>
           </div>

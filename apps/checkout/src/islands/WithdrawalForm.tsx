@@ -4,9 +4,9 @@ import type {
   WithdrawalForm as Form,
   WithdrawalReceipt,
 } from "@platform/storefront-sdk/types";
-import { Button, TextField } from "@platform/ui";
 import { createSignal, For, Show } from "solid-js";
 import { call } from "../lib/client";
+import { Button, TextField } from "../ui.tsx";
 import HydratedControls from "./HydratedControls";
 
 export default function WithdrawalForm(props: {
@@ -159,7 +159,7 @@ export default function WithdrawalForm(props: {
                     </Show>
                     <Button
                       type="button"
-                      variant="confirm"
+                      variant="primary"
                       loading={busy()}
                       disabled={expired()}
                       onClick={confirm}
@@ -248,7 +248,7 @@ export default function WithdrawalForm(props: {
                       onInput={(e) => setNote(e.currentTarget.value)}
                     />
                   </label>
-                  <Button type="submit" variant="confirm" disabled={expired()}>
+                  <Button type="submit" variant="primary" disabled={expired()}>
                     {t(m, "withdraw.continue")}
                   </Button>
                 </form>
