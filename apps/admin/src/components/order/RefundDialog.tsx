@@ -17,7 +17,7 @@ import { useFulfillmentRefresh } from "./shared.tsx";
 
 export function RefundResult(props: { result: Schemas["RefundOutcome"] }) {
   return (
-    <Alert tone="success">
+    <Alert live tone="success">
       <p>{t("fulfillment.refundResult", { amount: props.result.plan.amount.formatted })}</p>
       <Show when={props.result.credit_note_id}>
         <p class="break-all">

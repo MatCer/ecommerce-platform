@@ -348,7 +348,7 @@ export function AiPanel(props: {
             <div class="flex flex-col gap-3">
               <p class="text-sm text-muted-foreground">{t("ai.proposalHint")}</p>
               <Show when={p().warnings.length > 0}>
-                <Alert tone="warning" title={t("ai.warnings")}>
+                <Alert live tone="warning" title={t("ai.warnings")}>
                   <ul class="ml-4 list-disc">
                     <For each={p().warnings}>{(w) => <li>{w}</li>}</For>
                   </ul>

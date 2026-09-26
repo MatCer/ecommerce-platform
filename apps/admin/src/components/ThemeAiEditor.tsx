@@ -395,6 +395,7 @@ function RunView(props: {
       <Show when={run().status === "accepted" && run().revision_id}>
         {(id) => (
           <Alert
+            live
             tone="success"
             actions={
               <Button onClick={() => props.onShowRevision(id())}>

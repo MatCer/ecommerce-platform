@@ -250,6 +250,7 @@ export default function ContentLegal() {
             <Show when={installed()}>
               {(result) => (
                 <Alert
+                  live
                   tone="success"
                   title={t("content.installed", {
                     created: result().created.length,

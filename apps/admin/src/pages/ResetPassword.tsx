@@ -36,7 +36,14 @@ export function ResetPassword() {
         when={token() && !params.error}
         fallback={<Alert tone="error">{t("auth.resetInvalid")}</Alert>}
       >
-        <Show when={!done()} fallback={<Alert tone="success">{t("auth.resetDone")}</Alert>}>
+        <Show
+          when={!done()}
+          fallback={
+            <Alert live tone="success">
+              {t("auth.resetDone")}
+            </Alert>
+          }
+        >
           <form class="flex flex-col gap-4" onSubmit={submit}>
             <TextField
               label={t("auth.newPassword")}

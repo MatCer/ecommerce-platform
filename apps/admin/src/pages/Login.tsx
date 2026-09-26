@@ -140,7 +140,7 @@ export function Login() {
       </Match>
       <Match when={step() === "magic-sent" || step() === "reset-sent"}>
         <AuthLayout title={t("auth.magicSentTitle")}>
-          <Alert tone="success">
+          <Alert live tone="success">
             {step() === "magic-sent"
               ? t("auth.magicSentDesc", { email: email() })
               : t("auth.resetSent", { email: email() })}

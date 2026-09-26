@@ -315,7 +315,7 @@ export default function AiBulkEdit() {
                     </div>
                   </Match>
                   <Match when={p().status === "applied"}>
-                    <Alert tone="success">
+                    <Alert live tone="success">
                       {t("ai.applied", {
                         done: p().progress.done ?? 0,
                         skipped: p().progress.skipped ?? 0,

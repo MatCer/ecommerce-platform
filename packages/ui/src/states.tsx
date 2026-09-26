@@ -118,18 +118,28 @@ export interface AlertProps {
   /** Localised label of the dismiss (X) button; shown only together with `onDismiss`. */
   dismissLabel?: string;
   onDismiss?: () => void;
+  /**
+   * Announce the alert when it appears (the result of an action): warnings as `role="alert"`,
+   * other tones as `role="status"`. Errors are always announced.
+   */
+  live?: boolean;
   class?: string;
 }
 
 /**
- * Pajamas inline alert. Errors and warnings are announced (`role="alert"`), the rest politely
- * (`role="status"`).
+ * Pajamas inline alert. A plain container by default (static notices are read in page order);
+ * errors are `role="alert"`, and `live` announces the others.
  */
 export function Alert(props: AlertProps) {
   const tone = () => alertTones[props.tone ?? "info"];
+  const role = () => {
+    if (props.tone === "error") return "alert";
+    if (!props.live) return undefined;
+    return props.tone === "warning" ? "alert" : "status";
+  };
   return (
     <div
-      role={props.tone === "error" || props.tone === "warning" ? "alert" : "status"}
+      role={role()}
       class={`relative flex gap-3 rounded-md border py-3 pr-10 pl-3 text-sm text-foreground ${tone().box} ${props.class ?? ""}`}
       classList={{ "pr-3": !props.onDismiss }}
     >

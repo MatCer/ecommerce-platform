@@ -276,7 +276,7 @@ function StatementUpload() {
       <Show when={report()}>
         {(r) => (
           <div class="mt-4" data-testid="import-report">
-            <Alert tone="success">
+            <Alert live tone="success">
               {t("pay.imported", {
                 imported: r().imported,
                 duplicates: r().duplicates,

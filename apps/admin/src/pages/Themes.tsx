@@ -600,6 +600,7 @@ function TokenEditor(props: {
     >
       <Show when={conflict()}>
         <Alert
+          live
           tone="warning"
           class="mb-4"
           actions={
