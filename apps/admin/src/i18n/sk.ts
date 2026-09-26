@@ -783,6 +783,9 @@ export const sk: Dictionary = {
     radius: "Zaoblenie rohov",
     pick: "Vybrať farbu {{ name }}",
     saveTokens: "Vytvoriť revíziu",
+    draftConflict:
+      "Aktívna téma sa počas úprav zmenila. Pred vytvorením revízie načítajte aktuálne tokeny.",
+    loadLatestTokens: "Načítať aktuálne tokeny",
     invalid: {
       color: "Použite #rrggbb alebo oklch(L C H).",
       font: "Len písmená, číslice, medzery, čiarky, úvodzovky a pomlčky.",

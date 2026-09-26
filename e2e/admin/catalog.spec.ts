@@ -4,6 +4,7 @@
  */
 
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+import { tabTo } from "../keyboard";
 import { testContext } from "../rate-client";
 import {
   createTenant,
@@ -173,11 +174,11 @@ test("creates a product with variants and an uploaded image", async () => {
 test("keyboard only: edits and saves a product", async () => {
   await page.goto(productUrl);
   const brand = page.getByLabel("Brand");
-  await brand.focus();
+  await tabTo(page, brand);
   await page.keyboard.press("ControlOrMeta+A");
   await page.keyboard.type("Acme Keyboard");
   const save = page.getByRole("button", { name: "Save product" });
-  await save.focus();
+  await tabTo(page, save);
   const saved = page.waitForResponse(
     (response) =>
       response.url().includes("/admin/v1/products/") && response.request().method() === "PUT",

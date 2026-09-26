@@ -6,12 +6,18 @@
 
 import { type Browser, expect, type Page } from "@playwright/test";
 import { mailpit } from "../admin/support";
+import { tabTo } from "../keyboard";
 import { rateHeaders, testContext } from "../rate-client";
 
 const port = process.env.HTTP_PORT ?? "8080";
 export const CZ = `http://demo.localhost:${port}`;
 export const SK = `http://demo-sk.localhost:${port}`;
 export const checkoutOf = (shop: string) => shop.replace("://", "://checkout.");
+
+/** SSR controls are visible before the checkout island attaches its event handlers. */
+export async function checkoutReady(page: Page): Promise<void> {
+  await page.waitForFunction(() => !document.querySelector('astro-island[client="load"][ssr]'));
+}
 
 export interface Money {
   amount_minor: number;
@@ -89,10 +95,12 @@ export async function toCheckout(
       form.submit();
     }),
   ]);
+  await checkoutReady(page);
   return cart;
 }
 
 export async function fillContactAndAddress(page: Page, email: string | null, city = "Praha") {
+  await checkoutReady(page);
   if (email !== null) await page.locator('input[autocomplete="email"]').fill(email);
   await page.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
   await page.locator('input[autocomplete="section-billing street-address"]').fill("Dlouhá 12");
@@ -111,12 +119,12 @@ export async function choosePickupPoint(page: Page, point: RegExp, keyboard = fa
   if (keyboard) {
     // Tab cycles inside the dialog; Enter chooses (A26: keyboard pickup-point selection).
     const first = widget.getByRole("button").first();
-    await first.focus();
+    await tabTo(page, first);
     await page.keyboard.press("Shift+Tab");
     await expect(widget.getByRole("button", { name: "Zavřít" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(first).toBeFocused();
-    await target.focus();
+    await tabTo(page, target);
     await page.keyboard.press("Enter");
   } else {
     // The widget removes its frame right after the choice; a plain click would wait on it.
@@ -145,7 +153,9 @@ export async function fakePay(page: Page, button: "Pay" | "Fail the payment"): P
 
 export async function order(page: Page, shop: string, token: string): Promise<OrderModel> {
   return (await (
-    await page.request.get(`${checkoutOf(shop)}/_p/orders/${token}`)
+    await page.request.get(`${checkoutOf(shop)}/_p/orders/${token}`, {
+      headers: rateHeaders(page),
+    })
   ).json()) as OrderModel;
 }
 

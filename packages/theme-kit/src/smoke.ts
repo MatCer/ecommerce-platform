@@ -79,16 +79,27 @@ try {
   await page.screenshot({ path: `${values.shots}/category.png` });
   await budget(page);
 
-  await page.locator("main article a").first().click();
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const categoryUrl = page.url();
+  const candidates = Math.min(await page.locator("main article a").count(), 24);
+  let addToCart: ReturnType<Page["getByRole"]> | undefined;
+  for (let i = 0; i < candidates; i++) {
+    await page.locator("main article a").nth(i).click();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // SSR controls can appear before client:idle islands attach their handlers.
+    await page.waitForFunction(() => !document.querySelector('astro-island[client="idle"][ssr]'));
+    const button = page.getByRole("button", { name: /do košíku|do košíka|to cart/i }).first();
+    if ((await button.count()) > 0 && (await button.isEnabled())) {
+      addToCart = button;
+      break;
+    }
+    await page.goto(categoryUrl, { waitUntil: "networkidle" });
+  }
+  if (!addToCart) throw new Error("the first category has no purchasable product");
   await page.screenshot({ path: `${values.shots}/product.png` });
   await budget(page);
 
   // .first(): a theme may repeat the buy button in a sticky bar on phones.
-  await page
-    .getByRole("button", { name: /do košíku|do košíka|to cart/i })
-    .first()
-    .click();
+  await addToCart.click();
   await expect(page.getByRole("dialog", { name: /Košík|Cart/ })).toBeVisible();
   await page.screenshot({ path: `${values.shots}/cart.png` });
 
@@ -107,9 +118,13 @@ try {
     await page.waitForURL(/\/\/checkout\./);
     await expect(page.getByRole("heading", { name: /Souhrn|Súhrn|Summary/ })).toBeVisible();
     // The checkout origin shows the same cart: same total (incl. VAT) and the VAT recap.
-    await expect(page.locator("[data-cart-total]")).toHaveText(before.total.formatted);
+    await expect(page.getByTestId("checkout-total")).toHaveText(before.total.formatted);
     for (const row of before.vat ?? [])
-      await expect(page.locator(`[data-vat-rate="${row.rate}"]`)).toBeVisible();
+      await expect(
+        page
+          .locator('aside[aria-labelledby="co-summary"] dt')
+          .filter({ hasText: new RegExp(`${row.rate}\\s*%`) }),
+      ).toBeVisible();
   }
   await page.screenshot({ path: `${values.shots}/checkout.png` });
   if (errors.length) throw new Error(`console errors:\n${errors.join("\n")}`);

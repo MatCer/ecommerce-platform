@@ -43,20 +43,28 @@ pub const TENANT: &str = "demo";
 const ACTOR: &str = "seed";
 const SK_HOST: &str = "demo-sk.localhost";
 
-/// Only the pre-WP16 stock text is replaced on reruns; merchant-edited legal copy survives.
-fn legacy_review_copy(blocks: &[commerce::content::Block]) -> bool {
-    blocks.iter().any(|block| {
-        let commerce::content::Block::RichText { html } = block else {
-            return false;
-        };
-        [
-            "nezveřejňuje recenze",
-            "nezverejňuje recenzie",
-            "does not publish customer reviews",
-        ]
-        .iter()
-        .any(|old| html.contains(old))
-    })
+/// Match the complete pre-WP16 platform template. Any merchant addition keeps the page intact.
+fn legacy_review_copy(locale: &str, shop_name: &str, blocks: &[commerce::content::Block]) -> bool {
+    let old = match locale {
+        "cs" => {
+            "# Ověřování recenzí\n\nE-shop {{shop_name}} zatím nezveřejňuje recenze zákazníků.\n\nJakmile recenze začneme zobrazovat, na této stránce popíšeme, zda a jak ověřujeme, že pocházejí od zákazníků, kteří zboží skutečně zakoupili (například zasíláním žádosti o recenzi pouze na základě dokončené objednávky)."
+        }
+        "sk" => {
+            "# Overovanie recenzií\n\nE-shop {{shop_name}} zatiaľ nezverejňuje recenzie zákazníkov.\n\nKeď začneme recenzie zobrazovať, na tejto stránke opíšeme, či a ako overujeme, že pochádzajú od zákazníkov, ktorí tovar skutočne kúpili (napríklad zasielaním žiadosti o recenziu len na základe dokončenej objednávky)."
+        }
+        "en" => {
+            "# Review verification\n\nThe shop {{shop_name}} does not publish customer reviews yet.\n\nOnce reviews are shown, this page will explain whether and how we check that they come from customers who actually bought the product (for example by inviting reviews only after a completed order)."
+        }
+        _ => return false,
+    };
+    let escaped = shop_name
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+    let (_, expected) =
+        commerce::content::legal::markdown_blocks(&old.replace("{{shop_name}}", &escaped));
+    blocks == expected
 }
 
 /// A color variant of a fixture photo: the image is the fixture with its hue rotated.
@@ -1492,7 +1500,7 @@ impl Seeder<'_> {
                     .await?;
             let vat_id = tax::get(&mut tx).await?.and_then(|profile| profile.vat_id);
             for translation in &mut page.translations {
-                if !legacy_review_copy(&translation.blocks) {
+                if !legacy_review_copy(&translation.locale, &shop_name, &translation.blocks) {
                     continue;
                 }
                 if let Some((title, blocks)) = legal::render(
@@ -1644,14 +1652,24 @@ mod tests {
 
     #[test]
     fn legacy_review_copy_is_detected_without_overwriting_current_copy() {
-        let old = [commerce::content::Block::RichText {
-            html: "Náš obchod nezveřejňuje recenze zákazníků.".into(),
-        }];
+        let old = commerce::content::legal::markdown_blocks(
+            "# Ověřování recenzí\n\nE-shop Demo zatím nezveřejňuje recenze zákazníků.\n\nJakmile recenze začneme zobrazovat, na této stránce popíšeme, zda a jak ověřujeme, že pocházejí od zákazníků, kteří zboží skutečně zakoupili (například zasíláním žádosti o recenzi pouze na základě dokončené objednávky).",
+        ).1;
         let current = [commerce::content::Block::RichText {
             html: "Zveřejňujeme ověřené pozitivní i negativní recenze.".into(),
         }];
-        assert!(legacy_review_copy(&old));
-        assert!(!legacy_review_copy(&current));
+        assert!(legacy_review_copy("cs", "Demo", &old));
+        assert!(!legacy_review_copy("cs", "Demo", &current));
+        let mut merchant_edited = old.clone();
+        merchant_edited.push(commerce::content::Block::RichText {
+            html: "<p>Merchant addition</p>".into(),
+        });
+        assert!(!legacy_review_copy("cs", "Demo", &merchant_edited));
+        if let commerce::content::Block::RichText { html } = &mut merchant_edited[0] {
+            html.push_str("<p>Merchant addition</p>");
+        }
+        merchant_edited.pop();
+        assert!(!legacy_review_copy("cs", "Demo", &merchant_edited));
     }
 
     #[test]

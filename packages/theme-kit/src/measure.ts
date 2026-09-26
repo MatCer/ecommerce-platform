@@ -16,9 +16,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { gzipSync } from "node:zlib";
-import { AxeBuilder } from "@axe-core/playwright";
 import lighthouse from "lighthouse";
 import { type BrowserContext, chromium } from "playwright";
+import { scanAxe } from "./axe.ts";
 import { addCookie, chromiumArgs, freshSubrequests, parseCookie } from "./browser.ts";
 import { BUDGET, judge, median, type PageResult } from "./budget.ts";
 
@@ -114,31 +114,9 @@ async function measureJs(url: string, opts: { withRum: boolean }) {
     await page.evaluate((top) => window.scrollTo(0, top), y);
     await page.waitForTimeout(120);
   }
-  // End at the very bottom (a fixed consent banner then covers only the page's end padding).
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  // A sticky header covers whatever happens to scroll under it at this one position (the reader
-  // scrolls it back into view); axe would report that as a target-size failure depending on
-  // content height alone. Unstick sticky elements for the scan; fixed ones (the consent banner)
-  // stay and are checked.
-  await page.evaluate(() => {
-    for (const el of document.querySelectorAll<HTMLElement>("body *")) {
-      if (getComputedStyle(el).position === "sticky") el.style.position = "static";
-    }
-    window.scrollTo(0, document.documentElement.scrollHeight);
-  });
   await settle(ctx);
 
-  const axe = opts.withRum
-    ? []
-    : (
-        await new AxeBuilder({ page })
-          .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-          .analyze()
-      ).violations.map((v) => ({
-        id: v.id,
-        impact: v.impact ?? "unknown",
-        nodes: v.nodes.length,
-      }));
+  const axe = opts.withRum ? [] : await scanAxe(page);
   // Inline <script> bodies are part of the HTML transfer; count them too (Astro bootstrap).
   const inline = await page.evaluate(() =>
     [...document.querySelectorAll("script:not([src])")]

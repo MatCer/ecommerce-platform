@@ -781,6 +781,9 @@ export const en = {
     radius: "Corner radius",
     pick: "Pick colour {{ name }}",
     saveTokens: "Create revision",
+    draftConflict:
+      "The active theme changed while you were editing. Load its latest tokens before creating a revision.",
+    loadLatestTokens: "Load latest tokens",
     invalid: {
       color: "Use #rrggbb or oklch(L C H).",
       font: "Letters, digits, spaces, commas, quotes and hyphens only.",

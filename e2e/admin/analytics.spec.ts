@@ -5,7 +5,8 @@
  */
 
 import { expect, type Page, test } from "@playwright/test";
-import { testContext } from "../rate-client";
+import { checkoutReady } from "../checkout/support";
+import { rateHeaders, testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, run, useEnglish } from "./support.ts";
 
 const port = process.env.HTTP_PORT ?? "8080";
@@ -27,12 +28,14 @@ async function placeSkOrder(page: Page): Promise<void> {
   await page.context().addCookies([{ name: "consent", value: "", url: SK }]);
   await page.goto(`${SK}/`);
   const model = (await (
-    await page.request.get(`${SK}/_p/public/pages/product/tricko-oversize`)
+    await page.request.get(`${SK}/_p/public/pages/product/tricko-oversize`, {
+      headers: rateHeaders(page),
+    })
   ).json()) as { product: { variants: { id: string }[] } };
   let added = 0;
   for (const v of model.product.variants) {
     const res = await page.request.post(`${SK}/_p/cart/lines`, {
-      headers: { origin: SK },
+      headers: { origin: SK, ...rateHeaders(page) },
       data: { variant_id: v.id, quantity: 1 },
     });
     added = res.status();
@@ -49,6 +52,7 @@ async function placeSkOrder(page: Page): Promise<void> {
       form.submit();
     }),
   ]);
+  await checkoutReady(page);
   await page.locator('input[autocomplete="email"]').fill(`analytics-${run}@example.test`);
   await page.locator('input[autocomplete="section-billing name"]').fill("Jana Nováková");
   await page.locator('input[autocomplete="section-billing street-address"]').fill("Dlhá 12");

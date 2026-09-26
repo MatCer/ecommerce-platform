@@ -493,6 +493,12 @@ pub async fn edit_tokens(
     if let Some(id) = base {
         ensure_validated_base(tx, id).await?;
     }
+    if base != active_id(tx).await? {
+        return Err(invalid(
+            "stale_theme_base",
+            "the active theme changed; load its latest tokens before editing",
+        ));
+    }
     let mut source = match base {
         Some(id) => revision_source(tx, storage, id).await?,
         None => default_source(tx, storage).await?,

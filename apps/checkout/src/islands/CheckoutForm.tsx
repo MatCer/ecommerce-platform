@@ -190,6 +190,23 @@ export default function CheckoutForm(props: {
     await put("payment", { method: kind });
   }
 
+  /** Saving disables the fieldset and replaces its options. Return keyboard focus to the choice. */
+  async function keepChoiceFocus(input: HTMLInputElement, save: () => Promise<void>) {
+    const focused =
+      document.activeElement instanceof HTMLInputElement &&
+      document.activeElement.name === input.name;
+    const { name, value } = input;
+    await save();
+    if (focused && document.activeElement === document.body) {
+      for (const candidate of document.getElementsByName(name)) {
+        if (candidate instanceof HTMLInputElement && candidate.value === value) {
+          candidate.focus();
+          break;
+        }
+      }
+    }
+  }
+
   const emailValid = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email().trim());
   const addressesValid = () => complete(billing()) && (!elsewhere() || complete(delivery()));
 
@@ -420,7 +437,7 @@ export default function CheckoutForm(props: {
                     value={s.id}
                     checked={(pendingPickup() ?? view().shipping_method_id) === s.id}
                     disabled={s.price == null}
-                    onChange={() => void chooseShipping(s)}
+                    onChange={(e) => void keepChoiceFocus(e.currentTarget, () => chooseShipping(s))}
                   />
                   <span class="grid flex-1 gap-0.5">
                     <span class="flex justify-between gap-2 font-semibold">
@@ -482,7 +499,9 @@ export default function CheckoutForm(props: {
                     value={p.kind}
                     checked={view().payment_method === p.kind}
                     disabled={!p.selectable}
-                    onChange={() => void choosePayment(p.kind)}
+                    onChange={(e) =>
+                      void keepChoiceFocus(e.currentTarget, () => choosePayment(p.kind))
+                    }
                   />
                   <span class="grid flex-1 gap-0.5">
                     <span class="flex justify-between gap-2 font-semibold">

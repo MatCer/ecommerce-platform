@@ -15,13 +15,19 @@ import { GALLERY_SIZES } from "../../lib/images";
 import { storefront } from "../../lib/storefront";
 
 const sf = storefront(Astro.request);
-const [shop, page] = await Promise.all([sf.shop(), sf.product(Astro.params.slug ?? "")]);
+const pagePromise = sf.product(Astro.params.slug ?? "");
+// Recommendations are below the fold. Start their optional request as soon as the product
+// arrives, while the independent shop request may still be running.
+const recommendedPromise = pagePromise.then((result) =>
+  result
+    ? sf.recommendations(`product:${result.product.id}`, { limit: 4 }).catch(() => null)
+    : null,
+);
+const [shop, page, recommended] = await Promise.all([sf.shop(), pagePromise, recommendedPromise]);
 if (!page) return Astro.rewrite("/404");
 const { product: p } = page;
 const { t, tn, pick } = i18n(shop);
 const rating = page.reviews.summary;
-// An optional slot must never take the page down with it.
-const recommended = await sf.recommendations(`product:${p.id}`, { limit: 4 }).catch(() => null);
 const recommendedTitle =
   recommended?.title ??
   t(

@@ -307,6 +307,18 @@ async fn fork_build_preview_publish_rollback(db: PgPool) {
     let list = themes::list(&mut tx).await.unwrap();
     let first = list.iter().find(|r| r.number == 1).unwrap();
     assert_eq!(first.status, "superseded");
+    let stale = themes::edit_tokens(
+        &mut tx,
+        &storage,
+        "owner",
+        &TokensInput {
+            base_revision_id: Some(first.id),
+            tokens: tokens("#123456"),
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(stale.code(), "stale_theme_base");
     let rolled = themes::publish(&mut tx, "owner", first.id).await.unwrap();
     assert_eq!(rolled.status, "published");
     let list = themes::list(&mut tx).await.unwrap();

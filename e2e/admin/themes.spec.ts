@@ -239,11 +239,18 @@ test("publishing changes the storefront; rolling back restores it", async () => 
   const before = await buyColor(shopPage);
   expect(before).not.toBe(GREEN);
   await page.goto("/themes");
+  const editor = page.getByRole("region", { name: "Colours, fonts and corners" });
+  await editor.getByRole("textbox", { name: "buy", exact: true }).fill("#123456");
   const row = (n: number | string) =>
     page.getByRole("row").filter({ has: page.getByRole("button", { name: `#${n}`, exact: true }) });
   await row(tokens).getByRole("button", { name: "Publish" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText(`Revision #${tokens} is live.`)).toBeVisible();
+  await expect(editor.getByRole("alert")).toContainText("The active theme changed");
+  await expect(editor.getByRole("button", { name: "Create revision" })).toBeDisabled();
+  await editor.getByRole("button", { name: "Load latest tokens" }).click();
+  await expect(editor.getByRole("alert")).toHaveCount(0);
+  await expect(editor.getByRole("textbox", { name: "buy", exact: true })).toHaveValue(GREEN);
   await shopPage.reload();
   expect(await buyColor(shopPage)).toBe(GREEN);
   const audit = sql(
@@ -274,7 +281,7 @@ test("hostile archives are refused at upload with every reason", async () => {
       { name: "/root/.ssh/authorized_keys", body: "x" },
     ]),
   );
-  const alert = page.getByRole("alert");
+  const alert = page.getByRole("alert").filter({ hasText: "The archive was refused" });
   await expect(alert).toContainText("The archive was refused");
   await expect(alert).toContainText('"src/pages/index.astro": symbolic links are not allowed');
   await expect(alert).toContainText(`"../escape.astro": '..' is not allowed`);
@@ -287,7 +294,7 @@ test("hostile archives are refused at upload with every reason", async () => {
       { name: "public/big.bin", body: Buffer.alloc(51 * 1024 * 1024) },
     ]),
   );
-  await expect(page.getByRole("alert")).toContainText("larger than 50 MB");
+  await expect(page.getByRole("alert").filter({ hasText: "larger than 50 MB" })).toBeVisible();
   expect(latest()).toBe(count);
 });
 
@@ -353,7 +360,9 @@ test("contract violations and a network attempt fail the build with reasons", as
   // The failure reasons are shown in the admin.
   await page.goto("/themes");
   await page.getByRole("button", { name: `#${latest()}`, exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText(/NETWORK-PROBE: blocked|EAI_AGAIN/);
+  await expect(
+    page.getByRole("alert").filter({ hasText: /NETWORK-PROBE: blocked|EAI_AGAIN/ }),
+  ).toBeVisible();
 });
 
 test("a revision that blows the JS budget fails with the numbers", async () => {
