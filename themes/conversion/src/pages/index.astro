@@ -11,6 +11,7 @@ import {
   cardImage,
   HERO_SIZES,
   PROMO_SIZES,
+  SPOTLIGHT_CARD_SIZES,
   SPOTLIGHT_SIZES,
   TILE_SIZES,
 } from "../lib/images";
@@ -171,7 +172,7 @@ const sectionTitle = "text-center text-2xl font-bold md:text-3xl";
         <ul class="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4 md:gap-x-6">
           {spotProducts.map((p, i) => (
             <li class="flex first:col-span-2 first:row-span-2">
-              <ProductCard product={p} shop={shop} sizes={i === 0 ? SPOTLIGHT_SIZES : undefined} />
+              <ProductCard product={p} shop={shop} sizes={i === 0 ? SPOTLIGHT_SIZES : SPOTLIGHT_CARD_SIZES} wide={i === 0} />
             </li>
           ))}
         </ul>

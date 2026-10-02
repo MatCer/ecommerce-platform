@@ -2,7 +2,7 @@
 import { imageAttrs } from "@platform/storefront-sdk/format";
 import type { ProductCard, ShopModel } from "@platform/storefront-sdk/types";
 import { i18n, productHref } from "../lib/i18n";
-import { CARD_SIZES, cardImage } from "../lib/images";
+import { CARD_SIZES, capped, cardImage } from "../lib/images";
 import StockLine from "./StockLine.astro";
 
 /**
@@ -18,10 +18,19 @@ interface Props {
   priority?: boolean;
   /** The slot's `sizes` when the card is not in a standard grid (lib/images.ts). */
   sizes?: string;
+  /** Rendered wider than a grid card (home spotlight): keep the 960/1280 w candidates. */
+  wide?: boolean;
 }
-const { product: p, shop, eager = false, priority = false, sizes = CARD_SIZES } = Astro.props;
+const {
+  product: p,
+  shop,
+  eager = false,
+  priority = false,
+  sizes = CARD_SIZES,
+  wide = false,
+} = Astro.props;
 const { t } = i18n(shop);
-const [main, hover] = p.images.map(cardImage);
+const [main, hover] = p.images.map((i) => (wide ? capped(i, 1280) : cardImage(i)));
 const img = main && imageAttrs(main, { sizes, priority, width: 360 });
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 // A18: a reduction (badge, strikethrough, %) only with the page model's reference price.

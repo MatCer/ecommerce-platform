@@ -132,7 +132,7 @@ Colour roles: `background` (page ground), `card` (product cards, header, sheets)
 `muted` / `muted-foreground` / `subtle` (secondary surfaces and text), `border`, `identity` /
 `identity-ink` / `identity-wash` (chrome, links, focus, selection), `panel` /
 `panel-foreground` / `panel-raised` / `panel-deep` (header, footer), `buy` / `buy-hover` (add to
-cart and checkout only), `stock-in`, `stock-low`, `sale` / `sale-wash`, `rating` (stars),
+cart and checkout only), `stock-in`, `stock-low`, `sale` / `sale-wash`, `rating` (stars, ≥ 3:1 on `card`, `muted` and `review-wash`),
 `review-wash` (review cards), `guarantee-wash` (returns box). Keep text pairs at ≥ 4.5:1
 (`identity-ink` on `card`, `panel-foreground` on `panel`, `foreground` on `buy`, `card` on
 `identity`). A new token must also be

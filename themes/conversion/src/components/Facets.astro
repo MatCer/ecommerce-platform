@@ -51,7 +51,7 @@ const { t } = i18n(shop);
               <ul class="grid gap-0.5">
                 {f.values.map((v) => (
                   <li>
-                    <label class="flex min-h-9 cursor-pointer items-center gap-3 has-[:checked]:font-bold has-[:disabled]:cursor-not-allowed has-[:disabled]:text-subtle">
+                    <label class="flex min-h-11 cursor-pointer items-center gap-3 has-[:checked]:font-bold has-[:disabled]:cursor-not-allowed has-[:disabled]:text-subtle">
                       <input class="size-5 shrink-0 accent-identity" type="checkbox" name={`f.${f.key}`} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
                       {v.label}
                     </label>
