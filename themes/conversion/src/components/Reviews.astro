@@ -1,0 +1,111 @@
+---
+import type { ProductReviews, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+import Stars from "./Stars.astro";
+
+/**
+ * Published reviews (WP16): summary with a per-star breakdown, the newest reviews with the
+ * verified-purchase mark and the shop's reply, and the Omnibus disclosure of how reviews are
+ * verified (linked to the shop's legal page when published). Review text is plain text and
+ * rendered escaped. Nothing renders before the first published review.
+ */
+interface Props {
+  reviews: ProductReviews;
+  shop: ShopModel;
+}
+const { reviews, shop } = Astro.props;
+const { t, tn } = i18n(shop);
+const s = reviews.summary;
+const average = s
+  ? new Intl.NumberFormat(shop.locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(s.average)
+  : "";
+const date = (d: string) =>
+  new Intl.DateTimeFormat(shop.locale, { dateStyle: "long", timeZone: "UTC" }).format(new Date(d));
+---
+
+{
+  s && (
+    <section id="reviews" aria-labelledby="pd-reviews" class="mt-14 scroll-mt-40 md:mt-20">
+      <h2 id="pd-reviews" class="mb-6 text-2xl font-bold md:text-3xl">{t("reviews.title")}</h2>
+      <div class="grid gap-10 md:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] md:gap-14">
+        <div class="grid content-start gap-5">
+          <div class="flex items-center gap-4">
+            <p class="figures text-5xl font-bold">{average}</p>
+            <div class="grid gap-1">
+              <Stars rating={s.average} class="text-xl" />
+              <p class="text-sm text-muted-foreground">
+                <span class="sr-only">{t("reviews.average", { average })}, </span>
+                {tn("reviews.count", s.count)}
+              </p>
+            </div>
+          </div>
+          <dl class="grid gap-1.5 text-sm">
+            {[5, 4, 3, 2, 1].map((n) => (
+              <div class="grid grid-cols-[6.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
+                <dt class="whitespace-nowrap">{t("reviews.star_row", { n })}</dt>
+                <dd class="contents">
+                  <progress
+                    max={s.count}
+                    value={s.histogram[n - 1] ?? 0}
+                    aria-hidden="true"
+                    class="h-2 w-full appearance-none overflow-hidden rounded-full bg-muted [&::-moz-progress-bar]:bg-rating [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:bg-rating"
+                  />
+                  <span class="figures text-right text-muted-foreground">{s.histogram[n - 1] ?? 0}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <div class="rounded-xl bg-muted/60 p-4 text-sm">
+            <p class="flex gap-2">
+              <Icon name="shield" class="mt-0.5 size-5 shrink-0 text-identity-ink" />
+              <span>{t("reviews.disclosure")}</span>
+            </p>
+            {reviews.verification_url && (
+              <a href={reviews.verification_url} class="mt-2 inline-block font-semibold text-identity-ink underline">
+                {t("reviews.verification_link")}
+              </a>
+            )}
+          </div>
+        </div>
+        <div>
+          <ul class="grid gap-4">
+            {reviews.items.map((r) => (
+              <li class="rounded-lg bg-review-wash p-5" lang={r.locale}>
+                <article aria-labelledby={`review-${r.id}`}>
+                  <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <Stars rating={r.rating} label={t("reviews.stars", { n: r.rating })} />
+                    <h3 id={`review-${r.id}`} class="font-bold">{r.title || r.customer_name}</h3>
+                  </div>
+                  <p class="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+                    <span>{r.customer_name}</span>
+                    <time datetime={r.published_on}>{date(r.published_on)}</time>
+                    {r.verified && (
+                      <span class="inline-flex items-center gap-1 font-semibold text-stock-in">
+                        <Icon name="check" class="size-4" />
+                        {t("reviews.verified")}
+                      </span>
+                    )}
+                  </p>
+                  <p class="mt-3 max-w-prose leading-relaxed whitespace-pre-line">{r.body}</p>
+                  {r.reply && (
+                    <div class="mt-4 max-w-prose rounded-lg border-l-4 border-identity bg-identity-wash p-4 text-sm">
+                      <p class="font-semibold">{t("reviews.reply")}</p>
+                      <p class="mt-1 whitespace-pre-line">{r.reply}</p>
+                    </div>
+                  )}
+                </article>
+              </li>
+            ))}
+          </ul>
+          {s.count > reviews.items.length && (
+            <p class="mt-4 text-sm text-muted-foreground">{t("reviews.showing", { shown: reviews.items.length })}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}

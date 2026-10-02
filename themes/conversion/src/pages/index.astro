@@ -1,0 +1,225 @@
+---
+import { imageAttrs } from "@platform/storefront-sdk/format";
+import Icon from "../components/Icon.astro";
+import ProductCard from "../components/ProductCard.astro";
+import ForYou from "../islands/ForYou";
+import Base from "../layouts/Base.astro";
+import { i18n } from "../lib/i18n";
+import {
+  BLOG_SIZES,
+  CAROUSEL_SIZES,
+  cardImage,
+  HERO_SIZES,
+  PROMO_SIZES,
+  SPOTLIGHT_SIZES,
+  TILE_SIZES,
+} from "../lib/images";
+import { storefront } from "../lib/storefront";
+
+const sf = storefront(Astro.request);
+// The blog is optional below the fold: start it with the required models, never fail on it.
+const blogPromise = sf.blog().catch(() => null);
+const [shop, home] = await Promise.all([sf.shop(), sf.home()]);
+const { t, href, pick } = i18n(shop);
+// The public home recommendations (WP17): an open seasonal collection under its own heading,
+// else the market's bestsellers (newest products in a shop without sales yet).
+const featuredTitle =
+  home.featured_title ??
+  t(
+    home.featured_strategy === "bestsellers"
+      ? "home.bestsellers"
+      : home.featured_strategy === "seasonal"
+        ? "home.seasonal"
+        : home.featured_strategy === "newest"
+          ? "home.newest"
+          : "home.featured",
+  );
+// Category promo: the merchant's first three categories (menu order), the first one large.
+const [lead, ...side] = home.categories.slice(0, 3);
+// Spotlight: the lead category's own listing (its first five products), one extra page model.
+const leadSlug = lead?.href.split("/c/")[1];
+const [spotlight, blog] = await Promise.all([
+  leadSlug ? sf.category(decodeURIComponent(leadSlug)).catch(() => null) : null,
+  blogPromise,
+]);
+const spotProducts = spotlight?.products.slice(0, 5) ?? [];
+const posts = blog?.posts.slice(0, 6) ?? [];
+const hero = home.hero.image;
+// Without a hero or lead-category photo the first best-seller is the LCP image.
+const carouselLcp = !hero && !lead?.image;
+const lcp = hero
+  ? { image: hero, sizes: HERO_SIZES }
+  : lead?.image
+    ? { image: lead.image, sizes: PROMO_SIZES }
+    : home.featured[0]?.images[0] && {
+        image: cardImage(home.featured[0].images[0]),
+        sizes: CAROUSEL_SIZES,
+      };
+const date = (d: string) =>
+  new Date(d).toLocaleDateString(shop.locale, { dateStyle: "long", timeZone: "UTC" });
+const sectionTitle = "text-center text-2xl font-bold md:text-3xl";
+---
+
+<Base shop={shop} seo={home.seo} template="home" lcp={lcp}>
+  <section class="bg-muted">
+    <div class="container-shop grid items-center gap-8 py-10 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:py-16 lg:py-20">
+      <div class="grid justify-items-start gap-5">
+        <h1 class="text-4xl leading-tight md:text-5xl">{home.hero.title}</h1>
+        <p class="max-w-xl text-lg leading-relaxed text-muted-foreground">{home.hero.subtitle}</p>
+        <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          <a href={home.hero.cta.href} class="btn btn-primary h-14 px-7 text-base">{home.hero.cta.label}</a>
+          {home.featured.length > 0 && <a href="#featured" class="btn btn-dark h-14 px-7 text-base">{featuredTitle}</a>}
+        </div>
+      </div>
+      {
+        hero && (
+          <img {...imageAttrs(hero, { sizes: HERO_SIZES, width: 640, priority: true })} loading="eager" class="aspect-[5/4] w-full rounded-xl object-cover" />
+        )
+      }
+    </div>
+  </section>
+
+  {
+    lead && (
+      <section aria-label={t("home.categories")} class="container-shop mt-12 grid gap-5 md:mt-16 md:grid-cols-2 md:gap-8">
+        <a href={lead.href} class="group grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] items-center gap-4 overflow-hidden rounded-xl bg-muted p-6 md:p-8">
+          <span class="grid justify-items-start gap-4">
+            <span class="font-display text-2xl leading-tight font-bold md:text-3xl">{lead.label}</span>
+            <span class="btn btn-primary">{t("home.view_all")}</span>
+          </span>
+          {lead.image && <img {...imageAttrs(lead.image, { sizes: PROMO_SIZES, width: 360, priority: !hero })} loading={hero ? "lazy" : "eager"} class="aspect-square w-full rounded-lg object-cover transition-transform duration-500 group-hover:scale-[1.03]" />}
+        </a>
+        {
+          side.length > 0 && (
+            <div class="grid gap-5 md:gap-8">
+              {side.map((c) => (
+                <a href={c.href} class="group flex items-center justify-between gap-4 overflow-hidden rounded-xl bg-muted p-5 md:p-6">
+                  <span class="grid gap-1">
+                    <span class="font-display text-xl font-bold">{c.label}</span>
+                    <span class="inline-flex items-center gap-1 text-sm font-semibold text-identity-ink group-hover:underline">
+                      {t("home.view_all")}
+                      <Icon name="chevronRight" class="size-4" />
+                    </span>
+                  </span>
+                  {c.image && <img {...imageAttrs(c.image, { sizes: "6rem", width: 96 })} class="size-20 shrink-0 rounded-lg object-cover md:size-24" />}
+                </a>
+              ))}
+            </div>
+          )
+        }
+      </section>
+    )
+  }
+
+  {
+    home.categories.length > 0 && (
+      <section aria-labelledby="by-category" class="container-shop mt-14 md:mt-20">
+        <h2 id="by-category" class={`${sectionTitle} mb-8`}>{t("home.shop_by_category")}</h2>
+        <nav aria-label={t("home.categories")}>
+          <ul class="grid grid-cols-3 gap-4 md:grid-cols-6 md:gap-6">
+            {home.categories.map((c) => (
+              <li>
+                <a href={c.href} class="group grid gap-3 text-center font-bold">
+                  <span class="block aspect-square overflow-hidden rounded-lg bg-muted">
+                    {c.image && <img {...imageAttrs(c.image, { sizes: TILE_SIZES, width: 200 })} class="size-full object-cover transition-transform duration-500 group-hover:scale-[1.05]" />}
+                  </span>
+                  <span class="text-sm group-hover:underline md:text-base">{c.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </section>
+    )
+  }
+
+  {
+    home.featured.length > 0 && (
+      <section id="featured" aria-labelledby="featured-title" class="mt-14 bg-muted py-12 md:mt-20 md:py-16">
+        <div class="container-shop">
+          <div class="mb-8 grid justify-items-center gap-2">
+            <h2 id="featured-title" class={sectionTitle}>{featuredTitle}</h2>
+            <a href={home.hero.cta.href} class="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-identity-ink hover:underline">
+              {t("home.view_all")}
+              <Icon name="chevronRight" class="size-4" />
+            </a>
+          </div>
+          <ul class="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 px-4 pb-2 md:mx-0 md:scroll-px-0 md:px-0 md:gap-6 [scrollbar-width:thin]">
+            {home.featured.map((p, i) => (
+              <li class="flex w-[calc(50%-0.5rem)] shrink-0 snap-start rounded-xl bg-card p-2 md:w-[calc(25%-1.125rem)] md:p-3">
+                <ProductCard product={p} shop={shop} sizes={CAROUSEL_SIZES} eager={carouselLcp && i < 2} priority={carouselLcp && i === 0} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    )
+  }
+
+  <ForYou client:idle title={t("home.for_you")} base={shop.base_path} locale={shop.locale} labels={pick(["product.price_from"])} />
+
+  {
+    lead && spotProducts.length > 0 && (
+      <section aria-labelledby="spotlight" class="container-shop mt-14 md:mt-20">
+        <div class="mb-8 grid justify-items-center gap-2">
+          <h2 id="spotlight" class={sectionTitle}>{t("home.spotlight", { category: lead.label })}</h2>
+          <a href={lead.href} class="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-identity-ink hover:underline">
+            {t("home.view_all")}
+            <Icon name="chevronRight" class="size-4" />
+          </a>
+        </div>
+        <ul class="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4 md:gap-x-6">
+          {spotProducts.map((p, i) => (
+            <li class="flex first:col-span-2 first:row-span-2">
+              <ProductCard product={p} shop={shop} sizes={i === 0 ? SPOTLIGHT_SIZES : undefined} />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  {
+    posts.length > 0 && (
+      <section aria-labelledby="home-blog" class="container-shop mt-14 mb-16 md:mt-20 md:mb-24">
+        <div class="mb-8 grid justify-items-center gap-2">
+          <h2 id="home-blog" class={sectionTitle}>{t("home.blog")}</h2>
+          <a href={href("/blog")} class="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-identity-ink hover:underline">
+            {t("home.view_all")}
+            <Icon name="chevronRight" class="size-4" />
+          </a>
+        </div>
+        <ul class="grid gap-8 md:grid-cols-3">
+          {posts.slice(0, 2).map((post) => (
+            <li>
+              <article class="group relative grid gap-3">
+                <span class="block aspect-[4/3] overflow-hidden rounded-lg bg-muted">
+                  {post.image && <img {...imageAttrs(post.image, { sizes: BLOG_SIZES, width: 480 })} class="size-full object-cover" />}
+                </span>
+                <time datetime={post.published_at} class="text-xs text-muted-foreground">{date(post.published_at)}</time>
+                <h3 class="text-lg leading-snug font-bold"><a href={post.href} class="after:absolute after:inset-0 group-hover:underline">{post.title}</a></h3>
+                <p class="text-sm text-muted-foreground">{post.excerpt}</p>
+              </article>
+            </li>
+          ))}
+          {posts.length > 2 && (
+            <li>
+              <ul class="grid gap-5">
+                {posts.slice(2).map((post) => (
+                  <li>
+                    <article class="group relative flex items-center gap-4">
+                      <span class="block size-16 shrink-0 overflow-hidden rounded-md bg-muted">
+                        {post.image && <img {...imageAttrs(post.image, { sizes: "4rem", width: 64 })} class="size-full object-cover" />}
+                      </span>
+                      <h3 class="text-sm leading-snug font-bold"><a href={post.href} class="after:absolute after:inset-0 group-hover:underline">{post.title}</a></h3>
+                    </article>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          )}
+        </ul>
+      </section>
+    )
+  }
+</Base>

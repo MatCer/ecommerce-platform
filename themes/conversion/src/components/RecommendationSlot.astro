@@ -1,0 +1,25 @@
+---
+import type { ProductCard, ShopModel } from "@platform/storefront-sdk/types";
+import ProductGrid from "./ProductGrid.astro";
+
+/**
+ * Cross-sell slot: renders the products the platform recommends (`sf.recommendations`, WP17:
+ * bought together, then bestsellers) and nothing at all when there are none.
+ */
+interface Props {
+  products: ProductCard[];
+  shop: ShopModel;
+  title: string;
+  id: string;
+}
+const { products, shop, title, id } = Astro.props;
+---
+
+{
+  products.length > 0 && (
+    <section aria-labelledby={id} class="mt-14 md:mt-20">
+      <h2 id={id} class="mb-5 text-2xl font-bold md:text-3xl">{title}</h2>
+      <ProductGrid products={products} shop={shop} />
+    </section>
+  )
+}

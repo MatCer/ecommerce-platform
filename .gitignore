@@ -22,7 +22,7 @@ docker-compose.override.yml
 # Playwright / Lighthouse output
 test-results/
 playwright-report/
-/.perf/
+.perf/
 
 # Local backups (make backup)
 /backups/

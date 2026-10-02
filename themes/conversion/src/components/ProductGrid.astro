@@ -1,0 +1,31 @@
+---
+import type { ProductCard as Card, ShopModel } from "@platform/storefront-sdk/types";
+import { CARD_SIZES, LISTING_SIZES } from "../lib/images";
+import ProductCard from "./ProductCard.astro";
+
+/**
+ * Product grid: 2 columns, 3 from 48rem, 4 from 64rem (CARD_SIZES in lib/images.ts describes
+ * exactly this); `listing` grids sit beside the filter sidebar (LISTING_SIZES). `lcp` marks the first card as the page's LCP image.
+ */
+interface Props {
+  products: Card[];
+  shop: ShopModel;
+  lcp?: boolean;
+  /** Visually hidden heading when the grid has no visible one (keeps heading order). */
+  label?: string;
+  /** Beside the listing's filter sidebar: 2 columns, 3 from 64rem (LISTING_SIZES). */
+  listing?: boolean;
+}
+const { products, shop, lcp = false, label, listing = false } = Astro.props;
+---
+
+{label && <h2 class="sr-only">{label}</h2>}
+<ul class:list={["grid grid-cols-2 gap-x-3 gap-y-8 md:gap-x-5", listing ? "lg:grid-cols-3" : "md:grid-cols-3 lg:grid-cols-4"]}>
+  {
+    products.map((p, i) => (
+      <li class="flex">
+        <ProductCard product={p} shop={shop} sizes={listing ? LISTING_SIZES : CARD_SIZES} eager={lcp && i < 2} priority={lcp && i === 0} />
+      </li>
+    ))
+  }
+</ul>

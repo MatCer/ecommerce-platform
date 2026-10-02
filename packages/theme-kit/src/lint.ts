@@ -100,9 +100,14 @@ export const PLATFORM_FILES = ["package.json", "astro.config.mjs", "tsconfig.jso
 
 const readOptional = (p: string) => readFile(p, "utf8").catch(() => null);
 
+/** package.json equality without `name`: platform themes share one locked manifest. */
 function sameJson(a: string, b: string | null): boolean {
+  const unnamed = (s: string) => {
+    const { name: _, ...rest } = JSON.parse(s) ?? {};
+    return rest;
+  };
   try {
-    return isDeepStrictEqual(JSON.parse(a), JSON.parse(b ?? "null"));
+    return isDeepStrictEqual(unnamed(a), unnamed(b ?? "null"));
   } catch {
     return false;
   }

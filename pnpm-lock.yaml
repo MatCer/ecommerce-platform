@@ -353,6 +353,46 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
 
+  themes/conversion:
+    dependencies:
+      '@astrojs/cloudflare':
+        specifier: 'catalog:'
+        version: 14.3.3(@types/node@24.13.6)(astro@7.3.5(@types/node@24.13.6)(jiti@2.7.0)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(wrangler@4.137.0(@types/node@24.13.6))(yaml@2.9.1)
+      '@astrojs/solid-js':
+        specifier: 'catalog:'
+        version: 7.0.2(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(solid-js@1.9.15)(yaml@2.9.1)
+      '@platform/storefront-sdk':
+        specifier: workspace:*
+        version: link:../../packages/storefront-sdk
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.3(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      astro:
+        specifier: 'catalog:'
+        version: 7.3.5(@types/node@24.13.6)(jiti@2.7.0)(yaml@2.9.1)
+      solid-js:
+        specifier: 'catalog:'
+        version: 1.9.15
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.3
+    devDependencies:
+      '@astrojs/check':
+        specifier: 'catalog:'
+        version: 0.9.10(@emnapi/runtime@1.11.3)(prettier@3.9.9)(typescript@5.9.3)
+      '@platform/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@platform/theme-kit':
+        specifier: workspace:*
+        version: link:../../packages/theme-kit
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.137.0(@types/node@24.13.6)
+
   themes/default:
     dependencies:
       '@astrojs/cloudflare':
