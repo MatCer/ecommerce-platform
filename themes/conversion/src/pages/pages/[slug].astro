@@ -1,0 +1,21 @@
+---
+import Blocks from "../../components/Blocks.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import Base from "../../layouts/Base.astro";
+import { i18n } from "../../lib/i18n";
+import { storefront } from "../../lib/storefront";
+
+// CMS and legal pages (shipping, contact, terms, privacy, ...), built from content blocks.
+const sf = storefront(Astro.request);
+const [shop, page] = await Promise.all([sf.shop(), sf.cms(Astro.params.slug ?? "")]);
+if (!page) return Astro.rewrite("/404");
+const { t } = i18n(shop);
+---
+
+<Base shop={shop} seo={page.seo} template="page">
+  <article class="container-shop pb-8">
+    <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
+    <h1 class="mb-6 max-w-3xl text-4xl font-bold">{page.title}</h1>
+    <Blocks blocks={page.blocks} shop={shop} />
+  </article>
+</Base>

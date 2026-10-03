@@ -1,0 +1,72 @@
+---
+import type { ListingPage, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * The filter panel inside the listing's GET form (components/Listing.astro). Phones get it as a
+ * native popover sheet; from 48rem the same element is the grey sidebar, one collapsible
+ * section per facet with checkboxes. The FacetForm island only adds behaviour (submit on
+ * change from 48rem, Escape / outside click closes an open section). Values without a match
+ * are shown disabled (A23); counts are not shown in M1.
+ */
+interface Props {
+  page: ListingPage;
+  shop: ShopModel;
+  /** Number of selected values (sheet header badge, "clear" link). */
+  selected: number;
+  clearHref: string;
+}
+const { page, shop, selected, clearHref } = Astro.props;
+const { t } = i18n(shop);
+---
+
+<div id="filter-sheet" popover class="sheet md:static md:block md:h-auto md:w-auto md:translate-none md:overflow-visible md:rounded-lg md:bg-muted md:shadow-none">
+  <div class="flex h-16 items-center justify-between border-b border-border px-5 md:hidden">
+    <h2 class="flex items-center gap-2 text-xl font-bold">
+      {t("listing.filters")}
+      {selected > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-sm bg-panel px-1 text-xs text-card">{selected}</span>}
+    </h2>
+    <button type="button" popovertarget="filter-sheet" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-muted">
+      <Icon name="close" class="size-6" />
+      <span class="sr-only">{t("nav.close")}</span>
+    </button>
+  </div>
+  <h2 class="hidden px-5 pt-5 text-lg font-bold md:block">{t("listing.filters")}</h2>
+  <div class="divide-y divide-border px-5 md:pb-2">
+    {
+      page.facets.map((f) => {
+        const n = f.values.filter((v) => v.selected).length;
+        return (
+          <details name="facet" class="group/facet py-2">
+            <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-bold [&::-webkit-details-marker]:hidden">
+              <span class="flex items-center gap-2">
+                {f.label}
+                {n > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-sm bg-panel px-1 text-xs text-card">{n}</span>}
+              </span>
+              <Icon name="chevronDown" class="size-4 transition-transform group-open/facet:rotate-180" />
+            </summary>
+            <fieldset class="pt-1 pb-3">
+              <legend class="sr-only">{f.label}</legend>
+              <ul class="grid gap-0.5">
+                {f.values.map((v) => (
+                  <li>
+                    <label class="flex min-h-11 cursor-pointer items-center gap-3 has-[:checked]:font-bold has-[:disabled]:cursor-not-allowed has-[:disabled]:text-subtle">
+                      <input class="size-5 shrink-0 accent-identity" type="checkbox" name={`f.${f.key}`} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
+                      {v.label}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <button type="submit" class="btn btn-primary mt-3 hidden w-full md:flex md:group-data-[enhanced]/facets:hidden">{t("listing.apply")}</button>
+            </fieldset>
+          </details>
+        );
+      })
+    }
+  </div>
+  <div class="sticky bottom-0 mt-4 grid gap-2 border-t border-border bg-card p-4 md:hidden">
+    <button type="submit" class="btn btn-primary h-14 w-full text-base">{t("listing.show")}</button>
+    {selected > 0 && <a href={clearHref} class="btn btn-secondary w-full">{t("listing.clear")}</a>}
+  </div>
+</div>

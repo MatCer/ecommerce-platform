@@ -1,0 +1,116 @@
+---
+import type { ShopModel } from "@platform/storefront-sdk/types";
+import MiniCart from "../islands/MiniCart";
+import SearchBox from "../islands/SearchBox";
+import Sheets from "../islands/Sheets";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+import TrustStrip from "./TrustStrip.astro";
+
+/**
+ * Sticky navy header (menu, logo, search, account, cart with its total) with the top-level
+ * categories in a row from 48rem, then the trust strip. No hover menus (WCAG 1.4.13 would
+ * require them to be dismissible with Escape): the full tree is in a native popover sheet on
+ * every width (no JS, Escape and outside click close it).
+ */
+interface Props {
+  shop: ShopModel;
+  q?: string;
+}
+const { shop, q } = Astro.props;
+const { t, href, pick, pluralKeys } = i18n(shop);
+const accountUrl = `${shop.checkout_url}/account`;
+const CART_KEYS = [
+  "cart.title",
+  "cart.cross_sell",
+  "product.price_from",
+  "cart.open",
+  "cart.close",
+  "cart.empty",
+  "cart.continue",
+  "cart.subtotal",
+  "cart.discount",
+  "cart.total",
+  "cart.vat_included",
+  "cart.checkout",
+  "cart.increase",
+  "cart.decrease",
+  "cart.remove",
+  "cart.quantity",
+  "cart.unavailable",
+  "cart.update_failed",
+  "cart.shipping_note",
+  "cart.free_shipping_remaining",
+  "cart.free_shipping_reached",
+  ...pluralKeys("cart.items"),
+];
+---
+
+<header class="sticky top-0 z-30 bg-panel text-card">
+  <div class="container-shop grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-2 py-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-x-6 md:py-3">
+    <div class="flex items-center gap-1 md:gap-2">
+      <button type="button" popovertarget="nav-drawer" class="-ml-2 grid size-11 place-items-center rounded-md text-panel-foreground hover:bg-panel-raised hover:text-card">
+        <Icon name="menu" class="size-6" />
+        <span class="sr-only">{t("nav.menu")}</span>
+      </button>
+      <a href={href("/")} class="font-display text-xl font-bold tracking-tight whitespace-nowrap md:text-2xl">{shop.name}</a>
+    </div>
+    <div class="col-span-full row-start-2 md:col-span-1 md:col-start-2 md:row-start-1 md:max-w-2xl">
+      <SearchBox client:idle q={q} base={shop.base_path} labels={pick(["search.label", "search.placeholder", "search.all_results", "nav.categories", "search.products"])} />
+    </div>
+    <div class="col-start-3 flex items-center gap-1 justify-self-end md:gap-3">
+      <a href={accountUrl} class="grid size-11 place-items-center rounded-md text-panel-foreground hover:bg-panel-raised hover:text-card lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold">
+        <Icon name="user" class="size-6 lg:size-5" />
+        <span class="sr-only lg:not-sr-only">{t("nav.account")}</span>
+      </a>
+      <MiniCart client:idle locale={shop.locale} base={shop.base_path} threshold={shop.free_shipping_threshold ?? undefined} labels={pick(CART_KEYS)} />
+    </div>
+  </div>
+  <nav aria-label={t("nav.main")} class="hidden md:block">
+    <ul class="container-shop flex gap-x-6 overflow-x-auto text-[0.9375rem] font-medium text-panel-foreground [scrollbar-width:none]">
+      {
+        shop.menus.main.map((item, i) => (
+          <li class="shrink-0">
+            <a href={item.href} class:list={["flex h-11 items-center underline-offset-8 decoration-2 hover:text-card hover:underline", i === 0 && "font-bold text-card"]}>
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>
+
+<TrustStrip shop={shop} />
+
+<Sheets client:idle />
+<nav id="nav-drawer" popover aria-label={t("nav.main")} class="sheet bg-panel! text-card">
+  <div class="flex h-16 items-center justify-between border-b border-white/15 px-5">
+    <a href={href("/")} class="font-display text-xl font-bold tracking-tight">{shop.name}</a>
+    <button type="button" popovertarget="nav-drawer" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-panel-raised">
+      <Icon name="close" class="size-6" />
+      <span class="sr-only">{t("nav.close")}</span>
+    </button>
+  </div>
+  <ul class="px-5 py-3">
+    {
+      shop.menus.main.map((item) => (
+        <li class="py-1">
+          <a href={item.href} class="flex min-h-11 items-center text-lg font-bold text-panel-foreground hover:text-card">{item.label}</a>
+          {item.children.length > 0 && (
+            <ul class="grid pb-1 pl-3">
+              {item.children.map((c) => (
+                <li>
+                  <a href={c.href} class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">{c.label}</a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))
+    }
+  </ul>
+  <div class="border-t border-white/15 px-5 py-4">
+    <a href={accountUrl} class="flex min-h-11 items-center gap-3 font-semibold text-panel-foreground hover:text-card"><Icon name="user" />{t("nav.account")}</a>
+  </div>
+</nav>

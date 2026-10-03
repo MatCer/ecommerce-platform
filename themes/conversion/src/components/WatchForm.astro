@@ -1,0 +1,96 @@
+---
+import type { ProductDetail, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * Back-in-stock / price-drop alert (WP19). A plain form (works without JS) posted to the edge,
+ * which redirects back with `?watch=ok|invalid|unavailable#watch`. Double opt-in: the API only
+ * emails a confirmation link; the alert starts after it is confirmed (A20).
+ */
+interface Props {
+  shop: ShopModel;
+  product: ProductDetail;
+  /** SKU from `?variant=`, preselected like the buy box does. */
+  selected?: string | null;
+}
+const { shop, product: p, selected } = Astro.props;
+const { t } = i18n(shop);
+const outcome = Astro.url.searchParams.get("watch");
+const variantName = (options: Record<string, string>) =>
+  p.options
+    .map((o) => o.values.find((v) => v.code === options[o.code])?.name)
+    .filter(Boolean)
+    .join(" / ");
+const initial =
+  p.variants.find((v) => selected && v.sku === selected) ??
+  p.variants.find((v) => v.stock === "out_of_stock") ??
+  p.variants[0];
+const anyOut = p.variants.some((v) => v.stock === "out_of_stock");
+const field = "h-11 w-full rounded-md border border-border bg-card px-3";
+const label = "mb-1 block text-sm font-semibold";
+---
+
+{
+  initial && (
+    <details id="watch" class="surface group px-4 py-3" open={outcome ? true : undefined}>
+      <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 font-semibold [&::-webkit-details-marker]:hidden">
+        <span class="inline-flex items-center gap-2">
+          <Icon name="bell" class="size-5 text-identity-ink" />
+          {t("watch.title")}
+        </span>
+        <Icon name="chevronRight" class="size-4 shrink-0 transition-transform group-open:rotate-90" />
+      </summary>
+      <div class="grid gap-4 pt-2 pb-1">
+        {outcome === "ok" ? (
+          <p role="status" class="font-semibold">{t("watch.ok")}</p>
+        ) : (
+          <form method="post" action={`${shop.base_path}/_p/watch`} class="grid gap-4">
+            <p class="text-sm text-muted-foreground">{t("watch.intro")}</p>
+            {outcome === "invalid" && <p id="watch-error" role="alert" class="text-sm font-semibold text-sale">{t("watch.invalid")}</p>}
+            {outcome === "unavailable" && <p role="alert" class="text-sm font-semibold text-sale">{t("watch.unavailable")}</p>}
+            {outcome === "error" && <p role="alert" class="text-sm font-semibold text-sale">{t("watch.error")}</p>}
+            {p.variants.length > 1 ? (
+              <div>
+                <label for="watch-variant" class={label}>{t("watch.variant")}</label>
+                <select id="watch-variant" name="variant_id" class={field}>
+                  {p.variants.map((v) => (
+                    <option value={v.id} selected={v.id === initial.id}>{variantName(v.options) || v.sku}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <input type="hidden" name="variant_id" value={initial.id} />
+            )}
+            <fieldset>
+              <legend class={label}>{t("watch.kind")}</legend>
+              <div class="flex flex-wrap gap-x-6 gap-y-1">
+                <label class="inline-flex min-h-11 items-center gap-2">
+                  <input type="radio" name="kind" value="back_in_stock" checked={anyOut} class="size-4 accent-identity" />
+                  {t("watch.back_in_stock")}
+                </label>
+                <label class="inline-flex min-h-11 items-center gap-2">
+                  <input type="radio" name="kind" value="price_drop" checked={!anyOut} class="size-4 accent-identity" />
+                  {t("watch.price_drop")}
+                </label>
+              </div>
+            </fieldset>
+            <div>
+              <label for="watch-target" class={label}>{t("watch.target", { currency: shop.currency })}</label>
+              <input id="watch-target" name="target" type="text" inputmode="decimal" autocomplete="off" maxlength="14" aria-describedby={outcome === "invalid" ? "watch-error watch-target-hint" : "watch-target-hint"} aria-invalid={outcome === "invalid" ? "true" : undefined} class={`${field} max-w-48`} />
+              <p id="watch-target-hint" class="mt-1 text-xs text-muted-foreground">{t("watch.target_hint")}</p>
+            </div>
+            <div>
+              <label for="watch-email" class={label}>{t("watch.email")}</label>
+              <input id="watch-email" name="email" type="email" required autocomplete="email" maxlength="254" aria-invalid={outcome === "invalid" ? "true" : undefined} aria-describedby={outcome === "invalid" ? "watch-error watch-consent" : "watch-consent"} class={field} />
+            </div>
+            <p id="watch-consent" class="text-xs text-muted-foreground">{t("watch.consent")}</p>
+            <div>
+              <button type="submit" class="btn btn-secondary">{t("watch.submit")}</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </details>
+  )
+}

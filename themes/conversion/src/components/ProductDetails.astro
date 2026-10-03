@@ -1,0 +1,83 @@
+---
+import type { ProductDetail, ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * Description, parameters table and the product safety block. GPSR (EU 2023/988, art. 19)
+ * information is shown openly, not behind a toggle: manufacturer, EU responsible person,
+ * safety information and warnings, whatever the product carries.
+ */
+interface Props {
+  product: ProductDetail;
+  shop: ShopModel;
+}
+const { product: p, shop } = Astro.props;
+const { t } = i18n(shop);
+const g = p.gpsr;
+const party = (x: NonNullable<NonNullable<typeof g>["manufacturer"]>) =>
+  [x.name, x.address, x.email, x.phone, x.url].filter(Boolean).join(", ");
+---
+
+<div class="mt-8 grid gap-10 md:mt-10 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-14">
+  <section aria-labelledby="pd-description">
+    <h2 id="pd-description" class="mb-4 scroll-mt-48 text-2xl font-bold">{t("product.description")}</h2>
+    <!-- description_html is sanitized by the platform (contract: the only unescaped HTML). -->
+    <div class="grid max-w-prose gap-4 leading-relaxed [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5" set:html={p.description_html} />
+  </section>
+  <div class="grid content-start gap-10">
+    {
+      p.parameters.length > 0 && (
+        <section aria-labelledby="pd-parameters">
+          <h2 id="pd-parameters" class="mb-4 scroll-mt-48 text-2xl font-bold">{t("product.parameters")}</h2>
+          <table class="w-full text-sm">
+            <tbody class="divide-y divide-border border-y border-border">
+              {p.parameters.map((x) => (
+                <tr>
+                  <th scope="row" class="w-1/2 py-3 pr-4 text-left font-normal text-muted-foreground">{x.name}</th>
+                  <td class="py-3 font-medium">{x.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )
+    }
+    {
+      g && (
+        <section aria-labelledby="pd-safety" class="rounded-xl bg-muted/60 p-5 text-sm">
+          <h2 id="pd-safety" class="mb-3 flex items-center gap-2 text-base font-bold">
+            <Icon name="shield" class="size-5 text-identity-ink" />
+            {t("product.safety")}
+          </h2>
+          <dl class="grid gap-3">
+            {g.manufacturer && (
+              <div>
+                <dt class="font-semibold">{t("product.manufacturer")}</dt>
+                <dd class="text-muted-foreground">{party(g.manufacturer)}</dd>
+              </div>
+            )}
+            {g.eu_responsible_person && (
+              <div>
+                <dt class="font-semibold">{t("product.eu_responsible")}</dt>
+                <dd class="text-muted-foreground">{party(g.eu_responsible_person)}</dd>
+              </div>
+            )}
+            {g.safety_info && (
+              <div>
+                <dt class="font-semibold">{t("product.safety")}</dt>
+                <dd class="text-muted-foreground">{g.safety_info}</dd>
+              </div>
+            )}
+            {g.warnings && (
+              <div>
+                <dt class="font-semibold">{t("product.warnings")}</dt>
+                <dd class="text-muted-foreground">{g.warnings}</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+      )
+    }
+  </div>
+</div>

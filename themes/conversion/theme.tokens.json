@@ -1,0 +1,37 @@
+{
+  "colors": {
+    "background": "#ffffff",
+    "foreground": "#232f3e",
+    "card": "#ffffff",
+    "muted": "#f0f2f5",
+    "border": "#dde1e6",
+    "muted-foreground": "#5a5f66",
+    "subtle": "#616873",
+    "identity": "#225ea5",
+    "identity-ink": "#1d4f8c",
+    "identity-wash": "#eaf1fa",
+    "panel": "#232f3e",
+    "panel-foreground": "#e3e6ea",
+    "panel-raised": "#37424f",
+    "panel-deep": "#161e28",
+    "buy": "#14b200",
+    "buy-hover": "#2fc21a",
+    "stock-in": "#237a00",
+    "stock-low": "#8a5a1c",
+    "sale": "#ca232c",
+    "sale-wash": "#fdeced",
+    "rating": "#c27c00",
+    "review-wash": "#fcf8e6",
+    "guarantee-wash": "#f6e8c6"
+  },
+  "fonts": {
+    "display": "Roboto, system-ui, -apple-system, \"Segoe UI\", Arial, sans-serif",
+    "sans": "Roboto, system-ui, -apple-system, \"Segoe UI\", Arial, sans-serif"
+  },
+  "radius": {
+    "sm": "0.25rem",
+    "md": "0.375rem",
+    "lg": "0.5rem",
+    "xl": "0.625rem"
+  }
+}
