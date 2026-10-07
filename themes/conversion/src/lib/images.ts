@@ -11,28 +11,32 @@ import type { Image } from "@platform/storefront-sdk/types";
 export const CARD_SIZES =
   "(min-width: 80rem) 18.5rem, (min-width: 64rem) calc(25vw - 2rem), (min-width: 48rem) calc(33vw - 2rem), calc(50vw - 1.5rem)";
 
-/** Home "shop by category" tiles: 3 columns on phones, 6 from 48rem. */
+/** Home "shop by category" tiles: 3 columns on phones (0.75rem gaps), 6 from 48rem (1.5rem). */
 export const TILE_SIZES =
-  "(min-width: 80rem) 11.5rem, (min-width: 48rem) calc(16vw - 1.75rem), calc(33vw - 2rem)";
+  "(min-width: 80rem) 11.5rem, (min-width: 48rem) calc(16.6vw - 1.75rem), calc(33.3vw - 1.2rem)";
 
-/** Home hero photo: the 5/12 right column from 48rem, full width on phones. */
-export const HERO_SIZES = "(min-width: 80rem) 31rem, (min-width: 48rem) 40vw, calc(100vw - 2rem)";
+/** Home hero photo: full card width on phones, 6/12 of the card from 48rem, 5/12 from 64rem. */
+export const HERO_SIZES =
+  "(min-width: 80rem) 32rem, (min-width: 64rem) calc(41.7vw - 1.25rem), (min-width: 48rem) calc(50vw - 1.5rem), calc(100vw - 2rem)";
 
 /** Home lead-category card photo: 2/5 of the card (half the container from 48rem). */
 export const PROMO_SIZES =
   "(min-width: 80rem) 13rem, (min-width: 48rem) calc(20vw - 3rem), calc(40vw - 2.5rem)";
 
-/** Home best-seller carousel: 2 cards per view on phones, 4 from 48rem, inside white frames. */
+/** Home side-category card photos (the two next to the lead card): 6rem, 8rem from 48rem. */
+export const PROMO_SIDE_SIZES = "(min-width: 48rem) 8rem, 6rem";
+
+/** Home best-seller rail: 68vw (max 18rem) cards on phones, 4 per view from 48rem. */
 export const CAROUSEL_SIZES =
-  "(min-width: 80rem) 16.5rem, (min-width: 48rem) calc(25vw - 3.5rem), calc(50vw - 2.5rem)";
+  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), min(68vw, 18rem)";
 
 /** Home category spotlight: the lead product spans 2 of 4 columns (all 2 on phones). */
 export const SPOTLIGHT_SIZES =
-  "(min-width: 80rem) 37.5rem, (min-width: 48rem) calc(50vw - 2.5rem), calc(100vw - 2rem)";
+  "(min-width: 80rem) 37.75rem, (min-width: 48rem) calc(50vw - 2.25rem), calc(100vw - 2rem)";
 
 /** Home category spotlight, the other cards: 4 columns from 48rem, 2 on phones. */
 export const SPOTLIGHT_CARD_SIZES =
-  "(min-width: 80rem) 17.5rem, (min-width: 48rem) calc(25vw - 2rem), calc(50vw - 1.5rem)";
+  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), calc(50vw - 1.375rem)";
 
 /** Home blog teasers: 3 columns from 48rem. */
 export const BLOG_SIZES =
