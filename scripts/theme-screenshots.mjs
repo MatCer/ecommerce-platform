@@ -17,12 +17,20 @@ const widths = { mobile: [390, 844], desktop: [1440, 900] };
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 for (const [label, [width, height]] of Object.entries(widths)) {
-  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
+  const context = await browser.newContext({
+    viewport: { width, height },
+    reducedMotion: "reduce",
+  });
   // An empty consent decision keeps the banner from covering the page.
   await context.addCookies([{ name: "consent", value: "", url: base }]);
   const page = await context.newPage();
   const shoot = (name) =>
-    page.screenshot({ path: join(out, `${name}-${label}.jpg`), fullPage: true, type: "jpeg", quality: 80 });
+    page.screenshot({
+      path: join(out, `${name}-${label}.jpg`),
+      fullPage: true,
+      type: "jpeg",
+      quality: 80,
+    });
   for (const [name, path] of Object.entries(pages)) {
     await page.goto(base + path, { waitUntil: "networkidle" });
     await page.waitForFunction(() => !document.querySelector("astro-island[ssr]"));

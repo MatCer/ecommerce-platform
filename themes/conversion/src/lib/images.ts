@@ -35,7 +35,8 @@ export const SPOTLIGHT_CARD_SIZES =
   "(min-width: 80rem) 17.5rem, (min-width: 48rem) calc(25vw - 2rem), calc(50vw - 1.5rem)";
 
 /** Home blog teasers: 3 columns from 48rem. */
-export const BLOG_SIZES = "(min-width: 80rem) 24.5rem, (min-width: 48rem) calc(33vw - 2rem), calc(100vw - 2rem)";
+export const BLOG_SIZES =
+  "(min-width: 80rem) 24.5rem, (min-width: 48rem) calc(33vw - 2rem), calc(100vw - 2rem)";
 
 /** Product gallery: full width on phones, 7/12 of the container from 48rem. */
 export const GALLERY_SIZES =
