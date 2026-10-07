@@ -1,5 +1,4 @@
 import type { Messages } from "@platform/storefront-sdk/format";
-import { FOR_YOU_SIZES } from "../lib/images";
 import { recommendations } from "@platform/storefront-sdk/recommendations";
 import type { ProductCard } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
@@ -11,6 +10,9 @@ export type Props = {
   base: string;
   locale: string;
   labels: Messages;
+  /** `FOR_YOU_SIZES` from the server: importing `lib/images` here would split it into an
+      extra chunk on the product page's hydration path (+75 ms LCP measured). */
+  sizes: string;
 };
 
 /**
@@ -42,7 +44,7 @@ export default function ForYouList(props: Props) {
           <For each={items()}>
             {(p) => (
               <li>
-                <MiniCard product={p} base={props.base} labels={props.labels} sizes={FOR_YOU_SIZES} />
+                <MiniCard product={p} base={props.base} labels={props.labels} sizes={props.sizes} />
               </li>
             )}
           </For>
