@@ -13,7 +13,6 @@
   --color-identity-wash: #eef3fa;
   --color-buy: #f0b14a;
   --color-buy-hover: #e89b35;
-  --color-buy-foreground: #1b1f2a;
   --color-sale: #b3261e;
   --font-display: system-ui, sans-serif;
   --font-sans: system-ui, sans-serif;
@@ -46,8 +45,6 @@
     --color-input: var(--color-muted-foreground);
     --color-border-strong: var(--color-muted-foreground);
     --color-faint-foreground: var(--color-muted-foreground);
-    /* Label on the buy button: optional tenant token, dark text when a theme doesn't set it. */
-    --color-buy-foreground: var(--color-foreground);
     /* 44px targets for touch (WCAG 2.2 target size, comfortably). */
     --spacing-control: 2.75rem;
   }
@@ -70,4 +67,10 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* Label on the tenant's buy colour: white on a dark one, black on a light one (OKLCH lightness
+   0.6 picks the higher WCAG contrast), whatever colour the merchant chose. */
+@utility text-on-buy {
+  color: oklch(from var(--color-buy) clamp(0, (0.6 - l) * 1000, 1) 0 0);
 }

@@ -36,7 +36,7 @@ If the request cannot be done within the rules below (for example it needs data 
 
 # Design tokens (`theme.tokens.json`)
 
-Three groups: `colors` (`#rrggbb` or `oklch(L C H)`), `fonts` (family lists), `radius` (`0`, `<n>rem`, `<n>px`); keys match `^[a-z][a-z0-9-]{0,31}$`. They become CSS variables (`bg-<key>`, `text-<key>`, `font-<key>`, `rounded-<key>`) and the checkout follows them. Colour roles: `background`, `card`, `foreground`, `muted`, `muted-foreground`, `subtle`, `border`, `identity`, `identity-ink`, `identity-wash`, `panel`, `panel-foreground`, `buy`, `buy-hover` (add to cart and checkout only), `buy-foreground` (the label on `buy`, ≥ 4.5:1; the checkout uses it too), `input` (borders of inputs and chips, ≥ 3:1 on `card`), `stock-in`, `stock-low`, `sale`, `sale-wash`. A new token must also be listed in the `@theme reference` block of `src/styles/global.css`. A request that is only about colours, fonts or radii should change only this file.
+Three groups: `colors` (`#rrggbb` or `oklch(L C H)`), `fonts` (family lists), `radius` (`0`, `<n>rem`, `<n>px`); keys match `^[a-z][a-z0-9-]{0,31}$`. They become CSS variables (`bg-<key>`, `text-<key>`, `font-<key>`, `rounded-<key>`) and the checkout follows them. Colour roles: `background`, `card`, `foreground`, `muted`, `muted-foreground`, `subtle`, `border`, `identity`, `identity-ink`, `identity-wash`, `panel`, `panel-foreground`, `buy`, `buy-hover` (add to cart and checkout only), `input` (borders of inputs and chips, ≥ 3:1 on `card`), `stock-in`, `stock-low`, `sale`, `sale-wash`. A new token must also be listed in the `@theme reference` block of `src/styles/global.css`. A request that is only about colours, fonts or radii should change only this file.
 
 # Functional check
 

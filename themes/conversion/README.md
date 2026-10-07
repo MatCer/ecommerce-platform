@@ -133,16 +133,16 @@ Colour roles: `background` (page ground), `card` (product cards, header, sheets)
 `input` (borders of inputs, chips and secondary buttons, ≥ 3:1 on `card` and `muted`), `identity` /
 `identity-ink` / `identity-wash` (chrome, links, focus, selection), `panel` /
 `panel-foreground` / `panel-raised` / `panel-deep` (header, footer), `buy` / `buy-hover` (add to
-cart and checkout only) with `buy-foreground` (their label), `stock-in`, `stock-low`, `sale` /
+cart and checkout only; the label turns white or black by itself to read on them), `stock-in`, `stock-low`, `sale` /
 `sale-wash`, `rating` (stars, ≥ 3:1 on `card`, `muted` and `review-wash`), `review-wash` (review
 cards), `guarantee-wash` (returns box). Keep text pairs at ≥ 4.5:1 (`identity-ink` on `card`,
-`panel-foreground` on `panel`, `buy-foreground` on `buy`, `card` on `identity`). Dark chrome sets
+`panel-foreground` on `panel`, `card` on `identity`). Dark chrome sets
 `--focus-ring` to a light colour so focus stays visible. A new token must also be listed in the
 `@theme reference` block of `global.css` so Tailwind generates its utilities.
 
 The checkout follows the same tokens: `background`, `foreground`, `card`, `muted`, `border`,
 `input`, `muted-foreground`, `identity`, `identity-ink`, `identity-wash`, `buy`, `buy-hover`,
-`buy-foreground` (optional there, falls back to `foreground`), `sale` and `font-sans`. Check the
+`sale` and `font-sans`. Check the
 checkout pages after changing any of them.
 
 ## Checks

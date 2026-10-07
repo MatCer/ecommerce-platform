@@ -31,7 +31,6 @@
   --color-panel-deep: #0a0b0d;
   --color-buy: #2448c9;
   --color-buy-hover: #1c3aa8;
-  --color-buy-foreground: #fff;
   --color-stock-in: #17703e;
   --color-stock-low: #8a5518;
   --color-sale: #c22a2f;
@@ -204,10 +203,14 @@
   }
 }
 
-/* The money action. Cobalt appears nowhere else (white label: 7.4:1 on the cobalt). */
+/*
+ * The money action. Cobalt appears nowhere else. The label follows the buy colour: white on a
+ * dark one, black on a light one (OKLCH lightness 0.6 picks the higher WCAG contrast), so a
+ * merchant's colour cannot make it unreadable. White on the cobalt: 7.4:1.
+ */
 @utility btn-buy {
   background: var(--color-buy);
-  color: var(--color-buy-foreground);
+  color: oklch(from var(--color-buy) clamp(0, (0.6 - l) * 1000, 1) 0 0);
   font-family: var(--font-display);
   font-weight: 700;
   &:hover:not(:disabled) {
