@@ -2,7 +2,7 @@
 import Listing from "../components/Listing.astro";
 import Base from "../layouts/Base.astro";
 import { i18n } from "../lib/i18n";
-import { LISTING_SIZES, cardImage } from "../lib/images";
+import { cardImage, LISTING_SIZES } from "../lib/images";
 import { listingQuery, storefront } from "../lib/storefront";
 
 const sf = storefront(Astro.request);
