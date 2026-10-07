@@ -280,6 +280,14 @@ test("phone sheets (menu, filters, search): Escape closes, focus never stays beh
   await page.keyboard.press("Escape");
   await expect(box).toBeHidden();
   await expect(searchButton).toBeFocused();
+  // Growing into the desktop layout closes the sheet (its top-layer copy would cover the header)
+  // and leaves the field inline, still focused.
+  await searchButton.click();
+  await expect(box).toBeFocused();
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await expect(page.locator("#search-sheet:popover-open")).toHaveCount(0);
+  await expect(box).toBeVisible();
+  await expect(box).toBeFocused();
   await ctx.close();
 });
 

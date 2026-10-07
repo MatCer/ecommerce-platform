@@ -1,4 +1,5 @@
 import type { Messages } from "@platform/storefront-sdk/format";
+import { FOR_YOU_SIZES } from "../lib/images";
 import { recommendations } from "@platform/storefront-sdk/recommendations";
 import type { ProductCard } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
@@ -41,7 +42,7 @@ export default function ForYouList(props: Props) {
           <For each={items()}>
             {(p) => (
               <li>
-                <MiniCard product={p} base={props.base} labels={props.labels} />
+                <MiniCard product={p} base={props.base} labels={props.labels} sizes={FOR_YOU_SIZES} />
               </li>
             )}
           </For>

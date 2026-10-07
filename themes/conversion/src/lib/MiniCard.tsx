@@ -12,6 +12,8 @@ export default function MiniCard(props: {
   base: string;
   labels: Messages;
   class?: string;
+  /** Responsive slot (`lib/images.ts`); without it one ~360px variant (fixed-width rails). */
+  sizes?: string;
 }) {
   const p = () => props.product;
   const src = () => {
@@ -25,6 +27,8 @@ export default function MiniCard(props: {
     >
       <img
         src={src()}
+        srcset={props.sizes ? p().images[0]?.srcset : undefined}
+        sizes={props.sizes}
         alt=""
         width="176"
         height="220"

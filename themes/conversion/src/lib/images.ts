@@ -11,6 +11,10 @@ import type { Image } from "@platform/storefront-sdk/types";
 export const CARD_SIZES =
   "(min-width: 80rem) 18.5rem, (min-width: 64rem) calc(25vw - 2rem), (min-width: 48rem) calc(33vw - 2rem), calc(50vw - 1.5rem)";
 
+/** Home "for you" grid (island): 2 columns (0.75rem gap), 4 from 48rem (1.5rem gaps). */
+export const FOR_YOU_SIZES =
+  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), calc(50vw - 1.375rem)";
+
 /** Home "shop by category" tiles: 3 columns on phones (0.75rem gaps), 6 from 48rem (1.5rem). */
 export const TILE_SIZES =
   "(min-width: 80rem) 11.5rem, (min-width: 48rem) calc(16.6vw - 1.75rem), calc(33.3vw - 1.2rem)";
