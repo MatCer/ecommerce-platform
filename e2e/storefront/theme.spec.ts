@@ -4,7 +4,7 @@
  * Needs `make up && make seed`.
  */
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { testContext } from "../rate-client";
 import { CZ, decideConsent, expectAccessible, hydrated, SK, screenshot } from "./support";
 
@@ -195,6 +195,14 @@ test("variant selection, add to cart, cart drawer, checkout origin", async ({ pa
   await expect(page).toHaveURL(/^http:\/\/checkout\.demo\.localhost(:\d+)?\//);
 });
 
+/** A keyboard focus ring drawn in a different colour than the surface it sits on. */
+async function expectVisibleRing(el: Locator, surface: Locator) {
+  expect(await el.evaluate((e) => e.matches(":focus-visible"))).toBe(true);
+  const ring = await el.evaluate((e) => getComputedStyle(e).outlineColor);
+  const ground = await surface.evaluate((e) => getComputedStyle(e).backgroundColor);
+  expect(ring).not.toBe(ground);
+}
+
 test("keyboard only: skip link, header, product page, cart", async ({ page, context }) => {
   await decideConsent(context);
   await page.goto(`${CZ}/p/mikina-fleece`);
@@ -223,8 +231,11 @@ test("keyboard only: skip link, header, product page, cart", async ({ page, cont
   await page.keyboard.press("Enter");
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole("button", { name: "Zavřít košík" })).toBeFocused();
+  // The drawer sits inside the dark header: its focus ring must not inherit the header's light one.
+  await expectVisibleRing(drawer.getByRole("button", { name: "Zavřít košík" }), drawer);
   await page.keyboard.press("Escape");
   await expect(cartButton).toBeFocused();
+  await expectVisibleRing(cartButton, page.locator("body > header"));
 
   // Search by keyboard.
   await page.getByRole("combobox", { name: "Hledat" }).focus();

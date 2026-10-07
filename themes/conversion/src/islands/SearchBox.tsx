@@ -108,7 +108,7 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
   return (
     <search
       ref={root}
-      class="relative block w-full"
+      class="relative block w-full [--focus-ring:var(--color-identity)]"
       onFocusOut={(e) => {
         if (!root?.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}
