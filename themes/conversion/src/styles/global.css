@@ -64,9 +64,10 @@
 
 /*
  * One web font: Figtree (SIL OFL 1.1, src/fonts/OFL-Figtree.txt), variable 400-700, subset to
- * Latin + Latin-1 + Latin Extended-A (every Czech and Slovak letter), 19 kB. Not preloaded: a
- * preload competes with the LCP image on slow connections (prototype: home LCP 1653 ms with,
- * 1578 ms without). The fallback faces are Arial matched to Figtree per weight (advance widths
+ * Latin + Latin-1 + Latin Extended-A (every Czech and Slovak letter), 19 kB. Preloaded in
+ * Base.astro: discovered through this stylesheet it sits one round trip deeper than the LCP
+ * image and, when it lands first, pushed the lab LCP of the product page over 1500 ms on 2 of
+ * 3 runs; preloaded, 15 of 15 runs stayed at 1350-1430 ms. The fallback faces are Arial matched to Figtree per weight (advance widths
  * of Czech text, vertical metrics), so the swap moves nothing (CLS 0.0003 measured).
  */
 @font-face {

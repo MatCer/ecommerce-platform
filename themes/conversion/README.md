@@ -92,8 +92,9 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
     everything else `loading="lazy"`;
   - `sizes` from `lib/images.ts`, matching the real slot (a loose value downloads a 2-4×
     heavier file); change the grid → change the `sizes` line;
-  - one web font, Figtree (19 kB, `src/fonts/`), not preloaded: a preload competes with the LCP
-    image; the Arial-matched "Figtree Fallback" keeps the swap from shifting layout;
+  - one web font, Figtree (19 kB, `src/fonts/`), preloaded in `Base.astro` (without the preload
+    it sits one round trip behind the LCP image and the lab LCP flips over budget); the
+    Arial-matched "Figtree Fallback" keeps the swap from shifting layout;
   - prefer HTML/CSS (`<details>`, `popover`, `<dialog>`, `:has()`) over an island; an island
     that renders nothing on the server must use `client:idle` (or `client:load` when it
     handles input the user can hit straight away, like `FacetForm`), never `client:visible`;
@@ -110,7 +111,7 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
 | Want to | Where |
 |---|---|
 | Rebrand (colours, fonts, radii) | `theme.tokens.json`; checkout follows automatically |
-| A web font | replace the woff2 under `src/fonts/` (with its licence), its `@font-face` and metric-matched fallback in `global.css`, and the family in `theme.tokens.json`; one font at most (LCP budget); preload only if a re-measure shows it helps |
+| A web font | replace the woff2 under `src/fonts/` (with its licence), its `@font-face` and metric-matched fallback in `global.css`, and the family in `theme.tokens.json`, and its preload in `Base.astro`; one font at most (LCP budget) |
 | Header / navigation | `components/Header.astro` (mobile sheet included) |
 | Home sections | `pages/index.astro` (hero, category promo, category tiles, best-seller carousel, category spotlight, blog) |
 | Card content | `components/ProductCard.astro` (keep the stanza order; adjust `CARD_SIZES` if the grid changes) |

@@ -30,9 +30,10 @@ export const PROMO_SIZES =
 /** Home side-category card photos (the two next to the lead card): 6rem, 8rem from 48rem. */
 export const PROMO_SIDE_SIZES = "(min-width: 48rem) 8rem, 6rem";
 
-/** Home best-seller rail: 68vw (max 18rem) cards on phones, 4 per view from 48rem. */
+/** Home best-seller rail: 44vw cards on phones (two and a peek; 68vw doubled the image bytes in
+    the lazy-load range and cost ~150 ms of home LCP), 4 per view from 48rem. */
 export const CAROUSEL_SIZES =
-  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), min(68vw, 18rem)";
+  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), min(44vw, 18rem)";
 
 /** Home category spotlight: the lead product spans 2 of 4 columns (all 2 on phones). */
 export const SPOTLIGHT_SIZES =
