@@ -332,6 +332,66 @@
   }
 }
 
+/*
+ * Header search: on phones a top popover (opened by the search button, slides down); from 48rem
+ * the same element is shown in place as the inline field of the header bar.
+ */
+@utility search-sheet {
+  position: fixed;
+  inset: 0 0 auto 0;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 0;
+  overflow: visible;
+  color: inherit;
+  background: var(--color-card);
+  box-shadow: var(--shadow-lift);
+  transition:
+    translate 200ms ease-out,
+    display 200ms allow-discrete,
+    overlay 200ms allow-discrete;
+  translate: 0 -100%;
+  &:popover-open {
+    translate: 0 0;
+    @starting-style {
+      translate: 0 -100%;
+    }
+  }
+  @media (width >= 48rem) {
+    display: block;
+    position: static;
+    min-width: 0;
+    max-width: 28rem;
+    margin-left: auto;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    translate: none;
+    transition: none;
+  }
+  @media (width >= 80rem) {
+    margin-left: 0;
+    max-width: 20rem;
+  }
+}
+
+/* Horizontal snap rail (home best-sellers): native scrolling, no JS. */
+@utility rail {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  overscroll-behavior-x: contain;
+  & > * {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+}
+
 /* Cart count bump when an item lands (the family's signature confirmation). */
 @keyframes bump {
   40% {

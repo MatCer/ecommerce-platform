@@ -231,7 +231,7 @@ test("keyboard only: skip link, header, product page, cart", async ({ page, cont
   await page.keyboard.press("Enter");
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole("button", { name: "Zavřít košík" })).toBeFocused();
-  // The drawer sits inside the dark header: its focus ring must not inherit the header's light one.
+  // The drawer and the (white) header keep the ink ring: visible on their own ground.
   await expectVisibleRing(drawer.getByRole("button", { name: "Zavřít košík" }), drawer);
   await page.keyboard.press("Escape");
   await expect(cartButton).toBeFocused();
@@ -245,7 +245,7 @@ test("keyboard only: skip link, header, product page, cart", async ({ page, cont
   await expect(page.getByRole("heading", { level: 1 })).toContainText("mikina");
 });
 
-test("phone sheets (menu, filters): Escape closes, focus never stays behind an open sheet", async ({
+test("phone sheets (menu, filters, search): Escape closes, focus never stays behind an open sheet", async ({
   browser,
 }) => {
   const ctx = await testContext(browser, { viewport: { width: 390, height: 844 } });
@@ -269,6 +269,17 @@ test("phone sheets (menu, filters): Escape closes, focus never stays behind an o
     for (let i = 0; i < 60 && (await sheet.isVisible()); i++) await page.keyboard.press("Tab");
     await expect(sheet).toBeHidden();
   }
+  // Phone search: the header button opens the top sheet with the field focused; Escape closes it.
+  const searchButton = page.locator(
+    'header button[popovertarget="search-sheet"]:not([popovertargetaction])',
+  );
+  const box = page.getByRole("combobox", { name: "Hledat" });
+  await expect(box).toBeHidden();
+  await searchButton.click();
+  await expect(box).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(box).toBeHidden();
+  await expect(searchButton).toBeFocused();
   await ctx.close();
 });
 

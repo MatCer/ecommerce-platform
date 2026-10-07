@@ -4,14 +4,16 @@ import { i18n } from "../lib/i18n";
 import Icon from "./Icon.astro";
 
 /**
- * The shop's real promises in one grey strip, under the header and again above the footer:
+ * The shop's real promises in one slim grey line, under the header and again above the footer:
  * free delivery threshold (else the delivery promise), returns, payment methods. Phones show the
- * first one only. Nothing here is invented: every fact comes from the shop model.
+ * first one only (tablets the first two). Nothing here is invented: every fact comes from the shop model.
  */
 interface Props {
   shop: ShopModel;
+  /** Which edge borders the page content: under the header "bottom", above the footer "top". */
+  edge?: "top" | "bottom";
 }
-const { shop } = Astro.props;
+const { shop, edge = "bottom" } = Astro.props;
 const { t } = i18n(shop);
 const facts: { icon: "truck" | "returns" | "card"; text: string }[] = [
   {
@@ -27,12 +29,12 @@ const facts: { icon: "truck" | "returns" | "card"; text: string }[] = [
 ];
 ---
 
-<div class="bg-muted text-foreground">
-  <ul class="container-shop flex min-h-10 items-center justify-center gap-8 py-2 text-[0.8125rem] font-medium md:justify-between">
+<div class:list={["border-border bg-muted text-foreground", edge === "top" ? "border-t" : "border-b"]}>
+  <ul class="container-shop flex min-h-9 items-center justify-center gap-8 py-1.5 text-[0.8125rem] font-medium md:justify-between">
     {
       facts.map((f, i) => (
-        <li class:list={["items-center gap-2", i === 0 ? "flex" : "hidden md:flex"]}>
-          <Icon name={f.icon} class="size-[1.125rem] shrink-0 text-identity" />
+        <li class:list={["items-center gap-2", i === 0 ? "flex" : i === 1 ? "hidden md:flex" : "hidden lg:flex"]}>
+          <Icon name={f.icon} class="size-[1.125rem] shrink-0 text-identity-ink" />
           {f.text}
         </li>
       ))

@@ -8,10 +8,12 @@ import Icon from "./Icon.astro";
 import TrustStrip from "./TrustStrip.astro";
 
 /**
- * Sticky navy header (menu, logo, search, account, cart with its total) with the top-level
- * categories in a row from 48rem, then the trust strip. No hover menus (WCAG 1.4.13 would
- * require them to be dismissible with Escape): the full tree is in a native popover sheet on
- * every width (no JS, Escape and outside click close it).
+ * Sticky white bar (menu, logo, search, account, cart with its count). The top-level categories
+ * sit inline from 80rem and in a scrollable row under the bar below that, then the slim trust
+ * line. On phones the search is a button that opens the same SearchBox in a top popover, so
+ * the sticky bar stays 56 px; from 48rem that popover is shown in place as the inline field.
+ * No hover menus (WCAG 1.4.13 would require them to be dismissible with Escape): the full tree
+ * is in a native popover sheet on every width (no JS, Escape and outside click close it).
  */
 interface Props {
   shop: ShopModel;
@@ -20,6 +22,8 @@ interface Props {
 const { shop, q } = Astro.props;
 const { t, href, pick, pluralKeys } = i18n(shop);
 const accountUrl = `${shop.checkout_url}/account`;
+const path = Astro.url.pathname;
+const current = (h: string) => path === h || path.startsWith(`${h}/`);
 const CART_KEYS = [
   "cart.title",
   "cart.cross_sell",
@@ -44,40 +48,46 @@ const CART_KEYS = [
   "cart.free_shipping_reached",
   ...pluralKeys("cart.items"),
 ];
+const navList = "flex gap-x-6 overflow-x-auto text-[0.9375rem] font-medium [scrollbar-width:none]";
+const navLink =
+  "flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline aria-[current=page]:underline";
 ---
 
-<header class="sticky top-0 z-30 bg-panel text-card [--focus-ring:var(--color-card)]">
-  <div class="container-shop grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-2 py-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-x-6 md:py-3">
-    <div class="flex items-center gap-1 md:gap-2">
-      <button type="button" popovertarget="nav-drawer" class="-ml-2 grid size-11 place-items-center rounded-md text-panel-foreground hover:bg-panel-raised hover:text-card">
-        <Icon name="menu" class="size-6" />
-        <span class="sr-only">{t("nav.menu")}</span>
+<header class="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-sm">
+  <div class="container-shop flex h-14 items-center gap-1 md:h-16 md:gap-4 xl:gap-6">
+    <button type="button" popovertarget="nav-drawer" class="-ml-2 grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted">
+      <Icon name="menu" class="size-6" />
+      <span class="sr-only">{t("nav.menu")}</span>
+    </button>
+    <a href={href("/")} class="font-display text-[1.375rem] font-bold tracking-tight whitespace-nowrap md:text-2xl">{shop.name}</a>
+    <nav aria-label={t("nav.main")} class="ml-4 hidden min-w-0 flex-1 xl:block">
+      <ul class={navList}>{shop.menus.main.map((item) => <li class="shrink-0"><a href={item.href} aria-current={current(item.href) ? "page" : undefined} class={navLink}>{item.label}</a></li>)}</ul>
+    </nav>
+    <div id="search-sheet" popover class="search-sheet">
+      <div class="flex items-center gap-2">
+        <div class="min-w-0 flex-1">
+          <SearchBox client:idle q={q} base={shop.base_path} labels={pick(["search.label", "search.placeholder", "search.all_results", "nav.categories", "search.products"])} />
+        </div>
+        <button type="button" popovertarget="search-sheet" popovertargetaction="hide" class="grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted md:hidden">
+          <Icon name="close" class="size-6" />
+          <span class="sr-only">{t("nav.close")}</span>
+        </button>
+      </div>
+    </div>
+    <div class="ml-auto flex shrink-0 items-center gap-1 md:ml-0">
+      <button type="button" popovertarget="search-sheet" class="grid size-11 place-items-center rounded-full hover:bg-muted md:hidden">
+        <Icon name="search" class="size-6" />
+        <span class="sr-only">{t("search.label")}</span>
       </button>
-      <a href={href("/")} class="font-display text-xl font-bold tracking-tight whitespace-nowrap md:text-2xl">{shop.name}</a>
-    </div>
-    <div class="col-span-full row-start-2 md:col-span-1 md:col-start-2 md:row-start-1 md:max-w-2xl">
-      <SearchBox client:idle q={q} base={shop.base_path} labels={pick(["search.label", "search.placeholder", "search.all_results", "nav.categories", "search.products"])} />
-    </div>
-    <div class="col-start-3 flex items-center gap-1 justify-self-end md:gap-3">
-      <a href={accountUrl} class="grid size-11 place-items-center rounded-md text-panel-foreground hover:bg-panel-raised hover:text-card lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold">
+      <a href={accountUrl} class="hidden size-11 place-items-center rounded-full hover:bg-muted sm:grid lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold">
         <Icon name="user" class="size-6 lg:size-5" />
         <span class="sr-only lg:not-sr-only">{t("nav.account")}</span>
       </a>
       <MiniCart client:idle locale={shop.locale} base={shop.base_path} threshold={shop.free_shipping_threshold ?? undefined} labels={pick(CART_KEYS)} />
     </div>
   </div>
-  <nav aria-label={t("nav.main")} class="hidden md:block">
-    <ul class="container-shop flex gap-x-6 overflow-x-auto text-[0.9375rem] font-medium text-panel-foreground [scrollbar-width:none]">
-      {
-        shop.menus.main.map((item, i) => (
-          <li class="shrink-0">
-            <a href={item.href} class:list={["flex h-11 items-center underline-offset-8 decoration-2 hover:text-card hover:underline", i === 0 && "font-bold text-card"]}>
-              {item.label}
-            </a>
-          </li>
-        ))
-      }
-    </ul>
+  <nav aria-label={t("nav.main")} class="border-t border-border xl:hidden">
+    <ul class={`container-shop ${navList}`}>{shop.menus.main.map((item) => <li class="shrink-0"><a href={item.href} aria-current={current(item.href) ? "page" : undefined} class={navLink}>{item.label}</a></li>)}</ul>
   </nav>
 </header>
 
@@ -87,18 +97,18 @@ const CART_KEYS = [
 <nav id="nav-drawer" popover aria-label={t("nav.main")} class="sheet bg-panel! text-card [--focus-ring:var(--color-card)]">
   <div class="flex h-16 items-center justify-between border-b border-white/15 px-5">
     <a href={href("/")} class="font-display text-xl font-bold tracking-tight">{shop.name}</a>
-    <button type="button" popovertarget="nav-drawer" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-panel-raised">
+    <button type="button" popovertarget="nav-drawer" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-full hover:bg-panel-raised">
       <Icon name="close" class="size-6" />
       <span class="sr-only">{t("nav.close")}</span>
     </button>
   </div>
-  <ul class="px-5 py-3">
+  <ul class="px-5 py-4">
     {
       shop.menus.main.map((item) => (
-        <li class="py-1">
-          <a href={item.href} class="flex min-h-11 items-center text-lg font-bold text-panel-foreground hover:text-card">{item.label}</a>
+        <li class="py-0.5">
+          <a href={item.href} aria-current={current(item.href) ? "page" : undefined} class="flex min-h-12 items-center text-xl font-bold text-card">{item.label}</a>
           {item.children.length > 0 && (
-            <ul class="grid pb-1 pl-3">
+            <ul class="grid pb-2 pl-1">
               {item.children.map((c) => (
                 <li>
                   <a href={c.href} class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">{c.label}</a>
@@ -110,7 +120,8 @@ const CART_KEYS = [
       ))
     }
   </ul>
-  <div class="border-t border-white/15 px-5 py-4">
-    <a href={accountUrl} class="flex min-h-11 items-center gap-3 font-semibold text-panel-foreground hover:text-card"><Icon name="user" />{t("nav.account")}</a>
+  <div class="grid gap-1 border-t border-white/15 px-5 py-4 text-panel-foreground">
+    <a href={accountUrl} class="flex min-h-11 items-center gap-3 font-semibold hover:text-card"><Icon name="user" />{t("nav.account")}</a>
+    {shop.menus.footer.map((m) => <a href={m.href} class="flex min-h-11 items-center font-semibold hover:text-card">{m.label}</a>)}
   </div>
 </nav>

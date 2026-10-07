@@ -35,23 +35,40 @@ const languageName = (code: string) => {
   const name = new Intl.DisplayNames([code], { type: "language" }).of(code) ?? code;
   return name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
 };
-const heading = "mb-4 text-lg font-bold text-card";
+const heading = "mb-4 text-base font-bold text-card";
 const link =
-  "inline-flex min-h-8 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline";
+  "inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline";
 ---
 
-<TrustStrip shop={shop} />
+<TrustStrip shop={shop} edge="top" />
 <footer class="bg-panel text-sm text-panel-foreground [--focus-ring:var(--color-card)]">
-  <div class="container-shop grid gap-10 py-12 md:grid-cols-2 md:py-16 lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+  <div class="container-shop grid gap-10 py-12 md:grid-cols-2 md:py-16 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:gap-8">
+    <section aria-labelledby="footer-newsletter" class="md:col-span-2 lg:col-span-1 lg:pr-8">
+      <p class="mb-5 font-display text-3xl font-bold tracking-tight text-card">{shop.name}</p>
+      <h2 id="footer-newsletter" class={heading}>{t("newsletter.title")}</h2>
+      <p class="mb-4 max-w-sm text-panel-foreground/85">{t("footer.newsletter_text")}</p>
+      {
+        newsletter === "ok" ? (
+          <p role="status" class="font-semibold text-card">{t("newsletter.done")}</p>
+        ) : (
+          <form id="newsletter" method="post" action="/_p/newsletter" class="flex max-w-sm flex-col gap-2 sm:flex-row">
+            <label for="nl-email" class="sr-only">{t("newsletter.email")}</label>
+            <input id="nl-email" name="email" type="email" required autocomplete="email" placeholder={t("newsletter.placeholder")} aria-invalid={newsletter === "invalid" ? "true" : undefined} aria-describedby={newsletter === "invalid" ? "nl-error" : undefined} class="h-12 min-w-0 rounded-full border border-white/45 bg-panel-raised px-5 text-base text-card sm:flex-1 placeholder:text-panel-foreground/70 focus-visible:outline-card" />
+            <button type="submit" class="btn h-12 bg-card text-foreground hover:bg-panel-foreground">{t("newsletter.submit")}</button>
+          </form>
+        )
+      }
+      {newsletter === "invalid" && <p id="nl-error" role="alert" class="mt-2 text-card">{t("newsletter.invalid")}</p>}
+    </section>
     <nav aria-labelledby="footer-shop">
       <h2 id="footer-shop" class={heading}>{t("footer.shop")}</h2>
-      <ul class="grid gap-1">
+      <ul class="grid gap-0.5">
         {shop.menus.main.map((m) => <li><a href={m.href} class={link}>{m.label}</a></li>)}
       </ul>
     </nav>
     <nav aria-labelledby="footer-service">
       <h2 id="footer-service" class={heading}>{t("footer.customer_service")}</h2>
-      <ul class="grid gap-1">
+      <ul class="grid gap-0.5">
         {shop.menus.footer.map((m) => <li><a href={m.href} class={link}>{m.label}</a></li>)}
         <li><a href={`${shop.checkout_url}/account`} class={link}>{t("nav.account")}</a></li>
         <li><a href={`${shop.checkout_url}/withdraw`} class={link}>{t("footer.withdrawal")}</a></li>
@@ -59,7 +76,7 @@ const link =
     </nav>
     <nav aria-labelledby="footer-legal">
       <h2 id="footer-legal" class={heading}>{t("footer.legal")}</h2>
-      <ul class="grid gap-1">
+      <ul class="grid gap-0.5">
         {shop.legal_pages.map((m) => <li><a href={m.href} class={link}>{m.label}</a></li>)}
         <li><a href={shop.consent.policy_url} class={link}>{t("legal.cookies")}</a></li>
         <li>
@@ -68,23 +85,6 @@ const link =
         </li>
       </ul>
     </nav>
-    <section aria-labelledby="footer-newsletter">
-      <p class="mb-5 font-display text-3xl font-bold tracking-tight text-card">{shop.name}</p>
-      <h2 id="footer-newsletter" class={heading}>{t("newsletter.title")}</h2>
-      <p class="mb-3 max-w-sm text-panel-foreground/85">{t("footer.newsletter_text")}</p>
-      {
-        newsletter === "ok" ? (
-          <p role="status" class="font-semibold text-card">{t("newsletter.done")}</p>
-        ) : (
-          <form id="newsletter" method="post" action="/_p/newsletter" class="flex max-w-sm flex-col gap-2 sm:flex-row">
-            <label for="nl-email" class="sr-only">{t("newsletter.email")}</label>
-            <input id="nl-email" name="email" type="email" required autocomplete="email" placeholder={t("newsletter.placeholder")} aria-invalid={newsletter === "invalid" ? "true" : undefined} aria-describedby={newsletter === "invalid" ? "nl-error" : undefined} class="h-11 min-w-0 flex-1 rounded-md border border-white/25 bg-panel-raised px-3 text-card placeholder:text-panel-foreground/70 focus-visible:outline-card" />
-            <button type="submit" class="btn btn-primary">{t("newsletter.submit")}</button>
-          </form>
-        )
-      }
-      {newsletter === "invalid" && <p id="nl-error" role="alert" class="mt-2 text-card">{t("newsletter.invalid")}</p>}
-    </section>
   </div>
 
   <div class="bg-panel-deep">
@@ -96,7 +96,7 @@ const link =
               <h2 id="footer-payments" class="sr-only">{t("footer.payments")}</h2>
               <ul class="flex flex-wrap gap-2" aria-labelledby="footer-payments">
                 {payments.map((p) => (
-                  <li class="flex h-8 items-center gap-1.5 rounded-sm bg-card px-2.5 text-xs font-semibold text-foreground">
+                  <li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground">
                     <Icon name={PAYMENT_ICON[p.kind]} class="size-4" />
                     {p.label}
                   </li>
@@ -111,7 +111,7 @@ const link =
               <h2 id="footer-delivery" class="sr-only">{t("footer.delivery")}</h2>
               <ul class="flex flex-wrap gap-2" aria-labelledby="footer-delivery">
                 {carriers.map((c) => (
-                  <li class="flex h-8 items-center gap-1.5 rounded-sm bg-card px-2.5 text-xs font-semibold text-foreground">
+                  <li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground">
                     <Icon name={CARRIER_ICON[c.carrier]} class="size-4" />
                     {c.label}
                   </li>
@@ -122,7 +122,7 @@ const link =
         }
       </div>
       <a href="#" class="inline-flex min-h-11 items-center gap-2 font-semibold text-card hover:underline">
-        <Icon name="chevronDown" class="size-4 rotate-180" />
+        <Icon name="arrowUp" class="size-4" />
         {t("footer.back_to_top")}
       </a>
       {
