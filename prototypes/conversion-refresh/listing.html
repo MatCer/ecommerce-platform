@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oblečení · Lnen &amp; Co.</title>
+<meta name="description" content="Lnen &amp; Co. – oblečení a doplňky ze lnu a merino vlny. Prototyp SHOP-81.">
+<link rel="preload" href="fonts/figtree-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" as="image" href="img/sweat-grey.avif" fetchpriority="high">
+<link rel="stylesheet" href="styles.css">
+
+</head>
+<body class="">
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-foreground focus:px-5 focus:py-3 focus:text-card">Přeskočit na obsah</a>
+<header class="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur-sm">
+  <div class="container-shop flex h-14 items-center gap-1 md:h-16 md:gap-4 xl:gap-6">
+    <button type="button" popovertarget="nav-drawer" class="-ml-2 grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted"><svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="sr-only">Menu</span></button>
+    <a href="home.html" class="font-display text-[1.375rem] font-bold tracking-tight whitespace-nowrap md:text-2xl">Lnen &amp; Co.</a>
+    <nav aria-label="Hlavní navigace" class="ml-4 hidden min-w-0 flex-1 xl:block">
+      <ul class="flex gap-x-6 overflow-x-auto text-[15px] font-medium [scrollbar-width:none]"><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Novinky</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Trička</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Mikiny</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Doplňky</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  text-sale">Výprodej</a></li></ul>
+    </nav>
+    <form role="search" action="search.html" class="ml-auto hidden w-full max-w-md min-w-0 md:block xl:ml-0 xl:max-w-xs">
+  <label for="q-desktop" class="sr-only">Hledat</label>
+  <div class="relative">
+    <input id="q-desktop" name="q" type="search" placeholder="Hledat trička, mikiny…" autocomplete="off"  class="h-11 w-full rounded-full border border-border bg-muted pr-12 pl-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card">
+    <button type="submit" class="absolute top-0 right-0 grid size-11 place-items-center rounded-full text-foreground"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-4.2-4.2M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg><span class="sr-only">Hledat</span></button>
+  </div>
+</form>
+    <div class="ml-auto flex shrink-0 items-center gap-1 md:ml-0">
+      <button type="button" popovertarget="search-sheet" class="grid size-11 place-items-center rounded-full hover:bg-muted md:hidden"><svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-4.2-4.2M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg><span class="sr-only">Hledat</span></button>
+      <a href="#" class="hidden size-11 place-items-center rounded-full hover:bg-muted sm:grid lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold"><svg class="size-6 lg:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8.5c.8-3.4 3.6-5.5 7-5.5s6.2 2.1 7 5.5"/></svg><span class="sr-only lg:not-sr-only">Můj účet</span></a>
+      <a href="product-cart.html" class="relative -mr-2 grid size-11 place-items-center rounded-full hover:bg-muted lg:mr-0 lg:flex lg:w-auto lg:gap-2 lg:px-3 lg:text-sm lg:font-semibold">
+        <span class="relative"><svg class="size-6 lg:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 11.1a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5 8Zm4 0V6.5a3 3 0 0 1 6 0V8"/></svg><span class="absolute -top-1.5 -right-2 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-foreground px-1 text-[11px] leading-none font-bold text-card" aria-hidden="true">1</span></span>
+        <span class="sr-only lg:not-sr-only">Košík</span><span class="sr-only">, položek: 1</span>
+      </a>
+    </div>
+  </div>
+  <nav aria-label="Hlavní navigace" class="border-t border-border xl:hidden">
+    <ul class="container-shop flex gap-x-6 overflow-x-auto text-[15px] font-medium [scrollbar-width:none]"><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Novinky</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Trička</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Mikiny</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  ">Doplňky</a></li><li class="shrink-0"><a href="listing.html" class="flex h-11 items-center underline-offset-[14px] decoration-2 hover:underline  text-sale">Výprodej</a></li></ul>
+  </nav>
+</header>
+<div class="border-b border-border bg-muted"><ul class="container-shop flex min-h-9 items-center justify-center gap-8 py-1.5 text-[13px] font-medium md:justify-between"><li class="flex items-center gap-2"><svg class="size-[1.125rem] shrink-0 text-identity-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6h11v9.5h-11zM13.5 9h4l3 3.2v3.3h-7M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Zm11 0a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"/></svg>Doprava zdarma od 1 500 Kč</li><li class="hidden md:flex items-center gap-2"><svg class="size-[1.125rem] shrink-0 text-identity-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h11a5 5 0 0 1 0 10H9M4 9l4-4M4 9l4 4"/></svg>Vrácení do 30 dnů zdarma</li><li class="hidden md:flex items-center gap-2"><svg class="size-[1.125rem] shrink-0 text-identity-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5h18v11H3zM3 10h18M7 14.5h3"/></svg>Platba kartou · Bankovní převod · Dobírka</li></ul></div>
+<div id="search-sheet" popover class="fixed inset-x-0 top-0 m-0 w-full max-w-none border-0 bg-card p-4 pt-3 shadow-lift transition-[translate,display,overlay] duration-200 [transition-behavior:allow-discrete] -translate-y-full open:translate-y-0 starting:open:-translate-y-full">
+  <div class="flex items-center gap-2">
+    <form role="search" action="search.html" class="min-w-0 flex-1">
+  <label for="q-mobile" class="sr-only">Hledat</label>
+  <div class="relative">
+    <input id="q-mobile" name="q" type="search" placeholder="Hledat trička, mikiny…" autocomplete="off" autofocus class="h-11 w-full rounded-full border border-border bg-muted pr-12 pl-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card">
+    <button type="submit" class="absolute top-0 right-0 grid size-11 place-items-center rounded-full text-foreground"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-4.2-4.2M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg><span class="sr-only">Hledat</span></button>
+  </div>
+</form>
+    <button type="button" popovertarget="search-sheet" popovertargetaction="hide" class="grid size-11 shrink-0 place-items-center rounded-full hover:bg-muted"><svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span class="sr-only">Zavřít</span></button>
+  </div>
+</div>
+<nav id="nav-drawer" popover class="sheet bg-panel text-card" aria-label="Hlavní navigace">
+  <div class="flex h-16 items-center justify-between border-b border-white/15 px-5">
+    <a href="home.html" class="font-display text-xl font-bold tracking-tight">Lnen &amp; Co.</a>
+    <button type="button" popovertarget="nav-drawer" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-full hover:bg-panel-raised"><svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span class="sr-only">Zavřít</span></button>
+  </div>
+  <ul class="px-5 py-4"><li class="py-0.5"><a href="listing.html" class="flex min-h-12 items-center text-xl font-bold text-card">Novinky</a></li><li class="py-0.5"><a href="listing.html" class="flex min-h-12 items-center text-xl font-bold text-card">Trička</a><ul class="grid pb-2 pl-1"><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Basic</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Merino</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Lněná</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Dětská</a></li></ul></li><li class="py-0.5"><a href="listing.html" class="flex min-h-12 items-center text-xl font-bold text-card">Mikiny</a><ul class="grid pb-2 pl-1"><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">S kapucí</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Crew</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Na zip</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Merino</a></li></ul></li><li class="py-0.5"><a href="listing.html" class="flex min-h-12 items-center text-xl font-bold text-card">Doplňky</a><ul class="grid pb-2 pl-1"><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Čepice</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Tašky</a></li><li><a href="listing.html" class="flex min-h-11 items-center text-panel-foreground/85 hover:text-card">Batohy</a></li></ul></li><li class="py-0.5"><a href="listing.html" class="flex min-h-12 items-center text-xl font-bold text-sale">Výprodej</a></li></ul>
+  <div class="grid gap-1 border-t border-white/15 px-5 py-4 text-panel-foreground">
+    <a href="#" class="flex min-h-11 items-center gap-3 font-semibold hover:text-card"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8.5c.8-3.4 3.6-5.5 7-5.5s6.2 2.1 7 5.5"/></svg>Můj účet</a>
+    <a href="#" class="flex min-h-11 items-center gap-3 font-semibold hover:text-card"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6h11v9.5h-11zM13.5 9h4l3 3.2v3.3h-7M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Zm11 0a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"/></svg>Doprava a platba</a>
+    <a href="#" class="flex min-h-11 items-center gap-3 font-semibold hover:text-card"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h11a5 5 0 0 1 0 10H9M4 9l4-4M4 9l4 4"/></svg>Reklamace a vrácení</a>
+  </div>
+</nav>
+<main id="main" class="container-shop pb-16">
+  <nav aria-label="Drobečková navigace" class="py-4 text-sm text-muted-foreground"><ol class="flex flex-wrap gap-2"><li><a href="home.html" class="hover:underline">Domů</a></li><li aria-hidden="true">/</li><li aria-current="page" class="text-foreground">Oblečení</li></ol></nav>
+  <form id="facets" method="get" action="listing.html" class="group/facets grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-8 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-12">
+    <aside class="grid content-start gap-4">
+  <nav aria-label="Kategorie" class="md:rounded-lg md:bg-muted md:p-5">
+    <h2 class="mb-2 hidden text-base font-bold md:block">Kategorie</h2>
+    <ul class="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] md:grid md:gap-0 md:overflow-visible md:pb-0"><li class="shrink-0"><a href="listing.html" class="chip font-semibold md:min-h-10 md:justify-start md:border-0 md:bg-transparent md:px-0 md:font-medium md:hover:underline ">Trička</a></li><li class="shrink-0"><a href="listing.html" class="chip font-semibold md:min-h-10 md:justify-start md:border-0 md:bg-transparent md:px-0 md:font-medium md:hover:underline ">Mikiny</a></li><li class="shrink-0"><a href="listing.html" class="chip font-semibold md:min-h-10 md:justify-start md:border-0 md:bg-transparent md:px-0 md:font-medium md:hover:underline ">Dětské</a></li><li class="shrink-0"><a href="listing.html" class="chip font-semibold md:min-h-10 md:justify-start md:border-0 md:bg-transparent md:px-0 md:font-medium md:hover:underline ">Výprodej</a></li></ul>
+  </nav>
+  <div id="filter-sheet" popover class="sheet md:static md:block md:h-auto md:w-auto md:translate-none md:overflow-visible md:rounded-lg md:bg-muted md:shadow-none">
+    <div class="flex h-16 items-center justify-between border-b border-border px-5 md:hidden">
+      <h2 class="flex items-center gap-2 text-xl font-bold">Filtry <span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs text-card">2</span></h2>
+      <button type="button" popovertarget="filter-sheet" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-full hover:bg-muted"><svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg><span class="sr-only">Zavřít</span></button>
+    </div>
+    <h2 class="hidden px-5 pt-5 text-base font-bold md:block">Filtry</h2>
+    <div class="divide-y divide-border px-5 md:pb-2"><details name="facet" class="group/facet py-1" open>
+  <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
+    <span class="flex items-center gap-2">Velikost<span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs font-bold text-card">1</span></span><svg class="size-5 transition-transform group-open/facet:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </summary>
+  <fieldset class="pt-1 pb-3"><legend class="sr-only">Velikost</legend><ul class="grid"><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Velikost" value="XS" >XS<span class="ml-auto text-[13px] text-subtle">6</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Velikost" value="S" >S<span class="ml-auto text-[13px] text-subtle">18</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Velikost" value="M" checked>M<span class="ml-auto text-[13px] text-subtle">24</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Velikost" value="L" >L<span class="ml-auto text-[13px] text-subtle">22</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Velikost" value="XL" >XL<span class="ml-auto text-[13px] text-subtle">15</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Velikost" value="XXL" >XXL<span class="ml-auto text-[13px] text-subtle">7</span></label></li></ul></fieldset>
+</details><details name="facet" class="group/facet py-1" open>
+  <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
+    <span class="flex items-center gap-2">Barva<span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs font-bold text-card">1</span></span><svg class="size-5 transition-transform group-open/facet:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </summary>
+  <fieldset class="pt-1 pb-3"><legend class="sr-only">Barva</legend><ul class="grid"><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Barva" value="Zelená" checked>Zelená<span class="ml-auto text-[13px] text-subtle">9</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Barva" value="Modrá" >Modrá<span class="ml-auto text-[13px] text-subtle">7</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Barva" value="Šedá" >Šedá<span class="ml-auto text-[13px] text-subtle">6</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Barva" value="Cihlová" >Cihlová<span class="ml-auto text-[13px] text-subtle">4</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Barva" value="Písková" >Písková<span class="ml-auto text-[13px] text-subtle">5</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Barva" value="Švestková" >Švestková<span class="ml-auto text-[13px] text-subtle">3</span></label></li></ul></fieldset>
+</details><details name="facet" class="group/facet py-1" >
+  <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
+    <span class="flex items-center gap-2">Materiál</span><svg class="size-5 transition-transform group-open/facet:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </summary>
+  <fieldset class="pt-1 pb-3"><legend class="sr-only">Materiál</legend><ul class="grid"><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Materiál" value="Len" >Len<span class="ml-auto text-[13px] text-subtle">8</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Materiál" value="Merino" >Merino<span class="ml-auto text-[13px] text-subtle">7</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Materiál" value="Bavlna" >Bavlna<span class="ml-auto text-[13px] text-subtle">12</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name="f.Materiál" value="Fleece" >Fleece<span class="ml-auto text-[13px] text-subtle">3</span></label></li></ul></fieldset>
+</details><details name="facet" class="group/facet py-1" >
+  <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
+    <span class="flex items-center gap-2">Cena</span><svg class="size-5 transition-transform group-open/facet:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+  </summary>
+  <fieldset class="pt-1 pb-3"><legend class="sr-only">Cena</legend><ul class="grid"><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="radio" name="f.Cena" value="do 500 Kč" >do 500 Kč<span class="ml-auto text-[13px] text-subtle">6</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="radio" name="f.Cena" value="500–1 000 Kč" >500–1 000 Kč<span class="ml-auto text-[13px] text-subtle">9</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="radio" name="f.Cena" value="1 000–1 500 Kč" >1 000–1 500 Kč<span class="ml-auto text-[13px] text-subtle">7</span></label></li><li><label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold"><input class="size-5 shrink-0 rounded accent-identity" type="radio" name="f.Cena" value="nad 1 500 Kč" >nad 1 500 Kč<span class="ml-auto text-[13px] text-subtle">2</span></label></li></ul></fieldset>
+</details></div>
+    <div class="sticky bottom-0 mt-4 grid gap-2 border-t border-border bg-card p-4 md:hidden">
+      <button type="submit" class="btn btn-primary h-13 w-full text-base">Zobrazit výsledky</button>
+      <a href="listing.html" class="btn btn-secondary w-full">Zrušit filtry</a>
+    </div>
+  </div>
+</aside>
+    <div class="min-w-0">
+      <header class="mb-5">
+        <div class="flex flex-wrap items-baseline gap-x-3"><h1 class="text-3xl md:text-[2.5rem]">Oblečení</h1><p class="text-[15px] text-muted-foreground">24 produktů</p></div>
+        <p class="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground md:text-base">Trička a mikiny ze lnu, merino vlny a bavlny. Šijeme v Prostějově, v malých sériích a třech barvách na sezónu.</p>
+      </header>
+      <div class="mb-4 flex flex-wrap items-center gap-3 border-y border-border py-3">
+        <button type="button" popovertarget="filter-sheet" class="btn btn-secondary md:hidden"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9m4 0h3M4 17h3m4 0h9M15 5v4M9 15v4"/></svg>Filtry <span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs text-card">2</span></button>
+        <p class="hidden text-[15px] text-muted-foreground md:block">24 produktů</p>
+        <div class="ml-auto flex items-center gap-2 text-[15px]">
+          <label for="sort" class="text-muted-foreground">Řadit</label>
+          <select id="sort" name="sort" class="h-11 rounded-full border border-border bg-card pr-9 pl-4 font-semibold">
+            <option>Doporučené</option><option>Nejnovější</option><option>Nejlevnější</option><option>Nejdražší</option><option>Podle názvu</option>
+          </select>
+        </div>
+      </div>
+      <div class="mb-6 flex flex-wrap items-center gap-2">
+        <h2 class="sr-only">Aktivní filtry</h2>
+        <ul class="contents"><li><a href="listing.html" class="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-foreground pr-3 pl-4 text-sm font-medium text-card hover:bg-panel-raised"><span class="sr-only">Odebrat filtr: Velikost M</span><span aria-hidden="true">Velikost: M</span><svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></a></li><li><a href="listing.html" class="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-foreground pr-3 pl-4 text-sm font-medium text-card hover:bg-panel-raised"><span class="sr-only">Odebrat filtr: Barva Zelená</span><span aria-hidden="true">Barva: Zelená</span><svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></a></li></ul>
+        <a href="listing.html" class="ml-1 inline-flex min-h-10 items-center text-sm font-semibold underline underline-offset-4">Zrušit filtry</a>
+      </div>
+      <section aria-label="Produkty">
+        <ul class="grid grid-cols-2 gap-x-3 gap-y-8 lg:grid-cols-3 lg:gap-x-6 lg:gap-y-10"><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/sweat-grey.avif" alt="Mikina Crew" width="640" height="800" fetchpriority="high" loading="eager" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/sweat-cyan.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute top-3 left-3 flex items-center gap-1.5"><li class="rounded-full bg-sale px-2.5 py-1 text-[13px] font-bold text-white"><span aria-hidden="true">−11 %</span><span class="sr-only">Sleva 11 %</span></li></ul><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Mikina Crew</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="sr-only">Aktuální cena:</span><span class="price text-[17px] md:text-lg text-sale">1 352 Kč</span><s class="price text-sm font-medium text-subtle"><span class="sr-only">Původní cena: </span>1 521 Kč</s></p><p class="order-first text-[13px] leading-snug text-muted-foreground">Nejnižší cena za 30 dní: 1 521 Kč</p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Popelavá, Námořnická"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#8d9094" title="Popelavá"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#1f2540" title="Námořnická"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/sweat-brick.avif" alt="Mikina Fleece" width="640" height="800" loading="eager" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/sweat-grey.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute top-3 left-3 flex items-center gap-1.5"><li class="rounded-full bg-sale px-2.5 py-1 text-[13px] font-bold text-white"><span aria-hidden="true">−11 %</span><span class="sr-only">Sleva 11 %</span></li></ul><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Mikina Fleece</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="sr-only">Aktuální cena:</span><span class="price text-[17px] md:text-lg text-sale">952 Kč</span><s class="price text-sm font-medium text-subtle"><span class="sr-only">Původní cena: </span>1 072 Kč</s></p><p class="order-first text-[13px] leading-snug text-muted-foreground">Nejnižší cena za 30 dní: 1 072 Kč</p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-low"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Poslední kusy</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Cihlová, Popelavá, Petrolejová"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#b85c38" title="Cihlová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#8d9094" title="Popelavá"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f57" title="Petrolejová"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-teal.avif" alt="Tričko Henley" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/tee-navy.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute top-3 left-3 flex items-center gap-1.5"><li class="rounded-full bg-card px-2.5 py-1 text-[13px] font-bold text-foreground">Novinka</li></ul><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Tričko Henley</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">790 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Petrolejová, Námořnická, Švestková"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f57" title="Petrolejová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#1f2540" title="Námořnická"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#5b3c48" title="Švestková"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-green.avif" alt="Tričko Basic" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/tee-sand.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Tričko Basic</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">390 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Lahvová, Písková, Námořnická, Švestková"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f3c" title="Lahvová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#d9b98a" title="Písková"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#1f2540" title="Námořnická"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#5b3c48" title="Švestková"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/sweat-cyan.avif" alt="Mikina Oversize" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/sweat-brick.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute top-3 left-3 flex items-center gap-1.5"><li class="rounded-full bg-card px-2.5 py-1 text-[13px] font-bold text-foreground">Novinka</li></ul><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Mikina Oversize</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">1 512 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Tyrkysová, Cihlová, Popelavá"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2a9cae" title="Tyrkysová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#b85c38" title="Cihlová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#8d9094" title="Popelavá"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-sand.avif" alt="Lněné tričko" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/tee-teal.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute top-3 left-3 flex items-center gap-1.5"><li class="rounded-full bg-sale px-2.5 py-1 text-[13px] font-bold text-white"><span aria-hidden="true">−14 %</span><span class="sr-only">Sleva 14 %</span></li></ul><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Lněné tričko</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="sr-only">Aktuální cena:</span><span class="price text-[17px] md:text-lg text-sale">590 Kč</span><s class="price text-sm font-medium text-subtle"><span class="sr-only">Původní cena: </span>690 Kč</s></p><p class="order-first text-[13px] leading-snug text-muted-foreground">Nejnižší cena za 30 dní: 690 Kč</p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Písková, Přírodní"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#d9b98a" title="Písková"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#e4d5b8" title="Přírodní"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-plum.avif" alt="Tričko Merino" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Tričko Merino</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">590 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Švestková, Petrolejová"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#5b3c48" title="Švestková"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f57" title="Petrolejová"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-navy.avif" alt="Tričko s kapsičkou" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    <picture class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"><source media="(hover: hover) and (pointer: fine)" srcset="img/tee-green.avif"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="" width="640" height="800" loading="lazy" decoding="async" fetchpriority="low" class="size-full object-cover"></picture><ul class="absolute inset-x-0 bottom-2.5 flex justify-center gap-1.5 md:hidden" aria-hidden="true"><li class="size-1.5 rounded-full bg-foreground"></li><li class="size-1.5 rounded-full bg-foreground/30"></li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Tričko s kapsičkou</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">590 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Námořnická, Lahvová"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#1f2540" title="Námořnická"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f3c" title="Lahvová"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/sweat-brick.avif" alt="Mikina na zip" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Mikina na zip</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">1 432 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-low"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Na objednávku</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Cihlová"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#b85c38" title="Cihlová"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-teal.avif" alt="Tričko Heavy" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Tričko Heavy</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">790 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-low"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Poslední kusy</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Petrolejová, Námořnická"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f57" title="Petrolejová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#1f2540" title="Námořnická"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/tee-green.avif" alt="Dětské tričko" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    <ul class="absolute top-3 left-3 flex items-center gap-1.5"><li class="rounded-full bg-card px-2.5 py-1 text-[13px] font-bold text-foreground">Novinka</li></ul>
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Dětské tričko</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">690 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Lahvová, Písková, Tyrkysová"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2f4f3c" title="Lahvová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#d9b98a" title="Písková"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2a9cae" title="Tyrkysová"></li></ul>
+    </div>
+  </div>
+</article></li><li><article class="group relative flex w-full flex-col">
+  <div class="relative aspect-[4/5] overflow-hidden rounded-lg bg-muted">
+    <img src="img/sweat-cyan.avif" alt="Mikina s kapucí Klasik" width="640" height="800" loading="lazy" decoding="async" class="size-full object-cover">
+    
+  </div>
+  <div class="flex flex-1 flex-col gap-1 pt-3">
+    <h3 class="text-[15px] md:text-base leading-snug font-medium text-pretty"><a href="product.html" class="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-identity">Mikina s kapucí Klasik</a></h3>
+    <p class="order-first flex flex-wrap items-baseline gap-x-2"><span class="price text-[17px] md:text-lg ">1 272 Kč</span></p>
+    <div class="mt-1 flex items-center justify-between gap-2">
+      <p class="flex items-center gap-1.5 text-[13px] font-semibold text-stock-in"><span aria-hidden="true" class="size-1.5 rounded-full bg-current"></span>Skladem</p>
+      <ul class="flex items-center gap-1.5" aria-label="Barvy: Tyrkysová, Popelavá"><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#2a9cae" title="Tyrkysová"></li><li class="size-4 rounded-full border border-black/10 ring-1 ring-white" style="background:#8d9094" title="Popelavá"></li></ul>
+    </div>
+  </div>
+</article></li></ul>
+      </section>
+      <nav aria-label="Stránkování" class="mx-auto mt-12 grid max-w-sm justify-items-center gap-5">
+        <div class="grid w-full max-w-64 gap-2 text-center text-sm text-muted-foreground">
+          <p>Zobrazeno 12 z 24</p>
+          <progress max="24" value="12" aria-hidden="true" class="track"></progress>
+        </div>
+        <a rel="next" href="listing.html" class="btn btn-primary h-13 w-full text-base">Další<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <p class="text-[13px] text-muted-foreground">Strana 1 z 2</p>
+      </nav>
+    </div>
+  </form>
+</main>
+<div class="border-t border-border bg-muted"><ul class="container-shop flex min-h-9 items-center justify-center gap-8 py-1.5 text-[13px] font-medium md:justify-between"><li class="flex items-center gap-2"><svg class="size-[1.125rem] shrink-0 text-identity-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6h11v9.5h-11zM13.5 9h4l3 3.2v3.3h-7M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Zm11 0a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"/></svg>Doprava zdarma od 1 500 Kč</li><li class="hidden md:flex items-center gap-2"><svg class="size-[1.125rem] shrink-0 text-identity-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h11a5 5 0 0 1 0 10H9M4 9l4-4M4 9l4 4"/></svg>Vrácení do 30 dnů zdarma</li><li class="hidden md:flex items-center gap-2"><svg class="size-[1.125rem] shrink-0 text-identity-ink" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5h18v11H3zM3 10h18M7 14.5h3"/></svg>Platba kartou · Bankovní převod · Dobírka</li></ul></div>
+<footer class="bg-panel text-sm text-panel-foreground">
+  <div class="container-shop grid gap-10 py-12 md:grid-cols-2 md:py-16 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:gap-8">
+    <section aria-labelledby="footer-newsletter" class="md:col-span-2 lg:col-span-1 lg:pr-8">
+      <p class="mb-5 font-display text-3xl font-bold tracking-tight text-card">Lnen &amp; Co.</p>
+      <h2 id="footer-newsletter" class="mb-4 text-base font-bold text-card">Novinky e-mailem</h2>
+      <p class="mb-4 max-w-sm text-panel-foreground/85">Novinky a akce jednou za čas. Odhlásit se můžete kdykoli.</p>
+      <form method="post" action="#" class="flex max-w-sm flex-col gap-2 sm:flex-row">
+        <label for="nl-email" class="sr-only">E-mail</label>
+        <input id="nl-email" name="email" type="email" required autocomplete="email" placeholder="vas@email.cz" class="h-12 min-w-0 rounded-full border border-white/20 sm:flex-1 bg-panel-raised px-5 text-base text-card placeholder:text-panel-foreground/70 focus-visible:outline-card">
+        <button type="submit" class="btn h-12 bg-card text-foreground hover:bg-panel-foreground">Odebírat</button>
+      </form>
+    </section>
+    <nav aria-labelledby="footer-shop"><h2 id="footer-shop" class="mb-4 text-base font-bold text-card">Nakupování</h2><ul class="grid gap-0.5"><li><a href="listing.html" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Novinky</a></li><li><a href="listing.html" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Trička</a></li><li><a href="listing.html" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Mikiny</a></li><li><a href="listing.html" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Doplňky</a></li><li><a href="listing.html" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Výprodej</a></li></ul></nav>
+    <nav aria-labelledby="footer-service"><h2 id="footer-service" class="mb-4 text-base font-bold text-card">Zákaznický servis</h2><ul class="grid gap-0.5"><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Doprava a platba</a></li><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Reklamace a vrácení</a></li><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Kontakt</a></li><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Můj účet</a></li><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Odstoupení od smlouvy</a></li></ul></nav>
+    <nav aria-labelledby="footer-legal"><h2 id="footer-legal" class="mb-4 text-base font-bold text-card">Právní informace</h2><ul class="grid gap-0.5"><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Obchodní podmínky</a></li><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Ochrana osobních údajů</a></li><li><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Cookies</a></li><li><button type="button" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline cursor-pointer">Nastavení cookies</button></li></ul></nav>
+  </div>
+  <div class="bg-panel-deep">
+    <div class="container-shop grid gap-6 py-6 lg:grid-cols-[1fr_auto_auto] lg:items-center lg:gap-10">
+      <div class="flex flex-wrap gap-x-8 gap-y-3">
+        <div><h2 id="footer-payments" class="sr-only">Platba</h2><ul class="flex flex-wrap gap-2" aria-labelledby="footer-payments"><li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5h18v11H3zM3 10h18M7 14.5h3"/></svg>Platba kartou</li><li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10h18M5 10v7m4.7-7v7m4.6-7v7M19 10v7M3 20h18M12 4l9 4H3l9-4Z"/></svg>Bankovní převod</li><li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v10H3zM12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6 10v4M18 10v4"/></svg>Dobírka</li></ul></div>
+        <div><h2 id="footer-delivery" class="sr-only">Doprava</h2><ul class="flex flex-wrap gap-2" aria-labelledby="footer-delivery"><li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>Zásilkovna</li><li class="flex h-8 items-center gap-1.5 rounded-full bg-card px-3 text-xs font-semibold text-foreground"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6h11v9.5h-11zM13.5 9h4l3 3.2v3.3h-7M6.5 19a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Zm11 0a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"/></svg>PPL</li></ul></div>
+      </div>
+      <a href="#" class="inline-flex min-h-11 items-center gap-2 font-semibold text-card hover:underline"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>Zpět nahoru</a>
+      <nav aria-label="Země a jazyk" class="flex flex-wrap items-center gap-x-4 gap-y-2"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12h18M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9c-2.5-2.6-3.5-5.6-3.5-9s1-6.4 3.5-9Z"/></svg><a aria-current="true" class="font-semibold text-card">Česko (CZK)</a><a href="#" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Slovensko (EUR)</a><span aria-hidden="true" class="text-white/30">|</span><a aria-current="true" class="font-semibold text-card">Čeština</a><a href="#" hreflang="sk" lang="sk" class="inline-flex min-h-9 items-center text-panel-foreground/85 underline-offset-4 hover:text-card hover:underline">Slovenčina</a></nav>
+    </div>
+    <p class="container-shop border-t border-white/10 py-5 text-center text-xs text-panel-foreground/80">© 2026 Lnen &amp; Co.</p>
+  </div>
+</footer>
+</body>
+</html>
