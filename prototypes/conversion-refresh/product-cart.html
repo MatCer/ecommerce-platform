@@ -22,7 +22,7 @@
     <form role="search" action="search.html" class="ml-auto hidden w-full max-w-md min-w-0 md:block xl:ml-0 xl:max-w-xs">
   <label for="q-desktop" class="sr-only">Hledat</label>
   <div class="relative">
-    <input id="q-desktop" name="q" type="search" placeholder="Hledat trička, mikiny…" autocomplete="off"  class="h-11 w-full rounded-full border border-border bg-muted pr-12 pl-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card">
+    <input id="q-desktop" name="q" type="search" placeholder="Hledat trička, mikiny…" autocomplete="off"  class="h-11 w-full rounded-full border border-input bg-muted pr-12 pl-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card">
     <button type="submit" class="absolute top-0 right-0 grid size-11 place-items-center rounded-full text-foreground"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-4.2-4.2M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg><span class="sr-only">Hledat</span></button>
   </div>
 </form>
@@ -45,7 +45,7 @@
     <form role="search" action="search.html" class="min-w-0 flex-1">
   <label for="q-mobile" class="sr-only">Hledat</label>
   <div class="relative">
-    <input id="q-mobile" name="q" type="search" placeholder="Hledat trička, mikiny…" autocomplete="off" autofocus class="h-11 w-full rounded-full border border-border bg-muted pr-12 pl-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card">
+    <input id="q-mobile" name="q" type="search" placeholder="Hledat trička, mikiny…" autocomplete="off" autofocus class="h-11 w-full rounded-full border border-input bg-muted pr-12 pl-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card">
     <button type="submit" class="absolute top-0 right-0 grid size-11 place-items-center rounded-full text-foreground"><svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 20l-4.2-4.2M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></svg><span class="sr-only">Hledat</span></button>
   </div>
 </form>
@@ -121,7 +121,7 @@
         <label class="inline-flex min-h-11 items-center gap-2 text-[15px]"><input type="radio" name="kind" value="back_in_stock" class="size-4 accent-identity">bude znovu skladem</label>
         <label class="inline-flex min-h-11 items-center gap-2 text-[15px]"><input type="radio" name="kind" value="price_drop" checked class="size-4 accent-identity">klesne cena</label>
       </div></fieldset>
-    <div><label for="watch-email" class="mb-1 block text-sm font-semibold">E-mail</label><input id="watch-email" name="email" type="email" required autocomplete="email" class="h-11 w-full rounded-md border border-border bg-card px-3"></div>
+    <div><label for="watch-email" class="mb-1 block text-sm font-semibold">E-mail</label><input id="watch-email" name="email" type="email" required autocomplete="email" class="h-11 w-full rounded-md border border-input bg-card px-3"></div>
     <p class="text-[13px] text-muted-foreground">Nejdřív vám pošleme e-mail s potvrzovacím odkazem. Hlídání začne až po potvrzení a skončí po jednom upozornění.</p>
     <div><button type="submit" class="btn btn-secondary">Hlídat</button></div>
   </form>
@@ -295,7 +295,7 @@
       <p class="mb-4 max-w-sm text-panel-foreground/85">Novinky a akce jednou za čas. Odhlásit se můžete kdykoli.</p>
       <form method="post" action="#" class="flex max-w-sm flex-col gap-2 sm:flex-row">
         <label for="nl-email" class="sr-only">E-mail</label>
-        <input id="nl-email" name="email" type="email" required autocomplete="email" placeholder="vas@email.cz" class="h-12 min-w-0 rounded-full border border-white/20 sm:flex-1 bg-panel-raised px-5 text-base text-card placeholder:text-panel-foreground/70 focus-visible:outline-card">
+        <input id="nl-email" name="email" type="email" required autocomplete="email" placeholder="vas@email.cz" class="h-12 min-w-0 rounded-full border border-white/45 sm:flex-1 bg-panel-raised px-5 text-base text-card placeholder:text-panel-foreground/70 focus-visible:outline-card">
         <button type="submit" class="btn h-12 bg-card text-foreground hover:bg-panel-foreground">Odebírat</button>
       </form>
     </section>
