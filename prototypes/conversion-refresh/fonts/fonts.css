@@ -1,0 +1,32 @@
+/*
+ * Figtree (SIL OFL 1.1, fonts/OFL-Figtree.txt), variable 400-700, subset to Latin, Latin-1,
+ * Latin Extended-A (all Czech and Slovak letters), general punctuation, euro and arrows;
+ * kern, liga, tnum, lnum, case kept. 19.0 kB. Chosen at STOP 1 (SHOP-78), see direction/.
+ *
+ * The fallback faces are matched to Arial per weight (advance widths of a Czech sample and
+ * Figtree's vertical metrics), so the swap does not shift layout (CLS <= 0.05).
+ */
+@font-face {
+  font-family: Figtree;
+  src: url("figtree-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Figtree Fallback";
+  src: local("Arial");
+  font-weight: 400 500;
+  size-adjust: 98.1%;
+  ascent-override: 96.8%;
+  descent-override: 25.5%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Figtree Fallback";
+  src: local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 600 700;
+  size-adjust: 93.8%;
+  ascent-override: 101.3%;
+  descent-override: 26.7%;
+  line-gap-override: 0%;
+}

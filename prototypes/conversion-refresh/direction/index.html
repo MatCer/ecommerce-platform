@@ -152,8 +152,8 @@ body:has(#r-sharp:checked) .p { --r-sm: 0px; --r-md: 4px; --r-lg: 0px; --r-xl: 0
     <label><input type="radio" name="f" id="f-onest"> Onest</label>
   </fieldset>
   <fieldset><legend>Paleta</legend>
-    <label><input type="radio" name="pal" id="pal-a" checked> A Ink + Forest</label>
-    <label><input type="radio" name="pal" id="pal-b"> B Ink + Cobalt</label>
+    <label><input type="radio" name="pal" id="pal-a"> A Ink + Forest</label>
+    <label><input type="radio" name="pal" id="pal-b" checked> B Ink + Cobalt</label>
   </fieldset>
   <fieldset><legend>Rádius</legend>
     <label><input type="radio" name="r" id="r-soft" checked> Soft 8/12/16/24</label>
@@ -166,6 +166,20 @@ body:has(#r-sharp:checked) .p { --r-sm: 0px; --r-md: 4px; --r-lg: 0px; --r-xl: 0
   <p class="note">STOP 1. Pick a font, a palette and a radius scale with the bar above; the live slice below
   switches. Every placement of today's theme is kept. Buttons stay filled. Sale red only appears on a claimed
   reduction, always next to the 30-day lowest price. Reference screenshots are internal inspiration only; nothing is copied.</p>
+
+  <section id="decision" style="border:2px solid #2448c9">
+    <h2>Decision (owner, 2026-10-07, STOP 1)</h2>
+    <ul>
+      <li><b>Font: Figtree</b> (19.0 kB, friendly geometric, smallest file). Onest stays the runner-up; we can revisit after the prototype.
+        Final file and Arial-matched fallback: <code>prototypes/conversion-refresh/fonts/</code>.</li>
+      <li><b>Palette: B, Ink + Cobalt.</b> Ink is the identity (header, links, primary buttons), cobalt <code>#2448c9</code> only on add-to-cart and checkout, red only on a claimed reduction.</li>
+      <li><b>Radius: Soft</b> (8/12/16/24, pill buttons and badges).</li>
+      <li>Borrow/avoid list accepted as is; changes after the prototype review.</li>
+    </ul>
+    <p class="note">Why: the 2018 feel comes from Amazon-style colours, unshipped Roboto at 12–14px and 3 stacked header bands, not from the placements.
+    The measured references (section 2) show 16px body, 2 header bands and soft containers in the refined conversion-focused themes; none of them meets our performance budget, so we take the look, not the code.
+    The board below still shows every option that was compared.</p>
+  </section>
 
   <section id="today">
     <h2>1. Today (baseline, SHOP-75)</h2>
