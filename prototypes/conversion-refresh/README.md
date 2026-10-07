@@ -140,3 +140,16 @@ The as-is column fails the 1.5 s budget only because of the hosting: render dela
 full-size JPEGs and uncompressed CSS. Headroom is thin (~150 ms): the port must keep AVIF + `sizes` and the font preload.
 
 axe (wcag2a/aa, 2.1, 2.2 AA) at 390 and 1440: 0 violations on all 7 pages.
+
+## Gates (2026-10-07, before STOP 2)
+
+Lighthouse 12 mobile (simulated slow 4G), median of 3, plain HTTP on the dev box; axe-core WCAG 2.2 AA at 390 and 1440.
+
+| Page | LCP | TBT | CLS | JS | CSS | Font | Images | axe serious/critical |
+|---|---|---|---|---|---|---|---|---|
+| home | 1653 ms | 0 | 0 | 0 kB | 9.8 kB | 19.7 kB | 334 kB | 0 |
+| listing | 1728 ms | 0 | 0 | 0 kB | 9.8 kB | 19.7 kB | 263 kB | 0 |
+| product | 1502 ms | 0 | 0 | 0 kB | 9.8 kB | 19.7 kB | 98 kB | 0 |
+| today's live theme, home and PDP, same setup | 1578 ms | | | 28.5/34.5 kB | 10.7 kB | 0 | 50/110 kB | |
+
+Images are AVIF (the platform's delivery format) at 640px only; the theme serves `sizes`-matched variants, so card images there are smaller. Served gzipped (`pnpm dlx serve@14`). Removing the font preload brings home to 1578 ms with CLS 0.0003 (the Arial-matched fallback holds), so the port should not preload Figtree. The official gate is `make perf` (TLS + HTTP/2), where today's home measures 1207 ms; the port is measured there in PR 1.
