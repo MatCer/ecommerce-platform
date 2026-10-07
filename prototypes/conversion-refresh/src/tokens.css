@@ -1,0 +1,43 @@
+/*
+ * Conversion refresh tokens (SHOP-81). Palette B "Ink + Cobalt", radius "Soft", Figtree.
+ * This file becomes themes/conversion/theme.tokens.json: same 23 colour keys, 2 font keys,
+ * 4 radius keys. Nothing else is a token (shadows, type scale and spacing live in styles.css).
+ *
+ * Roles: identity (ink) = header text, links, primary buttons, focus. buy (cobalt) = add to
+ * cart and checkout only. sale (red) = a claimed reduction only, always next to the 30-day
+ * lowest price. panel = footer, navigation sheet, dark blocks.
+ */
+:root {
+  --color-background: #ffffff;
+  --color-foreground: #111317;
+  --color-card: #ffffff;
+  --color-muted: #f2f3f5;
+  --color-border: #e1e3e8;
+  --color-input: #868b94;
+  --color-muted-foreground: #575b63;
+  --color-subtle: #62666e;
+  --color-identity: #111317;
+  --color-identity-ink: #111317;
+  --color-identity-wash: #f2f3f5;
+  --color-panel: #111317;
+  --color-panel-foreground: #e9eaee;
+  --color-panel-raised: #272a30;
+  --color-panel-deep: #0a0b0d;
+  --color-buy: #2448c9;
+  --color-buy-hover: #1c3aa8;
+  --color-stock-in: #17703e;
+  --color-stock-low: #8a5518;
+  --color-sale: #c22a2f;
+  --color-sale-wash: #fcecea;
+  --color-rating: #a86a00;
+  --color-review-wash: #fbf6e9;
+  --color-guarantee-wash: #eef1fb;
+
+  --font-display: Figtree, "Figtree Fallback", system-ui, sans-serif;
+  --font-sans: Figtree, "Figtree Fallback", system-ui, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}

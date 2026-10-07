@@ -1,0 +1,20 @@
+---
+/**
+ * Five stars, `rating` (rounded) of them filled. Decorative when `label` is absent (the
+ * surrounding text says the rating); otherwise one image with that accessible name.
+ */
+interface Props {
+  rating: number;
+  label?: string;
+  class?: string;
+}
+const { rating, label, class: cls = "" } = Astro.props;
+const filled = Math.max(0, Math.min(5, Math.round(rating)));
+---
+
+<span
+  class={`inline-flex leading-none tracking-tight ${cls}`}
+  {...label ? { role: "img", "aria-label": label } : { "aria-hidden": "true" }}
+>
+  <span class="text-rating">{"★".repeat(filled)}</span><span class="text-border">{"★".repeat(5 - filled)}</span>
+</span>

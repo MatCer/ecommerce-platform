@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conversion refresh: direction board (SHOP-77, SHOP-78)</title>
+<style>
+@font-face { font-family: Figtree; src: url("fonts/figtree-latin-ext.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: Geist; src: url("fonts/geist-latin-ext.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: Onest; src: url("fonts/onest-latin-ext.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+
+/* Board chrome (not part of the proposal) */
+body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #222; background: #e9e9e7; }
+.board { max-width: 1360px; margin: 0 auto; padding: 32px 24px 96px; }
+.board h1 { font-size: 28px; margin: 0 0 4px; }
+.board > section { background: #fff; border-radius: 12px; padding: 24px; margin-top: 24px; }
+.board h2 { font-size: 20px; margin: 0 0 12px; }
+.note { color: #555; max-width: 75ch; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.shot { margin: 0; } .shot img { width: 100%; height: 260px; object-fit: cover; object-position: top; border: 1px solid #ddd; border-radius: 8px; display: block; }
+.shot figcaption { font-size: 13px; margin-top: 6px; }
+.borrow { color: #17643a; } .avoid { color: #a3262b; }
+table { border-collapse: collapse; font-size: 13px; } td, th { border-bottom: 1px solid #eee; padding: 4px 8px; text-align: left; }
+.picker { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px 24px; background: #111; color: #fff; padding: 12px 24px; border-radius: 0 0 12px 12px; }
+.picker fieldset { border: 0; margin: 0; padding: 0; display: flex; gap: 6px; align-items: center; }
+.picker legend { float: left; margin-right: 8px; font-weight: 600; }
+.picker label { padding: 6px 12px; border-radius: 999px; border: 1px solid #555; cursor: pointer; }
+.picker label:has(input:checked) { background: #fff; color: #111; }
+.picker input { position: absolute; opacity: 0; }
+.picker label:has(input:focus-visible) { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+
+/* ===== Proposal tokens (switched by the picker) ===== */
+.p {
+  --font: Figtree, "Figtree Fallback", system-ui, sans-serif;
+  /* Palette A: ink and forest */
+  --background:#ffffff; --foreground:#16181b; --card:#ffffff; --muted:#f4f3ef; --border:#e3e1db;
+  --muted-foreground:#5b5e64; --subtle:#65686e; --identity:#2b5185; --identity-ink:#21416d; --identity-wash:#eef2f8;
+  --panel:#16181b; --panel-foreground:#ebe9e4; --panel-raised:#2a2c30; --buy:#18794a; --buy-hover:#13653d; --buy-label:#fff;
+  --stock-in:#1c7340; --stock-low:#8a5518; --sale:#c22a2f; --sale-wash:#fcecea; --rating:#a86a00; --review-wash:#fbf6e9; --guarantee-wash:#f4ead6;
+  /* Radius: soft */
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px;
+}
+body:has(#f-geist:checked) .p { --font: Geist, system-ui, sans-serif; }
+body:has(#f-onest:checked) .p { --font: Onest, system-ui, sans-serif; }
+body:has(#pal-b:checked) .p {
+  /* Palette B: ink and cobalt (ink is the identity, cobalt is only the money action) */
+  --foreground:#111317; --muted:#f2f3f5; --border:#e1e3e8; --muted-foreground:#575b63; --subtle:#62666e;
+  --identity:#111317; --identity-ink:#111317; --identity-wash:#f2f3f5; --panel:#111317; --panel-foreground:#e9eaee; --panel-raised:#272a30;
+  --buy:#2448c9; --buy-hover:#1c3aa8; --stock-in:#17703e; --guarantee-wash:#eef1fb;
+}
+body:has(#r-sharp:checked) .p { --r-sm: 0px; --r-md: 4px; --r-lg: 0px; --r-xl: 0px; }
+
+.p { font-family: var(--font); color: var(--foreground); background: var(--background); border-radius: 12px; overflow: hidden; border: 1px solid #ddd; font-size: 16px; line-height: 1.5; }
+.p * { box-sizing: border-box; }
+.p .wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+.p h1, .p h2, .p h3 { margin: 0; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
+.p a { color: inherit; }
+.p .price { font-variant-numeric: tabular-nums; font-weight: 700; }
+.p .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--muted-foreground); }
+.p .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 24px; border-radius: 999px; border: 0; font: 600 16px/1 var(--font); cursor: pointer; text-decoration: none; }
+.p .btn:focus-visible, .p .chip:focus-visible, .p .icon:focus-visible { outline: 2px solid var(--identity); outline-offset: 2px; }
+.p .btn-buy { background: var(--buy); color: var(--buy-label); width: 100%; min-height: 56px; font-size: 17px; }
+.p .btn-buy:hover { background: var(--buy-hover); }
+.p .btn-primary { background: var(--foreground); color: var(--background); }
+.p .btn-secondary { background: var(--muted); color: var(--foreground); }
+.p .chip { min-height: 44px; min-width: 48px; padding: 0 14px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--card); font: 500 15px/1 var(--font); color: var(--foreground); cursor: pointer; }
+.p .chip[aria-pressed="true"] { border-color: var(--foreground); box-shadow: inset 0 0 0 1px var(--foreground); }
+.p .chip[disabled] { color: var(--subtle); text-decoration: line-through; background: var(--muted); }
+.p .icon { width: 44px; height: 44px; display: inline-grid; place-items: center; border-radius: 999px; background: transparent; border: 0; color: inherit; }
+.p svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Header: one band + nav row */
+.p header { border-bottom: 1px solid var(--border); background: var(--background); }
+.p .hbar { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; min-height: 72px; }
+.p .logo { font-weight: 700; font-size: 22px; letter-spacing: -0.03em; }
+.p .search { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 18px; border-radius: 999px; background: var(--muted); color: var(--muted-foreground); max-width: 560px; width: 100%; justify-self: center; font-size: 15px; }
+.p nav ul { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0 0 14px; font-weight: 500; font-size: 15px; }
+.p .trust { background: var(--muted); font-size: 13.5px; color: var(--foreground); }
+.p .trust ul { display: flex; justify-content: center; gap: 40px; list-style: none; margin: 0; padding: 9px 0; }
+.p .trust li::before { content: "✓ "; color: var(--stock-in); font-weight: 700; }
+.p .count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--foreground); color: var(--background); font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+
+/* Hero */
+.p .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: center; padding: 48px 0 64px; }
+.p .hero h1 { font-size: clamp(2.5rem, 5vw, 4.25rem); font-weight: 700; margin: 12px 0 16px; }
+.p .hero p { font-size: 18px; color: var(--muted-foreground); max-width: 42ch; margin: 0 0 28px; }
+.p .hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+.p .hero img { width: 100%; aspect-ratio: 5/4; object-fit: cover; border-radius: var(--r-xl); display: block; }
+
+/* Section head + cards */
+.p .shead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.p .shead h2 { font-size: clamp(1.5rem, 2.6vw, 2rem); font-weight: 700; }
+.p .shead a { font-weight: 600; font-size: 15px; text-underline-offset: 4px; }
+.p .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px 20px; padding-bottom: 72px; }
+.p .card { text-decoration: none; display: block; }
+.p .card .ph { position: relative; aspect-ratio: 4/5; border-radius: var(--r-lg); overflow: hidden; background: var(--muted); }
+.p .card .ph img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .4s ease; }
+.p .card:hover .ph img { transform: scale(1.03); }
+.p .badge { position: absolute; left: 10px; top: 10px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: var(--card); color: var(--foreground); }
+.p .badge.sale { background: var(--sale); color: #fff; }
+.p .dots { position: absolute; bottom: 10px; left: 50%; translate: -50% 0; display: flex; gap: 5px; }
+.p .dots i { width: 6px; height: 6px; border-radius: 3px; background: #fff; opacity: .55; } .p .dots i:first-child { opacity: 1; width: 14px; }
+.p .card .body { padding: 12px 2px 0; display: grid; gap: 2px; }
+.p .card .price { font-size: 18px; } .p .card .price.red { color: var(--sale); }
+.p .omni { font-size: 12.5px; color: var(--muted-foreground); }
+.p .omni s { color: var(--muted-foreground); }
+.p .card .name { font-size: 15px; font-weight: 500; }
+.p .card .meta { font-size: 13px; color: var(--muted-foreground); display: flex; justify-content: space-between; align-items: center; }
+.p .sw { display: flex; gap: 4px; } .p .sw i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0/.15); }
+.p .stock { font-size: 13px; color: var(--stock-in); font-weight: 500; }
+
+/* PDP slice + drawer */
+.p .pdp { display: grid; grid-template-columns: minmax(0,7fr) minmax(0,5fr); gap: 40px; padding: 8px 0 72px; align-items: start; }
+.p .gal { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .p .gal img { width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: var(--r-lg); display: block; }
+.p .info h1 { font-size: clamp(1.75rem, 3vw, 2.5rem); margin: 6px 0 8px; }
+.p .rating { display: flex; gap: 8px; align-items: center; font-size: 14px; } .p .stars { color: var(--rating); letter-spacing: 1px; }
+.p .panel { background: var(--muted); border-radius: var(--r-xl); padding: 24px; margin-top: 20px; display: grid; gap: 16px; }
+.p .panel .bigprice { font-size: 30px; } .p .panel .bigprice.red { color: var(--sale); }
+.p .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.p .lbl { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; } .p .lbl a { font-weight: 500; }
+.p .facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14.5px; }
+.p .facts li { display: flex; gap: 10px; align-items: flex-start; } .p .facts svg { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+.p .guar { background: var(--guarantee-wash); border-radius: var(--r-md); padding: 12px 14px; font-size: 14px; }
+.p .drawer { background: var(--card); border-radius: var(--r-xl); box-shadow: 0 24px 48px -16px rgb(0 0 0/.3); padding: 20px; display: grid; gap: 14px; max-width: 400px; border: 1px solid var(--border); }
+.p .bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; } .p .bar i { display: block; height: 100%; width: 64%; background: var(--stock-in); }
+.p .foot { background: var(--panel); color: var(--panel-foreground); padding: 40px 0; font-size: 14px; }
+.p .foot .cols { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 24px; } .p .foot b { display: block; margin-bottom: 8px; color: #fff; }
+
+@media (max-width: 760px) {
+  .p .hbar { grid-template-columns: auto 1fr auto; } .p .search { grid-column: 1 / -1; order: 3; margin-bottom: 12px; }
+  .p nav ul { overflow-x: auto; gap: 20px; }
+  .p .trust li:not(:first-child) { display: none; }
+  .p .hero, .p .pdp { grid-template-columns: 1fr; } .p .hero { padding: 24px 0 48px; }
+  .p .cards { grid-template-columns: 1fr 1fr; gap: 20px 12px; }
+  .p .foot .cols { grid-template-columns: 1fr 1fr; }
+}
+.specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.spec { border: 1px solid #ddd; border-radius: 10px; padding: 18px; }
+.spec .big { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; margin: 8px 0; }
+.spec .w { display: flex; gap: 14px; font-size: 22px; margin: 6px 0; }
+.spec .num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.swatches { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+@media (max-width: 760px) { .board { padding: 16px 8px 64px; } .board > section { padding: 16px 12px; } .specs, .swatches { grid-template-columns: 1fr; } .picker { padding: 10px 12px; } }
+.sws { display: flex; flex-wrap: wrap; gap: 6px; } .sws span { width: 108px; font-size: 11px; } .sws span i { display: block; height: 40px; border-radius: 6px; border: 1px solid #0001; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<form class="picker" aria-label="Kombinace návrhu">
+  <fieldset><legend>Písmo</legend>
+    <label><input type="radio" name="f" id="f-figtree" checked> Figtree</label>
+    <label><input type="radio" name="f" id="f-geist"> Geist</label>
+    <label><input type="radio" name="f" id="f-onest"> Onest</label>
+  </fieldset>
+  <fieldset><legend>Paleta</legend>
+    <label><input type="radio" name="pal" id="pal-a"> A Ink + Forest</label>
+    <label><input type="radio" name="pal" id="pal-b" checked> B Ink + Cobalt</label>
+  </fieldset>
+  <fieldset><legend>Rádius</legend>
+    <label><input type="radio" name="r" id="r-soft" checked> Soft 8/12/16/24</label>
+    <label><input type="radio" name="r" id="r-sharp"> Sharp 0 (měřeno)</label>
+  </fieldset>
+</form>
+
+<main class="board">
+  <h1>Conversion refresh: direction board</h1>
+  <p class="note">STOP 1. Pick a font, a palette and a radius scale with the bar above; the live slice below
+  switches. Every placement of today's theme is kept. Buttons stay filled. Sale red only appears on a claimed
+  reduction, always next to the 30-day lowest price. Reference screenshots are internal inspiration only; nothing is copied.</p>
+
+  <section id="decision" style="border:2px solid #2448c9">
+    <h2>Decision (owner, 2026-10-07, STOP 1)</h2>
+    <ul>
+      <li><b>Font: Figtree</b> (19.0 kB, friendly geometric, smallest file). Onest stays the runner-up; we can revisit after the prototype.
+        Final file and Arial-matched fallback: <code>prototypes/conversion-refresh/fonts/</code>.</li>
+      <li><b>Palette: B, Ink + Cobalt.</b> Ink is the identity (header, links, primary buttons), cobalt <code>#2448c9</code> only on add-to-cart and checkout, red only on a claimed reduction.</li>
+      <li><b>Radius: Soft</b> (8/12/16/24, pill buttons and badges).</li>
+      <li>Borrow/avoid list accepted as is; changes after the prototype review.</li>
+    </ul>
+    <p class="note">Why: the 2018 feel comes from Amazon-style colours, unshipped Roboto at 12–14px and 3 stacked header bands, not from the placements.
+    The measured references (section 2) show 16px body, 2 header bands and soft containers in the refined conversion-focused themes; none of them meets our performance budget, so we take the look, not the code.
+    The board below still shows every option that was compared.</p>
+  </section>
+
+  <section id="today">
+    <h2>1. Today (baseline, SHOP-75)</h2>
+    <div class="grid">
+      <figure class="shot"><a href="../../../docs/screenshots/conversion/home-desktop.jpg"><img src="../../../docs/screenshots/conversion/home-desktop.jpg" alt="Domovská stránka dnes, desktop"></a><figcaption>Home 1440. Navy bar + nav + trust strip = 3 bands; centred headings; white boxed cards on grey.</figcaption></figure>
+      <figure class="shot"><a href="../../../docs/screenshots/conversion/product-desktop.jpg"><img src="../../../docs/screenshots/conversion/product-desktop.jpg" alt="Produkt dnes, desktop"></a><figcaption>PDP 1440. Grey buy panel, neon green CTA with navy label.</figcaption></figure>
+      <figure class="shot"><a href="../../../docs/screenshots/conversion/category-mobile.jpg"><img src="../../../docs/screenshots/conversion/category-mobile.jpg" alt="Kategorie dnes, mobil"></a><figcaption>Listing 390. 12–13px meta text, small 6–10px radii.</figcaption></figure>
+      <figure class="shot"><a href="../../../docs/screenshots/conversion/cart-mobile.jpg"><img src="../../../docs/screenshots/conversion/cart-mobile.jpg" alt="Košík dnes, mobil"></a><figcaption>Cart 390. Good bones (progress bar, cross-sell, total); keep, restyle.</figcaption></figure>
+    </div>
+    <p class="note"><b>Found while capturing:</b> Roboto is named in the tokens but never shipped, so shoppers see Segoe UI (Windows), SF (Apple) or Noto (Linux). Cards show the struck reference price but its "lowest price in 30 days" label is screen-reader only; the refresh makes it visible (SHOP-83).</p>
+  </section>
+
+  <section id="refs">
+    <h2>2. References: borrow / avoid (SHOP-76 measurements)</h2>
+<p class="note">Measured on 9 Shopify demos + 5 real stores (full tables: <code>research_notes/Storefront theme inspiration/demo_measurements.md</code>).
+Medians across the Shopify demos: body 14px (Be Yours, Concept, Impact: 16px), section heading 34/29px, card price 14px, PDP price 18/16px,
+2 header bands, section gap 82/65px, grid gap 18/12px, 4/2 columns. Photos are square-cornered almost everywhere; soft radii appear on
+containers and buy panels (Concept, Impact). <b>Every reference fails our budget</b>: Lighthouse mobile LCP 5.4–14 s (median 7.1 s), JS 436–3546 kB, vs our home at 1.2 s / 24 kB.</p>
+<div class="grid"><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/concept-home-top-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/concept-home-top-1440.jpg" alt="Concept"></a><figcaption><b>Concept</b><br><span class="borrow">Borrow: Rounded hero container, pill CTAs, rating above name on cards, popular add-ons in the buy panel.</span><br><span class="avoid">Avoid: Social-icon rail, 313px section gaps (too airy for a catalogue).</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/impact-pdp-top-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/impact-pdp-top-1440.jpg" alt="Impact"></a><figcaption><b>Impact</b><br><span class="borrow">Borrow: Soft tonal PDP panel, filled pill ATC, in-stock dot line, colour swatches on cards.</span><br><span class="avoid">Avoid: Dark hero chrome and 3 promo bars; animation effects.</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/be-yours-pdp-top-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/be-yours-pdp-top-1440.jpg" alt="Be Yours"></a><figcaption><b>Be Yours</b><br><span class="borrow">Borrow: One quiet header row, big price, 16px body; ATC as full-width block.</span><br><span class="avoid">Avoid: Countdown bar in the header (fake-urgency risk), 3 header bands.</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/tecovas-pdp-top-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/tecovas-pdp-top-1440.jpg" alt="Tecovas"></a><figcaption><b>Tecovas</b><br><span class="borrow">Borrow: Size buttons grid, rating + count by the title, reviews quote under ATC.</span><br><span class="avoid">Avoid: Orange CTA plus orange sale accents compete.</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/rothys-pdp-top-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/rothys-pdp-top-1440.jpg" alt="Rothy's"></a><figcaption><b>Rothy's</b><br><span class="borrow">Borrow: Free-shipping and returns line right under ATC; colour swatches as a row.</span><br><span class="avoid">Avoid: Outline 'Select a size' CTA (ghost button).</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/horizon-home-top-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/horizon-home-top-1440.jpg" alt="Horizon"></a><figcaption><b>Horizon</b><br><span class="borrow">Borrow: One 66px header band, 4/2 grid, generous photo-led cards, left-aligned 'View all'.</span><br><span class="avoid">Avoid: 12–14px card text; sale price unclear.</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/symmetry-home-down-1440.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/symmetry-home-down-1440.jpg" alt="Symmetry (avoid)"></a><figcaption><b>Symmetry (avoid)</b><br><span class="borrow">Borrow: Clean left-aligned headings.</span><br><span class="avoid">Avoid: Flash-sale countdown timer: not allowed (EU 2023 sweep, DFA).</span></figcaption></figure><figure class="shot"><a href="../../../research_notes/Storefront%20theme%20inspiration/refs/vuch-home-down-390.jpg"><img src="../../../research_notes/Storefront%20theme%20inspiration/refs/vuch-home-down-390.jpg" alt="Vuch (avoid)"></a><figcaption><b>Vuch (avoid)</b><br><span class="borrow">Borrow: Local CZ reference: price + strikethrough on cards, swatches.</span><br><span class="avoid">Avoid: Pink promo bars, stacked −% stickers, chat bubble covering content.</span></figcaption></figure></div>
+  </section>
+
+  <section id="slice">
+    <h2>3. Live slice (switch with the bar)</h2>
+    <div class="p">
+      <header>
+        <div class="wrap hbar">
+          <span class="logo">Lnen &amp; Co.</span>
+          <div class="search" role="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Hledat trička, mikiny…</div>
+          <div><button class="icon" type="button" aria-label="Můj účet"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></button><button class="icon" type="button" aria-label="Košík, položek: 2" style="position:relative"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg><span class="count" aria-hidden="true">2</span></button></div>
+        </div>
+        <nav class="wrap" aria-label="Kategorie"><ul><li><a href="#">Novinky</a></li><li><a href="#">Oblečení</a></li><li><a href="#">Mikiny</a></li><li><a href="#">Trička</a></li><li><a href="#">Doplňky</a></li><li><a href="#" style="color:var(--sale)">Výprodej</a></li></ul></nav>
+      </header>
+      <div class="trust"><ul class="wrap"><li>Doprava zdarma od 1 500 Kč</li><li>Vrácení do 30 dnů zdarma</li><li>Karta, převod, dobírka</li></ul></div>
+
+      <div class="wrap">
+        <section class="hero">
+          <div>
+            <span class="eyebrow">Podzim 2026</span>
+            <h1>Nová kolekce z lnu a merino vlny</h1>
+            <p>Mikiny a trička šitá v Česku. Doručíme do 2 dnů, vrácení do 30 dnů zdarma.</p>
+            <div class="ctas"><a class="btn btn-primary" href="#">Prohlédnout kolekci</a><a class="btn btn-secondary" href="#">Nejprodávanější</a></div>
+          </div>
+          <img src="img/p1.jpg" alt="">
+        </section>
+
+        <div class="shead"><h2>Nejprodávanější</h2><a href="#">Zobrazit vše →</a></div>
+        <div class="cards">
+          <a class="card" href="#"><div class="ph"><img src="img/p2.jpg" alt=""><span class="badge">Novinka</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="body"><span class="price">790 Kč</span><span class="name">Tričko Henley</span><span class="meta">Lnen &amp; Co.<span class="sw"><i style="background:#3d4f55"></i><i style="background:#c66b3d"></i><i style="background:#ddd"></i></span></span><span class="stock">Skladem</span></div></a>
+          <a class="card" href="#"><div class="ph"><img src="img/p3.jpg" alt=""><span class="badge sale">−11 %</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="body"><span class="price red">1 352 Kč</span><span class="omni">Nejnižší cena za 30 dní <s>1 521 Kč</s></span><span class="name">Mikina Crew</span><span class="meta">Lnen &amp; Co.<span class="sw"><i style="background:#999"></i><i style="background:#2b3a55"></i></span></span><span class="stock">Skladem</span></div></a>
+          <a class="card" href="#"><div class="ph"><img src="img/p4.jpg" alt=""><span class="badge sale">−11 %</span><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="body"><span class="price red">1 512 Kč</span><span class="omni">Nejnižší cena za 30 dní <s>1 701 Kč</s></span><span class="name">Mikina Oversize</span><span class="meta">Lnen &amp; Co.<span class="sw"><i style="background:#2f8a96"></i><i style="background:#333"></i></span></span><span class="stock" style="color:var(--stock-low)">Poslední kusy</span></div></a>
+          <a class="card" href="#"><div class="ph"><img src="img/p1.jpg" alt=""><span class="dots"><i></i><i></i><i></i></span></div>
+            <div class="body"><span class="price">1 192 Kč</span><span class="name">Mikina Merino</span><span class="meta">Lnen &amp; Co.<span class="sw"><i style="background:#888"></i></span></span><span class="stock">Skladem</span></div></a>
+        </div>
+
+        <div class="pdp">
+          <div class="gal"><img src="img/p3.jpg" alt=""><img src="img/p4.jpg" alt=""></div>
+          <div class="info">
+            <span class="eyebrow">Lnen &amp; Co.</span>
+            <h1>Mikina Fleece</h1>
+            <a class="rating" href="#"><span class="stars" aria-hidden="true">★★★★★</span><span>4,8 · 23 recenzí</span></a>
+            <div class="panel">
+              <div><span class="price bigprice red">1 352 Kč</span> <span class="badge sale" style="position:static;display:inline-block;vertical-align:middle">−11 %</span>
+                <div class="omni">Nejnižší cena za posledních 30 dní <s>1 521 Kč</s> · vč. DPH</div></div>
+              <div><div class="lbl">Barva: Cihlová</div><div class="row" style="margin-top:8px"><button class="chip" type="button" aria-pressed="false">Popelavá</button><button class="chip" type="button" aria-pressed="true">Cihlová</button></div></div>
+              <div><div class="lbl">Velikost <a href="#">Tabulka velikostí</a></div><div class="row" style="margin-top:8px"><button class="chip" type="button" disabled>S</button><button class="chip" type="button" aria-pressed="false">M</button><button class="chip" type="button" aria-pressed="true">L</button><button class="chip" type="button" aria-pressed="false">XL</button></div></div>
+              <span class="stock">Skladem · odesíláme dnes</span>
+              <button class="btn btn-buy" type="button">Přidat do košíku</button>
+              <ul class="facts">
+                <li><svg viewBox="0 0 24 24"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg><span>Doručení <b>čt 9. 10.</b> · Zásilkovna 79 Kč, zdarma od 1 500 Kč</span></li>
+                <li><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg><span>Vrácení do 30 dnů zdarma</span></li>
+              </ul>
+              <div class="guar">Nesedí velikost? Výměnu pošleme hned, jak vrácení odešlete.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding-bottom:72px">
+          <div class="shead"><h2>Košík (zásuvka / spodní list na mobilu)</h2></div>
+          <div class="drawer" role="group" aria-label="Ukázka košíku">
+            <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">Košík <span style="font-weight:400;color:var(--muted-foreground);font-size:15px">2 položky</span></b><button class="icon" type="button" aria-label="Zavřít">✕</button></div>
+            <div style="font-size:14px">Do dopravy zdarma zbývá <b>148 Kč</b><div class="bar" style="margin-top:6px"><i></i></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:15px"><span>Mikina Fleece · Cihlová / L</span><span class="price">1 352 Kč</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span>Celkem <span style="color:var(--muted-foreground);font-size:13px">vč. DPH</span></span><span class="price" style="font-size:24px">1 352 Kč</span></div>
+            <button class="btn btn-buy" type="button">K pokladně</button>
+            <a href="#" style="text-align:center;font-weight:500">Pokračovat v nákupu</a>
+          </div>
+        </div>
+      </div>
+
+      <footer class="foot"><div class="wrap cols"><div><b>Lnen &amp; Co.</b>Novinky a akce jednou za čas.</div><div><b>Nakupování</b>Oblečení<br>Doplňky</div><div><b>Zákaznický servis</b>Doprava a platba<br>Kontakt</div><div><b>Právní informace</b>Obchodní podmínky<br>Reklamační řád</div></div></footer>
+    </div>
+  </section>
+
+  <section id="fonts">
+    <h2>4. Font candidates (SHOP-78)</h2>
+    <p class="note">One variable woff2, weights 400–700, subset to Latin + Latin-1 + Latin Extended-A (all Czech and Slovak letters verified),
+    kern/liga/tnum kept. All three are SIL OFL 1.1 (Google Fonts). Used for display, price and body; buttons use it too. Today's Archivo
+    file in the old default theme is 22.8 kB for comparison.</p>
+    <div class="specs">
+      <div class="spec" style="font-family:Figtree"><b>Figtree</b> · 19.0 kB · Erik Kennedy<div class="big">Žluťoučký kůň úpěl</div><div class="w"><span style="font-weight:400">Aa 400</span><span style="font-weight:500">Aa 500</span><span style="font-weight:600">Aa 600</span><span style="font-weight:700">Aa 700</span></div><div class="num">1 352 Kč · 1 111 Kč</div><p>Friendly geometric; round, open shapes suit a soft-radius DTC look. Smallest file.</p></div>
+      <div class="spec" style="font-family:Geist"><b>Geist</b> · 20.1 kB · Vercel<div class="big">Žluťoučký kůň úpěl</div><div class="w"><span style="font-weight:400">Aa 400</span><span style="font-weight:500">Aa 500</span><span style="font-weight:600">Aa 600</span><span style="font-weight:700">Aa 700</span></div><div class="num">1 352 Kč · 1 111 Kč</div><p>Neutral, technical grotesk; crisp at small sizes, reads "modern product". Common in SaaS, less in fashion.</p></div>
+      <div class="spec" style="font-family:Onest"><b>Onest</b> · 23.1 kB · Dmitri Voloshin<div class="big">Žluťoučký kůň úpěl</div><div class="w"><span style="font-weight:400">Aa 400</span><span style="font-weight:500">Aa 500</span><span style="font-weight:600">Aa 600</span><span style="font-weight:700">Aa 700</span></div><div class="num">1 352 Kč · 1 111 Kč</div><p>Warm humanist grotesk, tall x-height, very legible body text; most "retail", largest file.</p></div>
+    </div>
+  </section>
+
+  <section id="palette">
+    <h2>5. Palettes and radius</h2>
+    <div class="swatches">
+      <div><b>A · Ink + Forest.</b> White header with ink text, warm muted panels, slate-blue identity (links, focus), deep forest green only on the money action with a white label (5.4:1). Closest to today's role model (blue identity + green buy) but calm.
+        <div class="sws" style="margin-top:8px"><span><i style="background:#16181b"></i>foreground #16181b</span><span><i style="background:#f4f3ef"></i>muted #f4f3ef</span><span><i style="background:#2b5185"></i>identity #2b5185</span><span><i style="background:#18794a"></i>buy #18794a</span><span><i style="background:#c22a2f"></i>sale #c22a2f</span><span><i style="background:#a86a00"></i>rating #a86a00</span></div></div>
+      <div><b>B · Ink + Cobalt.</b> Monochrome ink identity (header, links, primary), cool greys, a single cobalt only on add-to-cart and checkout (7.4:1). Bolder, more Impact/Rothy's "one CTA colour". Merchants who set a brand colour change identity; buy stays cobalt.
+        <div class="sws" style="margin-top:8px"><span><i style="background:#111317"></i>foreground #111317</span><span><i style="background:#f2f3f5"></i>muted #f2f3f5</span><span><i style="background:#111317"></i>identity #111317</span><span><i style="background:#2448c9"></i>buy #2448c9</span><span><i style="background:#c22a2f"></i>sale #c22a2f</span><span><i style="background:#a86a00"></i>rating #a86a00</span></div></div>
+    </div>
+    <p class="note">Both palettes pass every documented pair (text ≥ 4.5:1, rating ≥ 3:1 on card, muted and review-wash; worst text pair: sale on sale-wash 5.0:1). All 23 token keys stay, including checkout's 8.
+    Radius: <b>Soft</b> = sm 8 / md 12 (chips, inputs) / lg 16 (photos) / xl 24 (buy panel, drawer), buttons and badges fully round. <b>Sharp</b> = what the Shopify demos actually measure (median 0 on photos, cards, panels and inputs; 4px chips; pill buttons only on Concept and Impact). Card shadows go; one lift shadow stays for drawers and sheets.</p>
+  </section>
+</main>
+</body>
+</html>

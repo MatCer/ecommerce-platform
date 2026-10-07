@@ -1,0 +1,41 @@
+---
+import type { ShopModel } from "@platform/storefront-sdk/types";
+import { i18n } from "../lib/i18n";
+import Icon from "./Icon.astro";
+
+/**
+ * The shop's real promises in one grey strip, under the header and again above the footer:
+ * free delivery threshold (else the delivery promise), returns, payment methods. Phones show the
+ * first one only. Nothing here is invented: every fact comes from the shop model.
+ */
+interface Props {
+  shop: ShopModel;
+}
+const { shop } = Astro.props;
+const { t } = i18n(shop);
+const facts: { icon: "truck" | "returns" | "card"; text: string }[] = [
+  {
+    icon: "truck",
+    text: shop.free_shipping_threshold
+      ? t("trust.free_shipping_from", { amount: shop.free_shipping_threshold.formatted })
+      : shop.trust.delivery,
+  },
+  { icon: "returns", text: shop.trust.returns },
+  ...(shop.trust.payments.length > 0
+    ? [{ icon: "card" as const, text: shop.trust.payments.join(" · ") }]
+    : []),
+];
+---
+
+<div class="bg-muted text-foreground">
+  <ul class="container-shop flex min-h-10 items-center justify-center gap-8 py-2 text-[0.8125rem] font-medium md:justify-between">
+    {
+      facts.map((f, i) => (
+        <li class:list={["items-center gap-2", i === 0 ? "flex" : "hidden md:flex"]}>
+          <Icon name={f.icon} class="size-[1.125rem] shrink-0 text-identity" />
+          {f.text}
+        </li>
+      ))
+    }
+  </ul>
+</div>

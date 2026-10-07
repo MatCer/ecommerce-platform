@@ -1,0 +1,38 @@
+{
+  "colors": {
+    "background": "#ffffff",
+    "foreground": "#111317",
+    "card": "#ffffff",
+    "muted": "#f2f3f5",
+    "border": "#e1e3e8",
+    "input": "#868b94",
+    "muted-foreground": "#575b63",
+    "subtle": "#62666e",
+    "identity": "#111317",
+    "identity-ink": "#111317",
+    "identity-wash": "#f2f3f5",
+    "panel": "#111317",
+    "panel-foreground": "#e9eaee",
+    "panel-raised": "#272a30",
+    "panel-deep": "#0a0b0d",
+    "buy": "#2448c9",
+    "buy-hover": "#1c3aa8",
+    "stock-in": "#17703e",
+    "stock-low": "#8a5518",
+    "sale": "#c22a2f",
+    "sale-wash": "#fcecea",
+    "rating": "#a86a00",
+    "review-wash": "#fbf6e9",
+    "guarantee-wash": "#eef1fb"
+  },
+  "fonts": {
+    "display": "Figtree, \"Figtree Fallback\", system-ui, sans-serif",
+    "sans": "Figtree, \"Figtree Fallback\", system-ui, sans-serif"
+  },
+  "radius": {
+    "sm": "8px",
+    "md": "12px",
+    "lg": "16px",
+    "xl": "24px"
+  }
+}

@@ -21,7 +21,8 @@ apps/mocks        third-party API stand-ins (incl. a DNS TXT stub)
 apps/edge         storefront edge: Node + Miniflare gateway (tenancy, cache, headers, checkout handoff)
 apps/theme-builder disposable theme build/check pipeline and Docker policy proxy
 apps/checkout     platform checkout app (Astro + Solid) served on checkout.<shop>
-themes/default    default Astro + Solid theme (the template merchants fork)
+themes/conversion default Astro + Solid theme, "high click-conversion" (the template merchants fork)
+themes/default    previous default theme ("market stall"), kept as an alternative (THEME_DIR=themes/default)
 docker/           Dockerfiles, Caddyfile, Postgres init script
 ```
 

@@ -31,12 +31,12 @@ If the request cannot be done within the rules below (for example it needs data 
 - One LCP image per page, passed to `Base` as `lcp`; every other image `loading="lazy"`. `sizes` values live in `src/lib/images.ts` and must match the real slot: change a grid, change its `sizes` line (and the LCP preload follows from the same value).
 - Prefer HTML and CSS (`<details>`, `popover`, `<dialog>`, `:has()`) over an island. An island that renders nothing on the server must use `client:idle`, never `client:visible` (it would never hydrate). UI most visitors never open is loaded on demand with `import()`.
 - Never fetch page models per card or per item (no N+1): use only what the card model carries.
-- Fonts: the theme ships one web font. Switching fonts means removing the old preload in `src/layouts/Base.astro` and the `@font-face` in `src/styles/global.css`; the system font stacks need no files.
+- Fonts: the theme ships at most one web font (`src/fonts/`). Switching fonts means replacing its `@font-face` and metric-matched fallback in `src/styles/global.css`, removing any font preload in `src/layouts/Base.astro`, and changing the family in `theme.tokens.json`; the system font stacks need no files.
 - WCAG 2.2 AA: one `h1` per page, labelled landmarks, visible focus, 44 px touch targets, text contrast ≥ 4.5:1, colour never the only signal, `prefers-reduced-motion` respected.
 
 # Design tokens (`theme.tokens.json`)
 
-Three groups: `colors` (`#rrggbb` or `oklch(L C H)`), `fonts` (family lists), `radius` (`0`, `<n>rem`, `<n>px`); keys match `^[a-z][a-z0-9-]{0,31}$`. They become CSS variables (`bg-<key>`, `text-<key>`, `font-<key>`, `rounded-<key>`) and the checkout follows them. Colour roles: `background`, `card`, `foreground`, `muted`, `muted-foreground`, `subtle`, `border`, `identity`, `identity-ink`, `identity-wash`, `panel`, `panel-foreground`, `buy`, `buy-hover` (add to cart and checkout only), `stock-in`, `stock-low`, `sale`, `sale-wash`. A new token must also be listed in the `@theme reference` block of `src/styles/global.css`. A request that is only about colours, fonts or radii should change only this file.
+Three groups: `colors` (`#rrggbb` or `oklch(L C H)`), `fonts` (family lists), `radius` (`0`, `<n>rem`, `<n>px`); keys match `^[a-z][a-z0-9-]{0,31}$`. They become CSS variables (`bg-<key>`, `text-<key>`, `font-<key>`, `rounded-<key>`) and the checkout follows them. Colour roles: `background`, `card`, `foreground`, `muted`, `muted-foreground`, `subtle`, `border`, `identity`, `identity-ink`, `identity-wash`, `panel`, `panel-foreground`, `buy`, `buy-hover` (add to cart and checkout only), `input` (borders of inputs and chips, ≥ 3:1 on `card`), `stock-in`, `stock-low`, `sale`, `sale-wash`. A new token must also be listed in the `@theme reference` block of `src/styles/global.css`. A request that is only about colours, fonts or radii should change only this file.
 
 # Functional check
 
@@ -54,7 +54,7 @@ test("size guide opens from the product page", async ({ page }) => {
 
 # Theme map (default theme; a merchant's copy may differ)
 
-- `src/layouts/Base.astro`: `<head>` (SEO, LCP preload, font preload), skip link, header, main, footer, consent banner, RUM.
+- `src/layouts/Base.astro`: `<head>` (SEO, LCP preload, font preload if the theme has one), skip link, header, main, footer, consent banner, RUM.
 - `src/pages/`: `index.astro` (home: hero, category tiles, featured grid), `c/[...slug].astro` (category), `p/[slug].astro` (product), `search.astro`, `pages/[slug].astro`, `blog/`, `404.astro`. All of these routes are required.
 - `src/components/`: server-rendered parts (Header, Footer, ProductCard, ProductGrid, Listing, Facets, ProductDetails, TrustRow, Breadcrumbs, RecommendationSlot, Prose, Icon).
 - `src/islands/`: SearchBox, MiniCart/CartDrawer, BuyBox, Gallery, FacetForm, RecentlyViewed, ForYou, Sheets, Rum.

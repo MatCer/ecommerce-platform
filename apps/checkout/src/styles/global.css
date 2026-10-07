@@ -68,3 +68,9 @@
     }
   }
 }
+
+/* Label on the tenant's buy colour: white on a dark one, black on a light one (OKLCH lightness
+   0.6 picks the higher WCAG contrast), whatever colour the merchant chose. */
+@utility text-on-buy {
+  color: oklch(from var(--color-buy) clamp(0, (0.6 - l) * 1000, 1) 0 0);
+}

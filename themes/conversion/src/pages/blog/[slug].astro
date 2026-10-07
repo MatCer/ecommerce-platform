@@ -1,0 +1,28 @@
+---
+import { lcpImage } from "@platform/storefront-sdk/format";
+import Blocks from "../../components/Blocks.astro";
+import Breadcrumbs from "../../components/Breadcrumbs.astro";
+import Base from "../../layouts/Base.astro";
+import { i18n } from "../../lib/i18n";
+import { GALLERY_SIZES } from "../../lib/images";
+import { storefront } from "../../lib/storefront";
+
+// Blog article, built from content blocks (WP13).
+const sf = storefront(Astro.request);
+const [shop, post] = await Promise.all([sf.shop(), sf.blogPost(Astro.params.slug ?? "")]);
+if (!post) return Astro.rewrite("/404");
+const { t } = i18n(shop);
+const cover = post.image && lcpImage(post.image, GALLERY_SIZES, 720).img;
+---
+
+<Base shop={shop} seo={post.seo} template="blog" lcp={post.image ? { image: post.image, sizes: GALLERY_SIZES } : undefined}>
+  <article class="container-shop pb-8">
+    <Breadcrumbs items={post.breadcrumbs} label={t("nav.breadcrumbs")} />
+    <header class="mb-8 max-w-3xl">
+      <time datetime={post.published_at} class="text-sm text-muted-foreground">{new Date(post.published_at).toLocaleDateString(shop.locale, { dateStyle: "long", timeZone: "UTC" })}</time>
+      <h1 class="mt-2 text-4xl font-bold md:text-5xl">{post.title}</h1>
+    </header>
+    {cover && <img {...cover} class="mb-8 aspect-[16/9] w-full max-w-4xl rounded-xl object-cover" />}
+    <Blocks blocks={post.blocks} shop={shop} />
+  </article>
+</Base>

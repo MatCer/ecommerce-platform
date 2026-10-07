@@ -6,6 +6,7 @@ import { expect, test } from "vitest";
 import { lintTheme } from "./lint.ts";
 
 const DEFAULT_THEME = fileURLToPath(new URL("../../../themes/default", import.meta.url));
+const CONVERSION_THEME = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 
 async function copyTheme() {
   const dir = await mkdtemp(path.join(tmpdir(), "wp2-lint-"));
@@ -17,6 +18,11 @@ async function copyTheme() {
 
 test("the default theme passes its own contract", async () => {
   expect(await lintTheme(DEFAULT_THEME, { referenceDir: DEFAULT_THEME })).toEqual([]);
+});
+
+test("every platform theme passes against the other's platform files (only the name differs)", async () => {
+  expect(await lintTheme(CONVERSION_THEME, { referenceDir: DEFAULT_THEME })).toEqual([]);
+  expect(await lintTheme(DEFAULT_THEME, { referenceDir: CONVERSION_THEME })).toEqual([]);
 });
 
 test("platform-owned files and tokens are locked (A6, §9.1)", async () => {

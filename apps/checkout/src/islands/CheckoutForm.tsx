@@ -671,7 +671,7 @@ export default function CheckoutForm(props: {
           </Show>
           <button
             type="submit"
-            class="mt-4 h-12 w-full rounded-md bg-buy px-4 font-display font-bold hover:bg-buy-hover disabled:cursor-not-allowed disabled:opacity-60"
+            class="mt-4 h-12 w-full rounded-md bg-buy px-4 font-display font-bold text-on-buy hover:bg-buy-hover disabled:cursor-not-allowed disabled:opacity-60"
             disabled={placing() || saving()}
             aria-busy={placing() || undefined}
           >
