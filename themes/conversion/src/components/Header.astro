@@ -46,7 +46,7 @@ const CART_KEYS = [
 ];
 ---
 
-<header class="sticky top-0 z-30 bg-panel text-card">
+<header class="sticky top-0 z-30 bg-panel text-card [--focus-ring:var(--color-card)]">
   <div class="container-shop grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-2 py-2 md:grid-cols-[auto_minmax(0,1fr)_auto] md:gap-x-6 md:py-3">
     <div class="flex items-center gap-1 md:gap-2">
       <button type="button" popovertarget="nav-drawer" class="-ml-2 grid size-11 place-items-center rounded-md text-panel-foreground hover:bg-panel-raised hover:text-card">
@@ -84,7 +84,7 @@ const CART_KEYS = [
 <TrustStrip shop={shop} />
 
 <Sheets client:idle />
-<nav id="nav-drawer" popover aria-label={t("nav.main")} class="sheet bg-panel! text-card">
+<nav id="nav-drawer" popover aria-label={t("nav.main")} class="sheet bg-panel! text-card [--focus-ring:var(--color-card)]">
   <div class="flex h-16 items-center justify-between border-b border-white/15 px-5">
     <a href={href("/")} class="font-display text-xl font-bold tracking-tight">{shop.name}</a>
     <button type="button" popovertarget="nav-drawer" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-panel-raised">

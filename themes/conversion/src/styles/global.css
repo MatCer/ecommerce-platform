@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
 /*
- * Conversion theme (the platform default): navy chrome, white ground, grey product boxes, the
- * price is the loudest type, one bright green only on the money action (add to cart, checkout),
- * red only on a claimed reduction. Trust facts repeat in a strip under the header and above the
+ * Conversion theme (the platform default): white ground, ink chrome, soft photo boxes, the
+ * price is the loudest type, one cobalt only on the money action (add to cart, checkout), red
+ * only on a claimed reduction. Trust facts repeat in a strip under the header and above the
  * footer. No fake urgency: stock is shown as it is, reductions only with an Omnibus reference.
+ * Design source: prototypes/conversion-refresh/ (SHOP-74).
  *
  * Every colour, font and radius comes from theme.tokens.json at runtime
  * (virtual:theme-tokens.css, unlayered :root). `@theme reference` only tells Tailwind which
@@ -14,48 +15,85 @@
  */
 @theme reference {
   --color-background: #fff;
-  --color-foreground: #232f3e;
+  --color-foreground: #111317;
   --color-card: #fff;
-  --color-muted: #f0f2f5;
-  --color-border: #dde1e6;
-  --color-muted-foreground: #5a5f66;
-  --color-subtle: #616873;
-  --color-identity: #225ea5;
-  --color-identity-ink: #1d4f8c;
-  --color-identity-wash: #eaf1fa;
-  --color-panel: #232f3e;
-  --color-panel-foreground: #e3e6ea;
-  --color-panel-raised: #37424f;
-  --color-panel-deep: #161e28;
-  --color-buy: #14b200;
-  --color-buy-hover: #2fc21a;
-  --color-stock-in: #237a00;
-  --color-stock-low: #8a5a1c;
-  --color-sale: #ca232c;
-  --color-sale-wash: #fdeced;
-  --color-rating: #c27c00;
-  --color-review-wash: #fcf8e6;
-  --color-guarantee-wash: #f6e8c6;
-  --font-display: Roboto, system-ui, sans-serif;
-  --font-sans: Roboto, system-ui, sans-serif;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.625rem;
-}
-
-/* Motion and depth scale (not merchant-facing, so not tokens). */
-@theme {
-  --ease-confirm: cubic-bezier(0.34, 1.3, 0.64, 1);
-  --shadow-card: 0 1px 2px rgb(35 47 62 / 0.06);
-  --shadow-lift: 0 10px 24px -12px rgb(35 47 62 / 0.3), 0 2px 6px rgb(35 47 62 / 0.06);
-  --shadow-sheet: 0 24px 48px -16px rgb(35 47 62 / 0.45);
+  --color-muted: #f2f3f5;
+  --color-border: #e1e3e8;
+  --color-input: #868b94;
+  --color-muted-foreground: #575b63;
+  --color-subtle: #62666e;
+  --color-identity: #111317;
+  --color-identity-ink: #111317;
+  --color-identity-wash: #f2f3f5;
+  --color-panel: #111317;
+  --color-panel-foreground: #e9eaee;
+  --color-panel-raised: #272a30;
+  --color-panel-deep: #0a0b0d;
+  --color-buy: #2448c9;
+  --color-buy-hover: #1c3aa8;
+  --color-buy-foreground: #fff;
+  --color-stock-in: #17703e;
+  --color-stock-low: #8a5518;
+  --color-sale: #c22a2f;
+  --color-sale-wash: #fcecea;
+  --color-rating: #a86a00;
+  --color-review-wash: #fbf6e9;
+  --color-guarantee-wash: #eef1fb;
+  --font-display: Figtree, "Figtree Fallback", system-ui, sans-serif;
+  --font-sans: Figtree, "Figtree Fallback", system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
 }
 
 /*
- * No web font: the design is set in Roboto, which Android and most Linux desktops ship; other
- * systems fall back to their UI face. Nothing competes with the LCP image on slow connections.
+ * Motion, depth and display type (not merchant-facing, so not tokens). Cards have no shadow;
+ * one lift shadow for popovers and hover, one for sheets and drawers.
  */
+@theme {
+  --ease-confirm: cubic-bezier(0.34, 1.3, 0.64, 1);
+  --shadow-lift: 0 10px 24px -12px rgb(17 19 23 / 0.25), 0 2px 6px rgb(17 19 23 / 0.06);
+  --shadow-sheet: 0 24px 48px -16px rgb(17 19 23 / 0.45);
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.02em;
+  --text-display-lg: 3.5rem;
+  --text-display-lg--line-height: 1.02;
+  --text-display-lg--letter-spacing: -0.025em;
+}
+
+/*
+ * One web font: Figtree (SIL OFL 1.1, src/fonts/OFL-Figtree.txt), variable 400-700, subset to
+ * Latin + Latin-1 + Latin Extended-A (every Czech and Slovak letter), 19 kB. Not preloaded: a
+ * preload competes with the LCP image on slow connections (prototype: home LCP 1653 ms with,
+ * 1578 ms without). The fallback faces are Arial matched to Figtree per weight (advance widths
+ * of Czech text, vertical metrics), so the swap moves nothing (CLS 0.0003 measured).
+ */
+@font-face {
+  font-family: Figtree;
+  src: url("../fonts/figtree-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Figtree Fallback";
+  src: local("Arial");
+  font-weight: 400 500;
+  size-adjust: 98.1%;
+  ascent-override: 96.8%;
+  descent-override: 25.5%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Figtree Fallback";
+  src: local("Arial Bold"), local("Arial-BoldMT");
+  font-weight: 600 700;
+  size-adjust: 93.8%;
+  ascent-override: 101.3%;
+  descent-override: 26.7%;
+  line-gap-override: 0%;
+}
 
 @view-transition {
   navigation: auto;
@@ -66,24 +104,35 @@
     background: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    line-height: 1.5;
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     scroll-padding-top: 9rem; /* anchors land below the sticky header */
+  }
+  body {
+    overflow-wrap: anywhere;
   }
   /* Headings in the display face; card titles (h3) stay in the body face: nobody buys a name. */
   h1,
   h2 {
     font-family: var(--font-display);
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    line-height: 1.12;
     text-wrap: balance;
   }
+  /* Dark chrome (header, footer, nav sheet) sets --focus-ring to a light colour. */
   :focus-visible {
-    outline: 2px solid var(--color-identity);
+    outline: 2px solid var(--focus-ring, var(--color-identity));
     outline-offset: 2px;
   }
   [popover] {
     color: inherit;
+  }
+  /* Figures line up in price columns and tables. */
+  s,
+  table {
+    font-variant-numeric: tabular-nums;
   }
   @media (prefers-reduced-motion: reduce) {
     *,
@@ -122,23 +171,25 @@
   letter-spacing: -0.01em;
 }
 
-/* Uppercase micro-label (stock, section eyebrows). */
+/* Uppercase micro-label (section eyebrows). 12px is the floor and only here, always bold. */
 @utility eyebrow {
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
+/* Buttons are pills, filled and high-contrast (never ghost). 44px floor. */
 @utility btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   min-height: 2.75rem;
-  padding-inline: 1.25rem;
+  padding-inline: 1.375rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: 9999px;
+  font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.1;
   text-align: center;
@@ -153,10 +204,10 @@
   }
 }
 
-/* The money action. Green appears nowhere else (navy text: 4.8:1 on the green). */
+/* The money action. Cobalt appears nowhere else (white label: 7.4:1 on the cobalt). */
 @utility btn-buy {
   background: var(--color-buy);
-  color: var(--color-foreground);
+  color: var(--color-buy-foreground);
   font-family: var(--font-display);
   font-weight: 700;
   &:hover:not(:disabled) {
@@ -176,7 +227,7 @@
   color: var(--color-card);
   font-weight: 700;
   &:hover {
-    background: var(--color-identity-ink);
+    background: var(--color-panel-raised);
   }
 }
 
@@ -190,9 +241,10 @@
   }
 }
 
+/* Filled white with a 3:1 border: secondary, never ghost. */
 @utility btn-secondary {
   background: var(--color-card);
-  border-color: var(--color-border);
+  border-color: var(--color-input);
   color: var(--color-identity-ink);
   &:hover {
     background: var(--color-identity-wash);
@@ -204,12 +256,13 @@
 @utility chip {
   display: inline-flex;
   align-items: center;
-  min-height: 2.5rem;
-  padding-inline: 0.875rem;
-  border: 1px solid var(--color-border);
+  justify-content: center;
+  min-height: 2.75rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--color-input);
   border-radius: var(--radius-md);
   background: var(--color-card);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -220,10 +273,9 @@
   }
   &:has(:checked) {
     border-color: var(--color-identity);
-    background: var(--color-identity-wash);
-    color: var(--color-foreground);
-    font-weight: 700;
-    box-shadow: inset 0 0 0 1px var(--color-identity);
+    background: var(--color-identity);
+    color: var(--color-card);
+    font-weight: 600;
   }
   &:has(:focus-visible) {
     outline: 2px solid var(--color-identity);
@@ -233,14 +285,15 @@
     cursor: not-allowed;
     color: var(--color-subtle);
     background: var(--color-background);
+    text-decoration: line-through;
   }
 }
 
+/* Soft container: a hairline, no shadow (card shadows are gone from the family). */
 @utility surface {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-card);
-  box-shadow: var(--shadow-card);
 }
 
 /*
@@ -256,6 +309,7 @@
   margin: 0;
   padding: 0;
   border: 0;
+  border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
   overflow-y: auto;
   background: var(--color-card);
   box-shadow: var(--shadow-sheet);
@@ -271,7 +325,7 @@
     }
   }
   &::backdrop {
-    background: rgb(21 29 46 / 0.45);
+    background: rgb(17 19 23 / 0.45);
   }
 }
 

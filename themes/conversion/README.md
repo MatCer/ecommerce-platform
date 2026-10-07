@@ -5,10 +5,10 @@ changes (spec §9, §12.3). Astro (`output: server`) on the Cloudflare adapter, 
 Tailwind 4. It runs as an untrusted worker behind the platform edge: it gets page models through
 one restricted binding and nothing else (`docs/decisions/runtime-contract.md`).
 
-Visual family: **conversion** (from the "E-commerce Conversion UI" Figma file). Navy header and
-footer, white ground, grey product boxes, the price above the name, one blue for links and
-primary calls to action, bright green only on the money action (add to cart, checkout, navy text
-for contrast), red only on a claimed reduction. The shop's real promises (free delivery
+Visual family: **conversion** (placements from the "E-commerce Conversion UI" Figma file, 2026
+look from `prototypes/conversion-refresh/`). White ground, ink chrome and primary calls to
+action, Figtree, soft photo boxes and pill buttons, the price above the name, one cobalt only on
+the money action (add to cart, checkout, white label), red only on a claimed reduction. The shop's real promises (free delivery
 threshold, returns, payments) repeat in a grey strip under the header and above the footer, and
 sit in the buy panel. No fake urgency: no countdowns, no "people are looking", no invented stock
 numbers; stock is shown as it is, reductions only with an Omnibus reference price.
@@ -92,8 +92,8 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
     everything else `loading="lazy"`;
   - `sizes` from `lib/images.ts`, matching the real slot (a loose value downloads a 2-4×
     heavier file); change the grid → change the `sizes` line;
-  - no web font: the design is set in Roboto, which most Android/Linux systems ship; others use
-    their UI face (adding one: see Extension points);
+  - one web font, Figtree (19 kB, `src/fonts/`), not preloaded: a preload competes with the LCP
+    image; the Arial-matched "Figtree Fallback" keeps the swap from shifting layout;
   - prefer HTML/CSS (`<details>`, `popover`, `<dialog>`, `:has()`) over an island; an island
     that renders nothing on the server must use `client:idle` (or `client:load` when it
     handles input the user can hit straight away, like `FacetForm`), never `client:visible`;
@@ -110,7 +110,7 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
 | Want to | Where |
 |---|---|
 | Rebrand (colours, fonts, radii) | `theme.tokens.json`; checkout follows automatically |
-| A web font | add the woff2 under `src/fonts/`, its `@font-face` (with a metric-matched fallback) in `global.css`, a preload in `Base.astro`, and the family in `theme.tokens.json`; one font at most (LCP budget) |
+| A web font | replace the woff2 under `src/fonts/` (with its licence), its `@font-face` and metric-matched fallback in `global.css`, and the family in `theme.tokens.json`; one font at most (LCP budget); preload only if a re-measure shows it helps |
 | Header / navigation | `components/Header.astro` (mobile sheet included) |
 | Home sections | `pages/index.astro` (hero, category promo, category tiles, best-seller carousel, category spotlight, blog) |
 | Card content | `components/ProductCard.astro` (keep the stanza order; adjust `CARD_SIZES` if the grid changes) |
@@ -129,14 +129,21 @@ Validated by `@platform/theme-kit` (A6): three groups, keys `^[a-z][a-z0-9-]{0,3
 | `radius` | `0`, `<n>rem`, `<n>px` | `--radius-<key>` → `rounded-<key>` |
 
 Colour roles: `background` (page ground), `card` (product cards, header, sheets), `foreground`,
-`muted` / `muted-foreground` / `subtle` (secondary surfaces and text), `border`, `identity` /
+`muted` / `muted-foreground` / `subtle` (secondary surfaces and text), `border` (dividers),
+`input` (borders of inputs, chips and secondary buttons, ≥ 3:1 on `card` and `muted`), `identity` /
 `identity-ink` / `identity-wash` (chrome, links, focus, selection), `panel` /
 `panel-foreground` / `panel-raised` / `panel-deep` (header, footer), `buy` / `buy-hover` (add to
-cart and checkout only), `stock-in`, `stock-low`, `sale` / `sale-wash`, `rating` (stars, ≥ 3:1 on `card`, `muted` and `review-wash`),
-`review-wash` (review cards), `guarantee-wash` (returns box). Keep text pairs at ≥ 4.5:1
-(`identity-ink` on `card`, `panel-foreground` on `panel`, `foreground` on `buy`, `card` on
-`identity`). A new token must also be
-listed in the `@theme reference` block of `global.css` so Tailwind generates its utilities.
+cart and checkout only) with `buy-foreground` (their label), `stock-in`, `stock-low`, `sale` /
+`sale-wash`, `rating` (stars, ≥ 3:1 on `card`, `muted` and `review-wash`), `review-wash` (review
+cards), `guarantee-wash` (returns box). Keep text pairs at ≥ 4.5:1 (`identity-ink` on `card`,
+`panel-foreground` on `panel`, `buy-foreground` on `buy`, `card` on `identity`). Dark chrome sets
+`--focus-ring` to a light colour so focus stays visible. A new token must also be listed in the
+`@theme reference` block of `global.css` so Tailwind generates its utilities.
+
+The checkout follows the same tokens: `background`, `foreground`, `card`, `muted`, `border`,
+`input`, `muted-foreground`, `identity`, `identity-ink`, `identity-wash`, `buy`, `buy-hover`,
+`buy-foreground` (optional there, falls back to `foreground`), `sale` and `font-sans`. Check the
+checkout pages after changing any of them.
 
 ## Checks
 

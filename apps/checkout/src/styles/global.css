@@ -13,6 +13,7 @@
   --color-identity-wash: #eef3fa;
   --color-buy: #f0b14a;
   --color-buy-hover: #e89b35;
+  --color-buy-foreground: #1b1f2a;
   --color-sale: #b3261e;
   --font-display: system-ui, sans-serif;
   --font-sans: system-ui, sans-serif;
@@ -45,6 +46,8 @@
     --color-input: var(--color-muted-foreground);
     --color-border-strong: var(--color-muted-foreground);
     --color-faint-foreground: var(--color-muted-foreground);
+    /* Label on the buy button: optional tenant token, dark text when a theme doesn't set it. */
+    --color-buy-foreground: var(--color-foreground);
     /* 44px targets for touch (WCAG 2.2 target size, comfortably). */
     --spacing-control: 2.75rem;
   }

@@ -53,7 +53,7 @@ export default function MiniCart(props: {
           <Icon d={bag} class="size-6 lg:size-7" />
           <span
             aria-hidden="true"
-            class="absolute -top-2 -right-2.5 grid h-5 min-w-5 place-items-center rounded-full bg-buy px-1 text-[0.6875rem] font-bold text-foreground tabular-nums"
+            class="absolute -top-2 -right-2.5 grid h-5 min-w-5 place-items-center rounded-full bg-card px-1 text-[0.6875rem] font-bold text-foreground tabular-nums"
             classList={{ "animate-bump": bump(), invisible: count() === 0 }}
           >
             {count()}

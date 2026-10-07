@@ -1,37 +1,39 @@
 {
   "colors": {
     "background": "#ffffff",
-    "foreground": "#232f3e",
+    "foreground": "#111317",
     "card": "#ffffff",
-    "muted": "#f0f2f5",
-    "border": "#dde1e6",
-    "muted-foreground": "#5a5f66",
-    "subtle": "#616873",
-    "identity": "#225ea5",
-    "identity-ink": "#1d4f8c",
-    "identity-wash": "#eaf1fa",
-    "panel": "#232f3e",
-    "panel-foreground": "#e3e6ea",
-    "panel-raised": "#37424f",
-    "panel-deep": "#161e28",
-    "buy": "#14b200",
-    "buy-hover": "#2fc21a",
-    "stock-in": "#237a00",
-    "stock-low": "#8a5a1c",
-    "sale": "#ca232c",
-    "sale-wash": "#fdeced",
-    "rating": "#c27c00",
-    "review-wash": "#fcf8e6",
-    "guarantee-wash": "#f6e8c6"
+    "muted": "#f2f3f5",
+    "border": "#e1e3e8",
+    "input": "#868b94",
+    "muted-foreground": "#575b63",
+    "subtle": "#62666e",
+    "identity": "#111317",
+    "identity-ink": "#111317",
+    "identity-wash": "#f2f3f5",
+    "panel": "#111317",
+    "panel-foreground": "#e9eaee",
+    "panel-raised": "#272a30",
+    "panel-deep": "#0a0b0d",
+    "buy": "#2448c9",
+    "buy-hover": "#1c3aa8",
+    "buy-foreground": "#ffffff",
+    "stock-in": "#17703e",
+    "stock-low": "#8a5518",
+    "sale": "#c22a2f",
+    "sale-wash": "#fcecea",
+    "rating": "#a86a00",
+    "review-wash": "#fbf6e9",
+    "guarantee-wash": "#eef1fb"
   },
   "fonts": {
-    "display": "Roboto, system-ui, -apple-system, \"Segoe UI\", Arial, sans-serif",
-    "sans": "Roboto, system-ui, -apple-system, \"Segoe UI\", Arial, sans-serif"
+    "display": "Figtree, \"Figtree Fallback\", system-ui, sans-serif",
+    "sans": "Figtree, \"Figtree Fallback\", system-ui, sans-serif"
   },
   "radius": {
-    "sm": "0.25rem",
-    "md": "0.375rem",
-    "lg": "0.5rem",
-    "xl": "0.625rem"
+    "sm": "8px",
+    "md": "12px",
+    "lg": "16px",
+    "xl": "24px"
   }
 }

@@ -50,7 +50,7 @@ const reduced = p.reference_price && p.discount_percent ? p.discount_percent : n
     }
     <ul class="absolute bottom-2 left-2 flex items-center gap-1">
       {reduced && <li class="rounded-sm bg-identity px-1.5 py-0.5 text-xs font-bold text-card"><span aria-hidden="true">−{reduced} %</span><span class="sr-only">{t("price.discount", { percent: reduced })}</span></li>}
-      {p.badges.includes("new") && <li class="rounded-sm bg-buy px-1.5 py-0.5 text-xs font-bold text-foreground uppercase">{t("badge.new")}</li>}
+      {p.badges.includes("new") && <li class="rounded-full bg-card px-2.5 py-1 text-[0.8125rem] font-bold text-foreground">{t("badge.new")}</li>}
     </ul>
   </div>
   <div class="flex flex-1 flex-col gap-0.5 px-1 pt-3">
