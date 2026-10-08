@@ -19890,10 +19890,17 @@
           {
             "name": "sort",
             "in": "query",
-            "description": "`recommended` (default), `price_asc`, `price_desc`, `newest`, `name`.",
+            "description": "`recommended` (default), `popular`, `newest`, `price_asc`, `price_desc`.",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "recommended",
+                "popular",
+                "newest",
+                "price_asc",
+                "price_desc"
+              ]
             }
           },
           {
@@ -20173,7 +20180,14 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "recommended",
+                "popular",
+                "newest",
+                "price_asc",
+                "price_desc"
+              ]
             }
           },
           {
@@ -20607,6 +20621,7 @@
               "type": "string",
               "enum": [
                 "relevance",
+                "popular",
                 "price_asc",
                 "price_desc",
                 "newest"
@@ -35276,9 +35291,10 @@
         "type": "string",
         "enum": [
           "recommended",
+          "popular",
+          "newest",
           "price_asc",
-          "price_desc",
-          "newest"
+          "price_desc"
         ]
       },
       "SortOption": {

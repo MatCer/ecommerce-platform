@@ -22,6 +22,88 @@ const TABLES: &[&str] = &[
     "theme_active",
 ];
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn popular_listing_options_and_fallback_order(db: PgPool) {
+    use commerce::storefront::listing::Sort;
+    use commerce::storefront::pages::{self, ListingParams};
+
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = testkit::storefront::shop(&runtime, "popular").await;
+    let mut products = vec![shop.product];
+    for sku in ["POPULAR-TIE", "UNSCORED"] {
+        let mut input = testkit::catalog::product_input(sku, 1);
+        input.category_ids = vec![shop.category];
+        let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+        testkit::pricing::set_prices(
+            &runtime,
+            shop.tenant,
+            shop.czk,
+            &[(product.variants[0].id, 100)],
+        )
+        .await;
+        products.push(product.id);
+    }
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for product in &products[..2] {
+        sqlx::query(
+            "INSERT INTO product_popularity (tenant_id, product_id, popularity) VALUES ($1, $2, 20)",
+        )
+        .bind(shop.tenant)
+        .bind(product)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let params = ListingParams::from_pairs(&[("sort".into(), "popular".into())]);
+    assert_eq!(params.sort, Some(Sort::Popular));
+    let category = pages::category(&mut tx, &ctx, None, "trika", &params)
+        .await
+        .unwrap()
+        .unwrap();
+    let search_params = ListingParams {
+        q: Some("Product".into()),
+        ..params
+    };
+    let search = pages::search(&mut tx, &ctx, None, &search_params)
+        .await
+        .unwrap();
+    for page in [category, search] {
+        assert_eq!(
+            page.sort
+                .iter()
+                .map(|s| s.value.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "recommended",
+                "popular",
+                "newest",
+                "price_asc",
+                "price_desc"
+            ]
+        );
+        let popular = &page.sort[1];
+        assert_eq!(popular.label, "Nejoblíbenější");
+        assert!(popular.selected);
+        assert!(popular.href.contains("sort=popular"));
+        assert_eq!(
+            page.products.iter().map(|p| p.id).collect::<Vec<_>>(),
+            [products[1], products[0], products[2]],
+            "popularity desc, then newest; missing popularity defaults to zero"
+        );
+    }
+}
+
 /// One row in every storefront table of `shop`.
 async fn fill(runtime: &PgPool, shop: &Shop, artifact: &str) {
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();

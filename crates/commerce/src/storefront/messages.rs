@@ -52,6 +52,17 @@ mod tests {
     }
 
     #[test]
+    fn popular_sort_labels() {
+        for (locale, label) in [
+            ("cs", "Nejoblíbenější"),
+            ("sk", "Najobľúbenejšie"),
+            ("en", "Most popular"),
+        ] {
+            assert_eq!(text(locale, "sort.popular"), label);
+        }
+    }
+
+    #[test]
     fn lookup_and_format() {
         assert_eq!(text("sk-SK", "cart.add"), "Pridať do košíka");
         assert_eq!(text("de", "cart.add"), "Add to cart");

@@ -37,22 +37,25 @@ pub const MAX_PAGE: u32 = 1000;
 pub enum Sort {
     #[default]
     Recommended,
+    Popular,
+    Newest,
     PriceAsc,
     PriceDesc,
-    Newest,
 }
 
 impl Sort {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Recommended,
+        Self::Popular,
+        Self::Newest,
         Self::PriceAsc,
         Self::PriceDesc,
-        Self::Newest,
     ];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Recommended => "recommended",
+            Self::Popular => "popular",
             Self::PriceAsc => "price_asc",
             Self::PriceDesc => "price_desc",
             Self::Newest => "newest",
@@ -63,6 +66,7 @@ impl Sort {
         use crate::search::query::Sort as S;
         match self {
             Self::Recommended => S::Relevance,
+            Self::Popular => S::Popular,
             Self::PriceAsc => S::PriceAsc,
             Self::PriceDesc => S::PriceDesc,
             Self::Newest => S::Newest,
@@ -137,6 +141,7 @@ pub struct Candidate {
     pub id: Uuid,
     pub position: i32,
     pub created_at: DateTime<Utc>,
+    pub popularity: i32,
     pub name: String,
     pub brand: Option<String>,
     pub variants: Vec<CandidateVariant>,
@@ -247,6 +252,11 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
                     .then(b.created_at.cmp(&a.created_at))
             });
         }
+        Sort::Popular => hits.sort_by(|a, b| {
+            b.popularity
+                .cmp(&a.popularity)
+                .then(b.created_at.cmp(&a.created_at))
+        }),
         Sort::PriceAsc => hits.sort_by_key(min_price),
         Sort::PriceDesc => hits.sort_by_key(|c| std::cmp::Reverse(min_price(c))),
         Sort::Newest => hits.sort_by_key(|c| std::cmp::Reverse(c.created_at)),
@@ -303,6 +313,7 @@ struct Base {
     id: Uuid,
     position: i32,
     created_at: DateTime<Utc>,
+    popularity: i32,
     name: String,
     brand: Option<String>,
 }
@@ -320,12 +331,13 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
                   (SELECT name FROM product_translations pt WHERE pt.product_id = p.id
                    ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1)
                    AS "name!",
-                  p.brand
+                  p.brand, coalesce(pp.popularity, 0) AS "popularity!"
            FROM products p
+           LEFT JOIN product_popularity pp ON pp.product_id = p.id
            LEFT JOIN product_categories pc
                   ON pc.product_id = p.id AND pc.category_id IN (SELECT id FROM subtree)
            WHERE p.status = 'active'
-           GROUP BY p.id
+           GROUP BY p.id, pp.popularity
            HAVING $1::uuid IS NULL OR count(pc.category_id) > 0"#,
         q.category_id,
         ctx.locale,
@@ -470,6 +482,7 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             id: b.id,
             position: b.position,
             created_at: b.created_at,
+            popularity: b.popularity,
             name: b.name,
             brand: b.brand,
         })
@@ -641,6 +654,7 @@ mod tests {
             position,
             created_at: DateTime::from_timestamp(i64::try_from(n).unwrap_or(0) * 1000, 0)
                 .unwrap_or_default(),
+            popularity: 0,
             name: name.into(),
             brand: Some(if n == 3 { "Acme" } else { "Lnen" }.into()),
             variants,
@@ -766,6 +780,43 @@ mod tests {
                 .iter()
                 .any(|v| v.value == "wool" && v.selected)
         );
+    }
+
+    #[test]
+    fn popular_parse_and_sort_options_roundtrip() {
+        let popular = Sort::parse("popular").expect("popular is a listing sort");
+        assert_eq!(popular, Sort::Popular);
+        assert_eq!(popular.as_str(), "popular");
+        assert_eq!(serde_json::to_value(popular).unwrap(), "popular");
+        assert_eq!(popular.search(), crate::search::query::Sort::Popular);
+        assert_eq!(
+            Sort::ALL.into_iter().map(Sort::as_str).collect::<Vec<_>>(),
+            [
+                "recommended",
+                "popular",
+                "newest",
+                "price_asc",
+                "price_desc"
+            ]
+        );
+        for sort in Sort::ALL {
+            assert_eq!(Sort::parse(sort.as_str()), Some(sort));
+        }
+        assert_eq!(Sort::parse("unknown"), None);
+    }
+
+    #[test]
+    fn popular_sort_orders_scores_then_dates_before_paging() {
+        let mut candidates = catalog();
+        candidates[0].popularity = 20;
+        candidates[1].popularity = 20;
+        let mut q = query(&[], Sort::Popular);
+        assert_eq!(ids(&select(candidates.clone(), &defs(), &q)), [2, 1, 3]);
+        q.per_page = 1;
+        q.page = 2;
+        let page = select(candidates, &defs(), &q);
+        assert_eq!(ids(&page), [1]);
+        assert_eq!((page.total, page.pages), (3, 3));
     }
 
     #[test]

@@ -383,6 +383,7 @@
   "search.title": "Search",
   "sort.name": "Name",
   "sort.newest": "Newest",
+  "sort.popular": "Most popular",
   "sort.price_asc": "Price: low to high",
   "sort.price_desc": "Price: high to low",
   "sort.recommended": "Recommended",
