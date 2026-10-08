@@ -69,7 +69,7 @@ const hasFacets = page.facets.length > 0;
       </header>
       {/* Nothing to sort or filter in an unfiltered empty result: straight to the way out. */}
       {
-        (page.products.length > 0 || selected.length > 0) && (
+        (page.total > 0 || selected.length > 0) && (
           <div class="mb-4 flex flex-wrap items-center gap-3 border-y border-border py-3">
             {
               hasFacets && (

@@ -170,6 +170,19 @@ test.describe("search", () => {
     await page.goto(`${CZ}/search?q=xyzzyqq`);
     await expect(main(page).getByText("Nic jsme nenašli.")).toBeVisible();
     await expect(main(page).getByRole("link", { name: "Oblečení" })).toBeVisible();
+    // No sorting or filters for nothing; bestsellers (or newest) as a way on.
+    await expect(page.getByLabel("Řadit")).toHaveCount(0);
+    await expect(page.locator("#search-rescue")).toBeVisible();
+  });
+
+  test("a page past the end of real results keeps sorting and shows no rescue rail", async ({
+    page,
+    context,
+  }) => {
+    await decideConsent(context);
+    await page.goto(`${CZ}/search?q=mikina&page=999`);
+    await expect(page.getByLabel("Řadit")).toBeVisible();
+    await expect(page.locator("#search-rescue")).toHaveCount(0);
   });
 });
 

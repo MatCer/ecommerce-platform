@@ -10,9 +10,7 @@ const sf = storefront(Astro.request);
 const [shop, page] = await Promise.all([sf.shop(), sf.search(listingQuery(Astro.url))]);
 // No results: the market's bestsellers (or newest) as a way on, never a dead end.
 const rescue =
-  page.products.length === 0
-    ? await sf.recommendations("home", { limit: 4 }).catch(() => null)
-    : null;
+  page.total === 0 ? await sf.recommendations("home", { limit: 4 }).catch(() => null) : null;
 const first = page.products[0]?.images[0] && cardImage(page.products[0].images[0]);
 // An empty query still lists the catalog; its heading must not read "Results for “”".
 const { t } = i18n(shop);
