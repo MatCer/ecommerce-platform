@@ -16,7 +16,7 @@ const date = (d: string) =>
 
 <Base shop={shop} seo={blog.seo} template="blog">
   <div class="container-shop py-8">
-    <h1 class="mb-8 text-4xl font-bold">{blog.title || t("blog.title")}</h1>
+    <h1 class="mb-8 text-3xl md:text-[2.5rem]">{blog.title || t("blog.title")}</h1>
     {
       blog.posts.length === 0 ? (
         <p class="text-muted-foreground">{t("blog.empty")}</p>
@@ -24,13 +24,13 @@ const date = (d: string) =>
         <ul class="grid gap-6 md:grid-cols-3">
           {blog.posts.map((post) => (
             <li>
-              <article class="group relative surface overflow-hidden">
-                {post.image && <img {...imageAttrs(post.image, { sizes: CARD_SIZES, width: 480 })} class="aspect-[4/3] w-full object-cover" />}
-                <div class="grid gap-2 p-5">
-                  <time datetime={post.published_at} class="text-xs text-muted-foreground">{date(post.published_at)}</time>
-                  <h2 class="text-xl font-bold"><a href={post.href} class="after:absolute after:inset-0">{post.title}</a></h2>
+              <article class="group relative">
+                {post.image && <img {...imageAttrs(post.image, { sizes: CARD_SIZES, width: 480 })} class="aspect-[4/3] w-full rounded-lg bg-muted object-cover" />}
+                <div class="grid gap-2 pt-4">
+                  <time datetime={post.published_at} class="text-[13px] text-muted-foreground">{date(post.published_at)}</time>
+                  <h2 class="text-xl"><a href={post.href} class="after:absolute after:inset-0 group-hover:underline">{post.title}</a></h2>
                   <p class="text-muted-foreground">{post.excerpt}</p>
-                  <span aria-hidden="true" class="text-sm font-semibold text-identity-ink">{t("blog.read_more")} →</span>
+                  <span aria-hidden="true" class="text-[15px] font-semibold">{t("blog.read_more")} →</span>
                 </div>
               </article>
             </li>

@@ -15,7 +15,7 @@ const { t } = i18n(shop);
 <Base shop={shop} seo={page.seo} template="page">
   <article class="container-shop pb-8">
     <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
-    <h1 class="mb-6 max-w-3xl text-4xl font-bold">{page.title}</h1>
+    <h1 class="mb-6 max-w-3xl text-3xl md:text-[2.5rem]">{page.title}</h1>
     <Blocks blocks={page.blocks} shop={shop} />
   </article>
 </Base>

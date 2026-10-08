@@ -11,16 +11,16 @@ Astro.response.status = 404;
 <Base shop={shop} template="404" seo={{ title: `${t("notfound.title")} | ${shop.name}`, description: "", canonical: Astro.url.href, alternates: [], json_ld: [], robots: "noindex" }}>
   <div class="container-shop grid max-w-2xl justify-items-start gap-4 py-16 md:py-24">
     <p class="eyebrow text-identity-ink">404</p>
-    <h1 class="text-4xl font-bold md:text-5xl">{t("notfound.title")}</h1>
+    <h1 class="text-[2.25rem] md:text-[3.5rem] md:leading-[1.02]">{t("notfound.title")}</h1>
     <p class="text-lg text-muted-foreground">{t("notfound.text")}</p>
     <form action={href("/search")} method="get" role="search" class="flex w-full max-w-md gap-2">
       <label for="nf-q" class="sr-only">{t("search.label")}</label>
-      <input id="nf-q" name="q" type="search" placeholder={t("search.placeholder")} class="h-11 min-w-0 flex-1 rounded-md border border-border bg-card px-4" />
+      <input id="nf-q" name="q" type="search" placeholder={t("search.placeholder")} class="h-11 min-w-0 flex-1 rounded-full border border-input bg-muted px-5 text-base placeholder:text-subtle hover:border-muted-foreground focus:bg-card" />
       <button type="submit" class="btn btn-primary">{t("search.label")}</button>
     </form>
     <ul class="flex flex-wrap gap-2">
       {shop.menus.main.map((m) => <li><a href={m.href} class="chip font-semibold">{m.label}</a></li>)}
     </ul>
-    <a href={href("/")} class="font-semibold text-identity-ink underline underline-offset-4">{t("notfound.back")}</a>
+    <a href={href("/")} class="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">{t("notfound.back")}</a>
   </div>
 </Base>
