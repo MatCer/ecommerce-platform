@@ -20,9 +20,9 @@ const cover = post.image && lcpImage(post.image, GALLERY_SIZES, 720).img;
     <Breadcrumbs items={post.breadcrumbs} label={t("nav.breadcrumbs")} />
     <header class="mb-8 max-w-3xl">
       <time datetime={post.published_at} class="text-sm text-muted-foreground">{new Date(post.published_at).toLocaleDateString(shop.locale, { dateStyle: "long", timeZone: "UTC" })}</time>
-      <h1 class="mt-2 text-4xl font-bold md:text-5xl">{post.title}</h1>
+      <h1 class="mt-2 text-3xl md:text-[2.5rem]">{post.title}</h1>
     </header>
-    {cover && <img {...cover} class="mb-8 aspect-[16/9] w-full max-w-4xl rounded-xl object-cover" />}
+    {cover && <img {...cover} class="mb-8 aspect-[16/9] w-full max-w-4xl rounded-xl bg-muted object-cover" />}
     <Blocks blocks={post.blocks} shop={shop} />
   </article>
 </Base>

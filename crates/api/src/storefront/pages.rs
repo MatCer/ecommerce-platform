@@ -9,6 +9,7 @@ use commerce::consent::{self, ConsentPurpose, Subject, well_formed_anon};
 use commerce::recommendations::engine::{self, Target, Visitor};
 use commerce::redirects::{self, ResolvedRedirect};
 use commerce::storefront::Search;
+use commerce::storefront::listing::Sort;
 use commerce::storefront::pages::{
     self, HomePage, ListingPage, ListingParams, Recommendations, ShopModel,
 };
@@ -74,7 +75,8 @@ async fn home(shopper: Shopper, State(s): State<AppState>) -> Result<Json<HomePa
 #[into_params(parameter_in = Query)]
 #[allow(dead_code)]
 pub struct ListingQueryDoc {
-    /// `recommended` (default), `price_asc`, `price_desc`, `newest`, `name`.
+    /// `recommended` (default), `popular`, `newest`, `price_asc`, `price_desc`.
+    #[param(value_type = Option<Sort>, inline)]
     sort: Option<String>,
     /// 1-based page (24 products per page).
     page: Option<u32>,
@@ -151,6 +153,7 @@ async fn product_page(
 #[allow(dead_code)]
 pub struct SearchQueryDoc {
     q: Option<String>,
+    #[param(value_type = Option<Sort>, inline)]
     sort: Option<String>,
     page: Option<u32>,
 }

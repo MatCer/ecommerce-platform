@@ -125,6 +125,7 @@ pub enum Sort {
     /// Text relevance; for an empty query, popularity then newest.
     #[default]
     Relevance,
+    Popular,
     PriceAsc,
     PriceDesc,
     Newest,
@@ -335,6 +336,7 @@ fn plan(scope: &Scope, req: &SearchRequest, facets: bool, exclude: &[Uuid]) -> P
         .chain(refinements.iter().map(|(_, c)| c.clone())));
     let price = format!("price.{}", market_key(&scope.market_code));
     let sort: Vec<String> = match req.sort {
+        Sort::Popular => vec!["popularity:desc".into(), "created_at:desc".into()],
         Sort::PriceAsc => vec![format!("{price}:asc")],
         Sort::PriceDesc => vec![format!("{price}:desc")],
         Sort::Newest => vec!["created_at:desc".into()],
@@ -1095,6 +1097,26 @@ mod tests {
             exact_clause(&r.q).as_deref(),
             Some(r#"skus = "x\"OR" OR eans = "x\"OR""#)
         );
+    }
+
+    #[test]
+    fn popular_sort_uses_popularity_then_newest() {
+        for q in ["", "boty"] {
+            let p = plan(
+                &scope(),
+                &SearchRequest {
+                    q: q.into(),
+                    sort: Sort::Popular,
+                    ..req()
+                },
+                false,
+                &[],
+            );
+            assert_eq!(
+                p.queries[0]["sort"],
+                json!(["popularity:desc", "created_at:desc"])
+            );
+        }
     }
 
     #[test]

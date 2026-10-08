@@ -243,6 +243,74 @@ fn set(v: &[&str]) -> BTreeSet<String> {
     v.iter().map(|s| (*s).to_owned()).collect()
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "needs Meilisearch: make test-search"]
+async fn popular_ordering_uses_newest_to_break_ties(db: PgPool) {
+    let s = shop(&db).await;
+    let mut products = Vec::new();
+    for sku in ["POPULAR-OLD", "POPULAR-NEW", "UNSCORED"] {
+        products.push(
+            s.product(
+                sku,
+                "Tričko",
+                "Tričko",
+                &[V {
+                    options: &[("color", "red"), ("size", "m")],
+                    cz: Some(100),
+                    sk: Some(5),
+                    stock: 5,
+                }],
+            )
+            .await,
+        );
+    }
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for product in &products[..2] {
+        sqlx::query(
+            "INSERT INTO product_popularity (tenant_id, product_id, popularity) VALUES ($1, $2, 20)",
+        )
+        .bind(s.tenant)
+        .bind(product)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+    for product in &products {
+        assert_eq!(s.index(*product).await, Indexed::Done);
+    }
+    s.settle().await;
+    for q in ["", "tričko"] {
+        let result = s
+            .search(
+                s.cz,
+                "cs",
+                SearchRequest {
+                    q: q.into(),
+                    sort: Sort::Popular,
+                    ..req(&[])
+                },
+            )
+            .await;
+        assert_eq!(
+            result
+                .items
+                .iter()
+                .map(|h| h.product_id)
+                .collect::<Vec<_>>(),
+            [products[1], products[0], products[2]]
+        );
+    }
+}
+
 /// A23 adversarial fixtures: cross-variant false matches, three options, unavailable variants,
 /// market prices, multi-select filters.
 #[sqlx::test(migrations = "../../migrations")]

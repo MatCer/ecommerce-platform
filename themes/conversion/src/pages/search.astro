@@ -1,5 +1,6 @@
 ---
 import Listing from "../components/Listing.astro";
+import RecommendationSlot from "../components/RecommendationSlot.astro";
 import Base from "../layouts/Base.astro";
 import { i18n } from "../lib/i18n";
 import { cardImage, LISTING_SIZES } from "../lib/images";
@@ -7,11 +8,31 @@ import { listingQuery, storefront } from "../lib/storefront";
 
 const sf = storefront(Astro.request);
 const [shop, page] = await Promise.all([sf.shop(), sf.search(listingQuery(Astro.url))]);
+// No results: the market's bestsellers (or newest) as a way on, never a dead end.
+const rescue =
+  page.total === 0 ? await sf.recommendations("home", { limit: 4 }).catch(() => null) : null;
 const first = page.products[0]?.images[0] && cardImage(page.products[0].images[0]);
 // An empty query still lists the catalog; its heading must not read "Results for “”".
-const title = page.query?.trim() ? page.title : i18n(shop).t("search.title");
+const { t } = i18n(shop);
+const title = page.query?.trim() ? page.title : t("search.title");
+const rescueTitle =
+  rescue?.title ??
+  t(
+    rescue?.strategy === "bestsellers"
+      ? "home.bestsellers"
+      : rescue?.strategy === "newest"
+        ? "home.newest"
+        : "home.featured",
+  );
 ---
 
 <Base shop={shop} seo={page.seo} template="search" q={page.query ?? ""} lcp={first && { image: first, sizes: LISTING_SIZES }}>
   <Listing page={{ ...page, title }} shop={shop} action={`${shop.base_path}/search`} />
+  {
+    rescue && rescue.products.length > 0 && (
+      <div class="container-shop -mt-16 pb-16">
+        <RecommendationSlot products={rescue.products} shop={shop} title={rescueTitle} id="search-rescue" />
+      </div>
+    )
+  }
 </Base>

@@ -40,11 +40,11 @@ const hasFacets = page.facets.length > 0;
       {
         page.subcategories.length > 0 && (
           <nav aria-label={t("nav.categories")} class="md:rounded-lg md:bg-muted md:p-5">
-            <h2 class="mb-3 hidden text-lg font-bold md:block">{t("nav.categories")}</h2>
+            <h2 class="mb-2 hidden text-base font-bold md:block">{t("nav.categories")}</h2>
             <ul class="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin] md:grid md:gap-0 md:overflow-visible md:pb-0">
               {page.subcategories.map((c) => (
                 <li class="shrink-0">
-                  <a href={c.href} class="chip font-semibold md:min-h-11 md:border-0 md:bg-transparent md:px-0 md:font-medium md:hover:underline">{c.label}</a>
+                  <a href={c.href} class="chip font-semibold md:min-h-11 md:justify-start md:border-0 md:bg-transparent md:px-0 md:font-medium md:hover:underline">{c.label}</a>
                 </li>
               ))}
             </ul>
@@ -55,51 +55,58 @@ const hasFacets = page.facets.length > 0;
     </aside>
 
     <div class="min-w-0">
-      <header class="mb-5 border-b border-border pb-5">
-        <h1 class="text-3xl md:text-4xl">{page.title}</h1>
+      <header class="mb-5">
+        <div class="flex flex-wrap items-baseline gap-x-3">
+          <h1 class="text-3xl md:text-[2.5rem]">{page.title}</h1>
+          <p class="text-[15px] text-muted-foreground">{tn("listing.count", page.total)}</p>
+        </div>
         {
           page.category?.description_html && (
             // description_html is sanitized by the platform (contract: the only unescaped HTML).
-            <div class="mt-3 max-w-3xl leading-relaxed text-muted-foreground" set:html={page.category.description_html} />
+            <div class="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground md:text-base" set:html={page.category.description_html} />
           )
         }
       </header>
-      <div class="mb-5 flex flex-wrap items-center gap-3">
-        {
-          hasFacets && (
-            <button type="button" popovertarget="filter-sheet" class="btn btn-secondary md:hidden">
-              <Icon name="sliders" />
-              {t("listing.filters")}
-              {selected.length > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-full bg-identity-ink px-1 text-xs text-card">{selected.length}</span>}
-            </button>
-          )
-        }
-        <p class="text-sm text-muted-foreground">{tn("listing.count", page.total)}</p>
-        <div class="ml-auto flex items-center gap-2 text-sm">
-          <label for="sort" class="text-muted-foreground">{t("listing.sort")}</label>
-          <select id="sort" name="sort" class="h-10 rounded-md border border-border bg-card pr-8 pl-3 font-semibold">
-            {page.sort.map((s) => <option value={s.value} selected={s.selected}>{s.label}</option>)}
-          </select>
-          <!-- Without JS sort needs a submit; with JS it submits on change (no button, no layout shift). -->
-          <noscript><button type="submit" class="btn btn-secondary min-h-10">{t("listing.apply")}</button></noscript>
-        </div>
-      </div>
+      {/* Nothing to sort or filter in an unfiltered empty result: straight to the way out. */}
+      {
+        (page.total > 0 || selected.length > 0) && (
+          <div class="mb-4 flex flex-wrap items-center gap-3 border-y border-border py-3">
+            {
+              hasFacets && (
+                <button type="button" popovertarget="filter-sheet" class="btn btn-secondary md:hidden">
+                  <Icon name="sliders" />
+                  {t("listing.filters")}
+                  {selected.length > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs text-card">{selected.length}</span>}
+                </button>
+              )
+            }
+            <div class="ml-auto flex items-center gap-2 text-[15px]">
+              <label for="sort" class="text-muted-foreground">{t("listing.sort")}</label>
+              <select id="sort" name="sort" class="h-11 rounded-full border border-input bg-card pr-9 pl-4 font-semibold">
+                {page.sort.map((s) => <option value={s.value} selected={s.selected}>{s.label}</option>)}
+              </select>
+              {/* Without JS sort needs a submit; with JS it submits on change (no button, no layout shift). */}
+              <noscript><button type="submit" class="btn btn-secondary">{t("listing.apply")}</button></noscript>
+            </div>
+          </div>
+        )
+      }
       {
         selected.length > 0 && (
-          <div class="mb-5 flex flex-wrap items-center gap-2">
+          <div class="mb-6 flex flex-wrap items-center gap-2">
             <h2 class="sr-only">{t("listing.active_filters")}</h2>
             <ul class="contents">
               {selected.map((v) => (
                 <li>
-                  <a href={v.href} class="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-identity-wash px-3 text-sm font-medium text-identity-ink hover:bg-identity hover:text-card">
+                  <a href={v.href} class="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-foreground pr-3 pl-4 text-sm font-medium text-card hover:bg-panel-raised">
                     <span class="sr-only">{t("listing.remove_filter", { label: `${v.facet} ${v.label}` })}</span>
-                    <span aria-hidden="true">{v.label}</span>
+                    <span aria-hidden="true">{v.facet}: {v.label}</span>
                     <Icon name="close" class="size-3.5" />
                   </a>
                 </li>
               ))}
             </ul>
-            <a href={clearHref} class="ml-1 text-sm font-semibold text-identity-ink underline underline-offset-4">{t("listing.clear")}</a>
+            <a href={clearHref} class="ml-1 inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-4">{t("listing.clear")}</a>
           </div>
         )
       }
@@ -122,7 +129,7 @@ const hasFacets = page.facets.length > 0;
           <nav aria-label={t("listing.pagination")} class="mx-auto mt-12 grid max-w-sm justify-items-center gap-5">
             <div class="grid w-full max-w-64 gap-2 text-center text-sm text-muted-foreground">
               <p>{t("listing.progress", { shown, total: page.total })}</p>
-              <progress max={page.total} value={shown} aria-hidden="true" class="h-1 w-full appearance-none overflow-hidden rounded-full bg-border [&::-moz-progress-bar]:bg-identity [&::-webkit-progress-bar]:bg-border [&::-webkit-progress-value]:bg-identity" />
+              <progress max={page.total} value={shown} aria-hidden="true" class="h-1.5 w-full appearance-none overflow-hidden rounded-full bg-border [&::-moz-progress-bar]:bg-identity [&::-webkit-progress-bar]:bg-border [&::-webkit-progress-value]:bg-identity" />
             </div>
             <div class="flex w-full items-center justify-center gap-3">
               {pg.prev ? (

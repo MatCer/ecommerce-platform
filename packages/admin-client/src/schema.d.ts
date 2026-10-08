@@ -8882,7 +8882,7 @@ export interface components {
             strategy: components["schemas"]["Strategy"];
         };
         /** @enum {string} */
-        Sort: "recommended" | "price_asc" | "price_desc" | "newest";
+        Sort: "recommended" | "popular" | "newest" | "price_asc" | "price_desc";
         SortOption: {
             href: string;
             label: string;
@@ -21066,8 +21066,8 @@ export interface operations {
     category: {
         parameters: {
             query?: {
-                /** @description `recommended` (default), `price_asc`, `price_desc`, `newest`, `name`. */
-                sort?: string;
+                /** @description `recommended` (default), `popular`, `newest`, `price_asc`, `price_desc`. */
+                sort?: "recommended" | "popular" | "newest" | "price_asc" | "price_desc";
                 /** @description 1-based page (24 products per page). */
                 page?: number;
             };
@@ -21206,7 +21206,7 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string;
-                sort?: string;
+                sort?: "recommended" | "popular" | "newest" | "price_asc" | "price_desc";
                 page?: number;
             };
             header: {
@@ -21422,7 +21422,7 @@ export interface operations {
             query?: {
                 /** @description Search text (≤ 200 characters). Empty: browse (e.g. a category listing). */
                 q?: string;
-                sort?: "relevance" | "price_asc" | "price_desc" | "newest";
+                sort?: "relevance" | "popular" | "price_asc" | "price_desc" | "newest";
                 /** @description 1-based page (results beyond the first 1000 are not available). */
                 page?: number;
                 /** @description 1-48, default 24. */

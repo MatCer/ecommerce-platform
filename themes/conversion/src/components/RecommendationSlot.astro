@@ -1,6 +1,7 @@
 ---
 import type { ProductCard, ShopModel } from "@platform/storefront-sdk/types";
 import ProductGrid from "./ProductGrid.astro";
+import SectionHeading from "./SectionHeading.astro";
 
 /**
  * Cross-sell slot: renders the products the platform recommends (`sf.recommendations`, WP17:
@@ -18,7 +19,7 @@ const { products, shop, title, id } = Astro.props;
 {
   products.length > 0 && (
     <section aria-labelledby={id} class="mt-14 md:mt-20">
-      <h2 id={id} class="mb-5 text-2xl font-bold md:text-3xl">{title}</h2>
+      <SectionHeading id={id} title={title} />
       <ProductGrid products={products} shop={shop} />
     </section>
   )

@@ -25,34 +25,34 @@ const { t } = i18n(shop);
   <div class="flex h-16 items-center justify-between border-b border-border px-5 md:hidden">
     <h2 class="flex items-center gap-2 text-xl font-bold">
       {t("listing.filters")}
-      {selected > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-sm bg-panel px-1 text-xs text-card">{selected}</span>}
+      {selected > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs text-card">{selected}</span>}
     </h2>
-    <button type="button" popovertarget="filter-sheet" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-muted">
+    <button type="button" popovertarget="filter-sheet" popovertargetaction="hide" class="-mr-2 grid size-11 place-items-center rounded-full hover:bg-muted">
       <Icon name="close" class="size-6" />
       <span class="sr-only">{t("nav.close")}</span>
     </button>
   </div>
-  <h2 class="hidden px-5 pt-5 text-lg font-bold md:block">{t("listing.filters")}</h2>
+  <h2 class="hidden px-5 pt-5 text-base font-bold md:block">{t("listing.filters")}</h2>
   <div class="divide-y divide-border px-5 md:pb-2">
     {
       page.facets.map((f) => {
         const n = f.values.filter((v) => v.selected).length;
         return (
-          <details name="facet" class="group/facet py-2">
-            <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 font-bold [&::-webkit-details-marker]:hidden">
+          <details name="facet" class="group/facet py-1">
+            <summary class="flex min-h-12 cursor-pointer list-none items-center justify-between gap-2 text-base font-semibold [&::-webkit-details-marker]:hidden">
               <span class="flex items-center gap-2">
                 {f.label}
-                {n > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-sm bg-panel px-1 text-xs text-card">{n}</span>}
+                {n > 0 && <span class="grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-xs text-card">{n}</span>}
               </span>
               <Icon name="chevronDown" class="size-4 transition-transform group-open/facet:rotate-180" />
             </summary>
             <fieldset class="pt-1 pb-3">
               <legend class="sr-only">{f.label}</legend>
-              <ul class="grid gap-0.5">
+              <ul class="grid">
                 {f.values.map((v) => (
                   <li>
-                    <label class="flex min-h-11 cursor-pointer items-center gap-3 has-[:checked]:font-bold has-[:disabled]:cursor-not-allowed has-[:disabled]:text-subtle">
-                      <input class="size-5 shrink-0 accent-identity" type="checkbox" name={`f.${f.key}`} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
+                    <label class="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] has-[:checked]:font-semibold has-[:disabled]:cursor-not-allowed has-[:disabled]:text-subtle">
+                      <input class="size-5 shrink-0 rounded accent-identity" type="checkbox" name={`f.${f.key}`} value={v.value} checked={v.selected} disabled={v.disabled && !v.selected} />
                       {v.label}
                     </label>
                   </li>
