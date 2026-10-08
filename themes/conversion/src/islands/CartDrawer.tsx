@@ -105,7 +105,8 @@ export default function CartDrawer(props: {
       class="drawer"
     >
       <div class="flex min-h-0 flex-1 flex-col">
-        <header class="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
+        {/* Plain divs: a <header>/<footer> in a modal reads as a second banner/contentinfo. */}
+        <div class="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
           <h2 id="cart-title" class="text-xl font-bold">
             {l("cart.title")}
             <Show when={count() > 0}>
@@ -123,7 +124,7 @@ export default function CartDrawer(props: {
             <Icon d={close} class="size-6" />
             <span class="sr-only">{l("cart.close")}</span>
           </button>
-        </header>
+        </div>
 
         <Show when={props.threshold && remaining() != null && lines().length > 0}>
           <div class="shrink-0 border-b border-border bg-muted px-5 py-3 text-sm">
@@ -241,7 +242,7 @@ export default function CartDrawer(props: {
               </section>
             </Show>
           </div>
-          <footer class="shrink-0 border-t border-border bg-card px-5 pt-4 pb-5">
+          <div class="shrink-0 border-t border-border bg-card px-5 pt-4 pb-5">
             <Show when={failed()}>
               <p role="alert" class="mb-3 text-sm font-medium text-sale">
                 {l("cart.update_failed")}
@@ -276,7 +277,7 @@ export default function CartDrawer(props: {
             >
               {l("cart.continue")}
             </button>
-          </footer>
+          </div>
         </Show>
       </div>
     </dialog>
