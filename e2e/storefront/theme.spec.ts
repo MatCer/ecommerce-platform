@@ -195,6 +195,37 @@ test("variant selection, add to cart, cart drawer, checkout origin", async ({ pa
   await expect(page).toHaveURL(/^http:\/\/checkout\.demo\.localhost(:\d+)?\//);
 });
 
+test("phone: the buy bar repeats the choice, the cart opens as a bottom sheet", async ({
+  browser,
+}) => {
+  const ctx = await testContext(browser, { viewport: { width: 390, height: 844 } });
+  await decideConsent(ctx);
+  const page = await ctx.newPage();
+  await page.goto(`${CZ}/p/mikina-fleece`);
+  await hydrated(page);
+  await page.locator("label", { hasText: "Cihlová" }).click();
+  await page.locator("label", { hasText: /^L$/ }).click();
+  // The bar slides in once the main button scrolls away and names the chosen variant.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const bar = page.locator("div.fixed.bottom-0", { hasText: "Přidat do košíku" });
+  await expect(bar).toBeInViewport();
+  await expect(bar.getByText(/^Cihlová \/ L · /)).toBeVisible();
+  await bar.getByRole("button", { name: "Přidat do košíku" }).click();
+  const drawer = page.getByRole("dialog", { name: /Košík/ });
+  await expect(drawer).toBeVisible();
+  // A sheet from the bottom edge (once it has slid in), leaving the page visible above it.
+  await expect
+    .poll(async () => {
+      const box = await drawer.boundingBox();
+      return box && [Math.round(box.y + box.height), box.y > 0];
+    })
+    .toEqual([844, true]);
+  await screenshot(page, "cart-sheet-phone");
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+  await ctx.close();
+});
+
 /** A keyboard focus ring drawn in a different colour than the surface it sits on. */
 async function expectVisibleRing(el: Locator, surface: Locator) {
   expect(await el.evaluate((e) => e.matches(":focus-visible"))).toBe(true);

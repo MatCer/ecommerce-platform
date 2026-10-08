@@ -51,8 +51,8 @@ export const BLOG_SIZES =
 export const GALLERY_SIZES =
   "(min-width: 80rem) 43rem, (min-width: 48rem) 55vw, calc(100vw - 2rem)";
 
-/** Gallery thumbnails and cart/search thumbnails. */
-export const THUMB_SIZES = "4rem";
+/** Gallery thumbnails (5 rem from 48rem; hidden on phones). */
+export const THUMB_SIZES = "5rem";
 
 /**
  * Drops srcset candidates wider than `max` px: a card never renders wider than ~300 CSS px, so

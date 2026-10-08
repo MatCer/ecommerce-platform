@@ -122,18 +122,14 @@ export default function BuyBox(props: Props) {
     </button>
   );
 
-  const Price = (p: { compact?: boolean }) => (
+  const Price = () => (
     <p class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
       <Show when={reduced()}>
         <span class="sr-only">{l("price.current")}:</span>
       </Show>
       <span
-        class="price"
-        classList={{
-          "text-sale": Boolean(reduced()),
-          "text-3xl": !p.compact,
-          "text-xl": p.compact,
-        }}
+        class="price text-[2rem] leading-none md:text-4xl"
+        classList={{ "text-sale": Boolean(reduced()) }}
       >
         {variant()?.price.formatted ?? first?.price.formatted}
       </span>
@@ -144,14 +140,12 @@ export default function BuyBox(props: Props) {
               <span class="sr-only">{l("price.original")}: </span>
               {v().reference_price?.formatted}
             </s>
-            <Show when={!p.compact}>
-              <span class="rounded-sm bg-sale px-1.5 py-0.5 text-xs font-bold text-card">
-                <span aria-hidden="true">−{v().discount_percent} %</span>
-                <span class="sr-only">
-                  {l("price.discount", { percent: v().discount_percent ?? 0 })}
-                </span>
+            <span class="rounded-full bg-sale px-2.5 py-1 text-[13px] font-bold text-card">
+              <span aria-hidden="true">−{v().discount_percent} %</span>
+              <span class="sr-only">
+                {l("price.discount", { percent: v().discount_percent ?? 0 })}
               </span>
-            </Show>
+            </span>
           </>
         )}
       </Show>
@@ -164,7 +158,7 @@ export default function BuyBox(props: Props) {
         <Price />
         <Show when={reduced()}>
           {(v) => (
-            <p class="mt-1.5 text-sm text-muted-foreground">
+            <p class="mt-2 text-sm text-muted-foreground">
               {l("price.lowest_30_days", { price: v().reference_price?.formatted ?? "" })}
             </p>
           )}
@@ -176,20 +170,20 @@ export default function BuyBox(props: Props) {
             </p>
           )}
         </Show>
-        <p class="mt-1 text-xs text-muted-foreground">{l("product.vat_included")}</p>
+        <p class="mt-0.5 text-[13px] text-muted-foreground">{l("product.vat_included")}</p>
       </div>
 
       <For each={props.options}>
         {(opt) => (
           <fieldset>
-            <legend class="mb-2 text-sm font-semibold">
+            <legend class="mb-3 text-[15px] font-semibold">
               {opt.name}: <span class="font-normal text-muted-foreground">{valueName(opt)}</span>
             </legend>
             <div class="flex flex-wrap gap-2">
               <For each={opt.values}>
                 {(value) => (
                   <label
-                    class="chip min-w-12 justify-center"
+                    class="chip min-w-14 justify-center"
                     classList={{
                       "text-subtle line-through decoration-1": !available(opt.code, value.code),
                     }}
@@ -214,7 +208,7 @@ export default function BuyBox(props: Props) {
         )}
       </For>
 
-      <div aria-live="polite" class="flex flex-col gap-1">
+      <div aria-live="polite" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <Show
           when={variant()}
           fallback={
@@ -223,11 +217,13 @@ export default function BuyBox(props: Props) {
         >
           {(v) => (
             <>
-              <p class={`flex items-center gap-2 text-sm font-semibold ${STOCK_CLASS[stock()]}`}>
+              <p
+                class={`flex items-center gap-2 text-[15px] font-semibold ${STOCK_CLASS[stock()]}`}
+              >
                 <span aria-hidden="true" class="size-2 rounded-full bg-current" />
                 {l(`product.${stock()}`)}
               </p>
-              <p class="text-xs text-muted-foreground">{l("product.sku", { sku: v().sku })}</p>
+              <p class="text-[13px] text-muted-foreground">{l("product.sku", { sku: v().sku })}</p>
             </>
           )}
         </Show>
@@ -244,14 +240,23 @@ export default function BuyBox(props: Props) {
 
       {/* Phones: the buy action stays in reach once the main button scrolls away. */}
       <div
-        class="fixed inset-x-0 bottom-0 z-20 flex items-center gap-3 border-t border-border bg-card/95 px-4 py-3 shadow-sheet backdrop-blur transition-transform duration-200 md:hidden"
+        class="fixed inset-x-0 bottom-0 z-20 flex items-center gap-3 border-t border-border bg-card/95 px-4 py-3 shadow-bar backdrop-blur-sm transition-transform duration-200 md:hidden"
         classList={{ "translate-y-full": !barVisible() }}
         inert={barVisible() ? undefined : true}
       >
-        <div class="min-w-0 flex-1">
-          <Price compact />
+        {/* Price and choice only: a struck reference here would need its Omnibus line too. */}
+        <div class="min-w-0 flex-1 leading-tight">
+          <p class="price text-xl">{variant()?.price.formatted ?? first?.price.formatted}</p>
+          <p class="truncate text-[13px] text-muted-foreground">
+            {[
+              props.options.map(valueName).filter(Boolean).join(" / "),
+              variant() && l(`product.${stock()}`),
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
         </div>
-        <div class="w-1/2">
+        <div class="w-1/2 shrink-0">
           <Button compact />
         </div>
       </div>

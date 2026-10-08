@@ -56,7 +56,7 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
           onScroll={onScroll}
           onPointerDown={() => setHydrated(true)}
           onFocus={() => setHydrated(true)}
-          class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-xl bg-muted [scrollbar-width:none]"
+          class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-lg bg-muted [scrollbar-width:none]"
           aria-roledescription="carousel"
           aria-label={l("product.gallery")}
           tabindex="0"
@@ -105,7 +105,8 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
         </Show>
       </div>
       <Show when={total() > 1}>
-        <ul class="flex gap-2 overflow-x-auto">
+        {/* Phones swipe and read the counter; thumbnails from 48rem. */}
+        <ul class="hidden gap-3 overflow-x-auto p-1 md:flex">
           <For each={props.images}>
             {(img, i) => (
               <li class="shrink-0">
@@ -113,7 +114,7 @@ export default function Gallery(props: { images: Image[]; labels: Messages }) {
                   type="button"
                   onClick={() => go(i())}
                   aria-current={current() === i() ? "true" : undefined}
-                  class="block w-16 overflow-hidden rounded-md border-2 border-transparent opacity-70 hover:opacity-100 aria-[current=true]:border-identity aria-[current=true]:opacity-100"
+                  class="block w-20 overflow-hidden rounded-sm bg-muted ring-offset-2 hover:ring-2 hover:ring-border aria-[current=true]:ring-2 aria-[current=true]:ring-foreground"
                 >
                   <Show
                     when={hydrated()}

@@ -102,21 +102,22 @@ export default function CartDrawer(props: {
       onClose={() => dialog?.open || setOpen(false)}
       onClick={(e) => e.target === dialog && setOpen(false)}
       aria-labelledby="cart-title"
-      class="m-0 ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground shadow-sheet backdrop:bg-foreground/45"
+      class="drawer"
     >
-      <div class="flex h-full flex-col">
-        <header class="flex h-16 items-center justify-between border-b border-border px-5">
-          <h2 id="cart-title" class="text-lg font-bold">
+      <div class="flex min-h-0 flex-1 flex-col">
+        <header class="flex h-16 shrink-0 items-center justify-between border-b border-border px-5">
+          <h2 id="cart-title" class="text-xl font-bold">
             {l("cart.title")}
             <Show when={count() > 0}>
-              <span class="ml-2 text-sm font-normal text-muted-foreground">
+              <span class="text-base font-normal text-muted-foreground">
+                {" · "}
                 {tn(props.labels, props.locale, "cart.items", count())}
               </span>
             </Show>
           </h2>
           <button
             type="button"
-            class="-mr-2 grid size-11 place-items-center rounded-md hover:bg-muted"
+            class="-mr-2 grid size-11 place-items-center rounded-full hover:bg-muted"
             onClick={() => setOpen(false)}
           >
             <Icon d={close} class="size-6" />
@@ -125,8 +126,8 @@ export default function CartDrawer(props: {
         </header>
 
         <Show when={props.threshold && remaining() != null && lines().length > 0}>
-          <div class="border-b border-border bg-identity-wash px-5 py-3 text-sm">
-            <p class="mb-2 flex items-center gap-2 font-medium text-identity-ink">
+          <div class="shrink-0 border-b border-border bg-muted px-5 py-3 text-sm">
+            <p class="mb-2 flex items-center gap-2 font-semibold">
               <Icon d={truck} class="size-4" />
               {remaining()?.amount_minor
                 ? l("cart.free_shipping_remaining", { amount: remaining()?.formatted ?? "" })
@@ -152,51 +153,51 @@ export default function CartDrawer(props: {
             </div>
           }
         >
-          <div class="flex-1 overflow-y-auto">
+          <div class="min-h-0 flex-1 overflow-y-auto">
             <ul class="divide-y divide-border px-5" aria-busy={busy()}>
               <For each={lines()}>
                 {(line) => (
-                  <li class="flex gap-4 py-4">
+                  <li class="flex gap-4 py-5">
                     {/* Decorative: the name next to it is the link (a nameless photo link failed axe). */}
                     <img
                       src={line.image ? imageUrl(line.image, 160) : undefined}
                       alt=""
-                      width="64"
-                      height="80"
+                      width="72"
+                      height="90"
                       loading="lazy"
-                      class="h-20 w-16 shrink-0 rounded-md bg-muted object-cover"
+                      class="h-[90px] w-[72px] shrink-0 rounded-md bg-muted object-cover"
                     />
-                    <div class="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                    <div class="flex min-w-0 flex-1 flex-col gap-1 text-[15px]">
                       <a
                         href={`${props.base}/p/${line.slug}`}
                         class="font-semibold hover:underline"
                       >
                         {line.product_name}
                       </a>
-                      <p class="text-muted-foreground">{line.variant_label}</p>
+                      <p class="text-sm text-muted-foreground">{line.variant_label}</p>
                       <Show when={!line.available}>
                         <p class="font-semibold text-sale">{l("cart.unavailable")}</p>
                       </Show>
-                      <div class="mt-auto flex items-center justify-between gap-2 pt-1">
-                        <fieldset class="flex items-center rounded-md border border-border">
+                      <div class="mt-auto flex items-center justify-between gap-2 pt-2">
+                        <fieldset class="flex items-center rounded-full border border-border">
                           <legend class="sr-only">
                             {l("cart.quantity")}: {line.product_name}
                           </legend>
                           <button
                             type="button"
-                            class="grid size-9 place-items-center disabled:text-subtle"
+                            class="grid size-11 place-items-center rounded-full disabled:text-subtle"
                             disabled={busy() || line.quantity <= 1}
                             onClick={() => change(line, line.quantity - 1)}
                           >
                             <Icon d={minus} class="size-4" />
                             <span class="sr-only">{l("cart.decrease")}</span>
                           </button>
-                          <span class="w-7 text-center tabular-nums" aria-live="polite">
+                          <span class="w-6 text-center tabular-nums" aria-live="polite">
                             {line.quantity}
                           </span>
                           <button
                             type="button"
-                            class="grid size-9 place-items-center disabled:text-subtle"
+                            class="grid size-11 place-items-center rounded-full disabled:text-subtle"
                             disabled={busy() || !line.available}
                             onClick={() => change(line, line.quantity + 1)}
                           >
@@ -206,7 +207,7 @@ export default function CartDrawer(props: {
                         </fieldset>
                         <button
                           type="button"
-                          class="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-sale"
+                          class="grid size-11 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-sale"
                           disabled={busy()}
                           onClick={() => change(line, 0)}
                         >
@@ -227,10 +228,10 @@ export default function CartDrawer(props: {
                 <h3 id="cart-cross-sell" class="mb-3 text-sm font-bold">
                   {l("cart.cross_sell")}
                 </h3>
-                <ul class="flex snap-x gap-3 overflow-x-auto pb-1">
+                <ul class="rail gap-3 pb-1">
                   <For each={crossSell()}>
                     {(p) => (
-                      <li class="w-28 shrink-0 snap-start">
+                      <li class="w-32">
                         <MiniCard product={p} base={props.base} labels={props.labels} />
                       </li>
                     )}
@@ -239,7 +240,7 @@ export default function CartDrawer(props: {
               </section>
             </Show>
           </div>
-          <footer class="border-t border-border bg-background px-5 py-4">
+          <footer class="shrink-0 border-t border-border bg-card px-5 pt-4 pb-5">
             <Show when={failed()}>
               <p role="alert" class="mb-3 text-sm font-medium text-sale">
                 {l("cart.update_failed")}
@@ -260,16 +261,16 @@ export default function CartDrawer(props: {
               </span>
               <span class="price text-2xl">{cart()?.total?.formatted}</span>
             </p>
-            <p class="mt-1 mb-4 text-xs text-muted-foreground">{l("cart.shipping_note")}</p>
+            <p class="mt-1 mb-4 text-[13px] text-muted-foreground">{l("cart.shipping_note")}</p>
             {/* Edge-owned handoff: mints a one-time token and redirects to checkout.<host>. */}
             <form method="post" action="/_p/checkout/start">
-              <button type="submit" class="btn btn-buy h-13 w-full text-lg">
+              <button type="submit" class="btn btn-buy h-14 w-full text-lg">
                 {l("cart.checkout")}
               </button>
             </form>
             <button
               type="button"
-              class="mt-2 min-h-11 w-full text-sm font-semibold text-identity-ink underline underline-offset-4"
+              class="mt-1 min-h-11 w-full text-sm font-semibold underline underline-offset-4"
               onClick={() => setOpen(false)}
             >
               {l("cart.continue")}
