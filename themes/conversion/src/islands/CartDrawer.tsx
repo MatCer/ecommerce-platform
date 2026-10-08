@@ -178,8 +178,9 @@ export default function CartDrawer(props: {
                       <Show when={!line.available}>
                         <p class="font-semibold text-sale">{l("cart.unavailable")}</p>
                       </Show>
-                      <div class="mt-auto flex items-center justify-between gap-2 pt-2">
-                        <fieldset class="flex items-center rounded-full border border-border">
+                      {/* Controls never shrink below 44px; on narrow phones the price wraps to its own row. */}
+                      <div class="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
+                        <fieldset class="flex shrink-0 items-center rounded-full border border-border">
                           <legend class="sr-only">
                             {l("cart.quantity")}: {line.product_name}
                           </legend>
@@ -207,7 +208,7 @@ export default function CartDrawer(props: {
                         </fieldset>
                         <button
                           type="button"
-                          class="grid size-11 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-sale"
+                          class="grid size-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-sale"
                           disabled={busy()}
                           onClick={() => change(line, 0)}
                         >

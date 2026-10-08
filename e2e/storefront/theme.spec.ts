@@ -221,6 +221,10 @@ test("phone: the buy bar repeats the choice, the cart opens as a bottom sheet", 
     })
     .toEqual([844, true]);
   await screenshot(page, "cart-sheet-phone");
+  // The smallest phones keep 44px controls on a line (the price wraps instead).
+  await page.setViewportSize({ width: 320, height: 640 });
+  const remove = await drawer.getByRole("button", { name: /^Odebrat/ }).boundingBox();
+  expect(remove && Math.min(remove.width, remove.height)).toBeGreaterThanOrEqual(44);
   await page.keyboard.press("Escape");
   await expect(drawer).toBeHidden();
   await ctx.close();
