@@ -4,7 +4,16 @@ import type { ProductCard } from "@platform/storefront-sdk/types";
 import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import MiniCard from "../lib/MiniCard";
 
-export type Props = { title: string; base: string; locale: string; labels: Messages };
+export type Props = {
+  title: string;
+  subtitle: string;
+  base: string;
+  locale: string;
+  labels: Messages;
+  /** `FOR_YOU_SIZES` from the server: importing `lib/images` here would split it into an
+      extra chunk on the product page's hydration path (+75 ms LCP measured). */
+  sizes: string;
+};
 
 /**
  * Personal picks on the home page (spec §11.2 "for you"): the private
@@ -24,15 +33,18 @@ export default function ForYouList(props: Props) {
   });
   return (
     <Show when={items().length > 0}>
-      <section aria-labelledby="for-you" class="container-shop mt-14 md:mt-20">
-        <h2 id="for-you" class="mb-5 text-2xl font-bold md:text-3xl">
-          {props.title}
-        </h2>
-        <ul class="flex snap-x gap-3 overflow-x-auto pb-2 md:gap-4">
+      <section aria-labelledby="for-you" class="container-shop mt-12 md:mt-20">
+        <div class="mb-5 md:mb-7">
+          <h2 id="for-you" class="text-2xl md:text-[2rem]">
+            {props.title}
+          </h2>
+          <p class="mt-1 text-[0.9375rem] text-muted-foreground">{props.subtitle}</p>
+        </div>
+        <ul class="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-4 md:gap-x-6 md:gap-y-10">
           <For each={items()}>
             {(p) => (
-              <li class="w-40 shrink-0 snap-start md:w-52">
-                <MiniCard product={p} base={props.base} labels={props.labels} />
+              <li>
+                <MiniCard product={p} base={props.base} labels={props.labels} sizes={props.sizes} />
               </li>
             )}
           </For>

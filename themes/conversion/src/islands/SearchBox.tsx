@@ -108,7 +108,7 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
   return (
     <search
       ref={root}
-      class="relative block w-full [--focus-ring:var(--color-identity)]"
+      class="relative block w-full"
       onFocusOut={(e) => {
         if (!root?.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}
@@ -133,11 +133,11 @@ export default function SearchBox(props: { q?: string; base: string; labels: Mes
           aria-controls="sb-list"
           aria-autocomplete="list"
           aria-activedescendant={expanded() && active() >= 0 ? optionId(active()) : undefined}
-          class="h-11 w-full rounded-full border border-transparent bg-card pr-12 pl-5 text-base text-foreground placeholder:text-subtle focus-visible:outline-card md:text-[0.9375rem]"
+          class="h-11 w-full rounded-full border border-input bg-muted pr-12 pl-5 text-base text-foreground placeholder:text-subtle hover:border-muted-foreground focus:bg-card"
         />
         <button
           type="submit"
-          class="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-full text-muted-foreground hover:text-foreground"
+          class="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-full text-foreground"
         >
           <Icon d={searchIcon} />
           <span class="sr-only">{l("search.label")}</span>

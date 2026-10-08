@@ -102,7 +102,7 @@ export default function CartDrawer(props: {
       onClose={() => dialog?.open || setOpen(false)}
       onClick={(e) => e.target === dialog && setOpen(false)}
       aria-labelledby="cart-title"
-      class="m-0 ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground shadow-sheet backdrop:bg-foreground/45 [--focus-ring:var(--color-identity)]"
+      class="m-0 ml-auto h-dvh max-h-none w-full max-w-md bg-card p-0 text-foreground shadow-sheet backdrop:bg-foreground/45"
     >
       <div class="flex h-full flex-col">
         <header class="flex h-16 items-center justify-between border-b border-border px-5">

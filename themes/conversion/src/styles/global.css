@@ -64,9 +64,10 @@
 
 /*
  * One web font: Figtree (SIL OFL 1.1, src/fonts/OFL-Figtree.txt), variable 400-700, subset to
- * Latin + Latin-1 + Latin Extended-A (every Czech and Slovak letter), 19 kB. Not preloaded: a
- * preload competes with the LCP image on slow connections (prototype: home LCP 1653 ms with,
- * 1578 ms without). The fallback faces are Arial matched to Figtree per weight (advance widths
+ * Latin + Latin-1 + Latin Extended-A (every Czech and Slovak letter), 19 kB. Preloaded in
+ * Base.astro: discovered through this stylesheet it sits one round trip deeper than the LCP
+ * image and, when it lands first, pushed the lab LCP of the product page over 1500 ms on 2 of
+ * 3 runs; preloaded, 15 of 15 runs stayed at 1350-1430 ms. The fallback faces are Arial matched to Figtree per weight (advance widths
  * of Czech text, vertical metrics), so the swap moves nothing (CLS 0.0003 measured).
  */
 @font-face {
@@ -329,6 +330,66 @@
   }
   &::backdrop {
     background: rgb(17 19 23 / 0.45);
+  }
+}
+
+/*
+ * Header search: on phones a top popover (opened by the search button, slides down); from 48rem
+ * the same element is shown in place as the inline field of the header bar.
+ */
+@utility search-sheet {
+  position: fixed;
+  inset: 0 0 auto 0;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 0;
+  overflow: visible;
+  color: inherit;
+  background: var(--color-card);
+  box-shadow: var(--shadow-lift);
+  transition:
+    translate 200ms ease-out,
+    display 200ms allow-discrete,
+    overlay 200ms allow-discrete;
+  translate: 0 -100%;
+  &:popover-open {
+    translate: 0 0;
+    @starting-style {
+      translate: 0 -100%;
+    }
+  }
+  @media (width >= 48rem) {
+    display: block;
+    position: static;
+    min-width: 0;
+    max-width: 28rem;
+    margin-left: auto;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    translate: none;
+    transition: none;
+  }
+  @media (width >= 80rem) {
+    margin-left: 0;
+    max-width: 20rem;
+  }
+}
+
+/* Horizontal snap rail (home best-sellers): native scrolling, no JS. */
+@utility rail {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  overscroll-behavior-x: contain;
+  & > * {
+    scroll-snap-align: start;
+    flex-shrink: 0;
   }
 }
 

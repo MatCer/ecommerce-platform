@@ -6,6 +6,7 @@ import "virtual:theme-tokens.css";
 import "../styles/global.css";
 import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
+import figtree from "../fonts/figtree-latin-ext.woff2?url";
 import Rum from "../islands/Rum";
 import { i18n } from "../lib/i18n";
 import { jsonLd } from "../lib/storefront";
@@ -62,6 +63,7 @@ const CONSENT_KEYS = [
     <meta property="og:url" content={seo.canonical} />
     {ogImage && <meta property="og:image" content={ogImage} />}
     {preload && <link {...preload} />}
+    <link rel="preload" href={figtree} as="font" type="font/woff2" crossorigin />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     {seo.json_ld.map((d) => <script type="application/ld+json" set:html={jsonLd(d)} />)}
   </head>

@@ -22,6 +22,8 @@ export const check = "M5 12.5l4.5 4.5L19 7.5";
 export const chevronDown = "M6 9l6 6 6-6";
 export const chevronLeft = "M15 6l-6 6 6 6";
 export const chevronRight = "M9 6l6 6-6 6";
+export const arrowRight = "M5 12h14M13 6l6 6-6 6";
+export const arrowUp = "M12 19V5M6 11l6-6 6 6";
 export const shield = "M12 3l7 3v5.5c0 4.3-3 8-7 9.5-4-1.5-7-5.2-7-9.5V6l7-3Z";
 export const globe =
   "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3 12h18M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9c-2.5-2.6-3.5-5.6-3.5-9s1-6.4 3.5-9Z";
