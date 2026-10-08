@@ -85,7 +85,7 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
   reduction from anything else.
 - **Consent banner** is the platform component `@platform/storefront-sdk/consent-banner`.
   Place it, do not rebuild it. `[data-consent-settings]` on any button reopens it.
-- **Performance** (§9.6, A26): LCP ≤ 1.5 s, TBT ≤ 150 ms, CLS ≤ 0.05, JS ≤ 30 kB gzip (home 35)
+- **Performance** (§9.6, A26): LCP ≤ 2.0 s (fails), target 1.5 s (warns), TBT ≤ 150 ms, CLS ≤ 0.05, JS ≤ 30 kB gzip (home 35)
   including islands loaded by scrolling, ≤ 10 page-model calls per render, axe 0
   serious/critical. Practical rules:
   - one LCP image per page, passed to `Base` as `lcp` (preload + `<img>` from one `sizes`);

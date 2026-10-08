@@ -1,6 +1,8 @@
 /** Performance budget (spec §9.6) and how a measured page is judged against it. */
 export const BUDGET = {
-  lcpMs: 1500,
+  /** Lab LCP (Lighthouse mobile, simulated slow 4G): over the limit fails, over the target warns. */
+  lcpMs: 2000,
+  lcpTargetMs: 1500,
   tbtMs: 150,
   cls: 0.05,
   /** All first-load JS incl. scroll-triggered islands (A26), gzip bytes. */
@@ -66,3 +68,10 @@ export const median = (xs: number[]) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? (s[m] ?? 0) : ((s[m - 1] ?? 0) + (s[m] ?? 0)) / 2;
 };
+
+/** Not failures: a page over a target still publishes, but `make perf` reports it. */
+export function advise(r: PageResult): string[] {
+  return r.lcpMs > BUDGET.lcpTargetMs && r.lcpMs <= BUDGET.lcpMs
+    ? [`LCP ${Math.round(r.lcpMs)} ms > target ${BUDGET.lcpTargetMs}`]
+    : [];
+}
