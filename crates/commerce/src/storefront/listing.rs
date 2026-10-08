@@ -244,6 +244,9 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
         .into_iter()
         .filter(|c| matches(c, &applied))
         .collect();
+    // The candidates arrive unordered: ties of every sort fall back to the id (the sorts below
+    // are stable), so paging never repeats or skips a product between requests.
+    hits.sort_by_key(|c| c.id);
     match q.sort {
         Sort::Recommended => {
             hits.sort_by(|a, b| {
@@ -780,6 +783,37 @@ mod tests {
                 .iter()
                 .any(|v| v.value == "wool" && v.selected)
         );
+    }
+
+    #[test]
+    fn ties_page_deterministically_whatever_the_input_order() {
+        let mut tied = catalog();
+        for c in &mut tied {
+            c.popularity = 7;
+            c.created_at = DateTime::from_timestamp(1_000, 0).unwrap_or_default();
+        }
+        let mut reversed = tied.clone();
+        reversed.reverse();
+        for sort in [Sort::Popular, Sort::Newest] {
+            let mut q = query(&[], sort);
+            q.per_page = 1;
+            let pages = |input: &Vec<Candidate>| {
+                (1..=3)
+                    .flat_map(|page| {
+                        ids(&select(
+                            input.clone(),
+                            &defs(),
+                            &ListingQuery { page, ..q.clone() },
+                        ))
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(pages(&tied), pages(&reversed));
+            let mut seen = pages(&tied);
+            seen.sort_unstable();
+            seen.dedup();
+            assert_eq!(seen.len(), 3);
+        }
     }
 
     #[test]
