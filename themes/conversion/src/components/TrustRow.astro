@@ -4,16 +4,15 @@ import { i18n } from "../lib/i18n";
 import Icon from "./Icon.astro";
 
 /**
- * Delivery, returns and payment facts as designed rows (family rule: trust sits in the buy
- * decision's field of view, not in small print). `list` beside the buy box, `band` on the home
- * page. A product's delivery estimate replaces the shop's generic delivery promise.
+ * Delivery, returns and payment facts inside the PDP buy panel (family rule: trust sits in the
+ * buy decision's field of view, not in small print). A product's delivery estimate replaces the
+ * shop's generic delivery promise.
  */
 interface Props {
   shop: ShopModel;
-  layout: "list" | "band";
   delivery?: DeliveryEstimate | null;
 }
-const { shop, layout, delivery } = Astro.props;
+const { shop, delivery } = Astro.props;
 const { t } = i18n(shop);
 const day = (d: string) =>
   new Date(`${d}T12:00:00Z`).toLocaleDateString(shop.locale, {
@@ -22,39 +21,29 @@ const day = (d: string) =>
     month: "numeric",
     timeZone: "UTC",
   });
+const threshold = shop.free_shipping_threshold;
 const rows = [
   {
     icon: "truck",
-    text: delivery
+    // The product's dates (else the shop's promise) lead; the free-delivery threshold follows.
+    lead: delivery
       ? t("product.delivery", { from: day(delivery.from), to: day(delivery.to) })
       : shop.trust.delivery,
+    text: threshold ? t("trust.free_shipping_from", { amount: threshold.formatted }) : null,
   },
-  { icon: "returns", text: shop.trust.returns },
+  { icon: "returns", lead: null, text: shop.trust.returns },
   // Only the methods checkout offers; no row when none is set up yet.
   ...(shop.trust.payments.length > 0
-    ? [{ icon: "card", text: shop.trust.payments.join(" · ") } as const]
+    ? [{ icon: "card", lead: null, text: shop.trust.payments.join(" · ") } as const]
     : []),
 ] as const;
 ---
 
-{
-  layout === "list" ? (
-    <ul class="grid gap-3 text-sm">
-      {rows.map((r) => (
-        <li class="flex items-center gap-3">
-          <span class="grid size-9 shrink-0 place-items-center rounded-full bg-identity-wash text-identity-ink"><Icon name={r.icon} class="size-5" /></span>
-          {r.text}
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <ul class={`grid gap-px overflow-hidden rounded-xl border border-border bg-border ${rows.length === 3 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
-      {rows.map((r) => (
-        <li class="flex items-center gap-4 bg-card px-5 py-5 md:px-6 md:py-6">
-          <span class="grid size-11 shrink-0 place-items-center rounded-full bg-identity-wash text-identity-ink"><Icon name={r.icon} class="size-6" /></span>
-          <span class="font-semibold">{r.text}</span>
-        </li>
-      ))}
-    </ul>
-  )
-}
+<ul class="grid gap-2 text-[15px]">
+  {rows.map((r) => (
+    <li class="flex items-start gap-3">
+      <Icon name={r.icon} class="mt-0.5 size-5 shrink-0 text-identity-ink" />
+      <span>{r.lead && <strong class="font-semibold">{r.lead}</strong>}{r.lead && r.text && " · "}{r.text}</span>
+    </li>
+  ))}
+</ul>

@@ -59,39 +59,41 @@ const BUY_KEYS = [
 <Base shop={shop} seo={page.seo} template="product" productId={p.id} bottomBar lcp={firstImage && { image: firstImage, sizes: GALLERY_SIZES }}>
   <div class="container-shop pb-16">
     <Breadcrumbs items={page.breadcrumbs} label={t("nav.breadcrumbs")} />
-    <div class="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10 lg:gap-12">
+    <div class="grid gap-6 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-10 lg:gap-14">
       <Gallery client:idle images={p.images} labels={pick(["product.gallery", "product.image", "product.prev_image", "product.next_image"])} />
       <!-- Not sticky while the watch form is open: the column would outgrow the viewport. -->
-      <div class="flex flex-col gap-5 md:sticky md:top-40 md:self-start md:has-[#watch[open]]:static">
+      <div class="flex flex-col gap-4 md:sticky md:top-24 md:self-start md:has-[#watch[open]]:static">
         <div>
-          {p.brand && <p class="mb-2 text-sm font-semibold text-identity-ink">{p.brand}</p>}
-          <h1 class="text-3xl leading-tight md:text-4xl">{p.name}</h1>
+          {p.brand && <p class="mb-2 text-sm font-semibold text-muted-foreground">{p.brand}</p>}
+          <h1 class="text-3xl md:text-[2.5rem]">{p.name}</h1>
           {
             rating && (
-              <a href="#reviews" class="mt-2 inline-flex min-h-6 items-center gap-2 text-sm text-identity-ink underline-offset-2 hover:underline">
+              <a href="#reviews" class="mt-3 inline-flex min-h-6 items-center gap-2 text-[15px] underline-offset-4 hover:underline">
                 <Stars rating={rating.average} label={t("reviews.average", { average: rating.average.toLocaleString(shop.locale) })} />
-                <span>{tn("reviews.count", rating.count)}</span>
+                <span class="font-semibold" aria-hidden="true">{rating.average.toLocaleString(shop.locale, { maximumFractionDigits: 1 })}</span>
+                <span class="text-muted-foreground">· {tn("reviews.count", rating.count)}</span>
               </a>
             )
           }
-          {p.short_description && <p class="mt-3 font-semibold text-pretty">{p.short_description}</p>}
+          {p.short_description && <p class="mt-3 text-[17px] text-pretty text-muted-foreground">{p.short_description}</p>}
         </div>
-        <div class="overflow-hidden rounded-lg bg-muted">
-          <div class="grid gap-5 p-5 md:p-6">
-            <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} selected={Astro.url.searchParams.get("variant")} />
-            <WatchForm shop={shop} product={p} selected={Astro.url.searchParams.get("variant")} />
-            <TrustRow shop={shop} layout="list" delivery={page.delivery_estimate} />
-          </div>
-          <p class="flex items-center gap-4 bg-guarantee-wash px-5 py-4 md:px-6">
-            <span class="grid size-12 shrink-0 place-items-center rounded-full bg-rating text-foreground"><Icon name="returns" class="size-6" /></span>
-            <span class="font-bold">{shop.trust.returns}</span>
-          </p>
+        <!-- Buy panel: delivery, returns and payments stay next to the button (SHOP-84). -->
+        <div class="grid gap-4 rounded-xl bg-muted p-5 md:p-6">
+          <BuyBox client:idle options={p.options} variants={p.variants} labels={pick(BUY_KEYS)} selected={Astro.url.searchParams.get("variant")} />
+          <TrustRow shop={shop} delivery={page.delivery_estimate} />
         </div>
+        <WatchForm shop={shop} product={p} selected={Astro.url.searchParams.get("variant")} />
+        <p class="flex items-center gap-4 rounded-xl bg-guarantee-wash px-5 py-4">
+          <span class="grid size-11 shrink-0 place-items-center rounded-full bg-card text-identity-ink"><Icon name="shield" class="size-6" /></span>
+          <span class="font-semibold">{shop.trust.returns}</span>
+        </p>
       </div>
     </div>
 
-    <nav aria-label={t("product.sections")} class="mt-12 border-y border-border md:mt-16">
-      <ul class="flex gap-6 overflow-x-auto text-sm font-semibold [scrollbar-width:none]">
+    <!-- Sticky on phones right under the header (56px bar + 44px category row + 2 hairlines,
+         sharing its bottom one), so nothing in it is ever covered. -->
+    <nav aria-label={t("product.sections")} class="sticky top-[101px] z-20 -mx-4 mt-12 border-y border-border bg-card/95 px-4 backdrop-blur-sm md:static md:mx-0 md:mt-16 md:px-0">
+      <ul class="flex gap-7 overflow-x-auto text-[15px] font-semibold [scrollbar-width:none]">
         <li><a href="#pd-description" class="flex min-h-12 items-center border-b-2 border-transparent hover:border-foreground">{t("product.description")}</a></li>
         {p.parameters.length > 0 && <li><a href="#pd-parameters" class="flex min-h-12 items-center border-b-2 border-transparent hover:border-foreground">{t("product.parameters")}</a></li>}
         {rating && <li><a href="#reviews" class="flex min-h-12 items-center border-b-2 border-transparent hover:border-foreground">{t("reviews.title")} <span class="ml-1 text-muted-foreground">{rating.count}</span></a></li>}

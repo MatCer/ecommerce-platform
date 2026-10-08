@@ -21,15 +21,15 @@ const party = (x: NonNullable<NonNullable<typeof g>["manufacturer"]>) =>
 
 <div class="mt-8 grid gap-10 md:mt-10 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-14">
   <section aria-labelledby="pd-description">
-    <h2 id="pd-description" class="mb-4 scroll-mt-48 text-2xl font-bold">{t("product.description")}</h2>
+    <h2 id="pd-description" class="mb-4 scroll-mt-48 text-2xl font-bold md:text-[2rem]">{t("product.description")}</h2>
     <!-- description_html is sanitized by the platform (contract: the only unescaped HTML). -->
-    <div class="grid max-w-prose gap-4 leading-relaxed [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5" set:html={p.description_html} />
+    <div class="grid max-w-prose gap-4 text-[17px] leading-relaxed text-pretty [&_li]:mt-1 [&_ul]:list-disc [&_ul]:pl-5" set:html={p.description_html} />
   </section>
   <div class="grid content-start gap-10">
     {
       p.parameters.length > 0 && (
         <section aria-labelledby="pd-parameters">
-          <h2 id="pd-parameters" class="mb-4 scroll-mt-48 text-2xl font-bold">{t("product.parameters")}</h2>
+          <h2 id="pd-parameters" class="mb-4 scroll-mt-48 text-2xl font-bold md:text-[2rem]">{t("product.parameters")}</h2>
           <table class="w-full text-sm">
             <tbody class="divide-y divide-border border-y border-border">
               {p.parameters.map((x) => (

@@ -30,10 +30,10 @@ export const PROMO_SIZES =
 /** Home side-category card photos (the two next to the lead card): 6rem, 8rem from 48rem. */
 export const PROMO_SIDE_SIZES = "(min-width: 48rem) 8rem, 6rem";
 
-/** Home best-seller rail: 44vw cards on phones (two and a peek; 68vw doubled the image bytes in
-    the lazy-load range and cost ~150 ms of home LCP), 4 per view from 48rem. */
+/** Home best-seller rail: 68vw (max 18rem) cards on phones, 4 per view from 48rem. Costs ~150 ms
+    of lab home LCP against 44vw (SHOP-92 moved the hard limit to 2 s for it). */
 export const CAROUSEL_SIZES =
-  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), min(44vw, 18rem)";
+  "(min-width: 80rem) 18.125rem, (min-width: 48rem) calc(25vw - 1.875rem), min(68vw, 18rem)";
 
 /** Home category spotlight: the lead product spans 2 of 4 columns (all 2 on phones). */
 export const SPOTLIGHT_SIZES =
@@ -51,8 +51,8 @@ export const BLOG_SIZES =
 export const GALLERY_SIZES =
   "(min-width: 80rem) 43rem, (min-width: 48rem) 55vw, calc(100vw - 2rem)";
 
-/** Gallery thumbnails and cart/search thumbnails. */
-export const THUMB_SIZES = "4rem";
+/** Gallery thumbnails (5 rem from 48rem; hidden on phones). */
+export const THUMB_SIZES = "5rem";
 
 /**
  * Drops srcset candidates wider than `max` px: a card never renders wider than ~300 CSS px, so

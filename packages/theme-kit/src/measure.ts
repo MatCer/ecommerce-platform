@@ -20,7 +20,7 @@ import lighthouse from "lighthouse";
 import { type BrowserContext, chromium } from "playwright";
 import { scanAxe } from "./axe.ts";
 import { addCookie, chromiumArgs, freshSubrequests, parseCookie } from "./browser.ts";
-import { BUDGET, judge, median, type PageResult } from "./budget.ts";
+import { advise, BUDGET, judge, median, type PageResult } from "./budget.ts";
 
 const { values } = parseArgs({
   options: {
@@ -215,7 +215,7 @@ for (const p of pages) {
 
 let failed = false;
 console.log(
-  `\nBudget (§9.6): LCP ≤ ${BUDGET.lcpMs} ms, TBT ≤ ${BUDGET.tbtMs} ms, CLS ≤ ${BUDGET.cls}, JS ≤ 30 kB gz (home 35)\n`,
+  `\nBudget (§9.6): LCP ≤ ${BUDGET.lcpMs} ms (target ${BUDGET.lcpTargetMs}), TBT ≤ ${BUDGET.tbtMs} ms, CLS ≤ ${BUDGET.cls}, JS ≤ 30 kB gz (home 35)\n`,
 );
 console.log(
   "page".padEnd(22),
@@ -230,6 +230,7 @@ console.log(
 );
 for (const r of results) {
   const fails = judge(r);
+  const warns = advise(r);
   failed ||= fails.length > 0;
   console.log(
     r.path.padEnd(22),
@@ -240,7 +241,11 @@ for (const r of results) {
     (r.jsGzipWithRum / 1024).toFixed(1).padStart(8),
     (r.jsTransfer / 1024).toFixed(1).padStart(8),
     String(r.subrequests).padStart(6),
-    fails.length ? ` FAIL: ${fails.join("; ")}` : " ok",
+    fails.length
+      ? ` FAIL: ${fails.join("; ")}`
+      : warns.length
+        ? ` ok, WARN: ${warns.join("; ")}`
+        : " ok",
   );
 }
 await mkdir(path.dirname(values.out), { recursive: true });

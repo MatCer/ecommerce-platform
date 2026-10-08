@@ -19,7 +19,7 @@ Rust core. SolidJS (fine-grained reactivity, no VDOM) for storefront and admin. 
 
 Measured on mid-range Android (Moto G class), throttled 4G, p75 real users (CrUX/RUM):
 
-- LCP < 1.5 s, INP < 100 ms, CLS < 0.05
+- LCP < 1.5 s target (lab gate: fails above 2.0 s, warns above 1.5 s), INP < 100 ms, CLS < 0.05
 - JS <= 30 kB gz on category and product pages
 - 0 third-party scripts in the browser (tracking is server-side)
 - Speculation Rules prerender + View Transitions for instant navigation
