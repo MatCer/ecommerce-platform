@@ -90,8 +90,8 @@ logs: ## Follow logs (`make logs s=api` for one service)
 ps: ## Show stack status
 	$(COMPOSE_FULL) ps
 
-theme-build: ## Build + pack the default theme (themes/conversion; THEME_DIR=themes/default for the alternative) and checkout (A22), upload + publish them (+ the default theme source, WP23) for every tenant (A30)
-	THEME_DIR=$(or $(THEME_DIR),themes/conversion) scripts/build-artifacts.sh
+theme-build: ## Build + pack the default theme (themes/conversion) and checkout (A22), upload + publish them (+ the default theme source, WP23) for every tenant (A30)
+	scripts/build-artifacts.sh
 	node packages/theme-kit/src/cli.ts verify --root .artifacts \
 		"$$(cat .artifacts/channels/default-theme)" "$$(cat .artifacts/channels/checkout)"
 	$(COMPOSE_FULL) run --rm --no-deps -v "$(CURDIR)/.artifacts:/artifacts:ro" api \

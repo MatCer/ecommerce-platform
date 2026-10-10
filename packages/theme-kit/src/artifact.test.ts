@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { packArtifact, readManifest, verifyArtifact } from "./artifact.ts";
 
-const PROJECT = fileURLToPath(new URL("../../../themes/default", import.meta.url));
+const PROJECT = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 
 async function dist(files: Record<string, string>) {
   const d = await mkdtemp(path.join(tmpdir(), "wp2-pack-"));

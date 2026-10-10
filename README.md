@@ -22,7 +22,6 @@ apps/edge         storefront edge: Node + Miniflare gateway (tenancy, cache, hea
 apps/theme-builder disposable theme build/check pipeline and Docker policy proxy
 apps/checkout     platform checkout app (Astro + Solid) served on checkout.<shop>
 themes/conversion default Astro + Solid theme, "high click-conversion" (the template merchants fork)
-themes/default    previous default theme ("market stall"), kept as an alternative (THEME_DIR=themes/default)
 docker/           Dockerfiles, Caddyfile, Postgres init script
 ```
 

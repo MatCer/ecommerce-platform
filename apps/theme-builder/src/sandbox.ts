@@ -21,7 +21,7 @@ import path from "node:path";
 import { lintTheme, type Violation } from "@platform/theme-kit/lint";
 
 const REPO = path.resolve(import.meta.dirname, "../../..");
-const PLATFORM_THEME = path.join(REPO, "themes/default");
+const PLATFORM_THEME = path.join(REPO, "themes/conversion");
 const KIT = path.join(REPO, "packages/theme-kit/src");
 const THEME = "/work/theme";
 const MAX_BYTES = 50 * 1024 * 1024;

@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
-    "@platform/theme-default": "workspace:*",
+    "@platform/theme-conversion": "workspace:*",
     "@platform/theme-kit": "workspace:*",
     "@playwright/test": "catalog:"
   },

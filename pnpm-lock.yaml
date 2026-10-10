@@ -262,9 +262,9 @@ importers:
       '@hono/node-server':
         specifier: 'catalog:'
         version: 2.1.1(hono@4.13.8)
-      '@platform/theme-default':
+      '@platform/theme-conversion':
         specifier: workspace:*
-        version: link:../../themes/default
+        version: link:../../themes/conversion
       '@platform/theme-kit':
         specifier: workspace:*
         version: link:../../packages/theme-kit
@@ -354,46 +354,6 @@ importers:
         version: 5.9.3
 
   themes/conversion:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.3(@types/node@24.13.6)(astro@7.3.5(@types/node@24.13.6)(jiti@2.7.0)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(wrangler@4.137.0(@types/node@24.13.6))(yaml@2.9.1)
-      '@astrojs/solid-js':
-        specifier: 'catalog:'
-        version: 7.0.2(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(solid-js@1.9.15)(yaml@2.9.1)
-      '@platform/storefront-sdk':
-        specifier: workspace:*
-        version: link:../../packages/storefront-sdk
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.5(@types/node@24.13.6)(jiti@2.7.0)(yaml@2.9.1)
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.15
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@astrojs/check':
-        specifier: 'catalog:'
-        version: 0.9.10(@emnapi/runtime@1.11.3)(prettier@3.9.9)(typescript@5.9.3)
-      '@platform/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@platform/theme-kit':
-        specifier: workspace:*
-        version: link:../../packages/theme-kit
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.137.0(@types/node@24.13.6)
-
-  themes/default:
     dependencies:
       '@astrojs/cloudflare':
         specifier: 'catalog:'
@@ -2686,8 +2646,8 @@ packages:
     resolution: {integrity: sha512-hHaB8C/rfzDDtr/t8YZwxAuPJTT0zHyaPoVzcXwDYhYNAgH/4sIfVhi/XLLIY+bL/FqaIJnjATDbi8ObSELmxg==}
     engines: {node: '>=22.0.0'}
 
-  legacy-javascript@0.0.1:
-    resolution: {integrity: sha512-lPyntS4/aS7jpuvOlitZDFifBCb4W8L/3QU0PLbUTUj+zYah8rfVjYic88yG7ZKTxhS5h9iz7duT8oUXKszLhg==}
+  legacy-javascript@0.0.3:
+    resolution: {integrity: sha512-1r6MT4dVaJyXt4G07Cm2cQ0AUaLJdefiEp4SmIAylA++gnEQ82YvmzE58RkM5EP0fk5hROLCslUPGnwIYdZQVA==}
 
   lighthouse-logger@2.0.2:
     resolution: {integrity: sha512-vWl2+u5jgOQuZR55Z1WM0XDdrJT6mzMP8zHUct7xTlWhuQs+eV0g+QL0RQdFjT54zVmbhLCP8vIVpy1wGn/gCg==}
@@ -4846,7 +4806,7 @@ snapshots:
 
   '@paulirish/trace_engine@0.0.65':
     dependencies:
-      legacy-javascript: 0.0.1
+      legacy-javascript: 0.0.3
       third-party-web: 0.30.0
 
   '@playwright/test@1.63.0':
@@ -5978,7 +5938,7 @@ snapshots:
 
   kysely@0.29.6: {}
 
-  legacy-javascript@0.0.1: {}
+  legacy-javascript@0.0.3: {}
 
   lighthouse-logger@2.0.2:
     dependencies:

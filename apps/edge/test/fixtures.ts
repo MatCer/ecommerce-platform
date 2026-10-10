@@ -6,7 +6,7 @@ import { type ArtifactKind, packArtifact } from "@platform/theme-kit";
 import type { Site } from "../src/sites.ts";
 
 // Resolves the pinned Astro/Solid for CSP hashes, exactly like a real theme build.
-const THEME_PROJECT = fileURLToPath(new URL("../../../themes/default", import.meta.url));
+const THEME_PROJECT = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 
 /**
  * A hostile "theme" used to prove the trust boundary (spec A7): besides rendering pages it

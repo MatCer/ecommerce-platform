@@ -22,7 +22,7 @@ import { LABEL_KEY } from "../src/policy.ts";
 import { createProxy } from "../src/proxy.ts";
 import { createQueue, createServer } from "../src/server.ts";
 
-const THEME = fileURLToPath(new URL("../../../themes/default", import.meta.url));
+const THEME = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 const TOKEN = "builder-token-0123456789abcdef0123456789";
 
 test("demux splits docker's multiplexed log stream", () => {

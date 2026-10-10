@@ -2,7 +2,7 @@
 
 Status: accepted for M1 (WP6/WP8 build on it; WP23 revisits the builder side).
 Spec: §3, §9, §9.6, §12.3, amendments A1, A2, A4, A6, A7, A22, A26, A30.
-Code: `apps/edge`, `packages/theme-kit`, `packages/storefront-sdk`, `themes/default`,
+Code: `apps/edge`, `packages/theme-kit`, `packages/storefront-sdk`, `themes/conversion`,
 `apps/checkout`, stub API in `apps/mocks/src/storefront`.
 
 ## 1. Version matrix (pinned in the pnpm catalog)
