@@ -15,8 +15,7 @@ numbers; stock is shown as it is, reductions only with an Omnibus reference pric
 
 Sections of the design without platform data are left out: shop-wide testimonials, review
 platform badges (Google, Trustpilot), brand logos, Instagram, quantity tiers, add-on and
-warranty upsells, product feature blocks. The previous default ("market stall") is still in
-`themes/default`.
+warranty upsells, product feature blocks.
 
 ## Structure
 

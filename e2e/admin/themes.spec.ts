@@ -97,7 +97,7 @@ function tarGz(entries: Entry[]): Buffer {
 
 /** The default theme's own files (what a fork starts from). */
 function defaultTheme(): Map<string, Buffer> {
-  const dir = join(root, "themes/default");
+  const dir = join(root, "themes/conversion");
   const files = new Map<string, Buffer>();
   const walk = (rel: string) => {
     for (const name of readdirSync(join(dir, rel))) {
@@ -298,7 +298,7 @@ test("publishing changes the storefront; rolling back restores it", async () => 
 });
 
 test("hostile archives are refused at upload with every reason", async () => {
-  const tokensFile = readFileSync(join(root, "themes/default/theme.tokens.json"));
+  const tokensFile = readFileSync(join(root, "themes/conversion/theme.tokens.json"));
   const count = latest();
   await upload(
     "evil.tar.gz",
@@ -338,7 +338,7 @@ test("functional checks cannot reach Mailpit by spoofing Caddy's Host header", a
     test("preview flows work while internal hosts remain blocked", async ({ page }) => {
       await page.goto("/");
       await expect(page.locator("main")).toBeVisible();
-      for (const route of ["/_p/cart", "/_p/consent", "/_p/recommendations", "/fonts/OFL-Archivo.txt"]) {
+      for (const route of ["/_p/cart", "/_p/consent", "/_p/recommendations", "/favicon.svg"]) {
         const status = await page.evaluate(async (path) => (await fetch(path)).status, route);
         expect(status, route).toBe(200);
       }

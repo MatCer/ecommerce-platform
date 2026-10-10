@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Builds the default theme ($THEME_DIR, default themes/conversion; themes/default stays a
-# selectable alternative) and the checkout app and packs them as content-addressed artifacts
+# Builds the default theme (themes/conversion) and the checkout app and packs them as content-addressed artifacts
 # (spec A22) into $ARTIFACT_ROOT (default .artifacts), updating the `default-theme` and
 # `checkout` channel pointers. Re-running with unchanged sources is a no-op (same ids): the
 # Astro key is fixed (DEFAULT_THEME_ASTRO_KEY), so builds are reproducible.
@@ -9,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root="${ARTIFACT_ROOT:-.artifacts}"
-theme="${THEME_DIR:-themes/conversion}"
+theme=themes/conversion
 mkdir -p "$root/sources"
 # Astro encrypts server-island props with this key and embeds it in the bundle; a fixed key
 # makes the shared default artifact reproducible. Tenant builds get their own key (WP23).

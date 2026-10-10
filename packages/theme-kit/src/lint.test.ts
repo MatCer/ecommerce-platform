@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 import { lintTheme } from "./lint.ts";
 
-const DEFAULT_THEME = fileURLToPath(new URL("../../../themes/default", import.meta.url));
+const DEFAULT_THEME = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 const CONVERSION_THEME = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 
 async function copyTheme() {

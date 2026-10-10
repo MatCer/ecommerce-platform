@@ -4,7 +4,7 @@
 #   theme-sandbox-proxy        node apps/theme-builder/src/proxy.ts    (holds the Docker socket)
 #   sandbox steps (disposable) node apps/theme-builder/src/sandbox.ts <step>
 #                              run --read-only --network none|internal, non-root, tmpfs /work
-# The locked theme dependencies (themes/default/node_modules) and Playwright's Chromium live
+# The locked theme dependencies (themes/conversion/node_modules) and Playwright's Chromium live
 # in the image, so the read-only root filesystem is the read-only node_modules of A6.
 # Debian, not Alpine: Chromium and workerd need glibc. Build context: repository root.
 FROM node:24.21.0-bookworm-slim
@@ -15,7 +15,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/config/package.json packages/config/
 COPY packages/theme-kit/package.json packages/theme-kit/
 COPY packages/storefront-sdk/package.json packages/storefront-sdk/
-COPY themes/default/package.json themes/default/
+COPY themes/conversion/package.json themes/conversion/
 COPY apps/theme-builder/package.json apps/theme-builder/
 RUN pnpm install --frozen-lockfile --filter "@platform/theme-builder..." \
     && pnpm --filter @platform/theme-builder exec playwright install --with-deps chromium \
@@ -23,7 +23,7 @@ RUN pnpm install --frozen-lockfile --filter "@platform/theme-builder..." \
 COPY packages/config packages/config
 COPY packages/theme-kit packages/theme-kit
 COPY packages/storefront-sdk packages/storefront-sdk
-COPY themes/default themes/default
+COPY themes/conversion themes/conversion
 COPY apps/theme-builder apps/theme-builder
 # /work: the job volume's mount point in the builder (the volume inherits this owner).
 RUN mkdir -p /work && chown node:node /work
