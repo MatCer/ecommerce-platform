@@ -17,6 +17,14 @@ db_name() {
   echo "app_wt_${slug%_}_$(printf %s "$1" | cksum | cut -d' ' -f1)"
 }
 
+worktree_db() {
+  local db
+  db=$(env_value APP_DB "$1/.env.worktree.local")
+  db=${db:-$(db_name "$1")}
+  [[ $db =~ ^app_wt_[a-z0-9_]+$ ]] || die "unexpected database name '$db' for $1"
+  echo "$db"
+}
+
 psql_owner() {
   local pw port
   pw=$(env_value APP_OWNER_PASSWORD "$MAIN_ENV")
@@ -47,7 +55,7 @@ setup() {
   [[ -e .env ]] || ln -s "$MAIN_ENV" .env
 
   local db port
-  db=$(db_name "$ROOT")
+  db=$(worktree_db "$ROOT")
   if [[ -z $(psql_owner -c "SELECT 1 FROM pg_database WHERE datname = '$db'") ]]; then
     psql_owner <<SQL
 CREATE DATABASE "$db" OWNER app_owner;
@@ -72,7 +80,7 @@ SQL
 
 teardown() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; it has no worktree database"
-  drop "$(db_name "$ROOT")"
+  drop "$(worktree_db "$ROOT")"
   rm -f .env.worktree.local
 }
 
@@ -85,7 +93,7 @@ SQL
 
 prune() {
   local keep=" " dir db
-  while read -r dir; do keep+="$(db_name "$dir") "; done < <(worktrees)
+  while read -r dir; do keep+="$(worktree_db "$dir") "; done < <(worktrees)
   this_clone_databases | while read -r db; do
     [[ $keep == *" $db "* ]] && continue
     echo "worktree: drop $db"
