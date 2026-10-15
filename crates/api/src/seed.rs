@@ -67,6 +67,36 @@ fn legacy_review_copy(locale: &str, shop_name: &str, blocks: &[commerce::content
     blocks == expected
 }
 
+/// Gives the `barva` values of an already seeded product their swatches when it has none, so a
+/// demo database seeded before swatches existed gets them on the next run. True when it wrote.
+async fn complete_swatches(
+    tx: &mut TenantTx,
+    sku_prefix: &str,
+    values: &[OptionValue],
+) -> anyhow::Result<bool> {
+    let completed = sqlx::query_scalar!(
+        r#"UPDATE product_options SET "values" = $2
+           WHERE code = 'barva'
+             AND product_id = (SELECT product_id FROM variants WHERE sku LIKE $1 LIMIT 1)
+             AND NOT jsonb_path_exists("values", '$[*].swatch')
+           RETURNING product_id"#,
+        format!("{sku_prefix}-%"),
+        serde_json::to_value(values)?
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(product_id) = completed else {
+        return Ok(false);
+    };
+    platform::queue::publish(
+        &mut **tx,
+        "product.updated",
+        &json!({ "product_id": product_id }),
+    )
+    .await?;
+    Ok(true)
+}
+
 /// A color variant of a fixture photo: the image is the fixture with its hue rotated.
 struct Color {
     code: &'static str,
@@ -74,6 +104,8 @@ struct Color {
     sk: &'static str,
     photo: &'static str,
     hue: i32,
+    /// Card and picker swatch, `#rrggbb`.
+    hex: &'static str,
 }
 
 const fn c(
@@ -82,6 +114,7 @@ const fn c(
     sk: &'static str,
     photo: &'static str,
     hue: i32,
+    hex: &'static str,
 ) -> Color {
     Color {
         code,
@@ -89,36 +122,94 @@ const fn c(
         sk,
         photo,
         hue,
+        hex,
     }
 }
 
 const TEE: &[Color] = &[
-    c("zelena", "Lesní zelená", "Lesná zelená", "tee-forest", 0),
-    c("inkoustova", "Inkoustová", "Atramentová", "tee-ink", 0),
-    c("piskova", "Písková", "Piesková", "tee-sand", 0),
-    c("vinova", "Vínová", "Vínová", "tee-forest", 200),
+    c(
+        "zelena",
+        "Lesní zelená",
+        "Lesná zelená",
+        "tee-forest",
+        0,
+        "#2f4f3c",
+    ),
+    c(
+        "inkoustova",
+        "Inkoustová",
+        "Atramentová",
+        "tee-ink",
+        0,
+        "#1f2540",
+    ),
+    c("piskova", "Písková", "Piesková", "tee-sand", 0, "#d9b98a"),
+    c("vinova", "Vínová", "Vínová", "tee-forest", 200, "#6b2737"),
     c(
         "petrolejova",
         "Petrolejová",
         "Petrolejová",
         "tee-forest",
         60,
+        "#2f4f57",
     ),
 ];
 const HOODIE: &[Color] = &[
-    c("popelava", "Popelavá", "Popolavá", "hoodie-ash", 0),
-    c("cihlova", "Cihlová", "Tehlová", "hoodie-clay", 0),
-    c("tyrkysova", "Tyrkysová", "Tyrkysová", "hoodie-clay", 170),
+    c(
+        "popelava",
+        "Popelavá",
+        "Popolavá",
+        "hoodie-ash",
+        0,
+        "#8d9094",
+    ),
+    c("cihlova", "Cihlová", "Tehlová", "hoodie-clay", 0, "#b85c38"),
+    c(
+        "tyrkysova",
+        "Tyrkysová",
+        "Tyrkysová",
+        "hoodie-clay",
+        170,
+        "#2a9cae",
+    ),
 ];
 const CAP: &[Color] = &[
-    c("olivova", "Olivová", "Olivová", "cap-olive", 0),
-    c("horcicova", "Hořčicová", "Horčicová", "cap-olive", -40),
-    c("modra", "Modrá", "Modrá", "cap-olive", 150),
+    c("olivova", "Olivová", "Olivová", "cap-olive", 0, "#6b6b3a"),
+    c(
+        "horcicova",
+        "Hořčicová",
+        "Horčicová",
+        "cap-olive",
+        -40,
+        "#c9a227",
+    ),
+    c("modra", "Modrá", "Modrá", "cap-olive", 150, "#2f5d8a"),
 ];
 const BAG: &[Color] = &[
-    c("prirodni", "Přírodní", "Prírodná", "bag-natural", 0),
-    c("salvejova", "Šalvějová", "Šalviová", "bag-natural", 80),
-    c("ruzova", "Pudrová", "Púdrová", "bag-natural", -60),
+    c(
+        "prirodni",
+        "Přírodní",
+        "Prírodná",
+        "bag-natural",
+        0,
+        "#e4d5b8",
+    ),
+    c(
+        "salvejova",
+        "Šalvějová",
+        "Šalviová",
+        "bag-natural",
+        80,
+        "#9caf88",
+    ),
+    c(
+        "ruzova",
+        "Pudrová",
+        "Púdrová",
+        "bag-natural",
+        -60,
+        "#e8c4c4",
+    ),
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -746,6 +837,20 @@ impl Seeder<'_> {
         eur_list: Uuid,
     ) -> anyhow::Result<bool> {
         let sku_prefix = format!("LN-{:03}", i + 1);
+        let palette = kind.colors();
+        // 2-3 colors per product, rotating through the palette.
+        let n_colors = 2 + i % 2;
+        let colors: Vec<&Color> = (0..n_colors.min(palette.len()))
+            .map(|k| &palette[(i + k) % palette.len()])
+            .collect();
+        let color_values: Vec<OptionValue> = colors
+            .iter()
+            .map(|c| OptionValue {
+                code: c.code.into(),
+                name_i18n: i18n(c.cs, c.sk),
+                swatch: Some(c.hex.into()),
+            })
+            .collect();
         let mut tx = self.tx(tenant_id).await?;
         let exists = sqlx::query_scalar!(
             "SELECT count(*) AS \"n!\" FROM variants WHERE sku LIKE $1",
@@ -754,28 +859,16 @@ impl Seeder<'_> {
         .fetch_one(&mut *tx)
         .await?;
         if exists > 0 {
+            complete_swatches(&mut tx, &sku_prefix, &color_values).await?;
             tx.commit().await?;
             return Ok(false);
         }
-        let palette = kind.colors();
-        // 2-3 colors per product, rotating through the palette.
-        let n_colors = 2 + i % 2;
-        let colors: Vec<&Color> = (0..n_colors.min(palette.len()))
-            .map(|k| &palette[(i + k) % palette.len()])
-            .collect();
         let sizes: &[&str] = if kind.apparel() { SIZES } else { &[] };
 
         let mut options = vec![ProductOption {
             code: "barva".into(),
             name_i18n: i18n("Barva", "Farba"),
-            values: colors
-                .iter()
-                .map(|c| OptionValue {
-                    code: c.code.into(),
-                    name_i18n: i18n(c.cs, c.sk),
-                    swatch: None,
-                })
-                .collect(),
+            values: color_values,
         }];
         if !sizes.is_empty() {
             options.push(ProductOption {
@@ -1713,6 +1806,43 @@ mod tests {
             .shipping;
         assert_eq!(shipping.carrier, commerce::shipping::Carrier::PacketaHome);
         assert_eq!(shipping.name, "Zásilkovna – na adresu");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_rerun_gives_seeded_colours_their_swatches_once(db: sqlx::PgPool) {
+        let runtime = testkit::runtime_pool(&db, 2).await;
+        let shop = testkit::storefront::shop(&runtime, "swatch-seed").await;
+        let mut input = testkit::catalog::product_input("LN-001", 2);
+        input.options[0].code = "barva".into();
+        for v in &mut input.variants {
+            let value = v.option_values.remove("size").unwrap();
+            v.option_values.insert("barva".into(), value);
+        }
+        let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+        let values: Vec<OptionValue> = input.options[0]
+            .values
+            .iter()
+            .zip(["#8d9094", "#b85c38"])
+            .map(|(v, hex)| OptionValue {
+                swatch: Some(hex.into()),
+                ..v.clone()
+            })
+            .collect();
+
+        let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+        assert!(complete_swatches(&mut tx, "LN-001", &values).await.unwrap());
+        assert!(!complete_swatches(&mut tx, "LN-001", &values).await.unwrap());
+        let stored = commerce::catalog::products::get(&mut tx, product.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            stored.options[0]
+                .values
+                .iter()
+                .map(|v| v.swatch.as_deref())
+                .collect::<Vec<_>>(),
+            [Some("#8d9094"), Some("#b85c38")]
+        );
     }
 
     #[test]
