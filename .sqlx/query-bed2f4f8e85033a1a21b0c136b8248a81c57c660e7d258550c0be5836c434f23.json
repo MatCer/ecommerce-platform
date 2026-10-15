@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH fresh AS (\n               SELECT product_id, market_id, sales_score AS s FROM product_scores\n               WHERE sales_score > 0\n           ), merged AS (\n               SELECT coalesce(f.product_id, o.product_id) AS product_id,\n                      coalesce(f.market_id, o.market_id) AS market_id,\n                      coalesce(f.s, 0) AS s, o.sales AS old\n               FROM fresh f FULL JOIN product_search_sales o\n                    ON o.product_id = f.product_id AND o.market_id = f.market_id\n           ), changed AS (\n               SELECT product_id, market_id, s FROM merged\n               WHERE (old IS NULL AND s > 0)\n                  OR (old IS NOT NULL AND (s = 0 OR abs(s - old) >= old * $2::float8))\n           ), upserted AS (\n               INSERT INTO product_search_sales (tenant_id, product_id, market_id, sales)\n               SELECT $1, product_id, market_id, s FROM changed WHERE s > 0\n               ON CONFLICT (tenant_id, product_id, market_id) DO UPDATE SET sales = EXCLUDED.sales\n           ), deleted AS (\n               DELETE FROM product_search_sales o USING changed c\n               WHERE c.s = 0 AND o.product_id = c.product_id AND o.market_id = c.market_id\n           )\n           INSERT INTO product_popularity (tenant_id, product_id, popularity, reindex)\n           SELECT DISTINCT $1::uuid, product_id, 0, true FROM changed\n           ON CONFLICT (tenant_id, product_id) DO UPDATE SET reindex = true",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bed2f4f8e85033a1a21b0c136b8248a81c57c660e7d258550c0be5836c434f23"
+}
