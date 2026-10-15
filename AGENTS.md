@@ -5,8 +5,9 @@ wrong.
 
 - In a linked git worktree, run `pnpm worktree:setup` before anything else (README, "Worktrees").
   It gives the worktree its own database and API port; `make api-native` is its dev server.
-- Never run `pnpm verify-merge`: on success it squash-merges the PR, and merging is the
-  maintainer's decision. Open the PR and stop.
+- Merge a PR only when the maintainer has delegated merging to you, and only after
+  `pnpm verify <PR#>` passed on its final head and its review is clean. Use the
+  `gh pr merge ... --match-head-commit <sha>` line verify prints. Never deploy.
 - Never start, stop or seed the compose stack from a worktree. The Makefile refuses; do not work
   around it by calling `docker compose` directly.
 - `make test-rust` may wait for another checkout's run to finish (one sqlx test run per Postgres

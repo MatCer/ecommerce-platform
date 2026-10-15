@@ -1,8 +1,5 @@
 name: CI
 
-# Static checks only. Every test suite (cargo test, vitest, Playwright e2e + axe, perf) runs
-# on the developer machine through `pnpm verify-merge <PR#>`, which records a `local-verify`
-# commit status on the PR head and merges. See docs/runbook.md ("Verify and merge").
 on:
   pull_request:
   push:
@@ -21,7 +18,6 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
-  # A commit on main must come from a merged PR whose head passed `pnpm verify-merge`.
   # Nothing refuses a direct push server-side, so this makes one visible (red main).
   gate:
     if: github.ref == 'refs/heads/main'
@@ -52,7 +48,7 @@ jobs:
           state="$(gh api "repos/$REPO/commits/$head/status" \
                      --jq '[.statuses[] | select(.context == "local-verify")][0].state // "missing"')"
           if [ "$state" != "success" ]; then
-            echo "::error::PR #$number head $head has local-verify=$state. Merge with 'pnpm verify-merge $number'."
+            echo "::error::PR #$number head $head has local-verify=$state. Run 'pnpm verify $number' before merging."
             exit 1
           fi
           echo "::notice::Commit came from PR #$number; local-verify passed on $head."
