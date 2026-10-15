@@ -15,7 +15,7 @@ main is PR-only. Push a branch, open a PR, and merge it once CI and review are c
 
   git switch -c feat/<slug> && git push -u origin feat/<slug>
   gh pr create --fill
-  gh pr merge <PR#> --squash --delete-branch
+  gh pr merge <PR#> --squash --delete-branch --match-head-commit <reviewed sha>
 
 A direct push to main also fails CI's gate job.
 MSG
