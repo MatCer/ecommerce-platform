@@ -75,7 +75,8 @@ async fn home(shopper: Shopper, State(s): State<AppState>) -> Result<Json<HomePa
 #[into_params(parameter_in = Query)]
 #[allow(dead_code)]
 pub struct ListingQueryDoc {
-    /// `recommended` (default), `popular`, `newest`, `price_asc`, `price_desc`.
+    /// `recommended` (default), `popular`, `best_selling`, `top_rated`, `newest`, `price_asc`,
+    /// `price_desc`.
     #[param(value_type = Option<Sort>, inline)]
     sort: Option<String>,
     /// 1-based page (24 products per page).
