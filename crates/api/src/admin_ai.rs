@@ -1,6 +1,7 @@
 //! AI helpers Admin API (spec §12): usage + quota, glossary, proposals (descriptions, SEO,
-//! translations) accepted per field, AI markers, and bulk edit by prompt. Every staff member
-//! may use them; writes go through the catalog/content/pricing services and the audit log.
+//! translations) accepted per field, AI markers, bulk edit by prompt, and the tenant's AI
+//! switches (SHOP-36). Every staff member may use the helpers; writes go through the
+//! catalog/content/pricing services and the audit log. Only admins change the switches.
 
 use axum::Json;
 use axum::body::Bytes;
@@ -13,7 +14,9 @@ use commerce::ai::glossary::{self, Glossary};
 use commerce::ai::marks::{self, AiMarkList};
 use commerce::ai::plan::{self, BulkPlan, NewPlan};
 use commerce::ai::proposals::{self, AcceptProposal, NewProposal, Proposal};
+use commerce::ai::review_summary::{self, AiSettings};
 use commerce::ai::{self, UsageSummary};
+use commerce::tenancy::Role;
 use platform::Error;
 use serde::Deserialize;
 use utoipa::IntoParams;
@@ -29,6 +32,7 @@ use crate::auth::TenantStaff;
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(usage))
+        .routes(routes!(get_settings, put_settings))
         .routes(routes!(get_glossary, put_glossary))
         .routes(routes!(create_proposal))
         .routes(routes!(get_proposal))
@@ -52,6 +56,59 @@ pub fn routes() -> OpenApiRouter<AppState> {
 async fn usage(staff: TenantStaff, State(s): State<AppState>) -> Result<Json<UsageSummary>, Error> {
     Ok(Json(
         in_tx(&s, staff.tenant_id, async |tx| ai::usage(tx, &s.ai).await).await?,
+    ))
+}
+
+/// The shop's AI switches. Review summaries are off until an admin turns them on.
+#[utoipa::path(
+    get,
+    path = "/admin/v1/ai/settings",
+    tag = "ai",
+    security(("staff_jwt" = [])),
+    params(TenantHeader),
+    responses((status = 200, body = AiSettings))
+)]
+async fn get_settings(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+) -> Result<Json<AiSettings>, Error> {
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            review_summary::settings(tx).await
+        })
+        .await?,
+    ))
+}
+
+/// Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
+/// summary per product with at least 5 published verified reviews; any change purges the
+/// shop's cached pages.
+#[utoipa::path(
+    put,
+    path = "/admin/v1/ai/settings",
+    tag = "ai",
+    security(("staff_jwt" = [])),
+    params(TenantHeader),
+    request_body = AiSettings,
+    responses(
+        (status = 200, body = AiSettings),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn put_settings(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+    body: Bytes,
+) -> Result<Json<AiSettings>, Error> {
+    staff.require(Role::Admin)?;
+    let input: AiSettings = parse_json(&body)?;
+    let actor = &staff.user.user_id;
+    Ok(Json(
+        in_tx(&s, staff.tenant_id, async |tx| {
+            review_summary::put_settings(tx, actor, &input).await
+        })
+        .await?,
     ))
 }
 
