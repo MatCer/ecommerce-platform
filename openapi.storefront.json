@@ -9396,6 +9396,17 @@
           "items"
         ],
         "properties": {
+          "ai_summary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReviewSummary",
+                "description": "AI summary of the verified reviews in the request's locale, when the shop switched it\non. Show it with its AI label."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "items": {
             "type": "array",
             "items": {
@@ -9695,6 +9706,34 @@
           "status": {
             "type": "string",
             "description": "Always `pending`: the shop publishes reviews after moderation."
+          }
+        }
+      },
+      "ReviewSummary": {
+        "type": "object",
+        "description": "An AI summary as the shop shows it (plain text; escape on output).",
+        "required": [
+          "text",
+          "locale",
+          "review_count",
+          "generated_at"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "locale": {
+            "type": "string",
+            "description": "Language of the text (`lang` attribute)."
+          },
+          "review_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Published verified reviews it was written from."
+          },
+          "text": {
+            "type": "string"
           }
         }
       },

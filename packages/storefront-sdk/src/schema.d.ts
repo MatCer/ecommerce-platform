@@ -2033,6 +2033,7 @@ export interface components {
             seo: components["schemas"]["Seo"];
         };
         ProductReviews: {
+            ai_summary?: components["schemas"]["ReviewSummary"] | null;
             /** @description Newest published reviews (at most 20). */
             items: components["schemas"]["PublicReview"][];
             summary?: components["schemas"]["RatingSummary"] | null;
@@ -2131,6 +2132,19 @@ export interface components {
         ReviewSubmitted: {
             /** @description Always `pending`: the shop publishes reviews after moderation. */
             status: string;
+        };
+        /** @description An AI summary as the shop shows it (plain text; escape on output). */
+        ReviewSummary: {
+            /** Format: date-time */
+            generated_at: string;
+            /** @description Language of the text (`lang` attribute). */
+            locale: string;
+            /**
+             * Format: int32
+             * @description Published verified reviews it was written from.
+             */
+            review_count: number;
+            text: string;
         };
         SearchHit: {
             brand?: string | null;
