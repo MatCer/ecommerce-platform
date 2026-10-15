@@ -96,6 +96,6 @@ prune() {
 case ${1:-} in
   setup) setup ;;
   teardown) teardown ;;
-  prune) prune "${2:-}" ;;
+  prune) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh prune [--dry-run]"; prune "${2:-}" ;;
   *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]" ;;
 esac
