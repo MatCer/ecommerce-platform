@@ -98,7 +98,8 @@ The repository allows squash merges only. Merge with
 When a spec starts visiting a new page, add it to that page's line in `scripts/verify-areas.txt`
 (map by the pages a spec visits, not its folder).
 
-**Release:** `pnpm verify <release PR#> --full`, then merge.
+**Release:** `pnpm verify <release PR#> --full` is the full acceptance run; optional while local
+verification is suspended.
 The M3 criterion-to-test map is [`docs/acceptance/m3.md`](acceptance/m3.md).
 
 ## 2. Metrics

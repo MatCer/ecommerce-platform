@@ -3,9 +3,10 @@
 `main` = WP26 merge. All work packages WP0–WP26 are merged (PRs #1–#32). WP26 = fixes from manual
 local testing (Firefox checkout handoff, seeded order detail, password-manager autofill; `scripts/autofill-check.mjs`
 checks autofill with the real Bitwarden extension). No open PRs, no running
-agents, no leftover worktrees. M1, M2 and M3 acceptance suites run locally, not in CI:
-`pnpm verify <PR#> --full` (full Playwright e2e at 4 workers + axe + `make perf`) before a
-release; ordinary PRs run the specs for their areas (`docs/runbook.md`, "Verify").
+agents, no leftover worktrees. M1, M2 and M3 acceptance suites run locally, not in CI, through
+`pnpm verify <PR#> --full` (full Playwright e2e at 4 workers + axe + `make perf`), or the specs
+for a PR's areas without `--full`. Local verification is optional for now and nothing requires it
+before a merge (`docs/runbook.md`, "Verify").
 
 | Milestone | Acceptance | Traceability |
 |---|---|---|
