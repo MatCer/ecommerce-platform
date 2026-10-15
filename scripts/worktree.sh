@@ -52,6 +52,11 @@ setup() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; it runs the dev stack itself"
   [[ -f $MAIN_ENV ]] || die "no $MAIN_ENV: run 'make dev-infra' (or 'make up') in $MAIN first"
   command -v sqlx >/dev/null || die "sqlx-cli not found (README, Prerequisites)"
+  local own main_project
+  own=$(env_value COMPOSE_PROJECT_NAME .env)
+  main_project=$(env_value COMPOSE_PROJECT_NAME "$MAIN_ENV")
+  [[ ! -e .env || ${own:-ecommerce} == "${main_project:-ecommerce}" ]] ||
+    die "this worktree runs its own stack (COMPOSE_PROJECT_NAME=$own); setup is for worktrees that share $MAIN's"
   [[ -e .env ]] || ln -s "$MAIN_ENV" .env
 
   local db port
