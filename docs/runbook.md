@@ -93,9 +93,9 @@ them against the dev stack, and keeps each Playwright project's traces and JSON 
 `.githooks/pre-push` refuses pushes to `main` (enable with `git config core.hooksPath .githooks`;
 `pnpm install` does it). CI's `gate` job fails a `main` commit that did not come from a merged PR,
 whose PR head lacks a successful `local-verify` status, or whose parent is not the base that
-status verified. Nothing on GitHub blocks the merge
-button itself, so merge only a PR whose current head has `local-verify=success`, with
-`--match-head-commit` so a later push cannot slip in.
+status verified. The repository allows squash merges only, so that parent is always the `main`
+tip the PR landed on. Nothing on GitHub blocks the merge button itself, so merge only a PR whose
+current head has `local-verify=success`, with `--match-head-commit` so a later push cannot slip in.
 
 When a spec starts visiting a new page, add it to that page's line in `scripts/verify-areas.txt`
 (map by the pages a spec visits, not its folder).
