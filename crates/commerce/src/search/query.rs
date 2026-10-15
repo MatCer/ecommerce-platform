@@ -126,6 +126,10 @@ pub enum Sort {
     #[default]
     Relevance,
     Popular,
+    /// The market's decayed unit sales; products without sales there last.
+    BestSelling,
+    /// Bayesian score of the published reviews; products without reviews last.
+    TopRated,
     PriceAsc,
     PriceDesc,
     Newest,
@@ -337,6 +341,11 @@ fn plan(scope: &Scope, req: &SearchRequest, facets: bool, exclude: &[Uuid]) -> P
     let price = format!("price.{}", market_key(&scope.market_code));
     let sort: Vec<String> = match req.sort {
         Sort::Popular => vec!["popularity:desc".into(), "created_at:desc".into()],
+        Sort::BestSelling => vec![
+            format!("sales.{}:desc", market_key(&scope.market_code)),
+            "created_at:desc".into(),
+        ],
+        Sort::TopRated => vec!["rating_score:desc".into(), "created_at:desc".into()],
         Sort::PriceAsc => vec![format!("{price}:asc")],
         Sort::PriceDesc => vec![format!("{price}:desc")],
         Sort::Newest => vec!["created_at:desc".into()],
@@ -1117,6 +1126,46 @@ mod tests {
                 json!(["popularity:desc", "created_at:desc"])
             );
         }
+    }
+
+    #[test]
+    fn best_selling_and_top_rated_sort_on_market_sales_and_rating_then_newest() {
+        let s = Scope {
+            market_code: "sk-eu".into(),
+            ..scope()
+        };
+        for (sort, expected) in [
+            (
+                Sort::BestSelling,
+                json!(["sales.sk_eu:desc", "created_at:desc"]),
+            ),
+            (
+                Sort::TopRated,
+                json!(["rating_score:desc", "created_at:desc"]),
+            ),
+        ] {
+            for q in ["", "boty"] {
+                let p = plan(
+                    &s,
+                    &SearchRequest {
+                        q: q.into(),
+                        sort,
+                        ..req()
+                    },
+                    false,
+                    &[],
+                );
+                assert_eq!(p.queries[0]["sort"], expected, "{sort:?} {q:?}");
+            }
+        }
+        assert_eq!(
+            serde_json::from_value::<Sort>(json!("best_selling")).unwrap(),
+            Sort::BestSelling
+        );
+        assert_eq!(
+            serde_json::from_value::<Sort>(json!("top_rated")).unwrap(),
+            Sort::TopRated
+        );
     }
 
     #[test]

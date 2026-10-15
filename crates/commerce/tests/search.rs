@@ -311,6 +311,121 @@ async fn popular_ordering_uses_newest_to_break_ties(db: PgPool) {
     }
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "needs Meilisearch: make test-search"]
+async fn best_selling_and_top_rated_put_products_without_the_value_last(db: PgPool) {
+    let s = shop(&db).await;
+    let mut products = Vec::new();
+    for sku in ["RANKED-OLD", "RANKED-NEW", "UNRANKED-NEWEST"] {
+        products.push(
+            s.product(
+                sku,
+                "Tričko",
+                "Tričko",
+                &[V {
+                    options: &[("color", "red"), ("size", "m")],
+                    cz: Some(100),
+                    sk: Some(5),
+                    stock: 5,
+                }],
+            )
+            .await,
+        );
+    }
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for (product, market, sales) in [
+        (products[0], s.cz, 5.0),
+        (products[1], s.cz, 5.0),
+        (products[2], s.sk, 9.0),
+    ] {
+        sqlx::query(
+            "INSERT INTO product_search_sales (tenant_id, product_id, market_id, sales)
+             VALUES ($1, $2, $3, $4)",
+        )
+        .bind(s.tenant)
+        .bind(product)
+        .bind(market)
+        .bind(sales)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    // Score 3.33 for one 5, (15 + 30) / 11 = 4.09 for six 5s; pending reviews do not count.
+    for (product, n, status) in [
+        (products[0], 1, "published"),
+        (products[1], 6, "published"),
+        (products[2], 6, "pending"),
+    ] {
+        for _ in 0..n {
+            sqlx::query(
+                "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                      locale, status, published_at)
+                 VALUES ($1, $2, 'Jana', 5, 'Super', true, 'cs', $3,
+                         CASE WHEN $3 = 'published' THEN now() END)",
+            )
+            .bind(s.tenant)
+            .bind(product)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+    }
+    tx.commit().await.unwrap();
+    for product in &products {
+        assert_eq!(s.index(*product).await, Indexed::Done);
+    }
+    s.settle().await;
+    let order = async |market, locale, sort| {
+        let mut runs = Vec::new();
+        for q in ["", "tričko"] {
+            let result = s
+                .search(
+                    market,
+                    locale,
+                    SearchRequest {
+                        q: q.into(),
+                        sort,
+                        ..req(&[])
+                    },
+                )
+                .await;
+            runs.push(
+                result
+                    .items
+                    .iter()
+                    .map(|h| h.product_id)
+                    .collect::<Vec<_>>(),
+            );
+        }
+        runs
+    };
+    let [old, new, unranked] = [products[0], products[1], products[2]];
+    assert_eq!(
+        order(s.cz, "cs", Sort::BestSelling).await,
+        [[new, old, unranked], [new, old, unranked]],
+        "CZ sales desc, ties by newest, no CZ sales last"
+    );
+    assert_eq!(
+        order(s.sk, "sk", Sort::BestSelling).await,
+        [[unranked, new, old], [unranked, new, old]],
+        "SK sales are SK's own"
+    );
+    assert_eq!(
+        order(s.cz, "cs", Sort::TopRated).await,
+        [[new, old, unranked], [new, old, unranked]],
+        "six 5s outrank one 5; no published review last"
+    );
+}
+
 /// A23 adversarial fixtures: cross-variant false matches, three options, unavailable variants,
 /// market prices, multi-select filters.
 #[sqlx::test(migrations = "../../migrations")]
