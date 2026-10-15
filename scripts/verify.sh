@@ -49,7 +49,7 @@ if [ "$(git branch --show-current)" = "$head_ref" ]; then
 fi
 
 # One run at a time: the stack's ports are fixed and a second heavy suite would swamp the box.
-cache="${XDG_CACHE_HOME:-$HOME/.cache}/ecommerce-verify"
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/ecommerce-verify-merge"
 mkdir -p "$cache"
 exec 9>"$cache/lock"
 flock -n 9 || die "another verify is running"
@@ -250,6 +250,6 @@ git fetch -q origin "$base_ref"
 [ "$(git rev-parse "origin/$base_ref")" = "$base" ] ||
   fail "$base_ref moved during verification; update the PR and rerun"
 say "passed in ${SECONDS}s; recording local-verify"
-status success "$summary (${SECONDS}s)"
-printf 'Merge while %s has not moved:\n  gh pr merge %s --repo %s --squash --delete-branch --match-head-commit %s\n' \
-  "$base_ref" "$pr" "$repo" "$sha" >&2
+status success "base ${base:0:12}: $summary (${SECONDS}s)"
+printf 'Merge while %s is still at %s (CI gate checks it):\n  gh pr merge %s --repo %s --squash --delete-branch --match-head-commit %s\n' \
+  "$base_ref" "${base:0:12}" "$pr" "$repo" "$sha" >&2

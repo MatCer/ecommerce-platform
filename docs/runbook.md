@@ -78,20 +78,22 @@ CI acceptance job (`make seed` + `scripts/seed-m2-perf-review.sh`), and removed 
 containers, volumes and image tags on success, failure or Ctrl-C (a `kill -9` leftover is
 removed by the next run); it never touches the dev stack (`ecommerce`).
 Committed `.only` fails both runners. One run at a time (lock in
-`~/.cache/ecommerce-verify/`; the persistent Cargo target dir lives there too).
+`~/.cache/ecommerce-verify-merge/`; the persistent Cargo target dir lives there too).
 
-On success it posts `local-verify=success` on the PR head and prints the merge command,
+On success it posts `local-verify=success` on the PR head, with the verified `main` commit at the
+start of its description, and prints the merge command,
 `gh pr merge <n> --squash --delete-branch --match-head-commit <sha>`. It never merges itself:
 the merge is a separate decision, taken after review. If `main` moved during the run it fails
 instead (rerun after updating); if `main` moves after it, update the PR and verify again
 before merging. On failure it posts `failure` (`error` if
 aborted), does not merge, lists the failing specs with a `make e2e args="…"` line to rerun
 them against the dev stack, and keeps each Playwright project's traces and JSON report in
-`~/.cache/ecommerce-verify/pr-<n>-test-results/`; stack logs in `pr-<n>-stack.log`.
+`~/.cache/ecommerce-verify-merge/pr-<n>-test-results/`; stack logs in `pr-<n>-stack.log`.
 
 `.githooks/pre-push` refuses pushes to `main` (enable with `git config core.hooksPath .githooks`;
-`pnpm install` does it). CI's `gate` job fails a `main` commit that did not come from a merged PR
-or whose PR head lacks a successful `local-verify` status. Nothing on GitHub blocks the merge
+`pnpm install` does it). CI's `gate` job fails a `main` commit that did not come from a merged PR,
+whose PR head lacks a successful `local-verify` status, or whose parent is not the base that
+status verified. Nothing on GitHub blocks the merge
 button itself, so merge only a PR whose current head has `local-verify=success`, with
 `--match-head-commit` so a later push cannot slip in.
 
