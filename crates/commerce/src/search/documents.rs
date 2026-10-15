@@ -128,6 +128,10 @@ pub struct ProductData {
     pub created_at: i64,
     /// Time-decayed sales/interest score from the recommendation rollups (WP17).
     pub popularity: i32,
+    /// market id → time-decayed unit sales (`product_search_sales`); markets without sales absent.
+    pub sales: HashMap<Uuid, f64>,
+    /// Published reviews; `None` without any.
+    pub rating: Option<Rating>,
     /// locale → (name, description html)
     pub translations: BTreeMap<String, (String, String)>,
     /// option code → value code → locale → label
@@ -136,6 +140,13 @@ pub struct ProductData {
     pub category_ids: Vec<Uuid>,
     /// Product-level parameter values.
     pub params: Vec<ParamValue>,
+}
+
+/// A product's published reviews: how many and their star total.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rating {
+    pub count: i64,
+    pub sum: i64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -206,6 +217,34 @@ pub async fn load_products(
     })
     .collect();
     let ids: Vec<Uuid> = products.keys().copied().collect();
+
+    for r in sqlx::query!(
+        "SELECT product_id, market_id, sales FROM product_search_sales WHERE product_id = ANY($1)",
+        &ids
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    {
+        if let Some(p) = products.get_mut(&r.product_id) {
+            p.sales.insert(r.market_id, r.sales);
+        }
+    }
+
+    for r in sqlx::query!(
+        r#"SELECT product_id, count(*) AS "count!", sum(rating)::bigint AS "sum!" FROM reviews
+           WHERE product_id = ANY($1) AND status = 'published' GROUP BY product_id"#,
+        &ids
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    {
+        if let Some(p) = products.get_mut(&r.product_id) {
+            p.rating = Some(Rating {
+                count: r.count,
+                sum: r.sum,
+            });
+        }
+    }
 
     for r in sqlx::query!(
         "SELECT product_id, locale, name, description_html FROM product_translations
@@ -354,6 +393,11 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
             }
         }
     }
+    let sales: Map<String, Value> = ctx
+        .markets
+        .iter()
+        .filter_map(|m| Some((market_key(&m.code), json!(p.sales.get(&m.id)?))))
+        .collect();
     for locale in ctx.locales() {
         let fallback = ctx.fallback_locale(&locale);
         let Some((name, description_html)) = p
@@ -422,7 +466,7 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
                         .map(String::as_str)
                 })
                 .collect();
-            let doc = json!({
+            let mut doc = json!({
                 "id": v.id,
                 "product_id": p.id,
                 "skus": [v.sku],
@@ -440,8 +484,17 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
                 "active_in_markets": markets,
                 "is_default": v.is_default,
                 "popularity": p.popularity,
+                "sales": sales,
                 "created_at": p.created_at,
             });
+            // Absent rather than null: Meilisearch sorts documents without the field last.
+            if let Some(r) = p.rating {
+                #[allow(clippy::cast_precision_loss)]
+                let average = r.sum as f64 / r.count as f64;
+                doc["rating_count"] = json!(r.count);
+                doc["rating_average"] = json!(average);
+                doc["rating_score"] = json!(crate::reviews::bayesian_score(r.sum, r.count));
+            }
             out.entry(locale.clone()).or_default().push(doc);
         }
     }
@@ -535,6 +588,8 @@ mod tests {
             brand: Some("Acme".into()),
             created_at: 1,
             popularity: 42,
+            sales: HashMap::new(),
+            rating: None,
             translations: [(
                 "cs".to_owned(),
                 (
@@ -614,6 +669,28 @@ mod tests {
         let text = red["text_stems"].as_str().unwrap_or_default();
         for stem in ["acm", "trick", "oblecn", "bavln", "mekk", "brn"] {
             assert!(text.split(' ').any(|w| w == stem), "{stem} in {text}");
+        }
+    }
+
+    #[test]
+    fn documents_carry_market_sales_and_the_published_rating() {
+        let (ctx, cz, sk) = ctx();
+        let mut p = product(cz, sk);
+        p.sales = HashMap::from([(Uuid::from_u128(100), 3.5), (Uuid::from_u128(999), 1.0)]);
+        p.rating = Some(Rating {
+            count: 40,
+            sum: 192,
+        });
+        let red = build_product(&ctx, &p)["cs"][0].clone();
+        assert_eq!(red["sales"], json!({ "cz": 3.5 }));
+        assert_eq!(red["rating_count"], json!(40));
+        assert_eq!(red["rating_average"], json!(4.8));
+        assert_eq!(red["rating_score"], json!(4.6));
+
+        let plain = build_product(&ctx, &product(cz, sk))["cs"][0].clone();
+        assert_eq!(plain["sales"], json!({}));
+        for field in ["rating_count", "rating_average", "rating_score"] {
+            assert_eq!(plain.get(field), None, "{field}");
         }
     }
 

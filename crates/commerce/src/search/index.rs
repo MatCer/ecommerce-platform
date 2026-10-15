@@ -54,7 +54,7 @@ pub fn settings(synonyms: &Value) -> Value {
             equality(&["opt.*", "param.*", "brand", "category_ids", "in_stock",
                        "active_in_markets", "id", "product_id", "skus", "eans"], false),
         ],
-        "sortableAttributes": ["price", "popularity", "created_at"],
+        "sortableAttributes": ["price", "popularity", "sales", "rating_score", "created_at"],
         "rankingRules": ["words", "typo", "proximity", "attributeRank", "sort", "wordPosition", "exactness"],
         "distinctAttribute": "product_id",
         "typoTolerance": { "disableOnAttributes": ["skus", "eans"], "disableOnNumbers": true },

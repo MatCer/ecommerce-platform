@@ -38,7 +38,7 @@ pub const SYNONYMS_JOB: &str = "search.synonyms";
 
 /// Bumped whenever [`index::settings`] changes; indexes with an older version get the new
 /// settings applied by the next indexing job.
-pub const SETTINGS_VERSION: i32 = 2;
+pub const SETTINGS_VERSION: i32 = 3;
 
 /// Meilisearch outages can last a while; indexing jobs keep retrying (capped backoff).
 const JOB_ATTEMPTS: i32 = 25;
@@ -130,8 +130,14 @@ pub fn job_for_event(
             .and_then(|s| Uuid::parse_str(s).ok())
     };
     match event_type {
-        "product.created" | "product.updated" | "product.deleted" | "price.changed"
-        | "inventory.changed" => Some(index_product_job(tenant_id, id("product_id")?, version)),
+        "product.created"
+        | "product.updated"
+        | "product.deleted"
+        | "price.changed"
+        | "inventory.changed"
+        | crate::reviews::CHANGED_EVENT => {
+            Some(index_product_job(tenant_id, id("product_id")?, version))
+        }
         // Memberships still exist in Postgres, so the affected products can be found.
         "category.updated" | "category.moved" => Some(versioned(
             REINDEX_CATEGORY_JOB,
@@ -189,7 +195,12 @@ mod tests {
     fn events_map_to_search_jobs() {
         let (t, p) = (Uuid::now_v7(), Uuid::now_v7());
         let payload = json!({ "product_id": p, "variant_id": Uuid::now_v7() });
-        for ty in ["product.updated", "price.changed", "inventory.changed"] {
+        for ty in [
+            "product.updated",
+            "price.changed",
+            "inventory.changed",
+            "review.changed",
+        ] {
             let job = job_for_event(Some(t), ty, &payload, 1);
             assert_eq!(job.map(|j| j.kind), Some(INDEX_PRODUCT_JOB), "{ty}");
         }
