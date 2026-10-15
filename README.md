@@ -157,8 +157,8 @@ pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dr
   on the shared Postgres, migrates it with the branch's migrations and records it and the API port
   (wtdev's, if installed) in `.env.worktree.local`. `make migrate` and `make api-native` use them.
 - Until setup has run, `make` in a worktree stops and asks for it. Compose targets (`make up`,
-  `down`, `dev-infra`, `seed`, `logs`, ...) always refuse: the worktree shares the main checkout's
-  `COMPOSE_PROJECT_NAME`, so they would rebuild its stack from the branch.
+  `down`, `dev-infra`, `seed`, `logs`, ...) and `backup`/`restore` always refuse: the worktree
+  shares the main checkout's `COMPOSE_PROJECT_NAME`, so they would act on its stack.
 - Meilisearch, MinIO, Mailpit and the auth service stay shared with the main checkout.
 - `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so
   concurrent runs from different checkouts wait for each other.
