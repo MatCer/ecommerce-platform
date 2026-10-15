@@ -251,5 +251,5 @@ git fetch -q origin "$base_ref"
   fail "$base_ref moved during verification; update the PR and rerun"
 say "passed in ${SECONDS}s; recording local-verify"
 status success "base ${base:0:12}: $summary (${SECONDS}s)"
-printf 'Merge while %s is still at %s (CI gate checks it):\n  gh pr merge %s --repo %s --squash --delete-branch --match-head-commit %s\n' \
+printf 'Merge while %s is still at %s:\n  gh pr merge %s --repo %s --squash --delete-branch --match-head-commit %s\n' \
   "$base_ref" "${base:0:12}" "$pr" "$repo" "$sha" >&2

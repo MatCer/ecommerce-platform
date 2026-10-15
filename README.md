@@ -126,7 +126,7 @@ trusted network.
 | `make fmt` | Format Rust and TS |
 | `make openapi` | Regenerate `openapi.json` and the TS clients; commit the result |
 | `make openapi-check` | Fail if the generated clients are stale (runs in CI) |
-| `pnpm verify <PR#> [--full]` | Test a PR on a throwaway stack and record `local-verify`; merge afterwards (runbook "Verify, then merge") |
+| `pnpm verify <PR#> [--full]` | Optional for now: test a PR on a throwaway stack and record `local-verify` (runbook "Verify") |
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |

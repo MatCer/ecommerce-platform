@@ -52,12 +52,12 @@ visual or interaction defects for the UI owner; automated axe checks cannot prov
 separate buckets. Auth and edge reject `E2E_RATE_SECRET` unless `APP_ENV=dev`; normal traffic
 keeps the peer-IP rate limit.
 
-### Verify, then merge (tests run locally, not in CI)
+### Verify (local test run, optional for now)
 
 CI (`.github/workflows/ci.yml`) runs only static checks: rustfmt, Clippy, the OpenAPI drift check,
-Biome and the TS typecheck. **A PR shows no test checks** — only those jobs plus the
-`local-verify` commit status. Every test suite runs on the developer machine, once, right
-before merge:
+Biome and the TS typecheck. **A PR shows no test checks.** The full suites run on the developer
+machine through `pnpm verify`. It is kept ready but is not required or enforced at the moment:
+a PR merges once CI and its review are clean. Run it when a change needs the full suites:
 
 ```bash
 pnpm verify <PR#>          # tests for the areas the PR touches
@@ -91,11 +91,9 @@ them against the dev stack, and keeps each Playwright project's traces and JSON 
 `~/.cache/ecommerce-verify-merge/pr-<n>-test-results/`; stack logs in `pr-<n>-stack.log`.
 
 `.githooks/pre-push` refuses pushes to `main` (enable with `git config core.hooksPath .githooks`;
-`pnpm install` does it). CI's `gate` job fails a `main` commit that did not come from a merged PR,
-whose PR head lacks a successful `local-verify` status, or whose parent is not the base that
-status verified. The repository allows squash merges only, so that parent is always the `main`
-tip the PR landed on. Nothing on GitHub blocks the merge button itself, so merge only a PR whose
-current head has `local-verify=success`, with `--match-head-commit` so a later push cannot slip in.
+`pnpm install` does it). CI's `gate` job fails a `main` commit that did not come from a merged PR.
+The repository allows squash merges only. Merge with
+`gh pr merge <n> --squash --delete-branch --match-head-commit <sha>` so a later push cannot slip in.
 
 When a spec starts visiting a new page, add it to that page's line in `scripts/verify-areas.txt`
 (map by the pages a spec visits, not its folder).

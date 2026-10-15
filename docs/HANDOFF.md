@@ -5,7 +5,7 @@ local testing (Firefox checkout handoff, seeded order detail, password-manager a
 checks autofill with the real Bitwarden extension). No open PRs, no running
 agents, no leftover worktrees. M1, M2 and M3 acceptance suites run locally, not in CI:
 `pnpm verify <PR#> --full` (full Playwright e2e at 4 workers + axe + `make perf`) before a
-release; ordinary PRs run the specs for their areas (`docs/runbook.md`, "Verify, then merge").
+release; ordinary PRs run the specs for their areas (`docs/runbook.md`, "Verify").
 
 | Milestone | Acceptance | Traceability |
 |---|---|---|

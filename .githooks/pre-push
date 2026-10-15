@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Runs no tests: WIP pushes stay free. Tests run once, before merge (docs/runbook.md).
-#
 # Enable once per clone (`pnpm install` does it via the root `prepare` script):
 #   git config core.hooksPath .githooks
 set -euo pipefail
@@ -13,11 +11,11 @@ while read -r local_ref _local_sha remote_ref _remote_sha; do
     cat >&2 <<'MSG'
 pre-push: refusing to push directly to main.
 
-main is PR-only. Push a branch, open a PR, run the local tests, then merge:
+main is PR-only. Push a branch, open a PR, and merge it once CI and review are clean:
 
   git switch -c feat/<slug> && git push -u origin feat/<slug>
   gh pr create --fill
-  pnpm verify <PR#>     # prints the gh pr merge command on success
+  gh pr merge <PR#> --squash --delete-branch
 
 A direct push to main also fails CI's gate job.
 MSG
