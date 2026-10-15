@@ -7,8 +7,8 @@ unrestricted on that same origin?
 
 **Status: draft, not approved.** The second security review (2026-10-15) rated it unsound; the
 third rated the fixes for its two blockers sound with required changes, which are folded in
-(A2, C4, C6). Four further issues remain open (§ Open issues, O3-O6). SHOP-54 does not start
-until they are closed.
+(A2, C4, C6). The four remaining issues are resolved in the note (§ Open issues, O3-O6). A final
+review of these changes is pending; SHOP-54 does not start before it passes.
 
 **Proposed decision: split them, like Shopify.**
 
@@ -63,19 +63,21 @@ legally required flows (placing an order, withdrawal, consent).
 **A1. Account origin.** Account pages, sign-in, sign-up, password reset and email verification
 are served only from the account origin, which runs no theme code; theme tokens style it as
 schema-validated values. Old `/account*` paths on `<shop>` and `checkout.<shop>` answer `308` to
-the account origin through an explicit route map. Cookies there are `__Host-` (not settable with
-`Domain`, so a theme on `<merchant domain>` cannot toss them onto `account.<merchant domain>`).
-The account origin accepts state-changing requests only when `Sec-Fetch-Site: same-origin`:
-`account.<merchant domain>` is same-site with the shop, so `SameSite` alone would let theme JS
-send credentialed POSTs.
+the account origin through an explicit route map. Cookies there are `__Host-` with `Secure;
+HttpOnly; Path=/` and no `Domain` (a theme on `<merchant domain>` cannot toss them onto
+`account.<merchant domain>`). The account origin accepts state-changing requests only when
+`Sec-Fetch-Site: same-origin`, and rejects requests without Fetch Metadata: `account.<merchant
+domain>` is same-site with the shop, so `SameSite` alone would let theme JS send credentialed
+POSTs. It sends no credentialed CORS headers to any storefront.
 
-Per-shop origins keep password managers from mixing up saved logins between shops. Two browser
-behaviours to know, neither of which hands theme JS a password without the customer picking it:
-Chrome offers logins saved for one subdomain on sibling subdomains of the same registrable
-domain after the user selects them. On the default origin that only affects other shops' account
-pages (all platform code); with `account.<merchant domain>` a theme form on the shop could have
-the customer pick their saved login. The merchant opts into that by choosing the custom
-subdomain; the admin says so.
+**Custom account subdomain.** Merchants may serve accounts from `account.<merchant domain>`
+instead of the default `<shop>.account.<platform>`, as Shopify allows. It is opt-in, and the
+admin says plainly what it trades: password managers that match logins by registrable domain
+(Bitwarden's default, Chrome's suggestions on sibling subdomains) can offer or, with autofill on
+page load enabled, fill a login saved for `account.<merchant domain>` into a form a theme draws
+on `<merchant domain>`. Accepted as R6. The default origin is on the platform's registrable
+domain, so no theme ever shares one with it; between shops' account pages, which are all
+platform code, shared suggestions are only a usability matter.
 
 **A2. Sign-in from checkout.** The shop origin never receives an account session. A checkout
 learns who the customer is only from the account origin's own session cookie, which a theme
@@ -142,8 +144,16 @@ stops new registrations but does not reliably remove an active one, so this must
 every shop origin from its first public response: SHOP-54 ships the C3 edge rule and CSP to
 theme responses before any shop goes live, and its verification checks that no production
 response has ever answered `Service-Worker: script` with a 2xx (the theme runtime serves no
-worker scripts today). A shop origin that ever served one cannot host platform pages until a
-recovery path exists; there is none in scope.
+worker scripts today).
+
+**Fresh origins only.** Our logs cover only what the platform served. A merchant domain that
+hosted a site elsewhere before may already hold a service worker or long-cached assets in
+customers' browsers, and nothing we serve can prove otherwise. So the same-origin checkout is
+enabled per shop origin, and only for origins that never served a public site before the
+platform (the platform's own `<shop>.<platform>` hostnames, and custom domains the merchant
+registered for the shop or confirms were never used, recorded in the admin when the domain is
+connected). Any other custom domain keeps checkout on `checkout.<shop>` until a verified
+recovery exists; none is in scope. Fail closed: unknown history counts as used.
 
 **C4. Page token on platform API calls.** `/_p/checkout/*` (except start, C10),
 `/_p/orders/*`, `/_p/withdraw*`, `/_p/reviews`, `/_p/newsletter/*`, `/_p/watch/*`, `/_p/flows/*`
@@ -186,11 +196,17 @@ history entries. The inventory, which the edge enforces by route and parameter n
 | Checkout identify (A2) | `?code=` |
 | Stripe return (`return_url`) | `payment_intent`, `payment_intent_client_secret`, `setup_intent`, `setup_intent_client_secret`, `redirect_status`, `source`, `client_secret` |
 
-Packeta's widget returns by `postMessage`, not by URL. The C5 cookies (`__Host-Http-cap`) are
-`Path=/`, live 30 minutes, are deleted when the page they authorise completes its action
-(withdrawal sent, review submitted) and hold one capability: a second link opened in the same
-browser replaces the first. Stripe values are consumed by the checkout-return handler and not
-kept. A clean URL opened in another browser shows "open the link from your email again".
+Packeta's widget returns by `postMessage`, not by URL. The cookie only carries the link; the
+server enforces the authorisation. Each exchanged link becomes a server-side capability record:
+one shop, one resource (the order, the withdrawal, the review request) and the actions that link
+allows, 30 minutes idle expiry, revoked when its action completes (withdrawal sent, review
+submitted), and single use where the action is. The `__Host-Http-cap` cookie (`Path=/`, 30
+minutes) holds one such capability; opening a second link in the same browser replaces the
+cookie and revokes the previous capability. Every request checks the record's shop, resource
+and action against what it asks for, inside the same transaction as the data access (C4); a
+valid HMAC proves possession, not permission. Stripe values are consumed by the checkout-return
+handler and not kept. A clean URL opened in another browser shows "open the link from your
+email again".
 
 **C6. The checkout capability.** The checkout cart cookie becomes `__Host-Http-cart`
 (`HttpOnly; Secure; Path=/; SameSite=Lax`, 256-bit random). Chrome 140+ and Firefox 143+ refuse
@@ -225,7 +241,8 @@ move to their own prefix, `/_checkout/<build id>/`, and the edge refuses theme f
 `/_checkout/`, `/checkout`, `/o/` and the other platform paths now, before any shop is live, so
 no browser can hold a theme-served response at a URL the checkout will later import. The build
 id makes every chunk and stylesheet URL new per release. A merchant redirect or CMS page cannot
-claim a platform path.
+claim a platform path. This holds only for URLs no one served before the platform, which is
+the fresh-origin rule in C3.
 
 **C9. Consent.** The theme-callable `/_p/consent` records only anonymous cookie categories
 (analytics, marketing cookies) for the current browser. It never sets `email_marketing`,
@@ -234,10 +251,12 @@ linked to a customer. Customer preferences change only on platform pages with a 
 checkout (marketing opt-in at placement) and the newsletter preferences page.
 `consent-contract.md` is updated to match.
 
-**C10. Checkout start.** The theme's checkout button is a form POST to `/checkout/start`: a
-top-level navigation (C1), exempt from the page token because a theme page cannot have one. It
-converts the shop cart, mints a new checkout capability, revokes the browser's previous one, and
-answers `303 /checkout` with no token in a readable place. A hostile theme can trigger it, which
+**C10. Checkout start.** The theme's checkout button is a form POST to `/_p/checkout/start`,
+which keeps the path the shop `cart` cookie (`Path=/_p`) is sent to. It must be a top-level
+navigation (C1 headers) and is exempt from the page token because a theme page cannot have one.
+In one transaction it converts the shop cart, mints a new checkout capability and revokes the
+browser's previous one; a second start racing the first wins, and the loser's capability is
+revoked. It answers `303 /checkout` with no token in a readable place. A hostile theme can trigger it, which
 does what the customer's own click does: restart checkout from the shop cart, which the theme
 already controls.
 
@@ -247,11 +266,11 @@ page token.
 
 Theme-side changes that come with it: theme CSP `form-action 'self'`, `worker-src 'none'`, COOP
 `same-origin-allow-popups`; the speculation rules exclude the platform paths; `checkout_url`
-in the page model points at `<shop>/checkout/start`.
+in the page model points at `<shop>/_p/checkout/start`.
 
 ## Routing (input to SHOP-54 and SHOP-95)
 
-On `<shop>`: `/checkout`, `/checkout/start`, `/checkout/identify/start`, `/checkout/identify`,
+On `<shop>`: `/checkout`, `/checkout/identify/start`, `/checkout/identify`,
 `/o/<token>` → `/o/<id>`,
 `/withdraw`, `/review`, `/restore-cart`, `/consent`, `/newsletter`, `/newsletter/*`,
 `/watch/*`, `/flows/*`, plus `/_p/fake-pay/*` locally. The `/_p/*` operations keep their paths,
@@ -264,7 +283,9 @@ map, never from the raw request path, so `//attacker.example` cannot become an e
 redirect. These redirects are `Cache-Control: no-store`, since some carry tokens until C5
 strips them on arrival.
 
-The handoff (`/start?h=`, `__Secure-hf-*`, `/storefront/v1/checkout/handoff`) goes away.
+The handoff (`/start?h=`, `__Secure-hf-*`, `/storefront/v1/checkout/handoff`) goes away on
+fresh origins. A shop whose custom domain is not fresh (C3) keeps today's `checkout.<shop>`
+host and handoff unchanged, so both modes exist side by side, chosen per shop origin.
 
 ## Residual risks
 
@@ -280,7 +301,8 @@ The handoff (`/start?h=`, `__Secure-hf-*`, `/storefront/v1/checkout/handoff`) go
 - **R2. Look-alike UI.** A theme can `pushState` to `/checkout` and draw a fake form that sends
   typed data away; CSP does not cover navigation. A theme could already draw any form on the
   shop. Browser address and card autofill is not origin-bound, so a theme form gets the same
-  autofill on any site; saved passwords are origin-bound and are on the account origin. Stripe
+  autofill on any site. Saved passwords live on the account origin; the custom-subdomain case is
+  R6. Stripe
   card fields stay in Stripe's cross-origin iframe.
 - **R3. Same-process side channels.** Separate browsing context groups on one site may share a
   renderer process. Accepted, as for any same-site app.
@@ -289,6 +311,10 @@ The handoff (`/start?h=`, `__Secure-hf-*`, `/storefront/v1/checkout/handoff`) go
 - **R5. Stripe's first-party cookies** (`__stripe_mid`, `__stripe_sid`) are readable and
   writable by theme JS. They carry fraud signals, not card data; tampering degrades Radar
   scoring only.
+- **R6. Custom account subdomain and password managers.** With `account.<merchant domain>`,
+  password managers that match by registrable domain can offer or autofill the customer's login
+  into a theme form on the shop (A1). Opt-in per merchant, stated in the admin, matches what
+  Shopify offers. Accepted. The default `<shop>.account.<platform>` does not have it.
 
 ## Rejected alternatives
 
@@ -312,7 +338,7 @@ Whether each response holds is in § Open issues.
 | 3 | Token-free consent can forge customer preferences | Theme consent limited to anonymous cookie categories, `source` ignored (C9) |
 | 4 | C3 does not remove an incumbent worker | C3 live before any shop goes public, verified (C3) |
 | 5 | Cached theme assets at future checkout URLs | Namespace reserved before launch, build-id asset paths (C8) |
-| 6 | Autofill credential theft | Passwords only on the account origin (A1); address autofill is not origin-bound (R2) |
+| 6 | Autofill credential theft | Passwords only on the account origin (A1); address autofill is not origin-bound (R2); custom account subdomain accepted as R6 |
 | 7 | Stripe return secrets in history | C5 inventory includes Stripe parameters; capability expiry and revocation defined |
 | 8 | `Origin: null` forms, one-click unsubscribe | `strict-origin` (C1), bearer unsubscribe endpoint (C11) |
 | 9 | Checkout start and token rotation | Start as navigation POST (C10), rotation and stale tabs (C4) |
@@ -344,20 +370,21 @@ Round 3 (2026-10-15) rated O1/O2 "sound with required changes": a read already a
 could outlive a rotation (fixed in C4), the identify link was not browser-bound (now
 prefill-only, A2), placement confirmation lacked its own binding (A2.4), and navigation POSTs
 clashed with JSON-only checks (C4). All four are folded in above.
+
 - **O3. Password managers (A1, R2).** Some managers match by registrable domain and can
   autofill on load (Bitwarden defaults), so a theme form on `<merchant domain>` can receive a
-  login saved for `account.<merchant domain>` without the customer choosing it. "Passwords are
-  origin-bound" is too strong. Either the custom account subdomain is an accepted risk, or
-  password accounts stay on the platform domain.
+  login saved for `account.<merchant domain>` without the customer choosing it.
+  **Resolved:** the owner keeps the custom account subdomain as an opt-in, as Shopify does;
+  the admin states the trade-off and the risk is accepted as R6 (A1).
 - **O4. Origin history (C3, C8).** A merchant domain used elsewhere before may already have a
-  service worker or cached assets in customers' browsers. Platform logs cannot prove otherwise.
-  Fail closed: same-origin checkout only on demonstrably fresh origins until a verified
-  recovery exists; the same provenance rule for asset URLs.
-- **O5. Checkout start path (C10).** `/checkout/start` does not receive the shop `cart` cookie
-  (`Path=/_p`). Keep the navigation POST at `/_p/checkout/start` or migrate the cookie path.
-- **O6. Capability lifecycle (C4, C5).** Cookie expiry and deletion are not revocation. The
-  server must enforce expiry, action/resource/shop scope, revocation and single use; a valid
-  HMAC proves possession, not permission.
+  service worker or cached assets in customers' browsers. **Resolved:** same-origin checkout
+  only on fresh origins, unknown history counts as used; others keep `checkout.<shop>` (C3,
+  C8).
+- **O5. Checkout start path (C10).** **Resolved:** start stays at `/_p/checkout/start`, with
+  atomic conversion and revocation and a defined concurrent-start outcome (C10).
+- **O6. Capability lifecycle (C4, C5).** **Resolved:** link capabilities are server-side
+  records with shop, resource and action scope, idle expiry, revocation on completion or
+  replacement, and single use where the action is (C5); checkout capabilities likewise (C6).
 
 Implementation notes from the same review: `consent-contract.md` and `consentProxy` in
 `apps/edge/src/gateway.ts` must change for C9; `apps/checkout/src/lib/placement.ts` must be
