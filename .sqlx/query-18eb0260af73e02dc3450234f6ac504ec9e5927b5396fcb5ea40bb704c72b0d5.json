@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT name FROM product_translations WHERE product_id = $1\n         ORDER BY (locale = (SELECT default_locale FROM markets WHERE is_default)) DESC NULLS LAST,\n                  locale\n         LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "product_translations",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "18eb0260af73e02dc3450234f6ac504ec9e5927b5396fcb5ea40bb704c72b0d5"
+}

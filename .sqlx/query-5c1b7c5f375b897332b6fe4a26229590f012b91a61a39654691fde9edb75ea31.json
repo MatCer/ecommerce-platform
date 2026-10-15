@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM ai_marks WHERE entity_type = $1 AND entity_id = $2 AND field = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5c1b7c5f375b897332b6fe4a26229590f012b91a61a39654691fde9edb75ea31"
+}

@@ -1397,7 +1397,7 @@ async fn apply_one(
                         value: &value,
                         feature: super::BULK_PLAN,
                         model: &source.model,
-                        proposal_id: source.plan_id,
+                        proposal_id: Some(source.plan_id),
                         accepted_by: actor,
                     },
                 )

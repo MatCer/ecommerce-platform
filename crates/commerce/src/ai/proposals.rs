@@ -415,7 +415,7 @@ pub async fn accept(
                     value: &value,
                     feature: proposal.kind.as_str(),
                     model: &model,
-                    proposal_id: id,
+                    proposal_id: Some(id),
                     accepted_by: actor,
                 },
             )

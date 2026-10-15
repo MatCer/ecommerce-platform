@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT input_sha256 FROM review_summaries WHERE product_id = $1 LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "input_sha256",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "review_summaries",
+            "name": "input_sha256"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d15597e46a4f93f881960ad755f82886e17d692fdab84ac49559d14c30fd7f9a"
+}

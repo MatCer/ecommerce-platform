@@ -10,6 +10,7 @@ pub mod marks;
 pub mod plan;
 mod prompts;
 pub mod proposals;
+pub mod review_summary;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -45,6 +46,10 @@ const FIXTURES: &[(&str, &str)] = &[
     (SEO, include_str!("fixtures/seo.j2")),
     (TRANSLATE, include_str!("fixtures/translate.j2")),
     (BULK_PLAN, include_str!("fixtures/bulk_plan.j2")),
+    (
+        review_summary::FEATURE,
+        include_str!("fixtures/review_summary.j2"),
+    ),
 ];
 
 /// The fake provider: helper fixtures and the scripted theme-editing agent.
