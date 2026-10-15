@@ -13,7 +13,10 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
     "openapi:generate": "pnpm -r --if-present openapi:generate",
-    "verify-merge": "scripts/verify-merge.sh"
+    "verify-merge": "scripts/verify-merge.sh",
+    "worktree:setup": "scripts/worktree.sh setup",
+    "worktree:teardown": "scripts/worktree.sh teardown",
+    "worktree:prune": "scripts/worktree.sh prune"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

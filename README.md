@@ -31,6 +31,7 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
 - Rust stable (`rustup`), plus `sqlx-cli` for `make migrate`:
   `cargo install sqlx-cli --no-default-features --features rustls,postgres --locked`
 - Node 24 and pnpm 11 (`corepack enable` picks the pinned version)
+- `flock` for `make test-rust` (util-linux; macOS: `brew install flock`), `psql` for worktrees
 
 ## Quick start
 
@@ -117,7 +118,7 @@ trusted network.
 | Command | What it does |
 |---|---|
 | `make up` / `make down` | Start / stop the full stack (`docker compose down -v` also wipes data) |
-| `make dev-infra` | Dependencies only; then `cargo run -p api` against them (see below) |
+| `make dev-infra` | Dependencies only; then `make api-native` against them (see below) |
 | `make migrate` | Apply migrations as `app_owner` |
 | `make test` | Rust tests (need Postgres from `make dev-infra`) + vitest |
 | `make test-search` | Search integration tests + cs/sk relevance fixtures against the real Meilisearch (`make dev-infra`) |
@@ -135,25 +136,36 @@ trusted network.
 | `make perf` | Serial Lighthouse mobile, JS budget and axe gate over HTTPS/h2 |
 | `scripts/smoke-images.sh` | Boot built images with optional dependencies absent; assert degraded readiness |
 
-Running the API natively against `make dev-infra` (values from `.env.example`):
+Running the API natively against `make dev-infra`: `make migrate`, then `make api-native`
+(`127.0.0.1:8000` by default, `API_PORT=...` to change it). It reads ports and credentials from
+`.env`. Staff invitations answer `503` natively: the auth service's `/internal` API is not proxied
+by Caddy.
+
+## Worktrees
+
+A linked git worktree (Claude Code, Codex, Conductor or a plain `git worktree add`) shares the main
+checkout's stack and gets its own dev database and API port:
 
 ```bash
-make migrate
-APP_ENV=dev API_BIND=127.0.0.1:8000 \
-DATABASE_URL=postgres://app_runtime:app-runtime-local@localhost:55432/app \
-MEILI_URL=http://localhost:57700 MEILI_SEARCH_KEY=2245a27fd200f741b246ce0479586838d71d3f5925e973144596c1ed10e3d918 \
-S3_ENDPOINT=http://localhost:59000 \
-S3_ACCESS_KEY_ID=app-local S3_SECRET_ACCESS_KEY=app-local-secret-key \
-S3_BUCKET_PUBLIC=public S3_BUCKET_PRIVATE=private \
-AUTH_JWKS_URL=http://auth.localhost:8080/api/auth/jwks ADMIN_ORIGIN=http://admin.localhost:8080 \
-INTERNAL_API_TOKEN=local-internal-api-token-0123456789abcdef \
-AUTH_INTERNAL_URL=http://localhost:3000/ AUTH_INTERNAL_TOKEN=local-auth-internal-token-0123456789abcdef \
-cargo run -p api
+pnpm worktree:setup      # once per worktree, safe to rerun
+make api-native          # this branch's API on its own port and database
+pnpm worktree:teardown   # drop the worktree's database, then remove the worktree
+pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dry-run to preview)
 ```
 
-`AUTH_INTERNAL_URL` is the auth service's `/internal` API (staff invitations). It is not proxied
-by Caddy, so natively it only works with the auth service also running natively. Without both
-`AUTH_INTERNAL_*` variables the API still starts and staff invitations answer `503`.
+- Setup symlinks `.env` to the main checkout's, installs packages, creates `app_wt_<name>_<hash>`
+  on the shared Postgres, migrates it with the branch's migrations and records it and the API port
+  (wtdev's, if installed) in `.env.worktree.local`. `make migrate` and `make api-native` use them.
+- Until setup has run, `make` in a worktree stops and asks for it. Compose targets (`make up`,
+  `down`, `dev-infra`, `seed`, `logs`, ...) and `backup`/`restore` always refuse: the worktree
+  shares the main checkout's `COMPOSE_PROJECT_NAME`, so they would act on its stack. A worktree
+  whose `.env` sets its own `COMPOSE_PROJECT_NAME`, like the one `pnpm verify-merge` builds, runs its
+  own stack and is not restricted.
+- Meilisearch, MinIO, Mailpit and the auth service stay shared with the main checkout.
+- `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so
+  concurrent runs from different checkouts wait for each other.
+- Every worktree builds its own `target/` (several GB); export a shared `CARGO_TARGET_DIR` to trade
+  that disk for serialised builds.
 
 ## Tenants and staff sign-in
 
