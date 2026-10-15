@@ -63,6 +63,18 @@ mod tests {
     }
 
     #[test]
+    fn best_selling_and_top_rated_sort_labels() {
+        for (locale, best_selling, top_rated) in [
+            ("cs", "Nejprodávanější", "Nejlépe hodnocené"),
+            ("sk", "Najpredávanejšie", "Najlepšie hodnotené"),
+            ("en", "Best selling", "Top rated"),
+        ] {
+            assert_eq!(text(locale, "sort.best_selling"), best_selling);
+            assert_eq!(text(locale, "sort.top_rated"), top_rated);
+        }
+    }
+
+    #[test]
     fn lookup_and_format() {
         assert_eq!(text("sk-SK", "cart.add"), "Pridať do košíka");
         assert_eq!(text("de", "cart.add"), "Add to cart");

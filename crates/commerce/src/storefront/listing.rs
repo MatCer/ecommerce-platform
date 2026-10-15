@@ -38,15 +38,19 @@ pub enum Sort {
     #[default]
     Recommended,
     Popular,
+    BestSelling,
+    TopRated,
     Newest,
     PriceAsc,
     PriceDesc,
 }
 
 impl Sort {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::Recommended,
         Self::Popular,
+        Self::BestSelling,
+        Self::TopRated,
         Self::Newest,
         Self::PriceAsc,
         Self::PriceDesc,
@@ -56,6 +60,8 @@ impl Sort {
         match self {
             Self::Recommended => "recommended",
             Self::Popular => "popular",
+            Self::BestSelling => "best_selling",
+            Self::TopRated => "top_rated",
             Self::PriceAsc => "price_asc",
             Self::PriceDesc => "price_desc",
             Self::Newest => "newest",
@@ -67,6 +73,8 @@ impl Sort {
         match self {
             Self::Recommended => S::Relevance,
             Self::Popular => S::Popular,
+            Self::BestSelling => S::BestSelling,
+            Self::TopRated => S::TopRated,
             Self::PriceAsc => S::PriceAsc,
             Self::PriceDesc => S::PriceDesc,
             Self::Newest => S::Newest,
@@ -142,6 +150,10 @@ pub struct Candidate {
     pub position: i32,
     pub created_at: DateTime<Utc>,
     pub popularity: i32,
+    /// Sales in the listing's market; `None` without any.
+    pub sales: Option<f64>,
+    /// [`crate::reviews::bayesian_score`] of the published reviews; `None` without any.
+    pub rating_score: Option<f64>,
     pub name: String,
     pub brand: Option<String>,
     pub variants: Vec<CandidateVariant>,
@@ -260,6 +272,12 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
                 .cmp(&a.popularity)
                 .then(b.created_at.cmp(&a.created_at))
         }),
+        Sort::BestSelling => hits.sort_by(|a, b| {
+            desc_missing_last(a.sales, b.sales).then(b.created_at.cmp(&a.created_at))
+        }),
+        Sort::TopRated => hits.sort_by(|a, b| {
+            desc_missing_last(a.rating_score, b.rating_score).then(b.created_at.cmp(&a.created_at))
+        }),
         Sort::PriceAsc => hits.sort_by_key(min_price),
         Sort::PriceDesc => hits.sort_by_key(|c| std::cmp::Reverse(min_price(c))),
         Sort::Newest => hits.sort_by_key(|c| std::cmp::Reverse(c.created_at)),
@@ -282,6 +300,13 @@ pub fn select(mut candidates: Vec<Candidate>, defs: &[FacetDef], q: &ListingQuer
         pages,
         facets,
         applied,
+    }
+}
+
+fn desc_missing_last(a: Option<f64>, b: Option<f64>) -> std::cmp::Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => b.total_cmp(&a),
+        _ => b.is_some().cmp(&a.is_some()),
     }
 }
 
@@ -317,6 +342,9 @@ struct Base {
     position: i32,
     created_at: DateTime<Utc>,
     popularity: i32,
+    sales: Option<f64>,
+    rating_count: Option<i64>,
+    rating_sum: Option<i64>,
     name: String,
     brand: Option<String>,
 }
@@ -334,17 +362,23 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
                   (SELECT name FROM product_translations pt WHERE pt.product_id = p.id
                    ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1)
                    AS "name!",
-                  p.brand, coalesce(pp.popularity, 0) AS "popularity!"
+                  p.brand, coalesce(pp.popularity, 0) AS "popularity!",
+                  ss.sales AS "sales?", r.n AS "rating_count?", r.total AS "rating_sum?"
            FROM products p
            LEFT JOIN product_popularity pp ON pp.product_id = p.id
+           LEFT JOIN product_search_sales ss ON ss.product_id = p.id AND ss.market_id = $4
+           LEFT JOIN (SELECT product_id, count(*) AS n, sum(rating)::bigint AS total
+                      FROM reviews WHERE status = 'published' GROUP BY product_id) r
+                  ON r.product_id = p.id
            LEFT JOIN product_categories pc
                   ON pc.product_id = p.id AND pc.category_id IN (SELECT id FROM subtree)
            WHERE p.status = 'active'
-           GROUP BY p.id, pp.popularity
+           GROUP BY p.id, pp.popularity, ss.sales, r.n, r.total
            HAVING $1::uuid IS NULL OR count(pc.category_id) > 0"#,
         q.category_id,
         ctx.locale,
-        ctx.market.default_locale
+        ctx.market.default_locale,
+        ctx.market.id
     )
     .fetch_all(&mut **tx)
     .await?;
@@ -486,6 +520,11 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             position: b.position,
             created_at: b.created_at,
             popularity: b.popularity,
+            sales: b.sales,
+            rating_score: b
+                .rating_count
+                .zip(b.rating_sum)
+                .map(|(count, sum)| crate::reviews::bayesian_score(sum, count)),
             name: b.name,
             brand: b.brand,
         })
@@ -658,6 +697,8 @@ mod tests {
             created_at: DateTime::from_timestamp(i64::try_from(n).unwrap_or(0) * 1000, 0)
                 .unwrap_or_default(),
             popularity: 0,
+            sales: None,
+            rating_score: None,
             name: name.into(),
             brand: Some(if n == 3 { "Acme" } else { "Lnen" }.into()),
             variants,
@@ -828,6 +869,8 @@ mod tests {
             [
                 "recommended",
                 "popular",
+                "best_selling",
+                "top_rated",
                 "newest",
                 "price_asc",
                 "price_desc"
@@ -835,8 +878,39 @@ mod tests {
         );
         for sort in Sort::ALL {
             assert_eq!(Sort::parse(sort.as_str()), Some(sort));
+            assert_eq!(serde_json::to_value(sort).unwrap(), sort.as_str());
         }
         assert_eq!(Sort::parse("unknown"), None);
+        assert_eq!(
+            Sort::parse("best_selling").map(Sort::search),
+            Some(crate::search::query::Sort::BestSelling)
+        );
+        assert_eq!(
+            Sort::parse("top_rated").map(Sort::search),
+            Some(crate::search::query::Sort::TopRated)
+        );
+    }
+
+    #[test]
+    fn best_selling_and_top_rated_order_values_then_newest_with_missing_last() {
+        type Field = fn(&mut Candidate) -> &mut Option<f64>;
+        let fields: [(Sort, Field); 2] = [
+            (Sort::BestSelling, |c| &mut c.sales),
+            (Sort::TopRated, |c| &mut c.rating_score),
+        ];
+        for (sort, field) in fields {
+            let mut candidates = catalog();
+            *field(&mut candidates[0]) = Some(1.0);
+            *field(&mut candidates[2]) = Some(1.0);
+            let q = query(&[], sort);
+            assert_eq!(
+                ids(&select(candidates.clone(), &defs(), &q)),
+                [3, 1, 2],
+                "{sort:?}: tie by newest, the newer product without a value last"
+            );
+            *field(&mut candidates[0]) = Some(4.5);
+            assert_eq!(ids(&select(candidates, &defs(), &q)), [1, 3, 2], "{sort:?}");
+        }
     }
 
     #[test]

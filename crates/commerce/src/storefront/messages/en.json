@@ -384,6 +384,8 @@
   "sort.name": "Name",
   "sort.newest": "Newest",
   "sort.popular": "Most popular",
+  "sort.best_selling": "Best selling",
+  "sort.top_rated": "Top rated",
   "sort.price_asc": "Price: low to high",
   "sort.price_desc": "Price: high to low",
   "sort.recommended": "Recommended",
