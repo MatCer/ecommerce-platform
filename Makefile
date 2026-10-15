@@ -3,10 +3,18 @@ SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
 .DEFAULT_GOAL := help
 
-# .env holds host ports and local credentials; created from .env.example on first use.
+LINKED_WORKTREE := $(filter-out $(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null),$(shell git rev-parse --path-format=absolute --git-dir 2>/dev/null))
+
 -include .env
+ifdef LINKED_WORKTREE
+include .env.worktree.local
+.env .env.worktree.local:
+	@echo "make: this is a linked worktree; run 'pnpm worktree:setup' first" >&2; exit 1
+else
+# .env holds host ports and local credentials; created from .env.example on first use.
 .env:
 	cp .env.example .env
+endif
 
 export CARGO_BUILD_JOBS ?= 6
 
@@ -17,13 +25,23 @@ MEILI_ADMIN_KEY ?= 39acad57a641ce3bb328074fcae83ae01e5cc0edbb28c2ae113d3c6b24690
 HTTPS_PORT ?= 8443
 STRIPE_MOCK_PORT ?= 12111
 APP_OWNER_PASSWORD ?= app-owner-local
-OWNER_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/app
+APP_DB ?= app
+API_PORT ?= 8000
+OWNER_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/$(APP_DB)
 TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/app_test
 
+ifdef LINKED_WORKTREE
+COMPOSE_FULL = $(error this worktree shares the main checkout's .env and COMPOSE_PROJECT_NAME, so compose here would rebuild its stack; run this target there)
+COMPOSE_INFRA = $(COMPOSE_FULL)
+else
 COMPOSE_FULL := COMPOSE_PROFILES=full docker compose
 COMPOSE_INFRA := COMPOSE_PROFILES=infra docker compose
+endif
+# One #[sqlx::test] run per Postgres at a time, across every checkout: sqlx names each test's
+# database after the test's path, so two runs of the suite would drop each other's databases.
+TEST_DB_LOCK := /tmp/ecommerce-sqlx-test-$(PG_PORT).lock
 
-.PHONY: help up down dev-infra migrate sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin seed logs ps theme-build perf e2e backup restore backup-drill
+.PHONY: help up down dev-infra migrate api-native sqlx-prepare test test-rust test-ts test-search lint fmt openapi openapi-check admin seed logs ps theme-build perf e2e backup restore backup-drill
 
 help: ## List targets
 	@grep -hE '^[a-z-]+:.*## ' Makefile | awk -F':.*## ' '{printf "  %-14s %s\n", $$1, $$2}'
@@ -37,8 +55,21 @@ down: ## Stop the stack (volumes are kept; `docker compose down -v` wipes data)
 dev-infra: .env ## Start dependencies only; run api/worker natively against them
 	$(COMPOSE_INFRA) up -d --build --wait
 
-migrate: ## Apply migrations as app_owner (needs sqlx-cli)
+migrate: ## Apply migrations as app_owner to APP_DB (needs sqlx-cli)
 	sqlx migrate run --source migrations --database-url "$(OWNER_DATABASE_URL)"
+
+api-native: ## Run the API on the host, port API_PORT, database APP_DB (needs `make dev-infra` or the main stack)
+	APP_ENV=dev API_BIND=127.0.0.1:$(API_PORT) \
+	DATABASE_URL="postgres://app_runtime:$(APP_RUNTIME_PASSWORD)@localhost:$(PG_PORT)/$(APP_DB)" \
+	MEILI_URL=http://localhost:$(MEILI_PORT) MEILI_SEARCH_KEY="$(MEILI_SEARCH_KEY)" \
+	S3_ENDPOINT=http://localhost:$(MINIO_PORT) \
+	S3_ACCESS_KEY_ID="$(S3_ACCESS_KEY_ID)" S3_SECRET_ACCESS_KEY="$(S3_SECRET_ACCESS_KEY)" \
+	S3_BUCKET_PUBLIC=public S3_BUCKET_PRIVATE=private \
+	AUTH_JWKS_URL=http://auth.localhost:$(HTTP_PORT)/api/auth/jwks ADMIN_ORIGIN=http://admin.localhost:$(HTTP_PORT) \
+	INTERNAL_API_TOKEN="$(INTERNAL_API_TOKEN)" SECRETS_KEY="$(SECRETS_KEY)" \
+	THEME_SECRET="$(THEME_SECRET)" THEME_BUILDER_TOKEN="$(THEME_BUILDER_TOKEN)" MAIL_EVENTS_SECRET="$(MAIL_EVENTS_SECRET)" \
+	STRIPE_MOCK_URL=http://localhost:$(STRIPE_MOCK_PORT) STRIPE_WEBHOOK_SECRET=whsec_local_simulator_0123456789 \
+	cargo run --locked -p api
 
 sqlx-prepare: ## Refresh .sqlx/ (offline query data) after SQL changes; needs `make migrate` first
 	SQLX_OFFLINE=false DATABASE_URL="$(OWNER_DATABASE_URL)" cargo sqlx prepare --workspace -- --all-targets
@@ -46,16 +77,18 @@ sqlx-prepare: ## Refresh .sqlx/ (offline query data) after SQL changes; needs `m
 test: test-rust test-ts ## Rust + TS tests (Rust integration tests need `make dev-infra`)
 
 test-rust:
+	cargo test --workspace --locked --no-run
 	DATABASE_URL="$(TEST_DATABASE_URL)" STRIPE_MOCK_URL="http://localhost:$(STRIPE_MOCK_PORT)" \
-	cargo test --workspace --locked
+	flock "$(TEST_DB_LOCK)" cargo test --workspace --locked
 
 test-ts:
 	pnpm test
 
 test-search: ## Search integration tests + cs/sk relevance fixtures against Meilisearch (needs `make dev-infra`)
+	cargo test --workspace --locked --no-run
 	DATABASE_URL="$(TEST_DATABASE_URL)" MEILI_URL="http://localhost:$(MEILI_PORT)" \
 	MEILI_ADMIN_KEY="$(MEILI_ADMIN_KEY)" MEILI_SEARCH_KEY="$(MEILI_SEARCH_KEY)" \
-	cargo test --workspace --locked -- --ignored
+	flock "$(TEST_DB_LOCK)" cargo test --workspace --locked -- --ignored
 
 lint: ## rustfmt check, clippy, Biome, TS typecheck
 	cargo fmt --all --check

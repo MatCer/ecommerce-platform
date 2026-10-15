@@ -29,6 +29,9 @@ die() {
   exit 1
 }
 
+[[ $(git rev-parse --path-format=absolute --git-dir) == "$(git rev-parse --path-format=absolute --git-common-dir)" ]] ||
+  die "this is a linked worktree; backup and restore act on the main checkout's stack, run them there"
+
 # psql as the postgres superuser over the container's local socket (trust auth, no password).
 psql_su() { "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -X -qAt -U postgres -d app "$@"; }
 
