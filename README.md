@@ -126,7 +126,7 @@ trusted network.
 | `make fmt` | Format Rust and TS |
 | `make openapi` | Regenerate `openapi.json` and the TS clients; commit the result |
 | `make openapi-check` | Fail if the generated clients are stale (runs in CI) |
-| `pnpm verify-merge <PR#> [--full]` | Test a PR on a throwaway stack, record `local-verify`, squash-merge (runbook "Verify and merge") |
+| `pnpm verify <PR#> [--full]` | Optional for now: test a PR on a throwaway stack and record `local-verify` (runbook "Verify") |
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
@@ -159,7 +159,7 @@ pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dr
 - Until setup has run, `make` in a worktree stops and asks for it. Compose targets (`make up`,
   `down`, `dev-infra`, `seed`, `logs`, ...) and `backup`/`restore` always refuse: the worktree
   shares the main checkout's `COMPOSE_PROJECT_NAME`, so they would act on its stack. A worktree
-  whose `.env` sets its own `COMPOSE_PROJECT_NAME`, like the one `pnpm verify-merge` builds, runs its
+  whose `.env` sets its own `COMPOSE_PROJECT_NAME`, like the one `pnpm verify` builds, runs its
   own stack and is not restricted.
 - Meilisearch, MinIO, Mailpit and the auth service stay shared with the main checkout.
 - `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so

@@ -1,18 +1,10 @@
 #!/usr/bin/env bash
-# pnpm verify-merge <PR#> [--full]
-#
-# The only place tests run (CI does lint + typecheck). Checks out the PR head in a temporary
-# worktree, runs the unit tests and e2e specs for the areas the PR touches (everything with
-# --full or when shared code changed) against a throwaway compose stack, posts the result as
-# the `local-verify` commit status on the PR head and, on success, squash-merges the PR.
-#
 # The stack is its own compose project (`ecommerce-verify`, own ports and volumes); it never
 # touches the dev stack (`ecommerce`) and is removed with its volumes on any exit.
-# Spec mapping: scripts/verify-areas.txt. Runbook: docs/runbook.md ("Verify and merge").
 set -euo pipefail
 
-usage() { echo "usage: pnpm verify-merge <PR#> [--full]" >&2; exit 2; }
-die() { printf '\033[31mverify-merge: %s\033[0m\n' "$*" >&2; exit 1; }
+usage() { echo "usage: pnpm verify <PR#> [--full]" >&2; exit 2; }
+die() { printf '\033[31mverify: %s\033[0m\n' "$*" >&2; exit 1; }
 say() { printf '\n\033[1m== %s\033[0m (%ss)\n' "$*" "$SECONDS" >&2; }
 
 pr='' full=0
@@ -60,10 +52,10 @@ fi
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/ecommerce-verify-merge"
 mkdir -p "$cache"
 exec 9>"$cache/lock"
-flock -n 9 || die "another verify-merge is running"
+flock -n 9 || die "another verify is running"
 
-git fetch -q origin "$base_ref" "+refs/pull/$pr/head:refs/verify-merge/pr-$pr"
-[ "$(git rev-parse "refs/verify-merge/pr-$pr")" = "$sha" ] || die "fetched head differs from the PR head; retry"
+git fetch -q origin "$base_ref" "+refs/pull/$pr/head:refs/verify/pr-$pr"
+[ "$(git rev-parse "refs/verify/pr-$pr")" = "$sha" ] || die "fetched head differs from the PR head; retry"
 base="$(git merge-base "origin/$base_ref" "$sha")"
 # The squash result must be what gets tested: the PR has to contain the current base tip.
 [ "$base" = "$(git rev-parse "origin/$base_ref")" ] ||
@@ -80,7 +72,7 @@ cleanup() {
   # Install errors, Ctrl-C, ...: never leave the status pending.
   if ((code != 0 && status_posted && !reported)); then status error "aborted (exit $code)" || true; fi
   if [ -f "$wt/.env" ]; then
-    echo "verify-merge: removing stack $project" >&2
+    echo "verify: removing stack $project" >&2
     # Sandbox containers (started by the builder, outside compose) hold the sandbox networks.
     compose stop --timeout 5 theme-builder theme-sandbox-proxy >/dev/null 2>&1 || true
     docker ps -aq --filter "label=platform.theme-sandbox=$project" | xargs -r docker rm -f >/dev/null 2>&1 || true
@@ -89,11 +81,11 @@ cleanup() {
     docker images --format '{{.Repository}}:{{.Tag}}' --filter "reference=$project-*:local" |
       xargs -r docker rmi >/dev/null 2>&1 || true
     if [ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$project")$(docker volume ls -q --filter "label=com.docker.compose.project=$project")" ]; then
-      echo "verify-merge: WARNING: $project containers/volumes left; the next run removes them" >&2
+      echo "verify: WARNING: $project containers/volumes left; the next run removes them" >&2
     fi
   fi
   git -C "$caller" worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"
-  git -C "$caller" update-ref -d "refs/verify-merge/pr-$pr" 2>/dev/null || true
+  git -C "$caller" update-ref -d "refs/verify/pr-$pr" 2>/dev/null || true
   exit "$code"
 }
 trap cleanup EXIT
@@ -118,7 +110,7 @@ fail() {
   status failure "$1" || true
   die "$1"
 }
-status pending "verify-merge running on $(hostname -s)"
+status pending "verify running on $(hostname -s)"
 
 # --- scope: changed files -> areas -> specs ------------------------------------------------
 mapfile -t changed < <(git diff --name-only "$base" "$sha")
@@ -241,13 +233,12 @@ if ((e2e_rc)) || ! ((perf_ok)); then
   cp -r "$results" "$cache/pr-$pr-test-results" 2>/dev/null || true
   what="${failed[*]:-e2e run errored (see output)}"; ((perf_ok)) || what="perf ${what}"
   status failure "failed: $what" || true
-  printf '\n\033[31mverify-merge: FAILED\033[0m %s\n' "$what" >&2
+  printf '\n\033[31mverify: FAILED\033[0m %s\n' "$what" >&2
   ((${#failed[@]} == 0)) || printf 'Rerun just those against your dev stack:\n  make e2e args="%s"\n' "${failed[*]}" >&2
   echo "Traces: $cache/pr-$pr-test-results (npx playwright show-trace <trace.zip>)" >&2
   exit 1
 fi
 
-# --- record + merge ---------------------------------------------------------------------
 if ((full)); then summary="full: cargo, vitest, all e2e + axe, image smoke, perf"
 else
   summary="rust=$rust vitest=changed e2e=${#spec_list[@]}: ${spec_list[*]}"
@@ -258,7 +249,7 @@ cd "$caller"
 git fetch -q origin "$base_ref"
 [ "$(git rev-parse "origin/$base_ref")" = "$base" ] ||
   fail "$base_ref moved during verification; update the PR and rerun"
-say "passed in ${SECONDS}s; recording local-verify and merging"
-status success "$summary (${SECONDS}s)"
-# --repo: gh leaves the local checkout alone (no base checkout, no local branch delete).
-gh pr merge "$pr" --repo "$repo" --squash --delete-branch --match-head-commit "$sha"
+say "passed in ${SECONDS}s; recording local-verify"
+status success "base ${base:0:12}: $summary (${SECONDS}s)"
+printf 'Merge while %s is still at %s:\n  gh pr merge %s --repo %s --squash --delete-branch --match-head-commit %s\n' \
+  "$base_ref" "${base:0:12}" "$pr" "$repo" "$sha" >&2
