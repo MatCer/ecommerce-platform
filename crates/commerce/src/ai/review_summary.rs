@@ -1,0 +1,559 @@
+//! AI review summaries (SHOP-36): with the tenant's opt-in switch on, a product with at least
+//! [`MIN_REVIEWS`] published verified reviews gets one short summary per market locale. The
+//! `ai.review_summary` job regenerates it after `review.changed` (debounced), skips the model
+//! call while the input hash is unchanged, and labels every stored text through `ai_marks`.
+//! The shop shows a summary only while the switch is on and its label still matches.
+
+use std::collections::BTreeMap;
+
+use chrono::{DateTime, Utc};
+use platform::Error;
+use platform::db::{TenantTx, tenant_tx};
+use platform::queue::{self, NewJob};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sqlx::PgPool;
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use super::fields::EntityType;
+use super::marks::{self, value_hash};
+use super::{Ai, Call, CallError, Outcome, prompts};
+use crate::audit;
+use crate::reviews::{self, plain_text};
+use crate::storefront::Context;
+
+pub const JOB: &str = "ai.review_summary";
+/// Metering key, fake fixture and `ai_marks.feature`.
+pub const FEATURE: &str = "review_summary";
+/// `ai_marks.field` of a stored summary.
+pub const FIELD: &str = "review_summary";
+pub const MIN_REVIEWS: i64 = 5;
+pub const MAX_INPUT_REVIEWS: i64 = 40;
+pub const BODY_CHARS: usize = 1000;
+pub const SUMMARY_MAX: usize = 600;
+pub const DEBOUNCE_SECS: i64 = 300;
+/// Part of the input hash: bump it when the prompt or the data shape changes.
+pub const PROMPT_VERSION: u32 = 1;
+/// `{product_id}` after a summary was written or deleted, `{}` after a settings change.
+pub const CHANGED_EVENT: &str = "review_summary.changed";
+const ACTOR: &str = "system";
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AiSettings {
+    /// AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
+    /// default.
+    pub review_summaries: bool,
+}
+
+/// An AI summary as the shop shows it (plain text; escape on output).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ReviewSummary {
+    pub text: String,
+    /// Language of the text (`lang` attribute).
+    pub locale: String,
+    /// Published verified reviews it was written from.
+    pub review_count: i32,
+    pub generated_at: DateTime<Utc>,
+}
+
+pub async fn settings(tx: &mut TenantTx) -> Result<AiSettings, Error> {
+    Ok(
+        sqlx::query_scalar!("SELECT review_summaries FROM ai_settings")
+            .fetch_optional(&mut **tx)
+            .await?
+            .map(|review_summaries| AiSettings { review_summaries })
+            .unwrap_or_default(),
+    )
+}
+
+/// Replaces the settings (audited). A change purges the tenant's pages; switching summaries on
+/// queues a job for every product with enough reviews.
+pub async fn put_settings(
+    tx: &mut TenantTx,
+    actor: &str,
+    input: &AiSettings,
+) -> Result<AiSettings, Error> {
+    let before = settings(tx).await?;
+    sqlx::query!(
+        "INSERT INTO ai_settings (tenant_id, review_summaries) VALUES ($1, $2)
+         ON CONFLICT (tenant_id) DO UPDATE SET
+             review_summaries = EXCLUDED.review_summaries, updated_at = now()",
+        tx.tenant_id(),
+        input.review_summaries
+    )
+    .execute(&mut **tx)
+    .await?;
+    audit::record(
+        tx,
+        actor,
+        "ai.settings_updated",
+        "ai_settings",
+        None,
+        &json!({ "before": before, "after": input }),
+    )
+    .await?;
+    if before != *input {
+        queue::publish(&mut **tx, CHANGED_EVENT, &json!({})).await?;
+    }
+    if input.review_summaries && !before.review_summaries {
+        let products = sqlx::query_scalar!(
+            "SELECT product_id FROM reviews WHERE status = 'published' AND verified
+             GROUP BY product_id HAVING count(*) >= $1",
+            MIN_REVIEWS
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        let now = Utc::now();
+        for product_id in products {
+            let mut j = new_job(tx.tenant_id(), product_id);
+            j.idempotency_key = Some(format!(
+                "{JOB}:{}:{product_id}:on:{}",
+                tx.tenant_id(),
+                now.timestamp_micros()
+            ));
+            queue::enqueue(&mut **tx, &j).await?;
+        }
+    }
+    Ok(*input)
+}
+
+fn new_job(tenant_id: Uuid, product_id: Uuid) -> NewJob<'static> {
+    let mut j = NewJob::new(JOB, json!({ "product_id": product_id }));
+    j.tenant_id = Some(tenant_id);
+    j.max_attempts = 3;
+    j
+}
+
+/// One job per product and debounce window, run at the window's end.
+pub fn job(tenant_id: Uuid, product_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
+    let slot = now.timestamp().div_euclid(DEBOUNCE_SECS);
+    let mut j = new_job(tenant_id, product_id);
+    j.idempotency_key = Some(format!("{JOB}:{tenant_id}:{product_id}:{slot}"));
+    j.run_at = DateTime::from_timestamp((slot + 1) * DEBOUNCE_SECS, 0);
+    j
+}
+
+/// Every `review.changed` (publish, hide, reply) queues a regeneration; the job decides
+/// whether anything changed.
+pub fn job_for_event(
+    tenant_id: Option<Uuid>,
+    event_type: &str,
+    payload: &Value,
+    now: DateTime<Utc>,
+) -> Option<NewJob<'static>> {
+    (event_type == reviews::CHANGED_EVENT).then_some(())?;
+    let product_id = payload
+        .get("product_id")
+        .and_then(Value::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())?;
+    Some(job(tenant_id?, product_id, now))
+}
+
+/// What the model sees for a product, and the hash of it.
+struct Input {
+    data: Value,
+    sha256: String,
+    review_count: i64,
+    locales: Vec<String>,
+}
+
+/// `None` when the product does not exist (for this tenant).
+async fn load(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<Input>, Error> {
+    let Some(product) = sqlx::query_scalar!(
+        "SELECT name FROM product_translations WHERE product_id = $1
+         ORDER BY (locale = (SELECT default_locale FROM markets WHERE is_default)) DESC NULLS LAST,
+                  locale
+         LIMIT 1",
+        product_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(None);
+    };
+    let mut locales =
+        sqlx::query_scalar!(r#"SELECT DISTINCT unnest(locales) AS "locale!" FROM markets"#)
+            .fetch_all(&mut **tx)
+            .await?;
+    locales.sort();
+    let counts = sqlx::query!(
+        r#"SELECT rating, count(*) AS "n!" FROM reviews
+           WHERE product_id = $1 AND status = 'published' AND verified GROUP BY rating"#,
+        product_id
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let rating = reviews::rating_summary(counts.iter().map(|c| (c.rating, c.n)));
+    let rows = sqlx::query!(
+        "SELECT id, rating, title, body, locale FROM reviews
+         WHERE product_id = $1 AND status = 'published' AND verified
+         ORDER BY published_at DESC, id DESC LIMIT $2",
+        product_id,
+        MAX_INPUT_REVIEWS
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let ids: Vec<Uuid> = rows.iter().map(|r| r.id).collect();
+    let items: Vec<Value> = rows
+        .into_iter()
+        .map(|r| {
+            json!({
+                "rating": r.rating,
+                "title": r.title,
+                "body": r.body.chars().take(BODY_CHARS).collect::<String>(),
+                "locale": r.locale,
+            })
+        })
+        .collect();
+    let data = json!({
+        "product": product,
+        "locales": locales,
+        "rating": rating,
+        "reviews": items,
+    });
+    let sha256 = value_hash(&json!({ "v": PROMPT_VERSION, "ids": ids, "data": data }));
+    Ok(Some(Input {
+        data,
+        sha256,
+        review_count: rating.as_ref().map_or(0, |r| r.count),
+        locales,
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Output {
+    summaries: Vec<OutputItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OutputItem {
+    locale: String,
+    summary: String,
+}
+
+/// The model's summaries by locale: exactly the requested locales (sorted), plain text of
+/// 1-600 characters without links, email addresses or markup.
+fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String>, CallError> {
+    let out: Output = super::parse(output)?;
+    let mut by_locale = BTreeMap::new();
+    for item in out.summaries {
+        let text = plain_text(&item.summary, false);
+        if !(1..=SUMMARY_MAX).contains(&text.chars().count()) {
+            return Err(CallError::output(format!(
+                "the {} summary must be 1-{SUMMARY_MAX} characters",
+                item.locale
+            )));
+        }
+        let lower = text.to_lowercase();
+        if ["://", "www.", "@", "<"].iter().any(|p| lower.contains(p)) {
+            return Err(CallError::output(format!(
+                "the {} summary contains a link, an email address or markup",
+                item.locale
+            )));
+        }
+        if by_locale.insert(item.locale, text).is_some() {
+            return Err(CallError::output("a locale is summarized twice"));
+        }
+    }
+    if !by_locale.keys().eq(locales.iter()) {
+        return Err(CallError::output(format!(
+            "summaries for {:?}, asked for {locales:?}",
+            by_locale.keys().collect::<Vec<_>>()
+        )));
+    }
+    Ok(by_locale)
+}
+
+async fn stored_hash(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<String>, Error> {
+    Ok(sqlx::query_scalar!(
+        "SELECT input_sha256 FROM review_summaries WHERE product_id = $1 LIMIT 1",
+        product_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?)
+}
+
+/// Regenerates (or below the minimum deletes) a product's summaries. Provider outages are
+/// retried until `last_attempt`; quota, refusals and invalid output keep the old summary.
+pub async fn run(
+    db: &PgPool,
+    ai: &Ai,
+    tenant: Uuid,
+    product_id: Uuid,
+    last_attempt: bool,
+) -> Result<Outcome, Error> {
+    if ai.client.is_none() {
+        return Ok(Outcome::Done);
+    }
+    let (input, stored) = {
+        let mut tx = tenant_tx(db, tenant).await?;
+        if !settings(&mut tx).await?.review_summaries {
+            return Ok(Outcome::Done);
+        }
+        let Some(input) = load(&mut tx, product_id).await? else {
+            return Ok(Outcome::Done);
+        };
+        let stored = stored_hash(&mut tx, product_id).await?;
+        tx.commit().await?;
+        (input, stored)
+    };
+    if input.review_count < MIN_REVIEWS || input.locales.is_empty() {
+        if stored.is_some() {
+            store(db, tenant, product_id, &input.sha256, None).await?;
+        }
+        return Ok(Outcome::Done);
+    }
+    if stored.as_deref() == Some(input.sha256.as_str()) {
+        return Ok(Outcome::Done);
+    }
+    let task = format!(
+        "Summarize the reviews of this product in these languages: {}.",
+        input.locales.join(", ")
+    );
+    let call = super::call(
+        db,
+        ai,
+        tenant,
+        ACTOR,
+        &Call {
+            feature: FEATURE,
+            system: prompts::REVIEW_SUMMARY_SYSTEM,
+            task: &task,
+            data: &input.data,
+            schema: &prompts::review_summary_schema(),
+            max_tokens: 2000,
+        },
+    )
+    .await;
+    let result =
+        call.and_then(|(output, model)| validate(output, &input.locales).map(|s| (s, model)));
+    match result {
+        Ok((summaries, model)) => {
+            let fresh = Fresh {
+                summaries: &summaries,
+                model: &model,
+                review_count: input.review_count,
+            };
+            store(db, tenant, product_id, &input.sha256, Some(&fresh)).await?;
+            Ok(Outcome::Done)
+        }
+        Err(CallError::Platform(e)) => Err(e),
+        Err(e) if e.retryable() && !last_attempt => Ok(Outcome::Retry(e.to_string())),
+        Err(e) => {
+            tracing::warn!(%product_id, code = e.code(), error = %e, "review summary failed");
+            Ok(Outcome::Done)
+        }
+    }
+}
+
+struct Fresh<'a> {
+    summaries: &'a BTreeMap<String, String>,
+    model: &'a str,
+    review_count: i64,
+}
+
+/// Replaces the product's summaries and labels with `fresh` (`None`: deletes them), unless
+/// the input changed since `sha256` was computed: that change queued a newer job.
+async fn store(
+    db: &PgPool,
+    tenant: Uuid,
+    product_id: Uuid,
+    sha256: &str,
+    fresh: Option<&Fresh<'_>>,
+) -> Result<(), Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('review_summary:' || $1::text, 0))",
+        product_id.to_string()
+    )
+    .execute(&mut *tx)
+    .await?;
+    if load(&mut tx, product_id)
+        .await?
+        .map(|i| i.sha256)
+        .as_deref()
+        != Some(sha256)
+    {
+        return Ok(());
+    }
+    let entity_id = product_id.to_string();
+    let deleted = sqlx::query!(
+        "DELETE FROM review_summaries WHERE product_id = $1",
+        product_id
+    )
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    sqlx::query!(
+        "DELETE FROM ai_marks WHERE entity_type = $1 AND entity_id = $2 AND field = $3",
+        EntityType::Product.as_str(),
+        entity_id,
+        FIELD
+    )
+    .execute(&mut *tx)
+    .await?;
+    if let Some(f) = fresh {
+        let review_count = i32::try_from(f.review_count).unwrap_or(i32::MAX);
+        for (locale, text) in f.summaries {
+            sqlx::query!(
+                "INSERT INTO review_summaries (tenant_id, product_id, locale, summary,
+                                               review_count, input_sha256, model)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                tenant,
+                product_id,
+                locale,
+                text,
+                review_count,
+                sha256,
+                f.model
+            )
+            .execute(&mut *tx)
+            .await?;
+            marks::record(
+                &mut tx,
+                EntityType::Product,
+                &entity_id,
+                &marks::NewMark {
+                    locale,
+                    field: FIELD,
+                    value: &json!(text),
+                    feature: FEATURE,
+                    model: f.model,
+                    proposal_id: None,
+                    accepted_by: ACTOR,
+                },
+            )
+            .await?;
+        }
+    }
+    if fresh.is_some() || deleted > 0 {
+        queue::publish(
+            &mut *tx,
+            CHANGED_EVENT,
+            &json!({ "product_id": product_id }),
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// The summary in the request's locale, only while the switch is on and its AI label still
+/// matches the text (fails closed).
+pub async fn for_storefront(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    product_id: Uuid,
+) -> Result<Option<ReviewSummary>, Error> {
+    let row = sqlx::query!(
+        "SELECT s.summary, s.locale, s.review_count, s.generated_at, m.value_sha256
+         FROM review_summaries s
+         JOIN ai_settings a ON a.review_summaries
+         JOIN ai_marks m ON m.entity_type = $3 AND m.entity_id = s.product_id::text
+                        AND m.locale = s.locale AND m.field = $4
+         WHERE s.product_id = $1 AND s.locale = $2",
+        product_id,
+        ctx.locale,
+        EntityType::Product.as_str(),
+        FIELD
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(row
+        .filter(|r| value_hash(&json!(r.summary)) == r.value_sha256)
+        .map(|r| ReviewSummary {
+            text: r.summary,
+            locale: r.locale,
+            review_count: r.review_count,
+            generated_at: r.generated_at,
+        }))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use chrono::TimeZone;
+
+    use super::*;
+
+    fn locales() -> Vec<String> {
+        vec!["cs".into(), "sk".into()]
+    }
+
+    fn out(items: &[(&str, &str)]) -> Value {
+        json!({ "summaries": items.iter().map(|(l, s)| json!({ "locale": l, "summary": s }))
+            .collect::<Vec<_>>() })
+    }
+
+    #[test]
+    fn valid_output_is_plain_text_per_requested_locale() {
+        let got = validate(
+            out(&[
+                ("sk", "  Zákazníci\tchvália strih. "),
+                ("cs", "Chválí střih."),
+            ]),
+            &locales(),
+        )
+        .unwrap();
+        assert_eq!(
+            got.into_iter().collect::<Vec<_>>(),
+            vec![
+                ("cs".to_owned(), "Chválí střih.".to_owned()),
+                ("sk".to_owned(), "Zákazníci chvália strih.".to_owned())
+            ]
+        );
+    }
+
+    #[test]
+    fn invalid_output_is_rejected() {
+        let long = "a".repeat(SUMMARY_MAX + 1);
+        for bad in [
+            out(&[("cs", "Jen česky.")]),
+            out(&[("cs", "A"), ("sk", "B"), ("en", "C")]),
+            out(&[("cs", "A"), ("cs", "B")]),
+            out(&[("cs", "Viz https://x.example"), ("sk", "B")]),
+            out(&[("cs", "Viz WWW.example.cz"), ("sk", "B")]),
+            out(&[("cs", "Pište na info@example.cz"), ("sk", "B")]),
+            out(&[("cs", "<b>Super</b>"), ("sk", "B")]),
+            out(&[("cs", &long), ("sk", "B")]),
+            out(&[("cs", "   "), ("sk", "B")]),
+            json!({ "summaries": [], "extra": 1 }),
+        ] {
+            let e = validate(bad.clone(), &locales()).unwrap_err();
+            assert_eq!(e.code(), "ai_invalid_output", "{bad}");
+        }
+    }
+
+    #[test]
+    fn review_changes_debounce_per_product() {
+        let (t, p) = (Uuid::now_v7(), Uuid::now_v7());
+        let now = Utc.with_ymd_and_hms(2026, 10, 16, 12, 1, 0).unwrap();
+        let payload = json!({ "product_id": p });
+        let a = job_for_event(Some(t), "review.changed", &payload, now).unwrap();
+        let b = job_for_event(
+            Some(t),
+            "review.changed",
+            &payload,
+            now + chrono::Duration::seconds(200),
+        )
+        .unwrap();
+        assert_eq!(a.kind, "ai.review_summary");
+        assert_eq!(a.idempotency_key, b.idempotency_key);
+        assert_eq!(
+            a.run_at,
+            Some(Utc.with_ymd_and_hms(2026, 10, 16, 12, 5, 0).unwrap())
+        );
+        assert_eq!(a.payload, payload);
+        assert_eq!((a.tenant_id, a.max_attempts), (Some(t), 3));
+        let other = job_for_event(Some(Uuid::now_v7()), "review.changed", &payload, now).unwrap();
+        assert_ne!(other.idempotency_key, a.idempotency_key);
+        assert!(job_for_event(Some(t), "review_summary.changed", &payload, now).is_none());
+        assert!(job_for_event(Some(t), "price.changed", &payload, now).is_none());
+        assert!(job_for_event(None, "review.changed", &payload, now).is_none());
+        assert!(job_for_event(Some(t), "review.changed", &json!({}), now).is_none());
+    }
+}

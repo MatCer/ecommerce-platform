@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.summary, s.locale, s.review_count, s.generated_at, m.value_sha256\n         FROM review_summaries s\n         JOIN ai_settings a ON a.review_summaries\n         JOIN ai_marks m ON m.entity_type = $3 AND m.entity_id = s.product_id::text\n                        AND m.locale = s.locale AND m.field = $4\n         WHERE s.product_id = $1 AND s.locale = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "summary",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "review_summaries",
+            "name": "summary"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "review_summaries",
+            "name": "locale"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "review_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "review_summaries",
+            "name": "review_count"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "generated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "review_summaries",
+            "name": "generated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "value_sha256",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_marks",
+            "name": "value_sha256"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "51a3be73dc8154485ad51bc9cdecbb4d51686593208a15169a6d37cda2223dd6"
+}

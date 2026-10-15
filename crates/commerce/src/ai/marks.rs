@@ -37,7 +37,8 @@ pub(crate) struct NewMark<'a> {
     pub value: &'a Value,
     pub feature: &'a str,
     pub model: &'a str,
-    pub proposal_id: Uuid,
+    /// `None` for text the platform writes without a proposal (review summaries).
+    pub proposal_id: Option<Uuid>,
     pub accepted_by: &'a str,
 }
 

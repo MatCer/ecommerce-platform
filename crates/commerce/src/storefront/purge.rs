@@ -30,6 +30,7 @@ pub const EVENTS: &[&str] = &[
     crate::content::PAGE_CHANGED_EVENT,
     crate::content::MENU_CHANGED_EVENT,
     crate::reviews::CHANGED_EVENT,
+    crate::ai::review_summary::CHANGED_EVENT,
 ];
 
 pub fn for_event(event_type: &str, payload: &Value) -> Option<Purge> {
@@ -47,6 +48,8 @@ pub fn for_event(event_type: &str, payload: &Value) -> Option<Purge> {
         | "price.changed"
         | "inventory.changed"
         | crate::reviews::CHANGED_EVENT => product(),
+        // Without a product: the settings changed for every product page.
+        crate::ai::review_summary::CHANGED_EVENT => product().or(Some(Purge::Tenant)),
         t if EVENTS.contains(&t) => Some(Purge::Tenant),
         _ => None,
     }
@@ -78,6 +81,14 @@ mod tests {
         assert_eq!(for_event("category.moved", &json!({})), Some(Purge::Tenant));
         assert_eq!(
             for_event(crate::content::PAGE_CHANGED_EVENT, &json!({})),
+            Some(Purge::Tenant)
+        );
+        assert_eq!(
+            for_event("review_summary.changed", &p),
+            Some(Purge::Tags(vec![format!("product:{id}")]))
+        );
+        assert_eq!(
+            for_event("review_summary.changed", &json!({})),
             Some(Purge::Tenant)
         );
         assert_eq!(for_event("coupon.created", &json!({})), None);

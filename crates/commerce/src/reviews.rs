@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::ai::review_summary::{self, ReviewSummary};
 use crate::audit;
 use crate::capability;
 use crate::markets::invalid;
@@ -659,6 +660,37 @@ pub struct ProductReviews {
     pub items: Vec<PublicReview>,
     /// The shop's published "how we verify reviews" page (Omnibus disclosure).
     pub verification_url: Option<String>,
+    /// AI summary of the verified reviews in the request's locale, when the shop switched it
+    /// on. Show it with its AI label.
+    pub ai_summary: Option<ReviewSummary>,
+}
+
+/// The summary of `(rating, count)` rows; `None` without any review.
+pub(crate) fn rating_summary(counts: impl Iterator<Item = (i16, i64)>) -> Option<RatingSummary> {
+    let mut histogram = [0_i64; 5];
+    for (rating, n) in counts {
+        if let Some(slot) = usize::try_from(rating - 1)
+            .ok()
+            .and_then(|i| histogram.get_mut(i))
+        {
+            *slot = n;
+        }
+    }
+    let count: i64 = histogram.iter().sum();
+    (count > 0).then(|| {
+        let total: i64 = histogram
+            .iter()
+            .zip(1_i64..)
+            .map(|(n, stars)| n * stars)
+            .sum();
+        #[allow(clippy::cast_precision_loss)]
+        let average = (total as f64 / count as f64 * 10.0).round() / 10.0;
+        RatingSummary {
+            average,
+            count,
+            histogram,
+        }
+    })
 }
 
 /// Published reviews and their summary for a product page.
@@ -674,31 +706,8 @@ pub async fn for_product(
     )
     .fetch_all(&mut **tx)
     .await?;
-    let mut histogram = [0_i64; 5];
-    for c in &counts {
-        if let Some(slot) = usize::try_from(c.rating - 1)
-            .ok()
-            .and_then(|i| histogram.get_mut(i))
-        {
-            *slot = c.n;
-        }
-    }
-    let count: i64 = histogram.iter().sum();
-    let summary = (count > 0).then(|| {
-        let total: i64 = histogram
-            .iter()
-            .zip(1_i64..)
-            .map(|(n, stars)| n * stars)
-            .sum();
-        #[allow(clippy::cast_precision_loss)]
-        let average = (total as f64 / count as f64 * 10.0).round() / 10.0;
-        RatingSummary {
-            average,
-            count,
-            histogram,
-        }
-    });
-    let items = if count == 0 {
+    let summary = rating_summary(counts.iter().map(|c| (c.rating, c.n)));
+    let items = if summary.is_none() {
         Vec::new()
     } else {
         sqlx::query!(
@@ -739,6 +748,7 @@ pub async fn for_product(
         summary,
         items,
         verification_url: slug.map(|s| ctx.path(&format!("/pages/{s}"))),
+        ai_summary: review_summary::for_storefront(tx, ctx, product_id).await?,
     })
 }
 
@@ -854,6 +864,7 @@ mod tests {
             summary: None,
             items: vec![],
             verification_url: None,
+            ai_summary: None,
         };
         assert!(json_ld(&empty).is_none());
         let r = PublicReview {
@@ -875,6 +886,7 @@ mod tests {
             }),
             items: vec![r; 7],
             verification_url: None,
+            ai_summary: None,
         };
         let (agg, items) = json_ld(&some).unwrap();
         assert_eq!(agg["ratingValue"], "4.0");

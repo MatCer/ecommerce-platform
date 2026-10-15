@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT unnest(locales) AS \"locale!\" FROM markets",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f77d9b70d3eefbbba234df205ecf1129f6d845bb0456b1c7263fd3b0687ee2df"
+}
