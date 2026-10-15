@@ -4,9 +4,11 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 LINKED_WORKTREE := $(filter-out $(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null),$(shell git rev-parse --path-format=absolute --git-dir 2>/dev/null))
+# A linked worktree with its own .env runs its own stack (scripts/verify-merge.sh does).
+SHARES_MAIN_STACK := $(if $(LINKED_WORKTREE),$(shell [ -L .env ] || [ ! -e .env ] && echo yes))
 
 -include .env
-ifdef LINKED_WORKTREE
+ifdef SHARES_MAIN_STACK
 include .env.worktree.local
 .env .env.worktree.local:
 	@echo "make: this is a linked worktree; run 'pnpm worktree:setup' first" >&2; exit 1
@@ -30,7 +32,7 @@ API_PORT ?= 8000
 OWNER_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/$(APP_DB)
 TEST_DATABASE_URL ?= postgres://app_owner:$(APP_OWNER_PASSWORD)@localhost:$(PG_PORT)/app_test
 
-ifdef LINKED_WORKTREE
+ifdef SHARES_MAIN_STACK
 COMPOSE_FULL = $(error this worktree shares the main checkout's .env and COMPOSE_PROJECT_NAME, so compose here would rebuild its stack; run this target there)
 COMPOSE_INFRA = $(COMPOSE_FULL)
 else
