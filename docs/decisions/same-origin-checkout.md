@@ -5,9 +5,10 @@ account, withdrawal, review, newsletter/watch/flow links, consent, restore-cart)
 `<shop>` (SHOP-54) while theme JS, which is merchant- or AI-authored and untrusted, keeps running
 unrestricted on that same origin?
 
-**Status: draft, not approved.** The second security review (2026-10-15) rated it unsound. Its
-two blockers are addressed in A2, C4 and C6 pending a third review; four further issues remain
-open (§ Open issues). SHOP-54 does not start until they are closed.
+**Status: draft, not approved.** The second security review (2026-10-15) rated it unsound; the
+third rated the fixes for its two blockers sound with required changes, which are folded in
+(A2, C4, C6). Four further issues remain open (§ Open issues, O3-O6). SHOP-54 does not start
+until they are closed.
 
 **Proposed decision: split them, like Shopify.**
 
@@ -82,20 +83,36 @@ cannot plant: it is `__Host-` on another host, and Safari enforces `__Host-`.
 
 1. "Sign in" in checkout is a navigation POST to `/checkout/identify/start` (page token). The
    server creates an identify transaction: a random `state`, bound to the checkout's current
-   capability, single use, valid 5 minutes. It answers `303` to the account origin with `state`.
+   capability, single use, valid 5 minutes, and sets it as a fresh `__Host-Http-idt` cookie as
+   well. It answers `303` to the account origin with `state`.
 2. The account origin signs the customer in if needed, then redirects to the one fixed
    callback `<shop>/checkout/identify?state=…&code=…`. The code is single use, valid 60 s and
    bound to the `state`, the shop and the account.
 3. The shop edge strips both under C5. The server accepts the callback only if the `state`
-   exists, is unused, the code was issued for it, and the request's capability is the one the
-   `state` was bound to; it consumes `state` and code in one transaction. An unsolicited
-   callback, or a code minted in another browser, is rejected (RFC 9700 §4.5: authorization
-   code injection). On success the checkout is linked to the account and the capability
-   rotates (C6).
-4. **Placement re-confirms.** A checkout linked to an account repeats steps 1-3 immediately
-   before placement; for a signed-in customer the account origin answers without any UI. The
-   order is attributed to the account only if the round trip confirms the same account in this
-   browser. Otherwise the link is dropped and the order is placed as a guest order.
+   exists, is unused, matches the `__Host-Http-idt` cookie, the code was issued for it, and the
+   request's capability is the one the `state` was bound to; it consumes `state` and code in
+   one transaction. An unsolicited callback is rejected (RFC 9700 §4.5: authorization code
+   injection). On success the checkout is linked to the account and the capability rotates
+   (C6).
+
+Steps 1-3 do not bind to the browser where the prefix is not enforced: a theme can plant both
+the capability and the transaction cookie the attacker started with. So **the identify link is
+only a prefill hint.** It lets checkout show that account's saved addresses; it never makes
+the checkout or anything entered in it visible in that account, and never updates the account.
+Only a confirmed placement (4) does.
+
+4. **Placement confirmation.** Placing a checkout linked to an account is a separate
+   transaction with its own purpose: the place-order POST creates a placement `state` bound to
+   the checkout id, its current capability generation and the expected account, and redirects
+   to the account origin. The account origin reports, from its own unplantable session, which
+   account is signed in in this browser, if any. The callback consumes that `state` and places
+   the order in the same transaction:
+   - same account: the order is attributed to it;
+   - no account or a different one: the order is placed as a guest order, and the checkout
+     shows that before the redirect back completes the placement;
+   - missing, expired, mismatched or reused `state`, or any capability rotation since the
+     place-order POST (another tab changed the checkout): placement aborts and the customer is
+     back on the review step. Abort never falls back to a guest order.
 
 The callback target is the exact canonical shop origin and path, never a prefix match.
 
@@ -144,7 +161,15 @@ capability, compared in constant time. Rules:
 - Calls that rotate the capability (C6) are navigation form POSTs answered with `303` to the
   next checkout page; the new token arrives in that page's HTML. A tab still holding an old
   token gets `403` and reloads itself by navigation; it never replays the mutation.
-- The same-origin `Origin`/`Sec-Fetch-Site` and JSON-only checks stay.
+- Every protected read and mutation validates the capability **inside the same database
+  transaction** that reads or writes the checkout, against the checkout's current capability
+  generation. A request authorised with a capability that a concurrent write has since
+  revoked fails instead of returning or changing data from after the rotation. This covers
+  non-PII mutations (shipping method, cart lines, discount codes) and their responses too.
+- JSON endpoints keep the same-origin `Origin`/`Sec-Fetch-Site` and JSON-only checks. The
+  navigation POSTs C4, C6, C10 and A2 rely on are a separate, enumerated set of
+  form-encoded endpoints that require `_pt` (except C10), same-origin `Origin`,
+  `Sec-Fetch-Site: same-origin` and `Sec-Fetch-Mode: navigate`.
 
 `/_p/consent` (C9) and the shop's `/_p/cart*` stay token-free: themes are meant to call them.
 
@@ -304,15 +329,21 @@ are partial and continue below.
   every browser. Fix direction: checkout starts the sign-in with a server-side transaction bound
   to the checkout capability and exact callback, consumed atomically with the code; unsolicited
   callbacks are rejected (RFC 9700 §4.5, authorization-code injection).
-  **Addressed** by the `state`-bound transaction and placement re-confirmation in A2; pending
-  review round 3.
+  **Resolved** (round 3) by the `state`-bound transaction, prefill-only identify link and the
+  separate placement confirmation in A2.
 - **O2. Blocker: planted guest checkout (C6, R1).** An attacker creates a guest checkout,
   enters dummy PII so the first-PII rotation has already happened, and plants the rotated
   capability in a browser without `__Host-Http-` support (Safari, Chrome < 140, Firefox < 143).
   The victim's later edits land in a checkout the attacker can read. Theme JS holding a planted
   capability and its token can also make the first PII call itself and read the replacement
   token. **Addressed** by rotation on every PII write and HTML-only tokens (C4, C6); the
-  remaining pre-filled-email case is accepted as R1. Pending review round 3.
+  remaining pre-filled-email case is accepted as R1. **Resolved** (round 3) once capability
+  checks run in the same transaction as the data access (C4).
+
+Round 3 (2026-10-15) rated O1/O2 "sound with required changes": a read already authorised
+could outlive a rotation (fixed in C4), the identify link was not browser-bound (now
+prefill-only, A2), placement confirmation lacked its own binding (A2.4), and navigation POSTs
+clashed with JSON-only checks (C4). All four are folded in above.
 - **O3. Password managers (A1, R2).** Some managers match by registrable domain and can
   autofill on load (Bitwarden defaults), so a theme form on `<merchant domain>` can receive a
   login saved for `account.<merchant domain>` without the customer choosing it. "Passwords are
@@ -342,8 +373,11 @@ registration fails and `Service-Worker: script` gets 403; `/_p/orders/*` without
 after `/o/<token>` and after a Stripe return → logo, `navigation.entries()` and
 `document.referrer` hold no secret; a capability the attacker holds, planted in the victim's
 browser, reads nothing the victim enters afterwards, including when the checkout already holds
-attacker PII; a PII write made by theme JS returns no token; an identify callback with a code
-minted in another browser, or without a matching `state`, is rejected; placement of a
+attacker PII; a PII write made by theme JS returns no token; an identify callback without a
+matching `state` or `__Host-Http-idt` is rejected; a checkout identified with the
+attacker's account shows nothing in that account; a read authorised with capability K and
+paused while the victim's write rotates K fails (deterministic race test); a placement whose
+checkout rotated after the place-order POST aborts; placement of a
 checkout linked to an account the browser is not signed in to produces a guest order;
 `/_p/consent` cannot set `email_marketing`; on Chromium, `document.cookie` cannot
 set `__Host-Http-cart`; `checkout.<shop>//attacker.example` does not redirect off-site. Unit
