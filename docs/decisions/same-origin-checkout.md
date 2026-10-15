@@ -5,8 +5,9 @@ account, withdrawal, review, newsletter/watch/flow links, consent, restore-cart)
 `<shop>` (SHOP-54) while theme JS, which is merchant- or AI-authored and untrusted, keeps running
 unrestricted on that same origin?
 
-**Status: draft, not approved.** The second security review (2026-10-15) still rates it unsound;
-see § Open issues. SHOP-54 does not start until they are closed.
+**Status: draft, not approved.** The second security review (2026-10-15) rated it unsound. Its
+two blockers are addressed in A2, C4 and C6 pending a third review; four further issues remain
+open (§ Open issues). SHOP-54 does not start until they are closed.
 
 **Proposed decision: split them, like Shopify.**
 
@@ -50,7 +51,8 @@ legally required flows (placing an order, withdrawal, consent).
 | Service worker on `/` intercepting platform navigations | No workers on the origin, ever (C3) |
 | Calling `/_p/checkout/*`, `/_p/orders/*` with the customer's cookies | Page token bound to a random capability (C4) |
 | Reading bearer URLs or payment-return secrets from history or referrer | Exchanged for a cookie + 303 to a clean URL (C5) |
-| Planting or overwriting the checkout capability | `__Host-Http-` cookie (C6), rotation on first PII (C6); residual on Safari (R1) |
+| Planting or overwriting the checkout capability | `__Host-Http-` cookie, rotation on every PII write (C6), HTML-only tokens (C4); residual R1 |
+| Attaching the attacker's account to the customer's checkout | `state`-bound identify and placement re-confirmation (A2) |
 | Forged consent | Theme consent limited to anonymous cookie categories (C9) |
 | Storage, `BroadcastChannel` | No platform data in origin storage (C7) |
 | Shadowing a platform path or asset, now or from cache | Platform namespace reserved before launch (C8) |
@@ -74,13 +76,28 @@ pages (all platform code); with `account.<merchant domain>` a theme form on the 
 the customer pick their saved login. The merchant opts into that by choosing the custom
 subdomain; the admin says so.
 
-**A2. Sign-in from checkout.** "Sign in" in checkout is a top-level navigation to the account
-origin with a return path. The account origin accepts only a checkout path on that shop's
-canonical origin as return target (no open redirect). After sign-in it redirects to
-`<shop>/checkout/identify?code=<code>`: a single-use code, valid 60 s, bound to the shop and the
-account. The shop edge exchanges it under C5, attaches the customer to the checkout server-side
-and rotates the checkout capability (C6). The shop origin never receives an account session;
-the checkout knows the customer only through its server-side checkout record.
+**A2. Sign-in from checkout.** The shop origin never receives an account session. A checkout
+learns who the customer is only from the account origin's own session cookie, which a theme
+cannot plant: it is `__Host-` on another host, and Safari enforces `__Host-`.
+
+1. "Sign in" in checkout is a navigation POST to `/checkout/identify/start` (page token). The
+   server creates an identify transaction: a random `state`, bound to the checkout's current
+   capability, single use, valid 5 minutes. It answers `303` to the account origin with `state`.
+2. The account origin signs the customer in if needed, then redirects to the one fixed
+   callback `<shop>/checkout/identify?state=…&code=…`. The code is single use, valid 60 s and
+   bound to the `state`, the shop and the account.
+3. The shop edge strips both under C5. The server accepts the callback only if the `state`
+   exists, is unused, the code was issued for it, and the request's capability is the one the
+   `state` was bound to; it consumes `state` and code in one transaction. An unsolicited
+   callback, or a code minted in another browser, is rejected (RFC 9700 §4.5: authorization
+   code injection). On success the checkout is linked to the account and the capability
+   rotates (C6).
+4. **Placement re-confirms.** A checkout linked to an account repeats steps 1-3 immediately
+   before placement; for a signed-in customer the account origin answers without any UI. The
+   order is attributed to the account only if the round trip confirms the same account in this
+   browser. Otherwise the link is dropped and the order is placed as a guest order.
+
+The callback target is the exact canonical shop origin and path, never a prefix match.
 
 ## Controls on `<shop>`
 
@@ -120,11 +137,13 @@ capability, compared in constant time. Rules:
 
 - A request without that capability cookie gets `403`. There is no token for empty
   credentials, so no token is shared between visitors.
-- The edge injects the token only into platform page HTML (`<meta name="page-token">`), which
-  C1 keeps from theme JS. A request that fails validation never receives a token.
-- When a valid call rotates the capability, the new token comes back in the `x-page-token`
-  response header to the platform page that made the call. A tab still holding the old token
-  gets `403` and reloads itself by navigation; it never replays the mutation.
+- Tokens exist only in platform page HTML (`<meta name="page-token">`), which C1 keeps from
+  theme JS. No API response ever carries a token, so theme JS that makes a call with a planted
+  capability and its known token learns nothing that outlives the next rotation. A request
+  that fails validation never receives a token.
+- Calls that rotate the capability (C6) are navigation form POSTs answered with `303` to the
+  next checkout page; the new token arrives in that page's HTML. A tab still holding an old
+  token gets `403` and reloads itself by navigation; it never replays the mutation.
 - The same-origin `Origin`/`Sec-Fetch-Site` and JSON-only checks stay.
 
 `/_p/consent` (C9) and the shop's `/_p/cart*` stay token-free: themes are meant to call them.
@@ -151,10 +170,22 @@ kept. A clean URL opened in another browser shows "open the link from your email
 **C6. The checkout capability.** The checkout cart cookie becomes `__Host-Http-cart`
 (`HttpOnly; Secure; Path=/; SameSite=Lax`, 256-bit random). Chrome 140+ and Firefox 143+ refuse
 `document.cookie`/Cookie Store writes of `__Http-`/`__Host-Http-` names; Safari does not (R1).
-The capability rotates, and the old value is revoked, on checkout start (C10), on identify
-(A2), and on the first request that stores PII in the checkout (email or address). An attacker
-who planted a capability they know therefore loses it before the customer's data reaches the
-checkout. The shop `cart` cookie (`Path=/_p`) and consent cookies are unchanged.
+Where the prefix is not enforced, theme JS can plant a capability the attacker holds, so C6
+does not rely on the prefix. Instead the capability rotates on **every** write that adds or
+changes PII (contact, address, note), on checkout start (C10) and on identify (A2). The write,
+the new random capability and the revocation of the old one happen in one transaction, and the
+new value is only ever sent as an `HttpOnly` `Set-Cookie`, which theme JS cannot read in any
+engine. PII therefore only ever sits under a capability the attacker has never seen: a planted
+capability is dead from the victim's first write, and a write the theme makes itself yields a
+cookie it cannot read and no token (C4). Planting another capability later moves the victim to
+a different checkout; their data stays where it was, out of the attacker's reach. Server-side,
+each capability has an expiry (24 h idle), is scoped to one shop and one checkout, and is
+checked against the checkout it is presented for.
+
+The final step shows "Confirmation goes to <email>" next to the place-order button, so a
+pre-filled email the customer did not type is in view at the moment of decision (R1).
+
+The shop `cart` cookie (`Path=/_p`) and consent cookies are unchanged.
 
 **C7. No platform state in origin storage or bfcache.** Platform pages put nothing into
 `localStorage`, `sessionStorage`, IndexedDB, Cache API or `BroadcastChannel`. The placement
@@ -195,7 +226,8 @@ in the page model points at `<shop>/checkout/start`.
 
 ## Routing (input to SHOP-54 and SHOP-95)
 
-On `<shop>`: `/checkout`, `/checkout/start`, `/checkout/identify`, `/o/<token>` → `/o/<id>`,
+On `<shop>`: `/checkout`, `/checkout/start`, `/checkout/identify/start`, `/checkout/identify`,
+`/o/<token>` → `/o/<id>`,
 `/withdraw`, `/review`, `/restore-cart`, `/consent`, `/newsletter`, `/newsletter/*`,
 `/watch/*`, `/flows/*`, plus `/_p/fake-pay/*` locally. The `/_p/*` operations keep their paths,
 except `/_p/account/*`, which moves to the account origin.
@@ -211,15 +243,15 @@ The handoff (`/start?h=`, `__Secure-hf-*`, `/storefront/v1/checkout/handoff`) go
 
 ## Residual risks
 
-- **R1. Safari checkout fixation.** Safari lets theme JS overflow the cookie jar and plant a
-  `__Host-Http-cart` value. C6 rotation means a planted guest checkout is lost to the attacker
-  at the first email or address. What remains: the attacker signs in to their own account in
-  checkout, plants that identified capability in the victim's browser, and the victim places an
-  order in a checkout that shows the attacker's cart and "Signed in as <attacker email>"; the
-  order then appears in the attacker's account. It needs a malicious theme, a Safari customer
-  and a customer who ignores a foreign cart and a foreign account. That is weaker than R2, which
-  any theme can do on any page. Accepted; Shopify carries the same. Revisit when WebKit ships
-  the prefix (WebKit bug 296267).
+- **R1. Pre-filled checkout.** On browsers that do not enforce `__Host-Http-` (Safari, Chrome
+  < 140, Firefox < 143) theme JS can plant a checkout the attacker filled in. C6 keeps
+  everything the customer enters out of the attacker's reach, and A2 keeps the attacker's
+  account off the order. What remains: fields the customer leaves untouched keep the
+  attacker's values. If the customer places the order with the attacker's email still shown
+  next to the button, the confirmation and order link go to the attacker. A theme can also
+  move the customer to another checkout, which loses their input (nuisance, no data). This
+  needs the customer to confirm a foreign email on screen, which is no stronger than R2.
+  Accepted. Revisit when WebKit ships the prefix (WebKit bug 296267).
 - **R2. Look-alike UI.** A theme can `pushState` to `/checkout` and draw a fake form that sends
   typed data away; CSP does not cover navigation. A theme could already draw any form on the
   shop. Browser address and card autofill is not origin-bound, so a theme form gets the same
@@ -251,7 +283,7 @@ Whether each response holds is in § Open issues.
 | # | Finding (Astra, 2026-10-10) | Response |
 |---|---|---|
 | 1 | Blocker: anonymous visitors share one page token; theme fixes a session via `/_p/account/login` | No login or session on `<shop>` (A1); no token without a capability, none issued on failure (C4) |
-| 2 | Blocker: R1 accepted data theft on Safari | Accounts off-origin; capability rotates on first PII (C6); remainder needs the customer to ignore a foreign cart and account (R1) |
+| 2 | Blocker: R1 accepted data theft on Safari | Accounts off-origin; capability rotates on every PII write, HTML-only tokens (C4, C6); `state`-bound identify (A2); remainder is a pre-filled email the customer confirms (R1) |
 | 3 | Token-free consent can forge customer preferences | Theme consent limited to anonymous cookie categories, `source` ignored (C9) |
 | 4 | C3 does not remove an incumbent worker | C3 live before any shop goes public, verified (C3) |
 | 5 | Cached theme assets at future checkout URLs | Namespace reserved before launch, build-id asset paths (C8) |
@@ -272,13 +304,15 @@ are partial and continue below.
   every browser. Fix direction: checkout starts the sign-in with a server-side transaction bound
   to the checkout capability and exact callback, consumed atomically with the code; unsolicited
   callbacks are rejected (RFC 9700 §4.5, authorization-code injection).
+  **Addressed** by the `state`-bound transaction and placement re-confirmation in A2; pending
+  review round 3.
 - **O2. Blocker: planted guest checkout (C6, R1).** An attacker creates a guest checkout,
   enters dummy PII so the first-PII rotation has already happened, and plants the rotated
   capability in a browser without `__Host-Http-` support (Safari, Chrome < 140, Firefox < 143).
   The victim's later edits land in a checkout the attacker can read. Theme JS holding a planted
   capability and its token can also make the first PII call itself and read the replacement
-  token. R1's argument does not hold for this case. Open decision: accept it, keep checkout on
-  `checkout.<shop>`, or refuse the same-origin checkout to browsers without the prefix.
+  token. **Addressed** by rotation on every PII write and HTML-only tokens (C4, C6); the
+  remaining pre-filled-email case is accepted as R1. Pending review round 3.
 - **O3. Password managers (A1, R2).** Some managers match by registrable domain and can
   autofill on load (Bitwarden defaults), so a theme form on `<merchant domain>` can receive a
   login saved for `account.<merchant domain>` without the customer choosing it. "Passwords are
@@ -306,8 +340,12 @@ platform page get nothing; `window.open('/checkout')` returns a closed handle; s
 registration fails and `Service-Worker: script` gets 403; `/_p/orders/*` without
 `x-page-token`, with one minted for another capability, or with no capability cookie gets 403;
 after `/o/<token>` and after a Stripe return → logo, `navigation.entries()` and
-`document.referrer` hold no secret; a planted known capability stops working after the first
-email entry; `/_p/consent` cannot set `email_marketing`; on Chromium, `document.cookie` cannot
+`document.referrer` hold no secret; a capability the attacker holds, planted in the victim's
+browser, reads nothing the victim enters afterwards, including when the checkout already holds
+attacker PII; a PII write made by theme JS returns no token; an identify callback with a code
+minted in another browser, or without a matching `state`, is rejected; placement of a
+checkout linked to an account the browser is not signed in to produces a guest order;
+`/_p/consent` cannot set `email_marketing`; on Chromium, `document.cookie` cannot
 set `__Host-Http-cart`; `checkout.<shop>//attacker.example` does not redirect off-site. Unit
 tests in `apps/edge` cover C1, C3, C4, C5, C8, C10 and C11 per route. SHOP-95 adds the account
 origin's own checks (return-path allowlist, identify code single use, `Sec-Fetch-Site`).
