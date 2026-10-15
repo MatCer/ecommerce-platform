@@ -29,10 +29,11 @@ die() {
   exit 1
 }
 
-if [[ $(git rev-parse --path-format=absolute --git-dir) != "$(git rev-parse --path-format=absolute --git-common-dir)" ]] &&
-  { [[ -L .env ]] || [[ ! -e .env ]]; }; then
-  die "this worktree shares the main checkout's stack; run backup and restore there"
-fi
+main=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
+main_project=$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$main/.env" 2>/dev/null | tail -1 || true)
+[[ $(pwd -P) == "$main" || $COMPOSE_PROJECT_NAME != "${main_project:-ecommerce}" ]] ||
+  die "this worktree shares the main checkout's stack ($COMPOSE_PROJECT_NAME); run backup and restore there"
+
 
 # psql as the postgres superuser over the container's local socket (trust auth, no password).
 psql_su() { "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -X -qAt -U postgres -d app "$@"; }

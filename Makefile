@@ -4,10 +4,12 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 LINKED_WORKTREE := $(filter-out $(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null),$(shell git rev-parse --path-format=absolute --git-dir 2>/dev/null))
-# A linked worktree with its own .env runs its own stack (scripts/verify-merge.sh does).
-SHARES_MAIN_STACK := $(if $(LINKED_WORKTREE),$(shell [ -L .env ] || [ ! -e .env ] && echo yes))
 
 -include .env
+# The compose project decides which stack a checkout drives: a worktree with its own project name
+# (scripts/verify-merge.sh) runs its own stack, any other linked worktree shares the main one.
+MAIN_COMPOSE_PROJECT := $(or $(shell sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$(shell git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')/.env" 2>/dev/null | tail -n 1),ecommerce)
+SHARES_MAIN_STACK := $(if $(LINKED_WORKTREE),$(if $(filter-out $(MAIN_COMPOSE_PROJECT),$(or $(COMPOSE_PROJECT_NAME),ecommerce)),,yes))
 ifdef SHARES_MAIN_STACK
 include .env.worktree.local
 .env .env.worktree.local:

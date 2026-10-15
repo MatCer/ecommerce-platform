@@ -159,8 +159,8 @@ pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dr
 - Until setup has run, `make` in a worktree stops and asks for it. Compose targets (`make up`,
   `down`, `dev-infra`, `seed`, `logs`, ...) and `backup`/`restore` always refuse: the worktree
   shares the main checkout's `COMPOSE_PROJECT_NAME`, so they would act on its stack. A worktree
-  with its own `.env` file (not the symlink), like the one `pnpm verify-merge` builds, runs its own
-  stack and is not restricted.
+  whose `.env` sets its own `COMPOSE_PROJECT_NAME`, like the one `pnpm verify-merge` builds, runs its
+  own stack and is not restricted.
 - Meilisearch, MinIO, Mailpit and the auth service stay shared with the main checkout.
 - `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so
   concurrent runs from different checkouts wait for each other.
