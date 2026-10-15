@@ -10,7 +10,9 @@ third rated the fixes for its two blockers sound with required changes, which ar
 (A2, C4, C6). The fourth (final) review approved with required changes, also folded in: a
 separate registrable domain for accounts (A1), known-history rule for fresh origins (C3), an
 authoritative checkout mode per origin (§ Routing), the full R1 consequences, and start races
-(C10). Approval is the merge of this note.
+(C10). A fifth review of those changes found them resolved and asked for two more, folded in:
+mode generations across switches (§ Routing) and the R1 wording. Approval is the merge of
+this note.
 
 **Proposed decision: split them, like Shopify.**
 
@@ -316,8 +318,14 @@ redirects alike:
 
 Capabilities, page tokens, identify and placement callbacks are bound to the origin they were
 issued for and rejected on any other, including aliases of the same shop. Switching an origin
-from isolated to same-origin is an explicit admin action that revokes every open checkout
-capability of that shop; there is no way back to isolated without the same revocation.
+from isolated to same-origin is an explicit admin action, allowed only when the origin meets C3,
+that revokes every open checkout capability of that shop; there is no way back to isolated
+without the same revocation. Each origin's mode carries a generation number. Every checkout
+capability, `state` and page token records the generation it was issued under, and every
+issuance and consumption (start, PII write, identify, placement) checks it in the same
+transaction as the mode row, which the switch updates under lock. An operation that began
+before a switch and finishes after it fails instead of minting or consuming a credential in
+the old mode, in both directions.
 
 ## Residual risks
 
@@ -330,10 +338,12 @@ capability of that shop; there is no way back to isolated without the same revoc
     and through them everything the order holds, including the address and phone the customer
     entered.
   - Attacker's delivery address left in place: the goods ship to the attacker.
-  - A theme can move the customer to another checkout, which loses their input.
+  - A theme can move the customer to another checkout at any time, which loses their input
+    (nuisance; nothing is disclosed).
 
-  Each needs the customer to place the order while a contact or delivery detail they did not
-  enter is shown on the review step ("Confirmation goes to <email>" next to the button).
+  The first two need the customer to place the order while a contact or delivery detail they
+  did not enter is shown on the review step ("Confirmation goes to <email>" next to the
+  button).
   Accepted by the owner. Revisit when WebKit ships the prefix (WebKit bug 296267).
 - **R2. Look-alike UI.** A theme can `pushState` to `/checkout` and draw a fake form that sends
   typed data away; CSP does not cover navigation. A theme could already draw any form on the
@@ -448,6 +458,7 @@ two starts whose responses arrive in reverse order leave a browser that recovers
 start without reviving the revoked capability; on an isolated-mode origin every checkout page
 and API on `<shop>` answers 404, and on a same-origin-mode origin the handoff is refused;
 a capability or callback issued for one origin is rejected on another, aliases included;
+a start or placement callback paused across a mode switch, in either direction, fails;
 `/_p/consent` cannot set `email_marketing`; on Chromium, `document.cookie` cannot
 set `__Host-Http-cart`; `checkout.<shop>//attacker.example` does not redirect off-site. Unit
 tests in `apps/edge` cover C1, C3, C4, C5, C8, C10 and C11 per route. SHOP-95 adds the account
