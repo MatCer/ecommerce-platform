@@ -46,6 +46,7 @@ fn option(code: &str, values: &[&str]) -> ProductOption {
             .map(|v| OptionValue {
                 code: (*v).into(),
                 name_i18n: i18n(&[("cs", v)]),
+                swatch: None,
             })
             .collect(),
     }

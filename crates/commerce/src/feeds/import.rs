@@ -1203,6 +1203,7 @@ fn options(
                             locale.to_owned(),
                             label.chars().take(100).collect(),
                         )]),
+                        swatch: None,
                     });
                     code_of.insert(label.clone(), c.clone());
                     c

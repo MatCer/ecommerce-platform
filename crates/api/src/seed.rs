@@ -773,6 +773,7 @@ impl Seeder<'_> {
                 .map(|c| OptionValue {
                     code: c.code.into(),
                     name_i18n: i18n(c.cs, c.sk),
+                    swatch: None,
                 })
                 .collect(),
         }];
@@ -785,6 +786,7 @@ impl Seeder<'_> {
                     .map(|s| OptionValue {
                         code: s.to_ascii_lowercase(),
                         name_i18n: i18n(s, s),
+                        swatch: None,
                     })
                     .collect(),
             });
