@@ -409,7 +409,7 @@
     flex: 0 0 100%;
     scroll-snap-align: start;
   }
-  /* Chrome fetches lazy images inside a scroller that are near the viewport; skipped content waits for the swipe. */
+  /* Chrome fetches lazy images in a scroller near the viewport; skipped content waits for a swipe. */
   & > :not(:first-child) {
     content-visibility: auto;
   }

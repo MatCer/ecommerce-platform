@@ -19,8 +19,7 @@ const image = (n: number) => ({
   alt: `Foto ${n}`,
 });
 
-/** A card as the API on main (before SHOP-91) serializes it: no `swatches`, two images. */
-const mainCard = {
+const preSwatchCard = {
   id: "00000000-0000-0000-0000-000000000001",
   slug: "tricko",
   name: "Tričko",
@@ -37,7 +36,7 @@ async function render(product: object) {
 }
 
 test("renders a card from the pre-swatch API shape without a colour row", async () => {
-  const html = await render(mainCard);
+  const html = await render(preSwatchCard);
   expect(html).toContain('href="/p/tricko"');
   expect(html).toContain("Skladem");
   expect(html).not.toContain("Barvy:");
@@ -45,7 +44,7 @@ test("renders a card from the pre-swatch API shape without a colour row", async 
 });
 
 test("renders a card with no images at all", async () => {
-  const html = await render({ ...mainCard, images: undefined });
+  const html = await render({ ...preSwatchCard, images: undefined });
   expect(html).toContain("Tričko");
   expect(html).not.toContain("<img");
 });
@@ -55,14 +54,14 @@ test("names every colour and counts the ones past four dots", async () => {
     name,
     color: "#000000",
   }));
-  const html = await render({ ...mainCard, swatches });
+  const html = await render({ ...preSwatchCard, swatches });
   expect(html).toContain("Barvy: Červená, Modrá, Zelená, Černá, Bílá");
   expect(html.match(/<circle /g)?.length).toBe(4);
   expect(html).toContain("+1</span>");
 });
 
 test("loads rail photos after the first one lazily and at low priority", async () => {
-  const html = await render({ ...mainCard, images: [image(1), image(2), image(3)] });
+  const html = await render({ ...preSwatchCard, images: [image(1), image(2), image(3)] });
   const slide = html.match(/<img [^>]*photo-3-640\.jpg[^>]*>/)?.[0];
   expect(slide).toContain('loading="lazy"');
   expect(slide).toContain('fetchpriority="low"');
