@@ -107,7 +107,7 @@ teardown() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; it has no worktree database"
   drop "$(worktree_db "$ROOT")"
   rm -f .env.worktree.local .cargo/worktree.toml
-  [[ ! -d target ]] || remove_target "$ROOT" "teardown"
+  remove_target "$ROOT" "teardown"
 }
 
 this_clone_databases() {
@@ -133,7 +133,11 @@ remove_target() (
   local target=$1/target bytes cleanup
   exec {cleanup}>"$(git -C "$1" rev-parse --absolute-git-dir)/target-cleanup.lock"
   flock -n "$cleanup" || { echo "worktree: another cleanup is running in $1, skipped"; exit 0; }
-  [[ -d $target ]] || exit 0
+  if compgen -G "$1/.target-trash.*" >/dev/null; then
+    echo "worktree: ${3:+would }remove leftover trash of an interrupted cleanup in $1"
+    [[ -n ${3:-} ]] || rm -rf "$1"/.target-trash.*
+  fi
+  [[ -n $2 && -d $target ]] || exit 0
   bytes=$(du -sb "$target" | cut -f1) || { echo "worktree: cannot measure $target, left as is" >&2; exit 0; }
   (
     for lock in "$target"/*/.cargo-lock; do
@@ -150,7 +154,9 @@ remove_target() (
 sweep() {
   local dir recent
   while read -r dir; do
-    [[ $dir != "$MAIN" && -d $dir/target ]] || continue
+    [[ $dir != "$MAIN" && -d $dir ]] || continue
+    remove_target "$dir" "" "$1"
+    [[ -d $dir/target ]] || continue
     recent=$(find "$dir/target" -newermt '14 days ago' -print -quit) ||
       { echo "worktree: cannot read all of $dir/target, kept" >&2; continue; }
     [[ -z $recent ]] || continue
@@ -160,6 +166,7 @@ sweep() {
 
 tidy() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; tidy is for linked worktrees"
+  remove_target "$ROOT" "" "$1"
   [[ -d target ]] || return 0
   local head pr='' bytes
   head=$(git rev-parse HEAD)
