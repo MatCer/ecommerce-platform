@@ -8,6 +8,7 @@ use axum::extract::rejection::{PathRejection, QueryRejection};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
+use commerce::ai::alt_text::{self, Backfill};
 use commerce::ai::fields::EntityType;
 use commerce::ai::glossary::{self, Glossary};
 use commerce::ai::marks::{self, AiMarkList};
@@ -32,6 +33,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(usage))
         .routes(routes!(get_ai_settings, put_ai_settings))
+        .routes(routes!(backfill_alt_texts))
         .routes(routes!(get_glossary, put_glossary))
         .routes(routes!(create_proposal))
         .routes(routes!(get_proposal))
@@ -106,6 +108,33 @@ async fn put_ai_settings(
         })
         .await?,
     ))
+}
+
+/// Queues AI alt texts for product images uploaded before the switch went on: one job per
+/// product with a ready image missing an alt text in some market language. Owner or admin.
+#[utoipa::path(
+    post,
+    path = "/admin/v1/ai/alt-texts/backfill",
+    tag = "ai",
+    security(("staff_jwt" = [])),
+    params(TenantHeader),
+    responses(
+        (status = 202, body = Backfill),
+        (status = 402, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 403, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn backfill_alt_texts(
+    staff: TenantStaff,
+    State(s): State<AppState>,
+) -> Result<Response, Error> {
+    staff.require(Role::Admin)?;
+    let queued = in_tx(&s, staff.tenant_id, async |tx| {
+        alt_text::backfill(tx, &s.ai).await
+    })
+    .await?;
+    Ok((StatusCode::ACCEPTED, Json(queued)).into_response())
 }
 
 /// Terms translations must keep (brand names) or translate one fixed way.

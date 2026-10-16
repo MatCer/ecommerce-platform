@@ -302,6 +302,70 @@
         ]
       }
     },
+    "/admin/v1/ai/alt-texts/backfill": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Queues AI alt texts for product images uploaded before the switch went on: one job per\nproduct with a ready image missing an alt text in some market language. Owner or admin.",
+        "operationId": "backfill_alt_texts",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backfill"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/ai/bulk-plans": {
       "post": {
         "tags": [
@@ -23187,6 +23251,19 @@
         },
         "propertyNames": {
           "type": "string"
+        }
+      },
+      "Backfill": {
+        "type": "object",
+        "required": [
+          "queued"
+        ],
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "description": "Products queued for alt texts.",
+            "minimum": 0
+          }
         }
       },
       "Badge": {
