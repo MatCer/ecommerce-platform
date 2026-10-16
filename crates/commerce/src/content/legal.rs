@@ -37,6 +37,8 @@ pub const REQUIRED: [LegalType; 5] = [
 
 pub const TEMPLATE_LOCALES: [&str; 3] = ["cs", "sk", "en"];
 
+pub const TEMPLATE_VERSION: &str = "2026-10-16";
+
 // ---------------------------------------------------------------------------------------
 // Legal entity
 
@@ -523,7 +525,7 @@ pub async fn install(
         sqlx::query!(
             "UPDATE pages SET legal_template_version = $2 WHERE id = $1",
             page.id,
-            consent::TEXT_VERSION
+            TEMPLATE_VERSION
         )
         .execute(&mut **tx)
         .await?;
@@ -536,8 +538,6 @@ pub async fn install(
     })
 }
 
-/// Whether visitors can read that analytics covers testing page variants: the published cookie
-/// page, in every locale of the tenant's markets, from a template that says so.
 pub async fn cookie_policy_covers_experiments(tx: &mut TenantTx) -> Result<bool, Error> {
     let page = sqlx::query!(
         r#"SELECT p.legal_template_version,

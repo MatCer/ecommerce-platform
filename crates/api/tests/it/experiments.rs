@@ -96,7 +96,7 @@ async fn staff_start_an_experiment_once_the_published_cookie_page_covers_it(db: 
         installed["created"][0].as_str().unwrap()
     );
     let (_, page, _) = admin(Call::get(&page_uri)).send(&s).await;
-    assert_eq!(page["legal_template_version"], consent::TEXT_VERSION);
+    assert_eq!(page["legal_template_version"], legal::TEMPLATE_VERSION);
     let (status, _, _) = post_start().send(&s).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "draft page");
 
@@ -106,7 +106,7 @@ async fn staff_start_an_experiment_once_the_published_cookie_page_covers_it(db: 
     });
     let (status, published, _) = admin(Call::put(&page_uri, input.clone())).send(&s).await;
     assert_eq!(status, StatusCode::OK, "{published}");
-    assert_eq!(published["legal_template_version"], consent::TEXT_VERSION);
+    assert_eq!(published["legal_template_version"], legal::TEMPLATE_VERSION);
 
     input["translations"][0]["blocks"]
         .as_array_mut()
@@ -114,7 +114,7 @@ async fn staff_start_an_experiment_once_the_published_cookie_page_covers_it(db: 
         .push(json!({"type": "rich_text", "html": "<p>Doplněno.</p>"}));
     input["still_covers_experiments"] = json!(true);
     let (_, confirmed, _) = admin(Call::put(&page_uri, input.clone())).send(&s).await;
-    assert_eq!(confirmed["legal_template_version"], consent::TEXT_VERSION);
+    assert_eq!(confirmed["legal_template_version"], legal::TEMPLATE_VERSION);
 
     let (status, _, _) = Call::post_raw(&uri, "", "application/json")
         .token(&clerk)

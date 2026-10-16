@@ -90,7 +90,6 @@ async fn running_with_arms(
     )
 }
 
-/// Draft -> running, once the cookie page tells visitors about testing page variants.
 pub async fn start(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Error> {
     let status = sqlx::query_scalar!(
         "SELECT status FROM experiments WHERE id = $1 FOR UPDATE",
