@@ -1009,7 +1009,7 @@ async fn theme_builds_are_handed_to_the_builder(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
-    use commerce::ai::settings::{self, AiSettings};
+    use commerce::ai::settings::{self, AiSettingsChange};
 
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "summaries").await;
@@ -1032,9 +1032,10 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     settings::put(
         &mut tx,
         "owner",
-        &AiSettings {
-            review_summaries: true,
-            alt_texts: false,
+        &AiSettingsChange {
+            review_summaries: Some(true),
+            alt_texts: Some(false),
+            ..Default::default()
         },
     )
     .await
@@ -1106,7 +1107,7 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool) {
-    use commerce::ai::settings::{self, AiSettings};
+    use commerce::ai::settings::{self, AiSettingsChange};
 
     let runtime = testkit::runtime_pool(&db, 4).await;
     let off = testkit::storefront::shop(&runtime, "off").await;
@@ -1115,9 +1116,10 @@ async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool)
     settings::put(
         &mut tx,
         "owner",
-        &AiSettings {
-            review_summaries: false,
-            alt_texts: true,
+        &AiSettingsChange {
+            review_summaries: Some(false),
+            alt_texts: Some(true),
+            ..Default::default()
         },
     )
     .await
@@ -1152,7 +1154,7 @@ async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool)
 #[sqlx::test(migrations = "../../migrations")]
 async fn image_events_queue_and_run_alt_text_jobs(db: PgPool) {
     use commerce::ai::fields::product_input;
-    use commerce::ai::settings::{self, AiSettings};
+    use commerce::ai::settings::{self, AiSettingsChange};
     use commerce::catalog::products::{self, ProductMedia};
     use object_store::{ObjectStoreExt, PutPayload, path::Path};
 
@@ -1172,9 +1174,10 @@ async fn image_events_queue_and_run_alt_text_jobs(db: PgPool) {
     settings::put(
         &mut tx,
         "owner",
-        &AiSettings {
-            review_summaries: false,
-            alt_texts: true,
+        &AiSettingsChange {
+            review_summaries: Some(false),
+            alt_texts: Some(true),
+            ..Default::default()
         },
     )
     .await
@@ -1257,4 +1260,153 @@ async fn image_events_queue_and_run_alt_text_jobs(db: PgPool) {
             ("sk".to_owned(), "[sk] Product TEE".to_owned()),
         ]
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn insights_fan_out_once_a_day_to_every_tenant(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (a, _) = testkit::tenant(&runtime, "ins-a").await;
+    let (b, _) = testkit::tenant(&runtime, "ins-b").await;
+    let cron_job = |slot: i64| {
+        let mut job = NewJob::new("insights.run", json!({ "slot": slot }));
+        job.idempotency_key = Some(format!("cron:insights.run:{slot}"));
+        job
+    };
+    let tenant_jobs =
+        async || -> Vec<(i64, Option<uuid::Uuid>, Option<String>, serde_json::Value)> {
+            sqlx::query_as(
+                "SELECT id, tenant_id, idempotency_key, payload FROM queue.jobs
+             WHERE kind = 'insights.run' AND tenant_id IS NOT NULL ORDER BY tenant_id",
+            )
+            .fetch_all(&db)
+            .await
+            .unwrap()
+        };
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    let three = queue::enqueue(&runtime, &cron_job(24 * 20_000 + 3))
+        .await
+        .unwrap();
+    wait_for_status(&db, three, "done").await;
+    assert_eq!(
+        tenant_jobs().await,
+        vec![],
+        "nothing fans out before 04:00 UTC"
+    );
+    let five = queue::enqueue(&runtime, &cron_job(24 * 20_000 + 5))
+        .await
+        .unwrap();
+    wait_for_status(&db, five, "done").await;
+    assert_eq!(
+        tenant_jobs().await.len(),
+        2,
+        "a slot after a missed 04:00 still fans out"
+    );
+    let four = queue::enqueue(&runtime, &cron_job(24 * 20_000 + 4))
+        .await
+        .unwrap();
+    wait_for_status(&db, four, "done").await;
+    let mut tenants = [a, b];
+    tenants.sort();
+    let jobs = tenant_jobs().await;
+    assert_eq!(
+        jobs.iter()
+            .map(|j| (j.1, j.2.clone(), j.3.clone()))
+            .collect::<Vec<_>>(),
+        tenants
+            .iter()
+            .map(|t| (
+                Some(*t),
+                Some(format!("insights.run:{t}:2024-10-03")),
+                json!({ "day": "2024-10-03" })
+            ))
+            .collect::<Vec<_>>(),
+        "the slot of 2024-10-04 04:00 UTC runs the day before"
+    );
+    for j in &jobs {
+        wait_for_status(&db, j.0, "done").await;
+    }
+    for payload in [json!({}), json!({ "day": "yesterday" })] {
+        let mut bad = NewJob::new("insights.run", payload);
+        bad.tenant_id = Some(a);
+        let bad = queue::enqueue(&runtime, &bad).await.unwrap();
+        wait_for_status(&db, bad, "dead").await;
+    }
+    stop.send(true).unwrap();
+    task.await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn insights_runs_for_days_before_yesterday_do_nothing(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, _) = testkit::tenant(&runtime, "ins-stale").await;
+    let yesterday = chrono::Utc::now().date_naive() - chrono::Days::new(1);
+    let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+    let signal: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score,
+                                      first_detected_on, last_detected_on)
+         VALUES ($1, gen_random_uuid(), 'slow_page', 'home:LCP',
+                 '{\"kind\": \"slow_page\", \"template\": \"home\", \"metric\": \"LCP\",
+                   \"p75\": 4000.0, \"samples\": 80, \"requests\": 2000}', 30, $2, $2)
+         RETURNING id",
+    )
+    .bind(tenant)
+    .bind(yesterday - chrono::Days::new(5))
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let status = async || -> String {
+        let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+        let s = sqlx::query_scalar("SELECT status FROM insight_signals WHERE id = $1")
+            .bind(signal)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        s
+    };
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    let stale = queue::enqueue(
+        &runtime,
+        &commerce::insights::job(tenant, yesterday - chrono::Days::new(1)),
+    )
+    .await
+    .unwrap();
+    wait_for_status(&db, stale, "done").await;
+    assert_eq!(
+        status().await,
+        "open",
+        "a run older than yesterday changes nothing"
+    );
+    let fresh = queue::enqueue(&runtime, &commerce::insights::job(tenant, yesterday))
+        .await
+        .unwrap();
+    wait_for_status(&db, fresh, "done").await;
+    assert_eq!(
+        status().await,
+        "resolved",
+        "yesterday's run resolves what it no longer sees"
+    );
+    stop.send(true).unwrap();
+    task.await.unwrap();
 }

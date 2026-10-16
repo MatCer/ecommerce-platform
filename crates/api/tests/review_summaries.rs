@@ -29,10 +29,10 @@ async fn admins_switch_summaries_and_the_product_page_shows_them(db: PgPool) {
         (status, body),
         (
             StatusCode::OK,
-            json!({ "review_summaries": false, "alt_texts": false })
+            json!({ "review_summaries": false, "alt_texts": false, "insights": false })
         )
     );
-    let on = json!({ "review_summaries": true, "alt_texts": false });
+    let on = json!({ "review_summaries": true, "alt_texts": false, "insights": false });
     let (status, body, _) = Call::put("/admin/v1/ai/settings", on.clone())
         .token(&clerk)
         .tenant(shop.tenant)
@@ -60,7 +60,7 @@ async fn admins_switch_summaries_and_the_product_page_shows_them(db: PgPool) {
         (status, body),
         (
             StatusCode::OK,
-            json!({ "review_summaries": true, "alt_texts": false })
+            json!({ "review_summaries": true, "alt_texts": false, "insights": false })
         )
     );
     let (_, log, _) = Call::get("/admin/v1/audit-log?limit=1")

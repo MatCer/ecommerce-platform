@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT review_summaries, alt_texts_since IS NOT NULL AS \"alt_texts!\" FROM ai_settings",
+  "query": "SELECT review_summaries, alt_texts_since IS NOT NULL AS \"alt_texts!\", insights\n           FROM ai_settings",
   "describe": {
     "columns": [
       {
@@ -19,6 +19,17 @@
         "name": "alt_texts!",
         "type_info": "Bool",
         "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "insights",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ai_settings",
+            "name": "insights"
+          }
+        }
       }
     ],
     "parameters": {
@@ -26,8 +37,9 @@
     },
     "nullable": [
       false,
-      null
+      null,
+      false
     ]
   },
-  "hash": "270615546eeb80e4c9c70b704958cb33093f1bf29eaffa64ab492cd778fa5ab7"
+  "hash": "899c53d0f968ae25456d5e9d6edcf3cb3c300707063eee7ec095896695bd57ca"
 }

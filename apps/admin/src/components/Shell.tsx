@@ -223,6 +223,10 @@ export function Shell(props: { children: JSX.Element }) {
         <Icon name="home" class="text-muted-foreground" />
         {t("nav.dashboard")}
       </A>
+      <A href="/insights" class={itemClass} activeClass={activeClass}>
+        <Icon name="information-o" class="text-muted-foreground" />
+        {t("nav.insights")}
+      </A>
       <For each={groups}>
         {(g) => {
           const key = g.icon;
@@ -342,6 +346,7 @@ export function Shell(props: { children: JSX.Element }) {
                 const hit = active();
                 const root = { label: m().name, href: "/" };
                 if (location.pathname === "/") return [root, { label: t("nav.dashboard") }];
+                if (location.pathname === "/insights") return [root, { label: t("nav.insights") }];
                 if (!hit) return [root];
                 const exact = location.pathname === hit.item.href;
                 const item = { label: hit.item.label(), href: exact ? undefined : hit.item.href };

@@ -274,9 +274,10 @@ export interface paths {
         /** The shop's AI switches. Each is off until an admin turns it on. */
         get: operations["get_ai_settings"];
         /**
-         * Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
-         *     summary per product with at least 5 published verified reviews; switching them purges the
-         *     shop's cached pages. Alt texts apply to images uploaded after they were turned on.
+         * Changes the AI switches; a switch left out keeps its value. Owner or admin; audited. Turning
+         *     review summaries on queues one summary per product with at least 5 published verified
+         *     reviews, and changing them purges the shop's cached pages. Alt texts apply to images uploaded
+         *     after they were turned on. Insight hypotheses start with the next nightly run.
          */
         put: operations["put_ai_settings"];
         post?: never;
@@ -1329,6 +1330,40 @@ export interface paths {
          *     reduction claims, images through the media pipeline, redirects from old URLs).
          */
         post: operations["apply_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the nightly detectors found, ranked. */
+        get: operations["list_insights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/insights/{id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hides a signal for good, also when it is detected again. Idempotent. */
+        post: operations["dismiss_insight"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4895,17 +4930,23 @@ export interface components {
         AiMarkList: {
             items: components["schemas"]["AiMark"][];
         };
+        /** @description The shop's AI switches; every one is off by default. */
         AiSettings: {
             /**
              * @description AI alt texts for product images uploaded from now on, in every market language that
-             *     has none. Off by default.
+             *     has none.
              */
             alt_texts: boolean;
-            /**
-             * @description AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
-             *     default.
-             */
+            /** @description AI hypotheses and theme-editor drafts for the top insights (the detection runs anyway). */
+            insights: boolean;
+            /** @description AI summaries of verified reviews on product pages, labelled as AI-generated. */
             review_summaries: boolean;
+        };
+        /** @description A change to the AI switches; a switch left out keeps its value. */
+        AiSettingsChange: {
+            alt_texts?: boolean | null;
+            insights?: boolean | null;
+            review_summaries?: boolean | null;
         };
         AiThemeNewRun: {
             /**
@@ -6234,6 +6275,38 @@ export interface components {
              */
             next_cursor?: string | null;
         };
+        /** @description What a detector found, with every number behind the score. */
+        Detection: {
+            baseline: components["schemas"]["Pair"];
+            /** @enum {string} */
+            kind: "funnel_drop";
+            recent: components["schemas"]["Pair"];
+            transition: components["schemas"]["Transition"];
+        } | {
+            /** Format: int64 */
+            adds: number;
+            /** @enum {string} */
+            kind: "low_add_to_cart";
+            /** Format: uuid */
+            product_id: string;
+            /** Format: int64 */
+            shop_adds: number;
+            /** Format: int64 */
+            shop_views: number;
+            /** Format: int64 */
+            views: number;
+        } | {
+            /** @enum {string} */
+            kind: "slow_page";
+            metric: components["schemas"]["Vital"];
+            /** Format: double */
+            p75: number;
+            /** Format: int64 */
+            requests: number;
+            /** Format: int64 */
+            samples: number;
+            template: string;
+        };
         /** @enum {string} */
         DistanceSalesMode: "origin_threshold" | "destination";
         DocumentInput: {
@@ -6660,6 +6733,14 @@ export interface components {
             hero: components["schemas"]["Hero"];
             seo: components["schemas"]["Seo"];
         };
+        Hypothesis: {
+            /** Format: date-time */
+            generated_at: string;
+            model: string;
+            text: string;
+            /** @description Draft request for the AI theme editor; staff edit and start it themselves. */
+            theme_prompt: string;
+        };
         /**
          * @description An image with every generated width. Render `srcset` (AVIF) with a `sizes` that matches the
          *     real slot; `src` is a JPEG/PNG fallback. `width`/`height` are the intrinsic size of the
@@ -6760,6 +6841,31 @@ export interface components {
             rebuilt_at?: string | null;
             /** Format: int32 */
             settings_version: number;
+        };
+        /** @description A ranked open signal as staff see it. */
+        Insight: {
+            detection: components["schemas"]["Detection"];
+            /** Format: date */
+            first_detected_on: string;
+            hypothesis?: components["schemas"]["Hypothesis"] | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: date */
+            last_detected_on: string;
+            /**
+             * @description Low add-to-cart: the product's name in the default market's language (`null` once the
+             *     product is gone).
+             */
+            product_name?: string | null;
+            /**
+             * Format: double
+             * @description Affected visits per week; the list is ordered by it.
+             */
+            score: number;
+        };
+        InsightList: {
+            /** @description Open signals, most affected visits first (at most 50). */
+            items: components["schemas"]["Insight"][];
         };
         InstallInput: {
             /**
@@ -7669,6 +7775,13 @@ export interface components {
             /** Format: int32 */
             pages: number;
             prev?: string | null;
+        };
+        /** @description Sessions that reached the from-step, and of them the to-step, in one window. */
+        Pair: {
+            /** Format: int64 */
+            from: number;
+            /** Format: int64 */
+            to: number;
         };
         Parameter: {
             /** Format: date-time */
@@ -9354,6 +9467,11 @@ export interface components {
             /** Format: int64 */
             page_requests: number;
         };
+        /**
+         * @description Adjacent funnel steps: sessions, view_item, add_to_cart, begin_checkout, purchase.
+         * @enum {string}
+         */
+        Transition: "sessions_to_view_item" | "view_item_to_add_to_cart" | "add_to_cart_to_begin_checkout" | "begin_checkout_to_purchase";
         Trust: {
             /** @description The delivery methods checkout offers in this market, in checkout order. */
             carriers: components["schemas"]["CarrierMark"][];
@@ -9519,6 +9637,11 @@ export interface components {
             rate: string;
             vat: components["schemas"]["MoneyView"];
         };
+        /**
+         * @description Core Web Vitals with their "good" bound (ms; CLS unitless).
+         * @enum {string}
+         */
+        Vital: "LCP" | "INP" | "CLS";
         VitalP75: {
             /** @description `LCP`, `INP` (ms) or `CLS` (unitless). */
             metric: string;
@@ -10296,7 +10419,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AiSettings"];
+                "application/json": components["schemas"]["AiSettingsChange"];
             };
         };
         responses: {
@@ -13023,6 +13146,60 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_insights: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightList"];
+                };
+            };
+        };
+    };
+    dismiss_insight: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Insight"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

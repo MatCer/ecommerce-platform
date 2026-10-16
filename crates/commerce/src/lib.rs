@@ -22,6 +22,7 @@ pub mod flows;
 pub mod fulfillment;
 pub mod id;
 pub mod idempotency;
+pub mod insights;
 pub mod inventory;
 pub mod invoicing;
 pub mod marketing;

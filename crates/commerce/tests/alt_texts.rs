@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use commerce::ai::alt_text::{self, Payload, Target};
 use commerce::ai::fields::{EntityType, product_input};
 use commerce::ai::marks;
-use commerce::ai::settings::{self, AiSettings};
+use commerce::ai::settings::{self, AiSettings, AiSettingsChange};
 use commerce::ai::{Ai, Outcome};
 use commerce::catalog::products::{self, ProductMedia};
 use object_store::path::Path;
@@ -49,9 +49,10 @@ impl World {
         let s = settings::put(
             &mut tx,
             "owner",
-            &AiSettings {
-                review_summaries,
-                alt_texts,
+            &AiSettingsChange {
+                review_summaries: Some(review_summaries),
+                alt_texts: Some(alt_texts),
+                ..Default::default()
             },
         )
         .await
@@ -210,11 +211,13 @@ async fn the_alt_text_switch_is_off_by_default_and_does_not_purge_pages(db: PgPo
     let off = AiSettings {
         review_summaries: false,
         alt_texts: false,
+        insights: false,
     };
     assert_eq!(w.get().await, off);
     let on = AiSettings {
         review_summaries: false,
         alt_texts: true,
+        insights: false,
     };
     assert_eq!(w.put(false, true).await, on);
     assert_eq!(w.get().await, on);

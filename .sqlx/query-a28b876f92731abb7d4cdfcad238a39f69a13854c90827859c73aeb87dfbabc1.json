@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score,\n                                          first_detected_on, last_detected_on)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $7)\n             ON CONFLICT (tenant_id, kind, subject) DO UPDATE\n             SET detection = EXCLUDED.detection, score = EXCLUDED.score,\n                 last_detected_on = EXCLUDED.last_detected_on,\n                 status = CASE insight_signals.status WHEN 'resolved' THEN 'open'\n                               ELSE insight_signals.status END\n             WHERE EXCLUDED.last_detected_on >= insight_signals.last_detected_on",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Float8",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a28b876f92731abb7d4cdfcad238a39f69a13854c90827859c73aeb87dfbabc1"
+}

@@ -9,7 +9,7 @@ pub mod fields;
 pub mod glossary;
 pub mod marks;
 pub mod plan;
-mod prompts;
+pub(crate) mod prompts;
 pub mod proposals;
 pub mod review_summary;
 pub mod settings;
@@ -34,6 +34,7 @@ pub const CATEGORY_DESCRIPTION: &str = "category_description";
 pub const SEO: &str = "seo";
 pub const TRANSLATE: &str = "translate";
 pub const BULK_PLAN: &str = "bulk_plan";
+pub const INSIGHT_HYPOTHESIS: &str = "insight_hypothesis";
 
 /// Fake provider fixtures (minijinja templates rendering JSON from the request data).
 const FIXTURES: &[(&str, &str)] = &[
@@ -53,6 +54,10 @@ const FIXTURES: &[(&str, &str)] = &[
         include_str!("fixtures/review_summary.j2"),
     ),
     (alt_text::FEATURE, include_str!("fixtures/alt_text.j2")),
+    (
+        INSIGHT_HYPOTHESIS,
+        include_str!("fixtures/insight_hypothesis.j2"),
+    ),
 ];
 
 /// The fake provider: helper fixtures and the scripted theme-editing agent.
@@ -433,6 +438,28 @@ pub(crate) async fn market_locales(tx: &mut TenantTx) -> Result<Vec<String>, Err
     Ok(locales)
 }
 
+pub(crate) fn safe_text(
+    raw: &str,
+    chars: std::ops::RangeInclusive<usize>,
+    what: &str,
+) -> Result<String, CallError> {
+    let text = crate::reviews::plain_text(raw, false);
+    if !chars.contains(&text.chars().count()) {
+        return Err(CallError::output(format!(
+            "{what} must be {}-{} characters",
+            chars.start(),
+            chars.end()
+        )));
+    }
+    let lower = text.to_lowercase();
+    if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) {
+        return Err(CallError::output(format!(
+            "{what} contains a link, an email address or markup"
+        )));
+    }
+    Ok(text)
+}
+
 /// What a job runner should do after a step.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -452,6 +479,35 @@ mod tests {
             month_start(now),
             Utc.with_ymd_and_hms(2026, 9, 1, 0, 0, 0).unwrap()
         );
+    }
+
+    #[test]
+    fn safe_text_keeps_plain_prose_and_rejects_links_contacts_and_markup() {
+        assert_eq!(
+            safe_text(
+                "  Zákazníci\tchválí střih, vel. M sedí. ",
+                1..=100,
+                "a text"
+            )
+            .unwrap(),
+            "Zákazníci chválí střih, vel. M sedí."
+        );
+        for bad in [
+            "Viz https://x.example",
+            "Viz WWW.example.cz",
+            "Pište na info@example.cz",
+            "Viz //evil.example/x",
+            "<b>Super</b>",
+            "   ",
+            "too long for the bound",
+        ] {
+            let e = safe_text(bad, 1..=20, "a text").unwrap_err();
+            assert_eq!(e.code(), "ai_invalid_output", "{bad}");
+            assert!(
+                bad.trim().is_empty() || !e.to_string().contains(bad.trim()),
+                "{e}"
+            );
+        }
     }
 
     #[test]

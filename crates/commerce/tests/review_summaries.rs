@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use commerce::ai::review_summary;
-use commerce::ai::settings::{self, AiSettings};
+use commerce::ai::settings::{self, AiSettings, AiSettingsChange};
 use commerce::ai::{Ai, Outcome};
 use commerce::reviews::{self, Status};
 use commerce::storefront::{self, PublicUrls};
@@ -49,9 +49,10 @@ async fn switch(runtime: &PgPool, shop: &Shop, on: bool) -> AiSettings {
     let s = settings::put(
         &mut tx,
         "owner",
-        &AiSettings {
-            review_summaries: on,
-            alt_texts: false,
+        &AiSettingsChange {
+            review_summaries: Some(on),
+            alt_texts: Some(false),
+            ..Default::default()
         },
     )
     .await
@@ -144,6 +145,7 @@ async fn nothing_happens_while_the_switch_is_off(db: PgPool) {
         AiSettings {
             review_summaries: false,
             alt_texts: false,
+            insights: false,
         }
     );
     tx.commit().await.unwrap();
@@ -166,6 +168,7 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
         AiSettings {
             review_summaries: true,
             alt_texts: false,
+            insights: false,
         }
     );
     assert_eq!(jobs(&db, &shop).await, 0, "below the minimum");
@@ -389,6 +392,7 @@ async fn summaries_and_settings_are_tenant_isolated(db: PgPool) {
         AiSettings {
             review_summaries: false,
             alt_texts: false,
+            insights: false,
         }
     );
     let forged = sqlx::query(
@@ -405,9 +409,10 @@ async fn summaries_and_settings_are_tenant_isolated(db: PgPool) {
     settings::put(
         &mut tx,
         "owner",
-        &AiSettings {
-            review_summaries: true,
-            alt_texts: false,
+        &AiSettingsChange {
+            review_summaries: Some(true),
+            alt_texts: Some(false),
+            ..Default::default()
         },
     )
     .await
@@ -457,9 +462,10 @@ async fn concurrent_switch_changes_each_purge(db: PgPool) {
     settings::put(
         &mut first,
         "owner",
-        &AiSettings {
-            review_summaries: true,
-            alt_texts: false,
+        &AiSettingsChange {
+            review_summaries: Some(true),
+            alt_texts: Some(false),
+            ..Default::default()
         },
     )
     .await
@@ -472,9 +478,10 @@ async fn concurrent_switch_changes_each_purge(db: PgPool) {
             settings::put(
                 &mut tx,
                 "admin",
-                &AiSettings {
-                    review_summaries: false,
-                    alt_texts: false,
+                &AiSettingsChange {
+                    review_summaries: Some(false),
+                    alt_texts: Some(false),
+                    ..Default::default()
                 },
             )
             .await
@@ -492,6 +499,7 @@ async fn concurrent_switch_changes_each_purge(db: PgPool) {
         AiSettings {
             review_summaries: false,
             alt_texts: false,
+            insights: false,
         }
     );
     drop(tx);

@@ -13,7 +13,7 @@ use uuid::Uuid;
 use super::fields::EntityType;
 use super::marks::{self, value_hash};
 use super::{Ai, Call, CallError, Outcome, prompts};
-use crate::reviews::{self, plain_text};
+use crate::reviews;
 use crate::storefront::Context;
 
 pub const JOB: &str = "ai.review_summary";
@@ -163,18 +163,7 @@ fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String
     let out: Output = super::parse(output)?;
     let mut by_locale = BTreeMap::new();
     for item in out.summaries {
-        let text = plain_text(&item.summary, false);
-        if !(1..=SUMMARY_MAX).contains(&text.chars().count()) {
-            return Err(CallError::output(format!(
-                "a summary must be 1-{SUMMARY_MAX} characters"
-            )));
-        }
-        let lower = text.to_lowercase();
-        if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) {
-            return Err(CallError::output(
-                "a summary contains a link, an email address or markup",
-            ));
-        }
+        let text = super::safe_text(&item.summary, 1..=SUMMARY_MAX, "a summary")?;
         if by_locale.insert(item.locale, text).is_some() {
             return Err(CallError::output("a locale is summarized twice"));
         }
@@ -462,6 +451,16 @@ mod tests {
         let ok =
             "Zákazníci hodnotí tričko s.Oliver průměrně 4,6 z 5. Chválí střih atd. Vel. M sedí.";
         assert!(validate(out(&[("cs", ok), ("sk", "B")]), &locales()).is_ok());
+    }
+
+    #[test]
+    fn a_hash_in_plain_prose_passes() {
+        let got = validate(
+            out(&[("cs", "Customers prefer shade #2."), ("sk", "B")]),
+            &locales(),
+        )
+        .unwrap();
+        assert_eq!(got["cs"], "Customers prefer shade #2.");
     }
 
     #[test]

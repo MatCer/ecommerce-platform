@@ -361,6 +361,50 @@ async fn purchases_rollups_and_the_dashboard(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_rollups_of_one_tenant_wait_for_each_other(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 3).await;
+    let shop = shop(&runtime, "lock").await;
+    let day = Utc::now().date_naive() - chrono::Days::new(1);
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO events (id, tenant_id, at, type, market_id)
+         SELECT gen_random_uuid(), $1, $2 + time '12:00', 'page_view', $3
+         FROM generate_series(1, 3)",
+    )
+    .bind(shop.tenant)
+    .bind(day)
+    .bind(shop.cz)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let mut first = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    analytics::rollup(&mut first, day).await.unwrap();
+    let second = tokio::spawn({
+        let (runtime, tenant) = (runtime.clone(), shop.tenant);
+        async move {
+            let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+            analytics::rollup(&mut tx, day).await.unwrap();
+            tx.commit().await.unwrap();
+        }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    first.commit().await.unwrap();
+    second.await.unwrap();
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let views: f64 = sqlx::query_scalar(
+        "SELECT sum(value) FROM daily_metrics WHERE date = $1 AND metric = 'page_views'",
+    )
+    .bind(day)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(views, 3.0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn partitions_are_created_ahead_and_dropped_after_retention(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 1).await;
     let created: i32 = sqlx::query_scalar("SELECT platform.ensure_event_partitions(3)")

@@ -237,6 +237,7 @@ export const en = {
     feature_bulk_plan: "Bulk edit plans",
     feature_review_summary: "Review summaries",
     feature_alt_text: "Image alt texts",
+    feature_insight_hypothesis: "Insight hypotheses",
     glossary: "Glossary",
     glossaryDesc:
       "Terms translations must keep as they are (brand names), or translate one fixed way. Leave a language empty to keep the term.",
@@ -249,6 +250,9 @@ export const en = {
     reviewSummaries: "Review summaries",
     reviewSummariesDesc:
       "Products with at least 5 published verified reviews get a short AI summary on the product page, in each market's language and labelled as AI-generated. Every summary uses AI tokens.",
+    insights: "Insight hypotheses",
+    insightsDesc:
+      "Each night AI writes a possible cause and a draft for the AI theme editor for up to 3 new insights, labelled as AI-generated. They appear after the next nightly run, not right away. Insights are detected either way. Every hypothesis uses AI tokens.",
     adminOnly: "Only owners and admins can change these settings.",
     altTexts: "Alt texts for new product images",
     altTextsDesc:
@@ -884,6 +888,7 @@ export const en = {
     taxProfile: "Tax settings",
     main: "Main navigation",
     dashboard: "Overview",
+    insights: "Insights",
     catalog: "Catalog",
     products: "Products",
     categories: "Categories",
@@ -2365,6 +2370,37 @@ export const en = {
     clockAdvance: "Advance",
     clockAdvanced: "Flow time is now {{time}}",
     errHours: "Enter whole hours from 1 to 2160.",
+  },
+  insights: {
+    title: "Insights",
+    description:
+      "Where the shop loses visits, from the last weeks of analytics. Ranked by affected visits: an estimate of how many visits a week would have gone further at the shop's usual rate or on a fast page.",
+    list: "Open insights",
+    empty: "Nothing stands out in the last 14 days.",
+    emptyHint:
+      "Insights need enough traffic: 100 sessions a week for a checkout step, 200 views for a product and 50 speed measurements for a page type.",
+    affected: "Affected visits: ~{{n}} a week",
+    since: "Detected since {{date}}",
+    deletedProduct: "Deleted product",
+    slowHeading: "{{template}}: {{metric}}",
+    hypothesis: "Possible cause",
+    draft: "Draft for the AI theme editor",
+    model: "Model: {{model}}",
+    dismiss: "Dismiss",
+    dismissed: "Insight dismissed",
+    openInEditor: "Open in AI theme editor",
+    transitions: {
+      sessions_to_view_item: "Visits that reach a product",
+      view_item_to_add_to_cart: "Product viewers who add to cart",
+      add_to_cart_to_begin_checkout: "Carts that reach checkout",
+      begin_checkout_to_purchase: "Started checkouts that end in an order",
+    },
+    funnel_drop:
+      "Fell to {{recent}} in the last 7 days, from {{baseline}} in the 21 days before ({{recentTo}} of {{recentFrom}} against {{baselineTo}} of {{baselineFrom}}).",
+    low_add_to_cart:
+      "Added to cart on {{rate}} of views in the last 14 days, against {{shopRate}} across the shop ({{adds}} of {{views}} views).",
+    slow_page:
+      "{{metric}} p75 is {{p75}}, above the good limit of {{bound}} ({{samples}} measurements in the last 14 days).",
   },
 };
 

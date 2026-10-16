@@ -1,5 +1,3 @@
-/** Pure helpers for the analytics dashboard and the webhook settings (days are UTC). */
-
 const DAY_MS = 86_400_000;
 export const PRESETS = [7, 30, 90] as const;
 const DEFAULT_PRESET = 30;
@@ -80,10 +78,40 @@ export function niceMax(v: number): number {
   return step * pow;
 }
 
+const TEMPLATES = [
+  "home",
+  "category",
+  "product",
+  "search",
+  "page",
+  "blog",
+  "checkout",
+  "other",
+] as const;
+
+export function templateLabel(
+  template: string,
+  t: (key: `dashboard.templates.${(typeof TEMPLATES)[number]}`) => string,
+): string {
+  const known = TEMPLATES.find((s) => s === template);
+  return known ? t(`dashboard.templates.${known}`) : template;
+}
+
+export const formatNumber = (n: number, locale: string) => new Intl.NumberFormat(locale).format(n);
+
+export const formatPercent = (n: number, locale: string) =>
+  new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 1 }).format(n);
+
+export function formatVital(metric: string, value: number, locale: string): string {
+  return metric === "CLS"
+    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)
+    : `${formatNumber(Math.round(value), locale)} ms`;
+}
+
 export type VitalRating = "good" | "needsImprovement" | "poor";
 
 /** Core Web Vitals thresholds (p75): LCP ms, INP ms, CLS unitless. */
-const THRESHOLDS: Record<string, [number, number]> = {
+export const THRESHOLDS: Record<string, [number, number]> = {
   LCP: [2500, 4000],
   INP: [200, 500],
   CLS: [0.1, 0.25],

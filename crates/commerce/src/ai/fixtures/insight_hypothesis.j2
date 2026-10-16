@@ -1,0 +1,11 @@
+{%- if data.kind == "funnel_drop" -%}
+{%- set h = "Demo AI: fewer sessions continue at " ~ data.transition ~ ", rate " ~ data.recent.rate ~ " against " ~ data.baseline.rate ~ " before." -%}
+{%- set p = "Make the next step after " ~ data.transition ~ " easier to find and more inviting on the storefront." -%}
+{%- elif data.kind == "low_add_to_cart" -%}
+{%- set h = "Demo AI: " ~ data.product ~ " is viewed often but added to the cart at rate " ~ data.rate ~ " against " ~ data.shop_rate ~ " in the shop." -%}
+{%- set p = "Make the add to cart button and the price on the product page of " ~ data.product ~ " more prominent." -%}
+{%- else -%}
+{%- set h = "Demo AI: the " ~ data.template ~ " pages are slow, " ~ data.metric ~ " p75 " ~ data.p75 ~ " against a good bound of " ~ data.good_bound ~ "." -%}
+{%- set p = "Make the " ~ data.template ~ " template lighter with smaller images and fewer blocks above the fold." -%}
+{%- endif -%}
+{"hypothesis": {{ h | tojson }}, "theme_prompt": {{ p | tojson }}}

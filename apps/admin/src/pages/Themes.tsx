@@ -11,6 +11,7 @@ import {
   showToast,
   TextField,
 } from "@platform/ui";
+import { useLocation } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -46,9 +47,14 @@ function reasons(e: unknown): string {
  * (A21), publish and rollback, reset to the default theme, archive upload/download for power
  * users, the design-token editor (a token-only revision, fast-path gates) and AI edits (WP24).
  */
+function aiPromptFromHistory(state: Partial<{ aiPrompt: unknown }> | null): string | undefined {
+  return typeof state?.aiPrompt === "string" ? state.aiPrompt : undefined;
+}
+
 export default function Themes() {
   const qc = useQueryClient();
   const { can } = useMembership();
+  const location = useLocation<{ aiPrompt: unknown }>();
   const [selected, setSelected] = createSignal<string>();
   const [error, setError] = createSignal<string>();
   const [publishing, setPublishing] = createSignal<Revision>();
@@ -361,18 +367,21 @@ export default function Themes() {
                 </Card>
               )}
             </Show>
-            <ThemeAiEditor
-              canEdit={can("admin")}
-              onShowRevision={(id) => {
-                setSelected(id);
-                document.getElementById("revisions-h")?.scrollIntoView({ behavior: "smooth" });
-              }}
-            />
           </Show>
         )}
       </QueryState>
       {/* Outside QueryState: its children are rebuilt whenever the (polled) list changes, which
           would discard an unsaved draft. */}
+      <Show when={list.data?.items.length}>
+        <ThemeAiEditor
+          canEdit={can("admin")}
+          initialPrompt={aiPromptFromHistory(location.state)}
+          onShowRevision={(id) => {
+            setSelected(id);
+            document.getElementById("revisions-h")?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
+      </Show>
       <Show when={can("admin") && active()}>
         <TokenEditor
           tokens={activeTokens.data?.tokens}
