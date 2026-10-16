@@ -376,3 +376,36 @@ async fn assignments_older_than_the_retention_are_purged(db: PgPool) {
     assert_eq!(purged, 1);
     assert_eq!(rows(&runtime, tenant).await, 1);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_enrolment_racing_a_withdrawal_writes_nothing_after_it(db: PgPool) {
+    let (runtime, tenant) = setup(&db, "exp-race").await;
+    running(&runtime, tenant).await;
+    choose(&runtime, tenant, SUBJECT, true, consent::TEXT_VERSION).await;
+
+    let mut withdrawal = tenant_tx(&runtime, tenant).await.unwrap();
+    consent::record(
+        &mut withdrawal,
+        &Subject::Anon(SUBJECT.into()),
+        &ConsentChoice {
+            purposes: Purposes {
+                analytics: Some(false),
+                ..Purposes::default()
+            },
+            text_version: consent::TEXT_VERSION.into(),
+            source: Source::Banner,
+        },
+        None,
+    )
+    .await
+    .unwrap();
+    let racing = tokio::spawn({
+        let runtime = runtime.clone();
+        async move { enrol(&runtime, tenant, SUBJECT).await }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    withdrawal.commit().await.unwrap();
+
+    assert_eq!(racing.await.unwrap(), None);
+    assert_eq!(rows(&runtime, tenant).await, 0);
+}
