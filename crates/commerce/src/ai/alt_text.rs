@@ -25,6 +25,7 @@ use super::{Ai, Call, CallError, Outcome, prompts};
 use crate::audit;
 use crate::catalog::I18n;
 use crate::media::AssetVariant;
+use crate::reviews::plain_text;
 
 pub const JOB: &str = "ai.alt_text";
 pub const FEATURE: &str = "alt_text";
@@ -177,11 +178,10 @@ fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String
     }
     out.into_iter()
         .map(|(locale, text)| {
-            let text = text.trim();
-            if text.contains(['\n', '\r']) {
+            if text.trim().contains(['\n', '\r']) {
                 return Err(CallError::output("an alt text spans several lines"));
             }
-            let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+            let text = plain_text(&text, false);
             if !(1..=ALT_MAX).contains(&text.chars().count()) {
                 return Err(CallError::output(format!(
                     "an alt text must be 1-{ALT_MAX} characters"
@@ -482,7 +482,7 @@ mod tests {
     #[test]
     fn valid_output_is_one_collapsed_line_per_requested_locale() {
         let got = validate(
-            json!({ "sk": "  Modré\ttričko   spredu ", "en": "Blue T-shirt, front view" }),
+            json!({ "sk": "  Modré\ttričko \u{202E}  spredu ", "en": "Blue T-shirt, front view" }),
             &locales(),
         )
         .unwrap();
