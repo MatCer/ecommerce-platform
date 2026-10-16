@@ -137,6 +137,10 @@ Product images get alt text in every market language without the merchant typing
   texts changed meanwhile is not written (its translations would be of the old text); the
   merchant's save queues a new job. The save validates, audits and publishes `product.updated`
   once per product and run, like any product edit.
+- **Stale forms.** A product save that sends an AI-written alt text empty (a form opened before
+  the job wrote) keeps the stored AI text while its mark still matches; typing another text
+  replaces it. Without this, every save from such a form would delete the text and pay for it
+  again.
 - **Labelling.** Each written value gets an `ai_marks` row (`field = alt_<asset id, 32 hex>`,
   feature `alt_text`, `accepted_by = system`); `Doc::get` resolves the field to that image's
   alt text, so the admin badge disappears once someone edits it.

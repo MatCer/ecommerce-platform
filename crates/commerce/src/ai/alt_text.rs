@@ -402,7 +402,7 @@ impl Job<'_> {
                 task: &task,
                 data: &json!({ "product": name, "existing": existing, "locales": targets }),
                 schema: &prompts::alt_text_schema(&targets),
-                max_tokens: 1000,
+                max_tokens: 200 + 150 * targets.len() as u32,
                 image: Some(Image {
                     media_type,
                     data: &bytes,
@@ -500,6 +500,36 @@ async fn store(
         .await?;
     }
     tx.commit().await?;
+    Ok(())
+}
+
+pub(crate) async fn keep_unedited(
+    tx: &mut TenantTx,
+    before: &products::Product,
+    media: &mut [products::ProductMedia],
+) -> Result<(), Error> {
+    let marks = sqlx::query!(
+        "SELECT field, locale, value_sha256 FROM ai_marks
+         WHERE entity_type = 'product' AND entity_id = $1 AND feature = $2",
+        before.id.to_string(),
+        FEATURE
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    for m in media.iter_mut() {
+        let Some(old) = before.media.iter().find(|o| o.asset_id == m.asset_id) else {
+            continue;
+        };
+        let field = alt_field(m.asset_id);
+        for mark in marks.iter().filter(|k| k.field == field) {
+            if let Some(text) = old.alt_i18n.get(&mark.locale)
+                && is_empty(m.alt_i18n.get(&mark.locale))
+                && marks::value_hash(&json!(text)) == mark.value_sha256
+            {
+                m.alt_i18n.insert(mark.locale.clone(), text.clone());
+            }
+        }
+    }
     Ok(())
 }
 
