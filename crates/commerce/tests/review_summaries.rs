@@ -307,6 +307,26 @@ async fn rejected_output_and_used_up_quota_keep_the_old_summary(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn summaries_below_the_minimum_are_deleted_without_a_provider(db: PgPool) {
+    let (runtime, shop) = setup(&db, "no-provider").await;
+    let mut ids = Vec::new();
+    for rating in [5, 5, 4, 4, 5] {
+        ids.push(review(&runtime, &shop, rating, true).await);
+    }
+    switch(&runtime, &shop, true).await;
+    run(&runtime, &Ai::fake(), &shop).await;
+    assert_eq!(summaries(&runtime, &shop).await.len(), 2);
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    reviews::set_status(&mut tx, "clerk", ids[0], Status::Hidden)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    run(&runtime, &Ai::fake_with_client(None), &shop).await;
+    assert!(summaries(&runtime, &shop).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn summaries_and_settings_are_tenant_isolated(db: PgPool) {
     let (runtime, a) = setup(&db, "iso-a").await;
     let b = testkit::storefront::shop(&runtime, "iso-b").await;

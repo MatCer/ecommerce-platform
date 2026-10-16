@@ -284,9 +284,6 @@ pub async fn run(
     product_id: Uuid,
     last_attempt: bool,
 ) -> Result<Outcome, Error> {
-    if ai.client.is_none() {
-        return Ok(Outcome::Done);
-    }
     let (input, stored) = {
         let mut tx = tenant_tx(db, tenant).await?;
         if !settings(&mut tx).await?.review_summaries {
@@ -305,7 +302,7 @@ pub async fn run(
         }
         return Ok(Outcome::Done);
     }
-    if stored.as_deref() == Some(input.sha256.as_str()) {
+    if ai.client.is_none() || stored.as_deref() == Some(input.sha256.as_str()) {
         return Ok(Outcome::Done);
     }
     let task = format!(
