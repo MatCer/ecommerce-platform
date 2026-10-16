@@ -7391,6 +7391,11 @@ export interface components {
             /** @example red */
             code: string;
             name_i18n: components["schemas"]["BTreeMap"];
+            /**
+             * @description Colour swatch as `#rrggbb`.
+             * @example #1f2540
+             */
+            swatch?: string | null;
         };
         OptionValueView: {
             code: string;
@@ -7988,7 +7993,10 @@ export interface components {
             brand?: string | null;
             /** Format: uuid */
             id: string;
-            /** @description Up to two images: the main one and a second (hover) image. */
+            /**
+             * @description Up to five images in display order: the first is the main photo, the second the
+             *     hover photo.
+             */
             images: components["schemas"]["Image"][];
             name: string;
             /** @description Variants differ in price: show the price as "from". */
@@ -7996,6 +8004,11 @@ export interface components {
             slug: string;
             /** @description The best state over the product's variants. */
             stock: components["schemas"]["StockState"];
+            /**
+             * @description Colour choices sold in the market, from the first option with swatches, in option
+             *     value order; empty when the product has none.
+             */
+            swatches: components["schemas"]["Swatch"][];
         };
         ProductDetail: {
             brand?: string | null;
@@ -9104,6 +9117,14 @@ export interface components {
         SuppressionPage: {
             items: components["schemas"]["Suppression"][];
             next_after?: string | null;
+        };
+        Swatch: {
+            /**
+             * @description `#rrggbb`
+             * @example #1f2540
+             */
+            color: string;
+            name: string;
         };
         Synonyms: {
             /**

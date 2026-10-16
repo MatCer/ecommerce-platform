@@ -74,6 +74,7 @@ struct Color {
     sk: &'static str,
     photo: &'static str,
     hue: i32,
+    hex: &'static str,
 }
 
 const fn c(
@@ -82,6 +83,7 @@ const fn c(
     sk: &'static str,
     photo: &'static str,
     hue: i32,
+    hex: &'static str,
 ) -> Color {
     Color {
         code,
@@ -89,36 +91,35 @@ const fn c(
         sk,
         photo,
         hue,
+        hex,
     }
 }
 
+#[rustfmt::skip]
 const TEE: &[Color] = &[
-    c("zelena", "Lesní zelená", "Lesná zelená", "tee-forest", 0),
-    c("inkoustova", "Inkoustová", "Atramentová", "tee-ink", 0),
-    c("piskova", "Písková", "Piesková", "tee-sand", 0),
-    c("vinova", "Vínová", "Vínová", "tee-forest", 200),
-    c(
-        "petrolejova",
-        "Petrolejová",
-        "Petrolejová",
-        "tee-forest",
-        60,
-    ),
+    c("zelena", "Lesní zelená", "Lesná zelená", "tee-forest", 0, "#2f4f3c"),
+    c("inkoustova", "Inkoustová", "Atramentová", "tee-ink", 0, "#1f2540"),
+    c("piskova", "Písková", "Piesková", "tee-sand", 0, "#d9b98a"),
+    c("vinova", "Vínová", "Vínová", "tee-forest", 200, "#6b2737"),
+    c("petrolejova", "Petrolejová", "Petrolejová", "tee-forest", 60, "#2f4f57"),
 ];
+#[rustfmt::skip]
 const HOODIE: &[Color] = &[
-    c("popelava", "Popelavá", "Popolavá", "hoodie-ash", 0),
-    c("cihlova", "Cihlová", "Tehlová", "hoodie-clay", 0),
-    c("tyrkysova", "Tyrkysová", "Tyrkysová", "hoodie-clay", 170),
+    c("popelava", "Popelavá", "Popolavá", "hoodie-ash", 0, "#8d9094"),
+    c("cihlova", "Cihlová", "Tehlová", "hoodie-clay", 0, "#b85c38"),
+    c("tyrkysova", "Tyrkysová", "Tyrkysová", "hoodie-clay", 170, "#2a9cae"),
 ];
+#[rustfmt::skip]
 const CAP: &[Color] = &[
-    c("olivova", "Olivová", "Olivová", "cap-olive", 0),
-    c("horcicova", "Hořčicová", "Horčicová", "cap-olive", -40),
-    c("modra", "Modrá", "Modrá", "cap-olive", 150),
+    c("olivova", "Olivová", "Olivová", "cap-olive", 0, "#6b6b3a"),
+    c("horcicova", "Hořčicová", "Horčicová", "cap-olive", -40, "#c9a227"),
+    c("modra", "Modrá", "Modrá", "cap-olive", 150, "#2f5d8a"),
 ];
+#[rustfmt::skip]
 const BAG: &[Color] = &[
-    c("prirodni", "Přírodní", "Prírodná", "bag-natural", 0),
-    c("salvejova", "Šalvějová", "Šalviová", "bag-natural", 80),
-    c("ruzova", "Pudrová", "Púdrová", "bag-natural", -60),
+    c("prirodni", "Přírodní", "Prírodná", "bag-natural", 0, "#e4d5b8"),
+    c("salvejova", "Šalvějová", "Šalviová", "bag-natural", 80, "#9caf88"),
+    c("ruzova", "Pudrová", "Púdrová", "bag-natural", -60, "#e8c4c4"),
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -773,6 +774,7 @@ impl Seeder<'_> {
                 .map(|c| OptionValue {
                     code: c.code.into(),
                     name_i18n: i18n(c.cs, c.sk),
+                    swatch: Some(c.hex.into()),
                 })
                 .collect(),
         }];
@@ -785,6 +787,7 @@ impl Seeder<'_> {
                     .map(|s| OptionValue {
                         code: s.to_ascii_lowercase(),
                         name_i18n: i18n(s, s),
+                        swatch: None,
                     })
                     .collect(),
             });

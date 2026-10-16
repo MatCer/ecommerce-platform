@@ -212,6 +212,24 @@ function compactOptions(options: readonly ProductOption[]): ProductOption[] {
   }));
 }
 
+export function settleOptions(
+  options: readonly ProductOption[],
+  codeFor: (value: ProductOption["values"][number], taken: readonly string[]) => string,
+): ProductOption[] {
+  return options.map((o) => {
+    const taken: string[] = [];
+    return {
+      ...o,
+      name_i18n: compactI18n(o.name_i18n),
+      values: o.values.map((v) => {
+        const code = codeFor(v, taken);
+        taken.push(code);
+        return { ...v, code, name_i18n: compactI18n(v.name_i18n) };
+      }),
+    };
+  });
+}
+
 /** The API document for a draft; throws `DraftError` for values it cannot represent. */
 export function draftToInput(d: ProductDraft): ProductInput {
   const translations = CONTENT_LOCALES.filter((l) => d.translations[l].name.trim() !== "").map(

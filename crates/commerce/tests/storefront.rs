@@ -209,6 +209,122 @@ async fn best_selling_and_top_rated_fallback_order_per_market(db: PgPool) {
     }
 }
 
+#[sqlx::test(migrations = "../../migrations")]
+async fn cards_carry_five_photos_and_sold_colour_swatches(db: PgPool) {
+    use commerce::catalog::products::{OptionValue, ProductMedia, ProductOption};
+    use commerce::storefront::cards::{self, Swatch};
+
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = testkit::storefront::shop(&runtime, "swatches").await;
+    let value = |code: &str, cs: &str, swatch: Option<&str>| OptionValue {
+        code: code.into(),
+        name_i18n: [("cs".to_owned(), cs.to_owned())].into(),
+        swatch: swatch.map(Into::into),
+    };
+    let mut assets = Vec::new();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    for i in 1..=6 {
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO assets (tenant_id, key, status, variants) VALUES ($1, $2, 'ready', $3)
+             RETURNING id",
+        )
+        .bind(shop.tenant)
+        .bind(format!("uploads/photo-{i}"))
+        .bind(serde_json::json!([{
+            "width": 640, "height": 800, "format": "jpeg",
+            "key": format!("media/photo-{i}-640.jpg"), "bytes": 1000
+        }]))
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assets.push(id);
+    }
+    tx.commit().await.unwrap();
+    let mut input = testkit::catalog::product_input("SWATCH", 1);
+    input.options = vec![
+        ProductOption {
+            code: "size".into(),
+            name_i18n: [("cs".to_owned(), "Velikost".to_owned())].into(),
+            values: vec![value("s", "S", None), value("m", "M", None)],
+        },
+        ProductOption {
+            code: "color".into(),
+            name_i18n: [("cs".to_owned(), "Barva".to_owned())].into(),
+            values: vec![
+                value("cervena", "Červená", Some("#c0392b")),
+                value("zelena", "Zelená", Some("#2f4f3c")),
+                value("modra", "Modrá", Some("#2F5D8A")),
+            ],
+        },
+    ];
+    let template = input.variants.remove(0);
+    for (color, size) in [
+        ("modra", "s"),
+        ("cervena", "s"),
+        ("cervena", "m"),
+        ("zelena", "m"),
+    ] {
+        let mut v = template.clone();
+        v.sku = format!("SWATCH-{color}-{size}");
+        v.option_values = [
+            ("color".to_owned(), color.to_owned()),
+            ("size".to_owned(), size.to_owned()),
+        ]
+        .into();
+        input.variants.push(v);
+    }
+    input.media = assets
+        .iter()
+        .map(|&asset_id| ProductMedia {
+            asset_id,
+            variant_sku: None,
+            alt_i18n: Default::default(),
+        })
+        .collect();
+    let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+    let priced: Vec<(Uuid, i64)> = product
+        .variants
+        .iter()
+        .filter(|v| v.option_values["color"] != "zelena")
+        .map(|v| (v.id, 100))
+        .collect();
+    testkit::pricing::set_prices(&runtime, shop.tenant, shop.czk, &priced).await;
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let cards = cards::cards(&mut tx, &ctx, &[product.id]).await.unwrap();
+    assert_eq!(
+        cards[0]
+            .images
+            .iter()
+            .map(|i| i.src.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "/media/photo-1-640.jpg",
+            "/media/photo-2-640.jpg",
+            "/media/photo-3-640.jpg",
+            "/media/photo-4-640.jpg",
+            "/media/photo-5-640.jpg",
+        ]
+    );
+    assert_eq!(
+        cards[0].swatches,
+        [
+            Swatch {
+                name: "Červená".into(),
+                color: "#c0392b".into(),
+            },
+            Swatch {
+                name: "Modrá".into(),
+                color: "#2F5D8A".into(),
+            },
+        ],
+        "colour option order, without the unpriced value"
+    );
+}
+
 /// One row in every storefront table of `shop`.
 async fn fill(runtime: &PgPool, shop: &Shop, artifact: &str) {
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();

@@ -179,6 +179,10 @@ pub struct OptionValue {
     #[schema(example = "red")]
     pub code: String,
     pub name_i18n: I18n,
+    /// Colour swatch as `#rrggbb`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "#1f2540")]
+    pub swatch: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -429,6 +433,13 @@ impl ProductInput {
                     return Err(invalid(OPT, format!("invalid value code {:?}", v.code)));
                 }
                 check_i18n("value name_i18n", OPT, &v.name_i18n, 100, true)?;
+                if let Some(s) = &v.swatch
+                    && !(s.len() == 7
+                        && s.starts_with('#')
+                        && s[1..].bytes().all(|b| b.is_ascii_hexdigit()))
+                {
+                    return Err(invalid(OPT, format!("swatch {s:?} must be #rrggbb")));
+                }
             }
         }
 
@@ -1151,6 +1162,7 @@ mod tests {
                 .map(|v| OptionValue {
                     code: (*v).into(),
                     name_i18n: i18n(&[("cs", v)]),
+                    swatch: None,
                 })
                 .collect(),
         }
@@ -1230,6 +1242,28 @@ mod tests {
         assert_eq!(code_of(&p), "invalid_variants", "active without variants");
         p.status = ProductStatus::Draft;
         p.validate().unwrap();
+    }
+
+    #[test]
+    fn validates_swatches() {
+        for ok in ["#1f2540", "#C0392B"] {
+            let mut p = tshirt();
+            p.options[0].values[0].swatch = Some(ok.into());
+            p.validate().unwrap();
+        }
+        for bad in [
+            "1f2540",
+            "#1f254",
+            "#1f25400",
+            "#1f254g",
+            "red",
+            "",
+            "#ｆｆｆｆｆｆ",
+        ] {
+            let mut p = tshirt();
+            p.options[0].values[0].swatch = Some(bad.into());
+            assert_eq!(code_of(&p), "invalid_options", "{bad:?}");
+        }
     }
 
     #[test]

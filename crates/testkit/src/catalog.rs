@@ -40,6 +40,7 @@ pub fn product_input(sku_prefix: &str, variants: usize) -> ProductInput {
                 .map(|i| OptionValue {
                     code: format!("v{i}"),
                     name_i18n: i18n(&format!("V{i}"), &format!("V{i}")),
+                    swatch: None,
                 })
                 .collect(),
         }]

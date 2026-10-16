@@ -9,6 +9,7 @@ import {
   move,
   type Product,
   type ProductOption,
+  settleOptions,
   slugify,
   variantMatrix,
 } from "./product-form.ts";
@@ -197,5 +198,42 @@ describe("move", () => {
     expect(move([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
     expect(move([1, 2, 3], 2, 1)).toEqual([1, 2, 3]);
     expect(move([1, 2, 3], 2, -2)).toEqual([3, 1, 2]);
+  });
+});
+
+describe("settleOptions", () => {
+  it("renames placeholder value codes and keeps every other value field", () => {
+    const options: ProductOption[] = [
+      {
+        code: "color",
+        name_i18n: { cs: " Barva ", sk: "" },
+        values: [
+          { code: "v1", name_i18n: { cs: "Zelená", sk: "" }, swatch: "#2f4f3c" },
+          { code: "red", name_i18n: { cs: "Červená" }, swatch: "#c0392b" },
+        ],
+      },
+    ];
+    expect(settleOptions(options, (v) => (v.code === "v1" ? "zelena" : v.code))).toEqual([
+      {
+        code: "color",
+        name_i18n: { cs: "Barva" },
+        values: [
+          { code: "zelena", name_i18n: { cs: "Zelená" }, swatch: "#2f4f3c" },
+          { code: "red", name_i18n: { cs: "Červená" }, swatch: "#c0392b" },
+        ],
+      },
+    ]);
+  });
+
+  it("picks codes from the names as typed, before blank names are dropped", () => {
+    const options: ProductOption[] = [
+      {
+        code: "color",
+        name_i18n: { cs: "Barva" },
+        values: [{ code: "v1", name_i18n: { cs: " ", sk: "Modrá" } }],
+      },
+    ];
+    const typed = settleOptions(options, (v) => Object.keys(v.name_i18n).join("+"));
+    expect(typed[0]?.values).toEqual([{ code: "cs+sk", name_i18n: { sk: "Modrá" } }]);
   });
 });

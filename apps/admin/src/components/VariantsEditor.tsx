@@ -7,6 +7,7 @@ import {
   compactI18n,
   eanValid,
   type ProductOption,
+  settleOptions,
   type VariantDraft,
   variantMatrix,
 } from "../lib/product-form.ts";
@@ -162,21 +163,11 @@ export function VariantsEditor(props: {
 
   const regenerate = () => {
     // Settle value codes from names first, so generated variants reference final codes.
-    const options = props.options.map((o) => {
-      const codes: string[] = [];
-      return {
-        ...o,
-        name_i18n: compactI18n(o.name_i18n),
-        values: o.values.map((v) => {
-          const code =
-            /^v\d+(-\d+)?$/.test(v.code) && label(v.name_i18n)
-              ? freshCode(v.name_i18n, codes, v.code)
-              : v.code;
-          codes.push(code);
-          return { code, name_i18n: compactI18n(v.name_i18n) };
-        }),
-      };
-    });
+    const options = settleOptions(props.options, (v, taken) =>
+      /^v\d+(-\d+)?$/.test(v.code) && label(v.name_i18n)
+        ? freshCode(v.name_i18n, taken, v.code)
+        : v.code,
+    );
     props.onOptions(options);
     try {
       props.onVariants(variantMatrix(options, props.variants, props.skuBase));

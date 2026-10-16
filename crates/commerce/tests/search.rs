@@ -78,6 +78,7 @@ fn option(code: &str, values: &[&str]) -> ProductOption {
             .map(|v| OptionValue {
                 code: (*v).into(),
                 name_i18n: [("cs".to_owned(), (*v).to_owned())].into(),
+                swatch: None,
             })
             .collect(),
     }

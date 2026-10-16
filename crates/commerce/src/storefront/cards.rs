@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, Duration, Utc};
 use platform::Error;
 use platform::db::TenantTx;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -25,6 +25,7 @@ use crate::pricing::{self, ShelfPrice};
 const NEW_FOR_DAYS: i64 = 30;
 /// Available units at or below which stock is "low".
 pub const LOW_STOCK: i32 = 5;
+const CARD_IMAGES: i64 = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -91,13 +92,25 @@ pub enum Badge {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct Swatch {
+    pub name: String,
+    /// `#rrggbb`
+    #[schema(example = "#1f2540")]
+    pub color: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ProductCard {
     pub id: Uuid,
     pub slug: String,
     pub name: String,
     pub brand: Option<String>,
-    /// Up to two images: the main one and a second (hover) image.
+    /// Up to five images in display order: the first is the main photo, the second the
+    /// hover photo.
     pub images: Vec<Image>,
+    /// Colour choices sold in the market, from the first option with swatches, in option
+    /// value order; empty when the product has none.
+    pub swatches: Vec<Swatch>,
     #[serde(flatten)]
     pub price: PriceView,
     /// Variants differ in price: show the price as "from".
@@ -276,6 +289,64 @@ pub(crate) fn price_view(ctx: &Context, product: &ProductRow, price: &ShelfPrice
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct SwatchValue {
+    code: String,
+    #[serde(default)]
+    name_i18n: Value,
+    swatch: Option<String>,
+}
+
+struct SwatchOption {
+    code: String,
+    values: Vec<SwatchValue>,
+}
+
+async fn swatch_options(
+    tx: &mut TenantTx,
+    ids: &[Uuid],
+) -> Result<HashMap<Uuid, Vec<SwatchOption>>, Error> {
+    let rows = sqlx::query!(
+        r#"SELECT product_id, code, "values" AS "values!" FROM product_options
+           WHERE product_id = ANY($1) ORDER BY product_id, position"#,
+        ids
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    let mut out: HashMap<Uuid, Vec<SwatchOption>> = HashMap::new();
+    for r in rows {
+        out.entry(r.product_id).or_default().push(SwatchOption {
+            code: r.code,
+            values: serde_json::from_value(r.values).unwrap_or_default(),
+        });
+    }
+    Ok(out)
+}
+
+fn swatches(
+    options: &[SwatchOption],
+    sold: &[&BTreeMap<String, String>],
+    text: impl Fn(&Value) -> Option<String>,
+) -> Vec<Swatch> {
+    let Some(option) = options
+        .iter()
+        .find(|o| o.values.iter().any(|v| v.swatch.is_some()))
+    else {
+        return Vec::new();
+    };
+    option
+        .values
+        .iter()
+        .filter(|v| sold.iter().any(|ov| ov.get(&option.code) == Some(&v.code)))
+        .filter_map(|v| {
+            Some(Swatch {
+                color: v.swatch.clone()?,
+                name: text(&v.name_i18n).unwrap_or_else(|| v.code.clone()),
+            })
+        })
+        .collect()
+}
+
 // ---------------------------------------------------------------------------------------
 // Cards
 
@@ -294,9 +365,10 @@ pub async fn cards(
         variants.entry(v.product_id).or_default().push(v);
     }
     let mut media_by: HashMap<Uuid, Vec<MediaRow>> = HashMap::new();
-    for m in media(tx, ids, Some(2)).await? {
+    for m in media(tx, ids, Some(CARD_IMAGES)).await? {
         media_by.entry(m.product_id).or_default().push(m);
     }
+    let options = swatch_options(tx, ids).await?;
     let new_since = ctx.now - Duration::days(NEW_FOR_DAYS);
     Ok(ids
         .iter()
@@ -322,6 +394,11 @@ pub async fn cards(
                     .get(id)
                     .map(|ms| ms.iter().filter_map(|m| image(ctx, m, &p.name)).collect())
                     .unwrap_or_default(),
+                swatches: swatches(
+                    options.get(id).map_or(&[], Vec::as_slice),
+                    &vs.iter().map(|v| &v.option_values).collect::<Vec<_>>(),
+                    |i| ctx.text(i),
+                ),
                 price_varies: most != cheapest.price.amount_minor,
                 price,
                 stock: vs
@@ -338,6 +415,79 @@ pub async fn cards(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+
+    fn option(code: &str, values: Value) -> SwatchOption {
+        SwatchOption {
+            code: code.into(),
+            values: serde_json::from_value(values).unwrap(),
+        }
+    }
+
+    fn cs(i18n: &Value) -> Option<String> {
+        i18n.get("cs").and_then(Value::as_str).map(str::to_owned)
+    }
+
+    fn sold(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+    }
+
+    fn swatch(name: &str, color: &str) -> Swatch {
+        Swatch {
+            name: name.into(),
+            color: color.into(),
+        }
+    }
+
+    #[test]
+    fn swatches_come_from_the_first_swatch_option_and_sold_values() {
+        let options = [
+            option("size", json!([{ "code": "s", "name_i18n": { "cs": "S" } }])),
+            option(
+                "color",
+                json!([
+                    { "code": "modra", "name_i18n": { "cs": "Modrá" }, "swatch": "#2f5d8a" },
+                    { "code": "bila", "name_i18n": { "cs": "Bílá" } },
+                    { "code": "zelena", "name_i18n": { "cs": "Zelená" }, "swatch": "#2f4f3c" },
+                    { "code": "cerna", "name_i18n": { "en": "Black" }, "swatch": "#111111" },
+                    { "code": "cervena", "name_i18n": { "cs": "Červená" }, "swatch": "#c0392b" },
+                ]),
+            ),
+            option(
+                "pattern",
+                json!([{ "code": "pruh", "name_i18n": { "cs": "Pruh" }, "swatch": "#000000" }]),
+            ),
+        ];
+        let variants = [
+            sold(&[("color", "cervena"), ("size", "s"), ("pattern", "pruh")]),
+            sold(&[("color", "bila"), ("size", "s"), ("pattern", "pruh")]),
+            sold(&[("color", "cerna"), ("size", "s"), ("pattern", "pruh")]),
+            sold(&[("color", "modra"), ("size", "s"), ("pattern", "pruh")]),
+        ];
+        let sold: Vec<&BTreeMap<String, String>> = variants.iter().collect();
+        assert_eq!(
+            swatches(&options, &sold, cs),
+            [
+                swatch("Modrá", "#2f5d8a"),
+                swatch("cerna", "#111111"),
+                swatch("Červená", "#c0392b"),
+            ]
+        );
+    }
+
+    #[test]
+    fn no_swatch_option_means_no_swatches() {
+        let options = [option(
+            "size",
+            json!([{ "code": "s", "name_i18n": { "cs": "S" } }]),
+        )];
+        let variant = sold(&[("size", "s")]);
+        assert_eq!(swatches(&options, &[&variant], cs), []);
+        assert_eq!(swatches(&[], &[&variant], cs), []);
+    }
 
     #[test]
     fn stock_states() {

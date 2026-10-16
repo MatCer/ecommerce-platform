@@ -30518,6 +30518,14 @@
           },
           "name_i18n": {
             "$ref": "#/components/schemas/BTreeMap"
+          },
+          "swatch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Colour swatch as `#rrggbb`.",
+            "example": "#1f2540"
           }
         },
         "additionalProperties": false
@@ -32464,6 +32472,7 @@
               "slug",
               "name",
               "images",
+              "swatches",
               "price_varies",
               "stock",
               "badges"
@@ -32490,7 +32499,7 @@
                 "items": {
                   "$ref": "#/components/schemas/Image"
                 },
-                "description": "Up to two images: the main one and a second (hover) image."
+                "description": "Up to five images in display order: the first is the main photo, the second the\nhover photo."
               },
               "name": {
                 "type": "string"
@@ -32505,6 +32514,13 @@
               "stock": {
                 "$ref": "#/components/schemas/StockState",
                 "description": "The best state over the product's variants."
+              },
+              "swatches": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Swatch"
+                },
+                "description": "Colour choices sold in the market, from the first option with swatches, in option\nvalue order; empty when the product has none."
               }
             }
           }
@@ -36011,6 +36027,23 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "Swatch": {
+        "type": "object",
+        "required": [
+          "name",
+          "color"
+        ],
+        "properties": {
+          "color": {
+            "type": "string",
+            "description": "`#rrggbb`",
+            "example": "#1f2540"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },

@@ -394,6 +394,78 @@
   }
 }
 
+@utility card-photos {
+  timeline-scope: --card-1, --card-2, --card-3, --card-4, --card-5;
+}
+@utility card-rail {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  & > * {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+  }
+  /* Chrome fetches lazy images in a scroller near the viewport; skipping later slides defers most. */
+  & > :not(:first-child) {
+    content-visibility: auto;
+  }
+  & > :nth-child(1) {
+    view-timeline: --card-1 inline;
+  }
+  & > :nth-child(2) {
+    view-timeline: --card-2 inline;
+  }
+  & > :nth-child(3) {
+    view-timeline: --card-3 inline;
+  }
+  & > :nth-child(4) {
+    view-timeline: --card-4 inline;
+  }
+  & > :nth-child(5) {
+    view-timeline: --card-5 inline;
+  }
+}
+@keyframes card-dot {
+  from,
+  to {
+    opacity: 1;
+  }
+}
+@utility card-dots {
+  & > li {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: var(--color-foreground);
+    opacity: 0.3;
+  }
+  @supports (animation-timeline: view()) {
+    & > li {
+      animation: card-dot linear none;
+      animation-range: cover 25% cover 75%;
+    }
+    & > li:nth-child(1) {
+      animation-timeline: --card-1;
+    }
+    & > li:nth-child(2) {
+      animation-timeline: --card-2;
+    }
+    & > li:nth-child(3) {
+      animation-timeline: --card-3;
+    }
+    & > li:nth-child(4) {
+      animation-timeline: --card-4;
+    }
+    & > li:nth-child(5) {
+      animation-timeline: --card-5;
+    }
+  }
+}
+
 /*
  * Cart drawer: a modal <dialog> on the right from 48rem, a bottom sheet on phones. Display only
  * while open, so the utility never overrides the closed dialog's `display: none`.
