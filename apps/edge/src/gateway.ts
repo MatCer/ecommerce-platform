@@ -85,12 +85,7 @@ const SPECULATION_RULES = JSON.stringify({
           { href_matches: "/*" },
           {
             not: {
-              href_matches: PLATFORM_SEGMENTS.flatMap((s) => [
-                `/${s}`,
-                `/${s}/*`,
-                `/*/${s}`,
-                `/*/${s}/*`,
-              ]),
+              href_matches: PLATFORM_SEGMENTS.flatMap((s) => [`/${s}{/*}?`, `/*/${s}{/*}?`]),
             },
           },
           { not: { selector_matches: "[rel~=nofollow], [data-no-prerender]" } },
@@ -457,6 +452,7 @@ export function createGateway(opts: GatewayOptions) {
     port: string,
     prefix = "",
   ): Promise<Response> {
+    if (isPlatformPath(url.pathname)) return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     // A20: counted before the cache, without identifiers (template + day only). Not previews.
@@ -1468,13 +1464,14 @@ ${
     const split = splitLocale(site, p);
     if (split) {
       const localized = { ...site, locale: split.locale };
-      const inner = new URL(`${split.path}${url.search}`, url);
+      const inner = new URL(url);
+      inner.pathname = split.path;
       // The product page's watch form posts under the page's locale prefix, so the
       // confirmation mail is written in the language the shopper read.
       if (split.path === "/_p/watch") return watchSubscribe(localized, req, host, port);
       if (split.path.startsWith("/_p/public/"))
         return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
-      if (!split.path.startsWith("/_") && !split.path.startsWith("/media/") && !isPlatformPath(p))
+      if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))
         return renderTheme(localized, inner, req, port, `/${split.locale}`);
       return text(404, "Not found");
     }
@@ -1542,7 +1539,6 @@ ${
         text(404, "Not found")
       );
     }
-    if (isPlatformPath(p)) return text(404, "Not found");
     const pub = await serveAsset(active, p, false);
     if (pub) return pub;
     return renderTheme(site, url, req, port);

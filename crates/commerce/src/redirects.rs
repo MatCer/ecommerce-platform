@@ -94,7 +94,7 @@ pub const PLATFORM_SEGMENTS: [&str; 13] = [
 pub fn is_platform_path(path: &str) -> bool {
     let mut p = path.as_bytes().to_vec();
     loop {
-        let next = percent_decode(&p);
+        let next: Vec<u8> = percent_encoding::percent_decode(&p).collect();
         if next == p {
             break;
         }
@@ -118,22 +118,6 @@ pub fn is_platform_path(path: &str) -> bool {
         }
         [] => false,
     }
-}
-
-fn percent_decode(p: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(p.len());
-    let mut i = 0;
-    while let Some(&b) = p.get(i) {
-        let hex = |j: usize| p.get(j).and_then(|c| char::from(*c).to_digit(16));
-        if let (b'%', Some(hi), Some(lo)) = (b, hex(i + 1), hex(i + 2)) {
-            out.push(u8::try_from(hi * 16 + lo).unwrap_or_default());
-            i += 3;
-        } else {
-            out.push(b);
-            i += 1;
-        }
-    }
-    out
 }
 
 /// `cs` or `en-gb` (lowercased): the shape of a market locale prefix.
@@ -366,6 +350,11 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
 
+    fn repo_json(path: &str) -> serde_json::Value {
+        let path = format!("{}/../../{path}", env!("CARGO_MANIFEST_DIR"));
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
     fn input(from: &str, to: &str) -> RedirectInput {
         RedirectInput {
             from_path: from.into(),
@@ -399,32 +388,13 @@ mod tests {
 
     #[test]
     fn platform_paths_are_reserved() {
-        for p in [
-            "/checkout",
-            "/checkout/identify",
-            "/_p",
-            "/_checkout/b1/a.js",
-            "/account",
-            "/cs/checkout",
-            "/en-GB/o/x",
-            "//checkout",
-            "/%63heckout",
-            "/%2563heckout",
-            "/CHECKOUT",
-            "/x/../checkout",
-            "/%5Ccheckout",
-        ] {
-            assert!(is_platform_path(p), "{p}");
+        let cases = repo_json("fixtures/platform-paths.json");
+        let paths = |k: &str| -> Vec<String> { serde_json::from_value(cases[k].clone()).unwrap() };
+        for p in paths("reserved") {
+            assert!(is_platform_path(&p), "{p}");
         }
-        for p in [
-            "/",
-            "/p/checkout",
-            "/checkouts",
-            "/pages/consent",
-            "/top/checkout",
-            "/%ZZcheckout",
-        ] {
-            assert!(!is_platform_path(p), "{p}");
+        for p in paths("allowed") {
+            assert!(!is_platform_path(&p), "{p}");
         }
         assert!(input("/stary", "/checkout").validate().is_ok());
         let err = input("/cs/review", "/p/x").validate().unwrap_err();
@@ -433,12 +403,7 @@ mod tests {
 
     #[test]
     fn platform_segments_match_the_edge_manifest() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../packages/theme-kit/src/platform-routes.json"
-        );
-        let json: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let json = repo_json("packages/theme-kit/src/platform-routes.json");
         let edge: Vec<&str> = json["segments"]
             .as_array()
             .unwrap()

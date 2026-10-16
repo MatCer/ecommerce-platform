@@ -23,6 +23,7 @@ image.workspace = true
 infer.workspace = true
 object_store.workspace = true
 platform.workspace = true
+percent-encoding.workspace = true
 qrcode.workspace = true
 quick-xml.workspace = true
 rand.workspace = true

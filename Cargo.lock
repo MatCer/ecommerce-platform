@@ -673,6 +673,7 @@ dependencies = [
  "infer",
  "minijinja",
  "object_store",
+ "percent-encoding",
  "platform",
  "proptest",
  "qrcode",

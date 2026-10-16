@@ -145,19 +145,24 @@ test("speculation rules never prerender a platform path or its localized variant
   const excluded = rules.prerender[0]?.where.and.flatMap((c) => c.not?.href_matches ?? []);
   expect(excluded).toEqual(
     expect.arrayContaining([
-      "/_p/*",
-      "/_checkout/*",
-      "/checkout",
-      "/checkout/*",
-      "/*/checkout",
-      "/o/*",
-      "/account",
-      "/*/account/*",
-      "/newsletter/*",
-      "/consent",
+      "/_p{/*}?",
+      "/_checkout{/*}?",
+      "/checkout{/*}?",
+      "/*/checkout{/*}?",
+      "/o{/*}?",
+      "/*/account{/*}?",
+      "/newsletter{/*}?",
+      "/consent{/*}?",
     ]),
   );
-  expect(excluded).not.toContain("/p/*");
+  const matches = (path: string) =>
+    (excluded ?? []).some((p) =>
+      new URLPattern(p, "http://demo.localhost/").test(`http://demo.localhost${path}`),
+    );
+  for (const p of ["/checkout", "/checkout/x?y=1", "/en/checkout", "/_p/cart", "/o/abc"])
+    expect(matches(p), p).toBe(true);
+  for (const p of ["/", "/p/tricko", "/checkouts", "/c/obleceni"])
+    expect(matches(p), p).toBe(false);
 });
 
 describe("response headers (C2, C3)", () => {
