@@ -129,9 +129,12 @@ prune() {
 
 gb() { awk -v b="$1" 'BEGIN { printf "%.1f GB", b / 1e9 }'; }
 
-remove_target() {
-  local target=$1/target trash=$1/.target-trash.$$ bytes
-  bytes=$(du -sb "$target" | cut -f1) || { echo "worktree: cannot measure $target, left as is" >&2; return 0; }
+remove_target() (
+  local target=$1/target bytes cleanup
+  exec {cleanup}>"$(git -C "$1" rev-parse --absolute-git-dir)/target-cleanup.lock"
+  flock -n "$cleanup" || { echo "worktree: another cleanup is running in $1, skipped"; exit 0; }
+  [[ -d $target ]] || exit 0
+  bytes=$(du -sb "$target" | cut -f1) || { echo "worktree: cannot measure $target, left as is" >&2; exit 0; }
   (
     for lock in "$target"/*/.cargo-lock; do
       [[ -e $lock ]] || continue
@@ -139,10 +142,10 @@ remove_target() {
       flock -n "$fd" || { echo "worktree: a cargo build is running in $1, $target left as is"; exit 0; }
     done
     echo "worktree: $2, ${3:+would }remove $target ($(gb "$bytes"))"
-    [[ -n ${3:-} ]] || mv -T "$target" "$trash"
+    [[ -n ${3:-} ]] || mv -T "$target" "$(mktemp -d "$1/.target-trash.XXXXXX")"
   )
-  [[ ! -e $trash ]] || rm -rf "$1"/.target-trash.*
-}
+  [[ -n ${3:-} ]] || rm -rf "$1"/.target-trash.*
+)
 
 sweep() {
   local dir recent
