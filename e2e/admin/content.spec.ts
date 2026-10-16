@@ -110,6 +110,45 @@ test("publishes Terms and a CMS page with heading, rich text and FAQ", async () 
   ).toContainText("Published");
 });
 
+test("an edited cookie page keeps its template version only when the owner confirms the wording", async () => {
+  const confirm = page.getByRole("checkbox", {
+    name: "This page still says analytics covers testing page variants",
+    exact: true,
+  });
+  const openCookies = async () => {
+    await nav("Pages").click();
+    await page
+      .getByRole("table", { name: "Pages", exact: true })
+      .getByRole("row")
+      .filter({ has: page.getByText("Cookies", { exact: true }) })
+      .getByRole("link")
+      .click();
+    await expect(page.getByText("Template, not legal advice", { exact: false })).toBeVisible();
+  };
+  const addParagraph = async (text: string) => {
+    await addBlock("Rich text");
+    await page.getByRole("textbox", { name: "Body text", exact: true }).last().fill(text);
+  };
+
+  await openCookies();
+  await expect(confirm).toBeVisible();
+  await expectAccessible(page, "content-cookie-editor");
+  await confirm.check();
+  await addParagraph("Doplněno se zachovaným textem o testování.");
+  await publish();
+  await expect(page.getByRole("heading", { name: "Pages", exact: true })).toBeVisible();
+
+  await openCookies();
+  await expect(confirm).toBeVisible();
+  await expect(confirm).not.toBeChecked();
+  await addParagraph("Doplněno bez potvrzení.");
+  await publish();
+  await expect(page.getByRole("heading", { name: "Pages", exact: true })).toBeVisible();
+
+  await openCookies();
+  await expect(confirm).toBeHidden();
+});
+
 test("publishes a blog post", async () => {
   await nav("Blog").click();
   await expect(page.getByRole("heading", { name: "Blog", exact: true })).toBeVisible();
