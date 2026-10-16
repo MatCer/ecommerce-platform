@@ -400,7 +400,8 @@ pub(crate) async fn record_usage(
 
 /// Deserializes the model output into `T` (unknown fields rejected).
 pub(crate) fn parse<T: serde::de::DeserializeOwned>(output: Value) -> Result<T, CallError> {
-    serde_json::from_value(output).map_err(|e| CallError::output(e.to_string()))
+    serde_json::from_value(output)
+        .map_err(|_| CallError::output("the output does not match the expected shape"))
 }
 
 /// What a job runner should do after a step.

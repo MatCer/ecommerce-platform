@@ -1033,7 +1033,7 @@ impl Gen<'_> {
         let mut map = BTreeMap::new();
         for f in out.fields {
             if map.insert(f.key.clone(), f.text).is_some() {
-                return Err(CallError::output(format!("field {} returned twice", f.key)));
+                return Err(CallError::output("a field is returned twice"));
             }
         }
         let expected: BTreeSet<&str> = units.iter().map(|u| u.key.as_str()).collect();

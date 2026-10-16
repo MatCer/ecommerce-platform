@@ -531,9 +531,15 @@ mod tests {
             out(&[("cs", "A"), ("PRIVATE-OUTPUT", "B")]),
             out(&[("cs", "Viz https://PRIVATE-OUTPUT.example"), ("sk", "B")]),
             out(&[("cs", &"PRIVATE-OUTPUT".repeat(60)), ("sk", "B")]),
+            json!({ "PRIVATE-OUTPUT-SENTINEL": 1, "summaries": [] }),
+            json!({ "summaries": "PRIVATE-OUTPUT-SENTINEL" }),
+            json!({ "summaries": [{ "locale": "cs", "summary": "A", "PRIVATE-OUTPUT": 1 }] }),
         ] {
-            let e = validate(bad, &locales()).unwrap_err().to_string();
-            assert!(!e.contains("PRIVATE-OUTPUT"), "{e}");
+            let e = validate(bad, &locales()).unwrap_err();
+            assert_eq!(e.code(), "ai_invalid_output");
+            let (display, debug) = (e.to_string(), format!("{e:?}"));
+            assert!(!display.contains("PRIVATE-OUTPUT"), "{display}");
+            assert!(!debug.contains("PRIVATE-OUTPUT"), "{debug}");
         }
     }
 
