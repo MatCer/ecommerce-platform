@@ -176,6 +176,35 @@ describe("ApiEnroller", () => {
     expect(await wave(400, 30_001)).toEqual(Array(12).fill("b"));
     expect(calls).toBe(27);
   });
+
+  test("a call that started before the outage and answers late does not end it; only the probe does", async () => {
+    for (const late of [200, 429]) {
+      const answers = [
+        () => new Response("down", { status: 503 }),
+        async () => {
+          await new Promise((r) => setTimeout(r, 10));
+          return late === 200
+            ? Response.json({ assignment: null })
+            : new Response("slow down", { status: 429 });
+        },
+      ];
+      let calls = 0;
+      const enroller = new ApiEnroller("http://api.test", "t", async () => {
+        const answer = answers[calls++];
+        return answer ? answer() : new Response("down", { status: 503 });
+      });
+      const s = site({ experiment: EXP });
+      const visitor = (i: number) => i.toString(16).padStart(32, "0");
+      await Promise.allSettled([
+        enroller.enrol(s, visitor(0), 0),
+        enroller.enrol(s, visitor(1), 0),
+      ]);
+      await Promise.allSettled(
+        Array.from({ length: 12 }, (_, i) => enroller.enrol(s, visitor(100 + i), 10_000)),
+      );
+      expect([late, calls]).toEqual([late, 3]);
+    }
+  });
 });
 
 describe("enrolment at the edge (SHOP-96)", () => {
