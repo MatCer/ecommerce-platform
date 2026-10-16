@@ -162,9 +162,7 @@ test("speculation rules never prerender a platform path or its localized variant
       "/_p{/*}?",
       "/_checkout{/*}?",
       "/checkout{/*}?",
-      "/*/checkout{/*}?",
       "/o{/*}?",
-      "/*/account{/*}?",
       "/newsletter{/*}?",
       "/consent{/*}?",
     ]),
@@ -176,7 +174,13 @@ test("speculation rules never prerender a platform path or its localized variant
   const caseVariant = (p: string) => /[A-Z]/.test(p.replace(/%[0-9a-f]{2}/gi, ""));
   for (const p of [...cases.reserved.filter((p) => !caseVariant(p)), "/checkout/x?y=1"])
     expect(matches(p), p).toBe(true);
-  for (const p of ["/", "/p/tricko", "/checkouts", "/c/obleceni"])
+  for (const p of [
+    "/",
+    "/p/tricko",
+    "/checkouts",
+    "/c/obleceni",
+    ...cases.allowed.filter((p) => !p.includes("%")),
+  ])
     expect(matches(p), p).toBe(false);
 });
 

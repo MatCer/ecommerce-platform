@@ -86,8 +86,13 @@ const SPECULATION_RULES = JSON.stringify({
           {
             not: {
               href_matches: [
-                ...PLATFORM_SEGMENTS.flatMap((s) => [`/${s}{/*}?`, `/*/${s}{/*}?`]),
+                ...PLATFORM_SEGMENTS.flatMap((s) => [
+                  `/${s}{/*}?`,
+                  `/:locale([a-zA-Z]{2}(?:-[a-zA-Z]{2})?)/${s}{/*}?`,
+                ]),
                 "/*%*",
+                "//*",
+                "/*//*",
               ],
             },
           },
