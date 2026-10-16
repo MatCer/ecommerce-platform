@@ -524,6 +524,7 @@ describe("enrolment while the API is down (SHOP-96)", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await gw?.dispose();
     gw = undefined;
   });
@@ -589,6 +590,41 @@ describe("enrolment while the API is down (SHOP-96)", () => {
     ]);
     expect(logs.filter((l) => l.msg === "experiment enrolment failed").length).toBe(1);
     expect(JSON.stringify(logs)).not.toContain(subject(42));
+  });
+
+  test("during an outage a visitor keeps their memoized arm for 60 s, then gets control without waiting", async () => {
+    let down = false;
+    let calls = 0;
+    const { page } = gateway((req) => {
+      calls++;
+      if (down)
+        return new Promise((_, reject) =>
+          req.signal.addEventListener("abort", () => reject(req.signal.reason)),
+        );
+      return Promise.resolve(
+        Response.json({ assignment: { experiment_id: EXP.id, version: EXP.version, arm: "b" } }),
+      );
+    });
+    expect((await page()).res.status).toBe(200);
+    const t0 = Date.now();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const PRIVATE = "private, max-age=0, must-revalidate";
+    const PUBLIC = "public, max-age=0, must-revalidate";
+    const at = async (ms: number, cookie: string) => {
+      vi.setSystemTime(t0 + ms);
+      const { res, ms: took } = await page(cookie);
+      return { cacheControl: res.headers.get("cache-control"), took };
+    };
+    const alice = consented(subject(1));
+    expect((await at(0, alice)).cacheControl).toBe(PRIVATE);
+    down = true;
+    expect((await at(55_000, consented(subject(2)))).cacheControl).toBe(PUBLIC);
+    expect(calls).toBe(2);
+    const kept = await at(59_000, alice);
+    const expired = await at(61_000, alice);
+    expect([kept.cacheControl, expired.cacheControl]).toEqual([PRIVATE, PUBLIC]);
+    expect(calls).toBe(2);
+    expect(Math.max(kept.took, expired.took)).toBeLessThan(50);
   });
 
   test("12 concurrent requests of one visitor ask the API once", async () => {
