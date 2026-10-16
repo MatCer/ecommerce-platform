@@ -476,7 +476,9 @@ separate cache namespace, never cached (already bypassed by the policy).
   deadline (the live lane measured 2 ms median, 9 ms p99, 100 ms worst). Concurrent misses of one
   (tenant, subject, experiment) share one call. After an error or a timeout the instance serves
   control without calling until 10 s after the failed call started; then a single call probes the
-  API while every other request stays control, and only its success (or a `429`) ends the outage.
+  API while every other request without a memoized arm or a call of its own subject to join stays
+  control, and only the probe's success (or a `429`) ends the outage; a late answer to a call
+  started before the failure does not.
   When the API goes down, the calls already in flight (one per distinct subject that arrived
   before the first failure) each wait at most 150 ms, and so do the requests that joined them;
   after that the instance makes one call per 10 s window, so a cache HIT stays a HIT. A `429`

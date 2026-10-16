@@ -68,10 +68,12 @@ export class ApiEnroller implements Enroller {
     let assignment: Assignment | null;
     try {
       assignment = await this.#call(site, subject);
-      this.#down = false;
+      if (probe) this.#down = false;
     } catch (err) {
-      this.#down = !(err instanceof RateLimited);
-      if (this.#down) this.#downUntil = now + BACKOFF_MS;
+      if (!(err instanceof RateLimited)) {
+        this.#down = true;
+        this.#downUntil = now + BACKOFF_MS;
+      } else if (probe) this.#down = false;
       throw err;
     } finally {
       if (probe) this.#probing = false;
