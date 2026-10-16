@@ -1689,6 +1689,8 @@ ${
   }
 
   async function handle(request: Request): Promise<Response> {
+    if (request.headers.get("service-worker") === "script")
+      return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
     const url = new URL(request.url);
     const rawHost = request.headers.get("host") ?? url.host;
     const host = normalizeHost(rawHost);
