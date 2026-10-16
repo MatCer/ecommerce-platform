@@ -1,0 +1,598 @@
+//! Storefront tables (redirects, carts, handoffs, theme revisions) against a real Postgres as
+//! the runtime role: tenant isolation and the service rules that live in SQL.
+
+use chrono::Utc;
+use commerce::cart::{self, NewLine};
+use commerce::redirects::{self, RedirectInput};
+use commerce::storefront::{self, PublicUrls};
+use commerce::{tenancy, themes};
+use platform::db::tenant_tx;
+use sqlx::PgPool;
+use testkit::storefront::Shop;
+use uuid::Uuid;
+
+const TABLES: &[&str] = &[
+    "redirects",
+    "carts",
+    "cart_lines",
+    "cart_coupons",
+    "checkout_handoffs",
+    "theme_revisions",
+    "theme_active",
+];
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn popular_listing_options_and_fallback_order(db: PgPool) {
+    use commerce::storefront::listing::Sort;
+    use commerce::storefront::pages::{self, ListingParams};
+
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = testkit::storefront::shop(&runtime, "popular").await;
+    let mut products = vec![shop.product];
+    for sku in ["POPULAR-TIE", "UNSCORED"] {
+        let mut input = testkit::catalog::product_input(sku, 1);
+        input.category_ids = vec![shop.category];
+        let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+        testkit::pricing::set_prices(
+            &runtime,
+            shop.tenant,
+            shop.czk,
+            &[(product.variants[0].id, 100)],
+        )
+        .await;
+        products.push(product.id);
+    }
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for product in &products[..2] {
+        sqlx::query(
+            "INSERT INTO product_popularity (tenant_id, product_id, popularity) VALUES ($1, $2, 20)",
+        )
+        .bind(shop.tenant)
+        .bind(product)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let params = ListingParams::from_pairs(&[("sort".into(), "popular".into())]);
+    assert_eq!(params.sort, Some(Sort::Popular));
+    let category = pages::category(&mut tx, &ctx, None, "trika", &params)
+        .await
+        .unwrap()
+        .unwrap();
+    let search_params = ListingParams {
+        q: Some("Product".into()),
+        ..params
+    };
+    let search = pages::search(&mut tx, &ctx, None, &search_params)
+        .await
+        .unwrap();
+    for page in [category, search] {
+        assert_eq!(
+            page.sort
+                .iter()
+                .map(|s| s.value.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "recommended",
+                "popular",
+                "best_selling",
+                "top_rated",
+                "newest",
+                "price_asc",
+                "price_desc"
+            ]
+        );
+        let popular = &page.sort[1];
+        assert_eq!(popular.label, "Nejoblíbenější");
+        assert!(popular.selected);
+        assert!(popular.href.contains("sort=popular"));
+        assert_eq!(
+            page.products.iter().map(|p| p.id).collect::<Vec<_>>(),
+            [products[1], products[0], products[2]],
+            "popularity desc, then newest; missing popularity defaults to zero"
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn best_selling_and_top_rated_fallback_order_per_market(db: PgPool) {
+    use commerce::storefront::listing::Sort;
+    use commerce::storefront::pages::{self, ListingParams};
+
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = testkit::storefront::shop(&runtime, "ranked").await;
+    let mut products = vec![shop.product];
+    for sku in ["RANKED-NEW", "UNRANKED-NEWEST"] {
+        let mut input = testkit::catalog::product_input(sku, 1);
+        input.category_ids = vec![shop.category];
+        let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+        let variant = product.variants[0].id;
+        testkit::pricing::set_prices(&runtime, shop.tenant, shop.czk, &[(variant, 100)]).await;
+        testkit::pricing::set_prices(&runtime, shop.tenant, shop.eur, &[(variant, 5)]).await;
+        products.push(product.id);
+    }
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for (product, market, sales) in [
+        (products[0], shop.cz, 5.0),
+        (products[1], shop.cz, 5.0),
+        (products[2], shop.sk, 9.0),
+    ] {
+        sqlx::query(
+            "INSERT INTO product_search_sales (tenant_id, product_id, market_id, sales)
+             VALUES ($1, $2, $3, $4)",
+        )
+        .bind(shop.tenant)
+        .bind(product)
+        .bind(market)
+        .bind(sales)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    for (product, n, status) in [
+        (products[0], 1, "published"),
+        (products[1], 6, "published"),
+        (products[2], 6, "pending"),
+    ] {
+        for _ in 0..n {
+            sqlx::query(
+                "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                      locale, status, published_at)
+                 VALUES ($1, $2, 'Jana', 5, 'Super', true, 'cs', $3,
+                         CASE WHEN $3 = 'published' THEN now() END)",
+            )
+            .bind(shop.tenant)
+            .bind(product)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+    }
+    let [old, new, unranked] = [products[0], products[1], products[2]];
+    for (market, sort, expected, label) in [
+        (
+            shop.cz,
+            "best_selling",
+            [new, old, unranked],
+            "Nejprodávanější",
+        ),
+        (
+            shop.sk,
+            "best_selling",
+            [unranked, new, old],
+            "Najpredávanejšie",
+        ),
+        (
+            shop.cz,
+            "top_rated",
+            [new, old, unranked],
+            "Nejlépe hodnocené",
+        ),
+    ] {
+        let ctx = storefront::context(&mut tx, &PublicUrls::default(), market, None, Utc::now())
+            .await
+            .unwrap();
+        let params = ListingParams {
+            q: Some("Product".into()),
+            ..ListingParams::from_pairs(&[("sort".into(), sort.into())])
+        };
+        assert_eq!(params.sort.map(Sort::as_str), Some(sort));
+        let page = pages::search(&mut tx, &ctx, None, &params).await.unwrap();
+        assert_eq!(
+            page.products.iter().map(|p| p.id).collect::<Vec<_>>(),
+            expected,
+            "{sort} in {market}"
+        );
+        let selected = page.sort.iter().find(|s| s.selected).unwrap();
+        assert_eq!(selected.label, label);
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn cards_carry_five_photos_and_sold_colour_swatches(db: PgPool) {
+    use commerce::catalog::products::{OptionValue, ProductMedia, ProductOption};
+    use commerce::storefront::cards::{self, Swatch};
+
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = testkit::storefront::shop(&runtime, "swatches").await;
+    let value = |code: &str, cs: &str, swatch: Option<&str>| OptionValue {
+        code: code.into(),
+        name_i18n: [("cs".to_owned(), cs.to_owned())].into(),
+        swatch: swatch.map(Into::into),
+    };
+    let mut assets = Vec::new();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    for i in 1..=6 {
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO assets (tenant_id, key, status, variants) VALUES ($1, $2, 'ready', $3)
+             RETURNING id",
+        )
+        .bind(shop.tenant)
+        .bind(format!("uploads/photo-{i}"))
+        .bind(serde_json::json!([{
+            "width": 640, "height": 800, "format": "jpeg",
+            "key": format!("media/photo-{i}-640.jpg"), "bytes": 1000
+        }]))
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assets.push(id);
+    }
+    tx.commit().await.unwrap();
+    let mut input = testkit::catalog::product_input("SWATCH", 1);
+    input.options = vec![
+        ProductOption {
+            code: "size".into(),
+            name_i18n: [("cs".to_owned(), "Velikost".to_owned())].into(),
+            values: vec![value("s", "S", None), value("m", "M", None)],
+        },
+        ProductOption {
+            code: "color".into(),
+            name_i18n: [("cs".to_owned(), "Barva".to_owned())].into(),
+            values: vec![
+                value("cervena", "Červená", Some("#c0392b")),
+                value("zelena", "Zelená", Some("#2f4f3c")),
+                value("modra", "Modrá", Some("#2F5D8A")),
+            ],
+        },
+    ];
+    let template = input.variants.remove(0);
+    for (color, size) in [
+        ("modra", "s"),
+        ("cervena", "s"),
+        ("cervena", "m"),
+        ("zelena", "m"),
+    ] {
+        let mut v = template.clone();
+        v.sku = format!("SWATCH-{color}-{size}");
+        v.option_values = [
+            ("color".to_owned(), color.to_owned()),
+            ("size".to_owned(), size.to_owned()),
+        ]
+        .into();
+        input.variants.push(v);
+    }
+    input.media = assets
+        .iter()
+        .map(|&asset_id| ProductMedia {
+            asset_id,
+            variant_sku: None,
+            alt_i18n: Default::default(),
+        })
+        .collect();
+    let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+    let priced: Vec<(Uuid, i64)> = product
+        .variants
+        .iter()
+        .filter(|v| v.option_values["color"] != "zelena")
+        .map(|v| (v.id, 100))
+        .collect();
+    testkit::pricing::set_prices(&runtime, shop.tenant, shop.czk, &priced).await;
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let cards = cards::cards(&mut tx, &ctx, &[product.id]).await.unwrap();
+    assert_eq!(
+        cards[0]
+            .images
+            .iter()
+            .map(|i| i.src.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "/media/photo-1-640.jpg",
+            "/media/photo-2-640.jpg",
+            "/media/photo-3-640.jpg",
+            "/media/photo-4-640.jpg",
+            "/media/photo-5-640.jpg",
+        ]
+    );
+    assert_eq!(
+        cards[0].swatches,
+        [
+            Swatch {
+                name: "Červená".into(),
+                color: "#c0392b".into(),
+            },
+            Swatch {
+                name: "Modrá".into(),
+                color: "#2F5D8A".into(),
+            },
+        ],
+        "colour option order, without the unpriced value"
+    );
+}
+
+/// One row in every storefront table of `shop`.
+async fn fill(runtime: &PgPool, shop: &Shop, artifact: &str) {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    redirects::create(
+        &mut tx,
+        "t",
+        &RedirectInput {
+            from_path: "/old".into(),
+            to_path: "/new".into(),
+            code: 301,
+        },
+    )
+    .await
+    .unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let (id, token) = cart::create(&mut tx, &ctx).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    assert_eq!(c.id, id);
+    cart::add_line(
+        &mut tx,
+        &ctx,
+        &c,
+        &NewLine {
+            variant_id: shop.variants[0],
+            quantity: 1,
+        },
+    )
+    .await
+    .unwrap();
+    let coupon: Uuid = sqlx::query_scalar(
+        "INSERT INTO coupons (tenant_id, code, kind, value) VALUES ($1, 'TEST10', 'percent', 1000) RETURNING id",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO cart_coupons (tenant_id, cart_id, coupon_id) VALUES ($1, $2, $3)")
+        .bind(shop.tenant)
+        .bind(id)
+        .bind(coupon)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    cart::start_handoff(&mut tx, &c).await.unwrap();
+    themes::activate_default(&mut tx, "t", artifact)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn tenants_cannot_reach_each_others_storefront_rows(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let a = testkit::storefront::shop(&runtime, "alpha").await;
+    let b = testkit::storefront::shop(&runtime, "beta").await;
+    let artifact = "0123456789abcdef0123456789abcdef";
+    sqlx::query("INSERT INTO platform.theme_artifacts (id, kind) VALUES ($1, 'theme')")
+        .bind(artifact)
+        .execute(&runtime)
+        .await
+        .unwrap();
+    fill(&runtime, &a, artifact).await;
+    fill(&runtime, &b, artifact).await;
+
+    for table in TABLES {
+        let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
+        let (own, foreign): (i64, i64) = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT count(*) FILTER (WHERE tenant_id = $1), count(*) FILTER (WHERE tenant_id <> $1) FROM {table}"
+        )))
+        .bind(b.tenant)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+        assert!(own > 0, "{table}: fixture row missing");
+        assert_eq!(foreign, 0, "{table}: A's rows visible to B");
+        let err = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {table} SET tenant_id = $1"
+        )))
+        .bind(a.tenant)
+        .execute(&mut *tx)
+        .await
+        .unwrap_err();
+        assert_eq!(
+            err.as_database_error().unwrap().code().as_deref(),
+            Some("42501"),
+            "{table}"
+        );
+        tx.rollback().await.unwrap();
+    }
+
+    // B cannot put A's variant into its cart: composite foreign keys.
+    let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
+    let cart_b: Uuid = sqlx::query_scalar("SELECT id FROM carts")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    let err = sqlx::query(
+        "INSERT INTO cart_lines (tenant_id, cart_id, variant_id, quantity) VALUES ($1, $2, $3, 1)",
+    )
+    .bind(b.tenant)
+    .bind(cart_b)
+    .bind(a.variants[1])
+    .execute(&mut *tx)
+    .await
+    .unwrap_err();
+    assert_eq!(
+        err.as_database_error().unwrap().code().as_deref(),
+        Some("23503")
+    );
+    tx.rollback().await.unwrap();
+
+    // And the service refuses A's variant for B's cart outright.
+    let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), b.cz, None, Utc::now())
+        .await
+        .unwrap();
+    let (_, token) = cart::create(&mut tx, &ctx).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    let err = cart::add_line(
+        &mut tx,
+        &ctx,
+        &c,
+        &NewLine {
+            variant_id: a.variants[0],
+            quantity: 1,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(err.code(), "unknown_variant");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn storefront_tokens_resolve_their_tenant_only(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let a = testkit::storefront::shop(&runtime, "alpha").await;
+    let b = testkit::storefront::shop(&runtime, "beta").await;
+    assert_eq!(
+        tenancy::storefront_token_tenant(&runtime, &a.token)
+            .await
+            .unwrap(),
+        Some(a.tenant)
+    );
+    assert_eq!(
+        tenancy::storefront_token_tenant(&runtime, &b.token)
+            .await
+            .unwrap(),
+        Some(b.tenant)
+    );
+    for bad in ["", "sf_x", "sf_' OR 1=1 --", &a.token.to_uppercase()] {
+        assert_eq!(
+            tenancy::storefront_token_tenant(&runtime, bad)
+                .await
+                .unwrap(),
+            None,
+            "{bad}"
+        );
+    }
+    // A suspended tenant's token stops working.
+    sqlx::query("UPDATE platform.tenants SET status = 'suspended' WHERE id = $1")
+        .bind(a.tenant)
+        .execute(&runtime)
+        .await
+        .unwrap();
+    assert_eq!(
+        tenancy::storefront_token_tenant(&runtime, &a.token)
+            .await
+            .unwrap(),
+        None
+    );
+    // A tenant created through the service gets a token and resolves with it.
+    let created = tenancy::create_tenant(
+        &runtime,
+        &tenancy::NewTenant {
+            slug: "gamma",
+            name: "Gamma",
+            owner_user_id: "u",
+            owner_email: "u@example.test",
+        },
+    )
+    .await
+    .unwrap();
+    let resolved = tenancy::resolve_host(&runtime, "gamma.localhost")
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(resolved.storefront_token.starts_with("sf_") && resolved.storefront_token.len() == 67);
+    assert_eq!(
+        tenancy::storefront_token_tenant(&runtime, &resolved.storefront_token)
+            .await
+            .unwrap(),
+        Some(created.tenant_id)
+    );
+    assert_eq!(
+        resolved.theme_artifact, None,
+        "no default theme published yet"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn publishing_keeps_recent_artifacts_retained(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let a = testkit::storefront::shop(&runtime, "alpha").await;
+    let ids: Vec<String> = (1..=5).map(|i| format!("{i:032x}")).collect();
+    for id in &ids {
+        sqlx::query("INSERT INTO platform.theme_artifacts (id, kind) VALUES ($1, 'theme')")
+            .bind(id)
+            .execute(&runtime)
+            .await
+            .unwrap();
+        assert_eq!(
+            themes::publish_default(&runtime, "t", id).await.unwrap(),
+            vec![a.tenant]
+        );
+    }
+    // Everything superseded within 7 days stays retained (newest first).
+    let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
+    let active = themes::active(&mut tx).await.unwrap();
+    assert_eq!(active.artifact_id.as_deref(), Some(ids[4].as_str()));
+    assert_eq!(
+        active.retained,
+        [
+            ids[3].clone(),
+            ids[2].clone(),
+            ids[1].clone(),
+            ids[0].clone()
+        ]
+    );
+    // Superseded more than 7 days ago: only the previous 3 revisions remain.
+    sqlx::query("UPDATE theme_revisions SET superseded_at = now() - interval '30 days'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let active = themes::active(&mut tx).await.unwrap();
+    assert_eq!(
+        active.retained,
+        [ids[3].clone(), ids[2].clone(), ids[1].clone()]
+    );
+    tx.rollback().await.unwrap();
+    // A long-lived revision replaced just now stays retained, whatever its age.
+    let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
+    sqlx::query(
+        "UPDATE theme_revisions SET published_at = now() - interval '300 days',
+             superseded_at = now() - interval '300 days'",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE theme_revisions SET superseded_at = now() WHERE number = 1")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let active = themes::active(&mut tx).await.unwrap();
+    assert!(active.retained.contains(&ids[0]), "{:?}", active.retained);
+    tx.rollback().await.unwrap();
+
+    // A custom revision (M3) is left alone by default publishes.
+    let mut tx = tenant_tx(&runtime, a.tenant).await.unwrap();
+    sqlx::query("UPDATE theme_revisions SET origin = 'custom', change = 'fork', source_key = 'x'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(
+        themes::publish_default(&runtime, "t", &ids[0])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}

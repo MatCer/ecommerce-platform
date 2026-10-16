@@ -16,7 +16,7 @@ for arg in "$@"; do
   esac
 done
 [[ "$pr" =~ ^[0-9]+$ ]] || usage
-for tool in gh jq docker flock make pnpm cargo; do
+for tool in gh jq docker flock make pnpm cargo cargo-nextest cargo-sweep; do
   command -v "$tool" >/dev/null || die "$tool not found"
 done
 
@@ -159,6 +159,9 @@ else echo "scope:    rust=$rust vitest=changed e2e=${spec_list[*]:-none}" >&2; f
 cd "$wt"
 export CARGO_TARGET_DIR="$cache/target"  # persistent: a cold workspace build is many minutes
 export CARGO_BUILD_JOBS=6
+# Env, not .cargo/worktree.toml: the PR under test may predate the include that reads it.
+export CARGO_INCREMENTAL=0 SCCACHE_CACHE_SIZE=30G
+if command -v sccache >/dev/null; then export RUSTC_WRAPPER=sccache; fi
 # Own project name and host ports; everything else is the .env.example default.
 sed -e "s/^COMPOSE_PROJECT_NAME=.*/COMPOSE_PROJECT_NAME=$project/" \
   -e 's/^HTTP_PORT=.*/HTTP_PORT=18080/' -e 's/^HTTPS_PORT=.*/HTTPS_PORT=18443/' \
@@ -185,6 +188,8 @@ elif ((rust)); then
 fi
 
 if ((rust)); then
+  say "cargo sweep (target cap 30GB)"
+  cargo sweep --maxsize 30GB . || fail "cargo sweep failed"
   say "cargo test"
   make test-rust || fail "cargo test failed"
   say "cargo test -- --ignored (Meilisearch)"

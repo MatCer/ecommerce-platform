@@ -1,6 +1,6 @@
 //! Shared harness for the API integration tests: a local JWKS server signing like the auth
 //! service, app state on the runtime role, and a small request builder.
-#![allow(dead_code, clippy::unwrap_used)]
+#![allow(dead_code)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};

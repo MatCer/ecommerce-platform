@@ -32,6 +32,12 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
   `cargo install sqlx-cli --no-default-features --features rustls,postgres --locked`
 - Node 24 and pnpm 11 (`corepack enable` picks the pinned version)
 - `flock` for `make test-rust` (util-linux; macOS: `brew install flock`), `psql` for worktrees
+- bash 4.4+ for `pnpm verify` and the worktree cleanup commands (`worktree:teardown`, `worktree:tidy`,
+  `scripts/worktree.sh sweep`); macOS ships 3.2, so `brew install bash`
+- `cargo install --locked cargo-nextest sccache cargo-sweep cargo-hakari`: nextest runs
+  `make test-rust` and `make test-search`; sccache caches worktree builds; cargo-sweep bounds
+  `pnpm verify`'s target dir; cargo-hakari regenerates
+  `crates/workspace-hack`
 
 ## Quick start
 
@@ -128,6 +134,7 @@ trusted network.
 | `make openapi-check` | Fail if the generated clients are stale (runs in CI) |
 | `pnpm verify <PR#> [--full]` | Optional for now: test a PR on a throwaway stack and record `local-verify` (runbook "Verify") |
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
+| `cargo hakari generate && cargo hakari manage-deps` | Refresh `crates/workspace-hack` after dependency changes; commit it (CI checks) |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
 | `make seed` | Create or complete the demo shop and publish theme/checkout artifacts; idempotent |
@@ -149,8 +156,10 @@ checkout's stack and gets its own dev database and API port:
 ```bash
 pnpm worktree:setup      # once per worktree, safe to rerun
 make api-native          # this branch's API on its own port and database
-pnpm worktree:teardown   # drop the worktree's database, then remove the worktree
+pnpm worktree:teardown   # drop the worktree's database and target/, then remove the worktree
 pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dry-run to preview)
+scripts/worktree.sh sweep  # drop target/ of every linked worktree with nothing built for 14 days (--dry-run)
+pnpm worktree:tidy       # this worktree: drop target/ once HEAD is a merged PR's head or it is over 10 GB (--dry-run)
 ```
 
 - Setup symlinks `.env` to the main checkout's, installs packages, creates `app_wt_<name>_<hash>`
@@ -164,8 +173,17 @@ pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dr
 - Meilisearch, MinIO, Mailpit and the auth service stay shared with the main checkout.
 - `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so
   concurrent runs from different checkouts wait for each other.
-- Every worktree builds its own `target/` (several GB); export a shared `CARGO_TARGET_DIR` to trade
-  that disk for serialised builds.
+- Setup also writes `.cargo/worktree.toml` (gitignored, included by `.cargo/config.toml`):
+  `sccache` as rustc wrapper, cache in `~/.cache/sccache` capped at 30 GB, so a new worktree takes
+  compiled dependencies from the cache. Workspace crates still build incrementally (a test compile
+  after a one-line edit takes seconds, not a minute), so `target/` grows with edits; `pnpm
+  worktree:tidy` keeps it in check. `pnpm verify` builds without incremental, where every crate
+  comes from sccache. The main checkout has no such file. Without `sccache` on `PATH`, setup warns
+  and writes no wrapper.
+- Tidy asks GitHub whether HEAD is the head commit of a merged PR. Offline, without `gh`, or on an
+  unmerged HEAD it only applies the 10 GB cap. Tidy, sweep and teardown delete the whole
+  `target/` (the next build takes dependencies from sccache) and skip it while a cargo build in
+  that worktree holds its lock, e.g. a dev server rebuilding.
 
 ## Tenants and staff sign-in
 

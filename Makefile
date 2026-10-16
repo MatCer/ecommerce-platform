@@ -82,18 +82,20 @@ sqlx-prepare: ## Refresh .sqlx/ (offline query data) after SQL changes; needs `m
 test: test-rust test-ts ## Rust + TS tests (Rust integration tests need `make dev-infra`)
 
 test-rust:
-	cargo test --workspace --locked --no-run
+	cargo nextest run --workspace --locked --no-run
 	DATABASE_URL="$(TEST_DATABASE_URL)" STRIPE_MOCK_URL="http://localhost:$(STRIPE_MOCK_PORT)" \
-	flock "$(TEST_DB_LOCK)" cargo test --workspace --locked
+	flock "$(TEST_DB_LOCK)" cargo nextest run --workspace --locked
+	cargo test --workspace --locked --doc
 
 test-ts:
 	pnpm test
 
 test-search: ## Search integration tests + cs/sk relevance fixtures against Meilisearch (needs `make dev-infra`)
-	cargo test --workspace --locked --no-run
+	cargo nextest run --workspace --locked --no-run
 	DATABASE_URL="$(TEST_DATABASE_URL)" MEILI_URL="http://localhost:$(MEILI_PORT)" \
 	MEILI_ADMIN_KEY="$(MEILI_ADMIN_KEY)" MEILI_SEARCH_KEY="$(MEILI_SEARCH_KEY)" \
-	flock "$(TEST_DB_LOCK)" cargo test --workspace --locked -- --ignored
+	flock "$(TEST_DB_LOCK)" cargo nextest run --workspace --locked --run-ignored only
+	cargo test --workspace --locked --doc -- --ignored
 
 lint: ## rustfmt check, clippy, Biome, TS typecheck
 	cargo fmt --all --check

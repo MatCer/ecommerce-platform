@@ -58,6 +58,12 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hakari@0.9.39
+      - run: cargo hakari generate --diff
+      - run: cargo hakari manage-deps --dry-run
+      - run: cargo hakari verify
       # SQLX_OFFLINE=true (.cargo/config.toml): query macros check against .sqlx/, no database.
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # Static and deterministic: committed OpenAPI snapshot + generated TS clients match the API.
