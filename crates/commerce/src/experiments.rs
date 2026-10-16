@@ -74,12 +74,26 @@ fn pick(arms: &[Arm], hash: u64) -> Option<&str> {
 }
 
 pub async fn running(tx: &mut TenantTx) -> Result<Option<ExperimentRef>, Error> {
-    Ok(sqlx::query_as!(
-        ExperimentRef,
-        "SELECT id, version FROM experiments WHERE status = 'running'"
+    Ok(running_with_arms(tx).await?.map(|(r, _)| r))
+}
+
+async fn running_with_arms(
+    tx: &mut TenantTx,
+) -> Result<Option<(ExperimentRef, serde_json::Value)>, Error> {
+    Ok(
+        sqlx::query!("SELECT id, version, arms FROM experiments WHERE status = 'running'")
+            .fetch_optional(&mut **tx)
+            .await?
+            .map(|r| {
+                (
+                    ExperimentRef {
+                        id: r.id,
+                        version: r.version,
+                    },
+                    r.arms,
+                )
+            }),
     )
-    .fetch_optional(&mut **tx)
-    .await?)
 }
 
 /// Enrols the anonymous consent subject `subject` (the `__Secure-consent_id` cookie value) in
@@ -101,17 +115,13 @@ pub async fn enrol(
         return Ok(None);
     };
     let mut tx = tenant_tx(db, tenant_id).await?;
-    let Some(exp) =
-        sqlx::query!("SELECT id, version, arms FROM experiments WHERE status = 'running'")
-            .fetch_optional(&mut *tx)
-            .await?
-    else {
+    let Some((exp, arms)) = running_with_arms(&mut tx).await? else {
         return Ok(None);
     };
     if !consent::analytics_covers_experiments(&mut tx, &Subject::Anon(subject.into())).await? {
         return Ok(None);
     }
-    let arms: Vec<Arm> = serde_json::from_value(exp.arms)
+    let arms: Vec<Arm> = serde_json::from_value(arms)
         .map_err(|e| Error::Internal(format!("experiment {} arms: {e}", exp.id)))?;
     let anon_id = crate::analytics::anon_id(tenant_id, subject);
     let arm = pick(&arms, key.hash(exp.id, exp.version, &anon_id))

@@ -463,8 +463,9 @@ export function createGateway(opts: GatewayOptions) {
    */
   async function enrolment(site: Site, headers: Headers): Promise<Assignment | undefined> {
     const running = site.experiment;
-    const subject = running && !site.preview ? analyticsSubject(headers) : undefined;
-    if (!running || !subject || !opts.experiments) return undefined;
+    if (!running || site.preview || !opts.experiments) return undefined;
+    const subject = analyticsSubject(headers);
+    if (!subject) return undefined;
     try {
       const a = await opts.experiments.enrol(site, subject);
       if (!a) return undefined;
@@ -557,11 +558,7 @@ export function createGateway(opts: GatewayOptions) {
       // An arm's page must not be stored by an outer shared cache without the arm in its key.
       h.set(
         "cache-control",
-        !cacheable
-          ? "no-store"
-          : assignment
-            ? "private, max-age=0, must-revalidate"
-            : "public, max-age=0, must-revalidate",
+        cacheable ? `${assignment ? "private" : "public"}, max-age=0, must-revalidate` : "no-store",
       );
       h.set("x-edge-cache", cacheState);
       // Page-model fan-out of this render (read by the gates as an N+1 signal).
@@ -942,7 +939,7 @@ ${
     const chose = res.ok && req.method === "POST";
     // The next page asks the API again, whose latest consent record decides (SHOP-96).
     if (chose)
-      for (const s of new Set([subject, minted]))
+      for (const s of [subject, minted])
         if (s && CONSENT_ID_RE.test(s)) opts.experiments?.forget(site.tenant_id, s);
     if (chose && minted && CONSENT_ID_RE.test(minted))
       headers.append(

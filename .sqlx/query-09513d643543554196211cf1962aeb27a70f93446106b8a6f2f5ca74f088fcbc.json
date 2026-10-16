@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT granted, text_version FROM consent_records\n         WHERE subject_type = $1 AND subject_id = $2 AND purpose = 'analytics'\n         ORDER BY at DESC, id DESC LIMIT 1",
+  "query": "SELECT granted, text_version FROM consent_records\n         WHERE subject_type = $1 AND subject_id = $2 AND purpose = $3\n         ORDER BY at DESC, id DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -29,6 +29,7 @@
     "parameters": {
       "Left": [
         "Text",
+        "Text",
         "Text"
       ]
     },
@@ -37,5 +38,5 @@
       false
     ]
   },
-  "hash": "87291a31402177e4f8d516356cb346f91da6797d0b2ea857cf715c68f80ff3db"
+  "hash": "09513d643543554196211cf1962aeb27a70f93446106b8a6f2f5ca74f088fcbc"
 }
