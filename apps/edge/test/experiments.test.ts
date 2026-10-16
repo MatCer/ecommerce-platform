@@ -415,6 +415,22 @@ describe("enrolment at the edge (SHOP-96)", () => {
     expect(enrolInvocations).toBe(1);
   });
 
+  test("reserved platform paths and service-worker scripts never enrol", async () => {
+    answers.set(subject("3"), "a");
+    enrolInvocations = 0;
+    const cookie = consented(subject("3"));
+    const reserved = await Promise.all(
+      ["/account", "/checkout/x", "/en/withdraw", "/_edge/x"].map((p) => page(p, cookie)),
+    );
+    const sw = await page("/sw.js", cookie, "demo.localhost", { "service-worker": "script" });
+    expect(enrolInvocations).toBe(0);
+    expect(enrolCalls).toEqual([]);
+    expect(reserved.map((r) => r.status)).toEqual([404, 404, 404, 404]);
+    expect(sw.status).toBe(403);
+    await page("/?case=reserved", cookie);
+    expect(enrolInvocations).toBe(1);
+  });
+
   test("a consent cookie without analytics stops enrolment at once", async () => {
     answers.set(subject("1"), "a");
     await page("/?case=f1", consented(subject("1")));
