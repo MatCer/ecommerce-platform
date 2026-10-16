@@ -48,7 +48,6 @@ const slides = (swipe && p.images.length > 1 ? p.images.slice(0, 5) : []).map((s
     ? img
     : { ...imageAttrs(wide ? capped(s, 1280) : capped(s, 640), { sizes, width: 360 }), alt: "" },
 );
-const Desktop = slides.length > 0 ? "div" : Fragment;
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 // A18: a reduction (badge, strikethrough, %) only with the page model's reference price.
 const reduced = p.reference_price && p.discount_percent ? p.discount_percent : null;
@@ -67,7 +66,7 @@ const reduced = p.reference_price && p.discount_percent ? p.discount_percent : n
         </div>
       )
     }
-    <Desktop class="hidden size-full md:block">
+    <div class:list={["size-full", slides.length > 0 && "hidden md:block"]}>
       {img && <img {...img} class="size-full object-cover" />}
       {
         hover && (
@@ -77,12 +76,12 @@ const reduced = p.reference_price && p.discount_percent ? p.discount_percent : n
           </picture>
         )
       }
-    </Desktop>
+    </div>
     {
       slides.length > 0 && (
         <ol class="card-dots pointer-events-none absolute inset-x-0 bottom-2.5 z-[2] flex justify-center gap-1.5 md:hidden" aria-hidden="true">
           {slides.map(() => (
-            <li class="size-1.5 rounded-full bg-foreground" />
+            <li />
           ))}
         </ol>
       )

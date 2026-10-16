@@ -447,27 +447,29 @@
 }
 @utility card-dots {
   & > li {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: var(--color-foreground);
     opacity: 0.3;
   }
   @supports (animation-timeline: view()) {
-    & > li:nth-child(1) {
+    & > li {
       animation: card-dot linear both;
+    }
+    & > li:nth-child(1) {
       animation-timeline: --card-1;
     }
     & > li:nth-child(2) {
-      animation: card-dot linear both;
       animation-timeline: --card-2;
     }
     & > li:nth-child(3) {
-      animation: card-dot linear both;
       animation-timeline: --card-3;
     }
     & > li:nth-child(4) {
-      animation: card-dot linear both;
       animation-timeline: --card-4;
     }
     & > li:nth-child(5) {
-      animation: card-dot linear both;
       animation-timeline: --card-5;
     }
   }

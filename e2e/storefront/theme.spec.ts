@@ -266,16 +266,22 @@ const SEED_COLOURS =
   /Barvy: (Lesní zelená|Inkoustová|Písková|Vínová|Petrolejová|Popelavá|Cihlová|Tyrkysová|Olivová|Hořčicová|Modrá|Přírodní|Šalvějová|Pudrová)/;
 
 test("phone cards swipe through their photos and name their colours", async ({ browser }) => {
-  const ctx = await testContext(browser, { viewport: { width: 390, height: 844 } });
+  // Reduced motion must not freeze the dots: they show state, not motion.
+  const ctx = await testContext(browser, {
+    viewport: { width: 390, height: 844 },
+    reducedMotion: "reduce",
+  });
   await decideConsent(ctx);
   const page = await ctx.newPage();
   await page.goto(`${CZ}/c/obleceni`);
-  const photos = main(page)
-    .getByRole("group", { name: /^Fotografie: / })
+  const group = { name: /^Fotografie: / };
+  const card = main(page)
+    .getByRole("article")
+    .filter({ has: page.getByRole("group", group) })
     .first();
+  const photos = card.getByRole("group", group);
   await expect(photos).toBeVisible();
   const name = (await photos.getAttribute("aria-label"))?.replace("Fotografie: ", "") ?? "";
-  const card = main(page).getByRole("article").filter({ has: photos });
   await expect(card).toContainText(SEED_COLOURS);
   const slides = photos.locator("img");
   const count = await slides.count();
