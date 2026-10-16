@@ -282,7 +282,7 @@ function ShopFeatures() {
               <Checkbox
                 label={t("ai.altTexts")}
                 description={t("ai.altTextsDesc")}
-                checked={current().alt_texts ?? false}
+                checked={current().alt_texts}
                 disabled={!can("admin") || save.isPending}
                 onChange={(alt_texts) => save.mutate({ ...current(), alt_texts })}
               />

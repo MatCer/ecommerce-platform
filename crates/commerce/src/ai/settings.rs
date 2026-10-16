@@ -19,7 +19,6 @@ pub struct AiSettings {
     pub review_summaries: bool,
     /// AI alt texts for product images uploaded from now on, in every market language that
     /// has none. Off by default.
-    #[serde(default)]
     pub alt_texts: bool,
 }
 

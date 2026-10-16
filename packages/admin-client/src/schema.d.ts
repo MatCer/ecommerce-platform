@@ -4900,7 +4900,7 @@ export interface components {
              * @description AI alt texts for product images uploaded from now on, in every market language that
              *     has none. Off by default.
              */
-            alt_texts?: boolean;
+            alt_texts: boolean;
             /**
              * @description AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
              *     default.

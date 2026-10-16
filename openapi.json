@@ -22501,7 +22501,8 @@
       "AiSettings": {
         "type": "object",
         "required": [
-          "review_summaries"
+          "review_summaries",
+          "alt_texts"
         ],
         "properties": {
           "alt_texts": {
