@@ -19,11 +19,10 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::fields::EntityType;
+use super::fields::{Doc, EntityType, product_input};
 use super::marks::{self, NewMark};
 use super::{Ai, Call, CallError, Outcome, prompts};
-use crate::audit;
-use crate::catalog::I18n;
+use crate::catalog::{I18n, products};
 use crate::media::AssetVariant;
 use crate::reviews::plain_text;
 
@@ -208,6 +207,13 @@ struct Generated {
     model: String,
 }
 
+struct Scope {
+    since: DateTime<Utc>,
+    locales: Vec<String>,
+    backfill: bool,
+    last_attempt: bool,
+}
+
 pub async fn run(
     db: &PgPool,
     ai: &Ai,
@@ -219,31 +225,34 @@ pub async fn run(
     if ai.client.is_none() {
         return Ok(Outcome::Done);
     }
-    let products = match payload.target {
-        Target::Product(id) => vec![id],
-        Target::Asset(asset_id) => {
-            let mut tx = tenant_tx(db, tenant).await?;
-            sqlx::query_scalar!(
-                "SELECT product_id FROM product_media WHERE asset_id = $1 ORDER BY product_id",
-                asset_id
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
+    let (scope, products) = {
+        let mut tx = tenant_tx(db, tenant).await?;
+        let Some(since) = since(&mut tx).await? else {
+            return Ok(Outcome::Done);
+        };
+        let locales = super::market_locales(&mut tx).await?;
+        let products =
+            match payload.target {
+                Target::Product(id) => vec![id],
+                Target::Asset(asset_id) => sqlx::query_scalar!(
+                    "SELECT product_id FROM product_media WHERE asset_id = $1 ORDER BY product_id",
+                    asset_id
+                )
+                .fetch_all(&mut *tx)
+                .await?,
+            };
+        tx.commit().await?;
+        let scope = Scope {
+            since,
+            locales,
+            backfill: payload.backfill,
+            last_attempt,
+        };
+        (scope, products)
     };
     for product_id in products {
         let mut generated = Vec::new();
-        let end = generate(
-            db,
-            ai,
-            storage,
-            tenant,
-            product_id,
-            payload.backfill,
-            last_attempt,
-            &mut generated,
-        )
-        .await;
+        let end = generate(db, ai, storage, tenant, &scope, product_id, &mut generated).await;
         store(db, tenant, product_id, &generated).await?;
         if let Outcome::Retry(reason) = end? {
             return Ok(Outcome::Retry(reason));
@@ -253,34 +262,31 @@ pub async fn run(
 }
 
 /// Calls the model image by image; `generated` keeps what came back before a stop.
-#[allow(clippy::too_many_arguments)]
 async fn generate(
     db: &PgPool,
     ai: &Ai,
     storage: &Storage,
     tenant: Uuid,
+    scope: &Scope,
     product_id: Uuid,
-    backfill: bool,
-    last_attempt: bool,
     generated: &mut Vec<Generated>,
 ) -> Result<Outcome, Error> {
-    let (name, locales, images) = {
+    let (name, images) = {
         let mut tx = tenant_tx(db, tenant).await?;
-        let Some(since) = since(&mut tx).await? else {
-            return Ok(Outcome::Done);
-        };
         let Some(name) = super::product_name(&mut tx, product_id).await? else {
             return Ok(Outcome::Done);
         };
-        let locales = super::market_locales(&mut tx).await?;
         let images = sqlx::query!(
-            "SELECT m.asset_id, m.alt_i18n, a.variants FROM product_media m
-             JOIN assets a ON a.id = m.asset_id
-             WHERE m.product_id = $1 AND a.status = 'ready' AND ($2 OR a.created_at >= $3)
-             ORDER BY m.position",
+            r#"SELECT m.asset_id, m.alt_i18n, a.variants FROM product_media m
+               JOIN assets a ON a.id = m.asset_id
+               WHERE m.product_id = $1 AND a.status = 'ready' AND ($2 OR a.created_at >= $3)
+                 AND EXISTS (SELECT 1 FROM unnest($4::text[]) l
+                             WHERE btrim(coalesce(m.alt_i18n ->> l, ''), E' \t\r\n') = '')
+               ORDER BY m.position"#,
             product_id,
-            backfill,
-            since
+            scope.backfill,
+            scope.since,
+            &scope.locales
         )
         .fetch_all(&mut *tx)
         .await?
@@ -294,10 +300,11 @@ async fn generate(
         })
         .collect::<Result<Vec<_>, Error>>()?;
         tx.commit().await?;
-        (name, locales, images)
+        (name, images)
     };
     for image in images {
-        let targets: Vec<String> = locales
+        let targets: Vec<String> = scope
+            .locales
             .iter()
             .filter(|l| is_empty(image.alt.get(*l)))
             .cloned()
@@ -320,7 +327,7 @@ async fn generate(
         let existing: BTreeMap<&String, &String> = image
             .alt
             .iter()
-            .filter(|(_, t)| !t.trim().is_empty())
+            .filter(|(_, t)| !is_empty(Some(t)))
             .collect();
         let task = format!(
             "Write the alt text of this product photo in these languages: {}.",
@@ -354,7 +361,9 @@ async fn generate(
             }),
             Err(CallError::Quota) => return Ok(Outcome::Done),
             Err(CallError::Platform(e)) => return Err(e),
-            Err(e) if e.retryable() && !last_attempt => return Ok(Outcome::Retry(e.to_string())),
+            Err(e) if e.retryable() && !scope.last_attempt => {
+                return Ok(Outcome::Retry(e.to_string()));
+            }
             Err(e) if e.retryable() => {
                 tracing::warn!(%product_id, code = e.code(), error = %e, "alt text failed");
                 return Ok(Outcome::Done);
@@ -368,8 +377,8 @@ async fn generate(
     Ok(Outcome::Done)
 }
 
-/// Writes the generated texts into the locales that are still empty, under the product row
-/// lock the catalog save takes, so a concurrent edit is never overwritten.
+/// Fills the locales that are still empty through the catalog save, under its product row
+/// lock, so a concurrent edit is never overwritten.
 async fn store(
     db: &PgPool,
     tenant: Uuid,
@@ -380,83 +389,43 @@ async fn store(
         return Ok(());
     }
     let mut tx = tenant_tx(db, tenant).await?;
-    if sqlx::query_scalar!(
-        "SELECT id FROM products WHERE id = $1 FOR UPDATE",
-        product_id
-    )
-    .fetch_optional(&mut *tx)
-    .await?
-    .is_none()
-    {
-        return Ok(());
-    }
     let entity_id = product_id.to_string();
-    let mut written = BTreeMap::new();
+    match Doc::lock(&mut tx, EntityType::Product, &entity_id).await {
+        Ok(()) => {}
+        Err(Error::NotFound) => return Ok(()),
+        Err(e) => return Err(e),
+    }
+    let mut input = product_input(&products::get(&mut tx, product_id).await?);
+    let mut written = Vec::new();
     for g in generated {
-        let Some(alt) = sqlx::query_scalar!(
-            "SELECT alt_i18n FROM product_media WHERE product_id = $1 AND asset_id = $2",
-            product_id,
-            g.asset_id
-        )
-        .fetch_optional(&mut *tx)
-        .await?
-        else {
+        let Some(media) = input.media.iter_mut().find(|m| m.asset_id == g.asset_id) else {
             continue;
         };
-        let mut alt: I18n = serde_json::from_value(alt).map_err(internal)?;
-        let fill: BTreeMap<&String, &String> = g
-            .texts
-            .iter()
-            .filter(|(l, _)| is_empty(alt.get(*l)))
-            .collect();
-        if fill.is_empty() {
-            continue;
+        for (locale, text) in &g.texts {
+            if is_empty(media.alt_i18n.get(locale)) {
+                media.alt_i18n.insert(locale.clone(), text.clone());
+                written.push((g, locale, text));
+            }
         }
-        for (l, t) in &fill {
-            alt.insert((*l).clone(), (*t).clone());
-        }
-        sqlx::query!(
-            "UPDATE product_media SET alt_i18n = $3 WHERE product_id = $1 AND asset_id = $2",
-            product_id,
-            g.asset_id,
-            json!(alt)
-        )
-        .execute(&mut *tx)
-        .await?;
-        let field = mark_field(g.asset_id);
-        for (locale, text) in &fill {
-            marks::record(
-                &mut tx,
-                EntityType::Product,
-                &entity_id,
-                &NewMark {
-                    locale,
-                    field: &field,
-                    value: &json!(text),
-                    feature: FEATURE,
-                    model: &g.model,
-                    proposal_id: None,
-                    accepted_by: ACTOR,
-                },
-            )
-            .await?;
-        }
-        written.insert(g.asset_id, fill);
     }
-    if !written.is_empty() {
-        audit::record(
+    if written.is_empty() {
+        return Ok(());
+    }
+    products::replace(&mut tx, ACTOR, product_id, &input).await?;
+    for (g, locale, text) in written {
+        marks::record(
             &mut tx,
-            ACTOR,
-            "product.alt_texts_generated",
-            "product",
-            Some(&entity_id),
-            &json!({ "alt_texts": written }),
-        )
-        .await?;
-        queue::publish(
-            &mut *tx,
-            "product.updated",
-            &json!({ "product_id": product_id }),
+            EntityType::Product,
+            &entity_id,
+            &NewMark {
+                locale,
+                field: &mark_field(g.asset_id),
+                value: &json!(text),
+                feature: FEATURE,
+                model: &g.model,
+                proposal_id: None,
+                accepted_by: ACTOR,
+            },
         )
         .await?;
     }

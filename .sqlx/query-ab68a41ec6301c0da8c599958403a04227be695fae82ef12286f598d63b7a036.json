@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT m.asset_id, m.alt_i18n, a.variants FROM product_media m\n             JOIN assets a ON a.id = m.asset_id\n             WHERE m.product_id = $1 AND a.status = 'ready' AND ($2 OR a.created_at >= $3)\n             ORDER BY m.position",
+  "query": "SELECT m.asset_id, m.alt_i18n, a.variants FROM product_media m\n               JOIN assets a ON a.id = m.asset_id\n               WHERE m.product_id = $1 AND a.status = 'ready' AND ($2 OR a.created_at >= $3)\n                 AND EXISTS (SELECT 1 FROM unnest($4::text[]) l\n                             WHERE btrim(coalesce(m.alt_i18n ->> l, ''), E' \\t\\r\\n') = '')\n               ORDER BY m.position",
   "describe": {
     "columns": [
       {
@@ -41,7 +41,8 @@
       "Left": [
         "Uuid",
         "Bool",
-        "Timestamptz"
+        "Timestamptz",
+        "TextArray"
       ]
     },
     "nullable": [
@@ -50,5 +51,5 @@
       false
     ]
   },
-  "hash": "083b3dc48fcd7ed0a5797141c845b450260ba4eaa68179fd7ac2f5a3edc8a3f9"
+  "hash": "ab68a41ec6301c0da8c599958403a04227be695fae82ef12286f598d63b7a036"
 }

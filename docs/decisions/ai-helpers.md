@@ -125,10 +125,10 @@ Product images get alt text in every market language without the merchant typing
   variant (JPEG, WebP or PNG, at most 5 MB, width closest to 1024; never AVIF) as a base64
   image block before the text, plus the product name, the image's non-empty alt texts (it
   translates them) and the target locales.
-- **Never overwrites.** The write takes the product row lock the catalog save takes, re-reads
-  the image row and fills only locales that are still empty, so a merchant's text, written
-  before or during the call, always wins. One `product.updated` per product and run purges the pages
-  and refreshes the feeds; the audit log records `product.alt_texts_generated`.
+- **Never overwrites.** The write goes through the catalog save (`products::replace`) under
+  its product row lock, re-reads the product and fills only locales that are still empty, so a
+  merchant's text, written before or during the call, always wins. The save validates, audits
+  and publishes `product.updated` once per product and run, like any product edit.
 - **Labelling.** Each written value gets an `ai_marks` row (`field = alt_<asset id, 32 hex>`,
   feature `alt_text`, `accepted_by = system`); `Doc::get` resolves the field to that image's
   alt text, so the admin badge disappears once someone edits it.
