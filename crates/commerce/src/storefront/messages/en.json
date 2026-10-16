@@ -135,7 +135,7 @@
   "consent.ads": "Advertising",
   "consent.ads_hint": "Ad measurement and more relevant ads.",
   "consent.analytics": "Analytics",
-  "consent.analytics_hint": "Anonymous visit statistics that help us improve the shop.",
+  "consent.analytics_hint": "Anonymous visit statistics and testing of page variants that help us improve the shop.",
   "consent.email_marketing": "Email marketing",
   "consent.email_marketing_hint": "News and offers by email. Every email has an unsubscribe link.",
   "consent.necessary": "Strictly necessary (always on)",

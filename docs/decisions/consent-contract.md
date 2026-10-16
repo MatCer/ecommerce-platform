@@ -79,3 +79,19 @@ When a customer signs in on the checkout origin, the anonymous subject's latest 
 are newer than the customer's own are copied to the customer (`source: linked`), so the most
 recent decision of the person wins. Later banner choices on the shop origin update the
 anonymous subject and are linked again at the next sign-in.
+
+## Experiments (SHOP-96)
+
+The `analytics` purpose also covers testing page variants to improve the shop: the banner hint
+(`consent.analytics_hint`) and the cookie policy templates say so from text version
+`2026-10-16` (`consent::TEXT_VERSION`).
+
+- Only an analytics grant whose text version is a date on or after `2026-10-16`
+  (`consent::covers_experiments`) enrols a visitor in an A/B experiment. Non-dated versions
+  (`1`, `imported`) never do.
+- Older grants keep analytics. They are not enrolled and not re-prompted (the banner shows only
+  while the `consent` cookie is missing); they enrol on their next choice.
+- Withdrawal stops enrolment at once: the latest analytics record decides at every request.
+  Existing assignments stay until retention (13 months) but nothing new is written.
+- An assignment stores the analytics pseudonym (`analytics::anon_id`), the arm and a time;
+  never the cookie value, an IP or a user agent.

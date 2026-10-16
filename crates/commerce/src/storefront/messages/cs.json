@@ -135,7 +135,7 @@
   "consent.ads": "Reklama",
   "consent.ads_hint": "Měření reklam a relevantnější reklama.",
   "consent.analytics": "Měření návštěvnosti",
-  "consent.analytics_hint": "Anonymní statistiky návštěvnosti, které nám pomáhají obchod zlepšovat.",
+  "consent.analytics_hint": "Anonymní statistiky návštěvnosti a testování variant stránek, které nám pomáhají obchod zlepšovat.",
   "consent.email_marketing": "E-mailový marketing",
   "consent.email_marketing_hint": "Novinky a akce e-mailem. Odhlásit se jde v každém e-mailu.",
   "consent.necessary": "Nezbytné (vždy zapnuté)",

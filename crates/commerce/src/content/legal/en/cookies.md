@@ -11,7 +11,7 @@ The shop {{shop_name}} ({{company_name}}) uses cookies. Necessary cookies are st
 
 ## Cookies with consent
 
-- **Analytics**: traffic and site speed measurement.
+- **Analytics**: traffic and site speed measurement, and testing page variants to improve the shop.
 - **Advertising**: ad effectiveness measurement.
 - **Personalization**: for example recently viewed products.
 

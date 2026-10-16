@@ -18,7 +18,18 @@ use crate::markets::invalid;
 
 /// Version of the platform's consent texts (banner, preferences page). Change it when the
 /// wording changes: stored records keep the version the person agreed to.
-pub const TEXT_VERSION: &str = "2026-09-25";
+pub const TEXT_VERSION: &str = "2026-10-16";
+
+/// The first text version whose analytics wording covers testing page variants (SHOP-96).
+pub const EXPERIMENTS_TEXT_VERSION: &str = "2026-10-16";
+
+/// Whether an analytics grant given under `text_version` covers experiments: only a
+/// `YYYY-MM-DD` version on or after [`EXPERIMENTS_TEXT_VERSION`] (`1`, `imported` never do).
+pub fn covers_experiments(text_version: &str) -> bool {
+    chrono::NaiveDate::parse_from_str(text_version, "%Y-%m-%d").is_ok()
+        && text_version.len() == 10
+        && text_version >= EXPERIMENTS_TEXT_VERSION
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
@@ -370,6 +381,25 @@ pub async fn latest(
     .await?)
 }
 
+/// Whether the subject's latest analytics choice is a grant given under a text that covers
+/// experiments; an older grant keeps analytics but does not enrol.
+pub async fn analytics_covers_experiments(
+    tx: &mut TenantTx,
+    subject: &Subject,
+) -> Result<bool, Error> {
+    let (kind, id) = subject.parts();
+    let latest = sqlx::query!(
+        "SELECT granted, text_version FROM consent_records
+         WHERE subject_type = $1 AND subject_id = $2 AND purpose = 'analytics'
+         ORDER BY at DESC, id DESC LIMIT 1",
+        kind,
+        id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(latest.is_some_and(|r| r.granted && covers_experiments(&r.text_version)))
+}
+
 /// The latest choice for `purpose` over several subjects of one person (a newsletter address
 /// and the customer account with that address): the most recent decision wins. `None` when
 /// none of them was ever asked.
@@ -466,6 +496,27 @@ mod tests {
         assert!(valid_text_version("2026-09-25"));
         assert!(!valid_text_version("v1;drop"));
         assert!(!valid_text_version(""));
+    }
+
+    #[test]
+    fn only_dated_versions_from_the_experiments_text_cover_experiments() {
+        assert!(covers_experiments("2026-10-16"));
+        assert!(covers_experiments("2026-11-01"));
+        assert!(covers_experiments("2027-01-05"));
+        assert!(covers_experiments(TEXT_VERSION));
+        for v in [
+            "2026-09-25",
+            "2026-10-15",
+            "1",
+            "imported",
+            "2026-10-16x",
+            "2026-1-160",
+            "2026_10_16",
+            "9999-99-99a",
+            "",
+        ] {
+            assert!(!covers_experiments(v), "{v}");
+        }
     }
 
     #[test]
