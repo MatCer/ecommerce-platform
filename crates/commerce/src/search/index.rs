@@ -333,7 +333,7 @@ pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<V
     .await?)
 }
 
-/// Queues a rebuild for every tenant whose live indexes predate [`SETTINGS_VERSION`].
+/// Queues a rebuild for every tenant whose indexes were not rebuilt by [`SETTINGS_VERSION`].
 pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
         .fetch_all(db)
@@ -342,7 +342,10 @@ pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     for tenant_id in tenants {
         let mut tx = tenant_tx(db, tenant_id).await?;
         let outdated = sqlx::query_scalar!(
-            r#"SELECT EXISTS (SELECT 1 FROM search_indexes WHERE settings_version < $1) AS "outdated!""#,
+            r#"SELECT EXISTS (
+                   SELECT 1 FROM search_indexes
+                   WHERE rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1
+               ) AS "outdated!""#,
             SETTINGS_VERSION
         )
         .fetch_one(&mut *tx)
@@ -553,11 +556,13 @@ async fn rebuild_locked(
     for locale in building.keys() {
         sqlx::query!(
             "UPDATE search_indexes SET building_uid = NULL, rebuild_version = $2,
-                    rebuilt_at = now(), documents = $3, updated_at = now()
+                    rebuilt_at = now(), documents = $3, rebuilt_settings_version = $4,
+                    updated_at = now()
              WHERE locale = $1",
             locale,
             read_version,
-            counts.get(locale).copied().unwrap_or(0)
+            counts.get(locale).copied().unwrap_or(0),
+            SETTINGS_VERSION
         )
         .execute(&mut *tx)
         .await?;

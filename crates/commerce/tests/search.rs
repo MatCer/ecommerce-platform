@@ -244,42 +244,53 @@ fn set(v: &[&str]) -> BTreeSet<String> {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn indexes_with_older_settings_get_one_rebuild(db: PgPool) {
+async fn indexes_not_rebuilt_by_current_settings_get_one_rebuild(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 2).await;
     let (old, _) = testkit::tenant(&runtime, "old").await;
+    let (applied, _) = testkit::tenant(&runtime, "applied").await;
     let (current, _) = testkit::tenant(&runtime, "current").await;
     testkit::tenant(&runtime, "unindexed").await;
-    for (tenant, version) in [(old, SETTINGS_VERSION - 1), (current, SETTINGS_VERSION)] {
+    for (tenant, rebuilt) in [
+        (old, Some(SETTINGS_VERSION - 1)),
+        (applied, None),
+        (current, Some(SETTINGS_VERSION)),
+    ] {
         let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
         sqlx::query(
-            "INSERT INTO search_indexes (tenant_id, locale, settings_version) VALUES ($1, 'cs', $2)",
+            "INSERT INTO search_indexes (tenant_id, locale, settings_version, rebuilt_settings_version)
+             VALUES ($1, 'cs', $2, $3)",
         )
         .bind(tenant)
-        .bind(version)
+        .bind(SETTINGS_VERSION)
+        .bind(rebuilt)
         .execute(&mut *tx)
         .await
         .unwrap();
         tx.commit().await.unwrap();
     }
-    let rebuilds = async || -> Vec<Option<Uuid>> {
+    let rebuilds = async || -> BTreeSet<Option<Uuid>> {
         sqlx::query_scalar("SELECT tenant_id FROM queue.jobs WHERE kind = 'search.rebuild'")
             .fetch_all(&db)
             .await
             .unwrap()
+            .into_iter()
+            .collect()
     };
 
-    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 1);
-    assert_eq!(rebuilds().await, vec![Some(old)]);
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
+    assert_eq!(rebuilds().await, BTreeSet::from([Some(old), Some(applied)]));
 
-    let mut tx = tenant_tx(&runtime, old).await.unwrap();
-    sqlx::query("UPDATE search_indexes SET settings_version = $1")
-        .bind(SETTINGS_VERSION)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
+    for tenant in [old, applied] {
+        let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+        sqlx::query("UPDATE search_indexes SET rebuilt_settings_version = $1")
+            .bind(SETTINGS_VERSION)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
     assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 0);
-    assert_eq!(rebuilds().await, vec![Some(old)]);
+    assert_eq!(rebuilds().await, BTreeSet::from([Some(old), Some(applied)]));
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -874,12 +885,34 @@ async fn rebuild_swaps_in_a_complete_index(db: PgPool) {
     s.index(a).await; // b is not indexed incrementally
     s.settle().await;
     assert_eq!(s.search(s.cz, "cs", req(&[])).await.total, 1);
+    let rebuilt_settings = async || -> Vec<(String, Option<i32>)> {
+        let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+        let rows = sqlx::query_as(
+            "SELECT locale, rebuilt_settings_version FROM search_indexes ORDER BY locale",
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        rows
+    };
+    assert_eq!(
+        rebuilt_settings().await,
+        vec![("cs".to_owned(), None), ("sk".to_owned(), None)]
+    );
 
     assert_eq!(
         index::rebuild(&s.runtime, &s.meili, s.tenant, 1000, None)
             .await
             .unwrap(),
         Rebuilt::Done
+    );
+    assert_eq!(
+        rebuilt_settings().await,
+        vec![
+            ("cs".to_owned(), Some(SETTINGS_VERSION)),
+            ("sk".to_owned(), Some(SETTINGS_VERSION))
+        ]
     );
     s.settle().await;
     let after = s.search(s.cz, "cs", req(&[])).await;

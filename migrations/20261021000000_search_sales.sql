@@ -14,3 +14,5 @@ CREATE POLICY tenant_isolation ON product_search_sales TO app_runtime
     USING (tenant_id = current_setting('app.tenant_id')::uuid)
     WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
 GRANT SELECT, INSERT, UPDATE, DELETE ON product_search_sales TO app_runtime;
+
+ALTER TABLE search_indexes ADD COLUMN rebuilt_settings_version integer;
