@@ -78,8 +78,8 @@ say, above the reviews on the product page (conversion theme).
   that a product has no summary and an existing one is deleted. The model sees the product
   name, the rating distribution and the newest 40 reviews (rating, title, body cut to 1000
   characters, language); no names, ids, dates or order links.
-- **Trigger.** Every `review.changed` (publish, hide, reply) queues `ai.review_summary` for
-  the product, debounced to one job per 5-minute window. The job hashes the input (system prompt
+- **Trigger.** Every `review.changed` (publish, hide, reply) and `product.updated` (a rename
+  changes the input) queues `ai.review_summary` for the product, debounced to one job per 5-minute window. The job hashes the input (system prompt
   and schema, target locales, product name, every input review's id, rating, title and body) and
   makes no call while it equals the stored hash, so a reply costs nothing. The write
   transaction takes a per-product advisory lock that moderation (`reviews::set_status`) also
