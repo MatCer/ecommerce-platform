@@ -536,11 +536,14 @@ pub async fn set_status(
     id: Uuid,
     to: Status,
 ) -> Result<Review, Error> {
-    let current = sqlx::query_scalar!("SELECT status FROM reviews WHERE id = $1 FOR UPDATE", id)
-        .fetch_optional(&mut **tx)
-        .await?
-        .map(|s| Status::parse(&s))
-        .ok_or(Error::NotFound)?;
+    let row = sqlx::query!(
+        "SELECT status, product_id FROM reviews WHERE id = $1 FOR UPDATE",
+        id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    let current = Status::parse(&row.status);
     if current == to {
         return get(tx, id).await;
     }
@@ -554,17 +557,19 @@ pub async fn set_status(
             ),
         });
     }
-    let product_id = sqlx::query_scalar!(
+    let product_id = row.product_id;
+    review_summary::lock_inputs(tx, product_id).await?;
+    sqlx::query!(
         "UPDATE reviews SET status = $2, moderated_at = now(), moderated_by = $3,
              published_at = CASE WHEN $2 = 'published' THEN coalesce(published_at, now())
                                  ELSE published_at END,
              updated_at = now()
-         WHERE id = $1 RETURNING product_id",
+         WHERE id = $1",
         id,
         to.as_str(),
         actor
     )
-    .fetch_one(&mut **tx)
+    .execute(&mut **tx)
     .await?;
     audit::record(
         tx,

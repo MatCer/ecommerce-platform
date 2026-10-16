@@ -63,11 +63,22 @@ pub async fn put_settings(
     actor: &str,
     input: &AiSettings,
 ) -> Result<AiSettings, Error> {
-    let before = settings(tx).await?;
     sqlx::query!(
-        "INSERT INTO ai_settings (tenant_id, review_summaries) VALUES ($1, $2)
-         ON CONFLICT (tenant_id) DO UPDATE SET
-             review_summaries = EXCLUDED.review_summaries, updated_at = now()",
+        "INSERT INTO ai_settings (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING",
+        tx.tenant_id()
+    )
+    .execute(&mut **tx)
+    .await?;
+    let before = AiSettings {
+        review_summaries: sqlx::query_scalar!(
+            "SELECT review_summaries FROM ai_settings WHERE tenant_id = $1 FOR UPDATE",
+            tx.tenant_id()
+        )
+        .fetch_one(&mut **tx)
+        .await?,
+    };
+    sqlx::query!(
+        "UPDATE ai_settings SET review_summaries = $2, updated_at = now() WHERE tenant_id = $1",
         tx.tenant_id(),
         input.review_summaries
     )
@@ -219,6 +230,19 @@ struct OutputItem {
     summary: String,
 }
 
+fn is_domain(word: &str) -> bool {
+    let word = word.trim_matches(|c: char| !c.is_alphanumeric());
+    let host = word.split('/').next().unwrap_or_default();
+    host.rsplit_once('.').is_some_and(|(name, tld)| {
+        !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
+            && tld.len() >= 2
+            && tld.chars().all(|c| c.is_ascii_lowercase())
+    })
+}
+
 fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String>, CallError> {
     let out: Output = super::parse(output)?;
     let mut by_locale = BTreeMap::new();
@@ -226,16 +250,16 @@ fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String
         let text = plain_text(&item.summary, false);
         if !(1..=SUMMARY_MAX).contains(&text.chars().count()) {
             return Err(CallError::output(format!(
-                "the {} summary must be 1-{SUMMARY_MAX} characters",
-                item.locale
+                "a summary must be 1-{SUMMARY_MAX} characters"
             )));
         }
         let lower = text.to_lowercase();
-        if ["://", "www.", "@", "<"].iter().any(|p| lower.contains(p)) {
-            return Err(CallError::output(format!(
-                "the {} summary contains a link, an email address or markup",
-                item.locale
-            )));
+        if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p))
+            || lower.split_whitespace().any(is_domain)
+        {
+            return Err(CallError::output(
+                "a summary contains a link, an email address or markup",
+            ));
         }
         if by_locale.insert(item.locale, text).is_some() {
             return Err(CallError::output("a locale is summarized twice"));
@@ -243,11 +267,20 @@ fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String
     }
     if !by_locale.keys().eq(locales.iter()) {
         return Err(CallError::output(format!(
-            "summaries for {:?}, asked for {locales:?}",
-            by_locale.keys().collect::<Vec<_>>()
+            "the summaries do not cover exactly the requested locales {locales:?}"
         )));
     }
     Ok(by_locale)
+}
+
+pub(crate) async fn lock_inputs(tx: &mut TenantTx, product_id: Uuid) -> Result<(), Error> {
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('review_summary:' || $1::text, 0))",
+        product_id.to_string()
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 async fn stored_hash(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<String>, Error> {
@@ -344,12 +377,10 @@ async fn store_if_input_unchanged(
     fresh: Option<&Fresh<'_>>,
 ) -> Result<(), Error> {
     let mut tx = tenant_tx(db, tenant).await?;
-    sqlx::query!(
-        "SELECT pg_advisory_xact_lock(hashtextextended('review_summary:' || $1::text, 0))",
-        product_id.to_string()
-    )
-    .execute(&mut *tx)
-    .await?;
+    lock_inputs(&mut tx, product_id).await?;
+    if stored_hash(&mut tx, product_id).await?.as_deref() == Some(sha256) {
+        return Ok(());
+    }
     if load(&mut tx, product_id)
         .await?
         .map(|i| i.sha256)
@@ -494,6 +525,9 @@ mod tests {
             out(&[("cs", "Viz https://x.example"), ("sk", "B")]),
             out(&[("cs", "Viz WWW.example.cz"), ("sk", "B")]),
             out(&[("cs", "Pište na info@example.cz"), ("sk", "B")]),
+            out(&[("cs", "Kupte na attacker.example/offer."), ("sk", "B")]),
+            out(&[("cs", "Kupte na shop.cz, je levnější."), ("sk", "B")]),
+            out(&[("cs", "Viz //evil.example/x"), ("sk", "B")]),
             out(&[("cs", "<b>Super</b>"), ("sk", "B")]),
             out(&[("cs", &long), ("sk", "B")]),
             out(&[("cs", "   "), ("sk", "B")]),
@@ -501,6 +535,24 @@ mod tests {
         ] {
             let e = validate(bad.clone(), &locales()).unwrap_err();
             assert_eq!(e.code(), "ai_invalid_output", "{bad}");
+        }
+    }
+
+    #[test]
+    fn plain_prose_with_decimals_and_abbreviations_passes() {
+        let ok = "Zákazníci hodnotí průměrně 4,6 z 5. Chválí střih, materiál atd. Vel. M sedí.";
+        assert!(validate(out(&[("cs", ok), ("sk", "B")]), &locales()).is_ok());
+    }
+
+    #[test]
+    fn rejection_errors_do_not_echo_model_output() {
+        for bad in [
+            out(&[("cs", "A"), ("PRIVATE-OUTPUT", "B")]),
+            out(&[("cs", "Viz https://PRIVATE-OUTPUT.example"), ("sk", "B")]),
+            out(&[("cs", &"PRIVATE-OUTPUT".repeat(60)), ("sk", "B")]),
+        ] {
+            let e = validate(bad, &locales()).unwrap_err().to_string();
+            assert!(!e.contains("PRIVATE-OUTPUT"), "{e}");
         }
     }
 

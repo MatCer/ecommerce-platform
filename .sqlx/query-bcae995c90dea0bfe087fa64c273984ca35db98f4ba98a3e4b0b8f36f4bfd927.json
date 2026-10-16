@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT status FROM reviews WHERE id = $1 FOR UPDATE",
+  "query": "SELECT status, product_id FROM reviews WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -13,6 +13,17 @@
             "name": "status"
           }
         }
+      },
+      {
+        "ordinal": 1,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "product_id"
+          }
+        }
       }
     ],
     "parameters": {
@@ -21,8 +32,9 @@
       ]
     },
     "nullable": [
+      false,
       false
     ]
   },
-  "hash": "bacf1d7f99bc906c33a388c4e4a646bfb342328167ce3760a7f5b8763dddbe7f"
+  "hash": "bcae995c90dea0bfe087fa64c273984ca35db98f4ba98a3e4b0b8f36f4bfd927"
 }
