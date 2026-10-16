@@ -326,6 +326,11 @@ async fn set_policy(runtime: &PgPool, origin: &str, set: &str) -> Result<(), sql
     Ok(())
 }
 
+async fn refused(runtime: &PgPool, origin: &str, set: &str) {
+    let err = set_policy(runtime, origin, set).await.unwrap_err();
+    assert_eq!(db_code(&err).as_deref(), Some("23514"), "{origin}: {set}");
+}
+
 async fn policies(runtime: &PgPool, host: &str) -> Vec<CheckoutOriginPolicy> {
     tenancy::resolve_host(runtime, host)
         .await
@@ -334,11 +339,16 @@ async fn policies(runtime: &PgPool, host: &str) -> Vec<CheckoutOriginPolicy> {
         .checkout_origins
 }
 
-fn policy(origin: &str, mode: CheckoutMode, checkout_origin: &str) -> CheckoutOriginPolicy {
+fn policy(
+    origin: &str,
+    mode: CheckoutMode,
+    mode_generation: i64,
+    checkout_origin: &str,
+) -> CheckoutOriginPolicy {
     CheckoutOriginPolicy {
         origin: origin.into(),
         mode,
-        mode_generation: 1,
+        mode_generation,
         checkout_origin: checkout_origin.into(),
     }
 }
@@ -354,6 +364,7 @@ async fn checkout_mode_defaults_isolated(db: PgPool) {
         vec![policy(
             "https://demo.localhost",
             CheckoutMode::Isolated,
+            1,
             "https://checkout.demo.localhost"
         )]
     );
@@ -372,6 +383,7 @@ async fn checkout_mode_defaults_isolated(db: PgPool) {
         vec![policy(
             "https://shop.example.cz",
             CheckoutMode::Isolated,
+            1,
             "https://checkout.shop.example.cz"
         )]
     );
@@ -384,10 +396,7 @@ async fn checkout_mode_defaults_isolated(db: PgPool) {
 
     // Unknown history counts as used: same-origin is refused, and so is plain HTTP outside
     // local development.
-    let err = set_policy(&runtime, "https://shop.example.cz", "mode = 'same_origin'")
-        .await
-        .unwrap_err();
-    assert_eq!(db_code(&err).as_deref(), Some("23514"));
+    refused(&runtime, "https://shop.example.cz", "mode = 'same_origin'").await;
     let err = sqlx::query(
         "INSERT INTO platform.checkout_origins (scheme, hostname, port, tenant_id, market_id)
          SELECT 'http', hostname, 80, tenant_id, market_id FROM platform.domains
@@ -425,19 +434,30 @@ async fn freshness_requires_full_history(db: PgPool) {
         vec![policy(
             "https://alpha.localhost",
             CheckoutMode::SameOrigin,
+            2,
             "https://alpha.localhost"
         )]
     );
+    // Every switch moves the generation, which the runtime role cannot set itself.
+    set_policy(&runtime, "https://alpha.localhost", "mode = 'isolated'")
+        .await
+        .unwrap();
+    set_policy(&runtime, "https://alpha.localhost", "mode = 'isolated'")
+        .await
+        .unwrap();
+    assert_eq!(policies(&runtime, "alpha.localhost").await[0].mode_generation, 3);
+    let err = set_policy(&runtime, "https://alpha.localhost", "mode_generation = 1")
+        .await
+        .unwrap_err();
+    assert_eq!(db_code(&err).as_deref(), Some("42501"));
 
     // A domain the merchant added is not a platform hostname, whatever its name.
-    let err = set_policy(
+    refused(
         &runtime,
         "https://alpha-shop.localhost",
         "history = 'platform_never_reassigned'",
     )
-    .await
-    .unwrap_err();
-    assert_eq!(db_code(&err).as_deref(), Some("23514"));
+    .await;
 
     // A claim older than the ledger (backfilled, `claimed_at` unknown) is not full history.
     sqlx::query(
@@ -446,14 +466,12 @@ async fn freshness_requires_full_history(db: PgPool) {
     .execute(&db)
     .await
     .unwrap();
-    let err = set_policy(
+    refused(
         &runtime,
         "https://beta.localhost",
         "history = 'platform_never_reassigned'",
     )
-    .await
-    .unwrap_err();
-    assert_eq!(db_code(&err).as_deref(), Some("23514"));
+    .await;
 
     // A merchant attestation needs its actor, time and wording version.
     for incomplete in [
@@ -461,10 +479,7 @@ async fn freshness_requires_full_history(db: PgPool) {
         "history = 'merchant_attested_never_served', attested_by = 'user-owner', attested_at = now()",
         "attested_by = 'user-owner'",
     ] {
-        let err = set_policy(&runtime, "https://alpha-shop.localhost", incomplete)
-            .await
-            .unwrap_err();
-        assert_eq!(db_code(&err).as_deref(), Some("23514"), "{incomplete}");
+        refused(&runtime, "https://alpha-shop.localhost", incomplete).await;
     }
     set_policy(
         &runtime,
@@ -567,11 +582,13 @@ async fn aliases_have_independent_policy(db: PgPool) {
             policy(
                 "http://alpha.localhost:8080",
                 CheckoutMode::Isolated,
+                1,
                 "http://checkout.alpha.localhost:8080"
             ),
             policy(
                 "https://alpha.localhost",
                 CheckoutMode::SameOrigin,
+                2,
                 "https://alpha.localhost"
             ),
         ]
@@ -582,17 +599,16 @@ async fn aliases_have_independent_policy(db: PgPool) {
         vec![policy(
             "https://alpha-alias.localhost",
             CheckoutMode::Isolated,
+            1,
             "https://checkout.alpha-alias.localhost"
         )]
     );
-    let err = set_policy(
+    refused(
         &runtime,
         "https://alpha-alias.localhost",
         "history = 'platform_never_reassigned'",
     )
-    .await
-    .unwrap_err();
-    assert_eq!(db_code(&err).as_deref(), Some("23514"));
+    .await;
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -639,7 +655,13 @@ async fn account_domain_cannot_host_storefront(db: PgPool) {
 #[sqlx::test(migrations = false)]
 async fn migration_backfills_populated_domains_isolated(db: PgPool) {
     let migrator = sqlx::migrate!("../../migrations");
-    migrator.run_to(20261021000100, &db).await.unwrap();
+    let before = migrator
+        .iter()
+        .map(|m| m.version)
+        .filter(|v| *v < 20261023000000)
+        .max()
+        .unwrap();
+    migrator.run_to(before, &db).await.unwrap();
     let runtime = testkit::runtime_pool(&db, 2).await;
     let (tenant, market) = testkit::tenant(&runtime, "demo").await;
     sqlx::query(
@@ -693,12 +715,10 @@ async fn migration_backfills_populated_domains_isolated(db: PgPool) {
         ]
     );
     // A backfilled hostname can never count as fresh platform history.
-    let err = set_policy(
+    refused(
         &runtime,
         "https://demo.localhost",
         "history = 'platform_never_reassigned'",
     )
-    .await
-    .unwrap_err();
-    assert_eq!(db_code(&err).as_deref(), Some("23514"));
+    .await;
 }

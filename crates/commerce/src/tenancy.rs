@@ -8,7 +8,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{audit, capability, id, themes, unique_violation};
+use crate::{audit, capability, id, storefront, themes, unique_violation};
 
 /// Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
 /// management or exports.
@@ -426,7 +426,7 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
             .ok_or_else(|| Error::Internal(format!("checkout mode {}", r.mode)))?;
         let checkout_origin = match mode {
             CheckoutMode::SameOrigin => r.origin.clone(),
-            CheckoutMode::Isolated => r.origin.replacen("://", "://checkout.", 1),
+            CheckoutMode::Isolated => storefront::checkout_base(&r.origin),
         };
         Ok(CheckoutOriginPolicy {
             origin: r.origin,

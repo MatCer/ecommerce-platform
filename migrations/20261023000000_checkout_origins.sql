@@ -60,7 +60,7 @@ CREATE TABLE platform.checkout_origins (
         CHECK (num_nulls(attested_by, attested_at, attestation_version)
                = CASE WHEN history = 'merchant_attested_never_served' THEN 0 ELSE 3 END)
 );
-CREATE INDEX checkout_origins_hostname ON platform.checkout_origins (hostname);
+CREATE INDEX checkout_origins_domain ON platform.checkout_origins (hostname, tenant_id, market_id);
 
 -- Existing hostnames: claimed with unknown history, one isolated production origin each.
 INSERT INTO platform.hostname_claims (hostname, tenant_id, claimed_at)
@@ -74,8 +74,7 @@ SET search_path = ''
 AS $$
 BEGIN
     IF EXISTS (SELECT 1 FROM platform.account_domains a
-               WHERE NEW.hostname = a.domain
-                  OR right(NEW.hostname, length(a.domain) + 1) = '.' || a.domain) THEN
+               WHERE NEW.hostname = a.domain OR NEW.hostname LIKE '%.' || a.domain) THEN
         RAISE EXCEPTION 'hostname % is under an account domain', NEW.hostname
             USING ERRCODE = 'check_violation', CONSTRAINT = 'account_domain';
     END IF;
@@ -100,8 +99,7 @@ SET search_path = ''
 AS $$
 BEGIN
     IF EXISTS (SELECT 1 FROM platform.hostname_claims c
-               WHERE c.hostname = NEW.domain
-                  OR right(c.hostname, length(NEW.domain) + 1) = '.' || NEW.domain) THEN
+               WHERE c.hostname = NEW.domain OR c.hostname LIKE '%.' || NEW.domain) THEN
         RAISE EXCEPTION 'account domain % covers a shop hostname', NEW.domain
             USING ERRCODE = 'check_violation', CONSTRAINT = 'account_domain';
     END IF;
@@ -118,7 +116,7 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-    IF NEW.history = 'platform_never_reassigned' AND NOT EXISTS (
+    IF NOT EXISTS (
         SELECT 1 FROM platform.hostname_claims c
         WHERE c.hostname = NEW.hostname AND c.tenant_id = NEW.tenant_id
           AND c.platform_issued AND c.claimed_at IS NOT NULL
@@ -130,10 +128,25 @@ BEGIN
 END
 $$;
 CREATE TRIGGER checkout_origin_history BEFORE INSERT OR UPDATE ON platform.checkout_origins
-    FOR EACH ROW EXECUTE FUNCTION platform.checkout_origin_history();
+    FOR EACH ROW WHEN (NEW.history = 'platform_never_reassigned')
+    EXECUTE FUNCTION platform.checkout_origin_history();
+
+-- Routing: each mode carries a generation. The database owns it, so no switch can forget it.
+CREATE FUNCTION platform.checkout_origin_mode_changed() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+    NEW.mode_generation := OLD.mode_generation + 1;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER checkout_origin_mode_changed BEFORE UPDATE OF mode ON platform.checkout_origins
+    FOR EACH ROW WHEN (OLD.mode IS DISTINCT FROM NEW.mode)
+    EXECUTE FUNCTION platform.checkout_origin_mode_changed();
 
 REVOKE UPDATE, DELETE ON platform.hostname_claims FROM app_runtime;
 REVOKE UPDATE, DELETE ON platform.account_domains FROM app_runtime;
 REVOKE UPDATE, DELETE ON platform.checkout_origins FROM app_runtime;
-GRANT UPDATE (mode, mode_generation, history, attested_by, attested_at, attestation_version)
+GRANT UPDATE (mode, history, attested_by, attested_at, attestation_version)
     ON platform.checkout_origins TO app_runtime;
