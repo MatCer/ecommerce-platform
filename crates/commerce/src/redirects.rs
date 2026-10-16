@@ -87,17 +87,8 @@ pub const PLATFORM_SEGMENTS: [&str; 13] = [
     "account",
 ];
 
-const MAX_DECODES: usize = 4;
-
 pub fn is_platform_path(path: &str) -> bool {
-    let decode = |p: &[u8]| -> Vec<u8> { percent_encoding::percent_decode(p).collect() };
-    let mut p = path.as_bytes().to_vec();
-    for _ in 0..MAX_DECODES {
-        p = decode(&p);
-    }
-    if decode(&p) != p {
-        return true;
-    }
+    let mut p = decode_fully(path.as_bytes());
     p.make_ascii_lowercase();
     let mut segments: Vec<&[u8]> = vec![];
     for s in p.split(|b| *b == b'/' || *b == b'\\') {
@@ -116,6 +107,22 @@ pub fn is_platform_path(path: &str) -> bool {
         }
         [] => false,
     }
+}
+
+fn decode_fully(p: &[u8]) -> Vec<u8> {
+    let hex = |b: u8| char::from(b).to_digit(16);
+    let mut out: Vec<u8> = Vec::with_capacity(p.len());
+    for &b in p {
+        out.push(b);
+        while let [.., b'%', hi, lo] = out[..] {
+            let (Some(hi), Some(lo)) = (hex(hi), hex(lo)) else {
+                break;
+            };
+            out.truncate(out.len() - 3);
+            out.push(u8::try_from(hi * 16 + lo).unwrap_or_default());
+        }
+    }
+    out
 }
 
 fn locale_shaped(s: &[u8]) -> bool {

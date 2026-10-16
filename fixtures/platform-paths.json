@@ -32,7 +32,8 @@
     "/%2Fcheckout",
     "/%5Ccheckout",
     "\\checkout",
-    "/%2525252570/tricko"
+    "/%25252525252525252525252563heckout",
+    "/en/%25252525252563heckout/x"
   ],
   "allowed": [
     "/",
@@ -46,6 +47,10 @@
     "/en/p/x",
     "/_astro/a.js",
     "/%ZZcheckout",
-    "/checkout/../p/x"
+    "/checkout/../p/x",
+    "/%2525252570/tricko",
+    "/images/%2525252541.svg",
+    "/p/%2525252578",
+    "/%2%41"
   ]
 }
