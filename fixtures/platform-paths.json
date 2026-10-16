@@ -31,7 +31,8 @@
     "/%2e%2e/checkout",
     "/%2Fcheckout",
     "/%5Ccheckout",
-    "\\checkout"
+    "\\checkout",
+    "/%2525252570/tricko"
   ],
   "allowed": [
     "/",

@@ -4,6 +4,8 @@ export const PLATFORM_SEGMENTS: readonly string[] = routes.segments;
 
 const RESERVED = new Set(routes.segments);
 const LOCALE = /^[a-z]{2}(-[a-z]{2})?$/;
+const ESCAPE = /%([0-9a-f]{2})/gi;
+const MAX_DECODES = 4;
 
 /**
  * True when `pathname`, however it is encoded, cased or slashed, names a reserved segment or
@@ -11,10 +13,9 @@ const LOCALE = /^[a-z]{2}(-[a-z]{2})?$/;
  */
 export function isPlatformPath(pathname: string): boolean {
   let p = pathname;
-  for (let prev = ""; prev !== p; ) {
-    prev = p;
-    p = p.replace(/%([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
-  }
+  for (let i = 0; i < MAX_DECODES; i++)
+    p = p.replace(ESCAPE, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  if (p.search(ESCAPE) !== -1) return true;
   const segments: string[] = [];
   for (const s of p.toLowerCase().split(/[/\\]/)) {
     if (s === "" || s === ".") continue;

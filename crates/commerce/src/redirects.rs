@@ -87,14 +87,16 @@ pub const PLATFORM_SEGMENTS: [&str; 13] = [
     "account",
 ];
 
+const MAX_DECODES: usize = 4;
+
 pub fn is_platform_path(path: &str) -> bool {
+    let decode = |p: &[u8]| -> Vec<u8> { percent_encoding::percent_decode(p).collect() };
     let mut p = path.as_bytes().to_vec();
-    loop {
-        let next: Vec<u8> = percent_encoding::percent_decode(&p).collect();
-        if next == p {
-            break;
-        }
-        p = next;
+    for _ in 0..MAX_DECODES {
+        p = decode(&p);
+    }
+    if decode(&p) != p {
+        return true;
     }
     p.make_ascii_lowercase();
     let mut segments: Vec<&[u8]> = vec![];
