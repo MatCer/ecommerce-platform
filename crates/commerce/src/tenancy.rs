@@ -8,7 +8,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{audit, capability, id, themes, unique_violation};
+use crate::{audit, capability, id, storefront, themes, unique_violation};
 
 /// Staff roles, weakest first (spec §5.3). `staff` has no settings, payment config, staff
 /// management or exports.
@@ -146,6 +146,15 @@ pub async fn create_tenant(db: &PgPool, t: &NewTenant<'_>) -> Result<CreatedTena
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query!(
+        "INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
+         VALUES ($1, $2, true)",
+        hostname,
+        tenant_id
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| domain_insert_error(e, &hostname))?;
+    sqlx::query!(
         "INSERT INTO platform.domains (hostname, tenant_id, market_id, is_primary, verified_at)
          VALUES ($1, $2, $3, true, now())",
         hostname,
@@ -154,16 +163,7 @@ pub async fn create_tenant(db: &PgPool, t: &NewTenant<'_>) -> Result<CreatedTena
     )
     .execute(&mut *tx)
     .await
-    .map_err(|e| {
-        if unique_violation(&e) {
-            Error::Conflict {
-                code: "already_exists",
-                detail: format!("domain {hostname} already exists"),
-            }
-        } else {
-            e.into()
-        }
-    })?;
+    .map_err(|e| domain_insert_error(e, &hostname))?;
     sqlx::query!(
         "INSERT INTO staff_members (tenant_id, user_id, email, role) VALUES ($1, $2, $3, 'owner')",
         tenant_id,
@@ -268,16 +268,7 @@ pub async fn add_domain(
     )
     .fetch_one(&mut *tx)
     .await
-    .map_err(|e| {
-        if unique_violation(&e) {
-            Error::Conflict {
-                code: "already_exists",
-                detail: format!("domain {host} is already registered"),
-            }
-        } else {
-            e.into()
-        }
-    })?;
+    .map_err(|e| domain_insert_error(e, &host))?;
     audit::record(
         &mut tx,
         audit::PLATFORM_ACTOR,
@@ -293,6 +284,22 @@ pub async fn add_domain(
         verification_token: token,
         verified: local,
     })
+}
+
+fn domain_insert_error(e: sqlx::Error, host: &str) -> Error {
+    if unique_violation(&e) {
+        return Error::Conflict {
+            code: "already_exists",
+            detail: format!("domain {host} is already registered"),
+        };
+    }
+    if e.as_database_error().and_then(|d| d.constraint()) == Some("account_domain") {
+        return invalid(
+            "reserved_hostname",
+            "the hostname is reserved for customer accounts",
+        );
+    }
+    e.into()
 }
 
 /// Looks up a domain awaiting verification.
@@ -348,6 +355,37 @@ pub struct Resolved {
     pub retained_artifacts: Vec<String>,
     /// The platform checkout artifact (same for every tenant, §9.4).
     pub checkout_artifact: Option<String>,
+    /// Checkout policy of each exact origin of this hostname. An origin without one is isolated.
+    pub checkout_origins: Vec<CheckoutOriginPolicy>,
+}
+
+/// Where checkout runs for one exact shop origin (same-origin-checkout.md, Routing).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckoutMode {
+    Isolated,
+    SameOrigin,
+}
+
+impl CheckoutMode {
+    fn parse(s: &str) -> Option<Self> {
+        match s {
+            "isolated" => Some(Self::Isolated),
+            "same_origin" => Some(Self::SameOrigin),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct CheckoutOriginPolicy {
+    /// As browsers serialize it: scheme, host and a non-default port (`https://shop.example`).
+    pub origin: String,
+    pub mode: CheckoutMode,
+    /// Every mode switch increments it; credentials record the generation they were issued under.
+    pub mode_generation: i64,
+    /// The origin itself in same-origin mode, `checkout.<host>` in isolated mode.
+    pub checkout_origin: String,
 }
 
 /// Resolves a verified domain of an active tenant; `None` for anything else.
@@ -371,6 +409,29 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
         Error::Internal(format!("tenant {} has no storefront token", d.tenant_id))
     })?;
     let checkout_artifact = themes::channel(db, themes::CHECKOUT).await?;
+    let checkout_origins = sqlx::query!(
+        r#"SELECT origin AS "origin!", mode, mode_generation FROM platform.checkout_origins
+           WHERE hostname = $1 ORDER BY origin"#,
+        host
+    )
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .map(|r| {
+        let mode = CheckoutMode::parse(&r.mode)
+            .ok_or_else(|| Error::Internal(format!("checkout mode {}", r.mode)))?;
+        let checkout_origin = match mode {
+            CheckoutMode::SameOrigin => r.origin.clone(),
+            CheckoutMode::Isolated => storefront::checkout_base(&r.origin),
+        };
+        Ok(CheckoutOriginPolicy {
+            origin: r.origin,
+            mode,
+            mode_generation: r.mode_generation,
+            checkout_origin,
+        })
+    })
+    .collect::<Result<_, Error>>()?;
     let mut tx = tenant_tx(db, d.tenant_id).await?;
     let m = sqlx::query!(
         "SELECT code, currency, default_locale, locales, country_codes FROM markets WHERE id = $1",
@@ -394,6 +455,7 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
         theme_artifact: theme.artifact_id,
         retained_artifacts: theme.retained,
         checkout_artifact,
+        checkout_origins,
     }))
 }
 

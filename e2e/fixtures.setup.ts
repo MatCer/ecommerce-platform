@@ -1,6 +1,29 @@
 import { expect, test } from "@playwright/test";
 import { signInOwner, sql } from "./admin/support";
+import { FRESH } from "./checkout/support";
 import { rateHeaders } from "./rate-client";
+
+test("seed a same-origin test origin of the demo shop", () => {
+  const { hostname, port } = new URL(FRESH);
+  sql(`INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
+         SELECT '${hostname}', id, true FROM platform.tenants WHERE slug = 'demo'
+         ON CONFLICT (hostname) DO NOTHING;
+       INSERT INTO platform.domains (hostname, tenant_id, market_id, verified_at)
+         SELECT '${hostname}', m.tenant_id, m.id, now()
+         FROM markets m JOIN platform.tenants t ON t.id = m.tenant_id
+         WHERE t.slug = 'demo' AND m.is_default
+         ON CONFLICT (hostname) DO NOTHING;
+       INSERT INTO platform.checkout_origins
+           (scheme, hostname, port, tenant_id, market_id, history, mode)
+         SELECT 'http', hostname, ${Number(port || 80)}, tenant_id, market_id,
+                'platform_never_reassigned', 'same_origin'
+         FROM platform.domains WHERE hostname = '${hostname}'
+         ON CONFLICT (origin) DO UPDATE SET history = EXCLUDED.history, mode = EXCLUDED.mode;`);
+  expect(
+    sql(`SELECT string_agg(origin || ' ' || mode_generation, ',')
+         FROM platform.checkout_origins WHERE mode = 'same_origin'`),
+  ).toBe(`${FRESH} 1`);
+});
 
 test("provision stock for concurrent checkout fixtures", async ({ browser }) => {
   // Carts do not reserve stock. Parallel specs can all add the last seeded unit,

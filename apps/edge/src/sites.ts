@@ -22,6 +22,7 @@ export interface Site {
   retained_artifacts: string[];
   /** The platform checkout artifact (same for every tenant); `null` if none is published. */
   checkout_artifact?: string | null;
+  checkout_origins?: CheckoutPolicy[];
   /**
    * Request-scoped, set by the gateway (never by the resolver): the client address from the
    * proxy's last `X-Forwarded-For` hop, forwarded as `X-Client-Ip` on every API call (rate
@@ -33,6 +34,30 @@ export interface Site {
    * artifact; nothing is cached, counted or handed to the checkout.
    */
   preview?: { revision: number; expiresAt: number };
+}
+
+export type CheckoutMode = "isolated" | "same_origin";
+
+export interface CheckoutPolicy {
+  origin: string;
+  mode: CheckoutMode;
+  mode_generation: number | null;
+  checkout_origin: string;
+}
+
+export function checkoutPolicy(
+  site: Pick<Site, "checkout_origins">,
+  requestOrigin: string,
+): CheckoutPolicy {
+  const origin = new URL(requestOrigin).origin;
+  return (
+    site.checkout_origins?.find((p) => p.origin === origin) ?? {
+      origin,
+      mode: "isolated",
+      mode_generation: null,
+      checkout_origin: origin.replace("://", "://checkout."),
+    }
+  );
 }
 
 export interface SiteResolver {
@@ -103,6 +128,7 @@ interface Resolved {
   theme_artifact: string | null;
   retained_artifacts: string[];
   checkout_artifact: string | null;
+  checkout_origins: CheckoutPolicy[];
 }
 
 /**
@@ -142,6 +168,7 @@ function toSite(r: Resolved): Site {
     theme_artifact: r.theme_artifact,
     retained_artifacts: r.retained_artifacts,
     checkout_artifact: r.checkout_artifact,
+    checkout_origins: r.checkout_origins,
   };
 }
 

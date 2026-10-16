@@ -25040,6 +25040,41 @@
           }
         }
       },
+      "CheckoutMode": {
+        "type": "string",
+        "description": "Where checkout runs for one exact shop origin (same-origin-checkout.md, Routing).",
+        "enum": [
+          "isolated",
+          "same_origin"
+        ]
+      },
+      "CheckoutOriginPolicy": {
+        "type": "object",
+        "required": [
+          "origin",
+          "mode",
+          "mode_generation",
+          "checkout_origin"
+        ],
+        "properties": {
+          "checkout_origin": {
+            "type": "string",
+            "description": "The origin itself in same-origin mode, `checkout.<host>` in isolated mode."
+          },
+          "mode": {
+            "$ref": "#/components/schemas/CheckoutMode"
+          },
+          "mode_generation": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Every mode switch increments it; credentials record the generation they were issued under."
+          },
+          "origin": {
+            "type": "string",
+            "description": "As browsers serialize it: scheme, host and a non-default port (`https://shop.example`)."
+          }
+        }
+      },
       "CheckoutView": {
         "type": "object",
         "description": "Everything the one-page checkout renders. Recomputed on every read.",
@@ -33837,7 +33872,8 @@
           "locales",
           "country_codes",
           "storefront_token",
-          "retained_artifacts"
+          "retained_artifacts",
+          "checkout_origins"
         ],
         "properties": {
           "checkout_artifact": {
@@ -33846,6 +33882,13 @@
               "null"
             ],
             "description": "The platform checkout artifact (same for every tenant, §9.4)."
+          },
+          "checkout_origins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutOriginPolicy"
+            },
+            "description": "Checkout policy of each exact origin of this hostname. An origin without one is isolated."
           },
           "country_codes": {
             "type": "array",
