@@ -59,6 +59,33 @@ describe("ApiEnroller", () => {
     expect(calls).toBe(4);
   });
 
+  test("an answer still in flight when the subject is forgotten is not memoized", async () => {
+    const pending: ((arm: string | null) => void)[] = [];
+    const enroller = new ApiEnroller(
+      "http://api.test",
+      "t",
+      () =>
+        new Promise((resolve) =>
+          pending.push((arm) =>
+            resolve(
+              Response.json({
+                assignment: arm && { experiment_id: EXP.id, version: 3, arm },
+              }),
+            ),
+          ),
+        ),
+    );
+    const s = site({ experiment: EXP });
+    const stale = enroller.enrol(s, ALICE, 0);
+    enroller.forget("t-demo", ALICE);
+    pending[0]?.(null);
+    expect(await stale).toBeNull();
+    const fresh = enroller.enrol(s, ALICE, 1);
+    expect(pending.length).toBe(2);
+    pending[1]?.("b");
+    expect(await fresh).toEqual({ experiment_id: EXP.id, version: 3, arm: "b" });
+  });
+
   test("gives up after 500 ms", async () => {
     const enroller = new ApiEnroller(
       "http://api.test",

@@ -23,6 +23,7 @@ export class ApiEnroller implements Enroller {
     string,
     { experiment: string; assignment: Assignment | null; at: number }
   >();
+  #forgets = 0;
   constructor(apiOrigin: string, token: string, upstream?: (r: Request) => Promise<Response>) {
     this.#apiOrigin = apiOrigin;
     this.#token = token;
@@ -35,6 +36,7 @@ export class ApiEnroller implements Enroller {
     const experiment = `${site.experiment.id}:${site.experiment.version}`;
     const hit = this.#memo.get(key);
     if (hit && hit.experiment === experiment && now - hit.at < MEMO_MS) return hit.assignment;
+    const forgets = this.#forgets;
     const res = await this.#upstream(
       new Request(`${this.#apiOrigin}/internal/v1/experiments/enrol`, {
         method: "POST",
@@ -49,6 +51,7 @@ export class ApiEnroller implements Enroller {
     );
     if (res.status !== 200) throw new Error(`enrol: ${res.status}`);
     const assignment = parseAssignment(((await res.json()) as { assignment?: unknown }).assignment);
+    if (forgets !== this.#forgets) return assignment;
     this.#memo.delete(key);
     if (this.#memo.size >= MAX_MEMO) this.#memo.delete(this.#memo.keys().next().value ?? "");
     this.#memo.set(key, { experiment, assignment, at: now });
@@ -56,6 +59,7 @@ export class ApiEnroller implements Enroller {
   }
 
   forget(tenantId: string, subject: string) {
+    this.#forgets++;
     this.#memo.delete(`${tenantId}|${subject}`);
   }
 }
