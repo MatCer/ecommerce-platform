@@ -334,8 +334,9 @@ pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<V
 }
 
 /// Queues a rebuild for every tenant whose indexes were not rebuilt by [`SETTINGS_VERSION`],
-/// at most one per tenant and version. Returns the number of such tenants, including those
-/// whose rebuild was already queued.
+/// at most one per tenant, version and last completed rebuild (a rebuild that finished without
+/// recording the version lets the next scan queue another). Returns the number of such
+/// tenants, including those whose rebuild was already queued.
 pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
         .fetch_all(db)
@@ -343,20 +344,19 @@ pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     let mut queued = 0;
     for tenant_id in tenants {
         let mut tx = tenant_tx(db, tenant_id).await?;
-        let outdated = sqlx::query_scalar!(
-            r#"SELECT EXISTS (
-                   SELECT 1 FROM search_indexes
-                   WHERE rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1
-               ) AS "outdated!""#,
+        let outdated = sqlx::query!(
+            r#"SELECT max(rebuild_version) AS last_rebuild FROM search_indexes
+               HAVING bool_or(rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1)"#,
             SETTINGS_VERSION
         )
-        .fetch_one(&mut *tx)
+        .fetch_optional(&mut *tx)
         .await?;
-        if outdated {
+        if let Some(r) = outdated {
             let version = super::next_version(&mut *tx).await?;
             let mut job = super::manual_rebuild_job(tenant_id, version);
             job.idempotency_key = Some(format!(
-                "search.settings-upgrade:{tenant_id}:{SETTINGS_VERSION}"
+                "search.settings-upgrade:{tenant_id}:{SETTINGS_VERSION}:{}",
+                r.last_rebuild.unwrap_or(0)
             ));
             platform::queue::enqueue(&mut *tx, &job).await?;
             tx.commit().await?;

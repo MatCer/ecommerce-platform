@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT max(rebuild_version) AS last_rebuild FROM search_indexes\n               HAVING bool_or(rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_rebuild",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "52e7f353030bd473bc0fc467a6f0edb339619eec942ee57406f152fb4a07b2cd"
+}
