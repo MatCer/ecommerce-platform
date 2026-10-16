@@ -189,9 +189,17 @@ impl Doc {
     }
 
     /// The current value of a field (`None`: no translation in `locale`, or an unset field).
+    /// Products also answer `alt_<asset id>`: that image's alt text (AI alt text labels).
     pub fn get(&self, locale: &str, field: &str) -> Option<Value> {
         match self {
             Self::Product(p) => {
+                if let Some(asset_id) = field
+                    .strip_prefix("alt_")
+                    .and_then(|id| Uuid::try_parse(id).ok())
+                {
+                    let m = p.media.iter().find(|m| m.asset_id == asset_id)?;
+                    return m.alt_i18n.get(locale).map(|t| json!(t));
+                }
                 let t = p.translations.iter().find(|t| t.locale == locale)?;
                 match field {
                     "name" => Some(json!(t.name)),

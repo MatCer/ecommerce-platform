@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT alt_texts_since FROM ai_settings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "alt_texts_since",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ai_settings",
+            "name": "alt_texts_since"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "240677a11db0fbe427e977117dffd584acc766002635ce973a7a9daeee031542"
+}

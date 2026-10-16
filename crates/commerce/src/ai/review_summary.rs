@@ -94,23 +94,10 @@ struct Input {
 }
 
 async fn load(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<Input>, Error> {
-    let Some(product) = sqlx::query_scalar!(
-        "SELECT name FROM product_translations WHERE product_id = $1
-         ORDER BY (locale = (SELECT default_locale FROM markets WHERE is_default)) DESC NULLS LAST,
-                  locale
-         LIMIT 1",
-        product_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    else {
+    let Some(product) = super::product_name(tx, product_id).await? else {
         return Ok(None);
     };
-    let mut locales =
-        sqlx::query_scalar!(r#"SELECT DISTINCT unnest(locales) AS "locale!" FROM markets"#)
-            .fetch_all(&mut **tx)
-            .await?;
-    locales.sort();
+    let locales = super::market_locales(tx).await?;
     let counts = sqlx::query!(
         r#"SELECT rating, count(*) AS "n!" FROM reviews
            WHERE product_id = $1 AND status = 'published' AND verified GROUP BY rating"#,

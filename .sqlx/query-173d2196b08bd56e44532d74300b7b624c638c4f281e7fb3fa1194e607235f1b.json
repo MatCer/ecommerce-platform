@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE product_media SET alt_i18n = $3 WHERE product_id = $1 AND asset_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "173d2196b08bd56e44532d74300b7b624c638c4f281e7fb3fa1194e607235f1b"
+}

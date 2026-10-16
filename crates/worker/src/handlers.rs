@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use commerce::ai::{Ai, Outcome, plan, proposals, review_summary};
+use commerce::ai::{Ai, Outcome, alt_text, plan, proposals, review_summary};
 use commerce::feeds::{export, import};
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
@@ -142,14 +142,16 @@ pub fn all(
     let webhooks = extra.webhooks.clone();
     let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
-    let (ai1, ai2, ai3, ai4) = (
+    let (ai1, ai2, ai3, ai4, ai5) = (
+        extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
     );
     let theme_builder = extra.theme_builder.clone();
-    let (theme_storage, ai_storage) = (storage.clone(), storage.clone());
+    let (theme_storage, ai_storage, alt_storage) =
+        (storage.clone(), storage.clone(), storage.clone());
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
     let urls = e4.urls.clone();
     let (urls2, urls3, urls4, urls5) = (urls.clone(), urls.clone(), urls.clone(), urls.clone());
@@ -268,6 +270,9 @@ pub fn all(
         .register(plan::APPLY_JOB, ai_apply)
         .register(review_summary::JOB, move |ctx, job| {
             ai_review_summary(ctx, job, ai4.clone())
+        })
+        .register(alt_text::JOB, move |ctx, job| {
+            ai_alt_text(ctx, job, ai5.clone(), alt_storage.clone())
         })
         .register(themes::BUILD_JOB, move |_ctx, job| {
             theme_build(job, theme_builder.clone())
@@ -389,6 +394,16 @@ async fn ai_review_summary(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
     let (tenant, product_id) = tenant_and(&job, "product_id")?;
     let last = job.attempts >= job.max_attempts;
     ai_outcome(review_summary::run(&ctx.db, &ai, tenant, product_id, last).await)
+}
+
+async fn ai_alt_text(ctx: Ctx, job: Job, ai: Ai, storage: Storage) -> Result<(), JobError> {
+    let tenant = job
+        .tenant_id
+        .ok_or_else(|| JobError::Permanent(format!("{} without tenant", job.kind)))?;
+    let payload: alt_text::Payload = serde_json::from_value(job.payload.clone())
+        .map_err(|e| JobError::Permanent(format!("bad payload: {e}")))?;
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(alt_text::run(&ctx.db, &ai, &storage, tenant, payload, last).await)
 }
 
 /// Applies a confirmed bulk plan, one product per transaction (resumable).

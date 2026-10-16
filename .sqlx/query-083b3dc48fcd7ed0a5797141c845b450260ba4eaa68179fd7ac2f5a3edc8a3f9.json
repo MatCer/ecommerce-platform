@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.asset_id, m.alt_i18n, a.variants FROM product_media m\n             JOIN assets a ON a.id = m.asset_id\n             WHERE m.product_id = $1 AND a.status = 'ready' AND ($2 OR a.created_at >= $3)\n             ORDER BY m.position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "asset_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "asset_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "alt_i18n",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "alt_i18n"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "variants",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "variants"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "083b3dc48fcd7ed0a5797141c845b450260ba4eaa68179fd7ac2f5a3edc8a3f9"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT m.product_id FROM product_media m\n           JOIN assets a ON a.id = m.asset_id AND a.status = 'ready'\n           WHERE EXISTS (SELECT 1 FROM markets k, unnest(k.locales) l\n                         WHERE btrim(coalesce(m.alt_i18n ->> l, ''), E' \\t\\r\\n') = '')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "product_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "product_media",
+            "name": "product_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "df76f25b1c52b0be79b267d4fb7bd81c066bc64d57c6f1061f209b597579b4c7"
+}
