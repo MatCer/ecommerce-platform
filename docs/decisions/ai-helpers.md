@@ -72,8 +72,8 @@ say, above the reviews on the product page (conversion theme).
 
 - **Opt-in.** `ai_settings.review_summaries` (no row = off), switched by an owner or admin
   under `PUT /admin/v1/ai/settings` (audited `ai.settings_updated`). Off hides every summary
-  at once; switching on queues one job per product that qualifies. Any change purges the
-  tenant's cached pages.
+  at once; switching on queues one job per product that qualifies or still has a cached
+  summary. Any change publishes `ai_settings.changed`, which purges the tenant's cached pages.
 - **Input and minimum.** Published, verified reviews only, at least 5 (`MIN_REVIEWS`); below
   that a product has no summary and an existing one is deleted. The model sees the product
   name, the rating distribution and the newest 40 reviews (rating, title, body cut to 1000

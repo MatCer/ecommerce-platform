@@ -265,7 +265,11 @@ function ShopFeatures() {
             <Checkbox
               label={t("ai.reviewSummaries")}
               description={t("ai.reviewSummariesDesc")}
-              checked={save.isPending ? !s.review_summaries : s.review_summaries}
+              checked={
+                save.isPending && save.variables
+                  ? save.variables.review_summaries
+                  : s.review_summaries
+              }
               disabled={!can("admin") || save.isPending}
               onChange={(review_summaries) => save.mutate({ review_summaries })}
             />

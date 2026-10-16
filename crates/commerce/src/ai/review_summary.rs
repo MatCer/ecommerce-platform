@@ -35,8 +35,10 @@ pub const SUMMARY_MAX: usize = 600;
 pub const DEBOUNCE_SECS: i64 = 300;
 /// Part of the input hash: bump it when the prompt or the data shape changes.
 pub const PROMPT_VERSION: u32 = 1;
-/// `{product_id}` after a summary was written or deleted, `{}` after a settings change.
+/// `{product_id}` after a summary was written or deleted.
 pub const CHANGED_EVENT: &str = "review_summary.changed";
+/// After an AI settings change (purges the tenant's pages).
+pub const SETTINGS_CHANGED_EVENT: &str = "ai_settings.changed";
 const ACTOR: &str = "system";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -95,7 +97,7 @@ pub async fn put_settings(
     )
     .await?;
     if before != *input {
-        queue::publish(&mut **tx, CHANGED_EVENT, &json!({})).await?;
+        queue::publish(&mut **tx, SETTINGS_CHANGED_EVENT, &json!({})).await?;
     }
     if input.review_summaries && !before.review_summaries {
         let products = sqlx::query_scalar!(
@@ -107,15 +109,9 @@ pub async fn put_settings(
         )
         .fetch_all(&mut **tx)
         .await?;
-        let now = Utc::now();
+        let tenant_id = tx.tenant_id();
         for product_id in products {
-            let mut j = new_job(tx.tenant_id(), product_id);
-            j.idempotency_key = Some(format!(
-                "{JOB}:{}:{product_id}:on:{}",
-                tx.tenant_id(),
-                now.timestamp_micros()
-            ));
-            queue::enqueue(&mut **tx, &j).await?;
+            queue::enqueue(&mut **tx, &new_job(tenant_id, product_id)).await?;
         }
     }
     Ok(*input)
