@@ -189,7 +189,6 @@ pub fn review_summary_schema() -> Value {
     }))
 }
 
-/// One alt text per requested language code.
 pub fn alt_text_schema(locales: &[String]) -> Value {
     object(Value::Object(
         locales.iter().map(|l| (l.clone(), string())).collect(),

@@ -52,7 +52,6 @@ function MediaRow(props: {
   index: number;
   count: number;
   skus: string[];
-  /** Locales whose alt text AI wrote and nobody changed since. */
   aiLocales: string[];
   onChange: (m: ProductMedia) => void;
   onMove: (delta: number) => void;
@@ -173,14 +172,13 @@ interface Uploading {
 export function MediaManager(props: {
   media: ProductMedia[];
   skus: string[];
-  /** Saved product: AI-written alt texts get a label. */
-  productId?: string;
+  aiMarksFor?: string;
   onChange: (media: ProductMedia[]) => void;
 }) {
   const [uploads, setUploads] = createSignal<Uploading[]>([]);
   const marks = useAiMarks(
     () => "product",
-    () => props.productId,
+    () => props.aiMarksFor,
   );
   const aiLocales = (assetId: string) =>
     (marks.data?.items ?? []).filter((m) => m.field === altField(assetId)).map((m) => m.locale);

@@ -70,7 +70,6 @@ export function useAiMarks(entityType: () => EntityType, entityId: () => string 
   }));
 }
 
-/** The AI marks field of a product image's alt text. */
 export function altField(assetId: string): string {
   return `alt_${assetId.replaceAll("-", "")}`;
 }

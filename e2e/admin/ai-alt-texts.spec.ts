@@ -1,9 +1,3 @@
-/**
- * SHOP-37: AI alt texts on the seeded demo shop with the fake provider. The owner switches them
- * on, uploads a product image with a cs alt text, and the worker fills the other market language
- * (sk) through the catalog save; the editor labels that field until the owner edits it.
- */
-
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { expectAccessible, pngFixture, run, screenshot, signInOwner, sql } from "./support.ts";
 
@@ -88,7 +82,7 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
 
   const cs = altText(image, "cs");
   const sk = altText(image, "sk");
-  const en = altText(image, "en");
+  const unsold = altText(image, "en");
   await expect
     .poll(
       async () => {
@@ -101,9 +95,8 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
   await expect(sk).toHaveAccessibleDescription(AI_LABEL);
   await expect(cs).toHaveValue(MERCHANT_ALT);
   await expect(cs).not.toHaveAccessibleDescription(AI_LABEL);
-  // en is a content language but no market sells in it.
-  await expect(en).toHaveValue("");
-  await expect(en).not.toHaveAccessibleDescription(AI_LABEL);
+  await expect(unsold).toHaveValue("");
+  await expect(unsold).not.toHaveAccessibleDescription(AI_LABEL);
   expect(
     Number(
       sql(`SELECT count(*) FROM audit_log WHERE tenant_id = ${DEMO} AND actor = 'system'

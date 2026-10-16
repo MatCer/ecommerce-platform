@@ -1,5 +1,3 @@
-{#- Fake provider: one alt text per requested locale, tagged with it and naming the first
-    existing alt text it "translates". -#}
 {%- set src = data.existing | items | first -%}
 {%- set suffix = (", from " ~ src[0] ~ ": " ~ src[1]) if src else "" -%}
 {

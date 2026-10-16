@@ -39,7 +39,6 @@ pub struct ReviewSummary {
     pub generated_at: DateTime<Utc>,
 }
 
-/// One summary job per product that has or may need a summary (the switch was turned on).
 pub(super) async fn enqueue_all(tx: &mut TenantTx) -> Result<(), Error> {
     let products = sqlx::query_scalar!(
         r#"SELECT product_id AS "product_id!" FROM reviews

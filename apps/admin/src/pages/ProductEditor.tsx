@@ -366,7 +366,7 @@ export default function ProductEditor() {
           <Section id="media" title={t("editor.media")}>
             <MediaManager
               media={draft.media}
-              productId={params.id}
+              aiMarksFor={params.id}
               skus={skus()}
               onChange={(m) => setDraft("media", reconcile(m))}
             />

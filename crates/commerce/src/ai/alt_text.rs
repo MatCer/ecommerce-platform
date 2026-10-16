@@ -1,8 +1,3 @@
-//! AI alt texts for product images: one vision call per image fills the market languages whose
-//! alt text is empty, translating the shop's own alt texts of that image where there are any.
-//! A non-empty alt text is never changed; written ones carry an `ai_marks` label
-//! (field `alt_<asset id>`) until someone edits them.
-
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
@@ -19,7 +14,7 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::fields::{Doc, EntityType, product_input};
+use super::fields::{Doc, EntityType, alt_field, product_input};
 use super::marks::{self, NewMark};
 use super::{Ai, Call, CallError, Outcome, prompts};
 use crate::catalog::{I18n, products};
@@ -35,7 +30,6 @@ const IMAGE_MAX_BYTES: u64 = 5 * 1024 * 1024;
 const IMAGE_WIDTH: u32 = 1024;
 const ACTOR: &str = "system";
 
-/// What a job covers: one product, or every product showing an asset that just became ready.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Target {
     #[serde(rename = "product_id")]
@@ -48,7 +42,6 @@ pub enum Target {
 pub struct Payload {
     #[serde(flatten)]
     pub target: Target,
-    /// Also images uploaded before the switch was turned on.
     #[serde(default)]
     pub backfill: bool,
 }
@@ -57,11 +50,6 @@ pub struct Payload {
 pub struct Backfill {
     /// Products queued for alt texts.
     pub queued: usize,
-}
-
-/// The `ai_marks` field of an image's alt text.
-pub fn mark_field(asset_id: Uuid) -> String {
-    format!("alt_{}", asset_id.simple())
 }
 
 fn is_empty(alt: Option<&String>) -> bool {
@@ -119,8 +107,6 @@ async fn since(tx: &mut TenantTx) -> Result<Option<DateTime<Utc>>, Error> {
     )
 }
 
-/// `POST /admin/v1/ai/alt-texts/backfill`: one job per product with a ready image missing an
-/// alt text in some market language. `409 ai_alt_texts_disabled` while the switch is off.
 pub async fn backfill(tx: &mut TenantTx, ai: &Ai) -> Result<Backfill, Error> {
     if since(tx).await?.is_none() {
         return Err(Error::Conflict {
@@ -150,7 +136,6 @@ pub async fn backfill(tx: &mut TenantTx, ai: &Ai) -> Result<Backfill, Error> {
     })
 }
 
-/// The variant sent to the model: a format the API reads, at most 5 MB, width closest to 1024.
 fn pick(variants: &[AssetVariant]) -> Option<(&AssetVariant, &'static str)> {
     variants
         .iter()
@@ -167,7 +152,6 @@ fn pick(variants: &[AssetVariant]) -> Option<(&AssetVariant, &'static str)> {
         .min_by_key(|(v, _)| (v.width.abs_diff(IMAGE_WIDTH), v.width))
 }
 
-/// The model output: exactly the requested locales, each a short single line of plain text.
 fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String>, CallError> {
     let out: BTreeMap<String, String> = super::parse(output)?;
     if !out.keys().eq(locales.iter()) {
@@ -207,11 +191,21 @@ struct Generated {
     model: String,
 }
 
-struct Scope {
+struct Job<'a> {
+    db: &'a PgPool,
+    ai: &'a Ai,
+    storage: &'a Storage,
+    tenant: Uuid,
     since: DateTime<Utc>,
     locales: Vec<String>,
     backfill: bool,
     last_attempt: bool,
+}
+
+enum Step {
+    Wrote(Generated),
+    Skipped,
+    Stop(Outcome),
 }
 
 pub async fn run(
@@ -225,7 +219,7 @@ pub async fn run(
     if ai.client.is_none() {
         return Ok(Outcome::Done);
     }
-    let (scope, products) = {
+    let (job, products) = {
         let mut tx = tenant_tx(db, tenant).await?;
         let Some(since) = since(&mut tx).await? else {
             return Ok(Outcome::Done);
@@ -242,17 +236,38 @@ pub async fn run(
                 .await?,
             };
         tx.commit().await?;
-        let scope = Scope {
+        let job = Job {
+            db,
+            ai,
+            storage,
+            tenant,
             since,
             locales,
             backfill: payload.backfill,
             last_attempt,
         };
-        (scope, products)
+        (job, products)
     };
     for product_id in products {
+        let Some((name, images)) = job.images(product_id).await? else {
+            continue;
+        };
         let mut generated = Vec::new();
-        let end = generate(db, ai, storage, tenant, &scope, product_id, &mut generated).await;
+        let mut end = Ok(Outcome::Done);
+        for image in &images {
+            match job.describe(product_id, &name, image).await {
+                Ok(Step::Wrote(g)) => generated.push(g),
+                Ok(Step::Skipped) => {}
+                Ok(Step::Stop(outcome)) => {
+                    end = Ok(outcome);
+                    break;
+                }
+                Err(e) => {
+                    end = Err(e);
+                    break;
+                }
+            }
+        }
         store(db, tenant, product_id, &generated).await?;
         if let Outcome::Retry(reason) = end? {
             return Ok(Outcome::Retry(reason));
@@ -261,20 +276,11 @@ pub async fn run(
     Ok(Outcome::Done)
 }
 
-/// Calls the model image by image; `generated` keeps what came back before a stop.
-async fn generate(
-    db: &PgPool,
-    ai: &Ai,
-    storage: &Storage,
-    tenant: Uuid,
-    scope: &Scope,
-    product_id: Uuid,
-    generated: &mut Vec<Generated>,
-) -> Result<Outcome, Error> {
-    let (name, images) = {
-        let mut tx = tenant_tx(db, tenant).await?;
+impl Job<'_> {
+    async fn images(&self, product_id: Uuid) -> Result<Option<(String, Vec<ImageRow>)>, Error> {
+        let mut tx = tenant_tx(self.db, self.tenant).await?;
         let Some(name) = super::product_name(&mut tx, product_id).await? else {
-            return Ok(Outcome::Done);
+            return Ok(None);
         };
         let images = sqlx::query!(
             r#"SELECT m.asset_id, m.alt_i18n, a.variants FROM product_media m
@@ -284,9 +290,9 @@ async fn generate(
                              WHERE btrim(coalesce(m.alt_i18n ->> l, ''), E' \t\r\n') = '')
                ORDER BY m.position"#,
             product_id,
-            scope.backfill,
-            scope.since,
-            &scope.locales
+            self.backfill,
+            self.since,
+            &self.locales
         )
         .fetch_all(&mut *tx)
         .await?
@@ -300,27 +306,38 @@ async fn generate(
         })
         .collect::<Result<Vec<_>, Error>>()?;
         tx.commit().await?;
-        (name, images)
-    };
-    for image in images {
-        let targets: Vec<String> = scope
+        Ok(Some((name, images)))
+    }
+
+    async fn describe(
+        &self,
+        product_id: Uuid,
+        name: &str,
+        image: &ImageRow,
+    ) -> Result<Step, Error> {
+        let targets: Vec<String> = self
             .locales
             .iter()
             .filter(|l| is_empty(image.alt.get(*l)))
             .cloned()
             .collect();
         if targets.is_empty() {
-            continue;
+            return Ok(Step::Skipped);
         }
         let Some((variant, media_type)) = pick(&image.variants) else {
             tracing::warn!(asset_id = %image.asset_id, "no image variant the model reads");
-            continue;
+            return Ok(Step::Skipped);
         };
-        let bytes = match storage.public.get(&Path::from(variant.key.as_str())).await {
+        let bytes = match self
+            .storage
+            .public
+            .get(&Path::from(variant.key.as_str()))
+            .await
+        {
             Ok(r) => r.bytes().await?,
             Err(object_store::Error::NotFound { .. }) => {
                 tracing::warn!(asset_id = %image.asset_id, "image variant missing in storage");
-                continue;
+                return Ok(Step::Skipped);
             }
             Err(e) => return Err(e.into()),
         };
@@ -334,9 +351,9 @@ async fn generate(
             targets.join(", ")
         );
         let result = super::call(
-            db,
-            ai,
-            tenant,
+            self.db,
+            self.ai,
+            self.tenant,
             ACTOR,
             &Call {
                 feature: FEATURE,
@@ -353,32 +370,30 @@ async fn generate(
         )
         .await
         .and_then(|(output, model)| validate(output, &targets).map(|t| (t, model)));
-        match result {
-            Ok((texts, model)) => generated.push(Generated {
+        Ok(match result {
+            Ok((texts, model)) => Step::Wrote(Generated {
                 asset_id: image.asset_id,
                 texts,
                 model,
             }),
-            Err(CallError::Quota) => return Ok(Outcome::Done),
+            Err(CallError::Quota) => Step::Stop(Outcome::Done),
             Err(CallError::Platform(e)) => return Err(e),
-            Err(e) if e.retryable() && !scope.last_attempt => {
-                return Ok(Outcome::Retry(e.to_string()));
+            Err(e) if e.retryable() && !self.last_attempt => {
+                Step::Stop(Outcome::Retry(e.to_string()))
             }
             Err(e) if e.retryable() => {
                 tracing::warn!(%product_id, code = e.code(), error = %e, "alt text failed");
-                return Ok(Outcome::Done);
+                Step::Stop(Outcome::Done)
             }
             Err(e) => {
                 tracing::warn!(%product_id, asset_id = %image.asset_id, code = e.code(), error = %e,
                                "alt text rejected");
+                Step::Skipped
             }
-        }
+        })
     }
-    Ok(Outcome::Done)
 }
 
-/// Fills the locales that are still empty through the catalog save, under its product row
-/// lock, so a concurrent edit is never overwritten.
 async fn store(
     db: &PgPool,
     tenant: Uuid,
@@ -419,7 +434,7 @@ async fn store(
             &entity_id,
             &NewMark {
                 locale,
-                field: &mark_field(g.asset_id),
+                field: &alt_field(g.asset_id),
                 value: &json!(text),
                 feature: FEATURE,
                 model: &g.model,

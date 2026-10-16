@@ -65,7 +65,6 @@ impl World {
         settings::get(&mut tx).await.unwrap()
     }
 
-    /// A ready asset with an AVIF and a WebP variant; `age_days` back-dates its upload.
     async fn asset(&self, age_days: i32) -> Uuid {
         let id = Uuid::now_v7();
         let t = self.shop.tenant;
@@ -96,7 +95,6 @@ impl World {
         id
     }
 
-    /// Replaces the product's images like the admin's save does.
     async fn media(&self, media: &[(Uuid, &[(&str, &str)])]) {
         let mut tx = tenant_tx(&self.runtime, self.shop.tenant).await.unwrap();
         let mut input = product_input(&products::get(&mut tx, self.shop.product).await.unwrap());

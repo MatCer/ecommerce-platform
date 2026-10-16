@@ -409,7 +409,6 @@ pub(crate) fn parse<T: serde::de::DeserializeOwned>(output: Value) -> Result<T, 
         .map_err(|_| CallError::output("the output does not match the expected shape"))
 }
 
-/// The product's name in the default market's language, else in the first language it has.
 pub(crate) async fn product_name(
     tx: &mut TenantTx,
     product_id: Uuid,
@@ -425,7 +424,6 @@ pub(crate) async fn product_name(
     .await?)
 }
 
-/// Every language a market of the shop is sold in, sorted.
 pub(crate) async fn market_locales(tx: &mut TenantTx) -> Result<Vec<String>, Error> {
     let mut locales =
         sqlx::query_scalar!(r#"SELECT DISTINCT unnest(locales) AS "locale!" FROM markets"#)

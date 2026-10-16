@@ -1,5 +1,3 @@
-//! The shop's AI switches (owners and admins; audited).
-
 use platform::Error;
 use platform::db::TenantTx;
 use platform::queue;

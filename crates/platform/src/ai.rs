@@ -43,7 +43,6 @@ pub struct Request<'a> {
     /// JSON schema of the output object (`additionalProperties: false` everywhere).
     pub schema: &'a Value,
     pub max_tokens: u32,
-    /// Sent before the task as a base64 image block.
     pub image: Option<Image<'a>>,
 }
 
@@ -54,7 +53,6 @@ pub struct Image<'a> {
     pub data: &'a [u8],
 }
 
-/// What the fake provider counts for an image.
 const FAKE_IMAGE_TOKENS: u64 = 1_000;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
