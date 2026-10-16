@@ -1,16 +1,42 @@
 #!/usr/bin/env bash
 # Rust build/test benchmark of a source tree (SHOP-129). Run it through buildq on an idle machine:
 #   buildq scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir>
+#   scripts/bench-rust.sh --summarize <out-dir>   rewrite summary.md from steps.tsv
 # <src-dir> is a plain copy (git archive), not a checkout; --setup runs in it once before the cold
-# scenario. Writes <out-dir>/steps.tsv (one row per step) and <out-dir>/summary.md (medians).
+# scenario. Writes <out-dir>/steps.tsv (one row per step) and <out-dir>/summary.md (medians;
+# avg cores = CPU time / wall time).
 set -euo pipefail
 
-usage() { echo "usage: scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir>" >&2; exit 2; }
+summarize() {
+  awk -F'\t' '
+    NR == 1 { next }
+    { key = $1 SUBSEP $3; if (!(key in n)) order[++k] = key; n[key]++
+      for (c = 4; c <= 11; c++) v[key, c, n[key]] = $c
+      v[key, 12, n[key]] = $5 > 0 ? $6 / 1000 / $5 : 0 }
+    function med(key, c,   m, i, j, t, a) {
+      m = n[key]; for (i = 1; i <= m; i++) a[i] = v[key, c, i]
+      for (i = 2; i <= m; i++) { t = a[i]; for (j = i - 1; j >= 1 && a[j] + 0 > t + 0; j--) a[j + 1] = a[j]; a[j + 1] = t }
+      return m % 2 ? a[(m + 1) / 2] : (a[m / 2] + a[m / 2 + 1]) / 2
+    }
+    END {
+      print "| scenario | step | runs | wall s | CPU s | avg cores | memory.peak GB | anon peak GB | target/ GB | sccache GB | load1 |"
+      print "|---|---|---|---|---|---|---|---|---|---|---|"
+      for (i = 1; i <= k; i++) {
+        key = order[i]; split(key, p, SUBSEP)
+        printf "| %s | %s | %d | %.1f | %.1f | %.1f | %.2f | %.2f | %.2f | %.2f | %s |\n", p[1], p[2], n[key],
+          med(key, 5) / 1000, med(key, 6) / 1e6, med(key, 12), med(key, 7) / 1e9, med(key, 8) / 1e9,
+          med(key, 9) / 1e9, med(key, 10) / 1e9, med(key, 11)
+      }
+    }' "$1/steps.tsv" >"$1/summary.md"
+}
+
+usage() { echo "usage: scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir> | --summarize <out-dir>" >&2; exit 2; }
 setup='' runs=3
 while [[ ${1:-} == --* ]]; do
   case $1 in
     --setup) setup=${2:?}; shift 2 ;;
     --runs) runs=${2:?}; shift 2 ;;
+    --summarize) summarize "${2:?}"; cat "$2/summary.md"; exit ;;
     *) usage ;;
   esac
 done
@@ -102,24 +128,6 @@ for ((i = 1; i <= runs; i++)); do
   step no-op "$i" test-run "${test_run[@]}"
 done
 
-awk -F'\t' '
-  NR == 1 { next }
-  { key = $1 SUBSEP $3; if (!(key in n)) order[++k] = key; n[key]++
-    for (c = 4; c <= 11; c++) v[key, c, n[key]] = $c }
-  function med(key, c,   m, i, j, t, a) {
-    m = n[key]; for (i = 1; i <= m; i++) a[i] = v[key, c, i]
-    for (i = 2; i <= m; i++) { t = a[i]; for (j = i - 1; j >= 1 && a[j] + 0 > t + 0; j--) a[j + 1] = a[j]; a[j + 1] = t }
-    return m % 2 ? a[(m + 1) / 2] : (a[m / 2] + a[m / 2 + 1]) / 2
-  }
-  END {
-    print "| scenario | step | runs | wall s | CPU s | memory.peak GB | anon peak GB | target/ GB | sccache GB | load1 |"
-    print "|---|---|---|---|---|---|---|---|---|---|"
-    for (i = 1; i <= k; i++) {
-      key = order[i]; split(key, p, SUBSEP)
-      printf "| %s | %s | %d | %.1f | %.1f | %.2f | %.2f | %.2f | %.2f | %s |\n", p[1], p[2], n[key],
-        med(key, 5) / 1000, med(key, 6) / 1e6, med(key, 7) / 1e9, med(key, 8) / 1e9,
-        med(key, 9) / 1e9, med(key, 10) / 1e9, med(key, 11)
-    }
-  }' "$out/steps.tsv" >"$out/summary.md"
+summarize "$out"
 cat "$out/summary.md"
 exit "$failed"
