@@ -225,7 +225,6 @@ export function validateManifest(m: ArtifactManifest, id: string): ArtifactManif
   if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
   if (m.kind !== "theme" && m.kind !== "checkout")
     throw new Error(`artifact ${id}: unknown kind ${JSON.stringify(m.kind)}`);
-  refuseReservedAssets(m.kind, m.assets);
   const r = m.runtime;
   const flags = JSON.stringify(r?.compatibility_flags);
   if (
@@ -251,7 +250,8 @@ export function validateManifest(m: ArtifactManifest, id: string): ArtifactManif
  * the content address recomputed from the files equals the id.
  */
 export async function verifyArtifact(root: string, id: string): Promise<ArtifactManifest> {
-  const m = await readManifest(root, id);
+  const m = await parseManifest(root, id);
+  refuseReservedAssets(m.kind, m.assets);
   const dir = path.join(root, id);
   const present = new Set(await listFiles(dir));
   const expected = new Set(["manifest.json"]);
@@ -281,11 +281,29 @@ export async function verifyArtifact(root: string, id: string): Promise<Artifact
   return m;
 }
 
-/** Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. */
-export async function readManifest(root: string, id: string): Promise<ArtifactManifest> {
+async function parseManifest(root: string, id: string): Promise<ArtifactManifest> {
   if (!ID_RE.test(id)) throw new Error(`artifact: invalid id ${JSON.stringify(id)}`);
   const m = JSON.parse(
     await readFile(path.join(root, id, "manifest.json"), "utf8"),
   ) as ArtifactManifest;
   return validateManifest(m, id);
+}
+
+/**
+ * Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. A theme
+ * packed before a path was reserved still loads, without its files at reserved paths;
+ * `onDropped` gets their count.
+ */
+export async function readManifest(
+  root: string,
+  id: string,
+  onDropped?: (count: number) => void,
+): Promise<ArtifactManifest> {
+  const m = await parseManifest(root, id);
+  if (m.kind !== "theme") return m;
+  const assets = Object.fromEntries(Object.entries(m.assets).filter(([p]) => !isPlatformPath(p)));
+  const count = Object.keys(m.assets).length - Object.keys(assets).length;
+  if (count === 0) return m;
+  onDropped?.(count);
+  return { ...m, assets };
 }

@@ -1,6 +1,7 @@
-import { mkdtemp } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rename, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { artifactId, packArtifact, sha256 } from "@platform/theme-kit";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import cases from "../../../fixtures/platform-paths.json" with { type: "json" };
 import { createGateway, type Gateway } from "../src/gateway.ts";
@@ -150,6 +151,73 @@ describe("reserved platform namespace (C8)", () => {
     expect((await get("http://demo.localhost/favicon.svg")).status).toBe(200);
     expect((await get("http://demo.localhost/_p/speculation-rules.json")).status).toBe(200);
   });
+});
+
+test("a theme packed before the reserved namespace still serves without its reserved files", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "shop115-legacy-"));
+  const packed = await buildArtifact(root, "theme", catchAllTheme, {
+    "legacy-checkout": "theme checkout page",
+    "favicon.svg": "<svg/>",
+  });
+  const { "/legacy-checkout": moved, ...rest } = packed.assets;
+  if (!moved) throw new Error("fixture: /legacy-checkout was not packed");
+  const assets = { ...rest, "/checkout": moved };
+  const server = await Promise.all(
+    packed.runtime.modules.map(
+      async (f): Promise<[string, string]> => [
+        f,
+        sha256(await readFile(path.join(root, packed.id, "server", f))),
+      ],
+    ),
+  );
+  const id = artifactId({ kind: "theme", server, assets, tokens: packed.tokens, csp: packed.csp });
+  await rename(
+    path.join(root, packed.id, "client", "legacy-checkout"),
+    path.join(root, packed.id, "client", "checkout"),
+  );
+  await writeFile(
+    path.join(root, packed.id, "manifest.json"),
+    JSON.stringify({ ...packed, id, assets }),
+  );
+  await rename(path.join(root, packed.id), path.join(root, id));
+
+  const events: Record<string, unknown>[] = [];
+  const legacy = createGateway({
+    artifactRoot: root,
+    resolver: new StaticResolver({ "old.localhost": site({ theme_artifact: id }) }),
+    apiOrigin: "http://api.test",
+    mediaOrigin: "http://media.test",
+    scheme: "http",
+    purgeToken: "purge-token-0123456789abcdef",
+    upstream: fakeApi().fn,
+    renderTimeoutMs: 1500,
+    log: (e) => events.push(e),
+  });
+  try {
+    const at = (p: string) =>
+      legacy.fetch(new Request(`http://old.localhost${p}`, { headers: { host: "old.localhost" } }));
+    for (const p of ["/", "/p/ordinary"]) {
+      const res = await at(p);
+      expect(res.status, p).toBe(200);
+      expect(await res.text(), p).toContain(`theme:${p}`);
+    }
+    expect((await at("/favicon.svg")).status).toBe(200);
+    const reserved = await at("/checkout");
+    expect(reserved.status).toBe(404);
+    expect(await reserved.text()).not.toContain("theme checkout page");
+    expect(events.filter((e) => e.msg === "reserved theme files dropped")).toEqual([
+      { level: "warn", msg: "reserved theme files dropped", artifact: id, count: 1 },
+    ]);
+  } finally {
+    await legacy.dispose();
+  }
+
+  const dist = await mkdtemp(path.join(tmpdir(), "shop115-legacy-dist-"));
+  await cp(path.join(root, id, "server"), path.join(dist, "server"), { recursive: true });
+  await cp(path.join(root, id, "client"), path.join(dist, "client"), { recursive: true });
+  await expect(
+    packArtifact({ dist, outRoot: root, kind: "theme", projectDir: dist }),
+  ).rejects.toThrow(/reserved platform path \/checkout/);
 });
 
 test("speculation rules never prerender a platform path or its localized variant", async () => {

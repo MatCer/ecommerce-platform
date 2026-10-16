@@ -299,7 +299,9 @@ export function createGateway(opts: GatewayOptions) {
       m = (async () => {
         await pruning.get(id);
         await opts.artifacts?.ensure(id);
-        return readManifest(opts.artifactRoot, id);
+        return readManifest(opts.artifactRoot, id, (count) =>
+          log({ level: "warn", msg: "reserved theme files dropped", artifact: id, count }),
+        );
       })();
       manifests.set(id, m);
       m.catch(() => manifests.delete(id));
