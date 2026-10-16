@@ -297,7 +297,7 @@ pub async fn run(
                 }
             }
         }
-        store(db, tenant, product_id, job.since, &generated).await?;
+        store(db, tenant, product_id, job.since, &name, &generated).await?;
         generating.rollback().await?;
         if let Outcome::Retry(reason) = end? {
             return Ok(Outcome::Retry(reason));
@@ -434,6 +434,7 @@ async fn store(
     tenant: Uuid,
     product_id: Uuid,
     since: DateTime<Utc>,
+    name: &str,
     generated: &[Generated],
 ) -> Result<(), Error> {
     if generated.is_empty() {
@@ -450,7 +451,9 @@ async fn store(
         .fetch_optional(&mut *tx)
         .await?
         .flatten();
-    if current != Some(since) {
+    if current != Some(since)
+        || super::product_name(&mut tx, product_id).await?.as_deref() != Some(name)
+    {
         return Ok(());
     }
     let mut input = product_input(&products::get(&mut tx, product_id).await?);

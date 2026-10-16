@@ -496,3 +496,27 @@ async fn images_get_at_most_as_many_languages_as_the_catalog_stores(db: PgPool) 
     assert_eq!(alts[0]["cs"], "Modré tričko");
     assert_eq!(alts[0]["bg"], "[bg] Product TEE, from cs: Modré tričko");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_product_renamed_during_generation_gets_no_alt_texts_of_the_old_name(db: PgPool) {
+    let w = setup(db, "alt-rename").await;
+    w.put(false, true).await;
+    let a = w.asset(0).await;
+    w.media(&[(a, &[("cs", "Modré tričko")])]).await;
+
+    let mut save = tenant_tx(&w.runtime, w.shop.tenant).await.unwrap();
+    let mut input = product_input(&products::get(&mut save, w.shop.product).await.unwrap());
+    for t in &mut input.translations {
+        t.name = "Product POLO".into();
+    }
+    products::replace(&mut save, "clerk", w.shop.product, &input)
+        .await
+        .unwrap();
+    let job = w.spawn_run(Target::Product(w.shop.product));
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    save.commit().await.unwrap();
+    assert_eq!(job.await.unwrap(), Outcome::Done);
+
+    assert_eq!(w.alts().await, vec![alt(&[("cs", "Modré tričko")])]);
+    assert_eq!(w.marks().await, vec![]);
+}
