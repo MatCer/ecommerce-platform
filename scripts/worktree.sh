@@ -12,8 +12,7 @@ cargo_config() {
   fi
   mkdir -p "$1/.cargo"
   cat >"$1/.cargo/worktree.toml" <<TOML
-# Written by scripts/worktree.sh; .cargo/config.toml includes it. sccache cannot cache
-# incremental builds, and incremental data is the bulk of a worktree's target/.
+# sccache cannot cache incremental builds.
 [build]
 incremental = false
 $wrapper
@@ -23,18 +22,12 @@ SCCACHE_CACHE_SIZE = "30G"
 TOML
 }
 
-# Before the git checks: it also prepares non-git copies (git archive, scripts/bench-rust.sh).
-if [[ ${1:-} == cargo-config ]]; then
-  [[ $# -le 2 ]] || die "usage: scripts/worktree.sh cargo-config [dir]"
-  cargo_config "${2:-.}"
-  exit
-fi
-
-cd "$(git rev-parse --show-toplevel)"
-
-ROOT=$(pwd)
-MAIN=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
-MAIN_ENV=$MAIN/.env
+in_checkout() {
+  cd "$(git rev-parse --show-toplevel)"
+  ROOT=$(pwd)
+  MAIN=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
+  MAIN_ENV=$MAIN/.env
+}
 
 env_value() { [[ ! -f $2 ]] || sed -n "s/^$1=//p" "$2" | tail -1; }
 worktrees() { git worktree list --porcelain | sed -n 's/^worktree //p'; }
@@ -146,9 +139,10 @@ sweep() {
 }
 
 case ${1:-} in
-  setup) setup ;;
-  teardown) teardown ;;
-  prune) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh prune [--dry-run]"; prune "${2:-}" ;;
-  sweep) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh sweep [--dry-run]"; sweep "${2:-}" ;;
+  setup) in_checkout; setup ;;
+  teardown) in_checkout; teardown ;;
+  prune) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh prune [--dry-run]"; in_checkout; prune "${2:-}" ;;
+  sweep) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh sweep [--dry-run]"; in_checkout; sweep "${2:-}" ;;
+  cargo-config) [[ $# -le 2 ]] || die "usage: scripts/worktree.sh cargo-config [dir]"; cargo_config "${2:-.}" ;;
   *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]|sweep [--dry-run]|cargo-config [dir]" ;;
 esac

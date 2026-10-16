@@ -1,5 +1,3 @@
-# Linked worktrees build without incremental and through sccache: `scripts/worktree.sh setup`
-# writes this gitignored file there; the main checkout has none.
 include = [{ path = "worktree.toml", optional = true }]
 
 [env]

@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Rust build/test benchmark of a source tree (SHOP-129). Run it through buildq on an idle machine:
-#   buildq scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir>
-#   scripts/bench-rust.sh --summarize <out-dir>   rewrite summary.md from steps.tsv
-# <src-dir> is a plain copy (git archive), not a checkout; --setup runs in it once before the cold
-# scenario. Writes <out-dir>/steps.tsv (one row per step) and <out-dir>/summary.md (medians;
-# avg cores = CPU time / wall time).
 set -euo pipefail
 
 summarize() {
@@ -30,7 +24,17 @@ summarize() {
     }' "$1/steps.tsv" >"$1/summary.md"
 }
 
-usage() { echo "usage: scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir> | --summarize <out-dir>" >&2; exit 2; }
+usage() {
+  cat >&2 <<'USAGE'
+usage: buildq scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir>
+       scripts/bench-rust.sh --summarize <out-dir>
+Benchmarks cold, warm-cache, warm-incremental and no-op Rust builds and tests of <src-dir>, a plain
+copy (git archive), not a checkout; run it on an idle machine. --setup runs in <src-dir> once before
+the cold scenario. Writes <out-dir>/steps.tsv (one row per step) and <out-dir>/summary.md (medians;
+avg cores = CPU time / wall time). --summarize rewrites summary.md from steps.tsv.
+USAGE
+  exit 2
+}
 setup='' runs=3
 while [[ ${1:-} == --* ]]; do
   case $1 in
@@ -51,10 +55,8 @@ out=$(realpath -m "$2")
 mkdir -p "$out/log"
 [[ ! -e $out/steps.tsv ]] || { echo "bench: $out/steps.tsv exists; use a new out dir" >&2; exit 1; }
 
-# Only the tree's own cargo config decides incremental and the wrapper.
 unset RUSTC_WRAPPER CARGO_INCREMENTAL CARGO_TARGET_DIR CARGO_BUILD_RUSTC_WRAPPER CARGO_BUILD_INCREMENTAL
 export CARGO_BUILD_JOBS=6 CARGO_TERM_COLOR=never
-# A private cache and server: the shared ~/.cache/sccache and a running server stay untouched.
 export SCCACHE_DIR=$out/sccache SCCACHE_SERVER_PORT=4299
 
 cd "$src"

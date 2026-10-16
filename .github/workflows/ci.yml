@@ -61,7 +61,6 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-hakari@0.9.39
-      # workspace-hack (cargo-hakari) is current, every crate depends on it, and it unifies features.
       - run: cargo hakari generate --diff
       - run: cargo hakari manage-deps --dry-run
       - run: cargo hakari verify

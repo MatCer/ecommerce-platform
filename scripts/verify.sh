@@ -159,7 +159,7 @@ else echo "scope:    rust=$rust vitest=changed e2e=${spec_list[*]:-none}" >&2; f
 cd "$wt"
 export CARGO_TARGET_DIR="$cache/target"  # persistent: a cold workspace build is many minutes
 export CARGO_BUILD_JOBS=6
-# A worktree's .cargo/worktree.toml settings, as env: the PR under test may predate its include.
+# Env, not .cargo/worktree.toml: the PR under test may predate the include that reads it.
 export CARGO_INCREMENTAL=0 SCCACHE_CACHE_SIZE=30G
 if command -v sccache >/dev/null; then export RUSTC_WRAPPER=sccache; fi
 # Own project name and host ports; everything else is the .env.example default.
