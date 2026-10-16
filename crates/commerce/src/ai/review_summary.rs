@@ -24,6 +24,7 @@ pub const MIN_REVIEWS: i64 = 5;
 pub const MAX_INPUT_REVIEWS: i64 = 40;
 pub const BODY_CHARS: usize = 1000;
 pub const SUMMARY_MAX: usize = 600;
+const LOCALES_PER_CALL: usize = 4;
 pub const DEBOUNCE_SECS: i64 = 300;
 pub const CHANGED_EVENT: &str = "review_summary.changed";
 pub const SETTINGS_CHANGED_EVENT: &str = "ai_settings.changed";
@@ -305,28 +306,7 @@ pub async fn run(
     if ai.client.is_none() || stored.as_deref() == Some(input.sha256.as_str()) {
         return Ok(Outcome::Done);
     }
-    let task = format!(
-        "Summarize the reviews of this product in these languages: {}.",
-        input.locales.join(", ")
-    );
-    let call = super::call(
-        db,
-        ai,
-        tenant,
-        ACTOR,
-        &Call {
-            feature: FEATURE,
-            system: prompts::REVIEW_SUMMARY_SYSTEM,
-            task: &task,
-            data: &input.data,
-            schema: &prompts::review_summary_schema(),
-            max_tokens: 2000,
-        },
-    )
-    .await;
-    let result =
-        call.and_then(|(output, model)| validate(output, &input.locales).map(|s| (s, model)));
-    match result {
+    match summarize(db, ai, tenant, &input).await {
         Ok((summaries, model)) => {
             let fresh = Fresh {
                 summaries: &summaries,
@@ -343,6 +323,36 @@ pub async fn run(
             Ok(Outcome::Done)
         }
     }
+}
+
+async fn summarize(
+    db: &PgPool,
+    ai: &Ai,
+    tenant: Uuid,
+    input: &Input,
+) -> Result<(BTreeMap<String, String>, String), CallError> {
+    let mut summaries = BTreeMap::new();
+    let mut model = String::new();
+    for locales in input.locales.chunks(LOCALES_PER_CALL) {
+        let mut data = input.data.clone();
+        data["locales"] = json!(locales);
+        let task = format!(
+            "Summarize the reviews of this product in these languages: {}.",
+            locales.join(", ")
+        );
+        let call = Call {
+            feature: FEATURE,
+            system: prompts::REVIEW_SUMMARY_SYSTEM,
+            task: &task,
+            data: &data,
+            schema: &prompts::review_summary_schema(),
+            max_tokens: 2000,
+        };
+        let (output, m) = super::call(db, ai, tenant, ACTOR, &call).await?;
+        summaries.extend(validate(output, locales)?);
+        model = m;
+    }
+    Ok((summaries, model))
 }
 
 struct Fresh<'a> {

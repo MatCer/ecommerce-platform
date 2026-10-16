@@ -263,6 +263,41 @@ fn scripted(output: &'static str) -> Ai {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn many_market_locales_are_summarized_within_the_output_cap(db: PgPool) {
+    let (runtime, shop) = setup(&db, "many").await;
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query(
+        "UPDATE markets SET locales = locales || '{de,en,hu,pl}' WHERE default_locale = 'cs'",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    for rating in [5, 5, 4, 4, 5] {
+        review(&runtime, &shop, rating, true).await;
+    }
+    switch(&runtime, &shop, true).await;
+    let capped = r#"{"summaries": [
+        {%- if data.locales | length <= 4 -%}
+        {%- for l in data.locales -%}
+        {"locale": {{ l | tojson }}, "summary": {{ ("Summary " ~ l) | tojson }}}{% if not loop.last %},{% endif %}
+        {%- endfor -%}
+        {%- endif -%}
+    ]}"#;
+    run(&runtime, &scripted(capped), &shop).await;
+    let texts: Vec<String> = summaries(&runtime, &shop)
+        .await
+        .into_iter()
+        .map(|s| s.1)
+        .collect();
+    assert_eq!(
+        texts,
+        ["cs", "de", "en", "hu", "pl", "sk"].map(|l| format!("Summary {l}"))
+    );
+    assert_eq!(usage(&runtime, &shop).await, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn rejected_output_and_used_up_quota_keep_the_old_summary(db: PgPool) {
     let (runtime, shop) = setup(&db, "keep").await;
     for rating in [5, 5, 4, 4, 5] {
