@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search_indexes SET upgrade_queued_at = now()\n             WHERE (rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1)\n               AND (upgrade_queued_at IS NULL\n                    OR upgrade_queued_at < now() - make_interval(secs => $2))\n             RETURNING locale",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search_indexes",
+            "name": "locale"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ffcad86fea2021adfeec2d2efa1d85baf5e6272913a5fd5e0e49c7bbb482008c"
+}

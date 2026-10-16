@@ -16,3 +16,5 @@ CREATE POLICY tenant_isolation ON product_search_sales TO app_runtime
 GRANT SELECT, INSERT, UPDATE, DELETE ON product_search_sales TO app_runtime;
 
 ALTER TABLE search_indexes ADD COLUMN rebuilt_settings_version integer;
+
+ALTER TABLE search_indexes ADD COLUMN upgrade_queued_at timestamptz;

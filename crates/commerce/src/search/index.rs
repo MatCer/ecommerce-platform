@@ -333,10 +333,13 @@ pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<V
     .await?)
 }
 
-/// Queues a rebuild for every tenant whose indexes were not rebuilt by [`SETTINGS_VERSION`],
-/// at most one per tenant, version and last completed rebuild (a rebuild that finished without
-/// recording the version lets the next scan queue another). Returns the number of such
-/// tenants, including those whose rebuild was already queued.
+/// How long a queued settings-upgrade rebuild is trusted before the scan queues another.
+const UPGRADE_LEASE: Duration = Duration::from_secs(60 * 60);
+
+/// Queues a rebuild for every tenant whose indexes were not rebuilt at [`SETTINGS_VERSION`],
+/// at most one per tenant per [`UPGRADE_LEASE`]: queuing leases the tenant's outdated index
+/// rows, so a rebuild that died, went stale or ran on an older worker is followed by another
+/// once the lease expires. Returns the number of tenants for which this call queued a rebuild.
 pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
         .fetch_all(db)
@@ -344,21 +347,21 @@ pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     let mut queued = 0;
     for tenant_id in tenants {
         let mut tx = tenant_tx(db, tenant_id).await?;
-        let outdated = sqlx::query!(
-            r#"SELECT max(rebuild_version) AS last_rebuild FROM search_indexes
-               HAVING bool_or(rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1)"#,
-            SETTINGS_VERSION
+        let leased = sqlx::query_scalar!(
+            "UPDATE search_indexes SET upgrade_queued_at = now()
+             WHERE (rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1)
+               AND (upgrade_queued_at IS NULL
+                    OR upgrade_queued_at < now() - make_interval(secs => $2))
+             RETURNING locale",
+            SETTINGS_VERSION,
+            UPGRADE_LEASE.as_secs_f64()
         )
-        .fetch_optional(&mut *tx)
+        .fetch_all(&mut *tx)
         .await?;
-        if let Some(r) = outdated {
+        if !leased.is_empty() {
             let version = super::next_version(&mut *tx).await?;
-            let mut job = super::manual_rebuild_job(tenant_id, version);
-            job.idempotency_key = Some(format!(
-                "search.settings-upgrade:{tenant_id}:{SETTINGS_VERSION}:{}",
-                r.last_rebuild.unwrap_or(0)
-            ));
-            platform::queue::enqueue(&mut *tx, &job).await?;
+            platform::queue::enqueue(&mut *tx, &super::manual_rebuild_job(tenant_id, version))
+                .await?;
             tx.commit().await?;
             queued += 1;
         }

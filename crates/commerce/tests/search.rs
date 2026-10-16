@@ -282,16 +282,17 @@ async fn indexes_not_rebuilt_by_current_settings_get_one_rebuild(db: PgPool) {
     let one_each = BTreeMap::from([(Some(old), 1), (Some(applied), 1)]);
 
     assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
-    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
+    assert_eq!(rebuilds().await, one_each);
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 0);
     assert_eq!(rebuilds().await, one_each);
 
     let mut tx = tenant_tx(&runtime, old).await.unwrap();
-    sqlx::query("UPDATE search_indexes SET rebuild_version = 1")
+    sqlx::query("UPDATE search_indexes SET upgrade_queued_at = now() - interval '2 hours'")
         .execute(&mut *tx)
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 1);
     let one_more = BTreeMap::from([(Some(old), 2), (Some(applied), 1)]);
     assert_eq!(rebuilds().await, one_more);
 
