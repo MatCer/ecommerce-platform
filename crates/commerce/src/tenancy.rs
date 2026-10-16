@@ -286,8 +286,6 @@ pub async fn add_domain(
     })
 }
 
-/// A hostname is registered once, for one tenant, for good, and never under an account domain
-/// (both enforced by `platform.domain_inserted`).
 fn domain_insert_error(e: sqlx::Error, host: &str) -> Error {
     if unique_violation(&e) {
         return Error::Conflict {
@@ -365,9 +363,7 @@ pub struct Resolved {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CheckoutMode {
-    /// On `checkout.<shop>`, as today. Every origin without known fresh history.
     Isolated,
-    /// On the shop origin itself (C3 fresh origins only).
     SameOrigin,
 }
 

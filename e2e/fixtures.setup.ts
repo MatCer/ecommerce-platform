@@ -4,9 +4,6 @@ import { FRESH } from "./checkout/support";
 import { rateHeaders } from "./rate-client";
 
 test("seed a same-origin test origin of the demo shop", () => {
-  // Database only: no API or admin path can switch a checkout mode. The hostname is minted as
-  // a platform hostname, the one history that may be same-origin (decision C3). Every real
-  // shop origin stays isolated.
   const { hostname, port } = new URL(FRESH);
   sql(`INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
          SELECT '${hostname}', id, true FROM platform.tenants WHERE slug = 'demo'

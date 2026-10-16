@@ -307,9 +307,6 @@ async fn idempotency_replays_conflicts_and_serializes_concurrent_requests(db: Pg
     );
 }
 
-// ---------------------------------------------------------------------------------------
-// Exact-origin checkout policy (SHOP-54 slice 2; same-origin-checkout.md C3, Routing).
-
 fn db_code(e: &sqlx::Error) -> Option<String> {
     e.as_database_error()
         .and_then(|d| d.code().map(|c| c.into_owned()))
@@ -369,7 +366,6 @@ async fn checkout_mode_defaults_isolated(db: PgPool) {
         )]
     );
 
-    // Verifying a custom domain proves DNS control, not freshness: it stays isolated.
     let domain = tenancy::add_domain(&runtime, "demo", "shop.example.cz", None, false)
         .await
         .unwrap();
@@ -394,8 +390,6 @@ async fn checkout_mode_defaults_isolated(db: PgPool) {
             .unwrap();
     assert_eq!(history, vec!["unknown_or_used", "unknown_or_used"]);
 
-    // Unknown history counts as used: same-origin is refused, and so is plain HTTP outside
-    // local development.
     refused(&runtime, "https://shop.example.cz", "mode = 'same_origin'").await;
     let err = sqlx::query(
         "INSERT INTO platform.checkout_origins (scheme, hostname, port, tenant_id, market_id)
@@ -421,7 +415,6 @@ async fn freshness_requires_full_history(db: PgPool) {
         .await
         .unwrap();
 
-    // A platform-issued hostname, recorded from its first registration, may be fresh.
     set_policy(
         &runtime,
         "https://alpha.localhost",
@@ -438,20 +431,6 @@ async fn freshness_requires_full_history(db: PgPool) {
             "https://alpha.localhost"
         )]
     );
-    // Every switch moves the generation, which the runtime role cannot set itself.
-    set_policy(&runtime, "https://alpha.localhost", "mode = 'isolated'")
-        .await
-        .unwrap();
-    set_policy(&runtime, "https://alpha.localhost", "mode = 'isolated'")
-        .await
-        .unwrap();
-    assert_eq!(policies(&runtime, "alpha.localhost").await[0].mode_generation, 3);
-    let err = set_policy(&runtime, "https://alpha.localhost", "mode_generation = 1")
-        .await
-        .unwrap_err();
-    assert_eq!(db_code(&err).as_deref(), Some("42501"));
-
-    // A domain the merchant added is not a platform hostname, whatever its name.
     refused(
         &runtime,
         "https://alpha-shop.localhost",
@@ -459,7 +438,6 @@ async fn freshness_requires_full_history(db: PgPool) {
     )
     .await;
 
-    // A claim older than the ledger (backfilled, `claimed_at` unknown) is not full history.
     sqlx::query(
         "UPDATE platform.hostname_claims SET claimed_at = NULL WHERE hostname = 'beta.localhost'",
     )
@@ -472,8 +450,52 @@ async fn freshness_requires_full_history(db: PgPool) {
         "history = 'platform_never_reassigned'",
     )
     .await;
+}
 
-    // A merchant attestation needs its actor, time and wording version.
+#[sqlx::test(migrations = "../../migrations")]
+async fn mode_switch_moves_the_generation(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    tenancy::create_tenant(&runtime, &owner("alpha"))
+        .await
+        .unwrap();
+    let origin = "https://alpha.localhost";
+    set_policy(
+        &runtime,
+        origin,
+        "history = 'platform_never_reassigned', mode = 'same_origin'",
+    )
+    .await
+    .unwrap();
+    set_policy(&runtime, origin, "mode = 'isolated'")
+        .await
+        .unwrap();
+    set_policy(&runtime, origin, "mode = 'isolated'")
+        .await
+        .unwrap();
+    assert_eq!(
+        policies(&runtime, "alpha.localhost").await,
+        vec![policy(
+            origin,
+            CheckoutMode::Isolated,
+            3,
+            "https://checkout.alpha.localhost"
+        )]
+    );
+    let err = set_policy(&runtime, origin, "mode_generation = 1")
+        .await
+        .unwrap_err();
+    assert_eq!(db_code(&err).as_deref(), Some("42501"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn merchant_attestation_needs_actor_time_and_version(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    tenancy::create_tenant(&runtime, &owner("alpha"))
+        .await
+        .unwrap();
+    tenancy::add_domain(&runtime, "alpha", "alpha-shop.localhost", None, false)
+        .await
+        .unwrap();
     for incomplete in [
         "history = 'merchant_attested_never_served'",
         "history = 'merchant_attested_never_served', attested_by = 'user-owner', attested_at = now()",
@@ -501,7 +523,6 @@ async fn retired_platform_hostname_not_reassigned(db: PgPool) {
         .await
         .unwrap();
 
-    // Retire alpha's platform hostname by hand (there is no removal API).
     sqlx::raw_sql(
         "DELETE FROM platform.checkout_origins WHERE hostname = 'alpha.localhost';
          DELETE FROM platform.domains WHERE hostname = 'alpha.localhost'",
@@ -516,7 +537,6 @@ async fn retired_platform_hostname_not_reassigned(db: PgPool) {
             .is_none()
     );
 
-    // The claim outlives the domain: no other tenant gets the hostname, by any path.
     assert_eq!(
         tenancy::add_domain(&runtime, "beta", "alpha.localhost", None, false)
             .await
@@ -535,7 +555,6 @@ async fn retired_platform_hostname_not_reassigned(db: PgPool) {
     .unwrap_err();
     assert_eq!(db_code(&err).as_deref(), Some("23505"));
 
-    // The runtime role can neither drop nor rewrite a claim.
     for stmt in [
         "DELETE FROM platform.hostname_claims WHERE hostname = 'alpha.localhost'",
         "UPDATE platform.hostname_claims SET tenant_id = tenant_id WHERE hostname = 'alpha.localhost'",
@@ -544,7 +563,6 @@ async fn retired_platform_hostname_not_reassigned(db: PgPool) {
         assert_eq!(db_code(&err).as_deref(), Some("42501"), "{stmt}");
     }
 
-    // Its own tenant may take it back.
     tenancy::add_domain(&runtime, "alpha", "alpha.localhost", None, true)
         .await
         .unwrap();
@@ -559,7 +577,6 @@ async fn aliases_have_independent_policy(db: PgPool) {
     tenancy::add_domain(&runtime, "alpha", "alpha-alias.localhost", None, false)
         .await
         .unwrap();
-    // A local HTTP origin of the primary host is an exact origin of its own too.
     sqlx::query(
         "INSERT INTO platform.checkout_origins (scheme, hostname, port, tenant_id, market_id)
          SELECT 'http', hostname, 8080, tenant_id, market_id FROM platform.domains
@@ -593,7 +610,6 @@ async fn aliases_have_independent_policy(db: PgPool) {
             ),
         ]
     );
-    // The primary host's policy never reaches the alias.
     assert_eq!(
         policies(&runtime, "alpha-alias.localhost").await,
         vec![policy(
@@ -621,7 +637,6 @@ async fn account_domain_cannot_host_storefront(db: PgPool) {
         .await
         .unwrap();
 
-    // Configuring the account domain over a shop domain is refused.
     let err = sqlx::query("INSERT INTO platform.account_domains (domain) VALUES ('example.cz')")
         .execute(&runtime)
         .await
@@ -646,7 +661,6 @@ async fn account_domain_cannot_host_storefront(db: PgPool) {
             "{host}"
         );
     }
-    // Only the domain and its subdomains, not every name ending in the same letters.
     tenancy::add_domain(&runtime, "alpha", "myaccounts.example", None, false)
         .await
         .unwrap();
@@ -714,7 +728,6 @@ async fn migration_backfills_populated_domains_isolated(db: PgPool) {
             ("shop.example.cz".to_owned(), false, true),
         ]
     );
-    // A backfilled hostname can never count as fresh platform history.
     refused(
         &runtime,
         "https://demo.localhost",

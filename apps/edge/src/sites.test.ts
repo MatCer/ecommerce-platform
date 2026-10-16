@@ -128,8 +128,6 @@ test("checkout policy matches the exact origin: scheme, host and effective port"
   expect(checkoutPolicy(site, "https://fresh.localhost")).toEqual(fresh);
   expect(checkoutPolicy(site, "https://fresh.localhost:443")).toEqual(fresh);
   expect(checkoutPolicy(site, "http://fresh.localhost:8080")).toEqual(local);
-  // Another scheme, port or host is another origin. An origin without a policy row is isolated
-  // with no generation (fail closed), whatever the shop's other origins say.
   for (const [other, origin] of [
     ["http://fresh.localhost", "http://fresh.localhost"],
     ["https://fresh.localhost:8443", "https://fresh.localhost:8443"],

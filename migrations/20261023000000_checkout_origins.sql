@@ -1,23 +1,10 @@
--- SHOP-54 slice 2: checkout policy per exact shop origin, the hostname history it rests on and
--- the account-domain reservation (docs/decisions/same-origin-checkout.md: C3 "Fresh origins
--- only", A1, Routing "Checkout mode per origin"). Nothing here enables same-origin checkout:
--- every existing and new origin is isolated with unknown history.
---
--- Platform routing tables like platform.domains: the resolver reads them before any tenant
--- context exists. Tenant consistency comes from the composite FK to the domain row.
-
--- Every hostname ever registered, for good. The claim outlives its domain row, so a hostname
--- one tenant used is never handed to another. `claimed_at` NULL: claimed before this ledger
--- existed, so its earlier history is unknown.
 CREATE TABLE platform.hostname_claims (
     hostname        text PRIMARY KEY,
     tenant_id       uuid NOT NULL REFERENCES platform.tenants (id),
-    -- The `<slug>.<platform>` hostname create_tenant minted, not a domain the merchant brought.
     platform_issued boolean NOT NULL DEFAULT false,
     claimed_at      timestamptz DEFAULT now()
 );
 
--- Account registrable domains (A1): never a storefront, nor any subdomain of one.
 CREATE TABLE platform.account_domains (
     domain     text PRIMARY KEY
                CHECK (domain ~ '^[a-z0-9-]+(\.[a-z0-9-]+)+$' AND length(domain) <= 253),
@@ -41,7 +28,6 @@ CREATE TABLE platform.checkout_origins (
     tenant_id           uuid NOT NULL,
     market_id           uuid NOT NULL,
     mode                text NOT NULL DEFAULT 'isolated' CHECK (mode IN ('isolated', 'same_origin')),
-    -- Every switch increments it; credentials record the generation they were issued under.
     mode_generation     bigint NOT NULL DEFAULT 1 CHECK (mode_generation >= 1),
     history             text NOT NULL DEFAULT 'unknown_or_used'
                         CHECK (history IN ('unknown_or_used', 'platform_never_reassigned',
@@ -62,7 +48,6 @@ CREATE TABLE platform.checkout_origins (
 );
 CREATE INDEX checkout_origins_domain ON platform.checkout_origins (hostname, tenant_id, market_id);
 
--- Existing hostnames: claimed with unknown history, one isolated production origin each.
 INSERT INTO platform.hostname_claims (hostname, tenant_id, claimed_at)
 SELECT hostname, tenant_id, NULL FROM platform.domains;
 INSERT INTO platform.checkout_origins (scheme, hostname, port, tenant_id, market_id)
@@ -109,9 +94,7 @@ $$;
 CREATE TRIGGER account_domain_inserted AFTER INSERT ON platform.account_domains
     FOR EACH ROW EXECUTE FUNCTION platform.account_domain_inserted();
 
--- C3: platform history counts only for a platform-issued hostname that its tenant has held
--- since the ledger recorded its first registration.
-CREATE FUNCTION platform.checkout_origin_history() RETURNS trigger
+CREATE FUNCTION platform.require_complete_platform_claim() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
@@ -127,11 +110,11 @@ BEGIN
     RETURN NEW;
 END
 $$;
-CREATE TRIGGER checkout_origin_history BEFORE INSERT OR UPDATE ON platform.checkout_origins
+CREATE TRIGGER platform_history_requires_complete_claim
+    BEFORE INSERT OR UPDATE ON platform.checkout_origins
     FOR EACH ROW WHEN (NEW.history = 'platform_never_reassigned')
-    EXECUTE FUNCTION platform.checkout_origin_history();
+    EXECUTE FUNCTION platform.require_complete_platform_claim();
 
--- Routing: each mode carries a generation. The database owns it, so no switch can forget it.
 CREATE FUNCTION platform.checkout_origin_mode_changed() RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
