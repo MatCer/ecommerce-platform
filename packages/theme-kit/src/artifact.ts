@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { isPlatformPath } from "./platform-routes.ts";
 import { type ThemeTokens, validateTokens } from "./tokens.ts";
 
 /**
@@ -161,6 +162,8 @@ export async function packArtifact(opts: {
   for (const f of clientFiles)
     assets[`/${f}`] = await hashFile(path.join(clientDir, f), `client/${f}`);
 
+  refuseReservedAssets(opts.kind, assets);
+
   const tokens = opts.tokensFile
     ? validateTokens(JSON.parse(await readFile(opts.tokensFile, "utf8")))
     : null;
@@ -206,6 +209,12 @@ async function exists(p: string) {
 
 const ID_RE = /^[0-9a-f]{32}$/;
 
+function refuseReservedAssets(kind: ArtifactKind, assets: Record<string, AssetEntry>) {
+  if (kind !== "theme") return;
+  const reserved = Object.keys(assets).find(isPlatformPath);
+  if (reserved) throw new Error(`artifact: theme file at reserved platform path ${reserved}`);
+}
+
 /**
  * Checks what the content address does not cover: the manifest's runtime section must be the
  * platform's (A22). The id covers every module and asset, the tokens, the CSP hashes and the
@@ -216,6 +225,7 @@ export function validateManifest(m: ArtifactManifest, id: string): ArtifactManif
   if (m.schema !== 1 || m.id !== id) throw new Error(`artifact ${id}: manifest mismatch`);
   if (m.kind !== "theme" && m.kind !== "checkout")
     throw new Error(`artifact ${id}: unknown kind ${JSON.stringify(m.kind)}`);
+  refuseReservedAssets(m.kind, m.assets);
   const r = m.runtime;
   const flags = JSON.stringify(r?.compatibility_flags);
   if (
