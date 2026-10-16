@@ -409,6 +409,10 @@
     flex: 0 0 100%;
     scroll-snap-align: start;
   }
+  /* Chrome fetches lazy images inside a scroller that are near the viewport; skipped content waits for the swipe. */
+  & > :not(:first-child) {
+    content-visibility: auto;
+  }
   & > :nth-child(1) {
     view-timeline: --card-1 inline;
   }
