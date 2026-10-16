@@ -958,7 +958,7 @@
           "ai"
         ],
         "summary": "The shop's AI switches. Review summaries are off until an admin turns them on.",
-        "operationId": "get_settings",
+        "operationId": "get_ai_settings",
         "parameters": [
           {
             "name": "X-Tenant-Id",
@@ -993,7 +993,7 @@
           "ai"
         ],
         "summary": "Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one\nsummary per product with at least 5 published verified reviews; any change purges the\nshop's cached pages.",
-        "operationId": "put_settings",
+        "operationId": "put_ai_settings",
         "parameters": [
           {
             "name": "X-Tenant-Id",

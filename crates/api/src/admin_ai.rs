@@ -32,7 +32,7 @@ use crate::auth::TenantStaff;
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(usage))
-        .routes(routes!(get_settings, put_settings))
+        .routes(routes!(get_ai_settings, put_ai_settings))
         .routes(routes!(get_glossary, put_glossary))
         .routes(routes!(create_proposal))
         .routes(routes!(get_proposal))
@@ -68,7 +68,7 @@ async fn usage(staff: TenantStaff, State(s): State<AppState>) -> Result<Json<Usa
     params(TenantHeader),
     responses((status = 200, body = AiSettings))
 )]
-async fn get_settings(
+async fn get_ai_settings(
     staff: TenantStaff,
     State(s): State<AppState>,
 ) -> Result<Json<AiSettings>, Error> {
@@ -96,7 +96,7 @@ async fn get_settings(
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
-async fn put_settings(
+async fn put_ai_settings(
     staff: TenantStaff,
     State(s): State<AppState>,
     body: Bytes,

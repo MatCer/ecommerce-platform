@@ -252,13 +252,13 @@ export interface paths {
             cookie?: never;
         };
         /** The shop's AI switches. Review summaries are off until an admin turns them on. */
-        get: operations["get_settings"];
+        get: operations["get_ai_settings"];
         /**
          * Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
          *     summary per product with at least 5 published verified reviews; any change purges the
          *     shop's cached pages.
          */
-        put: operations["put_settings"];
+        put: operations["put_ai_settings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -10147,7 +10147,7 @@ export interface operations {
             };
         };
     };
-    get_settings: {
+    get_ai_settings: {
         parameters: {
             query?: never;
             header: {
@@ -10169,7 +10169,7 @@ export interface operations {
             };
         };
     };
-    put_settings: {
+    put_ai_settings: {
         parameters: {
             query?: never;
             header: {
