@@ -16,8 +16,9 @@ use uuid::Uuid;
 
 use crate::markets::invalid;
 
-/// Version of the platform's consent texts (banner, preferences page). Change it when the
-/// wording changes: stored records keep the version the person agreed to.
+/// Version of the platform's consent texts (banner, preferences page, legal templates). Change
+/// it when the wording changes: stored records keep the version the person agreed to, and
+/// installed legal pages the version they were rendered from.
 pub const TEXT_VERSION: &str = "2026-10-16";
 
 pub const FIRST_EXPERIMENTS_TEXT_VERSION: &str = "2026-10-16";

@@ -7,7 +7,9 @@ use sqlx::PgPool;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::audit;
 use crate::consent::{self, Subject};
+use crate::content::legal;
 use crate::markets::invalid;
 
 /// The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.
@@ -88,6 +90,56 @@ async fn running_with_arms(
     )
 }
 
+/// Draft -> running, once the cookie page tells visitors about testing page variants.
+pub async fn start(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Error> {
+    let status = sqlx::query_scalar!(
+        "SELECT status FROM experiments WHERE id = $1 FOR UPDATE",
+        id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    if status != "draft" {
+        return Err(Error::Conflict {
+            code: "experiment_not_draft",
+            detail: format!("the experiment is {status}; only a draft can start"),
+        });
+    }
+    if !legal::cookie_policy_covers_experiments(tx).await? {
+        return Err(invalid(
+            "cookie_policy_outdated",
+            "publish the cookie page installed from the current legal template, in every market \
+             locale, before starting an experiment",
+        ));
+    }
+    sqlx::query!(
+        "UPDATE experiments SET status = 'running' WHERE id = $1",
+        id
+    )
+    .execute(&mut **tx)
+    .await
+    .map_err(|e| {
+        if e.as_database_error().and_then(|d| d.constraint()) == Some("experiments_one_running") {
+            Error::Conflict {
+                code: "experiment_running",
+                detail: "another experiment is running".into(),
+            }
+        } else {
+            e.into()
+        }
+    })?;
+    audit::record(
+        tx,
+        actor,
+        "experiment.started",
+        "experiment",
+        Some(&id.to_string()),
+        &serde_json::json!({}),
+    )
+    .await?;
+    Ok(())
+}
+
 pub async fn enrol(
     db: &PgPool,
     key: Option<&ExperimentKey>,
@@ -107,6 +159,9 @@ pub async fn enrol(
     let Some((exp, arms)) = running_with_arms(&mut tx).await? else {
         return Ok(None);
     };
+    if !legal::cookie_policy_covers_experiments(&mut tx).await? {
+        return Ok(None);
+    }
     consent::lock_anon(&mut tx, subject).await?;
     if !consent::analytics_covers_experiments(&mut tx, &Subject::Anon(subject.into())).await? {
         return Ok(None);

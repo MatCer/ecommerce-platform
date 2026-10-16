@@ -111,6 +111,7 @@ export function pageInput(page: Schemas["PageInput"]): Schemas["PageInput"] {
         tr.seo_description?.trim() ||
         (tr.blocks?.length ?? 0) > 0,
     ),
+    still_covers_experiments: page.still_covers_experiments ?? false,
   };
 }
 export function legalInput(entity: Schemas["LegalEntity"]): Schemas["LegalEntity"] {

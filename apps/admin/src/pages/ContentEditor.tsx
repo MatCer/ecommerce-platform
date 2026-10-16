@@ -1,4 +1,13 @@
-import { Alert, Button, Card, SelectField, showToast, Tabs, TextField } from "@platform/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  SelectField,
+  showToast,
+  Tabs,
+  TextField,
+} from "@platform/ui";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
@@ -154,6 +163,15 @@ export default function ContentEditor() {
       <div class="flex min-w-0 flex-col gap-4">
         <Show when={draft().kind === "legal"}>
           <Alert tone="warning">{t("content.notice")}</Alert>
+        </Show>
+        <Show when={draft().legal_type === "cookies" && page.data?.legal_template_version}>
+          <Checkbox
+            label={t("content.stillCoversExperiments")}
+            checked={draft().still_covers_experiments ?? false}
+            onChange={(still_covers_experiments) =>
+              setDraft((d) => ({ ...d, still_covers_experiments }))
+            }
+          />
         </Show>
         <Show when={error()}>
           <Alert tone="error">{error()}</Alert>

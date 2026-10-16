@@ -1504,6 +1504,7 @@ impl Seeder<'_> {
                 published_at: None,
                 image_asset_id: p.image_asset_id,
                 translations: p.translations,
+                still_covers_experiments: false,
             };
             content::update(&mut tx, ACTOR, id, &input).await?;
         }
@@ -1553,6 +1554,7 @@ impl Seeder<'_> {
                         published_at: page.published_at,
                         image_asset_id: page.image_asset_id,
                         translations: page.translations,
+                        still_covers_experiments: false,
                     },
                 )
                 .await?;
@@ -1633,6 +1635,7 @@ impl Seeder<'_> {
                             published_at: None,
                             image_asset_id: None,
                             translations,
+                            still_covers_experiments: false,
                         },
                     )
                     .await?

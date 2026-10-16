@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, kind, legal_type, status, published_at, image_asset_id, created_at, updated_at\n         FROM pages WHERE id = $1",
+  "query": "SELECT id, kind, legal_type, status, published_at, image_asset_id, legal_template_version,\n                created_at, updated_at\n         FROM pages WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -71,6 +71,17 @@
       },
       {
         "ordinal": 6,
+        "name": "legal_template_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "legal_template_version"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -104,9 +115,10 @@
       false,
       true,
       true,
+      true,
       false,
       false
     ]
   },
-  "hash": "424632b415a4cc23c05a3f43871d107e575b4c71dc82d734a89195d47b86a962"
+  "hash": "93be5f716415508c788dffe670777776f5027f6a484397344b7ecd7d25f5c34b"
 }

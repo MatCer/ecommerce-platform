@@ -1108,6 +1108,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/experiments/{id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Starts a draft experiment (owner/admin). Refused with `cookie_policy_outdated` until the
+         *     published cookie page, in every market locale, comes from a legal template that says
+         *     analytics covers testing page variants.
+         */
+        post: operations["start_experiment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/feeds": {
         parameters: {
             query?: never;
@@ -7735,6 +7756,12 @@ export interface components {
             /** Format: uuid */
             image_asset_id?: string | null;
             kind: components["schemas"]["PageKind"];
+            /**
+             * @description Version of the platform legal template the page was installed from; cleared when its
+             *     blocks are edited without `still_covers_experiments`.
+             * @example 2026-10-16
+             */
+            legal_template_version?: string | null;
             legal_type?: components["schemas"]["LegalType"] | null;
             /** Format: date-time */
             published_at?: string | null;
@@ -7769,6 +7796,11 @@ export interface components {
              */
             published_at?: string | null;
             status?: components["schemas"]["PageStatus"];
+            /**
+             * @description The merchant confirms the edited page still says analytics covers testing page
+             *     variants, so a blocks change keeps `legal_template_version`.
+             */
+            still_covers_experiments?: boolean;
             translations: components["schemas"]["PageTranslation"][];
         };
         /** @enum {string} */
@@ -12798,6 +12830,63 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    start_experiment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Running */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description experiment_not_draft, experiment_running */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description cookie_policy_outdated */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

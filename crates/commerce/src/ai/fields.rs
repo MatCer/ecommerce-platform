@@ -383,6 +383,7 @@ impl Doc {
                         published_at: p.published_at,
                         image_asset_id: p.image_asset_id,
                         translations: p.translations,
+                        still_covers_experiments: false,
                     },
                 )
                 .await?,
