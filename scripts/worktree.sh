@@ -1,8 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
 
 die() { echo "worktree: $*" >&2; exit 1; }
+
+cargo_config() {
+  [[ -d $1 ]] || die "no directory $1"
+  local wrapper='rustc-wrapper = "sccache"'
+  if ! command -v sccache >/dev/null; then
+    echo "worktree: sccache not found, building without a compile cache (README, Prerequisites)" >&2
+    wrapper=''
+  fi
+  mkdir -p "$1/.cargo"
+  cat >"$1/.cargo/worktree.toml" <<TOML
+# Written by scripts/worktree.sh; .cargo/config.toml includes it. sccache cannot cache
+# incremental builds, and incremental data is the bulk of a worktree's target/.
+[build]
+incremental = false
+$wrapper
+
+[env]
+SCCACHE_CACHE_SIZE = "30G"
+TOML
+}
+
+# Before the git checks: it also prepares non-git copies (git archive, scripts/bench-rust.sh).
+if [[ ${1:-} == cargo-config ]]; then
+  [[ $# -le 2 ]] || die "usage: scripts/worktree.sh cargo-config [dir]"
+  cargo_config "${2:-.}"
+  exit
+fi
+
+cd "$(git rev-parse --show-toplevel)"
 
 ROOT=$(pwd)
 MAIN=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
@@ -78,6 +106,7 @@ SQL
     "$db" "$port" >.env.worktree.local
   exec 9>&-
 
+  cargo_config "$ROOT"
   pnpm install --frozen-lockfile --prefer-offline
   make migrate
   echo "worktree: ready, database $db, make api-native serves http://127.0.0.1:$port"
@@ -86,7 +115,8 @@ SQL
 teardown() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; it has no worktree database"
   drop "$(worktree_db "$ROOT")"
-  rm -f .env.worktree.local
+  rm -f .env.worktree.local .cargo/worktree.toml
+  rm -rf target
 }
 
 this_clone_databases() {
@@ -106,9 +136,19 @@ prune() {
   done
 }
 
+sweep() {
+  command -v cargo-sweep >/dev/null || die "cargo-sweep not found (README, Prerequisites)"
+  local dir
+  while read -r dir; do
+    [[ $dir != "$MAIN" && -d $dir/target ]] || continue
+    env -u CARGO_TARGET_DIR cargo sweep ${1:+"$1"} --time 14 "$dir"
+  done < <(worktrees)
+}
+
 case ${1:-} in
   setup) setup ;;
   teardown) teardown ;;
   prune) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh prune [--dry-run]"; prune "${2:-}" ;;
-  *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]" ;;
+  sweep) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh sweep [--dry-run]"; sweep "${2:-}" ;;
+  *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]|sweep [--dry-run]|cargo-config [dir]" ;;
 esac
