@@ -129,6 +129,8 @@ prune() {
 
 gb() { awk -v b="$1" 'BEGIN { printf "%.1f GB", b / 1e9 }'; }
 
+size_bytes() { du -sk "$1" | awk '{ print $1 * 1024 }'; }
+
 remove_target() (
   local target=$1/target bytes cleanup gitdir trash
   shopt -s nullglob
@@ -141,7 +143,7 @@ remove_target() (
     [[ -n ${3:-} ]] || rm -rf "${trash[@]}"
   fi
   [[ -n $2 && -d $target ]] || exit 0
-  bytes=$(du -sb "$target" | cut -f1) || { echo "worktree: cannot measure $target, left as is" >&2; exit 0; }
+  bytes=$(size_bytes "$target") || { echo "worktree: cannot measure $target, left as is" >&2; exit 0; }
   (
     for lock in "$target"/*/.cargo-lock; do
       [[ -e $lock ]] || continue
@@ -149,7 +151,7 @@ remove_target() (
       flock -n "$fd" || { echo "worktree: a cargo build is running in $1, $target left as is"; exit 0; }
     done
     echo "worktree: $2, ${3:+would }remove $target ($(gb "$bytes"))"
-    [[ -n ${3:-} ]] || mv -T "$target" "$(mktemp -d "$1/.target-trash.XXXXXX")"
+    [[ -n ${3:-} ]] || mv "$target" "$(mktemp -d "$1/.target-trash.XXXXXX")"
   )
   [[ -n ${3:-} ]] || rm -rf -- "$1"/.target-trash.*
 )
@@ -181,7 +183,7 @@ tidy() {
   fi
   if [[ -n $pr ]]; then
     remove_target "$ROOT" "HEAD is the merged head of PR #$pr" "$1"
-  elif ! bytes=$(du -sb target | cut -f1); then
+  elif ! bytes=$(size_bytes target); then
     echo "worktree: cannot measure target/, kept" >&2
   elif ((bytes > 10 * 10 ** 9)); then
     remove_target "$ROOT" "target/ is over the 10 GB cap" "$1"
