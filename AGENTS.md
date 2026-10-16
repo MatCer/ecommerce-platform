@@ -13,3 +13,18 @@ wrong.
   around it by calling `docker compose` directly.
 - `make test-rust` may wait for another checkout's run to finish (one sqlx test run per Postgres
   at a time). Waiting is expected; do not kill it or point it at another database.
+
+## Code Review Rules
+
+Flag only issues this PR introduces that a real caller or input reaches in normal use, at one of:
+
+- P0: data loss, a security hole across a real trust boundary, a broken build or deploy.
+- P1: an acceptance-criterion break, a regression against main, or normal use doing a paid or
+  user-visible side effect twice (model calls, charges, emails).
+
+Do not flag edge cases normal use does not reach, hardening or defense in depth, validation of data
+from our own services, refactors, naming, style, or issues main already has. Do not suggest adding
+code unless a P0 or P1 needs it. Most PRs should get no comments.
+
+Operating context: pre-launch, one app instance and one worker. Rollback, deploy windows, replicas
+and outage handling are not normal use.
