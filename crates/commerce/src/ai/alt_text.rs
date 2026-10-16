@@ -171,7 +171,21 @@ fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String
                 )));
             }
             let lower = text.to_lowercase();
-            if text.contains(['<', '>']) || lower.contains("//") || lower.contains("www.") {
+            if text.contains(['<', '>', '@'])
+                || [
+                    "//",
+                    "www.",
+                    "mailto:",
+                    "tel:",
+                    "sms:",
+                    "data:",
+                    "javascript:",
+                    "http:",
+                    "https:",
+                ]
+                .iter()
+                .any(|p| lower.contains(p))
+            {
                 return Err(CallError::output("an alt text contains a link or markup"));
             }
             Ok((locale, text))
@@ -187,8 +201,16 @@ struct ImageRow {
 
 struct Generated {
     asset_id: Uuid,
+    source: I18n,
     texts: BTreeMap<String, String>,
     model: String,
+}
+
+fn filled(alt: &I18n) -> I18n {
+    alt.iter()
+        .filter(|(_, t)| !is_empty(Some(t)))
+        .map(|(l, t)| (l.clone(), t.clone()))
+        .collect()
 }
 
 struct Job<'a> {
@@ -249,6 +271,13 @@ pub async fn run(
         (job, products)
     };
     for product_id in products {
+        let mut generating = db.begin().await?;
+        sqlx::query!(
+            "SELECT pg_advisory_xact_lock(hashtextextended('ai.alt_text:' || $1::text, 0))",
+            product_id.to_string()
+        )
+        .fetch_one(&mut *generating)
+        .await?;
         let Some((name, images)) = job.images(product_id).await? else {
             continue;
         };
@@ -268,7 +297,8 @@ pub async fn run(
                 }
             }
         }
-        store(db, tenant, product_id, &generated).await?;
+        store(db, tenant, product_id, job.since, &generated).await?;
+        generating.rollback().await?;
         if let Outcome::Retry(reason) = end? {
             return Ok(Outcome::Retry(reason));
         }
@@ -341,11 +371,7 @@ impl Job<'_> {
             }
             Err(e) => return Err(e.into()),
         };
-        let existing: BTreeMap<&String, &String> = image
-            .alt
-            .iter()
-            .filter(|(_, t)| !is_empty(Some(t)))
-            .collect();
+        let existing = filled(&image.alt);
         let task = format!(
             "Write the alt text of this product photo in these languages: {}.",
             targets.join(", ")
@@ -373,6 +399,7 @@ impl Job<'_> {
         Ok(match result {
             Ok((texts, model)) => Step::Wrote(Generated {
                 asset_id: image.asset_id,
+                source: existing,
                 texts,
                 model,
             }),
@@ -398,6 +425,7 @@ async fn store(
     db: &PgPool,
     tenant: Uuid,
     product_id: Uuid,
+    since: DateTime<Utc>,
     generated: &[Generated],
 ) -> Result<(), Error> {
     if generated.is_empty() {
@@ -410,10 +438,19 @@ async fn store(
         Err(Error::NotFound) => return Ok(()),
         Err(e) => return Err(e),
     }
+    let current = sqlx::query_scalar!("SELECT alt_texts_since FROM ai_settings FOR SHARE")
+        .fetch_optional(&mut *tx)
+        .await?
+        .flatten();
+    if current != Some(since) {
+        return Ok(());
+    }
     let mut input = product_input(&products::get(&mut tx, product_id).await?);
     let mut written = Vec::new();
     for g in generated {
-        let Some(media) = input.media.iter_mut().find(|m| m.asset_id == g.asset_id) else {
+        let Some(media) = input.media.iter_mut().find(|m| {
+            m.asset_id == g.asset_id && g.source.iter().all(|(l, t)| m.alt_i18n.get(l) == Some(t))
+        }) else {
             continue;
         };
         for (locale, text) in &g.texts {
@@ -492,6 +529,10 @@ mod tests {
             json!({ "en": "See https://x.example", "sk": "Modré" }),
             json!({ "en": "See //x.example", "sk": "Modré" }),
             json!({ "en": "See WWW.example.com", "sk": "Modré" }),
+            json!({ "en": "Write to mailto:sales@example.com", "sk": "Modré" }),
+            json!({ "en": "Call tel:+420123", "sk": "Modré" }),
+            json!({ "en": "javascript:alert(1)", "sk": "Modré" }),
+            json!({ "en": "Ask sales@example.com", "sk": "Modré" }),
             json!({ "en": 1, "sk": "Modré" }),
         ] {
             let e = validate(bad.clone(), &locales()).unwrap_err();

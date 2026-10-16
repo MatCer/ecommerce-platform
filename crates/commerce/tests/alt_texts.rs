@@ -378,3 +378,96 @@ async fn a_merchant_save_during_generation_wins(db: PgPool) {
         ]
     );
 }
+
+impl World {
+    fn spawn_run(&self, target: Target) -> tokio::task::JoinHandle<Outcome> {
+        let (runtime, ai, storage, tenant) = (
+            self.runtime.clone(),
+            self.ai.clone(),
+            self.storage.clone(),
+            self.shop.tenant,
+        );
+        tokio::spawn(async move {
+            let payload = Payload {
+                target,
+                backfill: false,
+            };
+            alt_text::run(&runtime, &ai, &storage, tenant, payload, false)
+                .await
+                .unwrap()
+        })
+    }
+
+    async fn locked_save(&self, cs: &str) -> platform::db::TenantTx {
+        let mut save = tenant_tx(&self.runtime, self.shop.tenant).await.unwrap();
+        let mut input = product_input(&products::get(&mut save, self.shop.product).await.unwrap());
+        input.media[0].alt_i18n = alt(&[("cs", cs)]);
+        products::replace(&mut save, "clerk", self.shop.product, &input)
+            .await
+            .unwrap();
+        save
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn overlapping_jobs_for_one_image_call_the_model_once(db: PgPool) {
+    let w = setup(db, "alt-overlap").await;
+    w.put(false, true).await;
+    let a = w.asset(0).await;
+    w.media(&[(a, &[("cs", "Modré tričko")])]).await;
+
+    let save = w.locked_save("Modré tričko").await;
+    let (by_asset, by_product) = (
+        w.spawn_run(Target::Asset(a)),
+        w.spawn_run(Target::Product(w.shop.product)),
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    save.commit().await.unwrap();
+    assert_eq!(by_asset.await.unwrap(), Outcome::Done);
+    assert_eq!(by_product.await.unwrap(), Outcome::Done);
+
+    assert_eq!(w.usage().await, 1);
+    assert_eq!(
+        w.alts().await,
+        vec![alt(&[
+            ("cs", "Modré tričko"),
+            ("en", "[en] Product TEE, from cs: Modré tričko"),
+            ("sk", "[sk] Product TEE, from cs: Modré tričko"),
+        ])]
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_translation_of_an_alt_text_changed_meanwhile_is_dropped(db: PgPool) {
+    let w = setup(db, "alt-stale").await;
+    w.put(false, true).await;
+    let a = w.asset(0).await;
+    w.media(&[(a, &[("cs", "Červené tričko")])]).await;
+
+    let save = w.locked_save("Modré tričko").await;
+    let job = w.spawn_run(Target::Product(w.shop.product));
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    save.commit().await.unwrap();
+    assert_eq!(job.await.unwrap(), Outcome::Done);
+
+    assert_eq!(w.alts().await, vec![alt(&[("cs", "Modré tričko")])]);
+    assert_eq!(w.marks().await, vec![]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn switching_off_during_generation_writes_nothing(db: PgPool) {
+    let w = setup(db, "alt-off-mid").await;
+    w.put(false, true).await;
+    let a = w.asset(0).await;
+    w.media(&[(a, &[("cs", "Modré tričko")])]).await;
+
+    let save = w.locked_save("Modré tričko").await;
+    let job = w.spawn_run(Target::Product(w.shop.product));
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    w.put(false, false).await;
+    save.commit().await.unwrap();
+    assert_eq!(job.await.unwrap(), Outcome::Done);
+
+    assert_eq!(w.alts().await, vec![alt(&[("cs", "Modré tričko")])]);
+    assert_eq!(w.marks().await, vec![]);
+}

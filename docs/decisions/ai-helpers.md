@@ -125,21 +125,29 @@ Product images get alt text in every market language without the merchant typing
   variant (JPEG, WebP or PNG, at most 5 MB, width closest to 1024; never AVIF) as a base64
   image block before the text, plus the product name, the image's non-empty alt texts (it
   translates them) and the target locales.
+- **One job per product at a time.** Each product's generation runs under a transaction
+  advisory lock (`ai.alt_text:<product>`), so an `asset.ready` job and a `product.updated` job
+  for the same image never both call the model: the second waits, then finds nothing to fill.
 - **Never overwrites.** The write goes through the catalog save (`products::replace`) under
   its product row lock, re-reads the product and fills only locales that are still empty, so a
-  merchant's text, written before or during the call, always wins. The save validates, audits
-  and publishes `product.updated` once per product and run, like any product edit.
+  merchant's text, written before or during the call, always wins. An image whose sent alt
+  texts changed meanwhile is not written (its translations would be of the old text); the
+  merchant's save queues a new job. The save validates, audits and publishes `product.updated`
+  once per product and run, like any product edit.
 - **Labelling.** Each written value gets an `ai_marks` row (`field = alt_<asset id, 32 hex>`,
   feature `alt_text`, `accepted_by = system`); `Doc::get` resolves the field to that image's
   alt text, so the admin badge disappears once someone edits it.
 - **Failures.** Quota used up mid-job: the job stops and keeps what it wrote. Rejected output
   skips that image. Provider outages retry; the retry skips images filled meanwhile. Switching
-  off stops new writes and removes nothing.
+  off stops new writes and removes nothing: the write re-reads `alt_texts_since` under a share
+  lock and drops its results unless it is the one the job started with, so an off (or off and
+  on) during a call writes nothing. Calls already running for that product still count against
+  the quota.
 
 | Threat | Mitigation |
 |---|---|
 | Prompt injection through the product name, existing alt texts or text inside the photo | All of it is untrusted: names and alt texts travel in the `<data>` block, and the system prompt forbids following instructions there or in the photo. The output schema allows exactly one string per target locale. |
-| Links or markup in an alt attribute | Validation runs `plain_text` (control and bidi characters dropped), requires 1-200 characters on one line and rejects `<`, `>`, `//` and `www.`; themes escape attributes. Rejections are logged without model text. |
+| Links or markup in an alt attribute | Validation runs `plain_text` (control and bidi characters dropped), requires 1-200 characters on one line and rejects `<`, `>`, `@`, `//`, `www.` and the `mailto:`, `tel:`, `sms:`, `data:`, `javascript:`, `http:` and `https:` schemes; themes escape attributes. Rejections are logged without model text. |
 | AI overwriting the merchant's alt text | Only empty locales are targets, and the locked write re-checks them. |
 | Spending quota without a decision | Off by default, owners and admins only, automatic only for new uploads; the backfill is an explicit click that checks the quota first; every call is metered. |
 
