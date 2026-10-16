@@ -72,14 +72,23 @@ async fn backfill_missing_swatches(
     sku_prefix: &str,
     values: &[OptionValue],
 ) -> anyhow::Result<bool> {
+    let hexes: serde_json::Map<String, serde_json::Value> = values
+        .iter()
+        .filter_map(|v| Some((v.code.clone(), json!(v.swatch.as_ref()?))))
+        .collect();
     let completed = sqlx::query_scalar!(
-        r#"UPDATE product_options SET "values" = $2
-           WHERE code = 'barva'
-             AND product_id = (SELECT product_id FROM variants WHERE sku LIKE $1 LIMIT 1)
-             AND NOT jsonb_path_exists("values", '$[*].swatch')
-           RETURNING product_id"#,
+        r#"UPDATE product_options o SET "values" = (
+               SELECT jsonb_agg(CASE WHEN e.v ? 'swatch' OR NOT $2::jsonb ? (e.v->>'code') THEN e.v
+                                     ELSE e.v || jsonb_build_object('swatch', $2::jsonb->(e.v->>'code')) END
+                                ORDER BY e.n)
+               FROM jsonb_array_elements(o."values") WITH ORDINALITY AS e(v, n))
+           WHERE o.code = 'barva'
+             AND o.product_id = (SELECT product_id FROM variants WHERE sku LIKE $1 LIMIT 1)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(o."values") v
+                         WHERE NOT v ? 'swatch' AND $2::jsonb ? (v->>'code'))
+           RETURNING o.product_id"#,
         format!("{sku_prefix}-%"),
-        serde_json::to_value(values)?
+        serde_json::Value::Object(hexes)
     )
     .fetch_optional(&mut **tx)
     .await?;
@@ -1746,34 +1755,35 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../migrations")]
-    async fn a_rerun_gives_seeded_colours_their_swatches_once(db: sqlx::PgPool) {
+    async fn a_rerun_fills_missing_seed_swatches_and_keeps_edits(db: sqlx::PgPool) {
         let runtime = testkit::runtime_pool(&db, 2).await;
         let shop = testkit::storefront::shop(&runtime, "swatch-seed").await;
-        let mut input = testkit::catalog::product_input("LN-001", 2);
+        let mut input = testkit::catalog::product_input("LN-001", 3);
         input.options[0].code = "barva".into();
+        input.options[0].values[0].name_i18n = i18n("Upravená", "Upravená");
+        input.options[0].values[2].swatch = Some("#000000".into());
         for v in &mut input.variants {
             let value = v.option_values.remove("size").unwrap();
             v.option_values.insert("barva".into(), value);
         }
         let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
-        let values: Vec<OptionValue> = input.options[0]
-            .values
+        let fixture: Vec<OptionValue> = [("v1", "#8d9094"), ("v2", "#b85c38"), ("v3", "#111111")]
             .iter()
-            .zip(["#8d9094", "#b85c38"])
-            .map(|(v, hex)| OptionValue {
-                swatch: Some(hex.into()),
-                ..v.clone()
+            .map(|(code, hex)| OptionValue {
+                code: (*code).into(),
+                name_i18n: i18n(code, code),
+                swatch: Some((*hex).into()),
             })
             .collect();
 
         let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
         assert!(
-            backfill_missing_swatches(&mut tx, "LN-001", &values)
+            backfill_missing_swatches(&mut tx, "LN-001", &fixture)
                 .await
                 .unwrap()
         );
         assert!(
-            !backfill_missing_swatches(&mut tx, "LN-001", &values)
+            !backfill_missing_swatches(&mut tx, "LN-001", &fixture)
                 .await
                 .unwrap()
         );
@@ -1784,9 +1794,17 @@ mod tests {
             stored.options[0]
                 .values
                 .iter()
-                .map(|v| v.swatch.as_deref())
+                .map(|v| (
+                    v.code.as_str(),
+                    v.name_i18n["cs"].as_str(),
+                    v.swatch.as_deref()
+                ))
                 .collect::<Vec<_>>(),
-            [Some("#8d9094"), Some("#b85c38")]
+            [
+                ("v1", "Upravená", Some("#8d9094")),
+                ("v2", "V2", Some("#b85c38")),
+                ("v3", "V3", Some("#000000")),
+            ]
         );
     }
 
