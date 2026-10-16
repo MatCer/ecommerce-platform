@@ -290,7 +290,9 @@ async fn insert(
     source: &str,
     ip_hash: Option<&[u8]>,
 ) -> Result<(), Error> {
-    lock_subject(tx, subject).await?;
+    if let Subject::Anon(anon) = subject {
+        lock_anon(tx, anon).await?;
+    }
     let (kind, id) = subject.parts();
     let purposes: Vec<&str> = choices.iter().map(|(p, _)| p.as_str()).collect();
     let granted: Vec<bool> = choices.iter().map(|(_, g)| *g).collect();
@@ -319,11 +321,10 @@ async fn insert(
     Ok(())
 }
 
-pub(crate) async fn lock_subject(tx: &mut TenantTx, subject: &Subject) -> Result<(), Error> {
-    let (kind, id) = subject.parts();
+pub(crate) async fn lock_anon(tx: &mut TenantTx, anon: &str) -> Result<(), Error> {
     sqlx::query!(
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-        format!("consent:{}:{kind}:{id}", tx.tenant_id())
+        format!("consent:{}:anon:{anon}", tx.tenant_id())
     )
     .execute(&mut **tx)
     .await?;

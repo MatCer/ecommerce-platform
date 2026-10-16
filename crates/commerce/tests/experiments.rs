@@ -404,8 +404,66 @@ async fn an_enrolment_racing_a_withdrawal_writes_nothing_after_it(db: PgPool) {
         async move { enrol(&runtime, tenant, SUBJECT).await }
     });
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(!racing.is_finished(), "enrolment waits for the withdrawal");
     withdrawal.commit().await.unwrap();
 
     assert_eq!(racing.await.unwrap(), None);
     assert_eq!(rows(&runtime, tenant).await, 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_newsletter_and_a_cart_unsubscribe_of_one_address_do_not_deadlock(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let (tenant, market) = testkit::tenant(&runtime, "exp-lock").await;
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO subscribers (tenant_id, email, status, locale, market_id, text_version, source)
+         VALUES ($1, 'jana@example.cz', 'subscribed', 'cs', $2, '2026-10-16', 'form')",
+    )
+    .bind(tenant)
+    .bind(market)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let email = Subject::Email("jana@example.cz".into());
+
+    let mut newsletter = tenant_tx(&runtime, tenant).await.unwrap();
+    sqlx::query("UPDATE subscribers SET status = 'unsubscribed' WHERE email = 'jana@example.cz'")
+        .execute(&mut *newsletter)
+        .await
+        .unwrap();
+    let cart = tokio::spawn({
+        let runtime = runtime.clone();
+        let email = email.clone();
+        async move {
+            let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+            consent::record_server(
+                &mut tx,
+                &email,
+                consent::ConsentPurpose::EmailMarketing,
+                false,
+                consent::TEXT_VERSION,
+                "unsubscribe",
+                None,
+            )
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+        }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    consent::record_server(
+        &mut newsletter,
+        &email,
+        consent::ConsentPurpose::EmailMarketing,
+        false,
+        consent::TEXT_VERSION,
+        "unsubscribe",
+        None,
+    )
+    .await
+    .unwrap();
+    newsletter.commit().await.unwrap();
+    cart.await.unwrap();
 }

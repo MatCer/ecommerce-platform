@@ -107,9 +107,8 @@ pub async fn enrol(
     let Some((exp, arms)) = running_with_arms(&mut tx).await? else {
         return Ok(None);
     };
-    let anon = Subject::Anon(subject.into());
-    consent::lock_subject(&mut tx, &anon).await?;
-    if !consent::analytics_covers_experiments(&mut tx, &anon).await? {
+    consent::lock_anon(&mut tx, subject).await?;
+    if !consent::analytics_covers_experiments(&mut tx, &Subject::Anon(subject.into())).await? {
         return Ok(None);
     }
     let arms: Vec<Arm> = serde_json::from_value(arms)
