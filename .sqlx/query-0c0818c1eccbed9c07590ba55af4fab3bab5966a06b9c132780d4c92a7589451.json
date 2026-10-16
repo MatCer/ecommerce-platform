@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search_indexes SET building_uid = NULL, rebuild_version = $2,\n                    rebuilt_at = now(), documents = $3, rebuilt_settings_version = $4,\n                    updated_at = now()\n             WHERE locale = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0c0818c1eccbed9c07590ba55af4fab3bab5966a06b9c132780d4c92a7589451"
+}

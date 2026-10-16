@@ -95,6 +95,11 @@ pub const SCHEDULES: &[Schedule] = &[
         kind: handlers::SWEEP_JOB,
         every: Duration::from_secs(900),
     },
+    Schedule {
+        name: "search.settings_upgrade",
+        kind: commerce::search::SETTINGS_UPGRADE_JOB,
+        every: Duration::from_secs(900),
+    },
 ];
 
 /// A dedicated connection holding the leader lock, or `None` if another worker leads.

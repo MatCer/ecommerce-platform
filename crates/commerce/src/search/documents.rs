@@ -128,6 +128,10 @@ pub struct ProductData {
     pub created_at: i64,
     /// Time-decayed sales/interest score from the recommendation rollups (WP17).
     pub popularity: i32,
+    /// market id → time-decayed unit sales (`product_search_sales`); markets without sales absent.
+    pub sales: HashMap<Uuid, f64>,
+    /// [`crate::reviews::bayesian_score`] of the published reviews; `None` without any.
+    pub rating_score: Option<f64>,
     /// locale → (name, description html)
     pub translations: BTreeMap<String, (String, String)>,
     /// option code → value code → locale → label
@@ -206,6 +210,24 @@ pub async fn load_products(
     })
     .collect();
     let ids: Vec<Uuid> = products.keys().copied().collect();
+
+    for r in sqlx::query!(
+        "SELECT product_id, market_id, sales FROM product_search_sales WHERE product_id = ANY($1)",
+        &ids
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    {
+        if let Some(p) = products.get_mut(&r.product_id) {
+            p.sales.insert(r.market_id, r.sales);
+        }
+    }
+
+    for (id, score) in crate::reviews::scores(tx, &ids).await? {
+        if let Some(p) = products.get_mut(&id) {
+            p.rating_score = Some(score);
+        }
+    }
 
     for r in sqlx::query!(
         "SELECT product_id, locale, name, description_html FROM product_translations
@@ -354,6 +376,11 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
             }
         }
     }
+    let sales: Map<String, Value> = ctx
+        .markets
+        .iter()
+        .filter_map(|m| Some((market_key(&m.code), json!(p.sales.get(&m.id)?))))
+        .collect();
     for locale in ctx.locales() {
         let fallback = ctx.fallback_locale(&locale);
         let Some((name, description_html)) = p
@@ -422,7 +449,7 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
                         .map(String::as_str)
                 })
                 .collect();
-            let doc = json!({
+            let mut doc = json!({
                 "id": v.id,
                 "product_id": p.id,
                 "skus": [v.sku],
@@ -440,8 +467,12 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
                 "active_in_markets": markets,
                 "is_default": v.is_default,
                 "popularity": p.popularity,
+                "sales": sales,
                 "created_at": p.created_at,
             });
+            if let Some(score) = p.rating_score {
+                doc["rating_score"] = json!(score);
+            }
             out.entry(locale.clone()).or_default().push(doc);
         }
     }
@@ -535,6 +566,8 @@ mod tests {
             brand: Some("Acme".into()),
             created_at: 1,
             popularity: 42,
+            sales: HashMap::new(),
+            rating_score: None,
             translations: [(
                 "cs".to_owned(),
                 (
@@ -615,6 +648,21 @@ mod tests {
         for stem in ["acm", "trick", "oblecn", "bavln", "mekk", "brn"] {
             assert!(text.split(' ').any(|w| w == stem), "{stem} in {text}");
         }
+    }
+
+    #[test]
+    fn documents_carry_market_sales_and_the_published_rating() {
+        let (ctx, cz, sk) = ctx();
+        let mut p = product(cz, sk);
+        p.sales = HashMap::from([(Uuid::from_u128(100), 3.5), (Uuid::from_u128(999), 1.0)]);
+        p.rating_score = Some(4.6);
+        let red = build_product(&ctx, &p)["cs"][0].clone();
+        assert_eq!(red["sales"], json!({ "cz": 3.5 }));
+        assert_eq!(red["rating_score"], json!(4.6));
+
+        let plain = build_product(&ctx, &product(cz, sk))["cs"][0].clone();
+        assert_eq!(plain["sales"], json!({}));
+        assert_eq!(plain.get("rating_score"), None);
     }
 
     #[test]

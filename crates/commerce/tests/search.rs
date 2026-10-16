@@ -11,7 +11,7 @@ use commerce::money::Currency;
 use commerce::pricing::{self, NewPriceList};
 use commerce::search::index::{self, Indexed, Rebuilt};
 use commerce::search::query::{self, SearchRequest, SearchResult, Sort};
-use commerce::search::{Meili, index_uid};
+use commerce::search::{Meili, SETTINGS_VERSION, index_uid};
 use platform::db::tenant_tx;
 use sqlx::PgPool;
 use testkit::catalog::ACTOR;
@@ -244,6 +244,72 @@ fn set(v: &[&str]) -> BTreeSet<String> {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn indexes_not_rebuilt_by_current_settings_get_one_rebuild(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (old, _) = testkit::tenant(&runtime, "old").await;
+    let (applied, _) = testkit::tenant(&runtime, "applied").await;
+    let (current, _) = testkit::tenant(&runtime, "current").await;
+    testkit::tenant(&runtime, "unindexed").await;
+    for (tenant, rebuilt) in [
+        (old, Some(SETTINGS_VERSION - 1)),
+        (applied, None),
+        (current, Some(SETTINGS_VERSION)),
+    ] {
+        let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+        sqlx::query(
+            "INSERT INTO search_indexes (tenant_id, locale, settings_version, rebuilt_settings_version)
+             VALUES ($1, 'cs', $2, $3)",
+        )
+        .bind(tenant)
+        .bind(SETTINGS_VERSION)
+        .bind(rebuilt)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+    let rebuilds = async || -> BTreeMap<Option<Uuid>, i64> {
+        sqlx::query_as(
+            "SELECT tenant_id, count(*) FROM queue.jobs WHERE kind = 'search.rebuild'
+             GROUP BY tenant_id",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .collect()
+    };
+    let one_each = BTreeMap::from([(Some(old), 1), (Some(applied), 1)]);
+
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
+    assert_eq!(rebuilds().await, one_each);
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 0);
+    assert_eq!(rebuilds().await, one_each);
+
+    let mut tx = tenant_tx(&runtime, old).await.unwrap();
+    sqlx::query("UPDATE search_indexes SET upgrade_queued_at = now() - interval '2 hours'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 1);
+    let one_more = BTreeMap::from([(Some(old), 2), (Some(applied), 1)]);
+    assert_eq!(rebuilds().await, one_more);
+
+    for tenant in [old, applied] {
+        let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+        sqlx::query("UPDATE search_indexes SET rebuilt_settings_version = $1")
+            .bind(SETTINGS_VERSION)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 0);
+    assert_eq!(rebuilds().await, one_more);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 #[ignore = "needs Meilisearch: make test-search"]
 async fn popular_ordering_uses_newest_to_break_ties(db: PgPool) {
     let s = shop(&db).await;
@@ -309,6 +375,120 @@ async fn popular_ordering_uses_newest_to_break_ties(db: PgPool) {
             [products[1], products[0], products[2]]
         );
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "needs Meilisearch: make test-search"]
+async fn best_selling_and_top_rated_put_products_without_the_value_last(db: PgPool) {
+    let s = shop(&db).await;
+    let mut products = Vec::new();
+    for sku in ["RANKED-OLD", "RANKED-NEW", "UNRANKED-NEWEST"] {
+        products.push(
+            s.product(
+                sku,
+                "Tričko",
+                "Tričko",
+                &[V {
+                    options: &[("color", "red"), ("size", "m")],
+                    cz: Some(100),
+                    sk: Some(5),
+                    stock: 5,
+                }],
+            )
+            .await,
+        );
+    }
+    let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for (product, market, sales) in [
+        (products[0], s.cz, 5.0),
+        (products[1], s.cz, 5.0),
+        (products[2], s.sk, 9.0),
+    ] {
+        sqlx::query(
+            "INSERT INTO product_search_sales (tenant_id, product_id, market_id, sales)
+             VALUES ($1, $2, $3, $4)",
+        )
+        .bind(s.tenant)
+        .bind(product)
+        .bind(market)
+        .bind(sales)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    for (product, n, status) in [
+        (products[0], 1, "published"),
+        (products[1], 6, "published"),
+        (products[2], 6, "pending"),
+    ] {
+        for _ in 0..n {
+            sqlx::query(
+                "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                      locale, status, published_at)
+                 VALUES ($1, $2, 'Jana', 5, 'Super', true, 'cs', $3,
+                         CASE WHEN $3 = 'published' THEN now() END)",
+            )
+            .bind(s.tenant)
+            .bind(product)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+    }
+    tx.commit().await.unwrap();
+    for product in &products {
+        assert_eq!(s.index(*product).await, Indexed::Done);
+    }
+    s.settle().await;
+    let order = async |market, locale, sort| {
+        let mut runs = Vec::new();
+        for q in ["", "tričko"] {
+            let result = s
+                .search(
+                    market,
+                    locale,
+                    SearchRequest {
+                        q: q.into(),
+                        sort,
+                        ..req(&[])
+                    },
+                )
+                .await;
+            runs.push(
+                result
+                    .items
+                    .iter()
+                    .map(|h| h.product_id)
+                    .collect::<Vec<_>>(),
+            );
+        }
+        runs
+    };
+    let [old, new, unranked] = [products[0], products[1], products[2]];
+    assert_eq!(
+        order(s.cz, "cs", Sort::BestSelling).await,
+        [[new, old, unranked], [new, old, unranked]],
+        "CZ sales desc, ties by newest, no CZ sales last"
+    );
+    assert_eq!(
+        order(s.sk, "sk", Sort::BestSelling).await,
+        [[unranked, new, old], [unranked, new, old]],
+        "SK sales are SK's own"
+    );
+    assert_eq!(
+        order(s.cz, "cs", Sort::TopRated).await,
+        [[new, old, unranked], [new, old, unranked]],
+        "six 5s outrank one 5; no published review last"
+    );
 }
 
 /// A23 adversarial fixtures: cross-variant false matches, three options, unavailable variants,
@@ -721,12 +901,34 @@ async fn rebuild_swaps_in_a_complete_index(db: PgPool) {
     s.index(a).await; // b is not indexed incrementally
     s.settle().await;
     assert_eq!(s.search(s.cz, "cs", req(&[])).await.total, 1);
+    let rebuilt_settings = async || -> Vec<(String, Option<i32>)> {
+        let mut tx = tenant_tx(&s.runtime, s.tenant).await.unwrap();
+        let rows = sqlx::query_as(
+            "SELECT locale, rebuilt_settings_version FROM search_indexes ORDER BY locale",
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        rows
+    };
+    assert_eq!(
+        rebuilt_settings().await,
+        vec![("cs".to_owned(), None), ("sk".to_owned(), None)]
+    );
 
     assert_eq!(
         index::rebuild(&s.runtime, &s.meili, s.tenant, 1000, None)
             .await
             .unwrap(),
         Rebuilt::Done
+    );
+    assert_eq!(
+        rebuilt_settings().await,
+        vec![
+            ("cs".to_owned(), Some(SETTINGS_VERSION)),
+            ("sk".to_owned(), Some(SETTINGS_VERSION))
+        ]
     );
     s.settle().await;
     let after = s.search(s.cz, "cs", req(&[])).await;

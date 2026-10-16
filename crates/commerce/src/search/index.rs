@@ -54,7 +54,7 @@ pub fn settings(synonyms: &Value) -> Value {
             equality(&["opt.*", "param.*", "brand", "category_ids", "in_stock",
                        "active_in_markets", "id", "product_id", "skus", "eans"], false),
         ],
-        "sortableAttributes": ["price", "popularity", "created_at"],
+        "sortableAttributes": ["price", "popularity", "sales", "rating_score", "created_at"],
         "rankingRules": ["words", "typo", "proximity", "attributeRank", "sort", "wordPosition", "exactness"],
         "distinctAttribute": "product_id",
         "typoTolerance": { "disableOnAttributes": ["skus", "eans"], "disableOnNumbers": true },
@@ -333,6 +333,42 @@ pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<V
     .await?)
 }
 
+/// How long a queued settings-upgrade rebuild is trusted before the scan queues another.
+const UPGRADE_LEASE: Duration = Duration::from_secs(60 * 60);
+
+/// Queues a rebuild for every tenant whose indexes were not rebuilt at [`SETTINGS_VERSION`],
+/// at most one per tenant per [`UPGRADE_LEASE`]: queuing leases the tenant's outdated index
+/// rows, so a rebuild that died, went stale or ran on an older worker is followed by another
+/// once the lease expires. Returns the number of tenants for which this call queued a rebuild.
+pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
+    let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+        .fetch_all(db)
+        .await?;
+    let mut queued = 0;
+    for tenant_id in tenants {
+        let mut tx = tenant_tx(db, tenant_id).await?;
+        let leased = sqlx::query_scalar!(
+            "UPDATE search_indexes SET upgrade_queued_at = now()
+             WHERE (rebuilt_settings_version IS NULL OR rebuilt_settings_version < $1)
+               AND (upgrade_queued_at IS NULL
+                    OR upgrade_queued_at < now() - make_interval(secs => $2))
+             RETURNING locale",
+            SETTINGS_VERSION,
+            UPGRADE_LEASE.as_secs_f64()
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        if !leased.is_empty() {
+            let version = super::next_version(&mut *tx).await?;
+            platform::queue::enqueue(&mut *tx, &super::manual_rebuild_job(tenant_id, version))
+                .await?;
+            tx.commit().await?;
+            queued += 1;
+        }
+    }
+    Ok(queued)
+}
+
 /// Current state of a tenant's search indexes (admin status endpoint).
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct IndexStatus {
@@ -528,11 +564,13 @@ async fn rebuild_locked(
     for locale in building.keys() {
         sqlx::query!(
             "UPDATE search_indexes SET building_uid = NULL, rebuild_version = $2,
-                    rebuilt_at = now(), documents = $3, updated_at = now()
+                    rebuilt_at = now(), documents = $3, rebuilt_settings_version = $4,
+                    updated_at = now()
              WHERE locale = $1",
             locale,
             read_version,
-            counts.get(locale).copied().unwrap_or(0)
+            counts.get(locale).copied().unwrap_or(0),
+            SETTINGS_VERSION
         )
         .execute(&mut *tx)
         .await?;

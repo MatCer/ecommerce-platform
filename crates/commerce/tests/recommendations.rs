@@ -330,6 +330,80 @@ async fn bestsellers_decay_and_popularity_is_debounced(db: PgPool) {
     assert!(run(&runtime, &shop, now).await.is_empty(), "taken once");
 }
 
+async fn search_sales(runtime: &PgPool, tenant: Uuid) -> Vec<(Uuid, Uuid, f64)> {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    let rows = sqlx::query_as(
+        "SELECT product_id, market_id, sales FROM product_search_sales ORDER BY sales",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    rows
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn search_sales_are_per_market_and_debounced(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = shop(&runtime, "reco-sales").await;
+    let x = sellable(&runtime, &shop, "SALES", 10).await;
+    let now = Utc::now();
+    for _ in 0..3 {
+        order(&runtime, &shop, &[x], now, "confirmed").await;
+    }
+    testkit::storefront::raw_order(&runtime, &shop, shop.sk, "EUR", 1_040, 2, "confirmed").await;
+    let mut both = vec![x.0, shop.product];
+    both.sort();
+    assert_eq!(run(&runtime, &shop, now).await, both);
+    assert_eq!(
+        search_sales(&runtime, shop.tenant).await,
+        [(shop.product, shop.sk, 2.0), (x.0, shop.cz, 3.0)]
+    );
+    assert!(run(&runtime, &shop, now).await.is_empty());
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("DELETE FROM product_search_sales WHERE product_id = $1")
+        .bind(x.0)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(run(&runtime, &shop, now).await, [x.0]);
+    assert_eq!(
+        search_sales(&runtime, shop.tenant).await,
+        [(shop.product, shop.sk, 2.0), (x.0, shop.cz, 3.0)]
+    );
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let popularity: i32 =
+        sqlx::query_scalar("SELECT popularity FROM product_popularity WHERE product_id = $1")
+            .bind(x.0)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(popularity, 30);
+
+    order(&runtime, &shop, &[x], now - Duration::days(60), "confirmed").await;
+    assert!(run(&runtime, &shop, now).await.is_empty());
+    assert_eq!(
+        search_sales(&runtime, shop.tenant).await,
+        [(shop.product, shop.sk, 2.0), (x.0, shop.cz, 3.0)]
+    );
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("UPDATE orders SET status = 'cancelled' WHERE market_id = $1")
+        .bind(shop.cz)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(run(&runtime, &shop, now).await, [x.0]);
+    assert_eq!(
+        search_sales(&runtime, shop.tenant).await,
+        [(shop.product, shop.sk, 2.0)]
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn engine_filters_visibility_and_falls_back(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 2).await;
@@ -760,6 +834,7 @@ async fn recommendation_tables_are_tenant_isolated(db: PgPool) {
         "co_purchases",
         "product_scores",
         "product_popularity",
+        "product_search_sales",
         "collections",
         "recommendation_settings",
         "customer_affinity",

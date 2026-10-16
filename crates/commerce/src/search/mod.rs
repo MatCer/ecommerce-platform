@@ -35,10 +35,13 @@ pub const REINDEX_CATEGORY_JOB: &str = "search.reindex_category";
 pub const REBUILD_JOB: &str = "search.rebuild";
 /// Writes the tenant's synonyms ([`synonyms`]) to all of its indexes: `{}`.
 pub const SYNONYMS_JOB: &str = "search.synonyms";
+/// Queues the settings upgrade rebuilds ([`index::queue_settings_upgrades`]): `{}`.
+pub const SETTINGS_UPGRADE_JOB: &str = "search.settings_upgrade";
 
-/// Bumped whenever [`index::settings`] changes; indexes with an older version get the new
-/// settings applied by the next indexing job.
-pub const SETTINGS_VERSION: i32 = 2;
+/// Bumped whenever [`index::settings`] changes; worker start and a periodic job queue a full
+/// rebuild for tenants whose indexes were not rebuilt at this version
+/// ([`index::queue_settings_upgrades`]).
+pub const SETTINGS_VERSION: i32 = 3;
 
 /// Meilisearch outages can last a while; indexing jobs keep retrying (capped backoff).
 const JOB_ATTEMPTS: i32 = 25;
@@ -130,8 +133,14 @@ pub fn job_for_event(
             .and_then(|s| Uuid::parse_str(s).ok())
     };
     match event_type {
-        "product.created" | "product.updated" | "product.deleted" | "price.changed"
-        | "inventory.changed" => Some(index_product_job(tenant_id, id("product_id")?, version)),
+        "product.created"
+        | "product.updated"
+        | "product.deleted"
+        | "price.changed"
+        | "inventory.changed"
+        | crate::reviews::CHANGED_EVENT => {
+            Some(index_product_job(tenant_id, id("product_id")?, version))
+        }
         // Memberships still exist in Postgres, so the affected products can be found.
         "category.updated" | "category.moved" => Some(versioned(
             REINDEX_CATEGORY_JOB,
@@ -189,7 +198,12 @@ mod tests {
     fn events_map_to_search_jobs() {
         let (t, p) = (Uuid::now_v7(), Uuid::now_v7());
         let payload = json!({ "product_id": p, "variant_id": Uuid::now_v7() });
-        for ty in ["product.updated", "price.changed", "inventory.changed"] {
+        for ty in [
+            "product.updated",
+            "price.changed",
+            "inventory.changed",
+            "review.changed",
+        ] {
             let job = job_for_event(Some(t), ty, &payload, 1);
             assert_eq!(job.map(|j| j.kind), Some(INDEX_PRODUCT_JOB), "{ty}");
         }

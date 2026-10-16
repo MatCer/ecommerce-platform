@@ -87,6 +87,8 @@ async fn popular_listing_options_and_fallback_order(db: PgPool) {
             [
                 "recommended",
                 "popular",
+                "best_selling",
+                "top_rated",
                 "newest",
                 "price_asc",
                 "price_desc"
@@ -101,6 +103,109 @@ async fn popular_listing_options_and_fallback_order(db: PgPool) {
             [products[1], products[0], products[2]],
             "popularity desc, then newest; missing popularity defaults to zero"
         );
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn best_selling_and_top_rated_fallback_order_per_market(db: PgPool) {
+    use commerce::storefront::listing::Sort;
+    use commerce::storefront::pages::{self, ListingParams};
+
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let shop = testkit::storefront::shop(&runtime, "ranked").await;
+    let mut products = vec![shop.product];
+    for sku in ["RANKED-NEW", "UNRANKED-NEWEST"] {
+        let mut input = testkit::catalog::product_input(sku, 1);
+        input.category_ids = vec![shop.category];
+        let product = testkit::catalog::create(&runtime, shop.tenant, &input).await;
+        let variant = product.variants[0].id;
+        testkit::pricing::set_prices(&runtime, shop.tenant, shop.czk, &[(variant, 100)]).await;
+        testkit::pricing::set_prices(&runtime, shop.tenant, shop.eur, &[(variant, 5)]).await;
+        products.push(product.id);
+    }
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    for (product, market, sales) in [
+        (products[0], shop.cz, 5.0),
+        (products[1], shop.cz, 5.0),
+        (products[2], shop.sk, 9.0),
+    ] {
+        sqlx::query(
+            "INSERT INTO product_search_sales (tenant_id, product_id, market_id, sales)
+             VALUES ($1, $2, $3, $4)",
+        )
+        .bind(shop.tenant)
+        .bind(product)
+        .bind(market)
+        .bind(sales)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    for (product, n, status) in [
+        (products[0], 1, "published"),
+        (products[1], 6, "published"),
+        (products[2], 6, "pending"),
+    ] {
+        for _ in 0..n {
+            sqlx::query(
+                "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                      locale, status, published_at)
+                 VALUES ($1, $2, 'Jana', 5, 'Super', true, 'cs', $3,
+                         CASE WHEN $3 = 'published' THEN now() END)",
+            )
+            .bind(shop.tenant)
+            .bind(product)
+            .bind(status)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        }
+    }
+    let [old, new, unranked] = [products[0], products[1], products[2]];
+    for (market, sort, expected, label) in [
+        (
+            shop.cz,
+            "best_selling",
+            [new, old, unranked],
+            "Nejprodávanější",
+        ),
+        (
+            shop.sk,
+            "best_selling",
+            [unranked, new, old],
+            "Najpredávanejšie",
+        ),
+        (
+            shop.cz,
+            "top_rated",
+            [new, old, unranked],
+            "Nejlépe hodnocené",
+        ),
+    ] {
+        let ctx = storefront::context(&mut tx, &PublicUrls::default(), market, None, Utc::now())
+            .await
+            .unwrap();
+        let params = ListingParams {
+            q: Some("Product".into()),
+            ..ListingParams::from_pairs(&[("sort".into(), sort.into())])
+        };
+        assert_eq!(params.sort.map(Sort::as_str), Some(sort));
+        let page = pages::search(&mut tx, &ctx, None, &params).await.unwrap();
+        assert_eq!(
+            page.products.iter().map(|p| p.id).collect::<Vec<_>>(),
+            expected,
+            "{sort} in {market}"
+        );
+        let selected = page.sort.iter().find(|s| s.selected).unwrap();
+        assert_eq!(selected.label, label);
     }
 }
 

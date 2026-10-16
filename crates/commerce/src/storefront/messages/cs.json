@@ -384,6 +384,8 @@
   "sort.name": "Podle názvu",
   "sort.newest": "Nejnovější",
   "sort.popular": "Nejoblíbenější",
+  "sort.best_selling": "Nejprodávanější",
+  "sort.top_rated": "Nejlépe hodnocené",
   "sort.price_asc": "Nejlevnější",
   "sort.price_desc": "Nejdražší",
   "sort.recommended": "Doporučené",

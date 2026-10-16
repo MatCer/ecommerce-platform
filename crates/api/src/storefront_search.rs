@@ -104,7 +104,11 @@ fn parse_request(pairs: Vec<(String, String)>) -> Result<SearchRequest, Error> {
             "sort" => {
                 r.sort =
                     serde_json::from_value(serde_json::Value::String(value)).map_err(|_| {
-                        bad("sort: relevance, popular, newest, price_asc or price_desc".into())
+                        bad(
+                            "sort: relevance, popular, best_selling, top_rated, newest, price_asc \
+                             or price_desc"
+                                .into(),
+                        )
                     })?;
             }
             "page" | "per_page" => {
@@ -244,6 +248,14 @@ mod tests {
     fn parses_popular_sort() {
         let r = parse_request(pairs(&[("sort", "popular")])).unwrap();
         assert_eq!(r.sort, Sort::Popular);
+    }
+
+    #[test]
+    fn parses_best_selling_and_top_rated_sorts() {
+        let r = parse_request(pairs(&[("sort", "best_selling")])).unwrap();
+        assert_eq!(r.sort, Sort::BestSelling);
+        let r = parse_request(pairs(&[("sort", "top_rated")])).unwrap();
+        assert_eq!(r.sort, Sort::TopRated);
     }
 
     #[test]

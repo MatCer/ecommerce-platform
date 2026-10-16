@@ -291,3 +291,124 @@ async fn storefront_search_and_suggest_end_to_end(db: PgPool) {
             .await;
     assert!(write.is_err());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+#[ignore = "needs Meilisearch: make test-search"]
+async fn new_sorts_on_an_index_with_previous_settings(db: PgPool) {
+    let mut s = shop(&db, "shop", true).await;
+    s.s.meili = testkit::meili_search();
+    let admin = testkit::meili();
+    let mut tx = platform::db::tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    let list = commerce::pricing::create_price_list(
+        &mut tx,
+        "t",
+        &commerce::pricing::NewPriceList {
+            code: "cz".into(),
+            name: "cz".into(),
+            currency: commerce::money::Currency::Czk,
+            market_ids: vec![s.market],
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let cat = testkit::catalog::category(&s.runtime, s.tenant, "tricka", None).await;
+    let mut products = Vec::new();
+    for sku in ["RANKED", "UNRANKED"] {
+        let mut input = testkit::catalog::product_input(sku, 1);
+        input.translations[0].name = format!("Tričko {sku}");
+        input.category_ids = vec![cat.id];
+        let product = testkit::catalog::create(&s.runtime, s.tenant, &input).await;
+        testkit::pricing::set_prices(
+            &s.runtime,
+            s.tenant,
+            list.id,
+            &[(product.variants[0].id, 100)],
+        )
+        .await;
+        products.push(product.id);
+    }
+    let [ranked, unranked] = [products[0], products[1]];
+    let mut tx = platform::db::tenant_tx(&s.runtime, s.tenant).await.unwrap();
+    for (i, product) in products.iter().enumerate() {
+        sqlx::query("UPDATE products SET created_at = $2 WHERE id = $1")
+            .bind(product)
+            .bind(chrono::DateTime::from_timestamp(1000 + i as i64, 0).unwrap())
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    sqlx::query(
+        "INSERT INTO product_search_sales (tenant_id, product_id, market_id, sales)
+         VALUES ($1, $2, $3, 5)",
+    )
+    .bind(s.tenant)
+    .bind(ranked)
+    .bind(s.market)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                              locale, status, published_at)
+         VALUES ($1, $2, 'Jana', 5, 'Super', true, 'cs', 'published', now())",
+    )
+    .bind(s.tenant)
+    .bind(ranked)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    for product in &products {
+        commerce::search::index::index_product(&s.runtime, &admin, s.tenant, *product, None)
+            .await
+            .unwrap();
+    }
+    let uid = commerce::search::index_uid(s.tenant, "cs");
+    let previous = admin
+        .update_settings(
+            &uid,
+            &json!({ "sortableAttributes": ["price", "popularity", "created_at"] }),
+        )
+        .await
+        .unwrap();
+    admin.wait(previous, Duration::from_secs(30)).await.unwrap();
+
+    let ids = |items: &Value| -> Vec<Value> {
+        items
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["id"].clone())
+            .collect()
+    };
+    for sort in ["best_selling", "top_rated"] {
+        for uri in [
+            format!("/storefront/v1/pages/search?q=tricko&sort={sort}"),
+            format!("/storefront/v1/pages/category/tricka?sort={sort}"),
+        ] {
+            let (status, page, _) = s.storefront(&uri, "cs").await;
+            assert_eq!(status, StatusCode::OK, "{uri}: {page}");
+            assert_eq!(
+                ids(&page["products"]),
+                [json!(ranked), json!(unranked)],
+                "{uri}"
+            );
+        }
+        let (status, body, _) = s
+            .storefront(&format!("/storefront/v1/search?q=tricko&sort={sort}"), "cs")
+            .await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{sort}: {body}");
+    }
+    let (status, body, _) = s
+        .storefront("/storefront/v1/search?q=tricko&sort=newest", "cs")
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let found: Vec<Value> = body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| h["product_id"].clone())
+        .collect();
+    assert_eq!(found, [json!(unranked), json!(ranked)]);
+}

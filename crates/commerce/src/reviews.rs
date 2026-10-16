@@ -10,6 +10,8 @@
 //! - Staff publish, reject or hide reviews and may reply. Only `published` reviews leave the
 //!   admin API: product page model, rating summary and JSON-LD.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use platform::Error;
 use platform::db::TenantTx;
@@ -38,6 +40,31 @@ pub const NAME_MAX: usize = 60;
 pub const TITLE_MAX: usize = 120;
 pub const BODY_MAX: usize = 4000;
 pub const REPLY_MAX: usize = 2000;
+
+pub const RATING_PRIOR_MEAN: f64 = 3.0;
+pub const RATING_PRIOR_WEIGHT: f64 = 5.0;
+
+/// The "top rated" score of a product whose published reviews total `sum` stars over `count`
+/// reviews: their mean pulled towards [`RATING_PRIOR_MEAN`] by [`RATING_PRIOR_WEIGHT`] virtual
+/// reviews, so a single 5-star review does not outrank many good ones.
+#[allow(clippy::cast_precision_loss)]
+pub fn bayesian_score(sum: i64, count: i64) -> f64 {
+    (RATING_PRIOR_WEIGHT * RATING_PRIOR_MEAN + sum as f64) / (RATING_PRIOR_WEIGHT + count as f64)
+}
+
+/// [`bayesian_score`] of every product in `ids` with published reviews.
+pub async fn scores(tx: &mut TenantTx, ids: &[Uuid]) -> Result<HashMap<Uuid, f64>, Error> {
+    Ok(sqlx::query!(
+        r#"SELECT product_id, count(*) AS "count!", sum(rating)::bigint AS "sum!" FROM reviews
+           WHERE product_id = ANY($1) AND status = 'published' GROUP BY product_id"#,
+        ids
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|r| (r.product_id, bayesian_score(r.sum, r.count)))
+    .collect())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -782,6 +809,15 @@ pub fn json_ld(reviews: &ProductReviews) -> Option<(Value, Value)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bayesian_score_ranks_many_good_reviews_over_one_perfect() {
+        let one_perfect = bayesian_score(5, 1);
+        let many_good = bayesian_score(192, 40);
+        assert!((one_perfect - 20.0 / 6.0).abs() < 1e-9, "{one_perfect}");
+        assert!((many_good - 4.6).abs() < 1e-9, "{many_good}");
+        assert!(many_good > one_perfect);
+    }
 
     #[test]
     fn transitions() {

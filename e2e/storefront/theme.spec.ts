@@ -130,6 +130,25 @@ test("filters work without JavaScript", async ({ browser }) => {
   await ctx.close();
 });
 
+test("listing offers best selling and top rated and keeps the chosen sort", async ({
+  page,
+  context,
+}) => {
+  await decideConsent(context);
+  await page.goto(`${CZ}/c/obleceni?sort=top_rated`);
+  const sort = page.getByLabel("Řadit");
+  await expect(sort.locator("option")).toHaveText([
+    "Doporučené",
+    "Nejoblíbenější",
+    "Nejprodávanější",
+    "Nejlépe hodnocené",
+    "Nejnovější",
+    "Nejlevnější",
+    "Nejdražší",
+  ]);
+  await expect(sort).toHaveValue("top_rated");
+});
+
 test.describe("search", () => {
   for (const q of ["čepice", "cepice"]) {
     test(`results for "${q}" (diacritics-insensitive)`, async ({ page, context }) => {
