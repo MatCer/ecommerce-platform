@@ -1,12 +1,22 @@
-/** AI settings: this month's usage against the allowance, and the translation glossary. */
-import { Alert, Badge, Button, Card, ProgressBar, showToast, TextField } from "@platform/ui";
-import { createMutation, createQuery } from "@tanstack/solid-query";
+/** AI settings: this month's usage against the allowance, the AI switches of the shop, and the
+ * translation glossary. */
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  ProgressBar,
+  showToast,
+  TextField,
+} from "@platform/ui";
+import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, For, Index, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
 import { errorMessage, t } from "../i18n/index.ts";
 import { useAiUsage } from "../lib/ai.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
-import { tenantKey } from "../lib/me.ts";
+import { tenantKey, useMembership } from "../lib/me.ts";
 import { CONTENT_LOCALES } from "../lib/product-form.ts";
 
 type Entry = { term: string; translations: Record<string, string> };
@@ -17,6 +27,7 @@ const FEATURES = [
   "seo",
   "translate",
   "bulk_plan",
+  "review_summary",
 ] as const;
 
 function featureLabel(f: string): string {
@@ -224,6 +235,50 @@ function GlossaryEditor() {
   );
 }
 
+function ShopFeatures() {
+  const { can } = useMembership();
+  const qc = useQueryClient();
+  const key = () => tenantKey("ai-settings");
+  const query = createQuery(() => ({
+    queryKey: key(),
+    queryFn: () => unwrap(api.GET("/admin/v1/ai/settings", { params: { header: tenantHeader() } })),
+  }));
+  const [error, setError] = createSignal<string>();
+  const save = createMutation(() => ({
+    mutationFn: (body: Schemas["AiSettings"]) =>
+      unwrap(api.PUT("/admin/v1/ai/settings", { params: { header: tenantHeader() }, body })),
+    onMutate: () => setError(undefined),
+    onSuccess: (saved) => {
+      qc.setQueryData(key(), saved);
+      showToast({ title: t("common.saved"), closeLabel: t("common.close") });
+    },
+    onError: (e: unknown) => setError(errorMessage(e)),
+  }));
+  return (
+    <Card labelledBy="ai-shop-h" class="max-w-3xl" title={t("ai.shopFeatures")}>
+      <QueryState query={query}>
+        {(s) => (
+          <div class="flex flex-col gap-4">
+            <Show when={!can("admin")}>
+              <Alert tone="info">{t("ai.adminOnly")}</Alert>
+            </Show>
+            <Checkbox
+              label={t("ai.reviewSummaries")}
+              description={t("ai.reviewSummariesDesc")}
+              checked={save.isPending ? !s.review_summaries : s.review_summaries}
+              disabled={!can("admin") || save.isPending}
+              onChange={(review_summaries) => save.mutate({ review_summaries })}
+            />
+            <Show when={error()}>
+              <Alert tone="error">{error()}</Alert>
+            </Show>
+          </div>
+        )}
+      </QueryState>
+    </Card>
+  );
+}
+
 export default function AiSettings() {
   const usage = useAiUsage();
   return (
@@ -231,6 +286,7 @@ export default function AiSettings() {
       <PageHeader title={t("ai.settingsTitle")} description={t("ai.settingsDesc")} />
       <div class="flex flex-col gap-6">
         <QueryState query={usage}>{(u) => <Usage u={u} />}</QueryState>
+        <ShopFeatures />
         <GlossaryEditor />
       </div>
     </>

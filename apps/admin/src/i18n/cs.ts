@@ -234,6 +234,7 @@ export const cs: Dictionary = {
     feature_seo: "SEO",
     feature_translate: "Překlady",
     feature_bulk_plan: "Plány hromadných úprav",
+    feature_review_summary: "Shrnutí recenzí",
     glossary: "Glosář",
     glossaryDesc:
       "Výrazy, které překlady musí ponechat beze změny (značky), nebo překládat jedním pevným způsobem. Prázdný jazyk výraz ponechá.",
@@ -242,6 +243,11 @@ export const cs: Dictionary = {
     fixed: "Tvar {{locale}} výrazu {{n}}",
     addTerm: "Přidat výraz",
     removeTerm: "Odebrat výraz {{term}}",
+    shopFeatures: "AI v obchodě",
+    reviewSummaries: "Shrnutí recenzí",
+    reviewSummariesDesc:
+      "Produkty s alespoň 5 zveřejněnými ověřenými recenzemi dostanou na stránce produktu krátké shrnutí od AI, v jazyce každého trhu a označené jako vytvořené umělou inteligencí. Každé shrnutí spotřebuje tokeny AI.",
+    adminOnly: "Tato nastavení mohou měnit jen vlastníci a správci.",
   },
   redirects: {
     title: "Přesměrování",
