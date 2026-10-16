@@ -69,7 +69,7 @@ pub async fn settings(tx: &mut TenantTx) -> Result<AiSettings, Error> {
 }
 
 /// Replaces the settings (audited). A change purges the tenant's pages; switching summaries on
-/// queues a job for every product with enough reviews.
+/// queues a job for every product with enough reviews or a summary cached while it was off.
 pub async fn put_settings(
     tx: &mut TenantTx,
     actor: &str,
@@ -99,8 +99,10 @@ pub async fn put_settings(
     }
     if input.review_summaries && !before.review_summaries {
         let products = sqlx::query_scalar!(
-            "SELECT product_id FROM reviews WHERE status = 'published' AND verified
-             GROUP BY product_id HAVING count(*) >= $1",
+            r#"SELECT product_id AS "product_id!" FROM reviews
+               WHERE status = 'published' AND verified
+               GROUP BY product_id HAVING count(*) >= $1
+               UNION SELECT product_id FROM review_summaries"#,
             MIN_REVIEWS
         )
         .fetch_all(&mut **tx)
