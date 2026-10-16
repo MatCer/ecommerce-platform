@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ai_settings (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2984e55757d23e3cd050d5a363fec44eadb107db655e687ac4cc077ca1e7a4ba"
+}

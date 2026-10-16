@@ -388,3 +388,85 @@ async fn switching_on_refreshes_summaries_that_fell_below_the_minimum_while_off(
     assert!(summaries(&runtime, &shop).await.is_empty());
     assert_eq!(shown(&runtime, &shop, shop.cz).await, None);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn concurrent_switch_changes_each_purge(db: PgPool) {
+    let (runtime, shop) = setup(&db, "race-settings").await;
+    let mut first = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    review_summary::put_settings(
+        &mut first,
+        "owner",
+        &AiSettings {
+            review_summaries: true,
+        },
+    )
+    .await
+    .unwrap();
+    let second = tokio::spawn({
+        let runtime = runtime.clone();
+        let shop_tenant = shop.tenant;
+        async move {
+            let mut tx = tenant_tx(&runtime, shop_tenant).await.unwrap();
+            review_summary::put_settings(
+                &mut tx,
+                "admin",
+                &AiSettings {
+                    review_summaries: false,
+                },
+            )
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+        }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    first.commit().await.unwrap();
+    second.await.unwrap();
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    assert_eq!(
+        review_summary::settings(&mut tx).await.unwrap(),
+        AiSettings {
+            review_summaries: false
+        }
+    );
+    drop(tx);
+    assert_eq!(
+        changed_events(&db, &shop).await,
+        vec![json!({}), json!({})],
+        "on and off both purge"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn moderation_during_generation_wins_over_the_stale_summary(db: PgPool) {
+    let (runtime, shop) = setup(&db, "race-moderation").await;
+    let mut ids = Vec::new();
+    for rating in [5, 5, 4, 4, 5, 3] {
+        ids.push(review(&runtime, &shop, rating, true).await);
+    }
+    switch(&runtime, &shop, true).await;
+
+    let mut moderation = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    reviews::set_status(&mut moderation, "clerk", ids[0], Status::Hidden)
+        .await
+        .unwrap();
+    let job = tokio::spawn({
+        let runtime = runtime.clone();
+        let tenant = shop.tenant;
+        let product = shop.product;
+        async move {
+            review_summary::run(&runtime, &Ai::fake(), tenant, product, false)
+                .await
+                .unwrap()
+        }
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    moderation.commit().await.unwrap();
+    assert_eq!(job.await.unwrap(), Outcome::Done);
+
+    assert!(
+        summaries(&runtime, &shop).await.is_empty(),
+        "the job read six reviews, five remain: it must not store the six-review summary"
+    );
+}
