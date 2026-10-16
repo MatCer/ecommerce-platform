@@ -1098,7 +1098,7 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
     let purges: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM queue.jobs WHERE kind = 'edge.purge'
-         AND payload->>'type' = 'review_summary.changed'",
+         AND payload->>'type' IN ('ai_settings.changed', 'review_summary.changed')",
     )
     .fetch_one(&db)
     .await

@@ -744,11 +744,19 @@ pub async fn for_product(
     )
     .fetch_optional(&mut **tx)
     .await?;
+    let ai_summary = if summary
+        .as_ref()
+        .is_some_and(|s| s.count >= review_summary::MIN_REVIEWS)
+    {
+        review_summary::for_storefront(tx, ctx, product_id).await?
+    } else {
+        None
+    };
     Ok(ProductReviews {
         summary,
         items,
         verification_url: slug.map(|s| ctx.path(&format!("/pages/{s}"))),
-        ai_summary: review_summary::for_storefront(tx, ctx, product_id).await?,
+        ai_summary,
     })
 }
 

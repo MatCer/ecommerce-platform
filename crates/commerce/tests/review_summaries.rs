@@ -114,8 +114,8 @@ async fn jobs(db: &PgPool, shop: &Shop) -> i64 {
 
 async fn changed_events(db: &PgPool, shop: &Shop) -> Vec<serde_json::Value> {
     sqlx::query_scalar(
-        "SELECT payload FROM queue.outbox WHERE tenant_id = $1 AND type = 'review_summary.changed'
-         ORDER BY id",
+        "SELECT payload FROM queue.outbox WHERE tenant_id = $1
+           AND type IN ('review_summary.changed', 'ai_settings.changed') ORDER BY id",
     )
     .bind(shop.tenant)
     .fetch_all(db)
