@@ -496,16 +496,16 @@ async fn mode_switch_moves_the_generation(db: PgPool) {
     assert_eq!(db_code(&err).as_deref(), Some("42501"));
 }
 
-async fn wait_until_blocked<T>(db: &PgPool, task: &tokio::task::JoinHandle<T>) {
+async fn wait_until_blocked<T>(db: &PgPool, task: &tokio::task::JoinHandle<T>, waiters: i64) {
     while !task.is_finished() {
-        let blocked: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity
-                            WHERE datname = current_database() AND wait_event_type = 'Lock')",
+        let blocked: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM pg_stat_activity
+             WHERE datname = current_database() AND wait_event_type = 'Lock'",
         )
         .fetch_one(db)
         .await
         .unwrap();
-        if blocked {
+        if blocked >= waiters {
             return;
         }
         tokio::task::yield_now().await;
@@ -528,7 +528,7 @@ async fn account_domain_and_shop_registration_serialize(db: PgPool) {
         let runtime = runtime.clone();
         async move { tenancy::add_domain(&runtime, "alpha", "shop.accounts.example", None, false).await }
     });
-    wait_until_blocked(&db, &shop).await;
+    wait_until_blocked(&db, &shop, 1).await;
     config.commit().await.unwrap();
     assert_eq!(shop.await.unwrap().unwrap_err().code(), "reserved_hostname");
 
@@ -550,10 +550,91 @@ async fn account_domain_and_shop_registration_serialize(db: PgPool) {
                 .await
         }
     });
-    wait_until_blocked(&db, &reservation).await;
+    wait_until_blocked(&db, &reservation, 1).await;
     registration.commit().await.unwrap();
     let err = reservation.await.unwrap().unwrap_err();
     assert_eq!(db_code(&err).as_deref(), Some("23514"));
+}
+
+fn create_shop(
+    runtime: &PgPool,
+    slug: &'static str,
+) -> impl Future<Output = Result<(), Error>> + use<> {
+    let runtime = runtime.clone();
+    async move {
+        tenancy::create_tenant(&runtime, &owner(slug))
+            .await
+            .map(drop)
+    }
+}
+
+fn add_alpha_domain(
+    runtime: &PgPool,
+    host: &'static str,
+) -> impl Future<Output = Result<(), Error>> + use<> {
+    let runtime = runtime.clone();
+    async move {
+        tenancy::add_domain(&runtime, "alpha", host, None, false)
+            .await
+            .map(drop)
+    }
+}
+
+/// Runs `first` until it stops at the registration lock an uncommitted account domain holds,
+/// then `second` until it queues behind `first`, then releases the lock.
+async fn register_in_order(
+    db: &PgPool,
+    runtime: &PgPool,
+    first: impl Future<Output = Result<(), Error>> + Send + 'static,
+    second: impl Future<Output = Result<(), Error>> + Send + 'static,
+) -> (Result<(), Error>, Result<(), Error>) {
+    let mut config = runtime.begin().await.unwrap();
+    sqlx::query("INSERT INTO platform.account_domains (domain) VALUES ('accounts.example')")
+        .execute(&mut *config)
+        .await
+        .unwrap();
+    let first = tokio::spawn(first);
+    wait_until_blocked(db, &first, 1).await;
+    let second = tokio::spawn(second);
+    wait_until_blocked(db, &second, 2).await;
+    config.rollback().await.unwrap();
+    (first.await.unwrap(), second.await.unwrap())
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn create_tenant_after_add_domain_of_its_hostname_gets_already_exists(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    tenancy::create_tenant(&runtime, &owner("alpha"))
+        .await
+        .unwrap();
+    let (added, created) = register_in_order(
+        &db,
+        &runtime,
+        add_alpha_domain(&runtime, "beta.localhost"),
+        create_shop(&runtime, "beta"),
+    )
+    .await;
+    added.unwrap();
+    let err = created.unwrap_err();
+    assert_eq!(err.code(), "already_exists", "{err:?}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn add_domain_after_create_tenant_of_the_hostname_gets_already_exists(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    tenancy::create_tenant(&runtime, &owner("alpha"))
+        .await
+        .unwrap();
+    let (created, added) = register_in_order(
+        &db,
+        &runtime,
+        create_shop(&runtime, "beta"),
+        add_alpha_domain(&runtime, "beta.localhost"),
+    )
+    .await;
+    created.unwrap();
+    let err = added.unwrap_err();
+    assert_eq!(err.code(), "already_exists", "{err:?}");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
