@@ -18,7 +18,14 @@ use crate::markets::invalid;
 
 /// Version of the platform's consent texts (banner, preferences page). Change it when the
 /// wording changes: stored records keep the version the person agreed to.
-pub const TEXT_VERSION: &str = "2026-09-25";
+pub const TEXT_VERSION: &str = "2026-10-16";
+
+pub const FIRST_EXPERIMENTS_TEXT_VERSION: &str = "2026-10-16";
+
+pub fn covers_experiments(text_version: &str) -> bool {
+    let date = |v| chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").ok();
+    date(text_version).is_some_and(|d| date(FIRST_EXPERIMENTS_TEXT_VERSION).is_some_and(|c| d >= c))
+}
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, ToSchema,
@@ -283,6 +290,9 @@ async fn insert(
     source: &str,
     ip_hash: Option<&[u8]>,
 ) -> Result<(), Error> {
+    if let Subject::Anon(anon) = subject {
+        lock_anon(tx, anon).await?;
+    }
     let (kind, id) = subject.parts();
     let purposes: Vec<&str> = choices.iter().map(|(p, _)| p.as_str()).collect();
     let granted: Vec<bool> = choices.iter().map(|(_, g)| *g).collect();
@@ -308,6 +318,16 @@ async fn insert(
     if choices.contains(&(ConsentPurpose::EmailMarketing, false)) {
         crate::marketing::subscribers::on_withdrawal(tx, subject).await?;
     }
+    Ok(())
+}
+
+pub(crate) async fn lock_anon(tx: &mut TenantTx, anon: &str) -> Result<(), Error> {
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        format!("consent:{}:anon:{anon}", tx.tenant_id())
+    )
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 
@@ -357,9 +377,34 @@ pub async fn latest(
     subject: &Subject,
     purpose: ConsentPurpose,
 ) -> Result<Option<bool>, Error> {
+    Ok(latest_record(tx, subject, purpose)
+        .await?
+        .map(|r| r.granted))
+}
+
+pub async fn analytics_covers_experiments(
+    tx: &mut TenantTx,
+    subject: &Subject,
+) -> Result<bool, Error> {
+    Ok(latest_record(tx, subject, ConsentPurpose::Analytics)
+        .await?
+        .is_some_and(|r| r.granted && covers_experiments(&r.text_version)))
+}
+
+struct LatestChoice {
+    granted: bool,
+    text_version: String,
+}
+
+async fn latest_record(
+    tx: &mut TenantTx,
+    subject: &Subject,
+    purpose: ConsentPurpose,
+) -> Result<Option<LatestChoice>, Error> {
     let (kind, id) = subject.parts();
-    Ok(sqlx::query_scalar!(
-        "SELECT granted FROM consent_records
+    Ok(sqlx::query_as!(
+        LatestChoice,
+        "SELECT granted, text_version FROM consent_records
          WHERE subject_type = $1 AND subject_id = $2 AND purpose = $3
          ORDER BY at DESC, id DESC LIMIT 1",
         kind,
@@ -466,6 +511,27 @@ mod tests {
         assert!(valid_text_version("2026-09-25"));
         assert!(!valid_text_version("v1;drop"));
         assert!(!valid_text_version(""));
+    }
+
+    #[test]
+    fn only_dated_versions_from_the_experiments_text_cover_experiments() {
+        assert!(covers_experiments("2026-10-16"));
+        assert!(covers_experiments("2026-11-01"));
+        assert!(covers_experiments("2027-01-05"));
+        assert!(covers_experiments(TEXT_VERSION));
+        for v in [
+            "2026-09-25",
+            "2026-10-15",
+            "1",
+            "imported",
+            "2026-10-16x",
+            "2026-1-160",
+            "2026_10_16",
+            "9999-99-99a",
+            "",
+        ] {
+            assert!(!covers_experiments(v), "{v}");
+        }
     }
 
     #[test]

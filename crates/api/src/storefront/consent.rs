@@ -22,6 +22,7 @@ use crate::AppState;
 use crate::admin::parse_json;
 
 pub const SUMMARY_HEADER: &str = "x-consent-summary";
+pub const EXPERIMENTS_HEADER: &str = "x-consent-experiments";
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new().routes(routes!(get_consent, post_consent))
@@ -111,6 +112,7 @@ async fn get_consent(
         (status = 200, body = ConsentState, headers(
             ("X-Consent-Subject" = String, description = "The anonymous subject id (for the edge's cookie)"),
             ("X-Consent-Summary" = String, description = "Granted purposes, comma-separated, for the script-readable `consent` cookie"),
+            ("X-Consent-Experiments" = String, description = "`1` when the subject's analytics grant covers A/B experiments (the edge's `__Secure-consent_exp` cookie); absent otherwise"),
         )),
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
     )
@@ -124,7 +126,7 @@ async fn post_consent(
     let choice: ConsentChoice = parse_json(&body)?;
     let subject = anon(&headers).unwrap_or_else(consent::new_anon_id);
     let session = header_str(&headers, SESSION_HEADER);
-    let state = with_ctx(&s, &shopper, async |tx, _| {
+    let (state, experiments) = with_ctx(&s, &shopper, async |tx, _| {
         let ip = ip_hash(tx, &headers).await?;
         let anon = Subject::Anon(subject.clone());
         consent::record(tx, &anon, &choice, ip.as_deref()).await?;
@@ -139,7 +141,10 @@ async fn post_consent(
             )
             .await?;
         }
-        consent::state(tx, &anon).await
+        Ok((
+            consent::state(tx, &anon).await?,
+            consent::analytics_covers_experiments(tx, &anon).await?,
+        ))
     })
     .await?;
     let mut res = Json(&state).into_response();
@@ -153,6 +158,9 @@ async fn post_consent(
             SUMMARY_HEADER,
             HeaderValue::from_str(&summary).map_err(|e| Error::Internal(e.to_string()))?,
         );
+    }
+    if experiments {
+        h.insert(EXPERIMENTS_HEADER, HeaderValue::from_static("1"));
     }
     Ok(no_store(res))
 }

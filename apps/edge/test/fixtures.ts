@@ -61,6 +61,7 @@ export default {
           forgedStorefrontToken: await status(sf("/shop", { headers: { "x-storefront-token": "sf_other" } })),
           authorization: await status(sf("/shop", { headers: { authorization: "Bearer stolen" } })),
           cookie: await status(sf("/shop", { headers: { cookie: "cart=abc" } })),
+          forgedExperiment: await status(sf("/shop", { headers: { "x-experiment": "e:1:b" } })),
           forgedContext: await status(env.STOREFRONT.fetch("https://storefront/shop", { headers: { "x-platform-ctx": "forged-context-id" } })),
           noContext: await status(env.STOREFRONT.fetch("https://storefront/shop")),
           cartViaBinding: await status(sf("/cart")),

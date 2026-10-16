@@ -6,22 +6,26 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use commerce::experiments::{self, Assignment};
 use commerce::tenancy::{self, Resolved};
 use commerce::themes;
 use object_store::ObjectStoreExt;
 use platform::Error;
-use serde::Deserialize;
-use utoipa::IntoParams;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+use uuid::Uuid;
 
 use crate::AppState;
 use crate::auth::{BuilderService, Service, TENANT_HEADER};
+use crate::storefront::customer::CLIENT_IP_HEADER;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(resolve))
         .routes(routes!(counters))
+        .routes(routes!(enrol))
         .routes(routes!(preview_resolve))
         .routes(routes!(build_spec))
         .routes(routes!(build_source))
@@ -54,6 +58,54 @@ async fn counters(
     Ok(Json(
         commerce::analytics::record_counters(&s.db, &batch).await?,
     ))
+}
+
+#[derive(Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EnrolRequest {
+    pub tenant_id: Uuid,
+    /// The visitor's anonymous consent subject (`__Secure-consent_id`, 32 lowercase hex).
+    pub subject: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct EnrolResponse {
+    /// `null` = control (no running experiment, no covering analytics grant, or no key).
+    pub assignment: Option<Assignment>,
+}
+
+/// The visitor's arm of the tenant's running experiment, asked by the edge before render and
+/// cache (SHOP-96). Enrols only with an analytics grant whose text covers experiments.
+#[utoipa::path(
+    post,
+    path = "/internal/v1/experiments/enrol",
+    tag = "internal",
+    security(("service_token" = [])),
+    request_body = EnrolRequest,
+    responses(
+        (status = 200, body = EnrolResponse),
+        (status = 401, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 429, description = "rate_limited", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn enrol(
+    _service: Service,
+    State(s): State<AppState>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<Response, Error> {
+    let req: EnrolRequest = crate::admin::parse_json(&body)?;
+    let ip = headers
+        .get(CLIENT_IP_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("-");
+    if let Err(wait) = s.rate_limit.check(&format!("enrol:{}", req.tenant_id), ip) {
+        return Ok(crate::rate_limit::rate_limited(wait));
+    }
+    let assignment =
+        experiments::enrol(&s.db, s.experiments.as_ref(), req.tenant_id, &req.subject).await?;
+    Ok(Json(EnrolResponse { assignment }).into_response())
 }
 
 #[derive(Deserialize, IntoParams)]

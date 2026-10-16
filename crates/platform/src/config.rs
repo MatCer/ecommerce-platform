@@ -342,6 +342,7 @@ pub struct StorefrontConfig {
     pub edge_purge_url: Option<Url>,
     /// `EDGE_PURGE_TOKEN`: the edge's own purge token (distinct service token, A7).
     pub edge_purge_token: String,
+    pub experiments_secret: Option<String>,
 }
 
 impl StorefrontConfig {
@@ -372,11 +373,19 @@ impl StorefrontConfig {
                 reason: "must be at least 16 characters when EDGE_PURGE_URL is set".into(),
             });
         }
+        let experiments_secret = get(lookup, "EXPERIMENTS_SECRET");
+        if experiments_secret.as_ref().is_some_and(|s| s.len() < 32) {
+            return Err(ConfigError::Invalid {
+                name: "EXPERIMENTS_SECRET",
+                reason: "must be at least 32 characters".into(),
+            });
+        }
         Ok(Self {
             scheme,
             port,
             edge_purge_url,
             edge_purge_token,
+            experiments_secret,
         })
     }
 }
@@ -814,6 +823,23 @@ mod tests {
             .is_err(),
             "purge URL without a token"
         );
+    }
+
+    #[test]
+    fn experiments_secret_is_optional_but_long() {
+        let cfg = StorefrontConfig::from_lookup(&env(&[])).expect("defaults");
+        assert!(cfg.experiments_secret.is_none());
+        let secret = "0123456789abcdef0123456789abcdef";
+        let cfg =
+            StorefrontConfig::from_lookup(&env(&[("EXPERIMENTS_SECRET", secret)])).expect("valid");
+        assert_eq!(cfg.experiments_secret.as_deref(), Some(secret));
+        assert!(matches!(
+            StorefrontConfig::from_lookup(&env(&[("EXPERIMENTS_SECRET", "short")])),
+            Err(ConfigError::Invalid {
+                name: "EXPERIMENTS_SECRET",
+                ..
+            })
+        ));
     }
 
     fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {

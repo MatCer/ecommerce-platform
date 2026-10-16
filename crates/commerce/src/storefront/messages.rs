@@ -75,6 +75,30 @@ mod tests {
     }
 
     #[test]
+    fn the_banner_says_analytics_covers_testing_page_variants() {
+        for (locale, first_layer, hint) in [
+            (
+                "en",
+                "We use cookies for analytics and personalization. Analytics also covers testing page variants to improve the shop. Nothing is stored without your consent.",
+                "Anonymous visit statistics and testing of page variants that help us improve the shop.",
+            ),
+            (
+                "cs",
+                "Používáme cookies k měření návštěvnosti a personalizaci. Analytika zahrnuje i testování variant stránek pro zlepšení obchodu. Bez souhlasu nic neukládáme.",
+                "Anonymní statistiky návštěvnosti a testování variant stránek, které nám pomáhají obchod zlepšovat.",
+            ),
+            (
+                "sk",
+                "Používame cookies na meranie návštevnosti a personalizáciu. Analytika zahŕňa aj testovanie variantov stránok na zlepšenie obchodu. Bez súhlasu nič neukladáme.",
+                "Anonymné štatistiky návštevnosti a testovanie variantov stránok, ktoré nám pomáhajú obchod zlepšovať.",
+            ),
+        ] {
+            assert_eq!(text(locale, "consent.text"), first_layer);
+            assert_eq!(text(locale, "consent.analytics_hint"), hint);
+        }
+    }
+
+    #[test]
     fn lookup_and_format() {
         assert_eq!(text("sk-SK", "cart.add"), "Pridať do košíka");
         assert_eq!(text("de", "cart.add"), "Add to cart");

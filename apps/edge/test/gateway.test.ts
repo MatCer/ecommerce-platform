@@ -276,6 +276,7 @@ describe("restricted theme binding (A7)", () => {
       forgedStorefrontToken: 400,
       authorization: 400,
       cookie: 400,
+      forgedExperiment: 400,
       forgedContext: 403,
       noContext: 403,
       cartViaBinding: 404,
@@ -1347,6 +1348,7 @@ describe("platform routes backed by the real API (WP6)", () => {
       "__Secure-consent_id=0123456789abcdef0123456789abcdef; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400; HttpOnly",
       // The SDK's own format (granted purposes), so the banner and the edge write one cookie.
       "consent=analytics%2Cpersonalization; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=15552000",
+      "__Secure-consent_exp=; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=0; HttpOnly",
     ]);
     // The checkout origin (preferences page) shares the subject and adds the session.
     await get(

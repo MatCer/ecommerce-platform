@@ -357,6 +357,8 @@ pub struct Resolved {
     pub checkout_artifact: Option<String>,
     /// Checkout policy of each exact origin of this hostname. An origin without one is isolated.
     pub checkout_origins: Vec<CheckoutOriginPolicy>,
+    /// The running A/B experiment (SHOP-96); the edge asks for an arm only while it is set.
+    pub experiment: Option<crate::experiments::ExperimentRef>,
 }
 
 /// Where checkout runs for one exact shop origin (same-origin-checkout.md, Routing).
@@ -440,6 +442,7 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
     .fetch_one(&mut *tx)
     .await?;
     let theme = themes::active(&mut tx).await?;
+    let experiment = crate::experiments::running(&mut tx).await?;
     tx.commit().await?;
     Ok(Some(Resolved {
         hostname: host,
@@ -456,6 +459,7 @@ pub async fn resolve_host(db: &PgPool, host: &str) -> Result<Option<Resolved>, E
         retained_artifacts: theme.retained,
         checkout_artifact,
         checkout_origins,
+        experiment,
     }))
 }
 

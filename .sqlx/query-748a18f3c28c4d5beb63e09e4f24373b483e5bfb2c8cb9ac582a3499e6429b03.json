@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT arm FROM experiment_assignments WHERE experiment_id = $1 AND anon_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "arm",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiment_assignments",
+            "name": "arm"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "748a18f3c28c4d5beb63e09e4f24373b483e5bfb2c8cb9ac582a3499e6429b03"
+}

@@ -22,6 +22,7 @@ import {
 } from "./bindings.ts";
 import { HtmlCache, normalizeUrl, requestVerdict, responseVerdict } from "./cache.ts";
 import { type Counters, templateOf } from "./counters.ts";
+import type { Assignment, Enroller } from "./experiments.ts";
 import {
   contentSecurityPolicy,
   securityHeaders,
@@ -75,6 +76,7 @@ export interface GatewayOptions {
   adminOrigin?: string;
   /** Signed rate identities for local Playwright contexts; never configured in production. */
   e2eRateSecret?: string;
+  experiments?: Enroller;
 }
 
 const SPECULATION_RULES = JSON.stringify({
@@ -187,6 +189,7 @@ const CLEAR_SESSION_COOKIE = `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; Same
  */
 const CONSENT_ID_COOKIE = "__Secure-consent_id";
 const CONSENT_COOKIE = "consent";
+const EXPERIMENTS_COOKIE = "__Secure-consent_exp";
 const CONSENT_ID_MAX_AGE = 396 * 86_400;
 /** Same lifetime and format as the SDK's own write (`@platform/storefront-sdk/consent`). */
 const CONSENT_MAX_AGE = 180 * 86_400;
@@ -234,6 +237,21 @@ function readCookie(headers: Headers, name: string): string | undefined {
     if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim() || undefined;
   }
   return undefined;
+}
+
+function experimentSubject(headers: Headers): string | undefined {
+  const subject = readCookie(headers, CONSENT_ID_COOKIE);
+  if (!subject || !CONSENT_ID_RE.test(subject)) return undefined;
+  if (readCookie(headers, EXPERIMENTS_COOKIE) !== "1") return undefined;
+  let summary: string;
+  try {
+    summary = decodeURIComponent(readCookie(headers, CONSENT_COOKIE) ?? "");
+  } catch {
+    return undefined;
+  }
+  return CONSENT_SUMMARY_RE.test(summary) && summary.split(",").includes("analytics")
+    ? subject
+    : undefined;
 }
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -387,12 +405,14 @@ export function createGateway(opts: GatewayOptions) {
       sessionToken?: string | undefined;
       consentSubject?: string | undefined;
       scope?: string;
+      experiment?: Assignment | undefined;
     } = {},
   ) {
     const ctxId = registry.open(site, artifactId, {
       cartToken: extra.cartToken,
       sessionToken: extra.sessionToken,
       consentSubject: extra.consentSubject,
+      experiment: extra.experiment,
     });
     try {
       const headers = workerRequestHeaders();
@@ -434,6 +454,31 @@ export function createGateway(opts: GatewayOptions) {
     } finally {
       registry.close(ctxId);
     }
+  }
+
+  async function enrolment(site: Site, headers: Headers): Promise<Assignment | undefined> {
+    const running = site.experiment;
+    if (!running || site.preview || !opts.experiments) return undefined;
+    const subject = experimentSubject(headers);
+    if (!subject) return undefined;
+    try {
+      const a = await opts.experiments.enrol(site, subject);
+      if (!a) return undefined;
+      if (a.experiment_id === running.id && a.version === running.version) return a;
+      log({
+        level: "warn",
+        msg: "experiment answer for another experiment",
+        tenant: site.tenant_id,
+      });
+    } catch (err) {
+      log({
+        level: "warn",
+        msg: "experiment enrolment failed",
+        tenant: site.tenant_id,
+        err: String(err),
+      });
+    }
+    return undefined;
   }
 
   function themeHeaders(m: ArtifactManifest, site: Site, port: string): Record<string, string> {
@@ -481,11 +526,15 @@ export function createGateway(opts: GatewayOptions) {
       preview: Boolean(site.preview),
       headers: req.headers,
     });
+    const assignment = await enrolment(site, req.headers);
     const key = [
       site.tenant_id,
       site.market_id,
       site.locale,
       artifact,
+      ...(assignment
+        ? [`exp:${assignment.experiment_id}:${assignment.version}:${assignment.arm}`]
+        : []),
       normalized.host,
       normalized.pathname + normalized.search,
     ].join("|");
@@ -501,7 +550,10 @@ export function createGateway(opts: GatewayOptions) {
       const h = new Headers(headers);
       for (const [k, v] of Object.entries(themeHeaders(m, site, port))) h.set(k, v);
       // The edge holds the shared copy; browsers always revalidate so a purge takes effect at once.
-      h.set("cache-control", cacheable ? "public, max-age=0, must-revalidate" : "no-store");
+      h.set(
+        "cache-control",
+        cacheable ? `${assignment ? "private" : "public"}, max-age=0, must-revalidate` : "no-store",
+      );
       h.set("x-edge-cache", cacheState);
       // Page-model fan-out of this render (read by the gates as an N+1 signal).
       if (subrequests !== undefined) h.set("x-edge-subrequests", String(subrequests));
@@ -510,7 +562,10 @@ export function createGateway(opts: GatewayOptions) {
 
     const store = async () => {
       const gen = cache.generation;
-      const r = await render(artifact, normalized, site, { scope: site.tenant_id });
+      const r = await render(artifact, normalized, site, {
+        scope: site.tenant_id,
+        experiment: assignment,
+      });
       const rv = responseVerdict({
         status: r.status,
         headers: r.rawHeaders,
@@ -876,6 +931,9 @@ ${
     const summary = res.headers.get("x-consent-summary");
     const scope = `Domain=${site.shop_host}; Path=/; Secure; SameSite=Lax`;
     const chose = res.ok && req.method === "POST";
+    if (chose)
+      for (const s of [subject, minted])
+        if (s && CONSENT_ID_RE.test(s)) opts.experiments?.forget(site.tenant_id, s);
     if (chose && minted && CONSENT_ID_RE.test(minted))
       headers.append(
         "set-cookie",
@@ -885,6 +943,13 @@ ${
       headers.append(
         "set-cookie",
         `${CONSENT_COOKIE}=${encodeURIComponent(summary)}; ${scope}; Max-Age=${CONSENT_MAX_AGE}`,
+      );
+    if (chose)
+      headers.append(
+        "set-cookie",
+        res.headers.get("x-consent-experiments") === "1"
+          ? `${EXPERIMENTS_COOKIE}=1; ${scope}; Max-Age=${CONSENT_ID_MAX_AGE}; HttpOnly`
+          : `${EXPERIMENTS_COOKIE}=; ${scope}; Max-Age=0; HttpOnly`,
       );
     return new Response(await res.arrayBuffer(), {
       status: res.status,

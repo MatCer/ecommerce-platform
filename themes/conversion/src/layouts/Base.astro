@@ -42,7 +42,7 @@ const CONSENT_KEYS = [
   "consent.settings",
   "consent.save",
   "consent.necessary",
-  ...shop.consent.purposes.map((p) => `consent.${p}`),
+  ...shop.consent.purposes.flatMap((p) => [`consent.${p}`, `consent.${p}_hint`]),
 ];
 ---
 

@@ -110,6 +110,7 @@ pub struct AppState {
     pub builder_token: Option<auth::ServiceToken>,
     /// Packeta/PPL (WP12); `None` in tools and tests without carrier endpoints.
     pub carriers: Option<commerce::carriers::Carriers>,
+    pub experiments: Option<commerce::experiments::ExperimentKey>,
 }
 
 #[derive(OpenApi)]

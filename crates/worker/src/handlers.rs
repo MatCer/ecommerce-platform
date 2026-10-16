@@ -1084,7 +1084,6 @@ async fn recommendations_rollup(ctx: Ctx, job: Job) -> Result<(), JobError> {
     Ok(())
 }
 
-/// Nightly: event partitions two months ahead, drop those past the 13-month retention.
 async fn analytics_partitions(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let created = sqlx::query_scalar!(r#"SELECT platform.ensure_event_partitions(2) AS "n!""#)
         .fetch_one(&ctx.db)
@@ -1092,7 +1091,16 @@ async fn analytics_partitions(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let dropped = sqlx::query_scalar!(r#"SELECT platform.drop_event_partitions(13) AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
-    tracing::info!(created, dropped, "event partitions maintained");
+    let assignments_purged =
+        sqlx::query_scalar!(r#"SELECT platform.purge_experiment_assignments() AS "n!""#)
+            .fetch_one(&ctx.db)
+            .await?;
+    tracing::info!(
+        created,
+        dropped,
+        assignments_purged,
+        "event partitions maintained"
+    );
     Ok(())
 }
 

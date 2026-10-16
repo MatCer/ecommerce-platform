@@ -50,20 +50,34 @@ export default function ConsentPanel(props: ConsentPanelProps) {
             {l("consent.necessary")}
           </label>
           <For each={props.purposes}>
-            {(p) => (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={chosen().includes(p)}
-                  onChange={(e) =>
-                    setChosen(
-                      e.currentTarget.checked ? [...chosen(), p] : chosen().filter((x) => x !== p),
-                    )
-                  }
-                />
-                {l(`consent.${p}`)}
-              </label>
-            )}
+            {(p) => {
+              const hint = () => props.labels[`consent.${p}_hint`];
+              const hintId = `pf-consent-hint-${p}`;
+              return (
+                <div>
+                  <label>
+                    <input
+                      type="checkbox"
+                      aria-describedby={hint() ? hintId : undefined}
+                      checked={chosen().includes(p)}
+                      onChange={(e) =>
+                        setChosen(
+                          e.currentTarget.checked
+                            ? [...chosen(), p]
+                            : chosen().filter((x) => x !== p),
+                        )
+                      }
+                    />
+                    {l(`consent.${p}`)}
+                  </label>
+                  <Show when={hint()}>
+                    <p id={hintId} class="pf-consent__hint">
+                      {hint()}
+                    </p>
+                  </Show>
+                </div>
+              );
+            }}
           </For>
         </fieldset>
       </Show>

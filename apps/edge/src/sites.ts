@@ -34,6 +34,7 @@ export interface Site {
    * artifact; nothing is cached, counted or handed to the checkout.
    */
   preview?: { revision: number; expiresAt: number };
+  experiment?: { id: string; version: number } | null;
 }
 
 export type CheckoutMode = "isolated" | "same_origin";
@@ -129,6 +130,7 @@ interface Resolved {
   retained_artifacts: string[];
   checkout_artifact: string | null;
   checkout_origins: CheckoutPolicy[];
+  experiment?: { id: string; version: number } | null;
 }
 
 /**
@@ -169,6 +171,7 @@ function toSite(r: Resolved): Site {
     retained_artifacts: r.retained_artifacts,
     checkout_artifact: r.checkout_artifact,
     checkout_origins: r.checkout_origins,
+    experiment: r.experiment ?? null,
   };
 }
 

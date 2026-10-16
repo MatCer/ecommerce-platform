@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT granted, text_version FROM consent_records\n         WHERE subject_type = $1 AND subject_id = $2 AND purpose = $3\n         ORDER BY at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "granted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "consent_records",
+            "name": "granted"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "text_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "consent_records",
+            "name": "text_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "09513d643543554196211cf1962aeb27a70f93446106b8a6f2f5ca74f088fcbc"
+}

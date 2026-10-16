@@ -88,6 +88,7 @@ fn state(db: PgPool) -> AppState {
             "builder-token-for-http-tests-0123456789",
         )),
         carriers: None,
+        experiments: None,
     }
 }
 

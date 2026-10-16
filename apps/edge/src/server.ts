@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { ArtifactFetcher } from "./artifacts.ts";
 import { Counters } from "./counters.ts";
+import { ApiEnroller } from "./experiments.ts";
 import { createGateway } from "./gateway.ts";
 import { ApiPreviewResolver, ApiResolver } from "./sites.ts";
 
@@ -44,6 +45,7 @@ const gateway = createGateway({
   previews: new ApiPreviewResolver(apiOrigin, serviceToken),
   adminOrigin: process.env.ADMIN_ORIGIN || undefined,
   e2eRateSecret,
+  experiments: new ApiEnroller(apiOrigin, serviceToken),
 });
 
 const port = Number(process.env.PORT ?? 8787);

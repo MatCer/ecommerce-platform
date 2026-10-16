@@ -67,7 +67,14 @@ body:has(.pf-consent) {
 .pf-consent__purposes input {
   width: 1.125rem;
   height: 1.125rem;
+  margin: 0;
   accent-color: var(--color-identity, #2b5aa8);
+}
+.pf-consent__hint {
+  margin: 0;
+  margin-inline-start: calc(1.125rem + 0.625rem);
+  color: var(--color-muted-foreground, #5c6370);
+  font-size: smaller;
 }
 .pf-consent__sr {
   position: absolute;

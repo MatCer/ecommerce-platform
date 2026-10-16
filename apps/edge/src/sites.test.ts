@@ -69,6 +69,7 @@ test("the API resolver maps the resolve response and caches nothing on errors", 
     retained_artifacts: [],
     checkout_artifact: null,
     checkout_origins: [sk],
+    experiment: null,
   });
   expect(seen[0]).toBe(
     "http://api:8000/internal/v1/resolve?host=demo-sk.localhost Bearer service-token",
@@ -79,6 +80,27 @@ test("the API resolver maps the resolve response and caches nothing on errors", 
   const cached = new CachedResolver(r);
   await expect(cached.resolve("down.localhost")).rejects.toThrow();
   expect(seen.filter((s) => s.includes("down.localhost")).length).toBe(2);
+});
+
+test("the API resolver maps the running experiment (SHOP-96)", async () => {
+  const r = new ApiResolver("http://api:8000", "service-token", async () =>
+    Response.json({
+      hostname: "demo.localhost",
+      tenant_id: "t1",
+      market_id: "m-cz",
+      default_locale: "cs",
+      locales: ["cs"],
+      storefront_token: "sf_x",
+      theme_artifact: null,
+      retained_artifacts: [],
+      checkout_artifact: null,
+      experiment: { id: "11111111-1111-4111-8111-111111111111", version: 3 },
+    }),
+  );
+  expect((await r.resolve("demo.localhost"))?.experiment).toEqual({
+    id: "11111111-1111-4111-8111-111111111111",
+    version: 3,
+  });
 });
 
 test.each([

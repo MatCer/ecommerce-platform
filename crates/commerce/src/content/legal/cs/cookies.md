@@ -11,7 +11,7 @@ E-shop {{shop_name}} ({{company_name}}) používá cookies. Nezbytné cookies uk
 
 ## Cookies se souhlasem
 
-- **Analytika**: měření návštěvnosti a rychlosti webu.
+- **Analytika**: měření návštěvnosti a rychlosti webu a testování variant stránek pro zlepšení obchodu.
 - **Reklama**: měření účinnosti reklam.
 - **Personalizace**: například naposledy prohlížené zboží.
 

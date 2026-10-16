@@ -3201,6 +3201,8 @@ export interface operations {
         responses: {
             200: {
                 headers: {
+                    /** @description `1` when the subject's analytics grant covers A/B experiments (the edge's `__Secure-consent_exp` cookie); absent otherwise */
+                    "X-Consent-Experiments"?: string;
                     /** @description The anonymous subject id (for the edge's cookie) */
                     "X-Consent-Subject"?: string;
                     /** @description Granted purposes, comma-separated, for the script-readable `consent` cookie */

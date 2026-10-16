@@ -72,6 +72,7 @@ api-native: ## Run the API on the host, port API_PORT, database APP_DB (needs `m
 	AUTH_JWKS_URL=http://auth.localhost:$(HTTP_PORT)/api/auth/jwks ADMIN_ORIGIN=http://admin.localhost:$(HTTP_PORT) \
 	INTERNAL_API_TOKEN="$(INTERNAL_API_TOKEN)" SECRETS_KEY="$(SECRETS_KEY)" \
 	THEME_SECRET="$(THEME_SECRET)" THEME_BUILDER_TOKEN="$(THEME_BUILDER_TOKEN)" MAIL_EVENTS_SECRET="$(MAIL_EVENTS_SECRET)" \
+	EXPERIMENTS_SECRET="$(EXPERIMENTS_SECRET)" \
 	STRIPE_MOCK_URL=http://localhost:$(STRIPE_MOCK_PORT) STRIPE_WEBHOOK_SECRET=whsec_local_simulator_0123456789 \
 	cargo run --locked -p api
 
