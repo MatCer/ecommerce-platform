@@ -1348,6 +1348,8 @@ describe("platform routes backed by the real API (WP6)", () => {
       "__Secure-consent_id=0123456789abcdef0123456789abcdef; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400; HttpOnly",
       // The SDK's own format (granted purposes), so the banner and the edge write one cookie.
       "consent=analytics%2Cpersonalization; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=15552000",
+      // The API did not say the grant covers experiments (older wording).
+      "__Secure-consent_exp=; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=0; HttpOnly",
     ]);
     // The checkout origin (preferences page) shares the subject and adds the session.
     await get(

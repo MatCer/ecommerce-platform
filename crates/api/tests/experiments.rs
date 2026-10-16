@@ -161,3 +161,50 @@ async fn enrolment_is_rate_limited_per_tenant_and_client_ip(db: PgPool) {
     let (status, _, _) = enrol("198.51.100.1").send(&s).await;
     assert_eq!(status, StatusCode::OK, "another client IP");
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_recorded_choice_tells_the_edge_whether_its_analytics_grant_covers_experiments(
+    db: PgPool,
+) {
+    let jwks = jwks_server(json!([jwk("a", X_A)])).await;
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "exp-flag").await;
+    let s = state(runtime.clone(), &jwks, Duration::from_secs(30));
+    let mut seen = vec![];
+    for purposes in [
+        json!({"analytics": true}),
+        json!({"personalization": true}),
+        json!({"analytics": false}),
+    ] {
+        for version in [consent::TEXT_VERSION, "2026-09-25"] {
+            let (status, body, res) = Call::post(
+                "/storefront/v1/consent",
+                json!({"purposes": purposes, "text_version": version}),
+            )
+            .header("x-storefront-token", shop.token.clone())
+            .header("x-market", shop.cz.to_string())
+            .header("x-consent-subject", SUBJECT)
+            .send(&s)
+            .await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            seen.push(
+                res.headers()
+                    .get("x-consent-experiments")
+                    .map(|v| v.to_str().unwrap().to_owned()),
+            );
+        }
+    }
+    assert_eq!(
+        seen,
+        [
+            Some("1".into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ],
+        "analytics granted under the experiments wording, then the old wording; a later choice \
+         without analytics keeps the old analytics record; withdrawal"
+    );
+}

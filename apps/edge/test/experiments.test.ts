@@ -1,7 +1,7 @@
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { ApiEnroller, type Enroller } from "../src/experiments.ts";
 import { createGateway, type Gateway } from "../src/gateway.ts";
 import { StaticResolver } from "../src/sites.ts";
@@ -36,7 +36,7 @@ describe("ApiEnroller", () => {
     expect(seen.length).toBe(4);
   });
 
-  test("failures throw and are retried; malformed answers count as not enrolled", async () => {
+  test("failures throw and are retried after the backoff; malformed answers count as not enrolled", async () => {
     const answers: (() => Response)[] = [
       () => new Response("boom", { status: 500 }),
       () => Response.json({ assignment: { experiment_id: EXP.id, version: 3, arm: "A B" } }),
@@ -51,11 +51,11 @@ describe("ApiEnroller", () => {
     });
     const s = site({ experiment: EXP });
     await expect(enroller.enrol(s, ALICE, 0)).rejects.toThrow("enrol: 500");
-    expect(await enroller.enrol(s, ALICE, 0)).toBeNull();
+    expect(await enroller.enrol(s, ALICE, 10_000)).toBeNull();
     enroller.forget("t-demo", ALICE);
-    expect(await enroller.enrol(s, ALICE, 0)).toBeNull();
+    expect(await enroller.enrol(s, ALICE, 10_000)).toBeNull();
     enroller.forget("t-demo", ALICE);
-    expect(await enroller.enrol(s, ALICE, 0)).toBeNull();
+    expect(await enroller.enrol(s, ALICE, 10_000)).toBeNull();
     expect(calls).toBe(4);
   });
 
@@ -97,7 +97,7 @@ describe("ApiEnroller", () => {
     expect(ips).toEqual(["203.0.113.7", null]);
   });
 
-  test("gives up after 500 ms", async () => {
+  test("gives up after 150 ms", async () => {
     const enroller = new ApiEnroller(
       "http://api.test",
       "t",
@@ -108,7 +108,44 @@ describe("ApiEnroller", () => {
     );
     const started = Date.now();
     await expect(enroller.enrol(site({ experiment: EXP }), ALICE)).rejects.toThrow();
-    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(Date.now() - started).toBeLessThan(400);
+  });
+
+  test("12 concurrent enrolments of one subject share one API call", async () => {
+    let calls = 0;
+    let release = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const enroller = new ApiEnroller("http://api.test", "t", async () => {
+      calls++;
+      await gate;
+      return Response.json({ assignment: { experiment_id: EXP.id, version: 3, arm: "b" } });
+    });
+    const s = site({ experiment: EXP });
+    const all = Promise.all(Array.from({ length: 12 }, () => enroller.enrol(s, ALICE, 0)));
+    release();
+    expect(await all).toEqual(
+      Array.from({ length: 12 }, () => ({ experiment_id: EXP.id, version: 3, arm: "b" })),
+    );
+    expect(calls).toBe(1);
+  });
+
+  test("after a failure the API is asked at most once per 10 s window", async () => {
+    let calls = 0;
+    const enroller = new ApiEnroller("http://api.test", "t", async () => {
+      calls++;
+      return new Response("down", { status: 503 });
+    });
+    const s = site({ experiment: EXP });
+    const visitor = (i: number) => i.toString(16).padStart(32, "0");
+    await expect(enroller.enrol(s, visitor(0), 0)).rejects.toThrow("enrol: 503");
+    for (let t = 1; t < 10_000; t += 500) expect(await enroller.enrol(s, visitor(t), t)).toBeNull();
+    expect(calls).toBe(1);
+    await expect(enroller.enrol(s, visitor(1), 10_000)).rejects.toThrow("enrol: 503");
+    for (let t = 10_001; t < 20_000; t += 500)
+      expect(await enroller.enrol(s, visitor(t), t)).toBeNull();
+    expect(calls).toBe(2);
   });
 });
 
@@ -138,6 +175,13 @@ describe("enrolment at the edge (SHOP-96)", () => {
           typeof a === "string" ? { experiment_id: EXP.id, version: EXP.version, arm: a } : a,
       });
     }
+    if (url.pathname === "/storefront/v1/consent" && req.method === "POST") {
+      const choice = (await req.clone().json()) as { purposes: { analytics?: boolean } };
+      const res = await api.fn(req);
+      const headers = new Headers(res.headers);
+      if (choice.purposes.analytics) headers.set("x-consent-experiments", "1");
+      return new Response(res.body, { status: res.status, headers });
+    }
     const res = await api.fn(req);
     return url.pathname === "/storefront/v1/pages/product/short"
       ? Response.json({ cache: { public: true, max_age: 1, tags: [] } })
@@ -156,7 +200,7 @@ describe("enrolment at the edge (SHOP-96)", () => {
       }),
     );
   const consented = (s: string, purposes = "analytics%2Cpersonalization") =>
-    `__Secure-consent_id=${s}; consent=${purposes}`;
+    `__Secure-consent_id=${s}; consent=${purposes}; __Secure-consent_exp=1`;
   const experimentHeaders = (p: string) =>
     api.calls
       .filter((c) => c.url === `http://api.test/storefront/v1${p}`)
@@ -225,6 +269,39 @@ describe("enrolment at the edge (SHOP-96)", () => {
     await page("/?case=b", "consent=analytics");
     await page("/?case=b", consented(subject("b"), "analytics%ZZ"));
     expect(enrolCalls).toEqual([]);
+  });
+
+  test("an analytics grant under the older wording never asks the API", async () => {
+    answers.set(subject("a"), "a");
+    const old = `__Secure-consent_id=${subject("a")}; consent=analytics`;
+    for (const cookie of [old, `${old}; __Secure-consent_exp=0`, `${old}; __Secure-consent_exp=`])
+      expect((await page("/?case=old", cookie)).headers.get("cache-control")).toBe(PUBLIC);
+    expect(enrolCalls).toEqual([]);
+  });
+
+  test("a choice through the edge keeps the experiments cookie in step with the API", async () => {
+    const choose = async (analytics: boolean) =>
+      (
+        await gw.fetch(
+          new Request("http://demo.localhost/_p/consent", {
+            method: "POST",
+            headers: {
+              host: "demo.localhost",
+              origin: "http://demo.localhost",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ purposes: { analytics }, text_version: "2026-10-16" }),
+          }),
+        )
+      ).headers
+        .getSetCookie()
+        .filter((c) => c.startsWith("__Secure-consent_exp="));
+    expect(await choose(true)).toEqual([
+      "__Secure-consent_exp=1; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=34214400; HttpOnly",
+    ]);
+    expect(await choose(false)).toEqual([
+      "__Secure-consent_exp=; Domain=demo.localhost; Path=/; Secure; SameSite=Lax; Max-Age=0; HttpOnly",
+    ]);
   });
 
   test("an enrolled visitor keeps their arm: one enrol call, then a HIT of the arm's entry", async () => {
@@ -313,24 +390,6 @@ describe("enrolment at the edge (SHOP-96)", () => {
     expect(experimentHeaders("/shop")).toEqual([ARM("a"), null]);
   });
 
-  test("an enroller error or timeout serves the control page and logs no subject", async () => {
-    answers.set(subject("3"), "error");
-    answers.set(subject("4"), "hang");
-    const rs = [
-      await page("/?case=g", consented(subject("3"))),
-      await page("/?case=g", consented(subject("4"))),
-    ];
-    expect(rs.map((r) => [r.status, r.headers.get("cache-control")])).toEqual([
-      [200, PUBLIC],
-      [200, PUBLIC],
-    ]);
-    expect(experimentHeaders("/shop")).toEqual([null]);
-    expect(logs.filter((l) => l.msg === "experiment enrolment failed").length).toBe(2);
-    const logged = JSON.stringify(logs);
-    expect(logged).not.toContain(subject("3"));
-    expect(logged).not.toContain(subject("4"));
-  });
-
   test("a new visitor is enrolled even when their arm's page is a cache HIT", async () => {
     answers.set(subject("5"), "a");
     answers.set(subject("6"), "a");
@@ -373,5 +432,102 @@ describe("enrolment at the edge (SHOP-96)", () => {
     expect((await page("/_p/public/shop", undefined, "demo.localhost", forged)).status).toBe(200);
     expect(api.calls.length).toBe(2);
     expect(api.calls.map((c) => c.headers["x-experiment"] ?? null)).toEqual([null, null]);
+  });
+});
+
+describe("enrolment while the API is down (SHOP-96)", () => {
+  const subject = (i: number) => i.toString(16).padStart(32, "0");
+  const consented = (s: string) =>
+    `__Secure-consent_id=${s}; consent=analytics; __Secure-consent_exp=1`;
+  let root: string;
+  let theme: string;
+  let gw: Gateway | undefined;
+
+  beforeAll(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "shop96-outage-"));
+    theme = (await buildArtifact(root, "theme", hostileTheme("v1"), { "_astro/app.v1.js": "1" }))
+      .id;
+  });
+
+  afterEach(async () => {
+    await gw?.dispose();
+    gw = undefined;
+  });
+
+  const gateway = (enrol: (req: Request) => Promise<Response>) => {
+    const api = fakeApi();
+    const logs: Record<string, unknown>[] = [];
+    const upstream = (req: Request) =>
+      new URL(req.url).pathname === "/internal/v1/experiments/enrol" ? enrol(req) : api.fn(req);
+    gw = createGateway({
+      artifactRoot: root,
+      resolver: new StaticResolver({
+        "demo.localhost": site({ theme_artifact: theme, experiment: EXP }),
+      }),
+      apiOrigin: "http://api.test",
+      mediaOrigin: "http://media.test",
+      scheme: "http",
+      purgeToken: "purge-token-0123456789abcdef",
+      upstream,
+      log: (e) => logs.push(e),
+      experiments: new ApiEnroller("http://api.test", "service-token", upstream),
+    });
+    const g = gw;
+    const page = async (cookie?: string) => {
+      const started = performance.now();
+      const res = await g.fetch(
+        new Request("http://demo.localhost/?case=outage", {
+          headers: { host: "demo.localhost", ...(cookie ? { cookie } : {}) },
+        }),
+      );
+      return { res, ms: performance.now() - started };
+    };
+    return { page, logs };
+  };
+
+  test("a cached page stays fast while the API hangs; the API is asked once per window", async () => {
+    let calls = 0;
+    const { page, logs } = gateway((req) => {
+      calls++;
+      return new Promise((_, reject) =>
+        req.signal.addEventListener("abort", () => reject(req.signal.reason)),
+      );
+    });
+    expect((await page()).res.headers.get("x-edge-cache")).toBe("MISS");
+    const visits = [];
+    for (let i = 0; i < 8; i++) visits.push(await page(consented(subject(i))));
+    expect(visits.map((v) => [v.res.status, v.res.headers.get("x-edge-cache")])).toEqual(
+      visits.map(() => [200, "HIT"]),
+    );
+    expect(calls).toBe(1);
+    expect(visits[0]?.ms).toBeLessThan(400);
+    expect(Math.max(...visits.slice(1).map((v) => v.ms))).toBeLessThan(50);
+    expect(logs.filter((l) => l.msg === "experiment enrolment failed").length).toBe(1);
+    expect(JSON.stringify(logs)).not.toContain(subject(0));
+  });
+
+  test("an enroller error serves the control page and logs no subject", async () => {
+    const { page, logs } = gateway(async () => new Response("boom", { status: 500 }));
+    const { res } = await page(consented(subject(42)));
+    expect([res.status, res.headers.get("cache-control")]).toEqual([
+      200,
+      "public, max-age=0, must-revalidate",
+    ]);
+    expect(logs.filter((l) => l.msg === "experiment enrolment failed").length).toBe(1);
+    expect(JSON.stringify(logs)).not.toContain(subject(42));
+  });
+
+  test("12 concurrent requests of one visitor ask the API once", async () => {
+    let calls = 0;
+    const { page } = gateway(async () => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 20));
+      return Response.json({ assignment: { experiment_id: EXP.id, version: EXP.version, arm: "b" } });
+    });
+    const rs = await Promise.all(Array.from({ length: 12 }, () => page(consented(subject(7)))));
+    expect(rs.map((r) => r.res.headers.get("cache-control"))).toEqual(
+      rs.map(() => "private, max-age=0, must-revalidate"),
+    );
+    expect(calls).toBe(1);
   });
 });
