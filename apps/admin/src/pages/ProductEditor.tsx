@@ -210,6 +210,7 @@ export default function ProductEditor() {
       if (created) creation.done();
       qc.setQueryData([...base, "product", p.id], p);
       void qc.invalidateQueries({ queryKey: [...base, "products"] });
+      void qc.invalidateQueries({ queryKey: [...base, "ai-marks", "product", p.id] });
       // Only the screen that started the save reacts (same user, shop, product and still open).
       if (!alive || route !== params.id || JSON.stringify(base) !== JSON.stringify(tenantKey()))
         return;
@@ -365,6 +366,7 @@ export default function ProductEditor() {
           <Section id="media" title={t("editor.media")}>
             <MediaManager
               media={draft.media}
+              aiMarksFor={params.id}
               skus={skus()}
               onChange={(m) => setDraft("media", reconcile(m))}
             />

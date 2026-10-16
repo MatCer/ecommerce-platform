@@ -13,7 +13,6 @@ use uuid::Uuid;
 use super::fields::EntityType;
 use super::marks::{self, value_hash};
 use super::{Ai, Call, CallError, Outcome, prompts};
-use crate::audit;
 use crate::reviews::{self, plain_text};
 use crate::storefront::Context;
 
@@ -27,16 +26,7 @@ pub const SUMMARY_MAX: usize = 600;
 const LOCALES_PER_CALL: usize = 4;
 pub const DEBOUNCE_SECS: i64 = 300;
 pub const CHANGED_EVENT: &str = "review_summary.changed";
-pub const SETTINGS_CHANGED_EVENT: &str = "ai_settings.changed";
 const ACTOR: &str = "system";
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AiSettings {
-    /// AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
-    /// default.
-    pub review_summaries: bool,
-}
 
 /// An AI summary as the shop shows it (plain text; escape on output).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -49,70 +39,21 @@ pub struct ReviewSummary {
     pub generated_at: DateTime<Utc>,
 }
 
-pub async fn settings(tx: &mut TenantTx) -> Result<AiSettings, Error> {
-    Ok(
-        sqlx::query_scalar!("SELECT review_summaries FROM ai_settings")
-            .fetch_optional(&mut **tx)
-            .await?
-            .map(|review_summaries| AiSettings { review_summaries })
-            .unwrap_or_default(),
+pub(super) async fn enqueue_all(tx: &mut TenantTx) -> Result<(), Error> {
+    let products = sqlx::query_scalar!(
+        r#"SELECT product_id AS "product_id!" FROM reviews
+           WHERE status = 'published' AND verified
+           GROUP BY product_id HAVING count(*) >= $1
+           UNION SELECT product_id FROM review_summaries"#,
+        MIN_REVIEWS
     )
-}
-
-pub async fn put_settings(
-    tx: &mut TenantTx,
-    actor: &str,
-    input: &AiSettings,
-) -> Result<AiSettings, Error> {
-    sqlx::query!(
-        "INSERT INTO ai_settings (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING",
-        tx.tenant_id()
-    )
-    .execute(&mut **tx)
+    .fetch_all(&mut **tx)
     .await?;
-    let before = AiSettings {
-        review_summaries: sqlx::query_scalar!(
-            "SELECT review_summaries FROM ai_settings WHERE tenant_id = $1 FOR UPDATE",
-            tx.tenant_id()
-        )
-        .fetch_one(&mut **tx)
-        .await?,
-    };
-    sqlx::query!(
-        "UPDATE ai_settings SET review_summaries = $2, updated_at = now() WHERE tenant_id = $1",
-        tx.tenant_id(),
-        input.review_summaries
-    )
-    .execute(&mut **tx)
-    .await?;
-    audit::record(
-        tx,
-        actor,
-        "ai.settings_updated",
-        "ai_settings",
-        None,
-        &json!({ "before": before, "after": input }),
-    )
-    .await?;
-    if before != *input {
-        queue::publish(&mut **tx, SETTINGS_CHANGED_EVENT, &json!({})).await?;
+    let tenant_id = tx.tenant_id();
+    for product_id in products {
+        queue::enqueue(&mut **tx, &new_job(tenant_id, product_id)).await?;
     }
-    if input.review_summaries && !before.review_summaries {
-        let products = sqlx::query_scalar!(
-            r#"SELECT product_id AS "product_id!" FROM reviews
-               WHERE status = 'published' AND verified
-               GROUP BY product_id HAVING count(*) >= $1
-               UNION SELECT product_id FROM review_summaries"#,
-            MIN_REVIEWS
-        )
-        .fetch_all(&mut **tx)
-        .await?;
-        let tenant_id = tx.tenant_id();
-        for product_id in products {
-            queue::enqueue(&mut **tx, &new_job(tenant_id, product_id)).await?;
-        }
-    }
-    Ok(*input)
+    Ok(())
 }
 
 fn new_job(tenant_id: Uuid, product_id: Uuid) -> NewJob<'static> {
@@ -152,23 +93,10 @@ struct Input {
 }
 
 async fn load(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<Input>, Error> {
-    let Some(product) = sqlx::query_scalar!(
-        "SELECT name FROM product_translations WHERE product_id = $1
-         ORDER BY (locale = (SELECT default_locale FROM markets WHERE is_default)) DESC NULLS LAST,
-                  locale
-         LIMIT 1",
-        product_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    else {
+    let Some(product) = super::product_name(tx, product_id).await? else {
         return Ok(None);
     };
-    let mut locales =
-        sqlx::query_scalar!(r#"SELECT DISTINCT unnest(locales) AS "locale!" FROM markets"#)
-            .fetch_all(&mut **tx)
-            .await?;
-    locales.sort();
+    let locales = super::market_locales(tx).await?;
     let counts = sqlx::query!(
         r#"SELECT rating, count(*) AS "n!" FROM reviews
            WHERE product_id = $1 AND status = 'published' AND verified GROUP BY rating"#,
@@ -287,7 +215,7 @@ pub async fn run(
 ) -> Result<Outcome, Error> {
     let (input, stored) = {
         let mut tx = tenant_tx(db, tenant).await?;
-        if !settings(&mut tx).await?.review_summaries {
+        if !super::settings::get(&mut tx).await?.review_summaries {
             return Ok(Outcome::Done);
         }
         let Some(input) = load(&mut tx, product_id).await? else {
@@ -347,6 +275,7 @@ async fn summarize(
             data: &data,
             schema: &prompts::review_summary_schema(),
             max_tokens: 2000,
+            image: None,
         };
         let (output, m) = super::call(db, ai, tenant, ACTOR, &call).await?;
         summaries.extend(validate(output, locales)?);

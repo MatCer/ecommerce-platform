@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT alt_texts_since FROM ai_settings FOR SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "alt_texts_since",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "ai_settings",
+            "name": "alt_texts_since"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "83b18f9fd6abb48bf374bdcf40c86d537fb2580f3e9eda6fdfa87260ca5768ac"
+}

@@ -70,6 +70,10 @@ export function useAiMarks(entityType: () => EntityType, entityId: () => string 
   }));
 }
 
+export function altField(assetId: string): string {
+  return `alt_${assetId.replaceAll("-", "")}`;
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }

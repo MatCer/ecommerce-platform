@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT review_summaries FROM ai_settings WHERE tenant_id = $1 FOR UPDATE",
+  "query": "SELECT review_summaries, alt_texts_since IS NOT NULL AS \"alt_texts!\" FROM ai_settings\n           WHERE tenant_id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -13,6 +13,12 @@
             "name": "review_summaries"
           }
         }
+      },
+      {
+        "ordinal": 1,
+        "name": "alt_texts!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -21,8 +27,9 @@
       ]
     },
     "nullable": [
-      false
+      false,
+      null
     ]
   },
-  "hash": "13e9a7363d8ed112bcf582fc0c161cd48a9b0b7ed5b0cfa512b07ffb1d2f2f9a"
+  "hash": "0422734133666a064aca4119e430af8547b51d9170aa0055f03d0f37074e3c62"
 }

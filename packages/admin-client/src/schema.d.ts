@@ -79,6 +79,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/ai/alt-texts/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queues AI alt texts for product images uploaded before the switch went on: one job per
+         *     product with a ready image missing an alt text in some market language. Owner or admin.
+         */
+        post: operations["backfill_alt_texts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/ai/bulk-plans": {
         parameters: {
             query?: never;
@@ -251,12 +271,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The shop's AI switches. Review summaries are off until an admin turns them on. */
+        /** The shop's AI switches. Each is off until an admin turns it on. */
         get: operations["get_ai_settings"];
         /**
          * Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
-         *     summary per product with at least 5 published verified reviews; any change purges the
-         *     shop's cached pages.
+         *     summary per product with at least 5 published verified reviews; switching them purges the
+         *     shop's cached pages. Alt texts apply to images uploaded after they were turned on.
          */
         put: operations["put_ai_settings"];
         post?: never;
@@ -4877,6 +4897,11 @@ export interface components {
         };
         AiSettings: {
             /**
+             * @description AI alt texts for product images uploaded from now on, in every market language that
+             *     has none. Off by default.
+             */
+            alt_texts: boolean;
+            /**
              * @description AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
              *     default.
              */
@@ -5106,6 +5131,10 @@ export interface components {
         };
         BTreeMap: {
             [key: string]: string;
+        };
+        Backfill: {
+            /** @description Products queued for alt texts. */
+            queued: number;
         };
         /** @enum {string} */
         Badge: "sale" | "new";
@@ -9755,6 +9784,52 @@ export interface operations {
                 };
             };
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    backfill_alt_texts: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Backfill"];
+                };
+            };
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

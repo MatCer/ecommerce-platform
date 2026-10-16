@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use commerce::ai::review_summary::{self, AiSettings};
+use commerce::ai::review_summary;
+use commerce::ai::settings::{self, AiSettings};
 use commerce::ai::{Ai, Outcome};
 use commerce::reviews::{self, Status};
 use commerce::storefront::{self, PublicUrls};
@@ -45,11 +46,12 @@ async fn review(runtime: &PgPool, shop: &Shop, rating: i16, verified: bool) -> U
 
 async fn switch(runtime: &PgPool, shop: &Shop, on: bool) -> AiSettings {
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
-    let s = review_summary::put_settings(
+    let s = settings::put(
         &mut tx,
         "owner",
         &AiSettings {
             review_summaries: on,
+            alt_texts: false,
         },
     )
     .await
@@ -138,9 +140,10 @@ async fn nothing_happens_while_the_switch_is_off(db: PgPool) {
     }
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     assert_eq!(
-        review_summary::settings(&mut tx).await.unwrap(),
+        settings::get(&mut tx).await.unwrap(),
         AiSettings {
-            review_summaries: false
+            review_summaries: false,
+            alt_texts: false,
         }
     );
     tx.commit().await.unwrap();
@@ -161,7 +164,8 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     assert_eq!(
         switch(&runtime, &shop, true).await,
         AiSettings {
-            review_summaries: true
+            review_summaries: true,
+            alt_texts: false,
         }
     );
     assert_eq!(jobs(&db, &shop).await, 0, "below the minimum");
@@ -381,9 +385,10 @@ async fn summaries_and_settings_are_tenant_isolated(db: PgPool) {
     .unwrap();
     assert_eq!(seen, (0, 0));
     assert_eq!(
-        review_summary::settings(&mut tx).await.unwrap(),
+        settings::get(&mut tx).await.unwrap(),
         AiSettings {
-            review_summaries: false
+            review_summaries: false,
+            alt_texts: false,
         }
     );
     let forged = sqlx::query(
@@ -397,11 +402,12 @@ async fn summaries_and_settings_are_tenant_isolated(db: PgPool) {
     drop(tx);
 
     let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
-    review_summary::put_settings(
+    settings::put(
         &mut tx,
         "owner",
         &AiSettings {
             review_summaries: true,
+            alt_texts: false,
         },
     )
     .await
@@ -448,11 +454,12 @@ async fn switching_on_refreshes_summaries_that_fell_below_the_minimum_while_off(
 async fn concurrent_switch_changes_each_purge(db: PgPool) {
     let (runtime, shop) = setup(&db, "race-settings").await;
     let mut first = tenant_tx(&runtime, shop.tenant).await.unwrap();
-    review_summary::put_settings(
+    settings::put(
         &mut first,
         "owner",
         &AiSettings {
             review_summaries: true,
+            alt_texts: false,
         },
     )
     .await
@@ -462,11 +469,12 @@ async fn concurrent_switch_changes_each_purge(db: PgPool) {
         let shop_tenant = shop.tenant;
         async move {
             let mut tx = tenant_tx(&runtime, shop_tenant).await.unwrap();
-            review_summary::put_settings(
+            settings::put(
                 &mut tx,
                 "admin",
                 &AiSettings {
                     review_summaries: false,
+                    alt_texts: false,
                 },
             )
             .await
@@ -480,9 +488,10 @@ async fn concurrent_switch_changes_each_purge(db: PgPool) {
 
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     assert_eq!(
-        review_summary::settings(&mut tx).await.unwrap(),
+        settings::get(&mut tx).await.unwrap(),
         AiSettings {
-            review_summaries: false
+            review_summaries: false,
+            alt_texts: false,
         }
     );
     drop(tx);

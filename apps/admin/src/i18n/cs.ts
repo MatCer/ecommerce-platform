@@ -235,6 +235,7 @@ export const cs: Dictionary = {
     feature_translate: "Překlady",
     feature_bulk_plan: "Plány hromadných úprav",
     feature_review_summary: "Shrnutí recenzí",
+    feature_alt_text: "Alternativní texty obrázků",
     glossary: "Glosář",
     glossaryDesc:
       "Výrazy, které překlady musí ponechat beze změny (značky), nebo překládat jedním pevným způsobem. Prázdný jazyk výraz ponechá.",
@@ -248,6 +249,12 @@ export const cs: Dictionary = {
     reviewSummariesDesc:
       "Produkty s alespoň 5 zveřejněnými ověřenými recenzemi dostanou na stránce produktu krátké shrnutí od AI, v jazyce každého trhu a označené jako vytvořené umělou inteligencí. Každé shrnutí spotřebuje tokeny AI.",
     adminOnly: "Tato nastavení mohou měnit jen vlastníci a správci.",
+    altTexts: "Alternativní texty nových obrázků produktů",
+    altTextsDesc:
+      "Obrázky produktů nahrané od teď dostanou alternativní text od AI v každém jazyce trhu, kde chybí, přeložený z vašeho vlastního textu, pokud existuje. Vaše texty se nikdy nemění. Každý obrázek spotřebuje tokeny AI.",
+    altTextsBackfill: "Doplnit chybějící alternativní texty",
+    altTextsBackfillDesc: "Doplní chybějící alternativní texty i u dříve nahraných obrázků.",
+    altTextsQueued: "Produkty ve frontě na alternativní texty: {{n}}",
   },
   redirects: {
     title: "Přesměrování",

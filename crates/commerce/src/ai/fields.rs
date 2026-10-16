@@ -114,6 +114,17 @@ fn opt(v: &Option<String>) -> Option<Value> {
     v.as_ref().map(|s| json!(s))
 }
 
+pub fn alt_field(asset_id: Uuid) -> String {
+    format!("alt_{}", asset_id.simple())
+}
+
+fn alt_asset(field: &str) -> Option<Uuid> {
+    let hex = field.strip_prefix("alt_")?;
+    Uuid::try_parse(hex)
+        .ok()
+        .filter(|id| alt_field(*id) == field)
+}
+
 impl Doc {
     pub async fn load(tx: &mut TenantTx, t: EntityType, id: &str) -> Result<Self, Error> {
         let uuid = || Uuid::parse_str(id).map_err(|_| Error::NotFound);
@@ -192,6 +203,10 @@ impl Doc {
     pub fn get(&self, locale: &str, field: &str) -> Option<Value> {
         match self {
             Self::Product(p) => {
+                if let Some(asset_id) = alt_asset(field) {
+                    let m = p.media.iter().find(|m| m.asset_id == asset_id)?;
+                    return m.alt_i18n.get(locale).map(|t| json!(t));
+                }
                 let t = p.translations.iter().find(|t| t.locale == locale)?;
                 match field {
                     "name" => Some(json!(t.name)),

@@ -65,7 +65,11 @@ const FIELDS: readonly string[] = [
 
 /** "Description (CS)". */
 export function fieldLabel(field: string, locale: string): string {
-  const name = FIELDS.includes(field) ? t(`ai.field_${field as FieldKey}`) : field;
+  const name = field.startsWith("alt_")
+    ? t("editor.altText")
+    : FIELDS.includes(field)
+      ? t(`ai.field_${field as FieldKey}`)
+      : field;
   return `${name} (${locale.toUpperCase()})`;
 }
 

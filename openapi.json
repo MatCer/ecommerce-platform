@@ -302,6 +302,70 @@
         ]
       }
     },
+    "/admin/v1/ai/alt-texts/backfill": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Queues AI alt texts for product images uploaded before the switch went on: one job per\nproduct with a ready image missing an alt text in some market language. Owner or admin.",
+        "operationId": "backfill_alt_texts",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backfill"
+                }
+              }
+            }
+          },
+          "402": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/ai/bulk-plans": {
       "post": {
         "tags": [
@@ -957,7 +1021,7 @@
         "tags": [
           "ai"
         ],
-        "summary": "The shop's AI switches. Review summaries are off until an admin turns them on.",
+        "summary": "The shop's AI switches. Each is off until an admin turns it on.",
         "operationId": "get_ai_settings",
         "parameters": [
           {
@@ -992,7 +1056,7 @@
         "tags": [
           "ai"
         ],
-        "summary": "Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one\nsummary per product with at least 5 published verified reviews; any change purges the\nshop's cached pages.",
+        "summary": "Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one\nsummary per product with at least 5 published verified reviews; switching them purges the\nshop's cached pages. Alt texts apply to images uploaded after they were turned on.",
         "operationId": "put_ai_settings",
         "parameters": [
           {
@@ -22437,9 +22501,14 @@
       "AiSettings": {
         "type": "object",
         "required": [
-          "review_summaries"
+          "review_summaries",
+          "alt_texts"
         ],
         "properties": {
+          "alt_texts": {
+            "type": "boolean",
+            "description": "AI alt texts for product images uploaded from now on, in every market language that\nhas none. Off by default."
+          },
           "review_summaries": {
             "type": "boolean",
             "description": "AI summaries of verified reviews on product pages, labelled as AI-generated. Off by\ndefault."
@@ -23183,6 +23252,19 @@
         },
         "propertyNames": {
           "type": "string"
+        }
+      },
+      "Backfill": {
+        "type": "object",
+        "required": [
+          "queued"
+        ],
+        "properties": {
+          "queued": {
+            "type": "integer",
+            "description": "Products queued for alt texts.",
+            "minimum": 0
+          }
         }
       },
       "Badge": {

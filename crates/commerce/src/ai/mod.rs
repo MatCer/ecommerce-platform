@@ -4,6 +4,7 @@
 //! The model never touches the database: its JSON output is validated here and every write
 //! goes through the existing catalog/content/pricing services (audit log, outbox events).
 
+pub mod alt_text;
 pub mod fields;
 pub mod glossary;
 pub mod marks;
@@ -11,6 +12,7 @@ pub mod plan;
 mod prompts;
 pub mod proposals;
 pub mod review_summary;
+pub mod settings;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -50,6 +52,7 @@ const FIXTURES: &[(&str, &str)] = &[
         review_summary::FEATURE,
         include_str!("fixtures/review_summary.j2"),
     ),
+    (alt_text::FEATURE, include_str!("fixtures/alt_text.j2")),
 ];
 
 /// The fake provider: helper fixtures and the scripted theme-editing agent.
@@ -298,6 +301,7 @@ pub(crate) struct Call<'a> {
     pub data: &'a Value,
     pub schema: &'a Value,
     pub max_tokens: u32,
+    pub image: Option<platform::ai::Image<'a>>,
 }
 
 /// Quota check, the call, then the `ai_usage` row (also for failures that consumed tokens).
@@ -329,6 +333,7 @@ pub(crate) async fn call(
             data: c.data,
             schema: c.schema,
             max_tokens: c.max_tokens,
+            image: c.image,
         })
         .await;
     let (usage, model) = match &result {
@@ -402,6 +407,30 @@ pub(crate) async fn record_usage(
 pub(crate) fn parse<T: serde::de::DeserializeOwned>(output: Value) -> Result<T, CallError> {
     serde_json::from_value(output)
         .map_err(|_| CallError::output("the output does not match the expected shape"))
+}
+
+pub(crate) async fn product_name(
+    tx: &mut TenantTx,
+    product_id: Uuid,
+) -> Result<Option<String>, Error> {
+    Ok(sqlx::query_scalar!(
+        "SELECT name FROM product_translations WHERE product_id = $1
+         ORDER BY (locale = (SELECT default_locale FROM markets WHERE is_default)) DESC NULLS LAST,
+                  locale
+         LIMIT 1",
+        product_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?)
+}
+
+pub(crate) async fn market_locales(tx: &mut TenantTx) -> Result<Vec<String>, Error> {
+    let mut locales =
+        sqlx::query_scalar!(r#"SELECT DISTINCT unnest(locales) AS "locale!" FROM markets"#)
+            .fetch_all(&mut **tx)
+            .await?;
+    locales.sort();
+    Ok(locales)
 }
 
 /// What a job runner should do after a step.

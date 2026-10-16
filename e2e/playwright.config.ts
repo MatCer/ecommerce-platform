@@ -12,6 +12,7 @@ const sharedState = [
   "admin/newsletter.spec.ts",
   "storefront/newsletter.spec.ts",
   "admin/ai.spec.ts",
+  "admin/ai-alt-texts.spec.ts",
 ];
 
 export default defineConfig({

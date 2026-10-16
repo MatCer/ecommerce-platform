@@ -93,9 +93,14 @@ pub async fn run_background_jobs(
     media.owner = format!("{}/media", cfg.owner);
     media.queues = vec!["media".into()];
     media.concurrency = 1;
+    let mut ai = cfg.clone();
+    ai.owner = format!("{}/ai", cfg.owner);
+    ai.queues = vec![commerce::ai::alt_text::QUEUE.into()];
+    ai.concurrency = 2;
     tokio::join!(
         run(db.clone(), handlers.clone(), cfg, shutdown.clone()),
-        run(db, handlers, media, shutdown),
+        run(db.clone(), handlers.clone(), media, shutdown.clone()),
+        run(db, handlers, ai, shutdown),
     );
 }
 

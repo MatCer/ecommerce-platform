@@ -696,6 +696,7 @@ impl Gen<'_> {
                 data,
                 schema,
                 max_tokens: 8000,
+                image: None,
             },
         )
         .await

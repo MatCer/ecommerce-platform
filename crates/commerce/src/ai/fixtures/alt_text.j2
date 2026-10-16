@@ -1,0 +1,7 @@
+{%- set src = data.existing | items | first -%}
+{%- set suffix = (", from " ~ src[0] ~ ": " ~ src[1]) if src else "" -%}
+{
+{%- for l in data.locales -%}
+{{ l | tojson }}: {{ ("[" ~ l ~ "] " ~ data.product ~ suffix) | tojson }}{% if not loop.last %},{% endif %}
+{%- endfor -%}
+}

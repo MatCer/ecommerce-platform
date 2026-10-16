@@ -1009,7 +1009,7 @@ async fn theme_builds_are_handed_to_the_builder(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
-    use commerce::ai::review_summary::{self, AiSettings};
+    use commerce::ai::settings::{self, AiSettings};
 
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "summaries").await;
@@ -1029,11 +1029,12 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
         .await
         .unwrap();
     }
-    review_summary::put_settings(
+    settings::put(
         &mut tx,
         "owner",
         &AiSettings {
             review_summaries: true,
+            alt_texts: false,
         },
     )
     .await
@@ -1101,4 +1102,159 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(purges, 2, "the switch and the new summary");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn only_tenants_with_alt_texts_switched_on_queue_alt_text_jobs(db: PgPool) {
+    use commerce::ai::settings::{self, AiSettings};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let off = testkit::storefront::shop(&runtime, "off").await;
+    let on = testkit::storefront::shop(&runtime, "on").await;
+    let mut tx = platform::db::tenant_tx(&runtime, on.tenant).await.unwrap();
+    settings::put(
+        &mut tx,
+        "owner",
+        &AiSettings {
+            review_summaries: false,
+            alt_texts: true,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let (off_asset, on_asset) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    for (tenant, asset) in [(off.tenant, off_asset), (on.tenant, on_asset)] {
+        let mut tx = platform::db::tenant_tx(&runtime, tenant).await.unwrap();
+        queue::publish(&mut *tx, "asset.ready", &json!({ "asset_id": asset }))
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let jobs: Vec<(Option<uuid::Uuid>, serde_json::Value)> = sqlx::query_as(
+        "SELECT DISTINCT tenant_id, payload FROM queue.jobs WHERE kind = 'ai.alt_text'
+         ORDER BY payload",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        jobs,
+        vec![
+            (Some(on.tenant), json!({ "asset_id": on_asset })),
+            (Some(on.tenant), json!({ "product_id": on.product })),
+        ]
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn image_events_queue_and_run_alt_text_jobs(db: PgPool) {
+    use commerce::ai::fields::product_input;
+    use commerce::ai::settings::{self, AiSettings};
+    use commerce::catalog::products::{self, ProductMedia};
+    use object_store::{ObjectStoreExt, PutPayload, path::Path};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "alt").await;
+    let storage = testkit::memory_storage();
+    let asset = uuid::Uuid::now_v7();
+    let key = format!("media/{}/{asset}/a.webp", shop.tenant);
+    storage
+        .public
+        .put(&Path::from(key.as_str()), PutPayload::from_static(b"RIFF"))
+        .await
+        .unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    settings::put(
+        &mut tx,
+        "owner",
+        &AiSettings {
+            review_summaries: false,
+            alt_texts: true,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO assets (id, tenant_id, status, key, variants) VALUES ($1, $2, 'ready', $3, $4)",
+    )
+    .bind(asset)
+    .bind(shop.tenant)
+    .bind(format!("originals/{}/{asset}", shop.tenant))
+    .bind(json!([{"width": 1024, "height": 768, "format": "webp", "key": key, "bytes": 4}]))
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let mut input = product_input(&products::get(&mut tx, shop.product).await.unwrap());
+    input.media = vec![ProductMedia {
+        asset_id: asset,
+        variant_sku: None,
+        alt_i18n: Default::default(),
+    }];
+    products::replace(&mut tx, "clerk", shop.product, &input)
+        .await
+        .unwrap();
+    queue::publish(&mut *tx, "asset.ready", &json!({ "asset_id": asset }))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let jobs: Vec<(serde_json::Value, i32)> = sqlx::query_as(
+        "SELECT DISTINCT payload, max_attempts FROM queue.jobs WHERE kind = 'ai.alt_text'
+         ORDER BY payload",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        jobs,
+        vec![
+            (json!({ "asset_id": asset }), 3),
+            (json!({ "product_id": shop.product }), 3),
+        ]
+    );
+
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "UPDATE queue.jobs SET run_at = now() WHERE kind = 'ai.alt_text' RETURNING id",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            storage,
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    for id in ids {
+        wait_for_status(&db, id, "done").await;
+    }
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let alt = products::get(&mut tx, shop.product).await.unwrap().media[0]
+        .alt_i18n
+        .clone();
+    assert_eq!(
+        alt.into_iter().collect::<Vec<_>>(),
+        [
+            ("cs".to_owned(), "[cs] Product TEE".to_owned()),
+            ("sk".to_owned(), "[sk] Product TEE".to_owned()),
+        ]
+    );
 }
