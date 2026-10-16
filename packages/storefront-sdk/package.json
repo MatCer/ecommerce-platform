@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@platform/config": "workspace:*",
-    "solid-js": "catalog:"
+    "solid-js": "catalog:",
+    "vite-plugin-solid": "2.11.14"
   }
 }
