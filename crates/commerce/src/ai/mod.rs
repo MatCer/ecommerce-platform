@@ -10,6 +10,7 @@ pub mod marks;
 pub mod plan;
 mod prompts;
 pub mod proposals;
+pub mod review_summary;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -45,6 +46,10 @@ const FIXTURES: &[(&str, &str)] = &[
     (SEO, include_str!("fixtures/seo.j2")),
     (TRANSLATE, include_str!("fixtures/translate.j2")),
     (BULK_PLAN, include_str!("fixtures/bulk_plan.j2")),
+    (
+        review_summary::FEATURE,
+        include_str!("fixtures/review_summary.j2"),
+    ),
 ];
 
 /// The fake provider: helper fixtures and the scripted theme-editing agent.
@@ -395,7 +400,8 @@ pub(crate) async fn record_usage(
 
 /// Deserializes the model output into `T` (unknown fields rejected).
 pub(crate) fn parse<T: serde::de::DeserializeOwned>(output: Value) -> Result<T, CallError> {
-    serde_json::from_value(output).map_err(|e| CallError::output(e.to_string()))
+    serde_json::from_value(output)
+        .map_err(|_| CallError::output("the output does not match the expected shape"))
 }
 
 /// What a job runner should do after a step.

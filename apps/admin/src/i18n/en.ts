@@ -235,6 +235,7 @@ export const en = {
     feature_seo: "SEO",
     feature_translate: "Translations",
     feature_bulk_plan: "Bulk edit plans",
+    feature_review_summary: "Review summaries",
     glossary: "Glossary",
     glossaryDesc:
       "Terms translations must keep as they are (brand names), or translate one fixed way. Leave a language empty to keep the term.",
@@ -243,6 +244,11 @@ export const en = {
     fixed: "{{locale}} form of term {{n}}",
     addTerm: "Add term",
     removeTerm: "Remove term {{term}}",
+    shopFeatures: "AI on the shop",
+    reviewSummaries: "Review summaries",
+    reviewSummariesDesc:
+      "Products with at least 5 published verified reviews get a short AI summary on the product page, in each market's language and labelled as AI-generated. Every summary uses AI tokens.",
+    adminOnly: "Only owners and admins can change these settings.",
   },
   redirects: {
     title: "Redirects",

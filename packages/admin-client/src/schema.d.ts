@@ -244,6 +244,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/ai/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The shop's AI switches. Review summaries are off until an admin turns them on. */
+        get: operations["get_ai_settings"];
+        /**
+         * Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
+         *     summary per product with at least 5 published verified reviews; any change purges the
+         *     shop's cached pages.
+         */
+        put: operations["put_ai_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/ai/usage": {
         parameters: {
             query?: never;
@@ -4853,6 +4875,13 @@ export interface components {
         AiMarkList: {
             items: components["schemas"]["AiMark"][];
         };
+        AiSettings: {
+            /**
+             * @description AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
+             *     default.
+             */
+            review_summaries: boolean;
+        };
         AiThemeNewRun: {
             /**
              * Format: uuid
@@ -8034,6 +8063,7 @@ export interface components {
             next_cursor?: string | null;
         };
         ProductReviews: {
+            ai_summary?: components["schemas"]["ReviewSummary"] | null;
             /** @description Newest published reviews (at most 20). */
             items: components["schemas"]["PublicReview"][];
             summary?: components["schemas"]["RatingSummary"] | null;
@@ -8455,6 +8485,19 @@ export interface components {
         ReviewSubmitted: {
             /** @description Always `pending`: the shop publishes reviews after moderation. */
             status: string;
+        };
+        /** @description An AI summary as the shop shows it (plain text; escape on output). */
+        ReviewSummary: {
+            /** Format: date-time */
+            generated_at: string;
+            /** @description Language of the text (`lang` attribute). */
+            locale: string;
+            /**
+             * Format: int32
+             * @description Published verified reviews it was written from.
+             */
+            review_count: number;
+            text: string;
         };
         RevisionDetail: {
             /** @description The builder's gate report: `pipeline`, `sandbox`, `steps[]`, `failures[]`. */
@@ -10095,6 +10138,70 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_ai_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettings"];
+                };
+            };
+        };
+    };
+    put_ai_settings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiSettings"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettings"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT review_summaries FROM ai_settings WHERE tenant_id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "review_summaries",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "ai_settings",
+            "name": "review_summaries"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "13e9a7363d8ed112bcf582fc0c161cd48a9b0b7ed5b0cfa512b07ffb1d2f2f9a"
+}

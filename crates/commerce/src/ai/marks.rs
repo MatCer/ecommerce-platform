@@ -37,7 +37,7 @@ pub(crate) struct NewMark<'a> {
     pub value: &'a Value,
     pub feature: &'a str,
     pub model: &'a str,
-    pub proposal_id: Uuid,
+    pub proposal_id: Option<Uuid>,
     pub accepted_by: &'a str,
 }
 

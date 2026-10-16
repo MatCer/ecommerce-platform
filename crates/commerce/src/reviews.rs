@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::ai::review_summary::{self, ReviewSummary};
 use crate::audit;
 use crate::capability;
 use crate::markets::invalid;
@@ -562,11 +563,14 @@ pub async fn set_status(
     id: Uuid,
     to: Status,
 ) -> Result<Review, Error> {
-    let current = sqlx::query_scalar!("SELECT status FROM reviews WHERE id = $1 FOR UPDATE", id)
-        .fetch_optional(&mut **tx)
-        .await?
-        .map(|s| Status::parse(&s))
-        .ok_or(Error::NotFound)?;
+    let row = sqlx::query!(
+        "SELECT status, product_id FROM reviews WHERE id = $1 FOR UPDATE",
+        id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    let current = Status::parse(&row.status);
     if current == to {
         return get(tx, id).await;
     }
@@ -580,17 +584,19 @@ pub async fn set_status(
             ),
         });
     }
-    let product_id = sqlx::query_scalar!(
+    let product_id = row.product_id;
+    review_summary::lock_inputs(tx, product_id).await?;
+    sqlx::query!(
         "UPDATE reviews SET status = $2, moderated_at = now(), moderated_by = $3,
              published_at = CASE WHEN $2 = 'published' THEN coalesce(published_at, now())
                                  ELSE published_at END,
              updated_at = now()
-         WHERE id = $1 RETURNING product_id",
+         WHERE id = $1",
         id,
         to.as_str(),
         actor
     )
-    .fetch_one(&mut **tx)
+    .execute(&mut **tx)
     .await?;
     audit::record(
         tx,
@@ -686,6 +692,36 @@ pub struct ProductReviews {
     pub items: Vec<PublicReview>,
     /// The shop's published "how we verify reviews" page (Omnibus disclosure).
     pub verification_url: Option<String>,
+    /// AI summary of the verified reviews in the request's locale, when the shop switched it
+    /// on. Show it with its AI label.
+    pub ai_summary: Option<ReviewSummary>,
+}
+
+pub(crate) fn rating_summary(counts: impl Iterator<Item = (i16, i64)>) -> Option<RatingSummary> {
+    let mut histogram = [0_i64; 5];
+    for (rating, n) in counts {
+        if let Some(slot) = usize::try_from(rating - 1)
+            .ok()
+            .and_then(|i| histogram.get_mut(i))
+        {
+            *slot = n;
+        }
+    }
+    let count: i64 = histogram.iter().sum();
+    (count > 0).then(|| {
+        let total: i64 = histogram
+            .iter()
+            .zip(1_i64..)
+            .map(|(n, stars)| n * stars)
+            .sum();
+        #[allow(clippy::cast_precision_loss)]
+        let average = (total as f64 / count as f64 * 10.0).round() / 10.0;
+        RatingSummary {
+            average,
+            count,
+            histogram,
+        }
+    })
 }
 
 /// Published reviews and their summary for a product page.
@@ -701,31 +737,8 @@ pub async fn for_product(
     )
     .fetch_all(&mut **tx)
     .await?;
-    let mut histogram = [0_i64; 5];
-    for c in &counts {
-        if let Some(slot) = usize::try_from(c.rating - 1)
-            .ok()
-            .and_then(|i| histogram.get_mut(i))
-        {
-            *slot = c.n;
-        }
-    }
-    let count: i64 = histogram.iter().sum();
-    let summary = (count > 0).then(|| {
-        let total: i64 = histogram
-            .iter()
-            .zip(1_i64..)
-            .map(|(n, stars)| n * stars)
-            .sum();
-        #[allow(clippy::cast_precision_loss)]
-        let average = (total as f64 / count as f64 * 10.0).round() / 10.0;
-        RatingSummary {
-            average,
-            count,
-            histogram,
-        }
-    });
-    let items = if count == 0 {
+    let summary = rating_summary(counts.iter().map(|c| (c.rating, c.n)));
+    let items = if summary.is_none() {
         Vec::new()
     } else {
         sqlx::query!(
@@ -762,10 +775,19 @@ pub async fn for_product(
     )
     .fetch_optional(&mut **tx)
     .await?;
+    let ai_summary = if summary
+        .as_ref()
+        .is_some_and(|s| s.count >= review_summary::MIN_REVIEWS)
+    {
+        review_summary::for_storefront(tx, ctx, product_id).await?
+    } else {
+        None
+    };
     Ok(ProductReviews {
         summary,
         items,
         verification_url: slug.map(|s| ctx.path(&format!("/pages/{s}"))),
+        ai_summary,
     })
 }
 
@@ -890,6 +912,7 @@ mod tests {
             summary: None,
             items: vec![],
             verification_url: None,
+            ai_summary: None,
         };
         assert!(json_ld(&empty).is_none());
         let r = PublicReview {
@@ -911,6 +934,7 @@ mod tests {
             }),
             items: vec![r; 7],
             verification_url: None,
+            ai_summary: None,
         };
         let (agg, items) = json_ld(&some).unwrap();
         assert_eq!(agg["ratingValue"], "4.0");

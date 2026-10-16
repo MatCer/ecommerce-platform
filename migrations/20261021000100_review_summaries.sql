@@ -1,0 +1,36 @@
+CREATE TABLE ai_settings (
+    tenant_id        uuid PRIMARY KEY REFERENCES platform.tenants (id),
+    review_summaries boolean NOT NULL DEFAULT false,
+    updated_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE review_summaries (
+    tenant_id    uuid NOT NULL REFERENCES platform.tenants (id),
+    product_id   uuid NOT NULL,
+    locale       text NOT NULL CHECK (locale ~ '^[a-z]{2}(-[A-Z]{2})?$'),
+    summary      text NOT NULL CHECK (length(summary) BETWEEN 1 AND 600),
+    review_count integer NOT NULL CHECK (review_count > 0),
+    input_sha256 text NOT NULL CHECK (input_sha256 ~ '^[0-9a-f]{64}$'),
+    model        text NOT NULL,
+    generated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tenant_id, product_id, locale),
+    FOREIGN KEY (tenant_id, product_id) REFERENCES products (tenant_id, id) ON DELETE CASCADE
+);
+
+DO $$
+DECLARE
+    t text;
+BEGIN
+    FOREACH t IN ARRAY ARRAY['ai_settings', 'review_summaries']
+    LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+        EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+        EXECUTE format(
+            'CREATE POLICY tenant_isolation ON %I TO app_runtime
+                 USING (tenant_id = current_setting(''app.tenant_id'')::uuid)
+                 WITH CHECK (tenant_id = current_setting(''app.tenant_id'')::uuid)', t);
+    END LOOP;
+END
+$$;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON ai_settings, review_summaries TO app_runtime;

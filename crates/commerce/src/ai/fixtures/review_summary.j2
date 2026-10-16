@@ -1,0 +1,10 @@
+{%- set avg = data.rating.average | string | replace(".", ",") -%}
+{%- set texts = {
+  "cs": "Ukázkové shrnutí od demo AI: zákazníci hodnotí „" ~ data.product ~ "“ průměrně " ~ avg ~ " z 5.",
+  "sk": "Ukážkové zhrnutie od demo AI: zákazníci hodnotia „" ~ data.product ~ "“ priemerne " ~ avg ~ " z 5."
+} -%}
+{"summaries": [
+{%- for l in data.locales -%}
+{"locale": {{ l | tojson }}, "summary": {{ (texts[l] | default("Sample summary by the demo AI: customers rate \"" ~ data.product ~ "\" " ~ data.rating.average ~ " out of 5.")) | tojson }}}{% if not loop.last %},{% endif %}
+{%- endfor -%}
+]}

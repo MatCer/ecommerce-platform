@@ -82,6 +82,14 @@ pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
         {
             queue::enqueue(&mut *tx, &job).await?;
         }
+        if let Some(job) = commerce::ai::review_summary::job_for_event(
+            event.tenant_id,
+            &event.event_type,
+            &event.payload,
+            now,
+        ) {
+            queue::enqueue(&mut *tx, &job).await?;
+        }
         if let Some(job) = commerce::search::job_for_event(
             event.tenant_id,
             &event.event_type,

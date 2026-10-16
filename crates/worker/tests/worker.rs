@@ -1006,3 +1006,99 @@ async fn theme_builds_are_handed_to_the_builder(db: PgPool) {
     assert_eq!(seen[0].0, "Bearer builder-token-0123456789abcdef0123456789");
     assert_eq!(seen[0].1["tenant_id"], tenant.to_string());
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
+    use commerce::ai::review_summary::{self, AiSettings};
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "summaries").await;
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    for rating in [5, 4, 5, 4, 5] {
+        sqlx::query(
+            "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body, verified,
+                                  locale, status, published_at)
+             VALUES ($1, $2, 'Jana', $3, 'Sedí.', true, 'cs', 'published', now())",
+        )
+        .bind(shop.tenant)
+        .bind(shop.product)
+        .bind(rating)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    review_summary::put_settings(
+        &mut tx,
+        "owner",
+        &AiSettings {
+            review_summaries: true,
+        },
+    )
+    .await
+    .unwrap();
+    for _ in 0..2 {
+        queue::publish(
+            &mut *tx,
+            "review.changed",
+            &json!({ "product_id": shop.product }),
+        )
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let jobs: Vec<(serde_json::Value, i32, bool)> = sqlx::query_as(
+        "SELECT payload, max_attempts, run_at > now() FROM queue.jobs
+         WHERE kind = 'ai.review_summary' ORDER BY id",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    let payload = json!({ "product_id": shop.product });
+    assert_eq!(
+        jobs,
+        vec![(payload.clone(), 3, false), (payload.clone(), 3, true)]
+    );
+
+    let backfill: i64 = sqlx::query_scalar(
+        "SELECT id FROM queue.jobs WHERE kind = 'ai.review_summary' ORDER BY id LIMIT 1",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    wait_for_status(&db, backfill, "done").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let locales: Vec<String> =
+        sqlx::query_scalar("SELECT locale FROM review_summaries ORDER BY locale")
+            .fetch_all(&mut *tx)
+            .await
+            .unwrap();
+    assert_eq!(locales, ["cs", "sk"]);
+    drop(tx);
+    while outbox::dispatch_batch(&runtime).await.unwrap() > 0 {}
+    let purges: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM queue.jobs WHERE kind = 'edge.purge'
+         AND payload->>'type' IN ('ai_settings.changed', 'review_summary.changed')",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(purges, 2, "the switch and the new summary");
+}

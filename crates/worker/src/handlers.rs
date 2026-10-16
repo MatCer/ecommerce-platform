@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use commerce::ai::{Ai, Outcome, plan, proposals};
+use commerce::ai::{Ai, Outcome, plan, proposals, review_summary};
 use commerce::feeds::{export, import};
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
@@ -142,7 +142,12 @@ pub fn all(
     let webhooks = extra.webhooks.clone();
     let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
-    let (ai1, ai2, ai3) = (extra.ai.clone(), extra.ai.clone(), extra.ai.clone());
+    let (ai1, ai2, ai3, ai4) = (
+        extra.ai.clone(),
+        extra.ai.clone(),
+        extra.ai.clone(),
+        extra.ai.clone(),
+    );
     let theme_builder = extra.theme_builder.clone();
     let (theme_storage, ai_storage) = (storage.clone(), storage.clone());
     let (e1, e2, e3, e4) = (extra.clone(), extra.clone(), extra.clone(), extra);
@@ -261,6 +266,9 @@ pub fn all(
             ai_plan(ctx, job, ai2.clone())
         })
         .register(plan::APPLY_JOB, ai_apply)
+        .register(review_summary::JOB, move |ctx, job| {
+            ai_review_summary(ctx, job, ai4.clone())
+        })
         .register(themes::BUILD_JOB, move |_ctx, job| {
             theme_build(job, theme_builder.clone())
         })
@@ -375,6 +383,12 @@ async fn ai_plan(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
     let (tenant, id) = tenant_and(&job, "plan_id")?;
     let last = job.attempts >= job.max_attempts;
     ai_outcome(plan::run_plan(&ctx.db, &ai, tenant, id, last).await)
+}
+
+async fn ai_review_summary(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
+    let (tenant, product_id) = tenant_and(&job, "product_id")?;
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(review_summary::run(&ctx.db, &ai, tenant, product_id, last).await)
 }
 
 /// Applies a confirmed bulk plan, one product per transaction (resumable).
