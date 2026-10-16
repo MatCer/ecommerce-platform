@@ -11,7 +11,7 @@ use commerce::money::Currency;
 use commerce::pricing::{self, NewPriceList};
 use commerce::search::index::{self, Indexed, Rebuilt};
 use commerce::search::query::{self, SearchRequest, SearchResult, Sort};
-use commerce::search::{Meili, index_uid};
+use commerce::search::{Meili, SETTINGS_VERSION, index_uid};
 use platform::db::tenant_tx;
 use sqlx::PgPool;
 use testkit::catalog::ACTOR;
@@ -241,6 +241,45 @@ fn shown(r: &SearchResult, facet: &str) -> BTreeSet<String> {
 
 fn set(v: &[&str]) -> BTreeSet<String> {
     v.iter().map(|s| (*s).to_owned()).collect()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn indexes_with_older_settings_get_one_rebuild(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (old, _) = testkit::tenant(&runtime, "old").await;
+    let (current, _) = testkit::tenant(&runtime, "current").await;
+    testkit::tenant(&runtime, "unindexed").await;
+    for (tenant, version) in [(old, SETTINGS_VERSION - 1), (current, SETTINGS_VERSION)] {
+        let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+        sqlx::query(
+            "INSERT INTO search_indexes (tenant_id, locale, settings_version) VALUES ($1, 'cs', $2)",
+        )
+        .bind(tenant)
+        .bind(version)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+    let rebuilds = async || -> Vec<Option<Uuid>> {
+        sqlx::query_scalar("SELECT tenant_id FROM queue.jobs WHERE kind = 'search.rebuild'")
+            .fetch_all(&db)
+            .await
+            .unwrap()
+    };
+
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 1);
+    assert_eq!(rebuilds().await, vec![Some(old)]);
+
+    let mut tx = tenant_tx(&runtime, old).await.unwrap();
+    sqlx::query("UPDATE search_indexes SET settings_version = $1")
+        .bind(SETTINGS_VERSION)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 0);
+    assert_eq!(rebuilds().await, vec![Some(old)]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

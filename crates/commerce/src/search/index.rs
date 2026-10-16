@@ -333,6 +333,31 @@ pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<V
     .await?)
 }
 
+/// Queues a rebuild for every tenant whose live indexes predate [`SETTINGS_VERSION`].
+pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
+    let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+        .fetch_all(db)
+        .await?;
+    let mut queued = 0;
+    for tenant_id in tenants {
+        let mut tx = tenant_tx(db, tenant_id).await?;
+        let outdated = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM search_indexes WHERE settings_version < $1) AS "outdated!""#,
+            SETTINGS_VERSION
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if outdated {
+            let version = super::next_version(&mut *tx).await?;
+            platform::queue::enqueue(&mut *tx, &super::manual_rebuild_job(tenant_id, version))
+                .await?;
+            tx.commit().await?;
+            queued += 1;
+        }
+    }
+    Ok(queued)
+}
+
 /// Current state of a tenant's search indexes (admin status endpoint).
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct IndexStatus {

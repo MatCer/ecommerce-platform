@@ -36,8 +36,8 @@ pub const REBUILD_JOB: &str = "search.rebuild";
 /// Writes the tenant's synonyms ([`synonyms`]) to all of its indexes: `{}`.
 pub const SYNONYMS_JOB: &str = "search.synonyms";
 
-/// Bumped whenever [`index::settings`] changes; indexes with an older version get the new
-/// settings applied by the next indexing job.
+/// Bumped whenever [`index::settings`] changes; a starting worker queues a full rebuild for
+/// tenants with an older version ([`index::queue_settings_upgrades`]).
 pub const SETTINGS_VERSION: i32 = 3;
 
 /// Meilisearch outages can last a while; indexing jobs keep retrying (capped backoff).

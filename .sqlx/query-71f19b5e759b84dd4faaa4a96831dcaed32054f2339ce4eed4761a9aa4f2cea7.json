@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM search_indexes WHERE settings_version < $1) AS \"outdated!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "outdated!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "71f19b5e759b84dd4faaa4a96831dcaed32054f2339ce4eed4761a9aa4f2cea7"
+}

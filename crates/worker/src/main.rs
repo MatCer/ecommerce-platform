@@ -63,6 +63,14 @@ async fn main() -> anyhow::Result<()> {
             tracing::warn!(error = %e, "ensuring event partitions failed");
         }
     });
+    let upgrades_db = db.clone();
+    tokio::spawn(async move {
+        match commerce::search::index::queue_settings_upgrades(&upgrades_db).await {
+            Ok(0) => {}
+            Ok(tenants) => tracing::info!(tenants, "search settings upgrade rebuilds queued"),
+            Err(e) => tracing::warn!(error = %e, "queueing search settings upgrades failed"),
+        }
+    });
     // Edge purges and public URLs (export feeds); the SSRF-safe client for imports and
     // webhooks (A21).
     let sf = StorefrontConfig::from_env()?;
