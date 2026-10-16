@@ -12,6 +12,8 @@ import { rateHeaders, testContext } from "../rate-client";
 const port = process.env.HTTP_PORT ?? "8080";
 export const CZ = `http://demo.localhost:${port}`;
 export const SK = `http://demo-sk.localhost:${port}`;
+/** A fresh origin of the demo shop in same-origin checkout mode, seeded by fixtures.setup.ts. */
+export const FRESH = `http://demo-fresh.localhost:${port}`;
 export const checkoutOf = (shop: string) => shop.replace("://", "://checkout.");
 
 /** SSR controls are visible before the checkout island attaches its event handlers. */

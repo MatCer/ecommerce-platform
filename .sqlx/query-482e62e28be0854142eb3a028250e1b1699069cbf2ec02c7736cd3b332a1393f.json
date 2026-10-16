@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT origin AS \"origin!\", mode, mode_generation FROM platform.checkout_origins\n           WHERE hostname = $1 ORDER BY origin",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "origin!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.checkout_origins",
+            "name": "origin"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "mode",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "platform.checkout_origins",
+            "name": "mode"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "mode_generation",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "platform.checkout_origins",
+            "name": "mode_generation"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "482e62e28be0854142eb3a028250e1b1699069cbf2ec02c7736cd3b332a1393f"
+}

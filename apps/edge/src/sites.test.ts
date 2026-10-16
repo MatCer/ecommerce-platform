@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   ApiResolver,
   CachedResolver,
+  checkoutPolicy,
   classifyHost,
   normalizeHost,
   type Site,
@@ -28,6 +29,12 @@ test("splitLocale strips only a non-default locale of the market (spec §9.1)", 
 
 test("the API resolver maps the resolve response and caches nothing on errors", async () => {
   const seen: string[] = [];
+  const sk = {
+    origin: "https://demo-sk.localhost",
+    mode: "isolated",
+    mode_generation: 1,
+    checkout_origin: "https://checkout.demo-sk.localhost",
+  };
   const upstream = async (r: Request) => {
     seen.push(`${r.url} ${r.headers.get("authorization")}`);
     const host = new URL(r.url).searchParams.get("host");
@@ -47,6 +54,7 @@ test("the API resolver maps the resolve response and caches nothing on errors", 
       theme_artifact: "0123456789abcdef0123456789abcdef",
       retained_artifacts: [],
       checkout_artifact: null,
+      checkout_origins: [sk],
     });
   };
   const r = new ApiResolver("http://api:8000", "service-token", upstream);
@@ -60,6 +68,7 @@ test("the API resolver maps the resolve response and caches nothing on errors", 
     theme_artifact: "0123456789abcdef0123456789abcdef",
     retained_artifacts: [],
     checkout_artifact: null,
+    checkout_origins: [sk],
   });
   expect(seen[0]).toBe(
     "http://api:8000/internal/v1/resolve?host=demo-sk.localhost Bearer service-token",
@@ -100,4 +109,44 @@ test("resolution is cached 60 s and purged per tenant", async () => {
   cached.purge("t1");
   expect((await cached.resolve("demo.localhost", 59_001))?.theme_artifact).toBe("b");
   expect(await cached.resolve("__proto__", 0)).toBeNull();
+});
+
+test("checkout policy matches the exact origin: scheme, host and effective port", () => {
+  const fresh = {
+    origin: "https://fresh.localhost",
+    mode: "same_origin",
+    mode_generation: 3,
+    checkout_origin: "https://fresh.localhost",
+  } as const;
+  const local = {
+    origin: "http://fresh.localhost:8080",
+    mode: "isolated",
+    mode_generation: 1,
+    checkout_origin: "http://checkout.fresh.localhost:8080",
+  } as const;
+  const site = { checkout_origins: [local, fresh] };
+  expect(checkoutPolicy(site, "https://fresh.localhost")).toEqual(fresh);
+  expect(checkoutPolicy(site, "https://fresh.localhost:443")).toEqual(fresh);
+  expect(checkoutPolicy(site, "http://fresh.localhost:8080")).toEqual(local);
+  // Another scheme, port or host is another origin. An origin without a policy row is isolated
+  // with no generation (fail closed), whatever the shop's other origins say.
+  for (const [other, origin] of [
+    ["http://fresh.localhost", "http://fresh.localhost"],
+    ["https://fresh.localhost:8443", "https://fresh.localhost:8443"],
+    ["https://www.fresh.localhost", "https://www.fresh.localhost"],
+    ["http://demo.localhost:80", "http://demo.localhost"],
+  ] as const) {
+    expect(checkoutPolicy(site, other)).toEqual({
+      origin,
+      mode: "isolated",
+      mode_generation: null,
+      checkout_origin: origin.replace("://", "://checkout."),
+    });
+  }
+  expect(checkoutPolicy({}, "http://demo.localhost:8080")).toEqual({
+    origin: "http://demo.localhost:8080",
+    mode: "isolated",
+    mode_generation: null,
+    checkout_origin: "http://checkout.demo.localhost:8080",
+  });
 });

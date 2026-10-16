@@ -22,6 +22,8 @@ export interface Site {
   retained_artifacts: string[];
   /** The platform checkout artifact (same for every tenant); `null` if none is published. */
   checkout_artifact?: string | null;
+  /** Checkout policy of each exact origin of this host; read through {@link checkoutPolicy}. */
+  checkout_origins?: CheckoutPolicy[];
   /**
    * Request-scoped, set by the gateway (never by the resolver): the client address from the
    * proxy's last `X-Forwarded-For` hop, forwarded as `X-Client-Ip` on every API call (rate
@@ -33,6 +35,38 @@ export interface Site {
    * artifact; nothing is cached, counted or handed to the checkout.
    */
   preview?: { revision: number; expiresAt: number };
+}
+
+export type CheckoutMode = "isolated" | "same_origin";
+
+/** Checkout mode of one exact shop origin (same-origin-checkout.md, "Checkout mode per origin"). */
+export interface CheckoutPolicy {
+  /** As browsers serialize it: scheme, host and a non-default port (`https://shop.example`). */
+  origin: string;
+  mode: CheckoutMode;
+  /** Credentials record the generation they were issued under; `null` without a policy row. */
+  mode_generation: number | null;
+  /** The origin itself in same-origin mode, `checkout.<host>` in isolated mode. */
+  checkout_origin: string;
+}
+
+/**
+ * The policy of the exact request origin. Scheme, host and effective port must all match; an
+ * origin without a policy row is isolated (fail closed), whatever the host's other origins say.
+ */
+export function checkoutPolicy(
+  site: Pick<Site, "checkout_origins">,
+  requestOrigin: string,
+): CheckoutPolicy {
+  const origin = new URL(requestOrigin).origin;
+  return (
+    site.checkout_origins?.find((p) => p.origin === origin) ?? {
+      origin,
+      mode: "isolated",
+      mode_generation: null,
+      checkout_origin: origin.replace("://", "://checkout."),
+    }
+  );
 }
 
 export interface SiteResolver {
@@ -103,6 +137,7 @@ interface Resolved {
   theme_artifact: string | null;
   retained_artifacts: string[];
   checkout_artifact: string | null;
+  checkout_origins: CheckoutPolicy[];
 }
 
 /**
@@ -142,6 +177,7 @@ function toSite(r: Resolved): Site {
     theme_artifact: r.theme_artifact,
     retained_artifacts: r.retained_artifacts,
     checkout_artifact: r.checkout_artifact,
+    checkout_origins: r.checkout_origins,
   };
 }
 

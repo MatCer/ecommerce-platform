@@ -5669,6 +5669,23 @@ export interface components {
             /** @description Checkout-scoped cart capability (the edge sets it as the `__Host-cart` cookie). */
             cart_token: string;
         };
+        /**
+         * @description Where checkout runs for one exact shop origin (same-origin-checkout.md, Routing).
+         * @enum {string}
+         */
+        CheckoutMode: "isolated" | "same_origin";
+        CheckoutOriginPolicy: {
+            /** @description The origin itself in same-origin mode, `checkout.<host>` in isolated mode. */
+            checkout_origin: string;
+            mode: components["schemas"]["CheckoutMode"];
+            /**
+             * Format: int64
+             * @description Every mode switch increments it; credentials record the generation they were issued under.
+             */
+            mode_generation: number;
+            /** @description As browsers serialize it: scheme, host and a non-default port (`https://shop.example`). */
+            origin: string;
+        };
         /** @description Everything the one-page checkout renders. Recomputed on every read. */
         CheckoutView: {
             billing_address?: components["schemas"]["CheckoutAddress"] | null;
@@ -8411,6 +8428,8 @@ export interface components {
         Resolved: {
             /** @description The platform checkout artifact (same for every tenant, §9.4). */
             checkout_artifact?: string | null;
+            /** @description Checkout policy of each exact origin of this hostname. An origin without one is isolated. */
+            checkout_origins: components["schemas"]["CheckoutOriginPolicy"][];
             country_codes: string[];
             currency: string;
             default_locale: string;
