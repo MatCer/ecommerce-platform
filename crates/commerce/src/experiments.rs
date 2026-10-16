@@ -1,8 +1,3 @@
-//! A/B experiments (SHOP-96, `docs/research/ab-testing.md` slice 1). The edge asks [`enrol`]
-//! before render and cache; a visitor is enrolled only with an analytics grant whose text
-//! covers testing page variants ([`consent::covers_experiments`]). The arm is a keyed hash of
-//! the experiment version and the analytics pseudonym, stored on first enrolment so it sticks.
-
 use hmac::{Hmac, KeyInit, Mac};
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
@@ -29,14 +24,12 @@ pub struct Assignment {
     pub arm: String,
 }
 
-/// `EXPERIMENTS_SECRET`, the arm hash key. Not `Debug`: never logged.
 #[derive(Clone)]
 pub struct ExperimentKey {
     secret: Vec<u8>,
 }
 
 impl ExperimentKey {
-    /// `secret` must be at least 32 bytes (checked by the config loader).
     pub fn new(secret: &[u8]) -> Self {
         Self {
             secret: secret.to_vec(),
@@ -60,7 +53,6 @@ struct Arm {
     weight: u64,
 }
 
-/// The arm whose cumulative weight range (in stored order) holds `hash % total weight`.
 fn pick(arms: &[Arm], hash: u64) -> Option<&str> {
     let total: u64 = arms.iter().map(|a| a.weight).sum();
     let mut point = hash.checked_rem(total)?;
@@ -96,9 +88,6 @@ async fn running_with_arms(
     )
 }
 
-/// Enrols the anonymous consent subject `subject` (the `__Secure-consent_id` cookie value) in
-/// the tenant's running experiment. `None` = control: no key, no running experiment, or no
-/// analytics grant covering experiments; nothing is written then.
 pub async fn enrol(
     db: &PgPool,
     key: Option<&ExperimentKey>,

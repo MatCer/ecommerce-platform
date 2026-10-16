@@ -369,7 +369,7 @@ async fn assignments_older_than_the_retention_are_purged(db: PgPool) {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let purged: i64 = sqlx::query_scalar("SELECT platform.purge_experiment_assignments(13)")
+    let purged: i64 = sqlx::query_scalar("SELECT platform.purge_experiment_assignments()")
         .fetch_one(&runtime)
         .await
         .unwrap();

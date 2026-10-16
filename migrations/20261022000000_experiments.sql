@@ -1,7 +1,3 @@
--- A/B experiments (SHOP-96). The experiment row is the version: its config is frozen once
--- created, a new config is a new version (new row).
-
--- 2..8 arms {"key", "weight", "config"}: key unique, weight 1..10000, config an object.
 CREATE FUNCTION experiment_arms_valid(arms jsonb) RETURNS boolean
 LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
     SELECT CASE WHEN jsonb_typeof(arms) IS DISTINCT FROM 'array' THEN false
@@ -72,8 +68,6 @@ $$;
 CREATE TRIGGER experiments_freeze BEFORE UPDATE ON experiments
     FOR EACH ROW EXECUTE FUNCTION platform.experiments_freeze();
 
--- One row per (experiment version, visitor). `anon_id` is the analytics pseudonym
--- (`analytics::anon_id`), never the cookie value.
 CREATE TABLE experiment_assignments (
     tenant_id     uuid NOT NULL REFERENCES platform.tenants (id),
     experiment_id uuid NOT NULL,
@@ -103,19 +97,17 @@ $$;
 GRANT SELECT, INSERT, UPDATE ON experiments TO app_runtime;
 GRANT SELECT, INSERT ON experiment_assignments TO app_runtime;
 
--- Retention: the same 13 months as events. The owner's policies never reach younger rows, so
--- the purge cannot delete inside the retention window whatever it is called with.
 CREATE POLICY experiment_assignments_retention_read ON experiment_assignments
     FOR SELECT TO app_owner USING (assigned_at < now() - interval '13 months');
 CREATE POLICY experiment_assignments_retention_delete ON experiment_assignments
     FOR DELETE TO app_owner USING (assigned_at < now() - interval '13 months');
 
-CREATE FUNCTION platform.purge_experiment_assignments(months integer) RETURNS bigint
+CREATE FUNCTION platform.purge_experiment_assignments() RETURNS bigint
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = '' AS $$
     WITH deleted AS (
         DELETE FROM public.experiment_assignments
-        WHERE assigned_at < now() - make_interval(months => months) RETURNING 1
+        WHERE assigned_at < now() - interval '13 months' RETURNING 1
     ) SELECT count(*) FROM deleted
 $$;
-REVOKE ALL ON FUNCTION platform.purge_experiment_assignments(integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION platform.purge_experiment_assignments(integer) TO app_runtime;
+REVOKE ALL ON FUNCTION platform.purge_experiment_assignments() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION platform.purge_experiment_assignments() TO app_runtime;

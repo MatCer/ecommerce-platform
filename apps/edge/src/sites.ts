@@ -34,7 +34,6 @@ export interface Site {
    * artifact; nothing is cached, counted or handed to the checkout.
    */
   preview?: { revision: number; expiresAt: number };
-  /** The tenant's running experiment (SHOP-96); the edge enrols consented visitors into it. */
   experiment?: { id: string; version: number } | null;
 }
 

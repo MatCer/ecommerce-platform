@@ -1,6 +1,5 @@
 import type { Site } from "./sites.ts";
 
-/** A visitor's arm of one experiment version (SHOP-96), as the API stored it. */
 export interface Assignment {
   experiment_id: string;
   version: number;
@@ -8,9 +7,7 @@ export interface Assignment {
 }
 
 export interface Enroller {
-  /** The visitor's assignment in `site.experiment`; throws when the API cannot answer. */
   enrol(site: Site, subject: string): Promise<Assignment | null>;
-  /** Drops the memoized answer, e.g. after the visitor changed their consent. */
   forget(tenantId: string, subject: string): void;
 }
 
@@ -18,11 +15,6 @@ const ARM_RE = /^[a-z0-9_-]{1,32}$/;
 const MEMO_MS = 60_000;
 const MAX_MEMO = 10_000;
 
-/**
- * Enrols through `POST /internal/v1/experiments/enrol` with the service token: the API checks
- * the consent record and hashes with a secret the edge never holds. Answers are memoized per
- * (tenant, subject) for 60 s and only for the experiment version they were given for.
- */
 export class ApiEnroller implements Enroller {
   readonly #apiOrigin: string;
   readonly #token: string;

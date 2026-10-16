@@ -19,7 +19,6 @@ export interface RequestContext {
   sessionToken?: string | undefined;
   /** Checkout origin only: the anonymous consent subject (preferences page, A20). */
   consentSubject?: string | undefined;
-  /** Theme renders of an enrolled visitor (SHOP-96): forwarded to page models as `x-experiment`. */
   experiment?: Assignment | undefined;
   /** Collected from page models (`cache` hints, spec §8.2) for the edge cache decision. */
   tags: Set<string>;

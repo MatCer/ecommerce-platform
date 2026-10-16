@@ -77,7 +77,6 @@ describe("ApiEnroller", () => {
 describe("enrolment at the edge (SHOP-96)", () => {
   const ARM = (arm: string) => `${EXP.id}:3:${arm}`;
   const subject = (c: string) => c.repeat(32);
-  /** Per subject: the arm the fake API assigns, an explicit answer, or a failure mode. */
   const answers = new Map<string, string | null | Record<string, unknown>>();
   const enrolCalls: { authorization: string | null; tenant_id: string; subject: string }[] = [];
   const logs: Record<string, unknown>[] = [];
@@ -102,7 +101,6 @@ describe("enrolment at the edge (SHOP-96)", () => {
       });
     }
     const res = await api.fn(req);
-    // A 1 s page model, so a test can make an entry stale without fake clocks.
     return url.pathname === "/storefront/v1/pages/product/short"
       ? Response.json({ cache: { public: true, max_age: 1, tags: [] } })
       : res;
@@ -121,7 +119,6 @@ describe("enrolment at the edge (SHOP-96)", () => {
     );
   const consented = (s: string, purposes = "analytics%2Cpersonalization") =>
     `__Secure-consent_id=${s}; consent=${purposes}`;
-  /** The `x-experiment` header of every page-model call to `p`, in order. */
   const experimentHeaders = (p: string) =>
     api.calls
       .filter((c) => c.url === `http://api.test/storefront/v1${p}`)
@@ -148,7 +145,6 @@ describe("enrolment at the edge (SHOP-96)", () => {
       artifactRoot: root,
       resolver: new StaticResolver({
         "demo.localhost": site({ theme_artifact: theme, experiment: EXP }),
-        // The same shop without an experiment (same canonical host, so the same CSP).
         "plain.localhost": site({ theme_artifact: theme }),
       }),
       apiOrigin: "http://api.test",

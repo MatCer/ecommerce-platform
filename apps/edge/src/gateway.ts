@@ -76,7 +76,6 @@ export interface GatewayOptions {
   adminOrigin?: string;
   /** Signed rate identities for local Playwright contexts; never configured in production. */
   e2eRateSecret?: string;
-  /** A/B enrolment of analytics-consented visitors (SHOP-96); absent = everyone is control. */
   experiments?: Enroller;
 }
 
@@ -239,7 +238,6 @@ function readCookie(headers: Headers, name: string): string | undefined {
   return undefined;
 }
 
-/** The consent subject of a visitor whose `consent` cookie grants `analytics`, else undefined. */
 function analyticsSubject(headers: Headers): string | undefined {
   const subject = readCookie(headers, CONSENT_ID_COOKIE);
   if (!subject || !CONSENT_ID_RE.test(subject)) return undefined;
@@ -456,11 +454,6 @@ export function createGateway(opts: GatewayOptions) {
     }
   }
 
-  /**
-   * SHOP-96: the arm of an analytics-consented visitor, asked before the cache so a HIT is
-   * recorded too. Only an answer for the site's running experiment counts; anything else is
-   * control.
-   */
   async function enrolment(site: Site, headers: Headers): Promise<Assignment | undefined> {
     const running = site.experiment;
     if (!running || site.preview || !opts.experiments) return undefined;
@@ -555,7 +548,6 @@ export function createGateway(opts: GatewayOptions) {
       const h = new Headers(headers);
       for (const [k, v] of Object.entries(themeHeaders(m, site, port))) h.set(k, v);
       // The edge holds the shared copy; browsers always revalidate so a purge takes effect at once.
-      // An arm's page must not be stored by an outer shared cache without the arm in its key.
       h.set(
         "cache-control",
         cacheable ? `${assignment ? "private" : "public"}, max-age=0, must-revalidate` : "no-store",
@@ -937,7 +929,6 @@ ${
     const summary = res.headers.get("x-consent-summary");
     const scope = `Domain=${site.shop_host}; Path=/; Secure; SameSite=Lax`;
     const chose = res.ok && req.method === "POST";
-    // The next page asks the API again, whose latest consent record decides (SHOP-96).
     if (chose)
       for (const s of [subject, minted])
         if (s && CONSENT_ID_RE.test(s)) opts.experiments?.forget(site.tenant_id, s);

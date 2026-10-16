@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT platform.purge_experiment_assignments(13) AS \"n!\"",
+  "query": "SELECT platform.purge_experiment_assignments() AS \"n!\"",
   "describe": {
     "columns": [
       {
@@ -17,5 +17,5 @@
       null
     ]
   },
-  "hash": "2ebad4c0538377f7cb7264a7c8928bce759a3cd5cb592e102b5ba38ba03812b7"
+  "hash": "73a71c9a94df5743241d8f252b649b01a11142a4faaf4a328de633aacce09c0f"
 }

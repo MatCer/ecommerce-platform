@@ -20,14 +20,11 @@ use crate::markets::invalid;
 /// wording changes: stored records keep the version the person agreed to.
 pub const TEXT_VERSION: &str = "2026-10-16";
 
-/// The first text version whose analytics wording covers testing page variants (SHOP-96).
-pub const EXPERIMENTS_TEXT_VERSION: &str = "2026-10-16";
+pub const FIRST_EXPERIMENTS_TEXT_VERSION: &str = "2026-10-16";
 
-/// Whether an analytics grant given under `text_version` covers experiments: only a
-/// `YYYY-MM-DD` version on or after [`EXPERIMENTS_TEXT_VERSION`] (`1`, `imported` never do).
 pub fn covers_experiments(text_version: &str) -> bool {
     let date = |v| chrono::NaiveDate::parse_from_str(v, "%Y-%m-%d").ok();
-    date(text_version).is_some_and(|d| date(EXPERIMENTS_TEXT_VERSION).is_some_and(|c| d >= c))
+    date(text_version).is_some_and(|d| date(FIRST_EXPERIMENTS_TEXT_VERSION).is_some_and(|c| d >= c))
 }
 
 #[derive(
@@ -367,28 +364,33 @@ pub async fn latest(
     subject: &Subject,
     purpose: ConsentPurpose,
 ) -> Result<Option<bool>, Error> {
-    Ok(latest_record(tx, subject, purpose).await?.map(|(granted, _)| granted))
+    Ok(latest_record(tx, subject, purpose)
+        .await?
+        .map(|r| r.granted))
 }
 
-/// Whether the subject's latest analytics choice is a grant given under a text that covers
-/// experiments; an older grant keeps analytics but does not enrol.
 pub async fn analytics_covers_experiments(
     tx: &mut TenantTx,
     subject: &Subject,
 ) -> Result<bool, Error> {
     Ok(latest_record(tx, subject, ConsentPurpose::Analytics)
         .await?
-        .is_some_and(|(granted, version)| granted && covers_experiments(&version)))
+        .is_some_and(|r| r.granted && covers_experiments(&r.text_version)))
 }
 
-/// The latest choice for `purpose` and the text version it was given under.
+struct LatestChoice {
+    granted: bool,
+    text_version: String,
+}
+
 async fn latest_record(
     tx: &mut TenantTx,
     subject: &Subject,
     purpose: ConsentPurpose,
-) -> Result<Option<(bool, String)>, Error> {
+) -> Result<Option<LatestChoice>, Error> {
     let (kind, id) = subject.parts();
-    Ok(sqlx::query!(
+    Ok(sqlx::query_as!(
+        LatestChoice,
         "SELECT granted, text_version FROM consent_records
          WHERE subject_type = $1 AND subject_id = $2 AND purpose = $3
          ORDER BY at DESC, id DESC LIMIT 1",
@@ -397,8 +399,7 @@ async fn latest_record(
         purpose.as_str()
     )
     .fetch_optional(&mut **tx)
-    .await?
-    .map(|r| (r.granted, r.text_version)))
+    .await?)
 }
 
 /// The latest choice for `purpose` over several subjects of one person (a newsletter address

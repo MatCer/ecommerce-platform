@@ -342,8 +342,6 @@ pub struct StorefrontConfig {
     pub edge_purge_url: Option<Url>,
     /// `EDGE_PURGE_TOKEN`: the edge's own purge token (distinct service token, A7).
     pub edge_purge_token: String,
-    /// `EXPERIMENTS_SECRET` (≥ 32 characters, API only): keys the A/B arm hash; unset = nobody
-    /// is enrolled.
     pub experiments_secret: Option<String>,
 }
 
