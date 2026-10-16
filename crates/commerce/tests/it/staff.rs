@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used)]
 use commerce::{staff, tenancy::Role};
 use platform::db::tenant_tx;
 use sqlx::PgPool;

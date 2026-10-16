@@ -1,7 +1,6 @@
 //! AI helpers against a real Postgres as the runtime role, with the fake provider: proposals
 //! (generate, accept, AI markers, stale detection), translations with the glossary, bulk plans
 //! (preview, caps, apply with price history + audit), quotas and metering, tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
 

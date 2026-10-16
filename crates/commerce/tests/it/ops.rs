@@ -1,5 +1,4 @@
 //! Housekeeping sweeps: stuck assets, abandoned uploads, expired carts and handoffs.
-#![allow(clippy::unwrap_used)]
 
 use commerce::media::{self, NewUpload};
 use commerce::ops;

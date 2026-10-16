@@ -1,7 +1,6 @@
 //! WP24 AI theme editing against a real Postgres as the runtime role: the agent loop with the
 //! fake provider and scripted agents, a simulated builder answering the WP23 callbacks,
 //! limits, cancellation, accept/discard, the publish gate and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};

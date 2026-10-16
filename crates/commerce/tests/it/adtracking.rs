@@ -1,7 +1,6 @@
 //! Ad-platform forwarders (§11.3, A20, A21): config with sealed credentials, consent gating at
 //! capture and at send time, withdrawal, vendor payloads, retries/dead, pause/resume, refunds
 //! and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::sync::{Arc, Mutex};
 

@@ -1,5 +1,4 @@
 //! Storefront search and search Admin API over HTTP (spec §8.2, §11.1, A27).
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used)]
-
 use commerce::consent::{self, ConsentChoice, Purposes, Source, Subject};
 use commerce::experiments::{self, Assignment, ExperimentKey};
 use commerce::tenancy;

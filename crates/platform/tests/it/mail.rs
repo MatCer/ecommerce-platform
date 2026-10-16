@@ -1,5 +1,4 @@
 //! `Mailer::send` outcome classification against a scripted SMTP server (spec A14).
-#![allow(clippy::unwrap_used)]
 
 use platform::mail::{Attachment, Delivery, MailConfig, Mailer, Outgoing, Stream};
 use testkit::smtp::{FakeSmtp, Mode};

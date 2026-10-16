@@ -1,5 +1,4 @@
 //! Feeds Admin API and served export feeds (WP13a, A28), search synonyms.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

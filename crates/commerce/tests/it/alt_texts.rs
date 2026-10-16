@@ -1,5 +1,3 @@
-#![allow(clippy::unwrap_used)]
-
 use std::collections::BTreeMap;
 
 use commerce::ai::alt_text::{self, Payload, Target};

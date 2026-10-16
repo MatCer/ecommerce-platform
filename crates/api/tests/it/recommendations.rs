@@ -1,7 +1,6 @@
 //! Recommendations through the router: the public variant is cacheable, anything with a cart
 //! or consent subject is private (A2); personal contexts need server-side `personalization`
 //! consent (A20); admin collections, settings (admin role) and explanations.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

@@ -1,6 +1,5 @@
 //! Analytics (A20): counters without identifiers, consent-gated events, purchases, rollups,
 //! dashboard numbers and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use chrono::{Duration, Utc};
 use commerce::analytics::{self, CounterBatch, DashboardQuery, PageCounter};

@@ -1,5 +1,4 @@
 // Integration test file: panicking on unexpected errors is the desired failure mode.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 use std::{

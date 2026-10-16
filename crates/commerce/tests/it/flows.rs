@@ -1,6 +1,5 @@
 //! WP19 against Postgres as app_runtime: consent and exits, one-use capabilities, watch
 //! double opt-in, review tokens and RLS isolation.
-#![allow(clippy::unwrap_used)]
 
 use chrono::{Duration, Utc};
 use commerce::consent::{self, ConsentPurpose, Subject};

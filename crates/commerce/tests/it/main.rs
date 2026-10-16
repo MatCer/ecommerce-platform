@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 mod adtracking;
 mod ai;
 mod alt_texts;

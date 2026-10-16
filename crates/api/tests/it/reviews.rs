@@ -1,7 +1,6 @@
 //! Reviews through the router (WP16): the review link on the storefront API (read vs. submit,
 //! single use, validation, no-store), moderation in the admin API (staff roles, transitions,
 //! reply, tenant isolation) and the product page model with JSON-LD.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

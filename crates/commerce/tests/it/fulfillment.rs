@@ -3,7 +3,6 @@
 //! with credit notes (A15), cancellation, the A19 withdrawal flow, returns to sender, and
 //! tenant isolation of the new tables. Carriers are exercised end to end against the mocks
 //! (e2e); here the shop ships by personal pickup (no carrier call).
-#![allow(clippy::unwrap_used)]
 
 use std::sync::Arc;
 

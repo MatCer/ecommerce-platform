@@ -2,7 +2,6 @@
 //! redelivery), Stripe onboarding + checkout + the test simulator against stripe-mock
 //! (`STRIPE_MOCK_URL`), bank accounts with fresh-auth rules, statement upload, the
 //! exceptions queue and cash-on-delivery actions with roles.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

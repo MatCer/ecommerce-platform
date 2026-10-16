@@ -1,7 +1,6 @@
 //! Customer accounts and consent through the Storefront API (as the edge calls it): magic
 //! links, sessions, passwords (A5), addresses, cart merge (A4), consent (A20), rate limits and
 //! tenant isolation. Real Postgres as the runtime role.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

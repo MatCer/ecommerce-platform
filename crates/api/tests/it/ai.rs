@@ -1,6 +1,5 @@
 //! AI helpers through the router (WP22): staff access, 202 + job, accept, AI markers, 402 on a
 //! used-up allowance, fresh auth + Idempotency-Key for price plans, tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

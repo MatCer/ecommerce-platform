@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used)]
 use crate::common::*;
 use axum::http::StatusCode;
 use serde_json::json;

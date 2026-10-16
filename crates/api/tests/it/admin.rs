@@ -1,6 +1,5 @@
 //! Admin and internal API through the router, with real Postgres (runtime role) and a local
 //! JWKS server signing like the auth service (spec A8, A9, A12).
-#![allow(clippy::unwrap_used)]
 
 use std::sync::atomic::Ordering;
 use std::time::Duration;

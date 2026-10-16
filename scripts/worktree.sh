@@ -145,7 +145,7 @@ tidy() {
     # A worktree on a main commit is linked to the PR squash-merged into it, so match the PR head.
     pr=$(timeout 10 gh api "repos/{owner}/{repo}/commits/$head/pulls" \
       --jq "[.[] | select(.merged_at != null and .head.sha == \"$head\")][0].number // empty" 2>/dev/null) ||
-      { echo "worktree: GitHub not reachable, cannot tell whether HEAD is merged" >&2; pr=''; }
+      echo "worktree: GitHub not reachable, cannot tell whether HEAD is merged" >&2
   fi
   if [[ -n $pr ]]; then
     echo "worktree: HEAD is the merged head of PR #$pr, ${1:+would }remove target/ ($(du -sh target | cut -f1))"
@@ -158,11 +158,12 @@ tidy() {
 }
 
 case ${1:-} in
-  setup) in_checkout; setup ;;
-  teardown) in_checkout; teardown ;;
-  prune) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh prune [--dry-run]"; in_checkout; prune "${2:-}" ;;
-  sweep) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh sweep [--dry-run]"; in_checkout; sweep "${2:-}" ;;
-  tidy) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh tidy [--dry-run]"; in_checkout; tidy "${2:-}" ;;
+  setup | teardown) in_checkout; "$1" ;;
+  prune | sweep | tidy)
+    [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh $1 [--dry-run]"
+    in_checkout
+    "$1" "${2:-}"
+    ;;
   cargo-config) [[ $# -le 2 ]] || die "usage: scripts/worktree.sh cargo-config [dir]"; cargo_config "${2:-.}" ;;
   *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]|sweep [--dry-run]|tidy [--dry-run]|cargo-config [dir]" ;;
 esac

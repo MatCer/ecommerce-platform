@@ -2,7 +2,6 @@
 //! segments compiled to parameterized SQL (incl. injection attempts), idempotent throttled
 //! campaign batches with send-time re-checks (A12, A14, A20), personalized product blocks,
 //! signed click links, one-click unsubscribe, bounce ingestion and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
 

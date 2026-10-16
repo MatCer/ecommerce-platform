@@ -1,7 +1,6 @@
 //! Recommendations (spec §11.2, A20): rollups from orders and consented events, support
 //! thresholds, decay, popularity debounce, the engine's fallback chain and visibility filter,
 //! consent gating and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use chrono::{DateTime, Duration, Utc};
 use commerce::analytics;

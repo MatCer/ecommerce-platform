@@ -1,5 +1,4 @@
 //! Consent linking keeps decision chronology across browsers (A20).
-#![allow(clippy::unwrap_used)]
 
 use commerce::consent::{
     self, ConsentChoice, ConsentPurpose, Purposes, Source, Subject, new_anon_id,

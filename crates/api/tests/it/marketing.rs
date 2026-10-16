@@ -2,7 +2,6 @@
 //! (sign-up, confirmation read vs. confirm, preferences, one-click unsubscribe, signed clicks),
 //! the admin API (roles, fresh sign-in for exports, segments, campaigns, email log without
 //! sensitive bodies, suppressions, branding and texts) and the SES/SNS bounce endpoint.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

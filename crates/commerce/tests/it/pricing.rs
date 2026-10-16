@@ -1,6 +1,5 @@
 //! Tax profile, pricing, promotions and inventory services against a real Postgres, as the
 //! runtime role (RLS on).
-#![allow(clippy::unwrap_used)]
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use commerce::inventory::{self, Adjustment, LevelSettings, MovementRef};

@@ -35,6 +35,7 @@ avg cores = CPU time / wall time). --summarize rewrites summary.md from steps.ts
 USAGE
   exit 2
 }
+die() { echo "bench: $*" >&2; exit 1; }
 setup='' runs=3
 while [[ ${1:-} == --* ]]; do
   case $1 in
@@ -45,15 +46,15 @@ while [[ ${1:-} == --* ]]; do
   esac
 done
 (($# == 2)) || usage
-for tool in systemd-run make cargo; do command -v "$tool" >/dev/null || { echo "bench: $tool not found" >&2; exit 1; }; done
+for tool in systemd-run make cargo; do command -v "$tool" >/dev/null || die "$tool not found"; done
 
 main=$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree //p')
-[[ -f $main/.env ]] || { echo "bench: no $main/.env; run 'make dev-infra' in the main checkout" >&2; exit 1; }
+[[ -f $main/.env ]] || die "no $main/.env; run 'make dev-infra' in the main checkout"
 src=$(realpath "$1")
 out=$(realpath -m "$2")
-[[ -f $src/Cargo.toml ]] || { echo "bench: $src is not the workspace root" >&2; exit 1; }
+[[ -f $src/Cargo.toml ]] || die "$src is not the workspace root"
 mkdir -p "$out/log"
-[[ ! -e $out/steps.tsv ]] || { echo "bench: $out/steps.tsv exists; use a new out dir" >&2; exit 1; }
+[[ ! -e $out/steps.tsv ]] || die "$out/steps.tsv exists; use a new out dir"
 
 unset RUSTC_WRAPPER CARGO_INCREMENTAL CARGO_TARGET_DIR CARGO_BUILD_RUSTC_WRAPPER CARGO_BUILD_INCREMENTAL
 export CARGO_BUILD_JOBS=6 CARGO_TERM_COLOR=never

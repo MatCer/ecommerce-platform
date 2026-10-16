@@ -1,6 +1,5 @@
 //! WP14 through the HTTP API: the events beacon (consent-gated), edge counters (service
 //! token), the dashboard, webhook administration and the superadmin job view.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

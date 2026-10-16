@@ -1,6 +1,5 @@
 //! SSRF-safe client (A21) against a local server: loopback is blocked unless allowlisted,
 //! redirects are re-validated, bodies are capped.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

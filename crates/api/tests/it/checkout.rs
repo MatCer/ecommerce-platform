@@ -1,7 +1,6 @@
 //! Checkout, orders, the fake gateway and the checkout admin through the HTTP API (as the
 //! edge calls it): place-order idempotency, the order capability, payment failure → retry →
 //! success, signed fake events, customer orders, admin roles and fresh-auth rules.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

@@ -1,5 +1,4 @@
 //! Runner, outbox dispatcher and cron leader against a real Postgres (spec §13, A14).
-#![allow(clippy::unwrap_used)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};

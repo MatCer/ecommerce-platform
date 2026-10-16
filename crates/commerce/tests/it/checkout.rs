@@ -1,7 +1,6 @@
 //! Checkout and order placement against a real Postgres as the runtime role (A10, A12, A13,
 //! A15, A16, A20): the placement transaction, idempotency, the four races, timeouts, late
 //! payments, guest linking and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use chrono::Utc;
 use commerce::cart::{self, CartRef, NewLine, Scope};

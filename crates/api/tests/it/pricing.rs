@@ -1,6 +1,5 @@
 //! Pricing, promotions and inventory Admin API through the router (real Postgres as the
 //! runtime role, locally signed staff JWTs).
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

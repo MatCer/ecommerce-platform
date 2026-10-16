@@ -1,7 +1,6 @@
 //! WP16 against a real Postgres as the runtime role: review tokens per delivered order line
 //! (single use, expiring, rotated on re-issue), submission limits, moderation, the storefront
 //! summary + JSON-LD (published reviews only), and tenant isolation of the new tables.
-#![allow(clippy::unwrap_used)]
 
 use chrono::{Duration, Utc};
 use commerce::reviews::{self, ReviewInput, Status};

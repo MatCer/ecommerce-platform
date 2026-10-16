@@ -1,5 +1,4 @@
 //! Customer credential races (A5): rate limits and password changes under concurrency.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

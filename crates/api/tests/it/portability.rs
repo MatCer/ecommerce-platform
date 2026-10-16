@@ -1,6 +1,5 @@
 //! Data portability through the router (WP13b): roles, fresh sign-in for downloads and
 //! privacy requests (A9), the import lifecycle, exports and GDPR access/erasure.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

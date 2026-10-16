@@ -1,5 +1,4 @@
 //! Row-level security, grants and tenant_tx (spec §5.2, A8) against a real Postgres.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

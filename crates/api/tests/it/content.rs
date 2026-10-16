@@ -1,6 +1,5 @@
 //! Content through the router (WP13a): pages and blog posts with blocks, menus in `/shop`,
 //! legal entity + templates + go-live checklist (A29), tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

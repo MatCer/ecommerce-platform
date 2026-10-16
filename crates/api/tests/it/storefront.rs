@@ -1,7 +1,6 @@
 //! Storefront API through the router: authorization matrix (A4), page models, cart and the
 //! checkout handoff (A1), SEO files, redirects, storefront tokens, artifacts (real Postgres as
 //! the runtime role).
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

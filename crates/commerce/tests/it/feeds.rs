@@ -1,6 +1,5 @@
 //! Feed imports end to end against Postgres (runtime role), in-memory storage and a local
 //! image/feed server (WP13a, A18, A21, A28).
-#![allow(clippy::unwrap_used)]
 
 use axum::Router;
 use axum::routing::get;

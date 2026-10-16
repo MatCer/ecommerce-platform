@@ -1,6 +1,5 @@
 //! Outbound webhooks (§8.5, A21): subscriptions, fan-out, signed delivery, retries, dead,
 //! redeliver, rotation and tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::sync::{Arc, Mutex};
 

@@ -1,7 +1,6 @@
 //! Themes Admin API + builder callbacks + preview resolution through the router (WP23):
 //! roles, fresh auth for publish (A9), builder token separation (A7), archive rejection with
 //! reasons (A6), preview tokens (A21), tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

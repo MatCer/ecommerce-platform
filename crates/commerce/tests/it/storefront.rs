@@ -1,6 +1,5 @@
 //! Storefront tables (redirects, carts, handoffs, theme revisions) against a real Postgres as
 //! the runtime role: tenant isolation and the service rules that live in SQL.
-#![allow(clippy::unwrap_used)]
 
 use chrono::Utc;
 use commerce::cart::{self, NewLine};

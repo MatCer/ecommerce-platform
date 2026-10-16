@@ -1,6 +1,5 @@
 //! WP23 theme revisions against a real Postgres as the runtime role: fork → builder callbacks
 //! → preview → publish → rollback, token edits, uploads, tenant isolation, maintenance.
-#![allow(clippy::unwrap_used)]
 
 use chrono::Utc;
 use commerce::tenancy;

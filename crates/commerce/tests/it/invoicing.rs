@@ -3,7 +3,6 @@
 //!
 //! Regenerate the golden files after an intended change with `UPDATE_GOLDEN=1 cargo test -p
 //! commerce --test invoicing` and review the diff.
-#![allow(clippy::unwrap_used)]
 
 use chrono::NaiveDate;
 use commerce::invoicing::document::{

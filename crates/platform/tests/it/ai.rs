@@ -1,6 +1,5 @@
 //! The Anthropic client against a local stub of the Messages API: request shape, retries on
 //! 429/529 with `retry-after`, no retry on 400, error mapping.
-#![allow(clippy::unwrap_used)]
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;

@@ -1,6 +1,5 @@
 //! Mail core against Postgres (runtime role) and a scripted SMTP server: A14 send states and
 //! retry policy, suppression (A29), idempotent enqueueing, tenant isolation.
-#![allow(clippy::unwrap_used)]
 
 use commerce::notifications::{
     self, Brand, Email, Step, SuppressionReason, Template, brand::Colors,

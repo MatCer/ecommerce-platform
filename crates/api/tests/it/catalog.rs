@@ -1,6 +1,5 @@
 //! Catalog and media Admin API through the router (real Postgres as the runtime role,
 //! in-memory object storage, locally signed staff JWTs).
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

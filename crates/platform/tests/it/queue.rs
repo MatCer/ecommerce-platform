@@ -1,5 +1,4 @@
 //! Leased job queue and outbox semantics (spec §13, A14) against a real Postgres.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

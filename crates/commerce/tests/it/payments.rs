@@ -3,7 +3,6 @@
 //! webhook verification and processing, refunds, cash-on-delivery collection with rounding,
 //! and tenant isolation of the new tables. Tests marked "stripe-mock" call the local
 //! stripe-mock (`STRIPE_MOCK_URL`, default `http://localhost:12111`).
-#![allow(clippy::unwrap_used)]
 
 use std::sync::Arc;
 

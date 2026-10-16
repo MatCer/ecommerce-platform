@@ -1,6 +1,5 @@
 //! Search against a real Postgres and a real Meilisearch (spec §11.1, A23, A27).
 //! `#[ignore]`d: run with `make test-search` (needs `make dev-infra` or the wp stack).
-#![allow(clippy::unwrap_used)]
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::Duration;

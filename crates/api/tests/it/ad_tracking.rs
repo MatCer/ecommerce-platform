@@ -1,6 +1,5 @@
 //! WP20 through the HTTP API: ad-platform settings (roles, fresh auth, write-only
 //! credentials), the delivery log and the beacon/cart capture gated by `ads` consent.
-#![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
 

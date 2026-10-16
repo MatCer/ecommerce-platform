@@ -1,5 +1,4 @@
 //! Tenancy, markets, audit and idempotency against a real Postgres, as the runtime role.
-#![allow(clippy::unwrap_used)]
 
 use commerce::markets::{self, NewMarket, TaxMode};
 use commerce::tenancy::{self, CheckoutMode, CheckoutOriginPolicy, NewTenant, Role};

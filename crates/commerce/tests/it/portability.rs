@@ -1,7 +1,6 @@
 //! WP13b against Postgres (runtime role) and in-memory storage: CSV imports (customers,
 //! archived orders, subscribers with consent evidence), the tenant export zip, GDPR access
 //! and erasure, and tenant isolation of the new tables (spec §10.8, §14, A20, A28, A29).
-#![allow(clippy::unwrap_used)]
 
 use std::io::Read;
 

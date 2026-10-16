@@ -1,6 +1,5 @@
 //! Media upload, verification, processing and deletion with Postgres (runtime role) and
 //! in-memory object storage.
-#![allow(clippy::unwrap_used)]
 
 use std::io::Cursor;
 

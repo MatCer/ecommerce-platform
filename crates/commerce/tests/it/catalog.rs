@@ -1,5 +1,4 @@
 //! Catalog services against a real Postgres, as the runtime role (RLS on).
-#![allow(clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
 

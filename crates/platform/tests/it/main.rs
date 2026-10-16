@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 mod ai;
 mod http;
 mod mail;
