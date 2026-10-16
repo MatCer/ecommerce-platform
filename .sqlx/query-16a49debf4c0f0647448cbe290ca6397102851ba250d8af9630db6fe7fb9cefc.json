@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.legal_template_version,\n                  NOT EXISTS (\n                      SELECT 1 FROM markets m, unnest(m.locales) l (locale)\n                      WHERE NOT EXISTS (SELECT 1 FROM page_translations t\n                                        WHERE t.page_id = p.id AND t.locale = l.locale)\n                  ) AS \"every_locale!\"\n           FROM pages p\n           WHERE p.legal_type = 'cookies' AND p.status = 'published' AND p.published_at <= now()",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "legal_template_version",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "pages",
+            "name": "legal_template_version"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "every_locale!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "16a49debf4c0f0647448cbe290ca6397102851ba250d8af9630db6fe7fb9cefc"
+}

@@ -17,9 +17,9 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{Block, LegalType, PageInput, PageKind, PageStatus, PageTranslation};
-use crate::audit;
 use crate::catalog::check_text;
 use crate::markets::invalid;
+use crate::{audit, consent};
 
 /// Shown next to every template (admin install dialog, legal page editor, API docs).
 pub const NOTICE: &str = "These templates are a starting point, not legal advice. Have them \
@@ -36,6 +36,8 @@ pub const REQUIRED: [LegalType; 5] = [
 ];
 
 pub const TEMPLATE_LOCALES: [&str; 3] = ["cs", "sk", "en"];
+
+pub const TEMPLATE_VERSION: &str = "2026-10-16";
 
 // ---------------------------------------------------------------------------------------
 // Legal entity
@@ -516,8 +518,16 @@ pub async fn install(
                 published_at: None,
                 image_asset_id: None,
                 translations,
+                still_covers_experiments: false,
             },
         )
+        .await?;
+        sqlx::query!(
+            "UPDATE pages SET legal_template_version = $2 WHERE id = $1",
+            page.id,
+            TEMPLATE_VERSION
+        )
+        .execute(&mut **tx)
         .await?;
         created.push(page.id);
     }
@@ -526,6 +536,26 @@ pub async fn install(
         skipped,
         notice: NOTICE.into(),
     })
+}
+
+pub async fn cookie_policy_covers_experiments(tx: &mut TenantTx) -> Result<bool, Error> {
+    let page = sqlx::query!(
+        r#"SELECT p.legal_template_version,
+                  NOT EXISTS (
+                      SELECT 1 FROM markets m, unnest(m.locales) l (locale)
+                      WHERE NOT EXISTS (SELECT 1 FROM page_translations t
+                                        WHERE t.page_id = p.id AND t.locale = l.locale)
+                  ) AS "every_locale!"
+           FROM pages p
+           WHERE p.legal_type = 'cookies' AND p.status = 'published' AND p.published_at <= now()"#
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(page.is_some_and(|p| {
+        p.every_locale
+            && p.legal_template_version
+                .is_some_and(|v| consent::covers_experiments(&v))
+    }))
 }
 
 /// `base`, or `base-2`, `base-3`, ... if another page already uses it in `locale`.

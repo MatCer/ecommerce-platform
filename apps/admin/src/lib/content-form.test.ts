@@ -20,10 +20,11 @@ describe("content forms", () => {
       id: "id",
       created_at: "now",
       updated_at: "now",
+      legal_template_version: "2026-10-16",
       kind: "legal" as const,
-      legal_type: "terms" as const,
+      legal_type: "cookies" as const,
       status: "published" as const,
-      translations: [{ locale: "cs", title: "Terms", slug: "terms", blocks: [] }],
+      translations: [{ locale: "cs", title: "Cookies", slug: "cookies", blocks: [] }],
     };
     expect(Object.keys(pageInput(page)).sort()).toEqual([
       "image_asset_id",
@@ -31,8 +32,13 @@ describe("content forms", () => {
       "legal_type",
       "published_at",
       "status",
+      "still_covers_experiments",
       "translations",
     ]);
+    expect(pageInput(page).still_covers_experiments).toBe(false);
+    expect(pageInput({ ...page, still_covers_experiments: true }).still_covers_experiments).toBe(
+      true,
+    );
     expect(pageInput(page).translations).toEqual(page.translations);
     const entity = {
       company_name: "Shop",

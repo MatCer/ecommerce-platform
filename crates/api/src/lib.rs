@@ -9,6 +9,7 @@ pub mod admin_analytics;
 pub mod admin_catalog;
 pub mod admin_content;
 pub mod admin_email;
+pub mod admin_experiments;
 pub mod admin_feeds;
 pub mod admin_flows;
 pub mod admin_fulfillment;
@@ -145,6 +146,7 @@ pub struct AppState {
         (name = "portability", description = "Admin API: CSV imports, archived orders, data exports, GDPR access and erasure"),
         (name = "email", description = "Admin API: sent emails, suppressions, email logo and texts"),
         (name = "reviews", description = "Admin API: review moderation (publish, reject, hide) and replies"),
+        (name = "experiments", description = "Admin API: starting an A/B experiment, gated on the cookie page wording"),
         (name = "insights", description = "Admin API: ranked findings of the nightly detectors, with optional AI hypotheses"),
         (name = "webhooks", description = "Provider webhooks: payments (signed), email bounces/complaints"),
         (name = "storefront", description = "Storefront API: page models, search, cart, checkout handoff (storefront token, via the edge)"),
@@ -218,6 +220,7 @@ fn documented_routes() -> (Router<AppState>, OpenApiSpec) {
         .merge(admin_portability::routes())
         .merge(admin_reviews::routes())
         .merge(admin_insights::routes())
+        .merge(admin_experiments::routes())
         .merge(admin_flows::routes())
         .merge(storefront::routes())
         .merge(storefront_search::routes())

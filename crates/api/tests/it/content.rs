@@ -431,7 +431,7 @@ async fn go_live_flags_gaps_until_legal_content_is_complete(db: PgPool) {
             .collect();
         assert_eq!(locales, ["cs", "sk"], "the markets' locales");
         p["status"] = json!("published");
-        for k in ["id", "created_at", "updated_at"] {
+        for k in ["id", "created_at", "updated_at", "legal_template_version"] {
             p.as_object_mut().unwrap().remove(k);
         }
         let (status, body) = c.admin(Call::put(&uri, p)).await;
@@ -463,7 +463,7 @@ async fn go_live_flags_gaps_until_legal_content_is_complete(db: PgPool) {
     let (_, mut terms) = c.admin(Call::get(&uri)).await;
     terms["translations"][0]["blocks"] =
         json!([{ "type": "rich_text", "html": "<p>[DOPLŇTE: company_id]</p>" }]);
-    for k in ["id", "created_at", "updated_at"] {
+    for k in ["id", "created_at", "updated_at", "legal_template_version"] {
         terms.as_object_mut().unwrap().remove(k);
     }
     assert_eq!(c.admin(Call::put(&uri, terms)).await.0, StatusCode::OK);

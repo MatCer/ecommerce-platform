@@ -1,6 +1,9 @@
 use commerce::consent::{self, ConsentChoice, Purposes, Source, Subject};
+use commerce::content::legal::{self, InstallInput};
+use commerce::content::{self, Block, LegalType, Page, PageInput, PageStatus};
 use commerce::experiments::{self, Assignment, ExperimentKey};
 use commerce::tenancy;
+use platform::Error;
 use platform::db::tenant_tx;
 use serde_json::json;
 use sqlx::PgPool;
@@ -64,9 +67,94 @@ async fn set_status(runtime: &PgPool, tenant: Uuid, id: Uuid, status: &'static s
     tx.commit().await.unwrap();
 }
 
+const ACTOR: &str = "test";
+
+async fn install_cookie_page(runtime: &PgPool, tenant: Uuid) -> Uuid {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    let installed = legal::install(
+        &mut tx,
+        ACTOR,
+        &InstallInput {
+            locales: vec![],
+            types: vec![LegalType::Cookies],
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    installed.created[0]
+}
+
+async fn edit_page(
+    runtime: &PgPool,
+    tenant: Uuid,
+    id: Uuid,
+    still_covers_experiments: bool,
+    change: impl FnOnce(&mut PageInput),
+) -> Page {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    let p = content::get(&mut tx, id).await.unwrap();
+    let mut input = PageInput {
+        kind: p.kind,
+        legal_type: p.legal_type,
+        status: p.status,
+        published_at: p.published_at,
+        image_asset_id: p.image_asset_id,
+        translations: p.translations,
+        still_covers_experiments,
+    };
+    change(&mut input);
+    let page = content::update(&mut tx, ACTOR, id, &input).await.unwrap();
+    tx.commit().await.unwrap();
+    page
+}
+
+async fn publish(runtime: &PgPool, tenant: Uuid, id: Uuid, status: PageStatus) -> Page {
+    edit_page(runtime, tenant, id, false, |p| p.status = status).await
+}
+
+async fn add_paragraph(runtime: &PgPool, tenant: Uuid, id: Uuid, confirmed: bool) -> Page {
+    edit_page(runtime, tenant, id, confirmed, |p| {
+        p.translations[0].blocks.push(Block::RichText {
+            html: "<p>Doplněno obchodníkem.</p>".into(),
+        });
+    })
+    .await
+}
+
+async fn published_cookie_page(runtime: &PgPool, tenant: Uuid) -> Uuid {
+    let id = install_cookie_page(runtime, tenant).await;
+    publish(runtime, tenant, id, PageStatus::Published).await;
+    id
+}
+
+async fn start(runtime: &PgPool, tenant: Uuid, id: Uuid) -> Result<(), Error> {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    experiments::start(&mut tx, ACTOR, id).await?;
+    tx.commit().await.unwrap();
+    Ok(())
+}
+
+async fn sql(runtime: &PgPool, tenant: Uuid, sql: &'static str) {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query(sql).execute(&mut *tx).await.unwrap();
+    tx.commit().await.unwrap();
+}
+
+fn outdated(result: Result<(), Error>) -> bool {
+    matches!(
+        result,
+        Err(Error::Validation {
+            code: "cookie_policy_outdated",
+            ..
+        })
+    )
+}
+
 async fn running(runtime: &PgPool, tenant: Uuid) -> Uuid {
+    published_cookie_page(runtime, tenant).await;
     let id = draft(runtime, tenant, "homepage", 1).await;
-    set_status(runtime, tenant, id, "running").await;
+    start(runtime, tenant, id).await.unwrap();
     id
 }
 
@@ -136,6 +224,96 @@ async fn only_a_grant_of_the_experiments_text_enrols_and_the_arm_sticks(db: PgPo
     choose(&runtime, tenant, SUBJECT, false, consent::TEXT_VERSION).await;
     assert_eq!(enrol(&runtime, tenant, SUBJECT).await, None, "withdrawn");
     assert_eq!(rows(&runtime, tenant).await, 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_experiment_starts_only_once_the_published_cookie_page_names_testing_page_variants(
+    db: PgPool,
+) {
+    let (runtime, tenant) = setup(&db, "exp-gate").await;
+    let id = draft(&runtime, tenant, "homepage", 1).await;
+    assert!(
+        outdated(start(&runtime, tenant, id).await),
+        "no cookie page"
+    );
+
+    let page = install_cookie_page(&runtime, tenant).await;
+    assert!(outdated(start(&runtime, tenant, id).await), "unpublished");
+
+    let published = publish(&runtime, tenant, page, PageStatus::Published).await;
+    assert_eq!(
+        published.legal_template_version.as_deref(),
+        Some(consent::FIRST_EXPERIMENTS_TEXT_VERSION),
+        "publishing the installed template keeps its version"
+    );
+    let confirmed = add_paragraph(&runtime, tenant, page, true).await;
+    assert_eq!(
+        confirmed.legal_template_version.as_deref(),
+        Some(consent::FIRST_EXPERIMENTS_TEXT_VERSION),
+        "edited with confirmation"
+    );
+
+    sql(
+        &runtime,
+        tenant,
+        "UPDATE pages SET legal_template_version = '2026-09-25'",
+    )
+    .await;
+    assert!(
+        outdated(start(&runtime, tenant, id).await),
+        "older template"
+    );
+    sql(
+        &runtime,
+        tenant,
+        "UPDATE pages SET legal_template_version = '2026-10-16'",
+    )
+    .await;
+
+    sql(&runtime, tenant, "UPDATE markets SET locales = '{cs,sk}'").await;
+    assert!(
+        outdated(start(&runtime, tenant, id).await),
+        "a market locale the page lacks"
+    );
+    sql(&runtime, tenant, "UPDATE markets SET locales = '{cs}'").await;
+
+    let edited = add_paragraph(&runtime, tenant, page, false).await;
+    assert_eq!(edited.legal_template_version, None);
+    assert!(
+        outdated(start(&runtime, tenant, id).await),
+        "edited without confirmation"
+    );
+
+    sql(&runtime, tenant, "DELETE FROM pages").await;
+    published_cookie_page(&runtime, tenant).await;
+    start(&runtime, tenant, id).await.unwrap();
+    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    assert_eq!(
+        experiments::running(&mut tx).await.unwrap().map(|e| e.id),
+        Some(id)
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn enrolment_stops_when_the_cookie_page_stops_covering_experiments(db: PgPool) {
+    let (runtime, tenant) = setup(&db, "exp-gate-enrol").await;
+    let page = published_cookie_page(&runtime, tenant).await;
+    let id = draft(&runtime, tenant, "homepage", 1).await;
+    start(&runtime, tenant, id).await.unwrap();
+    choose(&runtime, tenant, SUBJECT, true, consent::TEXT_VERSION).await;
+    assert!(enrol(&runtime, tenant, SUBJECT).await.is_some());
+
+    publish(&runtime, tenant, page, PageStatus::Draft).await;
+    assert_eq!(enrol(&runtime, tenant, SUBJECT).await, None, "unpublished");
+
+    publish(&runtime, tenant, page, PageStatus::Published).await;
+    assert!(enrol(&runtime, tenant, SUBJECT).await.is_some());
+    add_paragraph(&runtime, tenant, page, false).await;
+    assert_eq!(
+        enrol(&runtime, tenant, SUBJECT).await,
+        None,
+        "marker cleared"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]

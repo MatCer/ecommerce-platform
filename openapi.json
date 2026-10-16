@@ -5035,6 +5035,84 @@
         ]
       }
     },
+    "/admin/v1/experiments/{id}/start": {
+      "post": {
+        "tags": [
+          "experiments"
+        ],
+        "summary": "Starts a draft experiment (owner/admin). Refused with `cookie_policy_outdated` until the\npublished cookie page, in every market locale, comes from a legal template that says\nanalytics covers testing page variants.",
+        "operationId": "start_experiment",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Running"
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "experiment_not_draft, experiment_running",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "cookie_policy_outdated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
     "/admin/v1/feeds": {
       "get": {
         "tags": [
@@ -31629,6 +31707,14 @@
           "kind": {
             "$ref": "#/components/schemas/PageKind"
           },
+          "legal_template_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Version of the platform legal template the page was installed from; cleared when its\nblocks are edited without `still_covers_experiments`.",
+            "example": "2026-10-16"
+          },
           "legal_type": {
             "oneOf": [
               {
@@ -31733,6 +31819,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/PageStatus"
+          },
+          "still_covers_experiments": {
+            "type": "boolean",
+            "description": "The merchant confirms the edited page still says analytics covers testing page\nvariants, so a blocks change keeps `legal_template_version`."
           },
           "translations": {
             "type": "array",
@@ -38116,6 +38206,10 @@
     {
       "name": "reviews",
       "description": "Admin API: review moderation (publish, reject, hide) and replies"
+    },
+    {
+      "name": "experiments",
+      "description": "Admin API: starting an A/B experiment, gated on the cookie page wording"
     },
     {
       "name": "insights",

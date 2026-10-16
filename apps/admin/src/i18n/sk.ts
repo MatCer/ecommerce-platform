@@ -331,6 +331,8 @@ export const sk: Dictionary = {
     addQuestion: "Pridať otázku",
     notice:
       "Šablóna nie je právne poradenstvo: pred publikovaním ju nechajte skontrolovať právnikom.",
+    stillCoversExperiments:
+      "Táto stránka stále uvádza, že analytika zahŕňa testovanie variantov stránok",
     deletePage: "Vymazať stránku?",
     deletePageDesc: "Stránka aj jej preklady budú natrvalo vymazané.",
     asset: "Vybrať obrázok",

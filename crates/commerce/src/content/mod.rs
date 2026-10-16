@@ -8,7 +8,7 @@ pub mod blocks;
 pub mod legal;
 pub mod menus;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use platform::Error;
@@ -156,6 +156,10 @@ pub struct PageInput {
     /// Cover image (blog cards, social previews).
     pub image_asset_id: Option<Uuid>,
     pub translations: Vec<PageTranslation>,
+    /// The merchant confirms the edited page still says analytics covers testing page
+    /// variants, so a blocks change keeps `legal_template_version`.
+    #[serde(default)]
+    pub still_covers_experiments: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -167,6 +171,10 @@ pub struct Page {
     pub published_at: Option<DateTime<Utc>>,
     pub image_asset_id: Option<Uuid>,
     pub translations: Vec<PageTranslation>,
+    /// Version of the platform legal template the page was installed from; cleared when its
+    /// blocks are edited without `still_covers_experiments`.
+    #[schema(example = "2026-10-16")]
+    pub legal_template_version: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -326,6 +334,13 @@ async fn save(tx: &mut TenantTx, id: Uuid, input: &PageInput) -> Result<(), Erro
     Ok(())
 }
 
+fn blocks_by_locale(translations: &[PageTranslation]) -> Result<BTreeMap<&str, Vec<Block>>, Error> {
+    translations
+        .iter()
+        .map(|t| Ok((t.locale.as_str(), blocks::normalize(&t.blocks)?)))
+        .collect()
+}
+
 fn page_db_error(e: sqlx::Error) -> Error {
     if e.as_database_error().and_then(|d| d.constraint()) == Some("pages_legal_type") {
         Error::Conflict {
@@ -382,6 +397,16 @@ pub async fn update(
         .await?
         .ok_or(Error::NotFound)?;
     let before = get(tx, id).await?;
+    if !input.still_covers_experiments
+        && blocks_by_locale(&before.translations)? != blocks_by_locale(&input.translations)?
+    {
+        sqlx::query!(
+            "UPDATE pages SET legal_template_version = NULL WHERE id = $1",
+            id
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
     save(tx, id, input).await?;
     let after = get(tx, id).await?;
     audit::record(
@@ -417,7 +442,8 @@ pub async fn delete(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Erro
 
 pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<Page, Error> {
     let row = sqlx::query!(
-        "SELECT id, kind, legal_type, status, published_at, image_asset_id, created_at, updated_at
+        "SELECT id, kind, legal_type, status, published_at, image_asset_id, legal_template_version,
+                created_at, updated_at
          FROM pages WHERE id = $1",
         id
     )
@@ -456,6 +482,7 @@ pub async fn get(tx: &mut TenantTx, id: Uuid) -> Result<Page, Error> {
         published_at: row.published_at,
         image_asset_id: row.image_asset_id,
         translations,
+        legal_template_version: row.legal_template_version,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -541,6 +568,7 @@ mod tests {
                 seo_title: None,
                 seo_description: None,
             }],
+            still_covers_experiments: false,
         }
     }
 

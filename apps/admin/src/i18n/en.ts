@@ -331,6 +331,7 @@ export const en = {
     answer: "Answer",
     addQuestion: "Add question",
     notice: "Template, not legal advice: have it reviewed by a lawyer before publishing.",
+    stillCoversExperiments: "This page still says analytics covers testing page variants",
     deletePage: "Delete page?",
     deletePageDesc: "This permanently removes the page and its translations.",
     asset: "Choose image",

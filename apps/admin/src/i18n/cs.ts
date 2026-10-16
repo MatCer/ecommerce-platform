@@ -330,6 +330,8 @@ export const cs: Dictionary = {
     answer: "Odpověď",
     addQuestion: "Přidat otázku",
     notice: "Šablona není právní poradenství: před publikací ji nechte zkontrolovat právníkem.",
+    stillCoversExperiments:
+      "Tato stránka stále uvádí, že analytika zahrnuje testování variant stránek",
     deletePage: "Smazat stránku?",
     deletePageDesc: "Stránka i její překlady budou trvale smazány.",
     asset: "Vybrat obrázek",
