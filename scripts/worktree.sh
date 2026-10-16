@@ -130,12 +130,15 @@ prune() {
 gb() { awk -v b="$1" 'BEGIN { printf "%.1f GB", b / 1e9 }'; }
 
 remove_target() (
-  local target=$1/target bytes cleanup
-  exec {cleanup}>"$(git -C "$1" rev-parse --absolute-git-dir)/target-cleanup.lock"
+  local target=$1/target bytes cleanup gitdir trash
+  shopt -s nullglob
+  { gitdir=$(git -C "$1" rev-parse --absolute-git-dir) && exec {cleanup}>"$gitdir/target-cleanup.lock"; } ||
+    { echo "worktree: cannot take the cleanup lock of $1, skipped" >&2; exit 0; }
   flock -n "$cleanup" || { echo "worktree: another cleanup is running in $1, skipped"; exit 0; }
-  if compgen -G "$1/.target-trash.*" >/dev/null; then
+  trash=("$1"/.target-trash.*)
+  if ((${#trash[@]})); then
     echo "worktree: ${3:+would }remove leftover trash of an interrupted cleanup in $1"
-    [[ -n ${3:-} ]] || rm -rf "$1"/.target-trash.*
+    [[ -n ${3:-} ]] || rm -rf "${trash[@]}"
   fi
   [[ -n $2 && -d $target ]] || exit 0
   bytes=$(du -sb "$target" | cut -f1) || { echo "worktree: cannot measure $target, left as is" >&2; exit 0; }
@@ -148,7 +151,7 @@ remove_target() (
     echo "worktree: $2, ${3:+would }remove $target ($(gb "$bytes"))"
     [[ -n ${3:-} ]] || mv -T "$target" "$(mktemp -d "$1/.target-trash.XXXXXX")"
   )
-  [[ -n ${3:-} ]] || rm -rf "$1"/.target-trash.*
+  [[ -n ${3:-} ]] || rm -rf -- "$1"/.target-trash.*
 )
 
 sweep() {
