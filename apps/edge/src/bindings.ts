@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ArtifactManifest } from "@platform/theme-kit";
+import type { Assignment } from "./experiments.ts";
 import type { Site } from "./sites.ts";
 
 /** Header carrying the per-request context id from the edge to the worker and back. */
@@ -18,6 +19,8 @@ export interface RequestContext {
   sessionToken?: string | undefined;
   /** Checkout origin only: the anonymous consent subject (preferences page, A20). */
   consentSubject?: string | undefined;
+  /** Theme renders of an enrolled visitor (SHOP-96): forwarded to page models as `x-experiment`. */
+  experiment?: Assignment | undefined;
   /** Collected from page models (`cache` hints, spec §8.2) for the edge cache decision. */
   tags: Set<string>;
   anyPrivate: boolean;
@@ -80,6 +83,7 @@ const CREDENTIAL_HEADERS = [
   "x-customer-session",
   "x-consent-subject",
   "x-client-ip",
+  "x-experiment",
 ];
 
 // Encoded separators/dots would let a path smuggle segments past the allowlist.
@@ -191,6 +195,8 @@ export function restrictedBinding(opts: {
     if (ctx.sessionToken) headers.set("x-customer-session", ctx.sessionToken);
     if (ctx.consentSubject) headers.set("x-consent-subject", ctx.consentSubject);
     if (ctx.site.clientIp) headers.set("x-client-ip", ctx.site.clientIp);
+    const exp = ctx.experiment;
+    if (exp) headers.set("x-experiment", `${exp.experiment_id}:${exp.version}:${exp.arm}`);
     const res = await opts.upstream(
       new Request(`${opts.apiOrigin}/storefront/v1${url.pathname}${url.search}`, {
         method: op.method,

@@ -276,6 +276,7 @@ describe("restricted theme binding (A7)", () => {
       forgedStorefrontToken: 400,
       authorization: 400,
       cookie: 400,
+      forgedExperiment: 400,
       forgedContext: 403,
       noContext: 403,
       cartViaBinding: 404,
