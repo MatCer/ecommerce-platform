@@ -77,7 +77,6 @@ pub async fn storefront(State(s): State<AppState>, req: Request, next: Next) -> 
     }
 }
 
-/// `429 rate_limited` with `Retry-After` in whole seconds.
 pub fn rate_limited(wait: Duration) -> Response {
     let mut res = Error::TooManyRequests {
         code: "rate_limited",
