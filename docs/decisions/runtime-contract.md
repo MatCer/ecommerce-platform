@@ -477,7 +477,8 @@ separate cache namespace, never cached (already bypassed by the policy).
 - **Fail closed:** an error, a timeout, a malformed answer or one for another experiment id or
   version is control, logged as a warning without the subject. Logs never contain subjects.
 - **Enrolled:** the HTML key gains `exp:<id>:<version>:<arm>`, so a URL has at most arms + 1
-  entries per locale and no client input reaches the key. The render context carries the
+  entries per locale and no client input reaches the key. The segment sits before the host,
+  which cannot contain `|` or `:`, so no path (which may contain `|`) can spell an arm's key. The render context carries the
   assignment and `STOREFRONT` sends `x-experiment: <id>:<version>:<arm>` on its page-model
   calls. Workers cannot send `x-experiment` (400, like the other credential headers) and it is
   stripped from client requests. The browser gets `private, max-age=0, must-revalidate`

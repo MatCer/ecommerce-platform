@@ -530,11 +530,11 @@ export function createGateway(opts: GatewayOptions) {
       site.market_id,
       site.locale,
       artifact,
-      normalized.host,
-      normalized.pathname + normalized.search,
       ...(assignment
         ? [`exp:${assignment.experiment_id}:${assignment.version}:${assignment.arm}`]
         : []),
+      normalized.host,
+      normalized.pathname + normalized.search,
     ].join("|");
 
     const respond = (

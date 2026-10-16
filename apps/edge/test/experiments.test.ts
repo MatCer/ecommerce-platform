@@ -319,6 +319,16 @@ describe("enrolment at the edge (SHOP-96)", () => {
     expect(enrolCalls.length).toBe(2);
   });
 
+  test("a path spelling an arm's cache key does not reach that arm's entry", async () => {
+    answers.set(subject("9"), "a");
+    const enrolled = await page("/p/short", consented(subject("9")));
+    expect(enrolled.headers.get("cache-control")).toBe(PRIVATE);
+    const armBody = await enrolled.text();
+    const crafted = await page(`/p/short|exp:${EXP.id}:3:a`);
+    expect([crafted.status, crafted.headers.get("x-edge-cache")]).toEqual([404, "MISS"]);
+    expect(await crafted.text()).not.toBe(armBody);
+  });
+
   test("a client's x-experiment header never reaches the API", async () => {
     const forged = { "x-experiment": ARM("b") };
     expect((await page("/?case=j", undefined, "demo.localhost", forged)).status).toBe(200);
