@@ -147,6 +147,35 @@ describe("ApiEnroller", () => {
       expect(await enroller.enrol(s, visitor(t), t)).toBeNull();
     expect(calls).toBe(2);
   });
+
+  test("after the window one call probes the API; other visitors stay control until it answers", async () => {
+    let calls = 0;
+    let healthy = false;
+    const enroller = new ApiEnroller("http://api.test", "t", async () => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 5));
+      return healthy
+        ? Response.json({ assignment: { experiment_id: EXP.id, version: 3, arm: "b" } })
+        : new Response("down", { status: 503 });
+    });
+    const s = site({ experiment: EXP });
+    const visitor = (i: number) => i.toString(16).padStart(32, "0");
+    const wave = async (from: number, at: number) =>
+      (
+        await Promise.allSettled(
+          Array.from({ length: 12 }, (_, i) => enroller.enrol(s, visitor(from + i), at)),
+        )
+      ).map((r) => (r.status === "fulfilled" ? (r.value?.arm ?? null) : "failed"));
+    expect(await wave(0, 0)).toEqual(Array(12).fill("failed"));
+    expect(calls).toBe(12);
+    expect(await wave(100, 10_000)).toEqual(["failed", ...Array(11).fill(null)]);
+    expect(await wave(200, 20_000)).toEqual(["failed", ...Array(11).fill(null)]);
+    expect(calls).toBe(14);
+    healthy = true;
+    expect(await wave(300, 30_000)).toEqual(["b", ...Array(11).fill(null)]);
+    expect(await wave(400, 30_001)).toEqual(Array(12).fill("b"));
+    expect(calls).toBe(27);
+  });
 });
 
 describe("enrolment at the edge (SHOP-96)", () => {
