@@ -173,11 +173,12 @@ tidy() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; tidy is for linked worktrees"
   remove_target "$ROOT" "" "$1"
   [[ -d target ]] || return 0
-  local head pr='' bytes
+  local head pr='' bytes limit=()
   head=$(git rev-parse HEAD)
+  ! command -v timeout >/dev/null || limit=(timeout 10)
   if command -v gh >/dev/null; then
     # A worktree on a main commit is linked to the PR squash-merged into it, so match the PR head.
-    pr=$(timeout 10 gh api "repos/{owner}/{repo}/commits/$head/pulls" \
+    pr=$("${limit[@]}" gh api "repos/{owner}/{repo}/commits/$head/pulls" \
       --jq "[.[] | select(.merged_at != null and .head.sha == \"$head\")][0].number // empty" 2>/dev/null) ||
       { pr=''; echo "worktree: GitHub did not answer, cannot tell whether HEAD is merged" >&2; }
   fi
