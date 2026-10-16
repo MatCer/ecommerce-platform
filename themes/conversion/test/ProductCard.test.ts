@@ -1,7 +1,7 @@
 import type { ProductCard as Card, ShopModel } from "@platform/storefront-sdk/types";
 import { experimental_AstroContainer as AstroContainer } from "astro/container";
 import { expect, test } from "vitest";
-import ProductCard from "./ProductCard.astro";
+import ProductCard from "../src/components/ProductCard.astro";
 
 const shop = {
   base_path: "",
