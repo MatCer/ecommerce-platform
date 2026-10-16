@@ -73,7 +73,7 @@ say, above the reviews on the product page (conversion theme).
 - **Opt-in.** `ai_settings.review_summaries` (no row = off), switched by an owner or admin
   under `PUT /admin/v1/ai/settings` (audited `ai.settings_updated`). Off hides every summary
   at once; switching on queues one job per product that qualifies or still has a cached
-  summary. Any change publishes `ai_settings.changed`, which purges the tenant's cached pages.
+  summary. Switching it publishes `ai_settings.changed`, which purges the tenant's cached pages.
 - **Input and minimum.** Published, verified reviews only, at least 5 (`MIN_REVIEWS`); below
   that a product has no summary and an existing one is deleted. The model sees the product
   name, the rating distribution and the newest 40 reviews (rating, title, body cut to 1000
@@ -105,6 +105,43 @@ say, above the reviews on the product page (conversion theme).
 | Unlabelled AI text on the shop | The storefront query requires the switch and a matching `ai_marks` hash (fails closed); the label is always rendered with the text. |
 | Publishing or spending quota without the merchant's decision | Off by default; only owners and admins switch it (the settings row is locked, so concurrent switches each purge and backfill); each call is metered against the tenant quota. |
 | Stale summary after a review is hidden | Bounded by the 5-minute debounce plus the job run; inputs were already moderated and carry no names. |
+
+## Image alt texts (SHOP-37)
+
+Product images get alt text in every market language without the merchant typing it.
+
+- **Opt-in.** `ai_settings.alt_texts_since` (NULL = off), exposed as `alt_texts: bool` on the
+  same settings route. Turning it on stores the time once (on again keeps it), off clears it.
+  Only images whose asset was uploaded after that time are filled automatically; older ones
+  only through `POST /admin/v1/ai/alt-texts/backfill` (owner or admin; `409
+  ai_alt_texts_disabled` while off, `402 ai_quota_exceeded`), which queues one job per product
+  with a ready image missing a language.
+- **Trigger.** `product.created`, `product.updated` and `asset.ready` queue `ai.alt_text`
+  (default queue, 3 attempts), debounced per product or asset to one job per minute. An
+  `asset.ready` job finds the products showing that asset itself, since the outbox dispatch has
+  no tenant context.
+- **One call per image.** The targets are the market locales whose `alt_i18n` is missing or
+  blank; none means no call, so a rerun after success costs nothing. The model gets one public
+  variant (JPEG, WebP or PNG, at most 5 MB, width closest to 1024; never AVIF) as a base64
+  image block before the text, plus the product name, the image's non-empty alt texts (it
+  translates them) and the target locales.
+- **Never overwrites.** The write takes the product row lock the catalog save takes, re-reads
+  the image row and fills only locales that are still empty, so a merchant's text, written
+  before or during the call, always wins. One `product.updated` per product and run purges the pages
+  and refreshes the feeds; the audit log records `product.alt_texts_generated`.
+- **Labelling.** Each written value gets an `ai_marks` row (`field = alt_<asset id, 32 hex>`,
+  feature `alt_text`, `accepted_by = system`); `Doc::get` resolves the field to that image's
+  alt text, so the admin badge disappears once someone edits it.
+- **Failures.** Quota used up mid-job: the job stops and keeps what it wrote. Rejected output
+  skips that image. Provider outages retry; the retry skips images filled meanwhile. Switching
+  off stops new writes and removes nothing.
+
+| Threat | Mitigation |
+|---|---|
+| Prompt injection through the product name, existing alt texts or text inside the photo | All of it is untrusted: names and alt texts travel in the `<data>` block, and the system prompt forbids following instructions there or in the photo. The output schema allows exactly one string per target locale. |
+| Links or markup in an alt attribute | Validation runs `plain_text` (control and bidi characters dropped), requires 1-200 characters on one line and rejects `<`, `>`, `//` and `www.`; themes escape attributes. Rejections are logged without model text. |
+| AI overwriting the merchant's alt text | Only empty locales are targets, and the locked write re-checks them. |
+| Spending quota without a decision | Off by default, owners and admins only, automatic only for new uploads; the backfill is an explicit click that checks the quota first; every call is metered. |
 
 ## Fake provider
 
