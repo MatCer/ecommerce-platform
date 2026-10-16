@@ -471,3 +471,28 @@ async fn switching_off_during_generation_writes_nothing(db: PgPool) {
     assert_eq!(w.alts().await, vec![alt(&[("cs", "Modré tričko")])]);
     assert_eq!(w.marks().await, vec![]);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn images_get_at_most_as_many_languages_as_the_catalog_stores(db: PgPool) {
+    let w = setup(db, "alt-many").await;
+    let mut tx = tenant_tx(&w.runtime, w.shop.tenant).await.unwrap();
+    sqlx::query(
+        "UPDATE markets SET locales = '{cs,en,de,fr,it,es,pl,hu,ro,bg,hr,sl,et,lv,lt,fi,sv,da,nl,pt,el,ga}'
+         WHERE code = 'cz'",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    w.put(false, true).await;
+    let a = w.asset(0).await;
+    w.media(&[(a, &[("cs", "Modré tričko")])]).await;
+
+    w.run_product(false).await;
+
+    assert_eq!(w.usage().await, 1);
+    let alts = w.alts().await;
+    assert_eq!(alts[0].len(), 20);
+    assert_eq!(alts[0]["cs"], "Modré tričko");
+    assert_eq!(alts[0]["bg"], "[bg] Product TEE, from cs: Modré tričko");
+}

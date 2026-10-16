@@ -19,6 +19,8 @@ use crate::markets::{invalid, is_locale};
 /// Translatable text: locale (`cs`, `sk`, `en-GB`) -> text.
 pub type I18n = BTreeMap<String, String>;
 
+pub(crate) const MAX_LOCALES: usize = 20;
+
 /// Validates a translation map: known locale format, at most 20 entries, non-blank values of at
 /// most `max` characters; `required` demands at least one entry.
 pub(crate) fn check_i18n(
@@ -34,8 +36,11 @@ pub(crate) fn check_i18n(
             format!("{field} needs at least one translation"),
         ));
     }
-    if value.len() > 20 {
-        return Err(invalid(code, format!("{field} has more than 20 locales")));
+    if value.len() > MAX_LOCALES {
+        return Err(invalid(
+            code,
+            format!("{field} has more than {MAX_LOCALES} locales"),
+        ));
     }
     for (locale, text) in value {
         if !is_locale(locale) {

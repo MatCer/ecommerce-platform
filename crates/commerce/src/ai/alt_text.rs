@@ -17,7 +17,7 @@ use uuid::Uuid;
 use super::fields::{Doc, EntityType, alt_field, product_input};
 use super::marks::{self, NewMark};
 use super::{Ai, Call, CallError, Outcome, prompts};
-use crate::catalog::{I18n, products};
+use crate::catalog::{I18n, MAX_LOCALES, products};
 use crate::media::AssetVariant;
 use crate::reviews::plain_text;
 
@@ -345,10 +345,18 @@ impl Job<'_> {
         name: &str,
         image: &ImageRow,
     ) -> Result<Step, Error> {
+        let mut stored = image.alt.len();
         let targets: Vec<String> = self
             .locales
             .iter()
             .filter(|l| is_empty(image.alt.get(*l)))
+            .filter(|l| {
+                let fits = image.alt.contains_key(*l) || stored < MAX_LOCALES;
+                if fits && !image.alt.contains_key(*l) {
+                    stored += 1;
+                }
+                fits
+            })
             .cloned()
             .collect();
         if targets.is_empty() {
