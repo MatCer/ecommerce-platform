@@ -333,7 +333,9 @@ pub async fn category_products(tx: &mut TenantTx, category_id: Uuid) -> Result<V
     .await?)
 }
 
-/// Queues a rebuild for every tenant whose indexes were not rebuilt by [`SETTINGS_VERSION`].
+/// Queues a rebuild for every tenant whose indexes were not rebuilt by [`SETTINGS_VERSION`],
+/// at most one per tenant and version. Returns the number of such tenants, including those
+/// whose rebuild was already queued.
 pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
     let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
         .fetch_all(db)
@@ -352,8 +354,11 @@ pub async fn queue_settings_upgrades(db: &PgPool) -> Result<usize, Error> {
         .await?;
         if outdated {
             let version = super::next_version(&mut *tx).await?;
-            platform::queue::enqueue(&mut *tx, &super::manual_rebuild_job(tenant_id, version))
-                .await?;
+            let mut job = super::manual_rebuild_job(tenant_id, version);
+            job.idempotency_key = Some(format!(
+                "search.settings-upgrade:{tenant_id}:{SETTINGS_VERSION}"
+            ));
+            platform::queue::enqueue(&mut *tx, &job).await?;
             tx.commit().await?;
             queued += 1;
         }

@@ -268,17 +268,22 @@ async fn indexes_not_rebuilt_by_current_settings_get_one_rebuild(db: PgPool) {
         .unwrap();
         tx.commit().await.unwrap();
     }
-    let rebuilds = async || -> BTreeSet<Option<Uuid>> {
-        sqlx::query_scalar("SELECT tenant_id FROM queue.jobs WHERE kind = 'search.rebuild'")
-            .fetch_all(&db)
-            .await
-            .unwrap()
-            .into_iter()
-            .collect()
+    let rebuilds = async || -> BTreeMap<Option<Uuid>, i64> {
+        sqlx::query_as(
+            "SELECT tenant_id, count(*) FROM queue.jobs WHERE kind = 'search.rebuild'
+             GROUP BY tenant_id",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .collect()
     };
+    let one_each = BTreeMap::from([(Some(old), 1), (Some(applied), 1)]);
 
     assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
-    assert_eq!(rebuilds().await, BTreeSet::from([Some(old), Some(applied)]));
+    assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 2);
+    assert_eq!(rebuilds().await, one_each);
 
     for tenant in [old, applied] {
         let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
@@ -290,7 +295,7 @@ async fn indexes_not_rebuilt_by_current_settings_get_one_rebuild(db: PgPool) {
         tx.commit().await.unwrap();
     }
     assert_eq!(index::queue_settings_upgrades(&runtime).await.unwrap(), 0);
-    assert_eq!(rebuilds().await, BTreeSet::from([Some(old), Some(applied)]));
+    assert_eq!(rebuilds().await, one_each);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

@@ -206,6 +206,7 @@ pub fn all(
             search_index_product(ctx, job, m1.clone())
         })
         .register(search::REINDEX_CATEGORY_JOB, search_reindex_category)
+        .register(search::SETTINGS_UPGRADE_JOB, search_settings_upgrade)
         .register(search::REBUILD_JOB, move |ctx, job| {
             search_rebuild(ctx, job, m3.clone())
         })
@@ -688,6 +689,16 @@ async fn search_reindex_category(ctx: Ctx, job: Job) -> Result<(), JobError> {
     }
     tx.commit().await?;
     tracing::info!(%tenant, %category, products = products.len(), "category reindex queued");
+    Ok(())
+}
+
+async fn search_settings_upgrade(ctx: Ctx, _job: Job) -> Result<(), JobError> {
+    let tenants = search::index::queue_settings_upgrades(&ctx.db)
+        .await
+        .map_err(|e| JobError::Retry(e.to_string()))?;
+    if tenants > 0 {
+        tracing::info!(tenants, "search settings upgrade rebuilds queued");
+    }
     Ok(())
 }
 
