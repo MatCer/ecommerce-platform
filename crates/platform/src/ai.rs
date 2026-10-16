@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use reqwest::{StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -42,7 +43,19 @@ pub struct Request<'a> {
     /// JSON schema of the output object (`additionalProperties: false` everywhere).
     pub schema: &'a Value,
     pub max_tokens: u32,
+    /// Sent before the task as a base64 image block.
+    pub image: Option<Image<'a>>,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct Image<'a> {
+    /// `image/jpeg`, `image/png`, `image/webp` or `image/gif`.
+    pub media_type: &'a str,
+    pub data: &'a [u8],
+}
+
+/// What the fake provider counts for an image.
+const FAKE_IMAGE_TOKENS: u64 = 1_000;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Usage {
@@ -304,6 +317,21 @@ impl Anthropic {
     }
 
     fn body(req: &Request<'_>) -> Value {
+        let text = user_content(req.task, req.data);
+        let content = match req.image {
+            None => json!(text),
+            Some(image) => json!([
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": image.media_type,
+                        "data": BASE64_STANDARD.encode(image.data),
+                    },
+                },
+                { "type": "text", "text": text },
+            ]),
+        };
         json!({
             "model": req.model,
             "max_tokens": req.max_tokens,
@@ -312,7 +340,7 @@ impl Anthropic {
                 "text": req.system,
                 "cache_control": { "type": "ephemeral" },
             }],
-            "messages": [{ "role": "user", "content": user_content(req.task, req.data) }],
+            "messages": [{ "role": "user", "content": content }],
             "output_config": {
                 "effort": "medium",
                 "format": { "type": "json_schema", "schema": req.schema },
@@ -548,7 +576,8 @@ impl Fake {
             .map_err(|e| AiError::InvalidOutput(format!("fixture {}: {e}", req.feature)))?;
         let estimate = |chars: usize| (chars as u64).div_ceil(4).max(1);
         let usage = Usage {
-            input_tokens: estimate(req.system.len() + user_content(req.task, req.data).len()),
+            input_tokens: estimate(req.system.len() + user_content(req.task, req.data).len())
+                + req.image.map_or(0, |_| FAKE_IMAGE_TOKENS),
             output_tokens: estimate(rendered.len()),
             ..Usage::default()
         };
@@ -746,6 +775,40 @@ mod tests {
     }
 
     #[test]
+    fn body_sends_an_image_before_the_task() {
+        let data = json!({"name": "Tričko"});
+        let schema = json!({"type": "object"});
+        let req = Request {
+            feature: "alt_text",
+            model: "claude-sonnet-5",
+            system: "sys",
+            task: "Describe.",
+            data: &data,
+            schema: &schema,
+            max_tokens: 100,
+            image: None,
+        };
+        assert_eq!(
+            Anthropic::body(&req)["messages"][0]["content"],
+            json!("Describe.\n\n<data>\n{\"name\":\"Tričko\"}\n</data>")
+        );
+        let with_image = Request {
+            image: Some(Image {
+                media_type: "image/webp",
+                data: b"RIFF",
+            }),
+            ..req
+        };
+        assert_eq!(
+            Anthropic::body(&with_image)["messages"][0]["content"],
+            json!([
+                {"type": "image", "source": {"type": "base64", "media_type": "image/webp", "data": "UklGRg=="}},
+                {"type": "text", "text": "Describe.\n\n<data>\n{\"name\":\"Tričko\"}\n</data>"}
+            ])
+        );
+    }
+
+    #[test]
     fn converse_body_caches_prefix_and_history() {
         let tools = json!([{"name": "read_file", "input_schema": {"type": "object"}}]);
         let messages = [json!({"role": "user", "content": "hi"})];
@@ -845,6 +908,7 @@ mod tests {
             data: &data,
             schema: &json!({}),
             max_tokens: 100,
+            image: None,
         };
         let c = fake.complete(&req).unwrap();
         assert_eq!(c.output["text"], "Hi Ann \"A\"");

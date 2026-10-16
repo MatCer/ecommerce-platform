@@ -77,6 +77,7 @@ async fn call(client: &Client) -> Result<platform::ai::Completion, platform::ai:
             data: &data,
             schema: &schema,
             max_tokens: 2000,
+            image: None,
         })
         .await
 }

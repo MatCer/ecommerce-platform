@@ -347,6 +347,7 @@ async fn summarize(
             data: &data,
             schema: &prompts::review_summary_schema(),
             max_tokens: 2000,
+            image: None,
         };
         let (output, m) = super::call(db, ai, tenant, ACTOR, &call).await?;
         summaries.extend(validate(output, locales)?);

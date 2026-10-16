@@ -1010,6 +1010,7 @@ pub async fn run_plan(
             data: &data,
             schema: &prompts::plan_schema(),
             max_tokens: 4000,
+            image: None,
         },
     )
     .await;

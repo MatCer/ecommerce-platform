@@ -298,6 +298,7 @@ pub(crate) struct Call<'a> {
     pub data: &'a Value,
     pub schema: &'a Value,
     pub max_tokens: u32,
+    pub image: Option<platform::ai::Image<'a>>,
 }
 
 /// Quota check, the call, then the `ai_usage` row (also for failures that consumed tokens).
@@ -329,6 +330,7 @@ pub(crate) async fn call(
             data: c.data,
             schema: c.schema,
             max_tokens: c.max_tokens,
+            image: c.image,
         })
         .await;
     let (usage, model) = match &result {
