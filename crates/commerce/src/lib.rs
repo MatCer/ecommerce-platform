@@ -17,6 +17,7 @@ pub mod consent;
 pub mod content;
 pub mod customers;
 pub mod documents;
+pub mod experiments;
 pub mod feeds;
 pub mod flows;
 pub mod fulfillment;

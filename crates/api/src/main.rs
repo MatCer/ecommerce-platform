@@ -210,7 +210,15 @@ async fn serve() -> anyhow::Result<()> {
         &ops,
     )?);
     let fulfillment = FulfillmentConfig::from_env()?;
+    let experiments = sf
+        .experiments_secret
+        .as_deref()
+        .map(|s| commerce::experiments::ExperimentKey::new(s.as_bytes()));
+    if experiments.is_none() {
+        tracing::warn!("EXPERIMENTS_SECRET not set: nobody is enrolled in A/B experiments");
+    }
     let state = api::AppState {
+        experiments,
         auth_service,
         db: db.clone(),
         http: http.clone(),

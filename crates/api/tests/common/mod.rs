@@ -28,6 +28,7 @@ pub const ADMIN_ORIGIN: &str = "http://admin.localhost:8180";
 pub const SERVICE_TOKEN: &str = "internal-test-token-0123456789abcdef";
 pub const THEME_SECRET: &str = "theme-secret-for-tests-0123456789abcdef";
 pub const BUILDER_TOKEN: &str = "theme-builder-test-token-0123456789abcdef";
+pub const EXPERIMENTS_SECRET: &str = "experiments-secret-for-tests-0123456789";
 pub const FAKE_SECRET: &str = "fake-gateway-test-secret";
 pub const STRIPE_WEBHOOK_SECRET: &str = "whsec_api_test_0123456789";
 
@@ -181,6 +182,9 @@ pub fn state(db: PgPool, jwks: &Jwks, forced_interval: Duration) -> AppState {
         themes: Some(commerce::themes::ThemeKeys::new(THEME_SECRET.as_bytes())),
         builder_token: Some(api::auth::ServiceToken::new(BUILDER_TOKEN)),
         carriers: None,
+        experiments: Some(commerce::experiments::ExperimentKey::new(
+            EXPERIMENTS_SECRET.as_bytes(),
+        )),
     }
 }
 

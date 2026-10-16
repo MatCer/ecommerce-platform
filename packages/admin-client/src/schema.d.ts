@@ -3336,6 +3336,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/experiments/enrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The visitor's arm of the tenant's running experiment, asked by the edge before render and
+         *     cache (SHOP-96). Enrols only with an analytics grant whose text covers experiments.
+         */
+        post: operations["enrol"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/previews/resolve": {
         parameters: {
             query?: never;
@@ -5117,6 +5137,13 @@ export interface components {
             /** Format: int32 */
             width: number;
         };
+        Assignment: {
+            arm: string;
+            /** Format: uuid */
+            experiment_id: string;
+            /** Format: int32 */
+            version: number;
+        };
         Attempt: {
             /** Format: int64 */
             amount_minor: number;
@@ -6389,6 +6416,15 @@ export interface components {
              */
             logo_asset_id?: string | null;
         };
+        EnrolRequest: {
+            /** @description The visitor's anonymous consent subject (`__Secure-consent_id`, 32 lowercase hex). */
+            subject: string;
+            /** Format: uuid */
+            tenant_id: string;
+        };
+        EnrolResponse: {
+            assignment?: components["schemas"]["Assignment"] | null;
+        };
         /** @enum {string} */
         EntityType: "product" | "category" | "page" | "menu";
         /** @description What an erasure did. Counts only: the report holds no personal data. */
@@ -6428,6 +6464,13 @@ export interface components {
             /** @description The same address again: erasure cannot be undone. */
             confirm_email: string;
             email: string;
+        };
+        /** @description The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`. */
+        ExperimentRef: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            version: number;
         };
         Explained: {
             /** @description The strategies tried, in order. */
@@ -8546,6 +8589,7 @@ export interface components {
             country_codes: string[];
             currency: string;
             default_locale: string;
+            experiment?: components["schemas"]["ExperimentRef"] | null;
             hostname: string;
             locales: string[];
             market_code: string;
@@ -18824,6 +18868,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CountersRecorded"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    enrol: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolResponse"];
                 };
             };
             401: {

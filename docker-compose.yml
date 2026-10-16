@@ -315,6 +315,8 @@ services:
       # WP23: preview tokens + per-tenant ASTRO_KEY (API only); the builder's service token.
       THEME_SECRET: ${THEME_SECRET:-local-theme-secret-0123456789abcdef0123}
       THEME_BUILDER_TOKEN: ${THEME_BUILDER_TOKEN:-local-theme-builder-token-0123456789abcdef}
+      # SHOP-96: A/B arm hash key (API only, never sent to the edge).
+      EXPERIMENTS_SECRET: ${EXPERIMENTS_SECRET:-local-experiments-secret-0123456789abcdef}
       # Superadmin CLI (`make admin args=...`) only.
       AUTH_INTERNAL_URL: http://auth:3000/
       AUTH_INTERNAL_TOKEN: ${AUTH_INTERNAL_TOKEN:-local-auth-internal-token-0123456789abcdef}
