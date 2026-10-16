@@ -129,22 +129,28 @@ prune() {
 
 gb() { awk -v b="$1" 'BEGIN { printf "%.1f GB", b / 1e9 }'; }
 
-remove_target() (
-  local target=$1/target lock fd
-  for lock in "$target"/*/.cargo-lock; do
-    [[ -e $lock ]] || continue
-    exec {fd}<"$lock"
-    flock -n "$fd" || { echo "worktree: a cargo build is running in $1, $target left as is"; exit 0; }
-  done
-  echo "worktree: $2, ${3:+would }remove $target ($(gb "$(du -sb "$target" | cut -f1)"))"
-  [[ -n ${3:-} ]] || rm -rf "$target"
-)
+remove_target() {
+  local target=$1/target trash=$1/.target-trash.$$ bytes
+  bytes=$(du -sb "$target" | cut -f1) || { echo "worktree: cannot measure $target, left as is" >&2; return 0; }
+  (
+    for lock in "$target"/*/.cargo-lock; do
+      [[ -e $lock ]] || continue
+      exec {fd}<"$lock"
+      flock -n "$fd" || { echo "worktree: a cargo build is running in $1, $target left as is"; exit 0; }
+    done
+    echo "worktree: $2, ${3:+would }remove $target ($(gb "$bytes"))"
+    [[ -n ${3:-} ]] || mv -T "$target" "$trash"
+  )
+  [[ ! -e $trash ]] || rm -rf "$1"/.target-trash.*
+}
 
 sweep() {
-  local dir
+  local dir recent
   while read -r dir; do
     [[ $dir != "$MAIN" && -d $dir/target ]] || continue
-    [[ -z $(find "$dir/target" -newermt '14 days ago' -print -quit) ]] || continue
+    recent=$(find "$dir/target" -newermt '14 days ago' -print -quit) ||
+      { echo "worktree: cannot read all of $dir/target, kept" >&2; continue; }
+    [[ -z $recent ]] || continue
     remove_target "$dir" "nothing built for 14 days" "$1"
   done < <(worktrees)
 }
@@ -160,9 +166,10 @@ tidy() {
       --jq "[.[] | select(.merged_at != null and .head.sha == \"$head\")][0].number // empty" 2>/dev/null) ||
       { pr=''; echo "worktree: GitHub did not answer, cannot tell whether HEAD is merged" >&2; }
   fi
-  bytes=$(du -sb target | cut -f1)
   if [[ -n $pr ]]; then
     remove_target "$ROOT" "HEAD is the merged head of PR #$pr" "$1"
+  elif ! bytes=$(du -sb target | cut -f1); then
+    echo "worktree: cannot measure target/, kept" >&2
   elif ((bytes > 10 * 10 ** 9)); then
     remove_target "$ROOT" "target/ is over the 10 GB cap" "$1"
   else

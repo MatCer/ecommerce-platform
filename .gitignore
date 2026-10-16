@@ -2,6 +2,7 @@
 
 # Rust
 /target/
+/.target-trash.*
 /.cargo/worktree.toml
 
 # Node
