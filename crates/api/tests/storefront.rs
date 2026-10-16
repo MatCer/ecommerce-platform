@@ -759,6 +759,57 @@ async fn redirects_admin_crud_and_resolution(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn redirects_cannot_claim_platform_paths(db: PgPool) {
+    let c = setup(db).await;
+    let admin = async |call: Call<'_>| {
+        let (s, b, _) = call.token(&c.owner).tenant(c.shop.tenant).send(&c.s).await;
+        (s, b)
+    };
+    for from in ["/checkout", "/cs/checkout", "/%63heckout"] {
+        let (status, body) = admin(Call::post(
+            "/admin/v1/redirects",
+            json!({ "from_path": from, "to_path": "/p/tee-cs" }),
+        ))
+        .await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::UNPROCESSABLE_ENTITY, Some("reserved_from_path")),
+            "{from}"
+        );
+    }
+    let (status, r) = admin(Call::post(
+        "/admin/v1/redirects",
+        json!({ "from_path": "/kosik", "to_path": "/checkout" }),
+    ))
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{r}");
+    let uri = format!("/admin/v1/redirects/{}", r["id"].as_str().unwrap());
+    let (status, body) = admin(Call::put(
+        &uri,
+        json!({ "from_path": "/consent", "to_path": "/p/tee-cs" }),
+    ))
+    .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("reserved_from_path"))
+    );
+
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO redirects (tenant_id, from_path, to_path) VALUES ($1, '/review', '/p/tee-cs')",
+    )
+    .bind(c.shop.tenant)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let (status, _) = c.get("/storefront/v1/redirects/resolve?path=/review").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn storefront_token_rotation_keeps_a_grace_period(db: PgPool) {
     let c = setup(db).await;
     let (status, body, _) = Call::get("/admin/v1/storefront-token")

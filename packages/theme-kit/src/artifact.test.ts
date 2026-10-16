@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
-import { packArtifact, readManifest, verifyArtifact } from "./artifact.ts";
+import { packArtifact, readManifest, validateManifest, verifyArtifact } from "./artifact.ts";
 
 const PROJECT = fileURLToPath(new URL("../../../themes/conversion", import.meta.url));
 
@@ -71,4 +71,66 @@ test("verify recomputes the content address and refuses tampered, missing or ext
   const asset = await pack();
   await writeFile(path.join(asset.out, asset.m.id, "client/_astro/a.js"), "2");
   await expect(verifyArtifact(asset.out, asset.m.id)).rejects.toThrow(/does not match/);
+});
+
+test("a theme cannot publish files at reserved platform paths", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "shop115-out-"));
+  for (const file of [
+    "checkout",
+    "checkout/index.html",
+    "_checkout/b1/app.js",
+    "_p/cart",
+    "o/x",
+    "account",
+    "CHECKOUT",
+    "%63heckout",
+    "cs/checkout",
+    "en-GB/withdraw",
+  ]) {
+    const d = await dist({ "server/entry.mjs": "export default {}", [`client/${file}`]: "x" });
+    await expect(
+      packArtifact({ dist: d, outRoot: out, kind: "theme", projectDir: PROJECT }),
+      file,
+    ).rejects.toThrow(/reserved platform path/);
+  }
+  const ok = await dist({
+    "server/entry.mjs": "export default {}",
+    "client/_astro/a.js": "1",
+    "client/checkout.svg": "<svg/>",
+    "client/p/checkout": "x",
+  });
+  const theme = await packArtifact({ dist: ok, outRoot: out, kind: "theme", projectDir: PROJECT });
+  expect(Object.keys(theme.assets)).toEqual(["/_astro/a.js", "/checkout.svg", "/p/checkout"]);
+
+  const platform = await dist({
+    "server/entry.mjs": "export default {}",
+    "client/_checkout/a.js": "1",
+  });
+  const checkout = await packArtifact({
+    dist: platform,
+    outRoot: out,
+    kind: "checkout",
+    projectDir: PROJECT,
+  });
+  expect(Object.keys(checkout.assets)).toEqual(["/_checkout/a.js"]);
+});
+
+test("a theme manifest naming a reserved asset is refused on publish and loads without it", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "shop115-out-"));
+  const d = await dist({ "server/entry.mjs": "export default {}", "client/_astro/a.js": "1" });
+  const m = await packArtifact({ dist: d, outRoot: out, kind: "theme", projectDir: PROJECT });
+  const forged = {
+    ...m,
+    assets: { ...m.assets, "/checkout": { sha256: "0".repeat(64), size: 1 } },
+  };
+  await writeFile(path.join(out, m.id, "manifest.json"), JSON.stringify(forged));
+  await expect(verifyArtifact(out, m.id)).rejects.toThrow(/reserved platform path \/checkout/);
+  const dropped: number[] = [];
+  const loaded = await readManifest(out, m.id, (n) => dropped.push(n));
+  expect(Object.keys(loaded.assets)).toEqual(["/_astro/a.js"]);
+  expect(dropped).toEqual([1]);
+  expect(Object.keys(validateManifest({ ...forged, kind: "checkout" }, m.id).assets)).toEqual([
+    "/_astro/a.js",
+    "/checkout",
+  ]);
 });

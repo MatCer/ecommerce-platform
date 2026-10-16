@@ -65,6 +65,7 @@ export function contentSecurityPolicy(
     "img-src 'self' data:",
     "font-src 'self'",
     "object-src 'none'",
+    "worker-src 'none'",
     "base-uri 'self'",
     `frame-ancestors ${opts.frameAncestors ?? "'none'"}`,
   ];
@@ -93,7 +94,7 @@ export function securityHeaders(profile: CspProfile, csp: string): Record<string
     "content-security-policy": csp,
     "referrer-policy": "strict-origin-when-cross-origin",
     "x-content-type-options": "nosniff",
-    "cross-origin-opener-policy": "same-origin",
+    "cross-origin-opener-policy": profile === "theme" ? "same-origin-allow-popups" : "same-origin",
     "permissions-policy":
       profile === "checkout"
         ? 'camera=(), microphone=(), geolocation=(), usb=(), payment=(self "https://js.stripe.com")'

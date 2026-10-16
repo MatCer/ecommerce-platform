@@ -71,6 +71,69 @@ fn path_ok(p: &str, allow_query: bool) -> bool {
         && (allow_query || !p.contains('?'))
 }
 
+pub const PLATFORM_SEGMENTS: [&str; 13] = [
+    "_p",
+    "_edge",
+    "_checkout",
+    "checkout",
+    "o",
+    "withdraw",
+    "review",
+    "restore-cart",
+    "consent",
+    "newsletter",
+    "watch",
+    "flows",
+    "account",
+];
+
+pub fn is_platform_path(path: &str) -> bool {
+    let mut p = decode_fully(path.as_bytes());
+    p.make_ascii_lowercase();
+    let mut segments: Vec<&[u8]> = vec![];
+    for s in p.split(|b| *b == b'/' || *b == b'\\') {
+        match s {
+            b"" | b"." => {}
+            b".." => {
+                segments.pop();
+            }
+            s => segments.push(s),
+        }
+    }
+    let reserved = |s: &[u8]| PLATFORM_SEGMENTS.iter().any(|r| r.as_bytes() == s);
+    match segments.as_slice() {
+        [first, rest @ ..] => {
+            reserved(first) || (locale_shaped(first) && rest.first().is_some_and(|s| reserved(s)))
+        }
+        [] => false,
+    }
+}
+
+fn decode_fully(p: &[u8]) -> Vec<u8> {
+    let hex = |b: u8| char::from(b).to_digit(16);
+    let mut out: Vec<u8> = Vec::with_capacity(p.len());
+    for &b in p {
+        out.push(b);
+        while let [.., b'%', hi, lo] = out[..] {
+            let (Some(hi), Some(lo)) = (hex(hi), hex(lo)) else {
+                break;
+            };
+            out.truncate(out.len() - 3);
+            out.push(u8::try_from(hi * 16 + lo).unwrap_or_default());
+        }
+    }
+    out
+}
+
+fn locale_shaped(s: &[u8]) -> bool {
+    let letters = |x: &[u8]| x.iter().all(u8::is_ascii_lowercase);
+    match s {
+        [_, _] => letters(s),
+        [a, b, b'-', c, d] => letters(&[*a, *b, *c, *d]),
+        _ => false,
+    }
+}
+
 /// Paths are matched without a trailing slash (except `/` itself), so `/a/` and `/a` are one.
 pub fn normalize_path(p: &str) -> String {
     let trimmed = p.trim_end_matches('/');
@@ -93,6 +156,12 @@ impl RedirectInput {
             return Err(invalid(
                 "invalid_to_path",
                 "to_path must be a path on the same shop (starting with a single /)",
+            ));
+        }
+        if is_platform_path(&self.from_path) {
+            return Err(invalid(
+                "reserved_from_path",
+                "from_path is a platform path (checkout, orders, account, ...) and cannot redirect",
             ));
         }
         if normalize_path(&self.from_path) == normalize_path(&self.to_path) {
@@ -265,7 +334,7 @@ pub async fn delete(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Erro
 /// The redirect for a requested path (query string ignored), if any.
 pub async fn resolve(tx: &mut TenantTx, path: &str) -> Result<Option<ResolvedRedirect>, Error> {
     let path = path.split('?').next().unwrap_or_default();
-    if !path_ok(path, false) {
+    if !path_ok(path, false) || is_platform_path(path) {
         return Ok(None);
     }
     Ok(sqlx::query!(
@@ -282,7 +351,13 @@ pub async fn resolve(tx: &mut TenantTx, path: &str) -> Result<Option<ResolvedRed
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
     use super::*;
+
+    fn repo_json(path: &str) -> serde_json::Value {
+        let path = format!("{}/../../{path}", env!("CARGO_MANIFEST_DIR"));
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
 
     fn input(from: &str, to: &str) -> RedirectInput {
         RedirectInput {
@@ -313,6 +388,33 @@ mod tests {
         let mut i = input("/a", "/b");
         i.code = 307;
         assert!(i.validate().is_err());
+    }
+
+    #[test]
+    fn platform_paths_are_reserved() {
+        let cases = repo_json("fixtures/platform-paths.json");
+        let paths = |k: &str| -> Vec<String> { serde_json::from_value(cases[k].clone()).unwrap() };
+        for p in paths("reserved") {
+            assert!(is_platform_path(&p), "{p}");
+        }
+        for p in paths("allowed") {
+            assert!(!is_platform_path(&p), "{p}");
+        }
+        assert!(input("/stary", "/checkout").validate().is_ok());
+        let err = input("/cs/review", "/p/x").validate().unwrap_err();
+        assert!(format!("{err:?}").contains("reserved_from_path"), "{err:?}");
+    }
+
+    #[test]
+    fn platform_segments_match_the_edge_manifest() {
+        let json = repo_json("packages/theme-kit/src/platform-routes.json");
+        let edge: Vec<&str> = json["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s.as_str().unwrap())
+            .collect();
+        assert_eq!(edge, PLATFORM_SEGMENTS);
     }
 
     #[test]

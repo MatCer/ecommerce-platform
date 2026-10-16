@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { isPlatformPath } from "./platform-routes.ts";
 import { type ThemeTokens, validateTokens } from "./tokens.ts";
 
 /**
@@ -161,6 +162,8 @@ export async function packArtifact(opts: {
   for (const f of clientFiles)
     assets[`/${f}`] = await hashFile(path.join(clientDir, f), `client/${f}`);
 
+  refuseReservedAssets(opts.kind, assets);
+
   const tokens = opts.tokensFile
     ? validateTokens(JSON.parse(await readFile(opts.tokensFile, "utf8")))
     : null;
@@ -206,6 +209,12 @@ async function exists(p: string) {
 
 const ID_RE = /^[0-9a-f]{32}$/;
 
+function refuseReservedAssets(kind: ArtifactKind, assets: Record<string, AssetEntry>) {
+  if (kind !== "theme") return;
+  const reserved = Object.keys(assets).find(isPlatformPath);
+  if (reserved) throw new Error(`artifact: theme file at reserved platform path ${reserved}`);
+}
+
 /**
  * Checks what the content address does not cover: the manifest's runtime section must be the
  * platform's (A22). The id covers every module and asset, the tokens, the CSP hashes and the
@@ -241,7 +250,8 @@ export function validateManifest(m: ArtifactManifest, id: string): ArtifactManif
  * the content address recomputed from the files equals the id.
  */
 export async function verifyArtifact(root: string, id: string): Promise<ArtifactManifest> {
-  const m = await readManifest(root, id);
+  const m = await parseManifest(root, id);
+  refuseReservedAssets(m.kind, m.assets);
   const dir = path.join(root, id);
   const present = new Set(await listFiles(dir));
   const expected = new Set(["manifest.json"]);
@@ -271,11 +281,29 @@ export async function verifyArtifact(root: string, id: string): Promise<Artifact
   return m;
 }
 
-/** Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. */
-export async function readManifest(root: string, id: string): Promise<ArtifactManifest> {
+async function parseManifest(root: string, id: string): Promise<ArtifactManifest> {
   if (!ID_RE.test(id)) throw new Error(`artifact: invalid id ${JSON.stringify(id)}`);
   const m = JSON.parse(
     await readFile(path.join(root, id, "manifest.json"), "utf8"),
   ) as ArtifactManifest;
   return validateManifest(m, id);
+}
+
+/**
+ * Reads and validates `<root>/<id>/manifest.json`. The id must be a content address. A theme
+ * packed before a path was reserved still loads, without its files at reserved paths;
+ * `onDropped` gets their count.
+ */
+export async function readManifest(
+  root: string,
+  id: string,
+  onDropped?: (count: number) => void,
+): Promise<ArtifactManifest> {
+  const m = await parseManifest(root, id);
+  if (m.kind !== "theme") return m;
+  const assets = Object.fromEntries(Object.entries(m.assets).filter(([p]) => !isPlatformPath(p)));
+  const count = Object.keys(m.assets).length - Object.keys(assets).length;
+  if (count === 0) return m;
+  onDropped?.(count);
+  return { ...m, assets };
 }

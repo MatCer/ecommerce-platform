@@ -93,6 +93,18 @@ describe("previews (A21)", () => {
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
   });
 
+  test("a preview link path starting with // never redirects off the preview host", async () => {
+    for (const path of ["//attacker.example/", "/\\attacker.example/x", "//%2Fattacker.example"]) {
+      const res = gw.fetch(
+        new Request(`http://${HOST}:8080${path}?preview_token=${TOKEN}`, {
+          headers: { host: `${HOST}:8080` },
+        }),
+      );
+      const location = (await res).headers.get("location") ?? "";
+      expect(new URL(location, `http://${HOST}:8080/`).host, path).toBe(`${HOST}:8080`);
+    }
+  });
+
   test("the previewed revision renders uncached, noindex, framable by the admin only", async () => {
     const headers = { cookie: `__Host-preview=${TOKEN}` };
     for (let i = 0; i < 2; i++) {

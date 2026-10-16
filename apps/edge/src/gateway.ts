@@ -1,7 +1,13 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
+import {
+  type ArtifactManifest,
+  isPlatformPath,
+  PLATFORM_SEGMENTS,
+  readManifest,
+  tokensToCss,
+} from "@platform/theme-kit";
 import type { ArtifactFetcher } from "./artifacts.ts";
 import {
   assetsBinding,
@@ -77,7 +83,19 @@ const SPECULATION_RULES = JSON.stringify({
       where: {
         and: [
           { href_matches: "/*" },
-          { not: { href_matches: "/_p/*" } },
+          {
+            not: {
+              href_matches: [
+                ...PLATFORM_SEGMENTS.flatMap((s) => [
+                  `/${s}{/*}?`,
+                  `/:locale([a-zA-Z]{2}(?:-[a-zA-Z]{2})?)/${s}{/*}?`,
+                ]),
+                "/*%*",
+                "//*",
+                "/*//*",
+              ],
+            },
+          },
           { not: { selector_matches: "[rel~=nofollow], [data-no-prerender]" } },
         ],
       },
@@ -281,7 +299,9 @@ export function createGateway(opts: GatewayOptions) {
       m = (async () => {
         await pruning.get(id);
         await opts.artifacts?.ensure(id);
-        return readManifest(opts.artifactRoot, id);
+        return readManifest(opts.artifactRoot, id, (count) =>
+          log({ level: "warn", msg: "reserved theme files dropped", artifact: id, count }),
+        );
       })();
       manifests.set(id, m);
       m.catch(() => manifests.delete(id));
@@ -442,6 +462,7 @@ export function createGateway(opts: GatewayOptions) {
     port: string,
     prefix = "",
   ): Promise<Response> {
+    if (isPlatformPath(url.pathname)) return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     // A20: counted before the cache, without identifiers (template + day only). Not previews.
@@ -1453,7 +1474,8 @@ ${
     const split = splitLocale(site, p);
     if (split) {
       const localized = { ...site, locale: split.locale };
-      const inner = new URL(`${split.path}${url.search}`, url);
+      const inner = new URL(url);
+      inner.pathname = split.path;
       // The product page's watch form posts under the page's locale prefix, so the
       // confirmation mail is written in the language the shopper read.
       if (split.path === "/_p/watch") return watchSubscribe(localized, req, host, port);
@@ -1493,6 +1515,7 @@ ${
     }
     if (p.startsWith("/_p/") || p.startsWith("/_edge/"))
       return problem(404, "not_found", "unknown platform route");
+    if (isPlatformPath(p)) return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     if (p.startsWith("/media/")) {
@@ -1689,6 +1712,8 @@ ${
   }
 
   async function handle(request: Request): Promise<Response> {
+    if (request.headers.get("service-worker") === "script")
+      return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
     const url = new URL(request.url);
     const rawHost = request.headers.get("host") ?? url.host;
     const host = normalizeHost(rawHost);
@@ -1702,7 +1727,7 @@ ${
       (lastHop && IP_RE.test(lastHop) ? lastHop : undefined);
     const req = new Request(request, { headers: stripUntrusted(request.headers) });
     // Canonical URL the worker sees: public scheme + the validated host.
-    const publicUrl = new URL(`${url.pathname}${url.search}`, `${scheme}://${host}${port}`);
+    const publicUrl = new URL(`${scheme}://${host}${port}${url.pathname}${url.search}`);
 
     if (host.startsWith("preview-")) return preview(request, req, publicUrl, host, port, clientIp);
     const origin = classifyHost(host);
@@ -1749,7 +1774,7 @@ ${
       return new Response(null, {
         status: 303,
         headers: {
-          location: `${clean.pathname}${clean.search}`,
+          location: `/${clean.pathname.replace(/^[/\\]+/, "")}${clean.search}`,
           "set-cookie": `${PREVIEW_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=${maxAge}`,
           "cache-control": "no-store",
           "referrer-policy": "no-referrer",
