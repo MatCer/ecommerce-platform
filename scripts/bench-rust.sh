@@ -29,7 +29,8 @@ usage() {
 usage: buildq scripts/bench-rust.sh [--setup CMD] [--runs N] <src-dir> <out-dir>
        scripts/bench-rust.sh --summarize <out-dir>
 Benchmarks cold, warm-cache, warm-incremental and no-op Rust builds and tests of <src-dir>, a plain
-copy (git archive), not a checkout; run it on an idle machine. --setup runs in <src-dir> once before
+copy (git archive), not a checkout; run it on an idle machine. Each warm-cache run builds a fresh
+copy of <src-dir> under <out-dir>, like a new worktree on the cache the cold run filled. --setup runs in <src-dir> once before
 the cold scenario. Writes <out-dir>/steps.tsv (one row per step) and <out-dir>/summary.md (medians;
 avg cores = CPU time / wall time). --summarize rewrites summary.md from steps.tsv.
 USAGE
@@ -53,6 +54,8 @@ main=$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree
 src=$(realpath "$1")
 out=$(realpath -m "$2")
 [[ -f $src/Cargo.toml ]] || die "$src is not the workspace root"
+! git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$src is in a git work tree; use a git archive copy"
+[[ ! -e $src/.env || -L $src/.env ]] || die "$src/.env is a regular file; the bench replaces it with a symlink"
 mkdir -p "$out/log"
 [[ ! -e $out/steps.tsv ]] || die "$out/steps.tsv exists; use a new out dir"
 
@@ -116,9 +119,15 @@ step cold 1 test-run "${test_run[@]}"
 step cold 1 clippy "${clippy[@]}"
 
 for ((i = 1; i <= runs; i++)); do
-  rm -rf target
+  copy=$out/warm-cache-$i
+  mkdir "$copy"
+  tar -C "$src" --exclude=./target --exclude=./.env -c . | tar -x -C "$copy"
+  ln -s "$main/.env" "$copy/.env"
+  cd "$copy"
   step warm-cache "$i" build "${build[@]}"
   step warm-cache "$i" test-compile "${test_compile[@]}"
+  cd "$src"
+  rm -rf "$copy"
 done
 
 for ((i = 1; i <= runs; i++)); do
