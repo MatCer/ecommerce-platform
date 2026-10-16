@@ -27,7 +27,6 @@ use super::{CART_HEADER, Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
 use crate::admin::query_params;
 
-/// The visitor's arm, `<id>:<version>:<arm>`, set by the edge only (runtime contract §15).
 const EXPERIMENT_HEADER: &str = "x-experiment";
 
 pub fn routes() -> OpenApiRouter<AppState> {

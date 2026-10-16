@@ -46,14 +46,12 @@ impl Assignment {
 
 type I18n = BTreeMap<String, String>;
 
-/// What an arm changes, from its frozen `config` (SHOP-98). `{}` changes nothing.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArmConfig {
     hero: Option<HeroOverride>,
 }
 
-/// Home hero texts by locale (`{"cs": "..."}`), picked like other i18n texts.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HeroOverride {
@@ -117,7 +115,12 @@ pub async fn arm_config(tx: &mut TenantTx, a: &Assignment) -> Result<Option<ArmC
     match ArmConfig::parse(&arm["config"]) {
         Ok(c) => Ok(Some(c)),
         Err(e) => {
-            tracing::warn!(experiment = %exp.id, arm = %a.arm, error = %e, "experiment arm config ignored; serving control");
+            tracing::warn!(
+                experiment = %exp.id,
+                arm = %a.arm,
+                error = %e,
+                "experiment arm config ignored; serving control"
+            );
             Ok(None)
         }
     }
