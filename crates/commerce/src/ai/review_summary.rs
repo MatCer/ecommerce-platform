@@ -135,7 +135,7 @@ pub fn job_for_event(
     payload: &Value,
     now: DateTime<Utc>,
 ) -> Option<NewJob<'static>> {
-    (event_type == reviews::CHANGED_EVENT).then_some(())?;
+    matches!(event_type, reviews::CHANGED_EVENT | "product.updated").then_some(())?;
     let product_id = payload
         .get("product_id")
         .and_then(Value::as_str)
@@ -564,6 +564,11 @@ mod tests {
         let other = job_for_event(Some(Uuid::now_v7()), "review.changed", &payload, now).unwrap();
         assert_ne!(other.idempotency_key, a.idempotency_key);
         assert!(job_for_event(Some(t), "review_summary.changed", &payload, now).is_none());
+        assert_eq!(
+            job_for_event(Some(t), "product.updated", &payload, now).map(|j| j.idempotency_key),
+            Some(a.idempotency_key.clone()),
+            "a rename can change the input"
+        );
         assert!(job_for_event(Some(t), "price.changed", &payload, now).is_none());
         assert!(job_for_event(None, "review.changed", &payload, now).is_none());
         assert!(job_for_event(Some(t), "review.changed", &json!({}), now).is_none());
