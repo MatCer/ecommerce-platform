@@ -1,4 +1,3 @@
-{#- Fake provider: one demo summary per requested locale from the product name and rating. -#}
 {%- set avg = data.rating.average | string | replace(".", ",") -%}
 {%- set texts = {
   "cs": "Ukázkové shrnutí od demo AI: zákazníci hodnotí „" ~ data.product ~ "“ průměrně " ~ avg ~ " z 5.",

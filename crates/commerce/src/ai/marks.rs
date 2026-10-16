@@ -1,7 +1,6 @@
-//! AI Act transparency (§12.1): fields written from an accepted AI proposal, and AI review
-//! summaries, carry an `ai_generated_at` marker, shown as a label in the admin or the shop. A
-//! marker holds the hash of the value it was written with; once someone rewrites the field, the
-//! label no longer shows.
+//! AI Act transparency (§12.1): fields written from an accepted AI proposal carry an
+//! `ai_generated_at` marker, shown as a label in the admin. A marker holds the hash of the value
+//! it was written with; once someone rewrites the field, the label no longer shows.
 
 use chrono::{DateTime, Utc};
 use platform::Error;
@@ -38,7 +37,6 @@ pub(crate) struct NewMark<'a> {
     pub value: &'a Value,
     pub feature: &'a str,
     pub model: &'a str,
-    /// `None` for text the platform writes without a proposal (review summaries).
     pub proposal_id: Option<Uuid>,
     pub accepted_by: &'a str,
 }

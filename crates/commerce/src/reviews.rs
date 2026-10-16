@@ -665,7 +665,6 @@ pub struct ProductReviews {
     pub ai_summary: Option<ReviewSummary>,
 }
 
-/// The summary of `(rating, count)` rows; `None` without any review.
 pub(crate) fn rating_summary(counts: impl Iterator<Item = (i16, i64)>) -> Option<RatingSummary> {
     let mut histogram = [0_i64; 5];
     for (rating, n) in counts {

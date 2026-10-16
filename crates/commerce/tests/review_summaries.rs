@@ -1,7 +1,3 @@
-//! SHOP-36 against a real Postgres as the runtime role, with the fake provider: the opt-in
-//! switch, the minimum of published verified reviews, one metered call per input change, the
-//! AI label that gates what the shop shows, failures keeping the old summary, and tenant
-//! isolation of the new tables.
 #![allow(clippy::unwrap_used)]
 
 use std::sync::Arc;
@@ -71,7 +67,6 @@ async fn run(runtime: &PgPool, ai: &Ai, shop: &Shop) {
     );
 }
 
-/// Tenant tables are read as the runtime role (FORCE RLS hides them from the owner).
 async fn count(runtime: &PgPool, sql: &'static str, tenant: Uuid) -> i64 {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     sqlx::query_scalar(sql)
@@ -171,7 +166,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     );
     assert_eq!(jobs(&db, &shop).await, 0, "below the minimum");
 
-    // Four verified (the unverified one does not count): no summary, no call.
     run(&runtime, &ai, &shop).await;
     assert_eq!(usage(&runtime, &shop).await, 0);
     assert!(summaries(&runtime, &shop).await.is_empty());
@@ -205,7 +199,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
         )
     };
     assert_eq!(marks, vec![mark("cs"), mark("sk")]);
-    // Switching on purged the tenant; the new summary purges the product.
     assert_eq!(
         changed_events(&db, &shop).await,
         vec![json!({}), json!({ "product_id": shop.product })]
@@ -219,7 +212,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
         Some(("sk".to_owned(), SK.to_owned(), 5))
     );
 
-    // Unchanged input and a reply (not input) cost nothing.
     run(&runtime, &ai, &shop).await;
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     reviews::set_reply(&mut tx, "clerk", fifth, Some("Děkujeme!"))
@@ -230,7 +222,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     assert_eq!(usage(&runtime, &shop).await, 1);
     assert_eq!(changed_events(&db, &shop).await.len(), 2);
 
-    // Off hides at once; on again shows the cached text and queues a refresh.
     switch(&runtime, &shop, false).await;
     assert_eq!(shown(&runtime, &shop, shop.cz).await, None);
     switch(&runtime, &shop, true).await;
@@ -242,7 +233,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     let purges = changed_events(&db, &shop).await;
     assert_eq!(&purges[2..], [json!({}), json!({})], "tenant purges");
 
-    // Text that no longer matches its AI label never reaches the shop.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query("UPDATE review_summaries SET summary = 'Nejlepší!' WHERE locale = 'cs'")
         .execute(&mut *tx)
@@ -251,7 +241,6 @@ async fn summaries_follow_published_verified_reviews(db: PgPool) {
     tx.commit().await.unwrap();
     assert_eq!(shown(&runtime, &shop, shop.cz).await, None);
 
-    // Below the minimum again: summaries and labels are gone.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     reviews::set_status(&mut tx, "clerk", fifth, Status::Hidden)
         .await
@@ -312,7 +301,6 @@ async fn rejected_output_and_used_up_quota_keep_the_old_summary(db: PgPool) {
         Some(("cs".to_owned(), CS.to_owned(), 5))
     );
 
-    // Without a provider (production without a key) the job just finishes.
     let disabled = Ai::fake_with_client(None);
     run(&runtime, &disabled, &shop).await;
     assert_eq!(usage(&runtime, &shop).await, 4);
@@ -353,7 +341,6 @@ async fn summaries_and_settings_are_tenant_isolated(db: PgPool) {
     assert!(forged.is_err());
     drop(tx);
 
-    // B's job for A's product finds nothing to summarize.
     let mut tx = tenant_tx(&runtime, b.tenant).await.unwrap();
     review_summary::put_settings(
         &mut tx,

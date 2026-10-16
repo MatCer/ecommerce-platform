@@ -82,7 +82,6 @@ pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
         {
             queue::enqueue(&mut *tx, &job).await?;
         }
-        // AI review summaries: one debounced regeneration per product and window.
         if let Some(job) = commerce::ai::review_summary::job_for_event(
             event.tenant_id,
             &event.event_type,

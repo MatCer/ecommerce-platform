@@ -1,9 +1,3 @@
-/**
- * AI review summaries (SHOP-36) on the seeded demo shop with the fake provider: the owner
- * switches them on in the admin, the worker summarizes a product with five verified reviews, and
- * its CZ and SK pages show the summary in the market language with the AI label. Switched off,
- * the summary is gone from the shop.
- */
 import { expect, type Page, test } from "@playwright/test";
 import { expectAccessible as expectAdminAccessible, run, signInOwner, sql } from "../admin/support";
 import { testContext } from "../rate-client";
@@ -22,8 +16,7 @@ function cleanUp(): void {
   sql(`DELETE FROM review_summaries WHERE product_id = ${PRODUCT}`);
 }
 
-/** The rating the job summarizes, as the fake provider prints it (one decimal, decimal comma). */
-function published(): { average: string; count: number } {
+function fakeSummaryRating(): { average: string; count: number } {
   const [count, total] = sql(`SELECT count(*) || '|' || sum(rating) FROM reviews
     WHERE product_id = ${PRODUCT} AND status = 'published' AND verified`)
     .split("|")
@@ -74,7 +67,7 @@ test("admin switch → worker summary → labelled summary on the CZ and SK prod
   browser,
 }) => {
   test.setTimeout(300_000);
-  const { average, count } = published();
+  const { average, count } = fakeSummaryRating();
   const admin = await signInOwner(browser);
   await setSwitch(admin, true);
   await expectAdminAccessible(admin, "ai-settings-review-summaries");

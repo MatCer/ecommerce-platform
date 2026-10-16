@@ -1007,8 +1007,6 @@ async fn theme_builds_are_handed_to_the_builder(db: PgPool) {
     assert_eq!(seen[0].1["tenant_id"], tenant.to_string());
 }
 
-/// SHOP-36: `review.changed` queues one debounced summary job per product; the worker runs it
-/// and the summary it writes purges the product page.
 #[sqlx::test(migrations = "../../migrations")]
 async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     use commerce::ai::review_summary::{self, AiSettings};
@@ -1059,7 +1057,6 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     .await
     .unwrap();
     let payload = json!({ "product_id": shop.product });
-    // The switch's backfill runs now; both events share one job at the window's end.
     assert_eq!(
         jobs,
         vec![(payload.clone(), 3, false), (payload.clone(), 3, true)]
