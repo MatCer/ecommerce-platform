@@ -205,7 +205,8 @@ read as a stream and cancelled at the limit; they are never fully buffered first
 requests with `Authorization`, responses with `Set-Cookie`, `Cache-Control: private|no-store|no-cache`,
 a private page model, non-200 responses. TTL = min(60 s, theme `s-maxage`/`max-age`, page-model
 `max_age`), so themes can only lower it, plus 300 s stale-while-revalidate. The key covers
-(tenant, market, locale, artifact, host, path + sorted query without `utm_*`/`gclid`/`fbclid`/…).
+(tenant, market, locale, artifact, host, path + sorted query without `utm_*`/`gclid`/`fbclid`/…),
+plus `exp:<id>:<version>:<arm>` for a visitor enrolled in an experiment (§15).
 Browsers get `max-age=0, must-revalidate`, so a purge is visible immediately. Purge works by
 tenant, by tags (scoped to a tenant when both are given), or everything. Every purge bumps a
 generation, and a render (or SWR refresh) that started before a purge cannot write its now-stale
@@ -461,3 +462,27 @@ separate cache namespace, never cached (already bypassed by the policy).
   (hourly, local copies unused for 7 days and not running).
 - **Custom revisions and A30:** a tenant whose active revision is custom no longer follows new
   default artifacts; rolling back to a default revision (or never forking) keeps following.
+
+## 15. SHOP-96: experiment assignment at the edge
+
+- **Prefilter:** theme `GET`/`HEAD`, not previews, only when the resolved site carries a running
+  `experiment` (`{id, version}` from `/internal/v1/resolve`), a well-formed `__Secure-consent_id`
+  and a `consent` cookie that lists `analytics`. Anyone else is control and nothing is called:
+  key, render context and headers are byte-identical to a shop without an experiment.
+- **Enrol:** before the cache lookup (so a HIT is recorded too), `POST
+  /internal/v1/experiments/enrol` with the service token, `{tenant_id, subject}`, 500 ms
+  timeout. The API checks the latest analytics consent record and its text version and hashes
+  with `EXPERIMENTS_SECRET`; the edge holds no new secret. Answers are memoized per (tenant,
+  subject) for 60 s, bound to the experiment id + version they were given for, at most 10k.
+- **Fail closed:** an error, a timeout, a malformed answer or one for another experiment id or
+  version is control, logged as a warning without the subject. Logs never contain subjects.
+- **Enrolled:** the HTML key gains `exp:<id>:<version>:<arm>`, so a URL has at most arms + 1
+  entries per locale and no client input reaches the key. The render context carries the
+  assignment and `STOREFRONT` sends `x-experiment: <id>:<version>:<arm>` on its page-model
+  calls. Workers cannot send `x-experiment` (400, like the other credential headers) and it is
+  stripped from client requests. The browser gets `private, max-age=0, must-revalidate`
+  (`no-store` stays `no-store`).
+- **SWR:** the refresh renders with the assignment of the key it refreshes and never enrols.
+- **Withdrawal:** the SDK rewrites the `consent` cookie at once, so the next page is control. A
+  `POST /_p/consent` through the edge also forgets the memo of the request's subject and of a
+  newly minted one; the API's latest consent record stays authoritative.
