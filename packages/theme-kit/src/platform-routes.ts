@@ -1,8 +1,3 @@
-/**
- * The platform namespace on a shop origin (decision `same-origin-checkout.md` C8): no theme
- * page, theme file or merchant redirect may answer at these paths, now or before they go live.
- * `crates/commerce/src/redirects.rs` holds the same list and tests it against this file.
- */
 import routes from "./platform-routes.json" with { type: "json" };
 
 export const PLATFORM_SEGMENTS: readonly string[] = routes.segments;

@@ -71,8 +71,6 @@ fn path_ok(p: &str, allow_query: bool) -> bool {
         && (allow_query || !p.contains('?'))
 }
 
-/// First path segments of the platform namespace (decision `same-origin-checkout.md` C8). The
-/// edge reads the same list from `packages/theme-kit/src/platform-routes.json` (tested).
 pub const PLATFORM_SEGMENTS: [&str; 13] = [
     "_p",
     "_edge",
@@ -89,8 +87,6 @@ pub const PLATFORM_SEGMENTS: [&str; 13] = [
     "account",
 ];
 
-/// The edge's `isPlatformPath`: true when `path`, however it is percent-encoded, cased or
-/// slashed, names a platform segment or its subtree, directly or behind a locale prefix.
 pub fn is_platform_path(path: &str) -> bool {
     let mut p = path.as_bytes().to_vec();
     loop {
@@ -120,7 +116,6 @@ pub fn is_platform_path(path: &str) -> bool {
     }
 }
 
-/// `cs` or `en-gb` (lowercased): the shape of a market locale prefix.
 fn locale_shaped(s: &[u8]) -> bool {
     let letters = |x: &[u8]| x.iter().all(u8::is_ascii_lowercase);
     match s {
