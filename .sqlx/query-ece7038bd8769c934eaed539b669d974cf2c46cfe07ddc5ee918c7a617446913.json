@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce((SELECT default_locale FROM markets WHERE is_default), 'en') AS \"l!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "l!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ece7038bd8769c934eaed539b669d974cf2c46cfe07ddc5ee918c7a617446913"
+}

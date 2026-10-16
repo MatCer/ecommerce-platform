@@ -28,6 +28,7 @@ const FEATURES = [
   "bulk_plan",
   "review_summary",
   "alt_text",
+  "insight_hypothesis",
 ] as const;
 
 function featureLabel(f: string): string {
@@ -245,7 +246,7 @@ function ShopFeatures() {
   }));
   const [error, setError] = createSignal<string>();
   const save = createMutation(() => ({
-    mutationFn: (body: Schemas["AiSettings"]) =>
+    mutationFn: (body: Schemas["AiSettingsChange"]) =>
       unwrap(api.PUT("/admin/v1/ai/settings", { params: { header: tenantHeader() }, body })),
     onMutate: () => setError(undefined),
     onSuccess: (saved) => {
@@ -262,46 +263,52 @@ function ShopFeatures() {
       showToast({ title: t("ai.altTextsQueued", { n: r.queued }), closeLabel: t("common.close") }),
     onError: (e: unknown) => setError(errorMessage(e)),
   }));
+  const shown = (s: Schemas["AiSettings"], key: keyof Schemas["AiSettings"]) =>
+    (save.isPending ? save.variables?.[key] : undefined) ?? s[key];
   return (
     <Card labelledBy="ai-shop-h" class="max-w-3xl" title={t("ai.shopFeatures")}>
       <QueryState query={query}>
-        {(s) => {
-          const current = () => (save.isPending && save.variables ? save.variables : s);
-          return (
-            <div class="flex flex-col gap-4">
-              <Show when={!can("admin")}>
-                <Alert tone="info">{t("ai.adminOnly")}</Alert>
-              </Show>
-              <Checkbox
-                label={t("ai.reviewSummaries")}
-                description={t("ai.reviewSummariesDesc")}
-                checked={current().review_summaries}
-                disabled={!can("admin") || save.isPending}
-                onChange={(review_summaries) => save.mutate({ ...current(), review_summaries })}
-              />
-              <Checkbox
-                label={t("ai.altTexts")}
-                description={t("ai.altTextsDesc")}
-                checked={current().alt_texts}
-                disabled={!can("admin") || save.isPending}
-                onChange={(alt_texts) => save.mutate({ ...current(), alt_texts })}
-              />
-              <div class="flex flex-col items-start gap-1">
-                <Button
-                  disabled={!can("admin") || !current().alt_texts || save.isPending}
-                  loading={backfill.isPending}
-                  onClick={() => backfill.mutate()}
-                >
-                  {t("ai.altTextsBackfill")}
-                </Button>
-                <p class="text-sm text-muted-foreground">{t("ai.altTextsBackfillDesc")}</p>
-              </div>
-              <Show when={error()}>
-                <Alert tone="error">{error()}</Alert>
-              </Show>
+        {(s) => (
+          <div class="flex flex-col gap-4">
+            <Show when={!can("admin")}>
+              <Alert tone="info">{t("ai.adminOnly")}</Alert>
+            </Show>
+            <Checkbox
+              label={t("ai.reviewSummaries")}
+              description={t("ai.reviewSummariesDesc")}
+              checked={shown(s, "review_summaries")}
+              disabled={!can("admin") || save.isPending}
+              onChange={(review_summaries) => save.mutate({ review_summaries })}
+            />
+            <Checkbox
+              label={t("ai.altTexts")}
+              description={t("ai.altTextsDesc")}
+              checked={shown(s, "alt_texts")}
+              disabled={!can("admin") || save.isPending}
+              onChange={(alt_texts) => save.mutate({ alt_texts })}
+            />
+            <div class="flex flex-col items-start gap-1">
+              <Button
+                disabled={!can("admin") || !shown(s, "alt_texts") || save.isPending}
+                loading={backfill.isPending}
+                onClick={() => backfill.mutate()}
+              >
+                {t("ai.altTextsBackfill")}
+              </Button>
+              <p class="text-sm text-muted-foreground">{t("ai.altTextsBackfillDesc")}</p>
             </div>
-          );
-        }}
+            <Checkbox
+              label={t("ai.insights")}
+              description={t("ai.insightsDesc")}
+              checked={shown(s, "insights")}
+              disabled={!can("admin") || save.isPending}
+              onChange={(insights) => save.mutate({ insights })}
+            />
+            <Show when={error()}>
+              <Alert tone="error">{error()}</Alert>
+            </Show>
+          </div>
+        )}
       </QueryState>
     </Card>
   );

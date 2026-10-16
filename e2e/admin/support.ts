@@ -204,11 +204,15 @@ export function sql(query: string): string {
   return dockerExec("postgres", ["psql", "-U", "postgres", "-d", "app", "-At", "-c", query]).trim();
 }
 
-/** Runs a worker job now instead of waiting for its cron slot (e.g. `shipping.track`). */
-export function enqueueJob(kind: string): void {
+export function enqueueJob(
+  kind: string,
+  tenantSql = "NULL",
+  payload: Record<string, string> = {},
+): string {
   if (!/^[a-z_.]+$/.test(kind)) throw new Error("bad job kind");
-  sql(
-    `SELECT queue.enqueue('${kind}', '{}'::jsonb, NULL, 'default', NULL, 3, 'e2e:${kind}:${Date.now()}')`,
+  const json = JSON.stringify(payload).replaceAll("'", "''");
+  return sql(
+    `SELECT queue.enqueue('${kind}', '${json}'::jsonb, ${tenantSql}, 'default', NULL, 3, 'e2e:${kind}:${Date.now()}')`,
   );
 }
 

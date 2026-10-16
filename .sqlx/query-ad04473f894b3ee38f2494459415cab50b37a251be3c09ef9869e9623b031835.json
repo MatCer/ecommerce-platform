@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.id,\n                  coalesce(round(sum(d.value) FILTER (WHERE d.metric = 'product.views')), 0)::bigint\n                      AS \"views!\",\n                  coalesce(round(sum(d.value) FILTER (WHERE d.metric = 'product.add_to_carts')), 0)::bigint\n                      AS \"adds!\"\n           FROM daily_metrics d\n           JOIN products p ON p.id::text = d.dims->>'product_id'\n           WHERE d.metric IN ('product.views', 'product.add_to_carts')\n             AND d.date BETWEEN $1 AND $2\n           GROUP BY p.id ORDER BY p.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "products",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "views!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "adds!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "ad04473f894b3ee38f2494459415cab50b37a251be3c09ef9869e9623b031835"
+}

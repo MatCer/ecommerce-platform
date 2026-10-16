@@ -1056,7 +1056,7 @@
         "tags": [
           "ai"
         ],
-        "summary": "Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one\nsummary per product with at least 5 published verified reviews; switching them purges the\nshop's cached pages. Alt texts apply to images uploaded after they were turned on.",
+        "summary": "Changes the AI switches; a switch left out keeps its value. Owner or admin; audited. Turning\nreview summaries on queues one summary per product with at least 5 published verified\nreviews, and changing them purges the shop's cached pages. Alt texts apply to images uploaded\nafter they were turned on. Insight hypotheses start with the next nightly run.",
         "operationId": "put_ai_settings",
         "parameters": [
           {
@@ -1074,7 +1074,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AiSettings"
+                "$ref": "#/components/schemas/AiSettingsChange"
               }
             }
           },
@@ -5667,6 +5667,98 @@
             }
           },
           "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/insights": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "What the nightly detectors found, ranked.",
+        "operationId": "list_insights",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightList"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staff_jwt": []
+          }
+        ]
+      }
+    },
+    "/admin/v1/insights/{id}/dismiss": {
+      "post": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Hides a signal for good, also when it is detected again. Idempotent.",
+        "operationId": "dismiss_insight",
+        "parameters": [
+          {
+            "name": "X-Tenant-Id",
+            "in": "header",
+            "description": "The tenant to act in; the caller must be a member.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Insight"
+                }
+              }
+            }
+          },
+          "404": {
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22500,18 +22592,48 @@
       },
       "AiSettings": {
         "type": "object",
+        "description": "The shop's AI switches; every one is off by default.",
         "required": [
           "review_summaries",
-          "alt_texts"
+          "alt_texts",
+          "insights"
         ],
         "properties": {
           "alt_texts": {
             "type": "boolean",
-            "description": "AI alt texts for product images uploaded from now on, in every market language that\nhas none. Off by default."
+            "description": "AI alt texts for product images uploaded from now on, in every market language that\nhas none."
+          },
+          "insights": {
+            "type": "boolean",
+            "description": "AI hypotheses and theme-editor drafts for the top insights (the detection runs anyway)."
           },
           "review_summaries": {
             "type": "boolean",
-            "description": "AI summaries of verified reviews on product pages, labelled as AI-generated. Off by\ndefault."
+            "description": "AI summaries of verified reviews on product pages, labelled as AI-generated."
+          }
+        }
+      },
+      "AiSettingsChange": {
+        "type": "object",
+        "description": "A change to the AI switches; a switch left out keeps its value.",
+        "properties": {
+          "alt_texts": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "insights": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "review_summaries": {
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         },
         "additionalProperties": false
@@ -26916,6 +27038,116 @@
           }
         }
       },
+      "Detection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The last 7 days against the 21 days before.",
+            "required": [
+              "transition",
+              "recent",
+              "baseline",
+              "kind"
+            ],
+            "properties": {
+              "baseline": {
+                "$ref": "#/components/schemas/Pair"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "funnel_drop"
+                ]
+              },
+              "recent": {
+                "$ref": "#/components/schemas/Pair"
+              },
+              "transition": {
+                "$ref": "#/components/schemas/Transition"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Views and add-to-carts over 14 days, of the product and of the whole shop.",
+            "required": [
+              "product_id",
+              "views",
+              "adds",
+              "shop_views",
+              "shop_adds",
+              "kind"
+            ],
+            "properties": {
+              "adds": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "low_add_to_cart"
+                ]
+              },
+              "product_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "shop_adds": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "shop_views": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "views": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "RUM p75 over 14 days and the template's page requests in that time.",
+            "required": [
+              "template",
+              "metric",
+              "p75",
+              "samples",
+              "requests",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "slow_page"
+                ]
+              },
+              "metric": {
+                "$ref": "#/components/schemas/Vital"
+              },
+              "p75": {
+                "type": "number",
+                "format": "double"
+              },
+              "requests": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "samples": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "template": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "What a detector found, with every number behind the score."
+      },
       "DistanceSalesMode": {
         "type": "string",
         "enum": [
@@ -28352,6 +28584,31 @@
           }
         }
       },
+      "Hypothesis": {
+        "type": "object",
+        "required": [
+          "text",
+          "theme_prompt",
+          "model",
+          "generated_at"
+        ],
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "model": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "theme_prompt": {
+            "type": "string",
+            "description": "Draft request for the AI theme editor; staff edit and start it themselves."
+          }
+        }
+      },
       "Image": {
         "type": "object",
         "description": "An image with every generated width. Render `srcset` (AVIF) with a `sizes` that matches the\nreal slot; `src` is a JPEG/PNG fallback. `width`/`height` are the intrinsic size of the\nlargest variant (use them for the aspect ratio: no layout shift).",
@@ -28645,6 +28902,72 @@
           "settings_version": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "Insight": {
+        "type": "object",
+        "description": "A ranked open signal as staff see it.",
+        "required": [
+          "id",
+          "detection",
+          "score",
+          "first_detected_on",
+          "last_detected_on"
+        ],
+        "properties": {
+          "detection": {
+            "$ref": "#/components/schemas/Detection"
+          },
+          "first_detected_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "hypothesis": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Hypothesis",
+                "description": "AI-generated; label it as such."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_detected_on": {
+            "type": "string",
+            "format": "date"
+          },
+          "product_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Low add-to-cart: the product's name in the default market's language (`null` once the\nproduct is gone)."
+          },
+          "score": {
+            "type": "number",
+            "format": "double",
+            "description": "Affected visits per week; the list is ordered by it."
+          }
+        }
+      },
+      "InsightList": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Insight"
+            },
+            "description": "Open signals, most affected visits first (at most 50)."
           }
         }
       },
@@ -31440,6 +31763,24 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "Pair": {
+        "type": "object",
+        "description": "Sessions that reached the from-step, and of them the to-step, in one window.",
+        "required": [
+          "from",
+          "to"
+        ],
+        "properties": {
+          "from": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -36682,6 +37023,16 @@
           }
         }
       },
+      "Transition": {
+        "type": "string",
+        "description": "Adjacent funnel steps: sessions, view_item, add_to_cart, begin_checkout, purchase.",
+        "enum": [
+          "sessions_to_view_item",
+          "view_item_to_add_to_cart",
+          "add_to_cart_to_begin_checkout",
+          "begin_checkout_to_purchase"
+        ]
+      },
       "Trust": {
         "type": "object",
         "required": [
@@ -37154,6 +37505,15 @@
           }
         }
       },
+      "Vital": {
+        "type": "string",
+        "description": "Core Web Vitals with their \"good\" bound (ms; CLS unitless).",
+        "enum": [
+          "LCP",
+          "INP",
+          "CLS"
+        ]
+      },
       "VitalP75": {
         "type": "object",
         "required": [
@@ -37603,6 +37963,10 @@
     {
       "name": "reviews",
       "description": "Admin API: review moderation (publish, reject, hide) and replies"
+    },
+    {
+      "name": "insights",
+      "description": "Admin API: ranked findings of the nightly detectors, with optional AI hypotheses"
     },
     {
       "name": "webhooks",

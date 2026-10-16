@@ -14,7 +14,7 @@ use commerce::ai::glossary::{self, Glossary};
 use commerce::ai::marks::{self, AiMarkList};
 use commerce::ai::plan::{self, BulkPlan, NewPlan};
 use commerce::ai::proposals::{self, AcceptProposal, NewProposal, Proposal};
-use commerce::ai::settings::{self, AiSettings};
+use commerce::ai::settings::{self, AiSettings, AiSettingsChange};
 use commerce::ai::{self, UsageSummary};
 use commerce::tenancy::Role;
 use platform::Error;
@@ -78,16 +78,17 @@ async fn get_ai_settings(
     ))
 }
 
-/// Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
-/// summary per product with at least 5 published verified reviews; switching them purges the
-/// shop's cached pages. Alt texts apply to images uploaded after they were turned on.
+/// Changes the AI switches; a switch left out keeps its value. Owner or admin; audited. Turning
+/// review summaries on queues one summary per product with at least 5 published verified
+/// reviews, and changing them purges the shop's cached pages. Alt texts apply to images uploaded
+/// after they were turned on. Insight hypotheses start with the next nightly run.
 #[utoipa::path(
     put,
     path = "/admin/v1/ai/settings",
     tag = "ai",
     security(("staff_jwt" = [])),
     params(TenantHeader),
-    request_body = AiSettings,
+    request_body = AiSettingsChange,
     responses(
         (status = 200, body = AiSettings),
         (status = 403, body = platform::Problem, content_type = "application/problem+json"),
@@ -100,11 +101,11 @@ async fn put_ai_settings(
     body: Bytes,
 ) -> Result<Json<AiSettings>, Error> {
     staff.require(Role::Admin)?;
-    let input: AiSettings = parse_json(&body)?;
+    let change: AiSettingsChange = parse_json(&body)?;
     let actor = &staff.user.user_id;
     Ok(Json(
         in_tx(&s, staff.tenant_id, async |tx| {
-            settings::put(tx, actor, &input).await
+            settings::put(tx, actor, &change).await
         })
         .await?,
     ))

@@ -63,7 +63,7 @@ async fn admins_switch_alt_texts_and_queue_a_backfill(db: PgPool) {
         (StatusCode::CONFLICT, Some("ai_alt_texts_disabled"))
     );
 
-    let on = json!({ "review_summaries": false, "alt_texts": true });
+    let on = json!({ "review_summaries": false, "alt_texts": true, "insights": false });
     let (status, body, _) = Call::put("/admin/v1/ai/settings", on.clone())
         .token(&boss)
         .tenant(shop.tenant)

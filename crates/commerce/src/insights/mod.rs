@@ -1,0 +1,529 @@
+pub mod detect;
+mod load;
+
+use chrono::{DateTime, NaiveDate, Utc};
+use platform::Error;
+use platform::db::{TenantTx, tenant_tx};
+use platform::queue::NewJob;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sqlx::{PgConnection, PgPool};
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use crate::ai::{self, Ai, Call, CallError, Outcome, prompts, settings};
+use crate::{analytics, audit};
+use detect::Detection;
+use detect::rules::{FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS};
+
+pub const JOB: &str = "insights.run";
+pub const DAILY_MODEL_CALLS: i64 = 3;
+pub const EARLIEST_RUN_HOUR_UTC: i64 = 4;
+pub const LIST_LIMIT: i64 = 50;
+pub const HYPOTHESIS_MAX: usize = 500;
+pub const THEME_PROMPT_MAX: usize = 1500;
+const ACTOR: &str = "system";
+
+/// The run of one tenant over `day` (the payload carries it, so a late or retried job still
+/// evaluates the same day).
+pub fn job(tenant: Uuid, day: NaiveDate) -> NewJob<'static> {
+    let mut j = NewJob::new(JOB, json!({ "day": day }));
+    j.tenant_id = Some(tenant);
+    j.max_attempts = 3;
+    j.idempotency_key = Some(format!("{JOB}:{tenant}:{day}"));
+    j
+}
+
+/// A ranked open signal as staff see it.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct Insight {
+    pub id: Uuid,
+    pub detection: Detection,
+    /// Affected visits per week; the list is ordered by it.
+    pub score: f64,
+    /// Low add-to-cart: the product's name in the default market's language (`null` once the
+    /// product is gone).
+    pub product_name: Option<String>,
+    pub first_detected_on: NaiveDate,
+    pub last_detected_on: NaiveDate,
+    /// AI-generated; label it as such.
+    pub hypothesis: Option<Hypothesis>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct Hypothesis {
+    pub text: String,
+    /// Draft request for the AI theme editor; staff edit and start it themselves.
+    pub theme_prompt: String,
+    pub model: String,
+    pub generated_at: DateTime<Utc>,
+}
+
+struct Row {
+    id: Uuid,
+    detection: Value,
+    score: f64,
+    product_name: Option<String>,
+    first_detected_on: NaiveDate,
+    last_detected_on: NaiveDate,
+    hypothesis: Option<String>,
+    theme_prompt: Option<String>,
+    hypothesis_model: Option<String>,
+    hypothesis_at: Option<DateTime<Utc>>,
+}
+
+fn parse_detection(v: Value) -> Result<Detection, Error> {
+    serde_json::from_value(v).map_err(|e| Error::Internal(format!("stored detection: {e}")))
+}
+
+impl TryFrom<Row> for Insight {
+    type Error = Error;
+
+    fn try_from(r: Row) -> Result<Self, Error> {
+        let hypothesis = match (
+            r.hypothesis,
+            r.theme_prompt,
+            r.hypothesis_model,
+            r.hypothesis_at,
+        ) {
+            (Some(text), Some(theme_prompt), Some(model), Some(generated_at)) => Some(Hypothesis {
+                text,
+                theme_prompt,
+                model,
+                generated_at,
+            }),
+            _ => None,
+        };
+        Ok(Self {
+            id: r.id,
+            detection: parse_detection(r.detection)?,
+            score: r.score,
+            product_name: r.product_name,
+            first_detected_on: r.first_detected_on,
+            last_detected_on: r.last_detected_on,
+            hypothesis,
+        })
+    }
+}
+
+pub async fn list(tx: &mut TenantTx) -> Result<Vec<Insight>, Error> {
+    select(tx, None).await
+}
+
+async fn select(tx: &mut TenantTx, id: Option<Uuid>) -> Result<Vec<Insight>, Error> {
+    sqlx::query_as!(
+        Row,
+        r#"SELECT id, detection, score, first_detected_on, last_detected_on, hypothesis,
+                  theme_prompt, hypothesis_model, hypothesis_at,
+                  CASE WHEN kind = 'low_add_to_cart'
+                       THEN insight_product_name((detection->>'product_id')::uuid) END
+                      AS product_name
+           FROM insight_signals
+           WHERE CASE WHEN $1::uuid IS NULL THEN status = 'open' ELSE id = $1 END
+           ORDER BY score DESC, kind COLLATE "C", subject COLLATE "C" LIMIT $2"#,
+        id,
+        LIST_LIMIT
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(Insight::try_from)
+    .collect()
+}
+
+pub async fn dismiss(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Insight, Error> {
+    let changed = sqlx::query!(
+        "UPDATE insight_signals SET status = 'dismissed', dismissed_at = now(), dismissed_by = $2
+         WHERE id = $1 AND status <> 'dismissed' RETURNING kind, subject",
+        id,
+        actor
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some(c) = changed {
+        audit::record(
+            tx,
+            actor,
+            "insight.dismissed",
+            "insight_signal",
+            Some(&id.to_string()),
+            &json!({ "kind": c.kind, "subject": c.subject }),
+        )
+        .await?;
+    }
+    select(tx, Some(id)).await?.pop().ok_or(Error::NotFound)
+}
+
+async fn lock_tenant_run(db: &PgPool, tenant: Uuid) -> Result<Option<PgConnection>, Error> {
+    let mut conn = db.acquire().await?.detach();
+    let locked = sqlx::query_scalar!(
+        r#"SELECT pg_try_advisory_lock(hashtextextended('insights:' || $1::text, 0)) AS "ok!""#,
+        tenant.to_string()
+    )
+    .fetch_one(&mut conn)
+    .await?;
+    Ok(locked.then_some(conn))
+}
+
+async fn unlock_tenant_run(mut conn: PgConnection, tenant: Uuid) -> Result<(), Error> {
+    sqlx::query_scalar!(
+        r#"SELECT pg_advisory_unlock(hashtextextended('insights:' || $1::text, 0)) AS "ok!""#,
+        tenant.to_string()
+    )
+    .fetch_one(&mut conn)
+    .await?;
+    Ok(())
+}
+
+async fn calls_today(db: &PgPool, tenant: Uuid) -> Result<i64, Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
+    let n = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM ai_usage
+           WHERE feature = $1
+             AND at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'"#,
+        ai::INSIGHT_HYPOTHESIS
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(n)
+}
+
+async fn store(tx: &mut TenantTx, day: NaiveDate, found: &[Detection]) -> Result<(), Error> {
+    for d in found {
+        let detection =
+            serde_json::to_value(d).map_err(|e| Error::Internal(format!("detection: {e}")))?;
+        sqlx::query!(
+            "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score,
+                                          first_detected_on, last_detected_on)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+             ON CONFLICT (tenant_id, kind, subject) DO UPDATE
+             SET detection = EXCLUDED.detection, score = EXCLUDED.score,
+                 last_detected_on = EXCLUDED.last_detected_on,
+                 status = CASE insight_signals.status WHEN 'resolved' THEN 'open'
+                               ELSE insight_signals.status END
+             WHERE EXCLUDED.last_detected_on >= insight_signals.last_detected_on",
+            tx.tenant_id(),
+            Uuid::now_v7(),
+            d.kind(),
+            d.subject(),
+            detection,
+            d.score(),
+            day
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    sqlx::query!(
+        "UPDATE insight_signals SET status = 'resolved'
+         WHERE status = 'open' AND last_detected_on < $1",
+        day
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+struct Target {
+    id: Uuid,
+    detection: Value,
+    product_name: Option<String>,
+}
+
+fn facts(d: &Detection, product: Option<&str>, locale: &str) -> Value {
+    let r4 = |x: f64| (x * 10_000.0).round() / 10_000.0;
+    let mut v = match d {
+        Detection::FunnelDrop {
+            transition,
+            recent,
+            baseline,
+        } => json!({
+            "transition": transition.as_str(),
+            "recent": { "days": FUNNEL_RECENT_DAYS, "sessions_at_step": recent.from,
+                        "sessions_continuing": recent.to,
+                        "rate": r4(detect::rate(recent.to, recent.from)) },
+            "baseline": { "days": FUNNEL_BASELINE_DAYS, "sessions_at_step": baseline.from,
+                          "sessions_continuing": baseline.to,
+                          "rate": r4(detect::rate(baseline.to, baseline.from)) },
+        }),
+        Detection::LowAddToCart {
+            views,
+            adds,
+            shop_views,
+            shop_adds,
+            ..
+        } => json!({
+            "product": product,
+            "days": PRODUCT_DAYS,
+            "views": views,
+            "add_to_carts": adds,
+            "rate": r4(detect::rate(*adds, *views)),
+            "shop_rate": r4(detect::rate(*shop_adds, *shop_views)),
+        }),
+        Detection::SlowPage {
+            template,
+            metric,
+            p75,
+            samples,
+            requests,
+        } => json!({
+            "template": template,
+            "metric": metric,
+            "p75": r4(*p75),
+            "good_bound": metric.good(),
+            "samples": samples,
+            "page_requests": requests,
+            "days": VITALS_DAYS,
+        }),
+    };
+    v["kind"] = json!(d.kind());
+    v["affected_visits_per_week"] = json!(r4(d.score()));
+    v["locale"] = json!(locale);
+    v
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Output {
+    hypothesis: String,
+    theme_prompt: String,
+}
+
+fn has_markdown(text: &str) -> bool {
+    let chars: Vec<char> = text.chars().collect();
+    let inside_word = |i: usize| {
+        i > 0
+            && chars[i - 1].is_alphanumeric()
+            && chars.get(i + 1).is_some_and(|c| c.is_alphanumeric())
+    };
+    let after_number = text.trim_start_matches(|c: char| c.is_ascii_digit());
+    let list = text.starts_with("- ")
+        || text.starts_with("+ ")
+        || (after_number.len() < text.len() && after_number.starts_with(". "));
+    list || chars.iter().enumerate().any(|(i, c)| {
+        matches!(c, '*' | '`' | '#' | '[' | ']' | '>') || (*c == '_' && !inside_word(i))
+    })
+}
+
+fn plain(
+    raw: &str,
+    chars: std::ops::RangeInclusive<usize>,
+    what: &str,
+) -> Result<String, CallError> {
+    let text = ai::safe_text(raw, chars, what)?;
+    if has_markdown(&text) {
+        return Err(CallError::output(format!("{what} contains Markdown")));
+    }
+    Ok(text)
+}
+
+fn validate(output: Value) -> Result<(String, String), CallError> {
+    let out: Output = ai::parse(output)?;
+    Ok((
+        plain(&out.hypothesis, 1..=HYPOTHESIS_MAX, "the hypothesis")?,
+        plain(&out.theme_prompt, 20..=THEME_PROMPT_MAX, "the theme prompt")?,
+    ))
+}
+
+/// Detects, stores and explains one tenant's signals for `day`. While another run of the same
+/// tenant is in progress it does nothing.
+pub async fn run(
+    db: &PgPool,
+    ai: &Ai,
+    tenant: Uuid,
+    day: NaiveDate,
+    last_attempt: bool,
+) -> Result<Outcome, Error> {
+    let Some(lock) = lock_tenant_run(db, tenant).await? else {
+        return Ok(Outcome::Done);
+    };
+    let outcome = run_locked(db, ai, tenant, day, last_attempt).await?;
+    unlock_tenant_run(lock, tenant).await?;
+    Ok(outcome)
+}
+
+async fn run_locked(
+    db: &PgPool,
+    ai: &Ai,
+    tenant: Uuid,
+    day: NaiveDate,
+    last_attempt: bool,
+) -> Result<Outcome, Error> {
+    let mut tx = tenant_tx(db, tenant).await?;
+    analytics::rollup(&mut tx, day).await?;
+    let mut found = detect::detect(&load::metrics(&mut tx, day).await?);
+    detect::rank(&mut found);
+    store(&mut tx, day, &found).await?;
+    let on = settings::get(&mut tx).await?.insights;
+    tx.commit().await?;
+    if !on || ai.client.is_none() {
+        return Ok(Outcome::Done);
+    }
+
+    let mut tx = tenant_tx(db, tenant).await?;
+    let targets = sqlx::query_as!(
+        Target,
+        r#"SELECT id, detection,
+                  CASE WHEN kind = 'low_add_to_cart'
+                       THEN insight_product_name((detection->>'product_id')::uuid) END
+                      AS product_name
+           FROM insight_signals WHERE status = 'open' AND hypothesis_at IS NULL
+           ORDER BY score DESC, kind COLLATE "C", subject COLLATE "C" LIMIT $1"#,
+        DAILY_MODEL_CALLS
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    let locale = sqlx::query_scalar!(
+        r#"SELECT coalesce((SELECT default_locale FROM markets WHERE is_default), 'en') AS "l!""#
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    for t in targets {
+        if calls_today(db, tenant).await? >= DAILY_MODEL_CALLS {
+            break;
+        }
+        let detection = parse_detection(t.detection)?;
+        let data = facts(&detection, t.product_name.as_deref(), &locale);
+        let task = format!(
+            "Explain this finding and draft a theme-editor request. Write both in the language \
+             {locale}."
+        );
+        let result = ai::call(
+            db,
+            ai,
+            tenant,
+            ACTOR,
+            &Call {
+                feature: ai::INSIGHT_HYPOTHESIS,
+                system: prompts::INSIGHT_SYSTEM,
+                task: &task,
+                data: &data,
+                schema: &prompts::insight_schema(),
+                max_tokens: 1500,
+                image: None,
+            },
+        )
+        .await
+        .and_then(|(output, model)| validate(output).map(|v| (v, model)));
+        let mut tx = tenant_tx(db, tenant).await?;
+        match result {
+            Ok(((text, prompt), model)) => {
+                sqlx::query!(
+                    "UPDATE insight_signals SET hypothesis = $2, theme_prompt = $3,
+                            hypothesis_model = $4, hypothesis_at = now()
+                     WHERE id = $1 AND hypothesis_at IS NULL",
+                    t.id,
+                    text,
+                    prompt,
+                    model
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Err(CallError::Platform(e)) => return Err(e),
+            Err(CallError::Quota) => return Ok(Outcome::Done),
+            Err(e) if e.retryable() && !last_attempt => return Ok(Outcome::Retry(e.to_string())),
+            Err(e) if e.retryable() => {
+                tracing::warn!(%tenant, signal = %t.id, code = e.code(), "insight hypothesis gave up");
+                return Ok(Outcome::Done);
+            }
+            Err(e) => {
+                tracing::warn!(%tenant, signal = %t.id, code = e.code(), "insight hypothesis rejected");
+                sqlx::query!(
+                    "UPDATE insight_signals SET hypothesis_error = $2, hypothesis_at = now()
+                     WHERE id = $1 AND hypothesis_at IS NULL",
+                    t.id,
+                    e.code()
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+        }
+        tx.commit().await?;
+    }
+    Ok(Outcome::Done)
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn output_is_plain_text_within_bounds() {
+        let ok = json!({ "hypothesis": " Fewer\tvisitors add it. ",
+                         "theme_prompt": "Make the add to cart button larger." });
+        assert_eq!(
+            validate(ok).unwrap(),
+            (
+                "Fewer visitors add it.".to_owned(),
+                "Make the add to cart button larger.".to_owned()
+            )
+        );
+        for bad in [
+            json!({ "hypothesis": "See https://x.example", "theme_prompt": "Make the button larger." }),
+            json!({ "hypothesis": "Fine.", "theme_prompt": "**Bold** the add to cart button." }),
+            json!({ "hypothesis": "Rating -> 5", "theme_prompt": "Make the button larger." }),
+            json!({ "hypothesis": "Use `code`", "theme_prompt": "Make the button larger." }),
+            json!({ "hypothesis": "See [the shop](x)", "theme_prompt": "Make the button larger." }),
+            json!({ "hypothesis": "# Heading", "theme_prompt": "Make the button larger." }),
+            json!({ "hypothesis": "Fine.", "theme_prompt": "Too short." }),
+            json!({ "hypothesis": "", "theme_prompt": "Make the button larger." }),
+            json!({ "hypothesis": "Fine.", "theme_prompt": "Make the button larger.", "x": 1 }),
+        ] {
+            assert_eq!(
+                validate(bad.clone()).unwrap_err().code(),
+                "ai_invalid_output",
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn markdown_is_rejected_and_underscores_inside_words_pass() {
+        let with = |h: &str| json!({ "hypothesis": h, "theme_prompt": "Make the button larger." });
+        for ok in ["add-to-cart rate fell", "view_item_to_add_to_cart"] {
+            assert_eq!(validate(with(ok)).unwrap().0, ok);
+        }
+        for bad in [
+            "The button is *hard to find*.",
+            "Make the _add to cart_ button more prominent.",
+            "Make the __primary action__ more prominent.",
+            "- bigger photos",
+            "+ bigger photos",
+            "1. bigger photos",
+            "Close the list ]",
+        ] {
+            assert_eq!(
+                validate(with(bad)).unwrap_err().code(),
+                "ai_invalid_output",
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn jobs_are_one_per_tenant_and_day() {
+        let t = Uuid::from_u128(7);
+        let day = NaiveDate::from_ymd_opt(2026, 10, 16).unwrap();
+        let j = job(t, day);
+        assert_eq!(
+            (
+                j.kind,
+                j.tenant_id,
+                j.max_attempts,
+                j.idempotency_key.as_deref(),
+                j.payload
+            ),
+            (
+                "insights.run",
+                Some(t),
+                3,
+                Some("insights.run:00000000-0000-0000-0000-000000000007:2026-10-16"),
+                json!({ "day": "2026-10-16" })
+            )
+        );
+    }
+}

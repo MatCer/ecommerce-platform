@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE insight_signals SET status = 'resolved'\n         WHERE status = 'open' AND last_detected_on < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f04563d4d5e1a27032ef3539a2a4ccb3c735e3d80fc671c6bcf98178babc96dd"
+}

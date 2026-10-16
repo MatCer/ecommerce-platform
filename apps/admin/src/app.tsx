@@ -60,6 +60,7 @@ const CampaignEditor = lazy(() => import("./pages/CampaignEditor.tsx"));
 const Emails = lazy(() => import("./pages/Emails.tsx"));
 const EmailBranding = lazy(() => import("./pages/EmailBranding.tsx"));
 const Themes = lazy(() => import("./pages/Themes.tsx"));
+const Insights = lazy(() => import("./pages/Insights.tsx"));
 const Customers = lazy(() => import("./pages/Customers.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
@@ -101,6 +102,7 @@ export function App() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/" component={Protected}>
           <Route path="/" component={Dashboard} />
+          <Route path="/insights" component={Insights} />
           <Route path="/products" component={Products} />
           <Route path="/products/new" component={ProductEditor} />
           <Route path="/products/:id" component={ProductEditor} />

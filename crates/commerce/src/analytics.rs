@@ -413,7 +413,15 @@ pub async fn link_purchase(
 
 // --- rollups -----------------------------------------------------------------------------------
 
-fn day_bounds(day: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
+pub(crate) const FUNNEL_METRICS: [&str; 5] = [
+    "sessions",
+    "funnel.view_item",
+    "funnel.add_to_cart",
+    "funnel.begin_checkout",
+    "funnel.purchase",
+];
+
+pub(crate) fn day_bounds(day: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
     let start = day.and_time(NaiveTime::MIN).and_utc();
     (start, start + chrono::Duration::days(1))
 }
@@ -421,8 +429,15 @@ fn day_bounds(day: NaiveDate) -> (DateTime<Utc>, DateTime<Utc>) {
 /// Recomputes one UTC day of `daily_metrics` from the events (idempotent). Sessions and the
 /// funnel count each session once, on the day it started (its steps may continue after
 /// midnight), so summing days never double-counts a session; page views and product
-/// views/adds count by event time.
+/// views/adds count by event time. Rollups of one tenant wait for each other (transaction-scoped
+/// advisory lock).
 pub async fn rollup(tx: &mut TenantTx, day: NaiveDate) -> Result<(), Error> {
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('analytics.rollup:' || $1::text, 0))",
+        tx.tenant_id().to_string()
+    )
+    .execute(&mut **tx)
+    .await?;
     let (start, end) = day_bounds(day);
     sqlx::query!("DELETE FROM daily_metrics WHERE date = $1", day)
         .execute(&mut **tx)
@@ -719,19 +734,13 @@ pub async fn dashboard(tx: &mut TenantTx, q: &DashboardQuery) -> Result<Dashboar
         consented_page_views: metric("page_views"),
         #[allow(clippy::cast_precision_loss)]
         conversion_rate: (sessions > 0).then(|| metric("funnel.purchase") as f64 / sessions as f64),
-        funnel: [
-            ("sessions", sessions),
-            ("view_item", metric("funnel.view_item")),
-            ("add_to_cart", metric("funnel.add_to_cart")),
-            ("begin_checkout", metric("funnel.begin_checkout")),
-            ("purchase", metric("funnel.purchase")),
-        ]
-        .into_iter()
-        .map(|(step, sessions)| FunnelStep {
-            step: step.into(),
-            sessions,
-        })
-        .collect(),
+        funnel: FUNNEL_METRICS
+            .iter()
+            .map(|k| FunnelStep {
+                step: k.trim_start_matches("funnel.").into(),
+                sessions: metric(k),
+            })
+            .collect(),
         by_template,
     };
 
@@ -782,22 +791,7 @@ pub async fn dashboard(tx: &mut TenantTx, q: &DashboardQuery) -> Result<Dashboar
     .fetch_all(&mut **tx)
     .await?;
 
-    // Exact p75 over the range (sampled RUM keeps this small).
-    let web_vitals = sqlx::query_as!(
-        VitalP75,
-        r#"SELECT props->>'template' AS "template!", props->>'name' AS "metric!",
-                  percentile_cont(0.75) WITHIN GROUP (ORDER BY (props->>'value')::float8) AS "p75!",
-                  count(*) AS "samples!"
-           FROM events
-           WHERE type = 'web_vitals' AND at >= $1 AND at < $2
-             AND ($3::uuid IS NULL OR market_id = $3)
-           GROUP BY 1, 2 ORDER BY 1, 2"#,
-        start,
-        end,
-        m
-    )
-    .fetch_all(&mut **tx)
-    .await?;
+    let web_vitals = web_vitals_p75(tx, start, end, m).await?;
 
     Ok(Dashboard {
         from: q.from,
@@ -812,6 +806,29 @@ pub async fn dashboard(tx: &mut TenantTx, q: &DashboardQuery) -> Result<Dashboar
         zero_result_searches,
         web_vitals,
     })
+}
+
+pub(crate) async fn web_vitals_p75(
+    tx: &mut TenantTx,
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    market: Option<Uuid>,
+) -> Result<Vec<VitalP75>, Error> {
+    Ok(sqlx::query_as!(
+        VitalP75,
+        r#"SELECT props->>'template' AS "template!", props->>'name' AS "metric!",
+                  percentile_cont(0.75) WITHIN GROUP (ORDER BY (props->>'value')::float8) AS "p75!",
+                  count(*) AS "samples!"
+           FROM events
+           WHERE type = 'web_vitals' AND at >= $1 AND at < $2
+             AND ($3::uuid IS NULL OR market_id = $3)
+           GROUP BY 1, 2 ORDER BY 1, 2"#,
+        start,
+        end,
+        market
+    )
+    .fetch_all(&mut **tx)
+    .await?)
 }
 
 #[cfg(test)]

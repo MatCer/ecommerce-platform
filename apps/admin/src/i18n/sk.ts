@@ -236,6 +236,7 @@ export const sk: Dictionary = {
     feature_bulk_plan: "Plány hromadných úprav",
     feature_review_summary: "Zhrnutia recenzií",
     feature_alt_text: "Alternatívne texty obrázkov",
+    feature_insight_hypothesis: "Hypotézy k postrehom",
     glossary: "Glosár",
     glossaryDesc:
       "Výrazy, ktoré preklady musia ponechať bez zmeny (značky), alebo prekladať jedným pevným spôsobom. Prázdny jazyk výraz ponechá.",
@@ -248,6 +249,9 @@ export const sk: Dictionary = {
     reviewSummaries: "Zhrnutia recenzií",
     reviewSummariesDesc:
       "Produkty s aspoň 5 zverejnenými overenými recenziami dostanú na stránke produktu krátke zhrnutie od AI, v jazyku každého trhu a označené ako vytvorené umelou inteligenciou. Každé zhrnutie spotrebuje tokeny AI.",
+    insights: "Hypotézy k postrehom",
+    insightsDesc:
+      "AI každú noc napíše pri najviac 3 nových postrehoch možnú príčinu a návrh zadania pre AI úpravy vzhľadu, označené ako vytvorené umelou inteligenciou. Zobrazia sa po ďalšom nočnom behu, nie hneď. Samotné postrehy sa vyhľadávajú tak či tak. Každá hypotéza spotrebuje tokeny AI.",
     adminOnly: "Tieto nastavenia môžu meniť len vlastníci a správcovia.",
     altTexts: "Alternatívne texty nových obrázkov produktov",
     altTextsDesc:
@@ -886,6 +890,7 @@ export const sk: Dictionary = {
     taxProfile: "Dane",
     main: "Hlavná navigácia",
     dashboard: "Prehľad",
+    insights: "Postrehy",
     catalog: "Katalóg",
     products: "Produkty",
     categories: "Kategórie",
@@ -2374,5 +2379,36 @@ export const sk: Dictionary = {
     clockAdvance: "Posunúť",
     clockAdvanced: "Čas automatizácií je teraz {{time}}",
     errHours: "Zadajte celé hodiny od 1 do 2160.",
+  },
+  insights: {
+    title: "Postrehy",
+    description:
+      "Kde obchod stráca návštevy, podľa analytiky posledných týždňov. Zoradené podľa ovplyvnených návštev: odhadu, koľko návštev týždenne by sa dostalo ďalej pri bežnej miere obchodu alebo na rýchlej stránke.",
+    list: "Otvorené postrehy",
+    empty: "Za posledných 14 dní nič nevybočuje.",
+    emptyHint:
+      "Postrehy potrebujú dosť návštevnosti: 100 relácií týždenne pre krok nákupu, 200 zobrazení pre produkt a 50 meraní rýchlosti pre typ stránky.",
+    affected: "Ovplyvnené návštevy: ~{{n}} týždenne",
+    since: "Zistené od {{date}}",
+    deletedProduct: "Odstránený produkt",
+    slowHeading: "{{template}}: {{metric}}",
+    hypothesis: "Možná príčina",
+    draft: "Návrh zadania pre AI úpravy vzhľadu",
+    model: "Model: {{model}}",
+    dismiss: "Skryť",
+    dismissed: "Postreh skrytý",
+    openInEditor: "Otvoriť v AI úpravách vzhľadu",
+    transitions: {
+      sessions_to_view_item: "Návštevy, ktoré sa dostanú k produktu",
+      view_item_to_add_to_cart: "Návštevníci produktu, ktorí pridajú do košíka",
+      add_to_cart_to_begin_checkout: "Košíky, ktoré sa dostanú k pokladni",
+      begin_checkout_to_purchase: "Začaté pokladne, ktoré skončia objednávkou",
+    },
+    funnel_drop:
+      "Pokles na {{recent}} za posledných 7 dní z {{baseline}} za 21 dní predtým ({{recentTo}} z {{recentFrom}} oproti {{baselineTo}} z {{baselineFrom}}).",
+    low_add_to_cart:
+      "Do košíka sa pridáva pri {{rate}} zobrazení za posledných 14 dní, v celom obchode pri {{shopRate}} ({{adds}} z {{views}} zobrazení).",
+    slow_page:
+      "{{metric}} p75 je {{p75}}, nad hranicou dobrého výsledku {{bound}} ({{samples}} meraní za posledných 14 dní).",
   },
 };

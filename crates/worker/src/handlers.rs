@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use commerce::ai::{Ai, Outcome, alt_text, plan, proposals, review_summary};
 use commerce::feeds::{export, import};
+use commerce::insights;
 use commerce::media::{self, Processed};
 use commerce::notifications::{self, Step};
 use commerce::payments::{bank, stripe};
@@ -142,7 +143,8 @@ pub fn all(
     let webhooks = extra.webhooks.clone();
     let wp12 = extra.fulfillment.clone();
     let ads = extra.ads.clone();
-    let (ai1, ai2, ai3, ai4, ai5) = (
+    let (ai1, ai2, ai3, ai4, ai5, ai6) = (
+        extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
         extra.ai.clone(),
@@ -274,6 +276,9 @@ pub fn all(
         .register(alt_text::JOB, move |ctx, job| {
             ai_alt_text(ctx, job, ai5.clone(), alt_storage.clone())
         })
+        .register(insights::JOB, move |ctx, job| {
+            insights_run(ctx, job, ai6.clone())
+        })
         .register(themes::BUILD_JOB, move |_ctx, job| {
             theme_build(job, theme_builder.clone())
         })
@@ -404,6 +409,37 @@ async fn ai_alt_text(ctx: Ctx, job: Job, ai: Ai, storage: Storage) -> Result<(),
         .map_err(|e| JobError::Permanent(format!("bad payload: {e}")))?;
     let last = job.attempts >= job.max_attempts;
     ai_outcome(alt_text::run(&ctx.db, &ai, &storage, tenant, payload, last).await)
+}
+
+async fn insights_run(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
+    let Some(tenant) = job.tenant_id else {
+        let slot = job.payload.get("slot").and_then(serde_json::Value::as_i64);
+        let day = slot
+            .filter(|s| s.rem_euclid(24) >= insights::EARLIEST_RUN_HOUR_UTC)
+            .and_then(|s| chrono::DateTime::from_timestamp(s.checked_mul(3600)?, 0))
+            .and_then(|at| at.date_naive().pred_opt());
+        if let Some(day) = day {
+            let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
+                .fetch_all(&ctx.db)
+                .await?;
+            for t in tenants {
+                queue::enqueue(&ctx.db, &insights::job(t, day)).await?;
+            }
+        }
+        return Ok(());
+    };
+    let day = job
+        .payload
+        .get("day")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .ok_or_else(|| JobError::Permanent("payload has no day".into()))?;
+    if day < chrono::Utc::now().date_naive() - chrono::Days::new(1) {
+        tracing::info!(%tenant, %day, "insights run superseded by a newer day");
+        return Ok(());
+    }
+    let last = job.attempts >= job.max_attempts;
+    ai_outcome(insights::run(&ctx.db, &ai, tenant, day, last).await)
 }
 
 /// Applies a confirmed bulk plan, one product per transaction (resumable).

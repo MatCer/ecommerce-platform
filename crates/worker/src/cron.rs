@@ -81,6 +81,11 @@ pub const SCHEDULES: &[Schedule] = &[
         every: Duration::from_secs(3600),
     },
     Schedule {
+        name: "insights.run",
+        kind: commerce::insights::JOB,
+        every: Duration::from_secs(3600),
+    },
+    Schedule {
         name: "analytics.partitions",
         kind: handlers::PARTITIONS_JOB,
         every: Duration::from_secs(86_400),

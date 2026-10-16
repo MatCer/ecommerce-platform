@@ -26,9 +26,13 @@ import { locale, t } from "../i18n/index.ts";
 import {
   type DayValue,
   dailySeries,
+  formatNumber,
+  formatPercent,
+  formatVital,
   niceMax,
   PRESETS,
   resolveRange,
+  templateLabel,
   type VitalRating,
   validRange,
   vitalRating,
@@ -43,16 +47,6 @@ type Dashboard = Schemas["Dashboard"];
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STEPS = ["sessions", "view_item", "add_to_cart", "begin_checkout", "purchase"] as const;
-const TEMPLATES = [
-  "home",
-  "category",
-  "product",
-  "search",
-  "page",
-  "blog",
-  "checkout",
-  "other",
-] as const;
 const METRICS = ["LCP", "INP", "CLS"] as const;
 const RATING_TONE: Record<VitalRating, Tone> = {
   good: "success",
@@ -60,9 +54,8 @@ const RATING_TONE: Record<VitalRating, Tone> = {
   poor: "error",
 };
 
-const num = (n: number) => new Intl.NumberFormat(locale()).format(n);
-const pct = (n: number) =>
-  new Intl.NumberFormat(locale(), { style: "percent", maximumFractionDigits: 1 }).format(n);
+const num = (n: number) => formatNumber(n, locale());
+const pct = (n: number) => formatPercent(n, locale());
 const money = (minor: number, currency: string) => formatMoney(minor, currency, locale());
 const day = (iso: string) =>
   new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", timeZone: "UTC" }).format(
@@ -72,11 +65,6 @@ const day = (iso: string) =>
 function stepLabel(step: string): string {
   const known = STEPS.find((s) => s === step);
   return known ? t(`dashboard.funnelSteps.${known}`) : step;
-}
-
-function templateLabel(template: string): string {
-  const known = TEMPLATES.find((s) => s === template);
-  return known ? t(`dashboard.templates.${known}`) : template;
 }
 
 function isEmpty(d: Dashboard): boolean {
@@ -480,7 +468,7 @@ function Overview(props: { data: Dashboard }) {
             <BarList
               label={t("dashboard.byTemplate")}
               items={templates().map((r) => ({
-                label: templateLabel(r.template),
+                label: templateLabel(r.template, t),
                 value: r.requests,
               }))}
             />
@@ -733,10 +721,7 @@ function VitalsTable(props: { rows: readonly Schemas["VitalP75"][] }) {
     }
     return [...map];
   });
-  const value = (r: Schemas["VitalP75"]) =>
-    r.metric === "CLS"
-      ? new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 }).format(r.p75)
-      : `${num(Math.round(r.p75))} ms`;
+  const value = (r: Schemas["VitalP75"]) => formatVital(r.metric, r.p75, locale());
 
   return (
     <Show when={props.rows.length > 0} fallback={<Nothing />}>
@@ -752,7 +737,7 @@ function VitalsTable(props: { rows: readonly Schemas["VitalP75"][] }) {
             <For each={byTemplate()}>
               {([template, metrics]) => (
                 <tr>
-                  <td class={tdClass}>{templateLabel(template)}</td>
+                  <td class={tdClass}>{templateLabel(template, t)}</td>
                   <For each={METRICS}>
                     {(metric) => (
                       <td class={`${tdClass} py-1.5`}>

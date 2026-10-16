@@ -1,0 +1,45 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT metric,\n                  coalesce(round(sum(value) FILTER (WHERE date >= $2)), 0)::bigint AS \"recent!\",\n                  coalesce(round(sum(value) FILTER (WHERE date < $2)), 0)::bigint AS \"baseline!\"\n           FROM daily_metrics\n           WHERE dims = '{}' AND metric = ANY ($4) AND date BETWEEN $1 AND $3\n           GROUP BY metric",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "metric",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "daily_metrics",
+            "name": "metric"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "recent!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "baseline!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Date",
+        "Date",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "82db51979382a02a916719d89907d723e73a1f0d2ea17176bd16ad1d535a310e"
+}

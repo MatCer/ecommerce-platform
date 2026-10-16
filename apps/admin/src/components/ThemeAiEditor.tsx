@@ -87,9 +87,14 @@ export function RevisionChanges(props: { id: string }) {
   );
 }
 
-export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: string) => void }) {
+export function ThemeAiEditor(props: {
+  canEdit: boolean;
+  onShowRevision: (id: string) => void;
+  initialPrompt?: string;
+}) {
   const qc = useQueryClient();
-  const [prompt, setPrompt] = createSignal("");
+  const initialPrompt = props.initialPrompt ?? "";
+  const [prompt, setPrompt] = createSignal(initialPrompt);
   const [selected, setSelected] = createSignal<string>();
   const [error, setError] = createSignal<unknown>();
 
@@ -181,6 +186,9 @@ export function ThemeAiEditor(props: { canEdit: boolean; onShowRevision: (id: st
       <Show when={props.canEdit && runs.data?.provider !== "disabled"}>
         <form
           class="mb-4 flex flex-col gap-4"
+          ref={(form) => {
+            if (initialPrompt) requestAnimationFrame(() => form.querySelector("textarea")?.focus());
+          }}
           onSubmit={(e) => {
             e.preventDefault();
             if (prompt().trim() && !busy()) start.mutate();
