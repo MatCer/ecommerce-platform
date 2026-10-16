@@ -224,4 +224,16 @@ describe("settleOptions", () => {
       },
     ]);
   });
+
+  it("picks codes from the names as typed, before blank names are dropped", () => {
+    const options: ProductOption[] = [
+      {
+        code: "color",
+        name_i18n: { cs: "Barva" },
+        values: [{ code: "v1", name_i18n: { cs: " ", sk: "Modrá" } }],
+      },
+    ];
+    const typed = settleOptions(options, (v) => Object.keys(v.name_i18n).join("+"));
+    expect(typed[0]?.values).toEqual([{ code: "cs+sk", name_i18n: { sk: "Modrá" } }]);
+  });
 });
