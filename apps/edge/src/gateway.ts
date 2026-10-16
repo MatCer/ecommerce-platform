@@ -189,6 +189,7 @@ const CLEAR_SESSION_COOKIE = `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; Same
  */
 const CONSENT_ID_COOKIE = "__Secure-consent_id";
 const CONSENT_COOKIE = "consent";
+const EXPERIMENTS_COOKIE = "__Secure-consent_exp";
 const CONSENT_ID_MAX_AGE = 396 * 86_400;
 /** Same lifetime and format as the SDK's own write (`@platform/storefront-sdk/consent`). */
 const CONSENT_MAX_AGE = 180 * 86_400;
@@ -238,9 +239,10 @@ function readCookie(headers: Headers, name: string): string | undefined {
   return undefined;
 }
 
-function analyticsSubject(headers: Headers): string | undefined {
+function experimentSubject(headers: Headers): string | undefined {
   const subject = readCookie(headers, CONSENT_ID_COOKIE);
   if (!subject || !CONSENT_ID_RE.test(subject)) return undefined;
+  if (readCookie(headers, EXPERIMENTS_COOKIE) !== "1") return undefined;
   let summary: string;
   try {
     summary = decodeURIComponent(readCookie(headers, CONSENT_COOKIE) ?? "");
@@ -457,7 +459,7 @@ export function createGateway(opts: GatewayOptions) {
   async function enrolment(site: Site, headers: Headers): Promise<Assignment | undefined> {
     const running = site.experiment;
     if (!running || site.preview || !opts.experiments) return undefined;
-    const subject = analyticsSubject(headers);
+    const subject = experimentSubject(headers);
     if (!subject) return undefined;
     try {
       const a = await opts.experiments.enrol(site, subject);
@@ -941,6 +943,13 @@ ${
       headers.append(
         "set-cookie",
         `${CONSENT_COOKIE}=${encodeURIComponent(summary)}; ${scope}; Max-Age=${CONSENT_MAX_AGE}`,
+      );
+    if (chose)
+      headers.append(
+        "set-cookie",
+        res.headers.get("x-consent-experiments") === "1"
+          ? `${EXPERIMENTS_COOKIE}=1; ${scope}; Max-Age=${CONSENT_ID_MAX_AGE}; HttpOnly`
+          : `${EXPERIMENTS_COOKIE}=; ${scope}; Max-Age=0; HttpOnly`,
       );
     return new Response(await res.arrayBuffer(), {
       status: res.status,

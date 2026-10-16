@@ -52,6 +52,7 @@ Before the first choice nothing is stored on the device (A20).
 |---|---|---|---|---|
 | `__Secure-consent_id` | anonymous subject id, 32 hex | `Domain=<shop host>; Path=/; Secure; SameSite=Lax; HttpOnly; Max-Age=13 months` | no | edge, on the first `POST` |
 | `consent` | granted purposes, comma-separated, URL-encoded (`analytics%2Cpersonalization`; empty = decided, nothing granted) | `Domain=<shop host>; Path=/; Secure; SameSite=Lax; Max-Age=180 days` | yes | the SDK at once on the shop origin, and the edge after every recorded `POST` (same name, domain and path, so it is one cookie) |
+| `__Secure-consent_exp` | `1` while the subject's analytics grant covers experiments (the API's `X-Consent-Experiments` answer) | `Domain=<shop host>; Path=/; Secure; SameSite=Lax; HttpOnly; Max-Age=13 months`, cleared (`Max-Age=0`) by a choice that does not cover them | no | edge, after every recorded `POST` |
 
 `Domain=<shop host>` makes both visible on `checkout.<shop host>` (the preferences page and
 sign-in linking run there), and lets the preferences page update the banner's cookie.
@@ -93,7 +94,9 @@ preferences page.
   (`consent::covers_experiments`) enrols a visitor in an A/B experiment. Non-dated versions
   (`1`, `imported`) never do.
 - Older grants keep analytics. They are not enrolled and not re-prompted (the banner shows only
-  while the `consent` cookie is missing); they enrol on their next choice.
+  while the `consent` cookie is missing); they enrol on their next choice. The edge asks the API
+  only while `__Secure-consent_exp=1` is set, so an older grant costs no call; the API still
+  decides on every call.
 - Withdrawal stops enrolment at once: the latest analytics record decides at every request.
   Existing assignments stay until retention (13 months) but nothing new is written.
 - An assignment stores the analytics pseudonym (`analytics::anon_id`), the arm and a time;

@@ -522,7 +522,9 @@ describe("enrolment while the API is down (SHOP-96)", () => {
     const { page } = gateway(async () => {
       calls++;
       await new Promise((r) => setTimeout(r, 20));
-      return Response.json({ assignment: { experiment_id: EXP.id, version: EXP.version, arm: "b" } });
+      return Response.json({
+        assignment: { experiment_id: EXP.id, version: EXP.version, arm: "b" },
+      });
     });
     const rs = await Promise.all(Array.from({ length: 12 }, () => page(consented(subject(7)))));
     expect(rs.map((r) => r.res.headers.get("cache-control"))).toEqual(

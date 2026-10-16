@@ -17095,6 +17095,12 @@
         "responses": {
           "200": {
             "headers": {
+              "X-Consent-Experiments": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`1` when the subject's analytics grant covers A/B experiments (the edge's `__Secure-consent_exp` cookie); absent otherwise"
+              },
               "X-Consent-Subject": {
                 "schema": {
                   "type": "string"

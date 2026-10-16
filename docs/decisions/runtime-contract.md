@@ -466,19 +466,26 @@ separate cache namespace, never cached (already bypassed by the policy).
 ## 15. SHOP-96: experiment assignment at the edge
 
 - **Prefilter:** theme `GET`/`HEAD`, not previews, only when the resolved site carries a running
-  `experiment` (`{id, version}` from `/internal/v1/resolve`), a well-formed `__Secure-consent_id`
-  and a `consent` cookie that lists `analytics`. Anyone else is control and nothing is called:
-  key, render context and headers are byte-identical to a shop without an experiment.
+  `experiment` (`{id, version}` from `/internal/v1/resolve`), a well-formed `__Secure-consent_id`,
+  a `consent` cookie that lists `analytics` and `__Secure-consent_exp=1` (the API said the
+  analytics grant covers experiments when the choice was recorded; older grants lack it until
+  their next choice). Anyone else is control and nothing is called: key, render context and
+  headers are byte-identical to a shop without an experiment.
 - **Enrol:** before the cache lookup (so a HIT is recorded too), `POST
-  /internal/v1/experiments/enrol` with the service token, `{tenant_id, subject}`, 500 ms
-  timeout. The API checks the latest analytics consent record and its text version and hashes
+  /internal/v1/experiments/enrol` with the service token, `{tenant_id, subject}`, 150 ms
+  deadline (the live lane measured 2 ms median, 9 ms p99, 100 ms worst). Concurrent misses of one
+  (tenant, subject, experiment) share one call. After an error or a timeout the instance serves
+  control without calling for 10 s, so an outage costs one call per instance per 10 s and at most
+  150 ms on the requests that make or join it; a cache HIT stays a HIT. A `429` opens no window
+  (it limits one client IP, not the API's health). The API checks the latest analytics consent record and its text version and hashes
   with `EXPERIMENTS_SECRET`; the edge holds no new secret. Answers are memoized per (tenant,
   subject) for 60 s, bound to the experiment id + version they were given for, at most 10k.
   The edge forwards `x-client-ip`, and the API limits enrolment per (tenant, client IP) on the
   storefront limiter before touching the database (`429 rate_limited`, which the edge serves as
   control and does not memoize), so forged consent ids cannot turn cached pages into DB load.
 - **Fail closed:** an error, a timeout, a malformed answer or one for another experiment id or
-  version is control, logged as a warning without the subject. Logs never contain subjects.
+  version is control, logged as a warning without the subject (one warning per window during an
+  outage). Logs never contain subjects.
 - **Enrolled:** the HTML key gains `exp:<id>:<version>:<arm>`, so a URL has at most arms + 1
   entries per locale and no client input reaches the key. The segment sits before the host,
   which cannot contain `|` or `:`, so no path (which may contain `|`) can spell an arm's key. The render context carries the

@@ -196,14 +196,7 @@ async fn a_recorded_choice_tells_the_edge_whether_its_analytics_grant_covers_exp
     }
     assert_eq!(
         seen,
-        [
-            Some("1".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-        ],
+        [Some("1".into()), None, None, None, None, None,],
         "analytics granted under the experiments wording, then the old wording; a later choice \
          without analytics keeps the old analytics record; withdrawal"
     );
