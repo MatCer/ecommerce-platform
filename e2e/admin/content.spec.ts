@@ -111,10 +111,8 @@ test("publishes Terms and a CMS page with heading, rich text and FAQ", async () 
 });
 
 test("an edited cookie page keeps its template version only when the owner confirms the wording", async () => {
-  const confirm = page.getByRole("checkbox", {
-    name: "This page still says analytics covers testing page variants",
-    exact: true,
-  });
+  const wording = "This page still says analytics covers testing page variants";
+  const confirm = page.getByRole("checkbox", { name: wording, exact: true });
   const openCookies = async () => {
     await nav("Pages").click();
     await page
@@ -133,7 +131,8 @@ test("an edited cookie page keeps its template version only when the owner confi
   await openCookies();
   await expect(confirm).toBeVisible();
   await expectAccessible(page, "content-cookie-editor");
-  await confirm.check();
+  await page.getByText(wording, { exact: true }).click();
+  await expect(confirm).toBeChecked();
   await addParagraph("Doplněno se zachovaným textem o testování.");
   await publish();
   await expect(page.getByRole("heading", { name: "Pages", exact: true })).toBeVisible();
