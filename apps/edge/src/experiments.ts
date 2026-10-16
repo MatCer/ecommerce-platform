@@ -31,6 +31,8 @@ export class ApiEnroller implements Enroller {
   >();
   #forgets = 0;
   #downUntil = 0;
+  #down = false;
+  #probing = false;
   constructor(apiOrigin: string, token: string, upstream?: (r: Request) => Promise<Response>) {
     this.#apiOrigin = apiOrigin;
     this.#token = token;
@@ -45,7 +47,7 @@ export class ApiEnroller implements Enroller {
     if (hit && hit.experiment === experiment && now - hit.at < MEMO_MS) return hit.assignment;
     const flying = this.#inflight.get(key);
     if (flying?.experiment === experiment) return flying.answer;
-    if (now < this.#downUntil) return null;
+    if (now < this.#downUntil || this.#probing) return null;
     const answer = this.#ask(site, subject, key, experiment, now).finally(() => {
       if (this.#inflight.get(key)?.answer === answer) this.#inflight.delete(key);
     });
@@ -61,12 +63,18 @@ export class ApiEnroller implements Enroller {
     now: number,
   ): Promise<Assignment | null> {
     const forgets = this.#forgets;
+    const probe = this.#down;
+    if (probe) this.#probing = true;
     let assignment: Assignment | null;
     try {
       assignment = await this.#call(site, subject);
+      this.#down = false;
     } catch (err) {
-      if (!(err instanceof RateLimited)) this.#downUntil = now + BACKOFF_MS;
+      this.#down = !(err instanceof RateLimited);
+      if (this.#down) this.#downUntil = now + BACKOFF_MS;
       throw err;
+    } finally {
+      if (probe) this.#probing = false;
     }
     if (forgets !== this.#forgets) return assignment;
     this.#memo.delete(key);
