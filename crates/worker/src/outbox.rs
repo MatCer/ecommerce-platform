@@ -90,11 +90,13 @@ pub async fn dispatch_batch(db: &PgPool) -> Result<usize, sqlx::Error> {
                 now,
             ),
             commerce::ai::alt_text::job_for_event(
+                &mut tx,
                 event.tenant_id,
                 &event.event_type,
                 &event.payload,
                 now,
-            ),
+            )
+            .await?,
         ]
         .into_iter()
         .flatten()

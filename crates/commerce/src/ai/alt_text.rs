@@ -10,7 +10,7 @@ use platform::queue::{self, NewJob};
 use platform::storage::Storage;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -75,7 +75,32 @@ pub fn debounced_job(tenant_id: Uuid, payload: Payload, now: DateTime<Utc>) -> N
     j
 }
 
-pub fn job_for_event(
+/// Only tenants with alt texts switched on get a job; `run` checks the switch again.
+pub async fn job_for_event(
+    conn: &mut PgConnection,
+    tenant_id: Option<Uuid>,
+    event_type: &str,
+    payload: &Value,
+    now: DateTime<Utc>,
+) -> Result<Option<NewJob<'static>>, sqlx::Error> {
+    let (Some(tenant), Some(job)) = (tenant_id, event_job(tenant_id, event_type, payload, now))
+    else {
+        return Ok(None);
+    };
+    sqlx::query!(
+        "SELECT set_config('app.tenant_id', $1, true)",
+        tenant.to_string()
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    let on = sqlx::query_scalar!(r#"SELECT alt_texts_since IS NOT NULL AS "on!" FROM ai_settings"#)
+        .fetch_optional(&mut *conn)
+        .await?
+        .unwrap_or(false);
+    Ok(on.then_some(job))
+}
+
+fn event_job(
     tenant_id: Option<Uuid>,
     event_type: &str,
     payload: &Value,
@@ -598,7 +623,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 10, 16, 12, 1, 10).unwrap();
         let later = now + chrono::Duration::seconds(30);
         let product = json!({ "product_id": p });
-        let job = job_for_event(Some(t), "product.updated", &product, now).unwrap();
+        let job = event_job(Some(t), "product.updated", &product, now).unwrap();
         assert_eq!(job.kind, "ai.alt_text");
         assert_eq!(job.payload, json!({ "product_id": p }));
         assert_eq!(job.queue, "ai");
@@ -608,7 +633,7 @@ mod tests {
         );
         assert_eq!((job.tenant_id, job.max_attempts), (Some(t), 3));
         assert_eq!(
-            job_for_event(Some(t), "product.created", &product, later).map(|j| j.idempotency_key),
+            event_job(Some(t), "product.created", &product, later).map(|j| j.idempotency_key),
             Some(job.idempotency_key.clone())
         );
         let backfill = debounced_job(
@@ -629,7 +654,7 @@ mod tests {
             now,
         );
         assert_ne!(next_period.idempotency_key, backfill.idempotency_key);
-        let ready = job_for_event(Some(t), "asset.ready", &json!({ "asset_id": a }), now).unwrap();
+        let ready = event_job(Some(t), "asset.ready", &json!({ "asset_id": a }), now).unwrap();
         assert_eq!(ready.payload, json!({ "asset_id": a }));
         assert_eq!(
             serde_json::from_value::<Payload>(ready.payload).unwrap(),
@@ -638,8 +663,8 @@ mod tests {
                 backfill: None
             }
         );
-        assert!(job_for_event(Some(t), "product.deleted", &product, now).is_none());
-        assert!(job_for_event(None, "product.updated", &product, now).is_none());
-        assert!(job_for_event(Some(t), "asset.ready", &product, now).is_none());
+        assert!(event_job(Some(t), "product.deleted", &product, now).is_none());
+        assert!(event_job(None, "product.updated", &product, now).is_none());
+        assert!(event_job(Some(t), "asset.ready", &product, now).is_none());
     }
 }

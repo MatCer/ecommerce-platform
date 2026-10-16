@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT alt_texts_since IS NOT NULL AS \"on!\" FROM ai_settings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "on!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "21d2f951bef636d3bcbbdc7ebfd1a1c2abfe58b6fb7a0f794a72881354a28027"
+}
