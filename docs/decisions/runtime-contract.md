@@ -475,17 +475,19 @@ separate cache namespace, never cached (already bypassed by the policy).
   /internal/v1/experiments/enrol` with the service token, `{tenant_id, subject}`, 150 ms
   deadline (the live lane measured 2 ms median, 9 ms p99, 100 ms worst). Concurrent misses of one
   (tenant, subject, experiment) share one call. After an error or a timeout the instance serves
-  control without calling for 10 s, so an outage costs one call per instance per 10 s and at most
-  150 ms on the requests that make or join it; a cache HIT stays a HIT. A `429` opens no window
-  (it limits one client IP, not the API's health). The API checks the latest analytics consent record and its text version and hashes
+  control without calling until 10 s after the failed call started. When the API goes down, the
+  calls already in flight (one per distinct subject that arrived before the first failure) each
+  wait at most 150 ms, and so do the requests that joined them; after that the instance makes one
+  call per 10 s window and every other request skips enrolment, so a cache HIT stays a HIT. A `429`
+  opens no window (it limits one client IP, not the API's health). The API checks the latest analytics consent record and its text version and hashes
   with `EXPERIMENTS_SECRET`; the edge holds no new secret. Answers are memoized per (tenant,
   subject) for 60 s, bound to the experiment id + version they were given for, at most 10k.
   The edge forwards `x-client-ip`, and the API limits enrolment per (tenant, client IP) on the
   storefront limiter before touching the database (`429 rate_limited`, which the edge serves as
   control and does not memoize), so forged consent ids cannot turn cached pages into DB load.
 - **Fail closed:** an error, a timeout, a malformed answer or one for another experiment id or
-  version is control, logged as a warning without the subject (one warning per window during an
-  outage). Logs never contain subjects.
+  version is control, logged as a warning without the subject: one per request that waited on
+  the failed call, none while the window is open. Logs never contain subjects.
 - **Enrolled:** the HTML key gains `exp:<id>:<version>:<arm>`, so a URL has at most arms + 1
   entries per locale and no client input reaches the key. The segment sits before the host,
   which cannot contain `|` or `:`, so no path (which may contain `|`) can spell an arm's key. The render context carries the
