@@ -12,9 +12,7 @@ cargo_config() {
   fi
   mkdir -p "$1/.cargo"
   cat >"$1/.cargo/worktree.toml" <<TOML
-# sccache cannot cache incremental builds.
 [build]
-incremental = false
 $wrapper
 
 [env]
@@ -138,11 +136,33 @@ sweep() {
   done < <(worktrees)
 }
 
+tidy() {
+  [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; tidy is for linked worktrees"
+  [[ -d target ]] || return 0
+  local head pr=''
+  head=$(git rev-parse HEAD)
+  if command -v gh >/dev/null; then
+    # A worktree on a main commit is linked to the PR squash-merged into it, so match the PR head.
+    pr=$(timeout 10 gh api "repos/{owner}/{repo}/commits/$head/pulls" \
+      --jq "[.[] | select(.merged_at != null and .head.sha == \"$head\")][0].number // empty" 2>/dev/null) ||
+      { echo "worktree: GitHub not reachable, cannot tell whether HEAD is merged" >&2; pr=''; }
+  fi
+  if [[ -n $pr ]]; then
+    echo "worktree: HEAD is the merged head of PR #$pr, ${1:+would }remove target/ ($(du -sh target | cut -f1))"
+    [[ -n ${1:-} ]] || rm -rf target
+  elif command -v cargo-sweep >/dev/null; then
+    env -u CARGO_TARGET_DIR cargo sweep ${1:+"$1"} --maxsize 10GB "$ROOT"
+  else
+    echo "worktree: cargo-sweep not found, target/ left as is (README, Prerequisites)" >&2
+  fi
+}
+
 case ${1:-} in
   setup) in_checkout; setup ;;
   teardown) in_checkout; teardown ;;
   prune) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh prune [--dry-run]"; in_checkout; prune "${2:-}" ;;
   sweep) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh sweep [--dry-run]"; in_checkout; sweep "${2:-}" ;;
+  tidy) [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh tidy [--dry-run]"; in_checkout; tidy "${2:-}" ;;
   cargo-config) [[ $# -le 2 ]] || die "usage: scripts/worktree.sh cargo-config [dir]"; cargo_config "${2:-.}" ;;
-  *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]|sweep [--dry-run]|cargo-config [dir]" ;;
+  *) die "usage: scripts/worktree.sh setup|teardown|prune [--dry-run]|sweep [--dry-run]|tidy [--dry-run]|cargo-config [dir]" ;;
 esac

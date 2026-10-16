@@ -16,7 +16,8 @@
     "verify": "scripts/verify.sh",
     "worktree:setup": "scripts/worktree.sh setup",
     "worktree:teardown": "scripts/worktree.sh teardown",
-    "worktree:prune": "scripts/worktree.sh prune"
+    "worktree:prune": "scripts/worktree.sh prune",
+    "worktree:tidy": "scripts/worktree.sh tidy"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

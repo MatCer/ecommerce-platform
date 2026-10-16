@@ -8,6 +8,7 @@ wrong.
 - Merge a PR only when the maintainer has delegated merging to you, and only after CI and its
   review are clean on the final head:
   `gh pr merge <PR#> --squash --delete-branch --match-head-commit <sha>`. Never deploy.
+  In a linked worktree, run `pnpm worktree:tidy` after the merge to free its `target/`.
 - Never start, stop or seed the compose stack from a worktree. The Makefile refuses; do not work
   around it by calling `docker compose` directly.
 - `make test-rust` may wait for another checkout's run to finish (one sqlx test run per Postgres

@@ -157,6 +157,7 @@ make api-native          # this branch's API on its own port and database
 pnpm worktree:teardown   # drop the worktree's database and target/, then remove the worktree
 pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dry-run to preview)
 scripts/worktree.sh sweep  # Rust artifacts older than 14 days in every linked worktree (--dry-run)
+pnpm worktree:tidy       # this worktree: drop target/ once HEAD is a merged PR's head, else cap it at 10 GB (--dry-run)
 ```
 
 - Setup symlinks `.env` to the main checkout's, installs packages, creates `app_wt_<name>_<hash>`
@@ -171,10 +172,15 @@ scripts/worktree.sh sweep  # Rust artifacts older than 14 days in every linked w
 - `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so
   concurrent runs from different checkouts wait for each other.
 - Setup also writes `.cargo/worktree.toml` (gitignored, included by `.cargo/config.toml`):
-  incremental off and `sccache` as rustc wrapper, cache in `~/.cache/sccache` capped at 30 GB, so
-  a new worktree takes compiled dependencies from the cache and its `target/` stays a few GB. The
-  main checkout has no such file and keeps incremental builds. Without `sccache` on `PATH`, setup
-  warns and writes only `incremental = false`.
+  `sccache` as rustc wrapper, cache in `~/.cache/sccache` capped at 30 GB, so a new worktree takes
+  compiled dependencies from the cache. Workspace crates still build incrementally (a test compile
+  after a one-line edit takes seconds, not a minute), so `target/` grows with edits; `pnpm
+  worktree:tidy` keeps it in check. `pnpm verify` builds without incremental, where every crate
+  comes from sccache. The main checkout has no such file. Without `sccache` on `PATH`, setup warns
+  and writes no wrapper.
+- Tidy asks GitHub whether HEAD is the head commit of a merged PR. Offline, without `gh`, or on an
+  unmerged HEAD it only runs `cargo sweep --maxsize 10GB`; without `cargo-sweep` it warns and
+  leaves `target/` alone.
 
 ## Tenants and staff sign-in
 
