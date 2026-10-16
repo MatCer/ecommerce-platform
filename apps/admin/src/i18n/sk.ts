@@ -234,6 +234,7 @@ export const sk: Dictionary = {
     feature_seo: "SEO",
     feature_translate: "Preklady",
     feature_bulk_plan: "Plány hromadných úprav",
+    feature_review_summary: "Zhrnutia recenzií",
     glossary: "Glosár",
     glossaryDesc:
       "Výrazy, ktoré preklady musia ponechať bez zmeny (značky), alebo prekladať jedným pevným spôsobom. Prázdny jazyk výraz ponechá.",
@@ -242,6 +243,11 @@ export const sk: Dictionary = {
     fixed: "Tvar {{locale}} výrazu {{n}}",
     addTerm: "Pridať výraz",
     removeTerm: "Odobrať výraz {{term}}",
+    shopFeatures: "AI v obchode",
+    reviewSummaries: "Zhrnutia recenzií",
+    reviewSummariesDesc:
+      "Produkty s aspoň 5 zverejnenými overenými recenziami dostanú na stránke produktu krátke zhrnutie od AI, v jazyku každého trhu a označené ako vytvorené umelou inteligenciou. Každé zhrnutie spotrebuje tokeny AI.",
+    adminOnly: "Tieto nastavenia môžu meniť len vlastníci a správcovia.",
   },
   redirects: {
     title: "Presmerovania",
