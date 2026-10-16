@@ -146,17 +146,13 @@ pub async fn create_tenant(db: &PgPool, t: &NewTenant<'_>) -> Result<CreatedTena
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query!(
-        "INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
-         VALUES ($1, $2, true)",
-        hostname,
-        tenant_id
-    )
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| domain_insert_error(e, &hostname))?;
-    sqlx::query!(
-        "INSERT INTO platform.domains (hostname, tenant_id, market_id, is_primary, verified_at)
-         VALUES ($1, $2, $3, true, now())",
+        "WITH domain AS (
+             INSERT INTO platform.domains (hostname, tenant_id, market_id, is_primary, verified_at)
+             VALUES ($1, $2, $3, true, now())
+             RETURNING hostname, tenant_id
+         )
+         INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
+         SELECT hostname, tenant_id, true FROM domain",
         hostname,
         tenant_id,
         market_id

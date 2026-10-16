@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH domain AS (\n             INSERT INTO platform.domains (hostname, tenant_id, market_id, is_primary, verified_at)\n             VALUES ($1, $2, $3, true, now())\n             RETURNING hostname, tenant_id\n         )\n         INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)\n         SELECT hostname, tenant_id, true FROM domain",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b8068b9b1ad7371b419466a30077257c224d4c6954c40d199cee0252557af43e"
+}
