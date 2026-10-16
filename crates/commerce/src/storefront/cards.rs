@@ -302,7 +302,6 @@ struct SwatchOption {
     values: Vec<SwatchValue>,
 }
 
-/// Options of the products, in position order.
 async fn swatch_options(
     tx: &mut TenantTx,
     ids: &[Uuid],
@@ -324,7 +323,6 @@ async fn swatch_options(
     Ok(out)
 }
 
-/// The values of the first option with swatches that some priced variant sells.
 fn swatches(
     options: &[SwatchOption],
     sold: &[&BTreeMap<String, String>],

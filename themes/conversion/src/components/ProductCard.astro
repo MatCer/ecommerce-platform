@@ -5,15 +5,6 @@ import { i18n, productHref } from "../lib/i18n";
 import { CARD_SIZES, capped, cardImage } from "../lib/images";
 import StockLine from "./StockLine.astro";
 
-/**
- * The one card stanza every grid repeats: photo (−N % / new badges) → price row (sale price +
- * struck reference) and the visible 30-day lowest price (both shown first, the name is first in
- * the DOM) → name → brand → unit price → stock with colour swatches. The whole card is the link.
- * On pointer devices the second photo appears on hover/focus, and only devices with hover
- * download it (`<source media>`, a data: placeholder otherwise). On phones a card with several
- * photos swipes through up to five (scroll-snap rail, dots driven by CSS scroll timelines, no
- * JS); the rail sits above the name link's overlay so touch swipes reach it.
- */
 interface Props {
   product: ProductCard;
   shop: ShopModel;
@@ -24,8 +15,7 @@ interface Props {
   sizes?: string;
   /** Rendered wider than a grid card (home spotlight): keep the 960/1280 w candidates. */
   wide?: boolean;
-  /** Phone photo rail; off inside a horizontal rail, where a swipe must move the rail. */
-  swipe?: boolean;
+  photoRail?: boolean;
 }
 const {
   product: p,
@@ -34,7 +24,7 @@ const {
   priority = false,
   sizes = CARD_SIZES,
   wide = false,
-  swipe = true,
+  photoRail = true,
 } = Astro.props;
 const { t } = i18n(shop);
 const href = productHref(shop, p.slug);
@@ -43,7 +33,7 @@ const [main, hover] = p.images.map((i) => (wide ? capped(i, 1280) : cardImage(i)
 // keeps the first.
 const mainAttrs = main && imageAttrs(main, { sizes, priority, width: 360 });
 const img = mainAttrs && { ...mainAttrs, loading: eager ? ("eager" as const) : mainAttrs.loading };
-const slides = (swipe && p.images.length > 1 ? p.images.slice(0, 5) : []).map((s, i) =>
+const slides = (photoRail && p.images.length > 1 ? p.images.slice(0, 5) : []).map((s, i) =>
   i === 0 && img
     ? img
     : { ...imageAttrs(wide ? capped(s, 1280) : capped(s, 640), { sizes, width: 360 }), alt: "" },

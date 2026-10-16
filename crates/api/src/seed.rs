@@ -67,9 +67,7 @@ fn legacy_review_copy(locale: &str, shop_name: &str, blocks: &[commerce::content
     blocks == expected
 }
 
-/// Gives the `barva` values of an already seeded product their swatches when it has none, so a
-/// demo database seeded before swatches existed gets them on the next run. True when it wrote.
-async fn complete_swatches(
+async fn backfill_missing_swatches(
     tx: &mut TenantTx,
     sku_prefix: &str,
     values: &[OptionValue],
@@ -104,7 +102,6 @@ struct Color {
     sk: &'static str,
     photo: &'static str,
     hue: i32,
-    /// Card and picker swatch, `#rrggbb`.
     hex: &'static str,
 }
 
@@ -779,7 +776,6 @@ impl Seeder<'_> {
     ) -> anyhow::Result<bool> {
         let sku_prefix = format!("LN-{:03}", i + 1);
         let palette = kind.colors();
-        // 2-3 colors per product, rotating through the palette.
         let n_colors = 2 + i % 2;
         let colors: Vec<&Color> = (0..n_colors.min(palette.len()))
             .map(|k| &palette[(i + k) % palette.len()])
@@ -800,7 +796,7 @@ impl Seeder<'_> {
         .fetch_one(&mut *tx)
         .await?;
         if exists > 0 {
-            complete_swatches(&mut tx, &sku_prefix, &color_values).await?;
+            backfill_missing_swatches(&mut tx, &sku_prefix, &color_values).await?;
             tx.commit().await?;
             return Ok(false);
         }
@@ -1771,8 +1767,16 @@ mod tests {
             .collect();
 
         let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-        assert!(complete_swatches(&mut tx, "LN-001", &values).await.unwrap());
-        assert!(!complete_swatches(&mut tx, "LN-001", &values).await.unwrap());
+        assert!(
+            backfill_missing_swatches(&mut tx, "LN-001", &values)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !backfill_missing_swatches(&mut tx, "LN-001", &values)
+                .await
+                .unwrap()
+        );
         let stored = commerce::catalog::products::get(&mut tx, product.id)
             .await
             .unwrap();

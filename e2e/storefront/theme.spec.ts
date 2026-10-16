@@ -265,8 +265,9 @@ test("phone: the buy bar repeats the choice, the cart opens as a bottom sheet", 
 const SEED_COLOURS =
   /Barvy: (Lesní zelená|Inkoustová|Písková|Vínová|Petrolejová|Popelavá|Cihlová|Tyrkysová|Olivová|Hořčicová|Modrá|Přírodní|Šalvějová|Pudrová)/;
 
-test("phone cards swipe through their photos and name their colours", async ({ browser }) => {
-  // Reduced motion must not freeze the dots: they show state, not motion.
+test("phone cards swipe through their photos and name their colours, also under reduced motion", async ({
+  browser,
+}) => {
   const ctx = await testContext(browser, {
     viewport: { width: 390, height: 844 },
     reducedMotion: "reduce",
@@ -296,7 +297,6 @@ test("phone cards swipe through their photos and name their colours", async ({ b
   });
   await expect(slides.nth(1)).toBeInViewport({ ratio: 0.9 });
   await expect(slides.nth(0)).not.toBeInViewport();
-  // The dots follow the visible photo (CSS scroll timelines).
   const dots = card.locator("ol > li");
   await expect.poll(() => dots.nth(1).evaluate((d) => getComputedStyle(d).opacity)).toBe("1");
   await expect.poll(() => dots.nth(0).evaluate((d) => getComputedStyle(d).opacity)).toBe("0.3");

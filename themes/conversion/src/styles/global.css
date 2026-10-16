@@ -394,12 +394,6 @@
   }
 }
 
-/*
- * Product card photos on phones: a snap rail with one photo per view and dots that follow it.
- * Each slide's view timeline is hoisted to the photo box (`timeline-scope`) so the sibling dot
- * list can animate on it; a slide as wide as the scrollport is the visible one between 25 % and
- * 75 % of its cover range. Without scroll-driven animations the dots stay equal.
- */
 @utility card-photos {
   timeline-scope: --card-1, --card-2, --card-3, --card-4, --card-5;
 }
@@ -432,17 +426,9 @@
   }
 }
 @keyframes card-dot {
-  0%,
-  24.9% {
-    opacity: 0.3;
-  }
-  25%,
-  75% {
+  from,
+  to {
     opacity: 1;
-  }
-  75.1%,
-  100% {
-    opacity: 0.3;
   }
 }
 @utility card-dots {
@@ -455,7 +441,8 @@
   }
   @supports (animation-timeline: view()) {
     & > li {
-      animation: card-dot linear both;
+      animation: card-dot linear none;
+      animation-range: cover 25% cover 75%;
     }
     & > li:nth-child(1) {
       animation-timeline: --card-1;
