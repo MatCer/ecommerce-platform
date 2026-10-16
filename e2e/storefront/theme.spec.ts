@@ -262,6 +262,52 @@ test("phone: the buy bar repeats the choice, the cart opens as a bottom sheet", 
   await ctx.close();
 });
 
+const SEED_COLOURS =
+  /Barvy: (Lesní zelená|Inkoustová|Písková|Vínová|Petrolejová|Popelavá|Cihlová|Tyrkysová|Olivová|Hořčicová|Modrá|Přírodní|Šalvějová|Pudrová)/;
+
+test("phone cards swipe through their photos and name their colours", async ({ browser }) => {
+  const ctx = await testContext(browser, { viewport: { width: 390, height: 844 } });
+  await decideConsent(ctx);
+  const page = await ctx.newPage();
+  await page.goto(`${CZ}/c/obleceni`);
+  const photos = main(page)
+    .getByRole("group", { name: /^Fotografie: / })
+    .first();
+  await expect(photos).toBeVisible();
+  const name = (await photos.getAttribute("aria-label"))?.replace("Fotografie: ", "") ?? "";
+  const card = main(page).getByRole("article").filter({ has: photos });
+  await expect(card).toContainText(SEED_COLOURS);
+  const slides = photos.locator("img");
+  const count = await slides.count();
+  expect(count).toBeGreaterThanOrEqual(2);
+  expect(count).toBeLessThanOrEqual(5);
+  await expectAccessible(page, "category-phone");
+
+  await expect(slides.nth(0)).toBeInViewport({ ratio: 0.9 });
+  await expect(slides.nth(1)).not.toBeInViewport();
+  await photos.evaluate((el) => {
+    el.scrollLeft = el.clientWidth;
+  });
+  await expect(slides.nth(1)).toBeInViewport({ ratio: 0.9 });
+  await expect(slides.nth(0)).not.toBeInViewport();
+  // The dots follow the visible photo (CSS scroll timelines).
+  const dots = card.locator("ol > li");
+  await expect.poll(() => dots.nth(1).evaluate((d) => getComputedStyle(d).opacity)).toBe("1");
+  await expect.poll(() => dots.nth(0).evaluate((d) => getComputedStyle(d).opacity)).toBe("0.3");
+
+  await photos.click();
+  await expect(page).toHaveURL(/\/p\//);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`${CZ}/c/obleceni`);
+  await expect(main(page).getByRole("group", { name: `Fotografie: ${name}` })).toBeHidden();
+  await main(page).getByRole("link", { name, exact: true }).first().click();
+  await expect(page).toHaveURL(/\/p\//);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+  await ctx.close();
+});
+
 /** A keyboard focus ring drawn in a different colour than the surface it sits on. */
 async function expectVisibleRing(el: Locator, surface: Locator) {
   expect(await el.evaluate((e) => e.matches(":focus-visible"))).toBe(true);
