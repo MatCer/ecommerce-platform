@@ -83,12 +83,20 @@ async fn admins_switch_alt_texts_and_queue_a_backfill(db: PgPool) {
         (StatusCode::ACCEPTED, json!({ "queued": 1 })),
         "sk is missing"
     );
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let since: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT alt_texts_since FROM ai_settings")
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
     let jobs: Vec<(serde_json::Value, String)> = sqlx::query_as(
         "SELECT payload - 'backfill', queue FROM queue.jobs WHERE kind = 'ai.alt_text'
-         AND (payload ->> 'backfill')::timestamptz =
-             (SELECT alt_texts_since FROM ai_settings WHERE tenant_id = $1)",
+         AND (payload ->> 'backfill')::timestamptz = $1",
     )
-    .bind(shop.tenant)
+    .bind(since)
     .fetch_all(&db)
     .await
     .unwrap();

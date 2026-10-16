@@ -60,9 +60,11 @@ fn is_empty(alt: Option<&String>) -> bool {
 pub fn debounced_job(tenant_id: Uuid, payload: Payload, now: DateTime<Utc>) -> NewJob<'static> {
     let slot = now.timestamp().div_euclid(DEBOUNCE_SECS);
     let (id, mode) = match (payload.target, payload.backfill) {
-        (Target::Product(id), None) => (id, "auto"),
-        (Target::Product(id), Some(_)) => (id, "backfill"),
-        (Target::Asset(id), _) => (id, "asset"),
+        (Target::Product(id), None) => (id, "auto".to_owned()),
+        (Target::Product(id), Some(since)) => {
+            (id, format!("backfill:{}", since.timestamp_micros()))
+        }
+        (Target::Asset(id), _) => (id, "asset".to_owned()),
     };
     let mut j = NewJob::new(JOB, json!(payload));
     j.queue = QUEUE;
@@ -618,6 +620,15 @@ mod tests {
             now,
         );
         assert_ne!(backfill.idempotency_key, job.idempotency_key);
+        let next_period = debounced_job(
+            t,
+            Payload {
+                target: Target::Product(p),
+                backfill: Some(later),
+            },
+            now,
+        );
+        assert_ne!(next_period.idempotency_key, backfill.idempotency_key);
         let ready = job_for_event(Some(t), "asset.ready", &json!({ "asset_id": a }), now).unwrap();
         assert_eq!(ready.payload, json!({ "asset_id": a }));
         assert_eq!(
