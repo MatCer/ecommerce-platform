@@ -1,6 +1,3 @@
--- The per-market sales (`product_scores.sales_score`) currently in the search documents, for
--- the "best selling" sort. Rewritten by the rollup only when a value moves noticeably, like
--- `product_popularity`; a missing row means no sales in that market.
 CREATE TABLE product_search_sales (
     tenant_id  uuid NOT NULL REFERENCES platform.tenants (id),
     product_id uuid NOT NULL,

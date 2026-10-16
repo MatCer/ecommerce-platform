@@ -343,8 +343,6 @@ struct Base {
     created_at: DateTime<Utc>,
     popularity: i32,
     sales: Option<f64>,
-    rating_count: Option<i64>,
-    rating_sum: Option<i64>,
     name: String,
     brand: Option<String>,
 }
@@ -363,17 +361,14 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
                    ORDER BY (pt.locale = $2) DESC, (pt.locale = $3) DESC, pt.locale LIMIT 1)
                    AS "name!",
                   p.brand, coalesce(pp.popularity, 0) AS "popularity!",
-                  ss.sales AS "sales?", r.n AS "rating_count?", r.total AS "rating_sum?"
+                  ss.sales AS "sales?"
            FROM products p
            LEFT JOIN product_popularity pp ON pp.product_id = p.id
            LEFT JOIN product_search_sales ss ON ss.product_id = p.id AND ss.market_id = $4
-           LEFT JOIN (SELECT product_id, count(*) AS n, sum(rating)::bigint AS total
-                      FROM reviews WHERE status = 'published' GROUP BY product_id) r
-                  ON r.product_id = p.id
            LEFT JOIN product_categories pc
                   ON pc.product_id = p.id AND pc.category_id IN (SELECT id FROM subtree)
            WHERE p.status = 'active'
-           GROUP BY p.id, pp.popularity, ss.sales, r.n, r.total
+           GROUP BY p.id, pp.popularity, ss.sales
            HAVING $1::uuid IS NULL OR count(pc.category_id) > 0"#,
         q.category_id,
         ctx.locale,
@@ -401,6 +396,11 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
         base.clear();
     }
     let ids: Vec<Uuid> = base.iter().map(|b| b.id).collect();
+    let mut rating_scores = if q.sort == Sort::TopRated {
+        crate::reviews::scores(tx, &ids).await?
+    } else {
+        HashMap::new()
+    };
 
     let mut variants: HashMap<Uuid, Vec<CandidateVariant>> = HashMap::new();
     for v in priced_variants(tx, ctx, &ids).await? {
@@ -521,10 +521,7 @@ pub async fn listing(tx: &mut TenantTx, ctx: &Context, q: &ListingQuery) -> Resu
             created_at: b.created_at,
             popularity: b.popularity,
             sales: b.sales,
-            rating_score: b
-                .rating_count
-                .zip(b.rating_sum)
-                .map(|(count, sum)| crate::reviews::bayesian_score(sum, count)),
+            rating_score: rating_scores.remove(&b.id),
             name: b.name,
             brand: b.brand,
         })
@@ -893,22 +890,21 @@ mod tests {
 
     #[test]
     fn best_selling_and_top_rated_order_values_then_newest_with_missing_last() {
-        type Field = fn(&mut Candidate) -> &mut Option<f64>;
-        let fields: [(Sort, Field); 2] = [
-            (Sort::BestSelling, |c| &mut c.sales),
-            (Sort::TopRated, |c| &mut c.rating_score),
-        ];
-        for (sort, field) in fields {
+        let set = |c: &mut Candidate, v: f64| {
+            c.sales = Some(v);
+            c.rating_score = Some(v);
+        };
+        for sort in [Sort::BestSelling, Sort::TopRated] {
             let mut candidates = catalog();
-            *field(&mut candidates[0]) = Some(1.0);
-            *field(&mut candidates[2]) = Some(1.0);
+            set(&mut candidates[0], 1.0);
+            set(&mut candidates[2], 1.0);
             let q = query(&[], sort);
             assert_eq!(
                 ids(&select(candidates.clone(), &defs(), &q)),
                 [3, 1, 2],
                 "{sort:?}: tie by newest, the newer product without a value last"
             );
-            *field(&mut candidates[0]) = Some(4.5);
+            set(&mut candidates[0], 4.5);
             assert_eq!(ids(&select(candidates, &defs(), &q)), [1, 3, 2], "{sort:?}");
         }
     }

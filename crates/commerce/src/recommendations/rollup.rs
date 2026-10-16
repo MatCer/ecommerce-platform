@@ -9,8 +9,9 @@
 //! - `product_popularity`: the scores summed over markets, for the search documents; written
 //!   only when a value moves by at least 10 % (or from/to zero), and the changed products are
 //!   marked for reindexing ([`take_reindex`]).
-//! - `product_search_sales`: the per-market sales scores in the search documents, debounced and
-//!   marked for reindexing the same way.
+//! - `product_search_sales`: the per-market sales scores in the search documents, debounced the
+//!   same way. A change sets the same `product_popularity.reindex` mark, so that one flag means
+//!   "search scores changed" (a product without popularity gets a row with popularity 0).
 //! - `customer_affinity`: categories/brands from the orders of customers whose current
 //!   `personalization` consent is granted.
 
@@ -204,7 +205,8 @@ pub async fn sales(tx: &mut TenantTx) -> Result<u64, Error> {
            )
            INSERT INTO product_popularity (tenant_id, product_id, popularity, reindex)
            SELECT DISTINCT $1::uuid, product_id, 0, true FROM changed
-           ON CONFLICT (tenant_id, product_id) DO UPDATE SET reindex = true"#,
+           ON CONFLICT (tenant_id, product_id) DO UPDATE SET reindex = true
+           WHERE NOT product_popularity.reindex"#,
         tx.tenant_id(),
         POPULARITY_STEP
     )
@@ -267,9 +269,8 @@ pub async fn customer_affinity(tx: &mut TenantTx, now: DateTime<Utc>) -> Result<
 }
 
 /// One rollup run for the tenant: the stats of the last `days` days (today included), then
-/// everything derived from them. Returns the products whose search popularity changed plus
-/// those whose search sales changed (all marked for [`take_reindex`]; a product with both
-/// counts twice).
+/// everything derived from them. Returns how many products' search popularity changed (they
+/// are marked for [`take_reindex`], like those whose search sales changed).
 pub async fn run(tx: &mut TenantTx, now: DateTime<Utc>, days: u32) -> Result<u64, Error> {
     // One rollup per tenant at a time (the hourly job and a seed backfill may overlap): the
     // second waits instead of failing on the first one's rows.
@@ -291,6 +292,7 @@ pub async fn run(tx: &mut TenantTx, now: DateTime<Utc>, days: u32) -> Result<u64
     co_purchases(tx, now).await?;
     scores(tx, today).await?;
     customer_affinity(tx, now).await?;
-    let popular = popularity(tx).await?;
-    Ok(popular + sales(tx).await?)
+    let changed = popularity(tx).await?;
+    sales(tx).await?;
+    Ok(changed)
 }

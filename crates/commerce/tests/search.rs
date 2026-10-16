@@ -358,7 +358,6 @@ async fn best_selling_and_top_rated_put_products_without_the_value_last(db: PgPo
         .await
         .unwrap();
     }
-    // Score 3.33 for one 5, (15 + 30) / 11 = 4.09 for six 5s; pending reviews do not count.
     for (product, n, status) in [
         (products[0], 1, "published"),
         (products[1], 6, "published"),

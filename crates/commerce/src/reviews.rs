@@ -10,6 +10,8 @@
 //! - Staff publish, reject or hide reviews and may reply. Only `published` reviews leave the
 //!   admin API: product page model, rating summary and JSON-LD.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use platform::Error;
 use platform::db::TenantTx;
@@ -39,8 +41,6 @@ pub const TITLE_MAX: usize = 120;
 pub const BODY_MAX: usize = 4000;
 pub const REPLY_MAX: usize = 2000;
 
-// A fixed prior, so a product's score depends only on its own reviews: a per-product reindex
-// is all it takes to keep it current.
 pub const RATING_PRIOR_MEAN: f64 = 3.0;
 pub const RATING_PRIOR_WEIGHT: f64 = 5.0;
 
@@ -50,6 +50,20 @@ pub const RATING_PRIOR_WEIGHT: f64 = 5.0;
 #[allow(clippy::cast_precision_loss)]
 pub fn bayesian_score(sum: i64, count: i64) -> f64 {
     (RATING_PRIOR_WEIGHT * RATING_PRIOR_MEAN + sum as f64) / (RATING_PRIOR_WEIGHT + count as f64)
+}
+
+/// [`bayesian_score`] of every product in `ids` with published reviews.
+pub async fn scores(tx: &mut TenantTx, ids: &[Uuid]) -> Result<HashMap<Uuid, f64>, Error> {
+    Ok(sqlx::query!(
+        r#"SELECT product_id, count(*) AS "count!", sum(rating)::bigint AS "sum!" FROM reviews
+           WHERE product_id = ANY($1) AND status = 'published' GROUP BY product_id"#,
+        ids
+    )
+    .fetch_all(&mut **tx)
+    .await?
+    .into_iter()
+    .map(|r| (r.product_id, bayesian_score(r.sum, r.count)))
+    .collect())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

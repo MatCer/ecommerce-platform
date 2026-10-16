@@ -130,8 +130,8 @@ pub struct ProductData {
     pub popularity: i32,
     /// market id → time-decayed unit sales (`product_search_sales`); markets without sales absent.
     pub sales: HashMap<Uuid, f64>,
-    /// Published reviews; `None` without any.
-    pub rating: Option<Rating>,
+    /// [`crate::reviews::bayesian_score`] of the published reviews; `None` without any.
+    pub rating_score: Option<f64>,
     /// locale → (name, description html)
     pub translations: BTreeMap<String, (String, String)>,
     /// option code → value code → locale → label
@@ -140,13 +140,6 @@ pub struct ProductData {
     pub category_ids: Vec<Uuid>,
     /// Product-level parameter values.
     pub params: Vec<ParamValue>,
-}
-
-/// A product's published reviews: how many and their star total.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Rating {
-    pub count: i64,
-    pub sum: i64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -230,19 +223,9 @@ pub async fn load_products(
         }
     }
 
-    for r in sqlx::query!(
-        r#"SELECT product_id, count(*) AS "count!", sum(rating)::bigint AS "sum!" FROM reviews
-           WHERE product_id = ANY($1) AND status = 'published' GROUP BY product_id"#,
-        &ids
-    )
-    .fetch_all(&mut **tx)
-    .await?
-    {
-        if let Some(p) = products.get_mut(&r.product_id) {
-            p.rating = Some(Rating {
-                count: r.count,
-                sum: r.sum,
-            });
+    for (id, score) in crate::reviews::scores(tx, &ids).await? {
+        if let Some(p) = products.get_mut(&id) {
+            p.rating_score = Some(score);
         }
     }
 
@@ -487,13 +470,8 @@ pub fn build_product(ctx: &Context, p: &ProductData) -> BTreeMap<String, Vec<Val
                 "sales": sales,
                 "created_at": p.created_at,
             });
-            // Absent rather than null: Meilisearch sorts documents without the field last.
-            if let Some(r) = p.rating {
-                #[allow(clippy::cast_precision_loss)]
-                let average = r.sum as f64 / r.count as f64;
-                doc["rating_count"] = json!(r.count);
-                doc["rating_average"] = json!(average);
-                doc["rating_score"] = json!(crate::reviews::bayesian_score(r.sum, r.count));
+            if let Some(score) = p.rating_score {
+                doc["rating_score"] = json!(score);
             }
             out.entry(locale.clone()).or_default().push(doc);
         }
@@ -589,7 +567,7 @@ mod tests {
             created_at: 1,
             popularity: 42,
             sales: HashMap::new(),
-            rating: None,
+            rating_score: None,
             translations: [(
                 "cs".to_owned(),
                 (
@@ -677,21 +655,14 @@ mod tests {
         let (ctx, cz, sk) = ctx();
         let mut p = product(cz, sk);
         p.sales = HashMap::from([(Uuid::from_u128(100), 3.5), (Uuid::from_u128(999), 1.0)]);
-        p.rating = Some(Rating {
-            count: 40,
-            sum: 192,
-        });
+        p.rating_score = Some(4.6);
         let red = build_product(&ctx, &p)["cs"][0].clone();
         assert_eq!(red["sales"], json!({ "cz": 3.5 }));
-        assert_eq!(red["rating_count"], json!(40));
-        assert_eq!(red["rating_average"], json!(4.8));
         assert_eq!(red["rating_score"], json!(4.6));
 
         let plain = build_product(&ctx, &product(cz, sk))["cs"][0].clone();
         assert_eq!(plain["sales"], json!({}));
-        for field in ["rating_count", "rating_average", "rating_score"] {
-            assert_eq!(plain.get(field), None, "{field}");
-        }
+        assert_eq!(plain.get("rating_score"), None);
     }
 
     #[test]

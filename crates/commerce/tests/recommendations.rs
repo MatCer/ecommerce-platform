@@ -323,8 +323,7 @@ async fn bestsellers_decay_and_popularity_is_debounced(db: PgPool) {
         rollup::run(&mut tx, now, rollup::BACKFILL_DAYS)
             .await
             .unwrap(),
-        2,
-        "its popularity and its CZ sales changed"
+        1
     );
     tx.commit().await.unwrap();
     assert_eq!(run(&runtime, &shop, now).await, [old.0]);
@@ -362,8 +361,6 @@ async fn search_sales_are_per_market_and_debounced(db: PgPool) {
     );
     assert!(run(&runtime, &shop, now).await.is_empty());
 
-    // Sales missing from the documents while the popularity is current: reindexed through
-    // the sales alone, and the indexed popularity stays as it is.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query("DELETE FROM product_search_sales WHERE product_id = $1")
         .bind(x.0)
@@ -386,7 +383,6 @@ async fn search_sales_are_per_market_and_debounced(db: PgPool) {
     tx.commit().await.unwrap();
     assert_eq!(popularity, 30);
 
-    // One unit 60 days ago adds ~0.05 to 3: under 10 %, nothing to reindex.
     order(&runtime, &shop, &[x], now - Duration::days(60), "confirmed").await;
     assert!(run(&runtime, &shop, now).await.is_empty());
     assert_eq!(
@@ -394,7 +390,6 @@ async fn search_sales_are_per_market_and_debounced(db: PgPool) {
         [(shop.product, shop.sk, 2.0), (x.0, shop.cz, 3.0)]
     );
 
-    // Every CZ order cancelled: the row goes and the product is reindexed.
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     sqlx::query("UPDATE orders SET status = 'cancelled' WHERE market_id = $1")
         .bind(shop.cz)
