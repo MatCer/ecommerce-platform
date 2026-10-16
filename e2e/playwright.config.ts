@@ -3,8 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // End-to-end suites against the running compose stack (`make up`, then `make e2e`).
 // Ports come from the environment / .env (HTTP_PORT, MAILPIT_UI_PORT).
 const port = process.env.HTTP_PORT ?? "8080";
-// These suites mutate/read the demo tenant's flow clock, flow definitions or
-// newsletter confirmation template. File-local serial mode cannot isolate them.
+// These suites mutate/read the demo tenant's flow clock, flow definitions, newsletter
+// confirmation template or AI settings. File-local serial mode cannot isolate them.
 const sharedState = [
   "admin/flows.spec.ts",
   "checkout/flows.spec.ts",
@@ -12,6 +12,7 @@ const sharedState = [
   "admin/newsletter.spec.ts",
   "storefront/newsletter.spec.ts",
   "admin/ai.spec.ts",
+  "admin/ai-alt-texts.spec.ts",
 ];
 
 export default defineConfig({
