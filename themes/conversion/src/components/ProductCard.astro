@@ -28,15 +28,21 @@ const {
 } = Astro.props;
 const { t } = i18n(shop);
 const href = productHref(shop, p.slug);
-const [main, hover] = p.images.map((i) => (wide ? capped(i, 1280) : cardImage(i)));
+// Defaults keep the published theme rendering against an API rolled back to before swatches.
+const { images = [], swatches = [] } = p;
+const [main, hover] = images.map((i) => (wide ? capped(i, 1280) : cardImage(i)));
 // Attributes are merged here: Astro renders a spread and a repeated attribute both, and HTML
 // keeps the first.
 const mainAttrs = main && imageAttrs(main, { sizes, priority, width: 360 });
 const img = mainAttrs && { ...mainAttrs, loading: eager ? ("eager" as const) : mainAttrs.loading };
-const slides = (photoRail && p.images.length > 1 ? p.images.slice(0, 5) : []).map((s, i) =>
+const slides = (photoRail && images.length > 1 ? images.slice(0, 5) : []).map((s, i) =>
   i === 0 && img
     ? img
-    : { ...imageAttrs(wide ? capped(s, 1280) : capped(s, 640), { sizes, width: 360 }), alt: "" },
+    : {
+        ...imageAttrs(wide ? capped(s, 1280) : capped(s, 640), { sizes, width: 360 }),
+        alt: "",
+        fetchpriority: "low" as const,
+      },
 );
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
 // A18: a reduction (badge, strikethrough, %) only with the page model's reference price.
@@ -97,19 +103,19 @@ const reduced = p.reference_price && p.discount_percent ? p.discount_percent : n
     {reduced && p.reference_price && <p class="order-first text-[0.8125rem] leading-snug text-muted-foreground">{t("price.lowest_30_days_short", { price: p.reference_price.formatted })}</p>}
     {p.brand && <p class="text-[0.8125rem] text-muted-foreground">{p.brand}</p>}
     {p.unit_price && <p class="text-[0.8125rem] text-muted-foreground">{t("price.unit", { price: p.unit_price.price.formatted, unit: p.unit_price.unit })}</p>}
-    <div class="mt-1 flex items-center justify-between gap-2">
+    <div class="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 whitespace-nowrap">
       <StockLine state={p.stock} label={t(`product.${p.stock}`)} />
       {
-        p.swatches.length > 0 && (
+        swatches.length > 0 && (
           <p class="flex items-center">
-            <span class="sr-only">{t("product.colors", { names: p.swatches.map((s) => s.name).join(", ") })}</span>
+            <span class="sr-only">{t("product.colors", { names: swatches.map((s) => s.name).join(", ") })}</span>
             <span class="flex items-center gap-1.5" aria-hidden="true">
-              {p.swatches.slice(0, 4).map((s) => (
+              {swatches.slice(0, 4).map((s) => (
                 <svg class="size-4 rounded-full border border-black/10 ring-1 ring-white" viewBox="0 0 16 16">
                   <circle cx="8" cy="8" r="8" fill={s.color} />
                 </svg>
               ))}
-              {p.swatches.length > 4 && <span class="text-[0.8125rem] text-muted-foreground">+{p.swatches.length - 4}</span>}
+              {swatches.length > 4 && <span class="text-[0.8125rem] text-muted-foreground">+{swatches.length - 4}</span>}
             </span>
           </p>
         )
