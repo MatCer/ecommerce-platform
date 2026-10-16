@@ -10,6 +10,7 @@ import {
 import { createQuery } from "@tanstack/solid-query";
 import { createSignal, For, Index, onCleanup, Show } from "solid-js";
 import { contentLocales, errorMessage, t } from "../i18n/index.ts";
+import { altField, useAiMarks } from "../lib/ai.ts";
 import { api, tenantHeader, unwrap } from "../lib/api.ts";
 import { mediaUrl } from "../lib/config.ts";
 import { tenantKey } from "../lib/me.ts";
@@ -51,6 +52,8 @@ function MediaRow(props: {
   index: number;
   count: number;
   skus: string[];
+  /** Locales whose alt text AI wrote and nobody changed since. */
+  aiLocales: string[];
   onChange: (m: ProductMedia) => void;
   onMove: (delta: number) => void;
   onRemove: () => void;
@@ -102,14 +105,23 @@ function MediaRow(props: {
         <div class="grid gap-4 sm:grid-cols-3">
           <For each={CONTENT_LOCALES}>
             {(l) => (
-              <TextField
-                label={`${t("editor.altText")} (${l})`}
-                value={props.media.alt_i18n?.[l] ?? ""}
-                maxLength={500}
-                onChange={(v) =>
-                  props.onChange({ ...props.media, alt_i18n: { ...props.media.alt_i18n, [l]: v } })
-                }
-              />
+              <div class="flex flex-col items-start gap-1">
+                <TextField
+                  class="w-full"
+                  label={`${t("editor.altText")} (${l})`}
+                  value={props.media.alt_i18n?.[l] ?? ""}
+                  maxLength={500}
+                  onChange={(v) =>
+                    props.onChange({
+                      ...props.media,
+                      alt_i18n: { ...props.media.alt_i18n, [l]: v },
+                    })
+                  }
+                />
+                <Show when={props.aiLocales.includes(l) && props.media.alt_i18n?.[l]}>
+                  <Badge tone="info">{t("ai.aiLabel")}</Badge>
+                </Show>
+              </div>
             )}
           </For>
         </div>
@@ -165,9 +177,17 @@ interface Uploading {
 export function MediaManager(props: {
   media: ProductMedia[];
   skus: string[];
+  /** Saved product: AI-written alt texts get a label. */
+  productId?: string;
   onChange: (media: ProductMedia[]) => void;
 }) {
   const [uploads, setUploads] = createSignal<Uploading[]>([]);
+  const marks = useAiMarks(
+    () => "product",
+    () => props.productId,
+  );
+  const aiLocales = (assetId: string) =>
+    (marks.data?.items ?? []).filter((m) => m.field === altField(assetId)).map((m) => m.locale);
   let input!: HTMLInputElement;
 
   const update = (id: string, progress: number) =>
@@ -253,6 +273,7 @@ export function MediaManager(props: {
                 index={i}
                 count={props.media.length}
                 skus={props.skus}
+                aiLocales={aiLocales(m().asset_id)}
                 onChange={(next) => props.onChange(props.media.map((x, j) => (j === i ? next : x)))}
                 onMove={(d) => props.onChange(move(props.media, i, d))}
                 onRemove={() => props.onChange(props.media.filter((_, j) => j !== i))}

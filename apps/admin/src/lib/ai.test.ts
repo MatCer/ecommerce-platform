@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayValue, isHtml, kindsFor, minorToMajor } from "./ai.ts";
+import { altField, displayValue, isHtml, kindsFor, minorToMajor } from "./ai.ts";
 
 describe("AI preview helpers", () => {
   it("renders text, block lists and menu labels", () => {
@@ -24,5 +24,11 @@ describe("AI preview helpers", () => {
     expect(kindsFor("category")).toContain("category_description");
     expect(minorToMajor(546)).toBe("5.46");
     expect(minorToMajor(-5)).toBe("-0.05");
+  });
+
+  it("names an image's alt text mark like the API", () => {
+    expect(altField("0192f0c3-6a5e-7c3d-9a41-1f2e3d4c5b6a")).toBe(
+      "alt_0192f0c36a5e7c3d9a411f2e3d4c5b6a",
+    );
   });
 });

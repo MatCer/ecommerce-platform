@@ -236,6 +236,7 @@ export const en = {
     feature_translate: "Translations",
     feature_bulk_plan: "Bulk edit plans",
     feature_review_summary: "Review summaries",
+    feature_alt_text: "Image alt texts",
     glossary: "Glossary",
     glossaryDesc:
       "Terms translations must keep as they are (brand names), or translate one fixed way. Leave a language empty to keep the term.",
@@ -249,6 +250,12 @@ export const en = {
     reviewSummariesDesc:
       "Products with at least 5 published verified reviews get a short AI summary on the product page, in each market's language and labelled as AI-generated. Every summary uses AI tokens.",
     adminOnly: "Only owners and admins can change these settings.",
+    altTexts: "Alt texts for new product images",
+    altTextsDesc:
+      "Product images uploaded from now on get an AI alt text in every market language that has none, translated from your own alt text where there is one. Your texts are never changed. Every image uses AI tokens.",
+    altTextsBackfill: "Generate missing alt texts",
+    altTextsBackfillDesc: "Also fills the missing alt texts of images uploaded earlier.",
+    altTextsQueued: "Products queued for alt texts: {{n}}",
   },
   redirects: {
     title: "Redirects",
