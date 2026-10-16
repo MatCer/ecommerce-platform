@@ -1,7 +1,13 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { type ArtifactManifest, readManifest, tokensToCss } from "@platform/theme-kit";
+import {
+  type ArtifactManifest,
+  isPlatformPath,
+  PLATFORM_SEGMENTS,
+  readManifest,
+  tokensToCss,
+} from "@platform/theme-kit";
 import type { ArtifactFetcher } from "./artifacts.ts";
 import {
   assetsBinding,
@@ -77,7 +83,16 @@ const SPECULATION_RULES = JSON.stringify({
       where: {
         and: [
           { href_matches: "/*" },
-          { not: { href_matches: "/_p/*" } },
+          {
+            not: {
+              href_matches: PLATFORM_SEGMENTS.flatMap((s) => [
+                `/${s}`,
+                `/${s}/*`,
+                `/*/${s}`,
+                `/*/${s}/*`,
+              ]),
+            },
+          },
           { not: { selector_matches: "[rel~=nofollow], [data-no-prerender]" } },
         ],
       },
@@ -1459,7 +1474,7 @@ ${
       if (split.path === "/_p/watch") return watchSubscribe(localized, req, host, port);
       if (split.path.startsWith("/_p/public/"))
         return publicProxy(localized, req, inner, split.path.slice("/_p/public".length));
-      if (!split.path.startsWith("/_") && !split.path.startsWith("/media/"))
+      if (!split.path.startsWith("/_") && !split.path.startsWith("/media/") && !isPlatformPath(p))
         return renderTheme(localized, inner, req, port, `/${split.locale}`);
       return text(404, "Not found");
     }
@@ -1527,6 +1542,7 @@ ${
         text(404, "Not found")
       );
     }
+    if (isPlatformPath(p)) return text(404, "Not found");
     const pub = await serveAsset(active, p, false);
     if (pub) return pub;
     return renderTheme(site, url, req, port);
@@ -1704,7 +1720,7 @@ ${
       (lastHop && IP_RE.test(lastHop) ? lastHop : undefined);
     const req = new Request(request, { headers: stripUntrusted(request.headers) });
     // Canonical URL the worker sees: public scheme + the validated host.
-    const publicUrl = new URL(`${url.pathname}${url.search}`, `${scheme}://${host}${port}`);
+    const publicUrl = new URL(`${scheme}://${host}${port}${url.pathname}${url.search}`);
 
     if (host.startsWith("preview-")) return preview(request, req, publicUrl, host, port, clientIp);
     const origin = classifyHost(host);
