@@ -187,6 +187,7 @@ dependencies = [
  "utoipa-axum",
  "utoipa-swagger-ui",
  "uuid",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -695,6 +696,7 @@ dependencies = [
  "utoipa",
  "uuid",
  "webp",
+ "workspace-hack",
  "zip",
 ]
 
@@ -2561,6 +2563,7 @@ dependencies = [
  "tracing-subscriber",
  "utoipa",
  "uuid",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -3824,6 +3827,7 @@ dependencies = [
  "sqlx",
  "tokio",
  "uuid",
+ "workspace-hack",
 ]
 
 [[package]]
@@ -4688,6 +4692,56 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+ "workspace-hack",
+]
+
+[[package]]
+name = "workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "aws-lc-rs",
+ "base64 0.22.1",
+ "bitflags",
+ "chrono",
+ "crossbeam-utils",
+ "crypto-common 0.1.6",
+ "crypto-common 0.2.2",
+ "digest 0.10.7",
+ "digest 0.11.3",
+ "either",
+ "fastrand",
+ "flate2",
+ "form_urlencoded",
+ "futures-channel",
+ "futures-sink",
+ "futures-util",
+ "getrandom 0.3.4",
+ "idna",
+ "indexmap",
+ "log",
+ "num-traits",
+ "quanta",
+ "rand 0.10.3",
+ "rand 0.9.5",
+ "regex-automata",
+ "regex-syntax",
+ "rustls",
+ "serde_core",
+ "sha2 0.10.9",
+ "sha2 0.11.0",
+ "simd-adler32",
+ "slab",
+ "smallvec",
+ "sqlx-core",
+ "syn 2.0.119",
+ "syn 3.0.6",
+ "thiserror",
+ "tokio",
+ "tracing-core",
+ "uuid",
+ "zeroize",
+ "zip",
+ "zlib-rs",
 ]
 
 [[package]]
