@@ -8,7 +8,8 @@ import Stars from "./Stars.astro";
  * Published reviews (WP16): summary with a per-star breakdown, the newest reviews with the
  * verified-purchase mark and the shop's reply, and the Omnibus disclosure of how reviews are
  * verified (linked to the shop's legal page when published). Review text is plain text and
- * rendered escaped. Nothing renders before the first published review.
+ * rendered escaped. Nothing renders before the first published review. The shop's opt-in AI
+ * summary (SHOP-36) sits above the list, always with its AI label.
  */
 interface Props {
   reviews: ProductReviews;
@@ -17,6 +18,7 @@ interface Props {
 const { reviews, shop } = Astro.props;
 const { t, tn } = i18n(shop);
 const s = reviews.summary;
+const ai = reviews.ai_summary;
 const average = s
   ? new Intl.NumberFormat(shop.locale, {
       minimumFractionDigits: 1,
@@ -72,6 +74,13 @@ const date = (d: string) =>
           </div>
         </div>
         <div>
+          {ai && (
+            <div class="mb-6 rounded-xl bg-muted/60 p-5">
+              <h3 class="font-bold">{t("reviews.ai_summary_title")}</h3>
+              <p class="mt-2 max-w-prose leading-relaxed" lang={ai.locale}>{ai.text}</p>
+              <p class="mt-3 text-sm text-muted-foreground">{tn("reviews.ai_summary_label", ai.review_count)}</p>
+            </div>
+          )}
           <ul class="grid gap-4">
             {reviews.items.map((r) => (
               <li class="rounded-lg bg-review-wash p-5" lang={r.locale}>
