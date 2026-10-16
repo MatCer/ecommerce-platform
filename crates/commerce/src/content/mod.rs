@@ -515,6 +515,16 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
 
+    #[test]
+    fn page_paths_never_claim_a_platform_path() {
+        for kind in [PageKind::Page, PageKind::Legal, PageKind::BlogPost] {
+            for slug in ["checkout", "account", "o", "consent", "review"] {
+                let path = kind.path(slug);
+                assert!(!crate::redirects::is_platform_path(&path), "{path}");
+            }
+        }
+    }
+
     fn input() -> PageInput {
         PageInput {
             kind: PageKind::Page,
