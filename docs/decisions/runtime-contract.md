@@ -502,3 +502,9 @@ separate cache namespace, never cached (already bypassed by the policy).
 - **Withdrawal:** the SDK rewrites the `consent` cookie at once, so the next page is control. A
   `POST /_p/consent` through the edge also forgets the memo of the request's subject and of a
   newly minted one; the API's latest consent record stays authoritative.
+- **Data arms (SHOP-98):** an arm's frozen `config` may carry
+  `{"hero": {"title"?, "subtitle"?, "cta"?}}`, each a locale map (`{"cs": "..."}`, 1-200
+  characters, picked like other i18n texts). `GET /storefront/v1/pages/home` applies it to
+  `hero` when `x-experiment` names an arm of the tenant's running experiment at that version, so
+  the arm renders server-side in the same artifact. Any other header, a stopped experiment, an
+  unknown key or an invalid text serves control (an invalid config logs a warning).

@@ -6,6 +6,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use commerce::consent::{self, ConsentPurpose, Subject, well_formed_anon};
+use commerce::experiments::{self, Assignment};
 use commerce::recommendations::engine::{self, Target, Visitor};
 use commerce::redirects::{self, ResolvedRedirect};
 use commerce::storefront::Search;
@@ -25,6 +26,9 @@ use super::customer::{CONSENT_SUBJECT_HEADER, header_str};
 use super::{CART_HEADER, Shopper, StorefrontHeaders, with_ctx};
 use crate::AppState;
 use crate::admin::query_params;
+
+/// The visitor's arm, `<id>:<version>:<arm>`, set by the edge only (runtime contract §15).
+const EXPERIMENT_HEADER: &str = "x-experiment";
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -64,10 +68,23 @@ async fn shop(shopper: Shopper, State(s): State<AppState>) -> Result<Json<ShopMo
     params(StorefrontHeaders),
     responses((status = 200, body = HomePage))
 )]
-async fn home(shopper: Shopper, State(s): State<AppState>) -> Result<Json<HomePage>, Error> {
-    with_ctx(&s, &shopper, async |tx, ctx| pages::home(tx, ctx).await)
-        .await
-        .map(Json)
+async fn home(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<HomePage>, Error> {
+    let arm = header_str(&headers, EXPERIMENT_HEADER).and_then(Assignment::parse);
+    with_ctx(&s, &shopper, async |tx, ctx| {
+        let mut page = pages::home(tx, ctx).await?;
+        if let Some(a) = &arm
+            && let Some(config) = experiments::arm_config(tx, a).await?
+        {
+            config.apply_home(ctx, &mut page);
+        }
+        Ok(page)
+    })
+    .await
+    .map(Json)
 }
 
 /// Listing query: `sort`, `page`; any other key is a facet filter (`?color=red&size=m`).
