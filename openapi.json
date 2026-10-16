@@ -15006,6 +15006,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "rate_limited",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [

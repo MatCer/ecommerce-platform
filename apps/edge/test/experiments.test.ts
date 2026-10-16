@@ -86,6 +86,17 @@ describe("ApiEnroller", () => {
     expect(await fresh).toEqual({ experiment_id: EXP.id, version: 3, arm: "b" });
   });
 
+  test("forwards the visitor's client IP for the API's rate limit", async () => {
+    const ips: (string | null)[] = [];
+    const enroller = new ApiEnroller("http://api.test", "t", async (r) => {
+      ips.push(r.headers.get("x-client-ip"));
+      return Response.json({ assignment: null });
+    });
+    await enroller.enrol(site({ experiment: EXP, clientIp: "203.0.113.7" }), ALICE, 0);
+    await enroller.enrol(site({ experiment: EXP }), "b".repeat(32), 0);
+    expect(ips).toEqual(["203.0.113.7", null]);
+  });
+
   test("gives up after 500 ms", async () => {
     const enroller = new ApiEnroller(
       "http://api.test",

@@ -73,17 +73,20 @@ pub async fn storefront(State(s): State<AppState>, req: Request, next: Next) -> 
     };
     match verdict {
         Ok(()) => next.run(req).await,
-        Err(wait) => {
-            let mut res = Error::TooManyRequests {
-                code: "rate_limited",
-            }
-            .into_response();
-            let secs = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
-            res.headers_mut()
-                .insert("retry-after", HeaderValue::from(secs.max(1)));
-            res
-        }
+        Err(wait) => rate_limited(wait),
     }
+}
+
+/// `429 rate_limited` with `Retry-After` in whole seconds.
+pub fn rate_limited(wait: Duration) -> Response {
+    let mut res = Error::TooManyRequests {
+        code: "rate_limited",
+    }
+    .into_response();
+    let secs = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
+    res.headers_mut()
+        .insert("retry-after", HeaderValue::from(secs.max(1)));
+    res
 }
 
 #[cfg(test)]

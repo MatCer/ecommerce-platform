@@ -474,6 +474,9 @@ separate cache namespace, never cached (already bypassed by the policy).
   timeout. The API checks the latest analytics consent record and its text version and hashes
   with `EXPERIMENTS_SECRET`; the edge holds no new secret. Answers are memoized per (tenant,
   subject) for 60 s, bound to the experiment id + version they were given for, at most 10k.
+  The edge forwards `x-client-ip`, and the API limits enrolment per (tenant, client IP) on the
+  storefront limiter before touching the database (`429 rate_limited`, which the edge serves as
+  control and does not memoize), so forged consent ids cannot turn cached pages into DB load.
 - **Fail closed:** an error, a timeout, a malformed answer or one for another experiment id or
   version is control, logged as a warning without the subject. Logs never contain subjects.
 - **Enrolled:** the HTML key gains `exp:<id>:<version>:<arm>`, so a URL has at most arms + 1

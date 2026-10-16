@@ -44,6 +44,7 @@ export class ApiEnroller implements Enroller {
           authorization: `Bearer ${this.#token}`,
           accept: "application/json",
           "content-type": "application/json",
+          ...(site.clientIp ? { "x-client-ip": site.clientIp } : {}),
         },
         body: JSON.stringify({ tenant_id: site.tenant_id, subject }),
         signal: AbortSignal.timeout(500),

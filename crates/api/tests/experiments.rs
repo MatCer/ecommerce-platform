@@ -134,3 +134,30 @@ async fn resolve_names_the_running_experiment(db: PgPool) {
     let (_, body, _) = Call::get(uri).token(SERVICE_TOKEN).send(&s).await;
     assert_eq!(body["experiment"], json!({"id": id, "version": 1}));
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn enrolment_is_rate_limited_per_tenant_and_client_ip(db: PgPool) {
+    let jwks = jwks_server(json!([jwk("a", X_A)])).await;
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "exp-rate").await;
+    let mut s = state(runtime.clone(), &jwks, Duration::from_secs(30));
+    s.rate_limit = std::sync::Arc::new(api::rate_limit::StorefrontLimiter::new(1, 2));
+    let enrol = |ip: &'static str| {
+        Call::post(ENROL, json!({"tenant_id": shop.tenant, "subject": SUBJECT}))
+            .token(SERVICE_TOKEN)
+            .header("x-client-ip", ip)
+    };
+
+    for _ in 0..2 {
+        let (status, _, _) = enrol("203.0.113.7").send(&s).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    let (status, problem, res) = enrol("203.0.113.7").send(&s).await;
+    assert_eq!(
+        (status, problem["code"].as_str()),
+        (StatusCode::TOO_MANY_REQUESTS, Some("rate_limited"))
+    );
+    assert_eq!(res.headers()["retry-after"], "1");
+    let (status, _, _) = enrol("198.51.100.1").send(&s).await;
+    assert_eq!(status, StatusCode::OK, "another client IP");
+}

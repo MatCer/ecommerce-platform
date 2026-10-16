@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 use crate::auth::{BuilderService, Service, TENANT_HEADER};
+use crate::storefront::customer::CLIENT_IP_HEADER;
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -85,17 +86,26 @@ pub struct EnrolResponse {
         (status = 200, body = EnrolResponse),
         (status = 401, body = platform::Problem, content_type = "application/problem+json"),
         (status = 422, body = platform::Problem, content_type = "application/problem+json"),
+        (status = 429, description = "rate_limited", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn enrol(
     _service: Service,
     State(s): State<AppState>,
+    headers: axum::http::HeaderMap,
     body: axum::body::Bytes,
-) -> Result<Json<EnrolResponse>, Error> {
+) -> Result<Response, Error> {
     let req: EnrolRequest = crate::admin::parse_json(&body)?;
+    let ip = headers
+        .get(CLIENT_IP_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("-");
+    if let Err(wait) = s.rate_limit.check(&format!("enrol:{}", req.tenant_id), ip) {
+        return Ok(crate::rate_limit::rate_limited(wait));
+    }
     let assignment =
         experiments::enrol(&s.db, s.experiments.as_ref(), req.tenant_id, &req.subject).await?;
-    Ok(Json(EnrolResponse { assignment }))
+    Ok(Json(EnrolResponse { assignment }).into_response())
 }
 
 #[derive(Deserialize, IntoParams)]
