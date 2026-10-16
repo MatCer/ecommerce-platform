@@ -149,7 +149,7 @@
   "consent.save": "Save choice",
   "consent.saved": "Saved.",
   "consent.settings": "Settings",
-  "consent.text": "We use cookies for analytics and personalization. Nothing is stored without your consent.",
+  "consent.text": "We use cookies for analytics and personalization. Analytics also covers testing page variants to improve the shop. Nothing is stored without your consent.",
   "consent.title": "Cookie consent",
   "flows.restore_button": "Continue to checkout",
   "flows.restore_intro": "Continue where you left off: your cart opens at checkout.",

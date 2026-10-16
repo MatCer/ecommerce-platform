@@ -84,9 +84,10 @@ anonymous subject and are linked again at the next sign-in.
 
 The `analytics` purpose also covers testing page variants to improve the shop: the banner hint
 (`consent.analytics_hint`) and the cookie policy templates say so from text version
-`2026-10-16` (`consent::TEXT_VERSION`). The banner's settings show each offered purpose's
-`consent.<purpose>_hint` under its checkbox (its accessible description), so a visitor sees
-that wording before granting analytics there.
+`2026-10-16` (`consent::TEXT_VERSION`). Every path that grants analytics shows it first: the
+banner's first layer (`consent.text`, above "Accept all"), the banner's settings (each offered
+purpose's `consent.<purpose>_hint` under its checkbox, as its accessible description) and the
+preferences page.
 
 - Only an analytics grant whose text version is a date on or after `2026-10-16`
   (`consent::covers_experiments`) enrols a visitor in an A/B experiment. Non-dated versions
