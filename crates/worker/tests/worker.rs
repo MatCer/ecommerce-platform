@@ -1172,8 +1172,8 @@ async fn image_events_queue_and_run_alt_text_jobs(db: PgPool) {
     assert_eq!(
         jobs,
         vec![
-            (json!({ "asset_id": asset, "backfill": false }), 3),
-            (json!({ "product_id": shop.product, "backfill": false }), 3),
+            (json!({ "asset_id": asset }), 3),
+            (json!({ "product_id": shop.product }), 3),
         ]
     );
 

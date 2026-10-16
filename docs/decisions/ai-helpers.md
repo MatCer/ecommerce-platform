@@ -115,9 +115,12 @@ Product images get alt text in every market language without the merchant typing
   Only images whose asset was uploaded after that time are filled automatically; older ones
   only through `POST /admin/v1/ai/alt-texts/backfill` (owner or admin; `409
   ai_alt_texts_disabled` while off, `402 ai_quota_exceeded`), which queues one job per product
-  with a ready image missing a language.
+  with a ready image missing a language. A backfill job carries the `alt_texts_since` it was
+  requested under and does nothing once the switch went off (and on again) meanwhile.
 - **Trigger.** `product.created`, `product.updated` and `asset.ready` queue `ai.alt_text`
-  (default queue, 3 attempts), debounced per product or asset to one job per minute. An
+  (queue `ai`, 3 attempts), debounced per product or asset to one job per minute. The `ai`
+  queue has its own two slots per worker, like `media`, so a product with many images (one
+  serial call each) never holds the slots that payments, mail and webhooks need. An
   `asset.ready` job finds the products showing that asset itself, since the outbox dispatch has
   no tenant context.
 - **One call per image.** The targets are the market locales whose `alt_i18n` is missing or

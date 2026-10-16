@@ -83,14 +83,18 @@ async fn admins_switch_alt_texts_and_queue_a_backfill(db: PgPool) {
         (StatusCode::ACCEPTED, json!({ "queued": 1 })),
         "sk is missing"
     );
-    let jobs: Vec<serde_json::Value> =
-        sqlx::query_scalar("SELECT payload FROM queue.jobs WHERE kind = 'ai.alt_text'")
-            .fetch_all(&db)
-            .await
-            .unwrap();
+    let jobs: Vec<(serde_json::Value, String)> = sqlx::query_as(
+        "SELECT payload - 'backfill', queue FROM queue.jobs WHERE kind = 'ai.alt_text'
+         AND (payload ->> 'backfill')::timestamptz =
+             (SELECT alt_texts_since FROM ai_settings WHERE tenant_id = $1)",
+    )
+    .bind(shop.tenant)
+    .fetch_all(&db)
+    .await
+    .unwrap();
     assert_eq!(
         jobs,
-        [json!({ "product_id": shop.product, "backfill": true })]
+        [(json!({ "product_id": shop.product }), "ai".to_owned())]
     );
 
     sqlx::query("UPDATE platform.tenants SET ai_monthly_tokens = 0 WHERE id = $1")

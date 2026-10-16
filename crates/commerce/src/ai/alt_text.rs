@@ -22,6 +22,7 @@ use crate::media::AssetVariant;
 use crate::reviews::plain_text;
 
 pub const JOB: &str = "ai.alt_text";
+pub const QUEUE: &str = "ai";
 pub const FEATURE: &str = "alt_text";
 pub const ALT_MAX: usize = 200;
 pub const DEBOUNCE_SECS: i64 = 60;
@@ -42,8 +43,8 @@ pub enum Target {
 pub struct Payload {
     #[serde(flatten)]
     pub target: Target,
-    #[serde(default)]
-    pub backfill: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backfill: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -59,11 +60,12 @@ fn is_empty(alt: Option<&String>) -> bool {
 pub fn debounced_job(tenant_id: Uuid, payload: Payload, now: DateTime<Utc>) -> NewJob<'static> {
     let slot = now.timestamp().div_euclid(DEBOUNCE_SECS);
     let (id, mode) = match (payload.target, payload.backfill) {
-        (Target::Product(id), false) => (id, "auto"),
-        (Target::Product(id), true) => (id, "backfill"),
+        (Target::Product(id), None) => (id, "auto"),
+        (Target::Product(id), Some(_)) => (id, "backfill"),
         (Target::Asset(id), _) => (id, "asset"),
     };
     let mut j = NewJob::new(JOB, json!(payload));
+    j.queue = QUEUE;
     j.tenant_id = Some(tenant_id);
     j.max_attempts = 3;
     j.idempotency_key = Some(format!("{JOB}:{tenant_id}:{id}:{slot}:{mode}"));
@@ -92,7 +94,7 @@ pub fn job_for_event(
         tenant_id?,
         Payload {
             target,
-            backfill: false,
+            backfill: None,
         },
         now,
     ))
@@ -108,12 +110,12 @@ async fn since(tx: &mut TenantTx) -> Result<Option<DateTime<Utc>>, Error> {
 }
 
 pub async fn backfill(tx: &mut TenantTx, ai: &Ai) -> Result<Backfill, Error> {
-    if since(tx).await?.is_none() {
+    let Some(since) = since(tx).await? else {
         return Err(Error::Conflict {
             code: "ai_alt_texts_disabled",
             detail: "turn on AI alt texts first".into(),
         });
-    }
+    };
     super::ensure_quota(tx, ai).await?;
     let products = sqlx::query_scalar!(
         r#"SELECT DISTINCT m.product_id FROM product_media m
@@ -127,7 +129,7 @@ pub async fn backfill(tx: &mut TenantTx, ai: &Ai) -> Result<Backfill, Error> {
     for &product_id in &products {
         let payload = Payload {
             target: Target::Product(product_id),
-            backfill: true,
+            backfill: Some(since),
         };
         queue::enqueue(&mut **tx, &debounced_job(tenant_id, payload, now)).await?;
     }
@@ -243,7 +245,10 @@ pub async fn run(
     }
     let (job, products) = {
         let mut tx = tenant_tx(db, tenant).await?;
-        let Some(since) = since(&mut tx).await? else {
+        let Some(since) = since(&mut tx)
+            .await?
+            .filter(|s| payload.backfill.is_none_or(|b| b == *s))
+        else {
             return Ok(Outcome::Done);
         };
         let locales = super::market_locales(&mut tx).await?;
@@ -265,7 +270,7 @@ pub async fn run(
             tenant,
             since,
             locales,
-            backfill: payload.backfill,
+            backfill: payload.backfill.is_some(),
             last_attempt,
         };
         (job, products)
@@ -593,7 +598,8 @@ mod tests {
         let product = json!({ "product_id": p });
         let job = job_for_event(Some(t), "product.updated", &product, now).unwrap();
         assert_eq!(job.kind, "ai.alt_text");
-        assert_eq!(job.payload, json!({ "product_id": p, "backfill": false }));
+        assert_eq!(job.payload, json!({ "product_id": p }));
+        assert_eq!(job.queue, "ai");
         assert_eq!(
             job.run_at,
             Some(Utc.with_ymd_and_hms(2026, 10, 16, 12, 2, 0).unwrap())
@@ -607,18 +613,18 @@ mod tests {
             t,
             Payload {
                 target: Target::Product(p),
-                backfill: true,
+                backfill: Some(now),
             },
             now,
         );
         assert_ne!(backfill.idempotency_key, job.idempotency_key);
         let ready = job_for_event(Some(t), "asset.ready", &json!({ "asset_id": a }), now).unwrap();
-        assert_eq!(ready.payload, json!({ "asset_id": a, "backfill": false }));
+        assert_eq!(ready.payload, json!({ "asset_id": a }));
         assert_eq!(
             serde_json::from_value::<Payload>(ready.payload).unwrap(),
             Payload {
                 target: Target::Asset(a),
-                backfill: false
+                backfill: None
             }
         );
         assert!(job_for_event(Some(t), "product.deleted", &product, now).is_none());

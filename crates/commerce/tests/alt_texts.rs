@@ -124,19 +124,33 @@ impl World {
     }
 
     async fn run(&self, target: Target, backfill: bool) {
+        let backfill = if backfill { self.since().await } else { None };
+        self.run_payload(Payload { target, backfill }).await;
+    }
+
+    async fn run_payload(&self, payload: Payload) {
         assert_eq!(
             alt_text::run(
                 &self.runtime,
                 &self.ai,
                 &self.storage,
                 self.shop.tenant,
-                Payload { target, backfill },
+                payload,
                 false,
             )
             .await
             .unwrap(),
             Outcome::Done
         );
+    }
+
+    async fn since(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        let mut tx = tenant_tx(&self.runtime, self.shop.tenant).await.unwrap();
+        sqlx::query_scalar("SELECT alt_texts_since FROM ai_settings")
+            .fetch_optional(&mut *tx)
+            .await
+            .unwrap()
+            .flatten()
     }
 
     async fn run_product(&self, backfill: bool) {
@@ -351,7 +365,7 @@ async fn a_merchant_save_during_generation_wins(db: PgPool) {
         async move {
             let payload = Payload {
                 target: Target::Product(product),
-                backfill: false,
+                backfill: None,
             };
             alt_text::run(&runtime, &ai, &storage, tenant, payload, false)
                 .await
@@ -390,7 +404,7 @@ impl World {
         tokio::spawn(async move {
             let payload = Payload {
                 target,
-                backfill: false,
+                backfill: None,
             };
             alt_text::run(&runtime, &ai, &storage, tenant, payload, false)
                 .await
@@ -519,4 +533,27 @@ async fn a_product_renamed_during_generation_gets_no_alt_texts_of_the_old_name(d
 
     assert_eq!(w.alts().await, vec![alt(&[("cs", "Modré tričko")])]);
     assert_eq!(w.marks().await, vec![]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_backfill_queued_before_switching_off_and_on_again_does_nothing(db: PgPool) {
+    let w = setup(db, "alt-period").await;
+    let old = w.asset(1).await;
+    w.put(false, true).await;
+    w.media(&[(old, &[])]).await;
+    let mut tx = tenant_tx(&w.runtime, w.shop.tenant).await.unwrap();
+    alt_text::backfill(&mut tx, &w.ai).await.unwrap();
+    tx.commit().await.unwrap();
+    let queued: serde_json::Value =
+        sqlx::query_scalar("SELECT payload FROM queue.jobs WHERE kind = 'ai.alt_text'")
+            .fetch_one(&w.db)
+            .await
+            .unwrap();
+
+    w.put(false, false).await;
+    w.put(false, true).await;
+    w.run_payload(serde_json::from_value(queued).unwrap()).await;
+
+    assert_eq!(w.alts().await, vec![BTreeMap::new()]);
+    assert_eq!(w.usage().await, 0);
 }
