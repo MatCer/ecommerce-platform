@@ -105,23 +105,19 @@ function MediaRow(props: {
         <div class="grid gap-4 sm:grid-cols-3">
           <For each={CONTENT_LOCALES}>
             {(l) => (
-              <div class="flex flex-col items-start gap-1">
-                <TextField
-                  class="w-full"
-                  label={`${t("editor.altText")} (${l})`}
-                  value={props.media.alt_i18n?.[l] ?? ""}
-                  maxLength={500}
-                  onChange={(v) =>
-                    props.onChange({
-                      ...props.media,
-                      alt_i18n: { ...props.media.alt_i18n, [l]: v },
-                    })
-                  }
-                />
-                <Show when={props.aiLocales.includes(l) && props.media.alt_i18n?.[l]}>
-                  <Badge tone="info">{t("ai.aiLabel")}</Badge>
-                </Show>
-              </div>
+              <TextField
+                label={`${t("editor.altText")} (${l})`}
+                description={
+                  props.aiLocales.includes(l) && props.media.alt_i18n?.[l]
+                    ? t("ai.aiLabel")
+                    : undefined
+                }
+                value={props.media.alt_i18n?.[l] ?? ""}
+                maxLength={500}
+                onChange={(v) =>
+                  props.onChange({ ...props.media, alt_i18n: { ...props.media.alt_i18n, [l]: v } })
+                }
+              />
             )}
           </For>
         </div>

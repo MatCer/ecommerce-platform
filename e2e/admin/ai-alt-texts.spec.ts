@@ -12,7 +12,7 @@ const DEMO = "(SELECT id FROM platform.tenants WHERE slug = 'demo')";
 const PRODUCT = `(SELECT product_id FROM product_translations
   WHERE tenant_id = ${DEMO} AND locale = 'cs' AND name = '${NAME}')`;
 const UPLOADS = `(SELECT id FROM assets WHERE tenant_id = ${DEMO} AND filename LIKE 'shop-37-%')`;
-const CONTENT_LOCALES = ["cs", "sk", "en"];
+const AI_LABEL = "AI-generated";
 const MERCHANT_ALT = "Šedé tričko Slub na ramínku";
 const AI_ALT = `[sk] ${NAME}, from cs: ${MERCHANT_ALT}`;
 const EDITED_ALT = "Sivé tričko Slub na vešiaku";
@@ -38,17 +38,8 @@ async function setSwitch(admin: Page, on: boolean): Promise<Locator> {
   return card;
 }
 
-/** One locale's alt text field and the AI label shown next to it (not next to its neighbours). */
-function altText(image: Locator, locale: string): { field: Locator; badge: Locator } {
-  const page = image.page();
-  const field = page.getByLabel(`Alt text (${locale})`);
-  const others = CONTENT_LOCALES.filter((l) => l !== locale).join("|");
-  const box = image
-    .locator("div")
-    .filter({ has: field })
-    .filter({ hasNot: page.getByLabel(new RegExp(`^Alt text \\((${others})\\)$`)) })
-    .first();
-  return { field: box.getByLabel(`Alt text (${locale})`), badge: box.getByText("AI-generated") };
+function altText(image: Locator, locale: string): Locator {
+  return image.getByLabel(`Alt text (${locale})`, { exact: true });
 }
 
 test.beforeAll(() => {
@@ -102,17 +93,17 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
     .poll(
       async () => {
         await admin.goto(productUrl);
-        return sk.field.inputValue();
+        return sk.inputValue();
       },
       { timeout: 180_000, intervals: [2_000, 5_000] },
     )
     .toBe(AI_ALT);
-  await expect(sk.badge).toBeVisible();
-  await expect(cs.field).toHaveValue(MERCHANT_ALT);
-  await expect(cs.badge).toHaveCount(0);
+  await expect(sk).toHaveAccessibleDescription(AI_LABEL);
+  await expect(cs).toHaveValue(MERCHANT_ALT);
+  await expect(cs).not.toHaveAccessibleDescription(AI_LABEL);
   // en is a content language but no market sells in it.
-  await expect(en.field).toHaveValue("");
-  await expect(en.badge).toHaveCount(0);
+  await expect(en).toHaveValue("");
+  await expect(en).not.toHaveAccessibleDescription(AI_LABEL);
   expect(
     Number(
       sql(`SELECT count(*) FROM audit_log WHERE tenant_id = ${DEMO} AND actor = 'system'
@@ -124,17 +115,17 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
   await image.scrollIntoViewIfNeeded();
   await screenshot(admin, "shop-37-media-editor-desktop");
   await admin.setViewportSize({ width: 390, height: 844 });
-  await sk.badge.scrollIntoViewIfNeeded();
+  await sk.scrollIntoViewIfNeeded();
   await screenshot(admin, "shop-37-media-editor-phone");
   await admin.setViewportSize({ width: 1280, height: 860 });
 
-  await sk.field.fill(EDITED_ALT);
+  await sk.fill(EDITED_ALT);
   await admin.getByRole("button", { name: "Save product" }).click();
   await expect(admin.getByText("Changes saved").last()).toBeVisible();
-  await expect(sk.badge).toHaveCount(0);
+  await expect(sk).not.toHaveAccessibleDescription(AI_LABEL);
   await admin.goto(productUrl);
-  await expect(sk.field).toHaveValue(EDITED_ALT);
-  await expect(sk.badge).toHaveCount(0);
+  await expect(sk).toHaveValue(EDITED_ALT);
+  await expect(sk).not.toHaveAccessibleDescription(AI_LABEL);
 
   await image.getByRole("button", { name: `Remove: Image ${before + 1}` }).click();
   await admin.getByRole("button", { name: "Save product" }).click();
