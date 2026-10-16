@@ -68,7 +68,7 @@ It refuses drafts, unmergeable PRs, PRs behind `main` (`gh pr update-branch <n> 
 a local PR branch that differs from the pushed head. It checks out the PR head in a temporary
 worktree (your working tree is not touched), maps changed
 files to areas via `scripts/verify-areas.txt`, and runs: vitest for changed TS (`--changed`),
-`cargo test` + the Meilisearch tests when Rust, migrations or fixtures change, and the e2e specs
+`make test-rust` + `make test-search` when Rust, migrations or fixtures change, and the e2e specs
 (with their axe checks) linked to each area. Shared code (UI kit, admin shell/i18n/API client,
 auth, edge, migrations, API core, compose, e2e support/config), a file no area maps, or
 `--full` runs everything: all Rust and TS tests, all e2e, the image smoke test and `make perf`.
@@ -78,7 +78,9 @@ CI acceptance job (`make seed` + `scripts/seed-m2-perf-review.sh`), and removed 
 containers, volumes and image tags on success, failure or Ctrl-C (a `kill -9` leftover is
 removed by the next run); it never touches the dev stack (`ecommerce`).
 Committed `.only` fails both runners. One run at a time (lock in
-`~/.cache/ecommerce-verify-merge/`; the persistent Cargo target dir lives there too).
+`~/.cache/ecommerce-verify-merge/`; the persistent Cargo target dir lives there too, built
+through sccache without incremental and cut to 30 GB by `cargo sweep --maxsize` before each
+cargo stage).
 
 On success it posts `local-verify=success` on the PR head, with the verified `main` commit at the
 start of its description, and prints the merge command,

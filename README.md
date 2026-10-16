@@ -32,6 +32,10 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
   `cargo install sqlx-cli --no-default-features --features rustls,postgres --locked`
 - Node 24 and pnpm 11 (`corepack enable` picks the pinned version)
 - `flock` for `make test-rust` (util-linux; macOS: `brew install flock`), `psql` for worktrees
+- `cargo install --locked cargo-nextest sccache cargo-sweep cargo-hakari`: nextest runs
+  `make test-rust` and `make test-search`; sccache caches worktree builds; cargo-sweep bounds
+  `target/` dirs (`pnpm verify`, `scripts/worktree.sh sweep`); cargo-hakari regenerates
+  `crates/workspace-hack`
 
 ## Quick start
 
@@ -128,6 +132,7 @@ trusted network.
 | `make openapi-check` | Fail if the generated clients are stale (runs in CI) |
 | `pnpm verify <PR#> [--full]` | Optional for now: test a PR on a throwaway stack and record `local-verify` (runbook "Verify") |
 | `make sqlx-prepare` | Refresh `.sqlx/` (offline `query!` data) after SQL changes; commit it |
+| `cargo hakari generate && cargo hakari manage-deps` | Refresh `crates/workspace-hack` after dependency changes; commit it (CI checks) |
 | `make admin args="..."` | Superadmin CLI in the api container (see below) |
 | `make logs s=api`, `make ps` | Logs / status |
 | `make seed` | Create or complete the demo shop and publish theme/checkout artifacts; idempotent |
@@ -149,8 +154,9 @@ checkout's stack and gets its own dev database and API port:
 ```bash
 pnpm worktree:setup      # once per worktree, safe to rerun
 make api-native          # this branch's API on its own port and database
-pnpm worktree:teardown   # drop the worktree's database, then remove the worktree
+pnpm worktree:teardown   # drop the worktree's database and target/, then remove the worktree
 pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dry-run to preview)
+scripts/worktree.sh sweep  # Rust artifacts older than 14 days in every linked worktree (--dry-run)
 ```
 
 - Setup symlinks `.env` to the main checkout's, installs packages, creates `app_wt_<name>_<hash>`
@@ -164,8 +170,11 @@ pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dr
 - Meilisearch, MinIO, Mailpit and the auth service stay shared with the main checkout.
 - `make test-rust` and `make test-search` take a per-Postgres lock (Makefile, `TEST_DB_LOCK`), so
   concurrent runs from different checkouts wait for each other.
-- Every worktree builds its own `target/` (several GB); export a shared `CARGO_TARGET_DIR` to trade
-  that disk for serialised builds.
+- Setup also writes `.cargo/worktree.toml` (gitignored, included by `.cargo/config.toml`):
+  incremental off and `sccache` as rustc wrapper, cache in `~/.cache/sccache` capped at 30 GB, so
+  a new worktree takes compiled dependencies from the cache and its `target/` stays a few GB. The
+  main checkout has no such file and keeps incremental builds. Without `sccache` on `PATH`, setup
+  warns and writes only `incremental = false`.
 
 ## Tenants and staff sign-in
 
