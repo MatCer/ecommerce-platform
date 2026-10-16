@@ -10,8 +10,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use testkit::storefront::Shop;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 struct Ctx {
     s: api::AppState,

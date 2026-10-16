@@ -10,8 +10,7 @@ use object_store::{ObjectStoreExt, PutPayload, path::Path};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 fn category(name: &str, slug: &str, parent: Option<&str>) -> Value {
     json!({

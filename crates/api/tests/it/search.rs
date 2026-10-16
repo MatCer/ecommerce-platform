@@ -1,8 +1,6 @@
 //! Storefront search and search Admin API over HTTP (spec §8.2, §11.1, A27).
 #![allow(clippy::unwrap_used)]
 
-mod common;
-
 use std::time::Duration;
 
 use axum::body::Body;
@@ -13,7 +11,7 @@ use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use common::*;
+use crate::common::*;
 
 struct Shop {
     s: api::AppState,

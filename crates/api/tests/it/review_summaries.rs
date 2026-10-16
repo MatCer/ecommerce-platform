@@ -7,8 +7,7 @@ use commerce::ai::{Ai, Outcome, review_summary};
 use serde_json::json;
 use sqlx::PgPool;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn admins_switch_summaries_and_the_product_page_shows_them(db: PgPool) {

@@ -14,8 +14,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use testkit::storefront::Shop;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 const DEFAULT: &str = "d0000000000000000000000000000000";
 const BUILT: &str = "a0000000000000000000000000000001";

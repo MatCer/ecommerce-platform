@@ -1,7 +1,6 @@
 #![allow(clippy::unwrap_used)]
-mod common;
+use crate::common::*;
 use axum::http::StatusCode;
-use common::*;
 use serde_json::json;
 use sqlx::PgPool;
 use std::time::Duration;

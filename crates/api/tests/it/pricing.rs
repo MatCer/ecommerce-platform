@@ -9,8 +9,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 struct Ctx {
     s: api::AppState,

@@ -15,8 +15,7 @@ use sqlx::PgPool;
 use testkit::storefront::Shop;
 use uuid::Uuid;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 const CZ_IBAN: &str = "CZ6508000000192000145399";
 

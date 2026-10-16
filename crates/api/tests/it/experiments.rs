@@ -9,8 +9,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 const ENROL: &str = "/internal/v1/experiments/enrol";
 const SUBJECT: &str = "0123456789abcdef0123456789abcdef";

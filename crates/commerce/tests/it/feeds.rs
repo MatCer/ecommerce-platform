@@ -15,8 +15,8 @@ use sqlx::PgPool;
 use testkit::storefront::Shop;
 use uuid::Uuid;
 
-const HEUREKA: &str = include_str!("../../../fixtures/feeds/heureka-demo.xml");
-const JPEG: &[u8] = include_bytes!("../../../fixtures/images/smoke-photo.jpg");
+const HEUREKA: &str = include_str!("../../../../fixtures/feeds/heureka-demo.xml");
+const JPEG: &[u8] = include_bytes!("../../../../fixtures/images/smoke-photo.jpg");
 
 /// Serves the demo image for every `/images/demo/*` path and the feed at `/feed.xml`.
 async fn server(feed: String) -> String {

@@ -11,8 +11,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use testkit::storefront::{Shop, raw_order};
 
-mod common;
-use common::*;
+use crate::common::*;
 
 fn sf<'a>(call: Call<'a>, shop: &Shop) -> Call<'a> {
     call.header("x-storefront-token", shop.token.clone())

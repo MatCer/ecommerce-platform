@@ -10,8 +10,7 @@ use sqlx::PgPool;
 use testkit::storefront::Shop;
 use uuid::Uuid;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 struct Ctx {
     s: api::AppState,

@@ -14,8 +14,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use tower::ServiceExt;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 fn sk_market() -> Value {
     json!({

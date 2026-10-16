@@ -9,8 +9,7 @@ use commerce::insights;
 use serde_json::json;
 use sqlx::PgPool;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn staff_list_and_dismiss_their_shops_insights(db: PgPool) {

@@ -9,8 +9,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-mod common;
-use common::*;
+use crate::common::*;
 
 const BACKFILL: &str = "/admin/v1/ai/alt-texts/backfill";
 
