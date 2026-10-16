@@ -129,7 +129,7 @@ prune() {
 
 gb() { awk -v b="$1" 'BEGIN { printf "%.1f GB", b / 1e9 }'; }
 
-size_bytes() { du -sk "$1" | awk '{ print $1 * 1024 }'; }
+size_bytes() { du -sk "$1" | awk '{ printf "%.0f\n", $1 * 1024 }'; }
 
 remove_target() (
   local target=$1/target bytes cleanup gitdir trash
@@ -178,7 +178,7 @@ tidy() {
   ! command -v timeout >/dev/null || limit=(timeout 10)
   if command -v gh >/dev/null; then
     # A worktree on a main commit is linked to the PR squash-merged into it, so match the PR head.
-    pr=$("${limit[@]}" gh api "repos/{owner}/{repo}/commits/$head/pulls" \
+    pr=$(${limit[@]+"${limit[@]}"} gh api "repos/{owner}/{repo}/commits/$head/pulls" \
       --jq "[.[] | select(.merged_at != null and .head.sha == \"$head\")][0].number // empty" 2>/dev/null) ||
       { pr=''; echo "worktree: GitHub did not answer, cannot tell whether HEAD is merged" >&2; }
   fi
