@@ -580,24 +580,22 @@ fn add_alpha_domain(
     }
 }
 
-/// Runs `first` until it stops at the registration lock an uncommitted account domain holds,
-/// then `second` until it queues behind `first`, then releases the lock.
 async fn register_in_order(
     db: &PgPool,
     runtime: &PgPool,
     first: impl Future<Output = Result<(), Error>> + Send + 'static,
     second: impl Future<Output = Result<(), Error>> + Send + 'static,
 ) -> (Result<(), Error>, Result<(), Error>) {
-    let mut config = runtime.begin().await.unwrap();
+    let mut registration_lock = runtime.begin().await.unwrap();
     sqlx::query("INSERT INTO platform.account_domains (domain) VALUES ('accounts.example')")
-        .execute(&mut *config)
+        .execute(&mut *registration_lock)
         .await
         .unwrap();
     let first = tokio::spawn(first);
     wait_until_blocked(db, &first, 1).await;
     let second = tokio::spawn(second);
     wait_until_blocked(db, &second, 2).await;
-    config.rollback().await.unwrap();
+    registration_lock.rollback().await.unwrap();
     (first.await.unwrap(), second.await.unwrap())
 }
 
