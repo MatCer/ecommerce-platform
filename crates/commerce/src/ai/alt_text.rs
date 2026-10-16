@@ -503,36 +503,6 @@ async fn store(
     Ok(())
 }
 
-pub(crate) async fn keep_unedited(
-    tx: &mut TenantTx,
-    before: &products::Product,
-    media: &mut [products::ProductMedia],
-) -> Result<(), Error> {
-    let marks = sqlx::query!(
-        "SELECT field, locale, value_sha256 FROM ai_marks
-         WHERE entity_type = 'product' AND entity_id = $1 AND feature = $2",
-        before.id.to_string(),
-        FEATURE
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    for m in media.iter_mut() {
-        let Some(old) = before.media.iter().find(|o| o.asset_id == m.asset_id) else {
-            continue;
-        };
-        let field = alt_field(m.asset_id);
-        for mark in marks.iter().filter(|k| k.field == field) {
-            if let Some(text) = old.alt_i18n.get(&mark.locale)
-                && is_empty(m.alt_i18n.get(&mark.locale))
-                && marks::value_hash(&json!(text)) == mark.value_sha256
-            {
-                m.alt_i18n.insert(mark.locale.clone(), text.clone());
-            }
-        }
-    }
-    Ok(())
-}
-
 fn internal(e: serde_json::Error) -> Error {
     Error::Internal(e.to_string())
 }
