@@ -43,15 +43,18 @@ impl MeiliError {
 }
 
 impl From<MeiliError> for platform::Error {
-    /// Outages (unreachable, 5xx, rate limits, a missing index, task trouble) are
+    /// Outages (unreachable, 5xx, rate limits, task trouble) and an index that is missing or
+    /// still on older settings (a sort attribute not sortable yet, right after a deploy) are
     /// `Unavailable`: search degrades and storefront pages fall back to Postgres. A request
-    /// Meilisearch refused (a malformed query, a rejected key) is a bug or a misconfiguration
-    /// and must not be hidden behind a fallback: `Internal`.
+    /// Meilisearch refused otherwise (a malformed query, a rejected key) is a bug or a
+    /// misconfiguration and must not be hidden behind a fallback: `Internal`.
     fn from(e: MeiliError) -> Self {
         let refused = matches!(
             &e,
             MeiliError::Api { status, code, .. }
-                if (400..500).contains(status) && *status != 429 && code != "index_not_found"
+                if (400..500).contains(status)
+                    && *status != 429
+                    && !matches!(code.as_str(), "index_not_found" | "invalid_search_sort")
         );
         if refused {
             Self::Internal(format!("search: {e}"))
@@ -340,6 +343,10 @@ mod error_tests {
         assert!(matches!(api(503, "x"), platform::Error::Unavailable(_)));
         assert!(matches!(
             api(404, "index_not_found"),
+            platform::Error::Unavailable(_)
+        ));
+        assert!(matches!(
+            api(400, "invalid_search_sort"),
             platform::Error::Unavailable(_)
         ));
         assert!(matches!(
