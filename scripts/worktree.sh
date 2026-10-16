@@ -3,6 +3,11 @@ set -euo pipefail
 
 die() { echo "worktree: $*" >&2; exit 1; }
 
+cleanup_bash() {
+  ((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4))) ||
+    die "$1 needs bash 4.4+, this is $BASH_VERSION (macOS: brew install bash)"
+}
+
 cargo_config() {
   [[ -d $1 ]] || die "no directory $1"
   local wrapper='rustc-wrapper = "sccache"'
@@ -196,11 +201,13 @@ tidy() {
 case ${1:-} in
   setup | teardown)
     [[ $# -eq 1 ]] || die "usage: scripts/worktree.sh $1"
+    [[ $1 == setup ]] || cleanup_bash "$1"
     in_checkout
     "$1"
     ;;
   prune | sweep | tidy)
     [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh $1 [--dry-run]"
+    [[ $1 == prune ]] || cleanup_bash "$1"
     in_checkout
     "$1" "${2:-}"
     ;;

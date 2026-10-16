@@ -32,6 +32,8 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
   `cargo install sqlx-cli --no-default-features --features rustls,postgres --locked`
 - Node 24 and pnpm 11 (`corepack enable` picks the pinned version)
 - `flock` for `make test-rust` (util-linux; macOS: `brew install flock`), `psql` for worktrees
+- bash 4.4+ for `pnpm verify` and the worktree cleanup commands (`worktree:teardown`, `worktree:tidy`,
+  `scripts/worktree.sh sweep`); macOS ships 3.2, so `brew install bash`
 - `cargo install --locked cargo-nextest sccache cargo-sweep cargo-hakari`: nextest runs
   `make test-rust` and `make test-search`; sccache caches worktree builds; cargo-sweep bounds
   `pnpm verify`'s target dir; cargo-hakari regenerates
