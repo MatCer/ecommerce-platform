@@ -11,6 +11,7 @@ pub mod plan;
 mod prompts;
 pub mod proposals;
 pub mod review_summary;
+pub mod settings;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;

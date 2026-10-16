@@ -27,7 +27,10 @@ async fn admins_switch_summaries_and_the_product_page_shows_them(db: PgPool) {
         .await;
     assert_eq!(
         (status, body),
-        (StatusCode::OK, json!({ "review_summaries": false }))
+        (
+            StatusCode::OK,
+            json!({ "review_summaries": false, "alt_texts": false })
+        )
     );
     let on = json!({ "review_summaries": true });
     let (status, body, _) = Call::put("/admin/v1/ai/settings", on.clone())
@@ -53,7 +56,13 @@ async fn admins_switch_summaries_and_the_product_page_shows_them(db: PgPool) {
         .tenant(shop.tenant)
         .send(&s)
         .await;
-    assert_eq!((status, body), (StatusCode::OK, on.clone()));
+    assert_eq!(
+        (status, body),
+        (
+            StatusCode::OK,
+            json!({ "review_summaries": true, "alt_texts": false })
+        )
+    );
     let (_, log, _) = Call::get("/admin/v1/audit-log?limit=1")
         .token(&boss)
         .tenant(shop.tenant)

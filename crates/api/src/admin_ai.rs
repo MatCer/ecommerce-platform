@@ -13,7 +13,7 @@ use commerce::ai::glossary::{self, Glossary};
 use commerce::ai::marks::{self, AiMarkList};
 use commerce::ai::plan::{self, BulkPlan, NewPlan};
 use commerce::ai::proposals::{self, AcceptProposal, NewProposal, Proposal};
-use commerce::ai::review_summary::{self, AiSettings};
+use commerce::ai::settings::{self, AiSettings};
 use commerce::ai::{self, UsageSummary};
 use commerce::tenancy::Role;
 use platform::Error;
@@ -58,7 +58,7 @@ async fn usage(staff: TenantStaff, State(s): State<AppState>) -> Result<Json<Usa
     ))
 }
 
-/// The shop's AI switches. Review summaries are off until an admin turns them on.
+/// The shop's AI switches. Each is off until an admin turns it on.
 #[utoipa::path(
     get,
     path = "/admin/v1/ai/settings",
@@ -72,16 +72,13 @@ async fn get_ai_settings(
     State(s): State<AppState>,
 ) -> Result<Json<AiSettings>, Error> {
     Ok(Json(
-        in_tx(&s, staff.tenant_id, async |tx| {
-            review_summary::settings(tx).await
-        })
-        .await?,
+        in_tx(&s, staff.tenant_id, async |tx| settings::get(tx).await).await?,
     ))
 }
 
 /// Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
-/// summary per product with at least 5 published verified reviews; any change purges the
-/// shop's cached pages.
+/// summary per product with at least 5 published verified reviews; switching them purges the
+/// shop's cached pages. Alt texts apply to images uploaded after they were turned on.
 #[utoipa::path(
     put,
     path = "/admin/v1/ai/settings",
@@ -105,7 +102,7 @@ async fn put_ai_settings(
     let actor = &staff.user.user_id;
     Ok(Json(
         in_tx(&s, staff.tenant_id, async |tx| {
-            review_summary::put_settings(tx, actor, &input).await
+            settings::put(tx, actor, &input).await
         })
         .await?,
     ))

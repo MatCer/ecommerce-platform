@@ -31,7 +31,7 @@ pub const EVENTS: &[&str] = &[
     crate::content::MENU_CHANGED_EVENT,
     crate::reviews::CHANGED_EVENT,
     crate::ai::review_summary::CHANGED_EVENT,
-    crate::ai::review_summary::SETTINGS_CHANGED_EVENT,
+    crate::ai::settings::CHANGED_EVENT,
 ];
 
 pub fn for_event(event_type: &str, payload: &Value) -> Option<Purge> {

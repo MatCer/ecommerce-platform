@@ -251,12 +251,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The shop's AI switches. Review summaries are off until an admin turns them on. */
+        /** The shop's AI switches. Each is off until an admin turns it on. */
         get: operations["get_ai_settings"];
         /**
          * Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one
-         *     summary per product with at least 5 published verified reviews; any change purges the
-         *     shop's cached pages.
+         *     summary per product with at least 5 published verified reviews; switching them purges the
+         *     shop's cached pages. Alt texts apply to images uploaded after they were turned on.
          */
         put: operations["put_ai_settings"];
         post?: never;
@@ -4876,6 +4876,11 @@ export interface components {
             items: components["schemas"]["AiMark"][];
         };
         AiSettings: {
+            /**
+             * @description AI alt texts for product images uploaded from now on, in every market language that
+             *     has none. Off by default.
+             */
+            alt_texts?: boolean;
             /**
              * @description AI summaries of verified reviews on product pages, labelled as AI-generated. Off by
              *     default.

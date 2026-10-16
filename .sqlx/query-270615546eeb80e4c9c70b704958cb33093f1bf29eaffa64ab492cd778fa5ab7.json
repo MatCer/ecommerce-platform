@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT review_summaries FROM ai_settings",
+  "query": "SELECT review_summaries, alt_texts_since IS NOT NULL AS \"alt_texts!\" FROM ai_settings",
   "describe": {
     "columns": [
       {
@@ -13,14 +13,21 @@
             "name": "review_summaries"
           }
         }
+      },
+      {
+        "ordinal": 1,
+        "name": "alt_texts!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
       "Left": []
     },
     "nullable": [
-      false
+      false,
+      null
     ]
   },
-  "hash": "48c5d7360a67a880f26ed1ac3e392b1e5512351de9356fd9160d98df541da971"
+  "hash": "270615546eeb80e4c9c70b704958cb33093f1bf29eaffa64ab492cd778fa5ab7"
 }

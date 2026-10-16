@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE ai_settings SET review_summaries = $2,\n             alt_texts_since = CASE WHEN $3 THEN coalesce(alt_texts_since, now()) END,\n             updated_at = now()\n         WHERE tenant_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "62ddf1a7b81647e194d60acb184a65b406a6ec098dbd66bdf2246f9c17906105"
+}

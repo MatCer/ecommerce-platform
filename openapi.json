@@ -957,7 +957,7 @@
         "tags": [
           "ai"
         ],
-        "summary": "The shop's AI switches. Review summaries are off until an admin turns them on.",
+        "summary": "The shop's AI switches. Each is off until an admin turns it on.",
         "operationId": "get_ai_settings",
         "parameters": [
           {
@@ -992,7 +992,7 @@
         "tags": [
           "ai"
         ],
-        "summary": "Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one\nsummary per product with at least 5 published verified reviews; any change purges the\nshop's cached pages.",
+        "summary": "Replaces the AI switches. Owner or admin; audited. Turning review summaries on queues one\nsummary per product with at least 5 published verified reviews; switching them purges the\nshop's cached pages. Alt texts apply to images uploaded after they were turned on.",
         "operationId": "put_ai_settings",
         "parameters": [
           {
@@ -22440,6 +22440,10 @@
           "review_summaries"
         ],
         "properties": {
+          "alt_texts": {
+            "type": "boolean",
+            "description": "AI alt texts for product images uploaded from now on, in every market language that\nhas none. Off by default."
+          },
           "review_summaries": {
             "type": "boolean",
             "description": "AI summaries of verified reviews on product pages, labelled as AI-generated. Off by\ndefault."

@@ -1009,7 +1009,7 @@ async fn theme_builds_are_handed_to_the_builder(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
-    use commerce::ai::review_summary::{self, AiSettings};
+    use commerce::ai::settings::{self, AiSettings};
 
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "summaries").await;
@@ -1029,11 +1029,12 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
         .await
         .unwrap();
     }
-    review_summary::put_settings(
+    settings::put(
         &mut tx,
         "owner",
         &AiSettings {
             review_summaries: true,
+            alt_texts: false,
         },
     )
     .await
