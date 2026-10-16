@@ -1,3 +1,5 @@
+SET LOCAL lock_timeout = '5s';
+
 CREATE TABLE platform.hostname_claims (
     hostname        text PRIMARY KEY,
     tenant_id       uuid NOT NULL REFERENCES platform.tenants (id),
@@ -58,6 +60,7 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
+    PERFORM pg_advisory_xact_lock('platform.account_domains'::regclass::oid::bigint);
     IF EXISTS (SELECT 1 FROM platform.account_domains a
                WHERE NEW.hostname = a.domain OR NEW.hostname LIKE '%.' || a.domain) THEN
         RAISE EXCEPTION 'hostname % is under an account domain', NEW.hostname
@@ -83,6 +86,7 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
+    PERFORM pg_advisory_xact_lock('platform.account_domains'::regclass::oid::bigint);
     IF EXISTS (SELECT 1 FROM platform.hostname_claims c
                WHERE c.hostname = NEW.domain OR c.hostname LIKE '%.' || NEW.domain) THEN
         RAISE EXCEPTION 'account domain % covers a shop hostname', NEW.domain
@@ -130,6 +134,9 @@ CREATE TRIGGER checkout_origin_mode_changed BEFORE UPDATE OF mode ON platform.ch
 
 REVOKE UPDATE, DELETE ON platform.hostname_claims FROM app_runtime;
 REVOKE UPDATE, DELETE ON platform.account_domains FROM app_runtime;
-REVOKE UPDATE, DELETE ON platform.checkout_origins FROM app_runtime;
+REVOKE INSERT, UPDATE, DELETE ON platform.checkout_origins FROM app_runtime;
+GRANT INSERT (scheme, hostname, port, tenant_id, market_id, mode, history,
+              attested_by, attested_at, attestation_version)
+    ON platform.checkout_origins TO app_runtime;
 GRANT UPDATE (mode, history, attested_by, attested_at, attestation_version)
     ON platform.checkout_origins TO app_runtime;

@@ -485,6 +485,76 @@ async fn mode_switch_moves_the_generation(db: PgPool) {
         .await
         .unwrap_err();
     assert_eq!(db_code(&err).as_deref(), Some("42501"));
+    let err = sqlx::query(
+        "INSERT INTO platform.checkout_origins
+             (scheme, hostname, port, tenant_id, market_id, mode_generation)
+         SELECT 'https', hostname, 8443, tenant_id, market_id, 9001 FROM platform.domains
+         WHERE hostname = 'alpha.localhost'",
+    )
+    .execute(&runtime)
+    .await
+    .unwrap_err();
+    assert_eq!(db_code(&err).as_deref(), Some("42501"));
+}
+
+async fn wait_until_blocked<T>(db: &PgPool, task: &tokio::task::JoinHandle<T>) {
+    while !task.is_finished() {
+        let blocked: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+                            WHERE datname = current_database() AND wait_event_type = 'Lock')",
+        )
+        .fetch_one(db)
+        .await
+        .unwrap();
+        if blocked {
+            return;
+        }
+        tokio::task::yield_now().await;
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn account_domain_and_shop_registration_serialize(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 3).await;
+    let alpha = tenancy::create_tenant(&runtime, &owner("alpha"))
+        .await
+        .unwrap();
+
+    let mut config = runtime.begin().await.unwrap();
+    sqlx::query("INSERT INTO platform.account_domains (domain) VALUES ('accounts.example')")
+        .execute(&mut *config)
+        .await
+        .unwrap();
+    let shop = tokio::spawn({
+        let runtime = runtime.clone();
+        async move { tenancy::add_domain(&runtime, "alpha", "shop.accounts.example", None, false).await }
+    });
+    wait_until_blocked(&db, &shop).await;
+    config.commit().await.unwrap();
+    assert_eq!(shop.await.unwrap().unwrap_err().code(), "reserved_hostname");
+
+    let mut registration = runtime.begin().await.unwrap();
+    sqlx::query(
+        "INSERT INTO platform.domains (hostname, tenant_id, market_id)
+         VALUES ('shop.other.example', $1, $2)",
+    )
+    .bind(alpha.tenant_id)
+    .bind(alpha.market_id)
+    .execute(&mut *registration)
+    .await
+    .unwrap();
+    let reservation = tokio::spawn({
+        let runtime = runtime.clone();
+        async move {
+            sqlx::query("INSERT INTO platform.account_domains (domain) VALUES ('other.example')")
+                .execute(&runtime)
+                .await
+        }
+    });
+    wait_until_blocked(&db, &reservation).await;
+    registration.commit().await.unwrap();
+    let err = reservation.await.unwrap().unwrap_err();
+    assert_eq!(db_code(&err).as_deref(), Some("23514"));
 }
 
 #[sqlx::test(migrations = "../../migrations")]

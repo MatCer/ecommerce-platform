@@ -12,7 +12,7 @@ import { rateHeaders, testContext } from "../rate-client";
 const port = process.env.HTTP_PORT ?? "8080";
 export const CZ = `http://demo.localhost:${port}`;
 export const SK = `http://demo-sk.localhost:${port}`;
-export const FRESH = `http://demo-fresh.localhost:${port}`;
+export const FRESH = new URL(`http://demo-fresh.localhost:${port}`).origin;
 export const checkoutOf = (shop: string) => shop.replace("://", "://checkout.");
 
 /** SSR controls are visible before the checkout island attaches its event handlers. */
