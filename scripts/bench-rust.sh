@@ -54,6 +54,7 @@ main=$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree
 src=$(realpath "$1")
 out=$(realpath -m "$2")
 [[ -f $src/Cargo.toml ]] || die "$src is not the workspace root"
+[[ $out != "$src" && $out != "$src"/* ]] || die "<out-dir> $out is <src-dir> or inside it; warm-cache copies would include it"
 ! git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "$src is in a git work tree; use a git archive copy"
 [[ ! -e $src/.env || -L $src/.env ]] || die "$src/.env is a regular file; the bench replaces it with a symlink"
 mkdir -p "$out/log"
