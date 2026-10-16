@@ -1,7 +1,6 @@
 //! AI helpers Admin API (spec §12): usage + quota, glossary, proposals (descriptions, SEO,
-//! translations) accepted per field, AI markers, bulk edit by prompt, and the tenant's AI
-//! switches (SHOP-36). Every staff member may use the helpers; writes go through the
-//! catalog/content/pricing services and the audit log. Only admins change the switches.
+//! translations) accepted per field, AI markers, and bulk edit by prompt. Every staff member
+//! may use them; writes go through the catalog/content/pricing services and the audit log.
 
 use axum::Json;
 use axum::body::Bytes;

@@ -385,7 +385,6 @@ async fn ai_plan(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
     ai_outcome(plan::run_plan(&ctx.db, &ai, tenant, id, last).await)
 }
 
-/// Regenerates a product's AI review summaries; only provider outages are retried.
 async fn ai_review_summary(ctx: Ctx, job: Job, ai: Ai) -> Result<(), JobError> {
     let (tenant, product_id) = tenant_and(&job, "product_id")?;
     let last = job.attempts >= job.max_attempts;

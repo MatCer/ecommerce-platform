@@ -79,8 +79,8 @@ say, above the reviews on the product page (conversion theme).
   name, the rating distribution and the newest 40 reviews (rating, title, body cut to 1000
   characters, language); no names, ids, dates or order links.
 - **Trigger.** Every `review.changed` (publish, hide, reply) queues `ai.review_summary` for
-  the product, debounced to one job per 5-minute window. The job hashes the input (prompt
-  version, target locales, product name, every input review's id, rating, title and body) and
+  the product, debounced to one job per 5-minute window. The job hashes the input (system prompt
+  and schema, target locales, product name, every input review's id, rating, title and body) and
   makes no call while it equals the stored hash, so a reply costs nothing. It recomputes the
   hash in the write transaction and writes nothing if the input changed meanwhile (that
   change queued a newer job). A written or deleted summary publishes

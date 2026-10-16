@@ -1,9 +1,3 @@
-//! AI review summaries (SHOP-36): with the tenant's opt-in switch on, a product with at least
-//! [`MIN_REVIEWS`] published verified reviews gets one short summary per market locale. The
-//! `ai.review_summary` job regenerates it after `review.changed` (debounced), skips the model
-//! call while the input hash is unchanged, and labels every stored text through `ai_marks`.
-//! The shop shows a summary only while the switch is on and its label still matches.
-
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
@@ -24,20 +18,14 @@ use crate::reviews::{self, plain_text};
 use crate::storefront::Context;
 
 pub const JOB: &str = "ai.review_summary";
-/// Metering key, fake fixture and `ai_marks.feature`.
 pub const FEATURE: &str = "review_summary";
-/// `ai_marks.field` of a stored summary.
 pub const FIELD: &str = "review_summary";
 pub const MIN_REVIEWS: i64 = 5;
 pub const MAX_INPUT_REVIEWS: i64 = 40;
 pub const BODY_CHARS: usize = 1000;
 pub const SUMMARY_MAX: usize = 600;
 pub const DEBOUNCE_SECS: i64 = 300;
-/// Part of the input hash: bump it when the prompt or the data shape changes.
-pub const PROMPT_VERSION: u32 = 1;
-/// `{product_id}` after a summary was written or deleted.
 pub const CHANGED_EVENT: &str = "review_summary.changed";
-/// After an AI settings change (purges the tenant's pages).
 pub const SETTINGS_CHANGED_EVENT: &str = "ai_settings.changed";
 const ACTOR: &str = "system";
 
@@ -70,8 +58,6 @@ pub async fn settings(tx: &mut TenantTx) -> Result<AiSettings, Error> {
     )
 }
 
-/// Replaces the settings (audited). A change purges the tenant's pages; switching summaries on
-/// queues a job for every product with enough reviews or a summary cached while it was off.
 pub async fn put_settings(
     tx: &mut TenantTx,
     actor: &str,
@@ -124,8 +110,7 @@ fn new_job(tenant_id: Uuid, product_id: Uuid) -> NewJob<'static> {
     j
 }
 
-/// One job per product and debounce window, run at the window's end.
-pub fn job(tenant_id: Uuid, product_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
+pub fn debounced_job(tenant_id: Uuid, product_id: Uuid, now: DateTime<Utc>) -> NewJob<'static> {
     let slot = now.timestamp().div_euclid(DEBOUNCE_SECS);
     let mut j = new_job(tenant_id, product_id);
     j.idempotency_key = Some(format!("{JOB}:{tenant_id}:{product_id}:{slot}"));
@@ -133,8 +118,6 @@ pub fn job(tenant_id: Uuid, product_id: Uuid, now: DateTime<Utc>) -> NewJob<'sta
     j
 }
 
-/// Every `review.changed` (publish, hide, reply) queues a regeneration; the job decides
-/// whether anything changed.
 pub fn job_for_event(
     tenant_id: Option<Uuid>,
     event_type: &str,
@@ -146,10 +129,9 @@ pub fn job_for_event(
         .get("product_id")
         .and_then(Value::as_str)
         .and_then(|s| Uuid::parse_str(s).ok())?;
-    Some(job(tenant_id?, product_id, now))
+    Some(debounced_job(tenant_id?, product_id, now))
 }
 
-/// What the model sees for a product, and the hash of it.
 struct Input {
     data: Value,
     sha256: String,
@@ -157,7 +139,6 @@ struct Input {
     locales: Vec<String>,
 }
 
-/// `None` when the product does not exist (for this tenant).
 async fn load(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<Input>, Error> {
     let Some(product) = sqlx::query_scalar!(
         "SELECT name FROM product_translations WHERE product_id = $1
@@ -211,7 +192,12 @@ async fn load(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<Input>, Erro
         "rating": rating,
         "reviews": items,
     });
-    let sha256 = value_hash(&json!({ "v": PROMPT_VERSION, "ids": ids, "data": data }));
+    let sha256 = value_hash(&json!({
+        "system": prompts::REVIEW_SUMMARY_SYSTEM,
+        "schema": prompts::review_summary_schema(),
+        "ids": ids,
+        "data": data,
+    }));
     Ok(Some(Input {
         data,
         sha256,
@@ -233,8 +219,6 @@ struct OutputItem {
     summary: String,
 }
 
-/// The model's summaries by locale: exactly the requested locales (sorted), plain text of
-/// 1-600 characters without links, email addresses or markup.
 fn validate(output: Value, locales: &[String]) -> Result<BTreeMap<String, String>, CallError> {
     let out: Output = super::parse(output)?;
     let mut by_locale = BTreeMap::new();
@@ -275,8 +259,6 @@ async fn stored_hash(tx: &mut TenantTx, product_id: Uuid) -> Result<Option<Strin
     .await?)
 }
 
-/// Regenerates (or below the minimum deletes) a product's summaries. Provider outages are
-/// retried until `last_attempt`; quota, refusals and invalid output keep the old summary.
 pub async fn run(
     db: &PgPool,
     ai: &Ai,
@@ -301,7 +283,7 @@ pub async fn run(
     };
     if input.review_count < MIN_REVIEWS || input.locales.is_empty() {
         if stored.is_some() {
-            store(db, tenant, product_id, &input.sha256, None).await?;
+            store_if_input_unchanged(db, tenant, product_id, &input.sha256, None).await?;
         }
         return Ok(Outcome::Done);
     }
@@ -336,7 +318,7 @@ pub async fn run(
                 model: &model,
                 review_count: input.review_count,
             };
-            store(db, tenant, product_id, &input.sha256, Some(&fresh)).await?;
+            store_if_input_unchanged(db, tenant, product_id, &input.sha256, Some(&fresh)).await?;
             Ok(Outcome::Done)
         }
         Err(CallError::Platform(e)) => Err(e),
@@ -354,9 +336,7 @@ struct Fresh<'a> {
     review_count: i64,
 }
 
-/// Replaces the product's summaries and labels with `fresh` (`None`: deletes them), unless
-/// the input changed since `sha256` was computed: that change queued a newer job.
-async fn store(
+async fn store_if_input_unchanged(
     db: &PgPool,
     tenant: Uuid,
     product_id: Uuid,
@@ -440,8 +420,6 @@ async fn store(
     Ok(())
 }
 
-/// The summary in the request's locale, only while the switch is on and its AI label still
-/// matches the text (fails closed).
 pub async fn for_storefront(
     tx: &mut TenantTx,
     ctx: &Context,

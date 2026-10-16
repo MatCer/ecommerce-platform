@@ -1,5 +1,4 @@
-/** AI settings: this month's usage against the allowance, the AI switches of the shop, and the
- * translation glossary. */
+/** AI settings: this month's usage against the allowance, and the translation glossary. */
 import {
   Alert,
   Badge,

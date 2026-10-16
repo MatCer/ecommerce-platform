@@ -1,5 +1,3 @@
-//! AI review summaries through the router (SHOP-36): the admin switch (default off, admin-only
-//! writes, audited) and the summary on the storefront product page model.
 #![allow(clippy::unwrap_used)]
 
 use std::time::Duration;
