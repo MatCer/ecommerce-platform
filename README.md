@@ -34,7 +34,7 @@ docker/           Dockerfiles, Caddyfile, Postgres init script
 - `flock` for `make test-rust` (util-linux; macOS: `brew install flock`), `psql` for worktrees
 - `cargo install --locked cargo-nextest sccache cargo-sweep cargo-hakari`: nextest runs
   `make test-rust` and `make test-search`; sccache caches worktree builds; cargo-sweep bounds
-  `target/` dirs (`pnpm verify`, `scripts/worktree.sh sweep`); cargo-hakari regenerates
+  `pnpm verify`'s target dir; cargo-hakari regenerates
   `crates/workspace-hack`
 
 ## Quick start
@@ -156,8 +156,8 @@ pnpm worktree:setup      # once per worktree, safe to rerun
 make api-native          # this branch's API on its own port and database
 pnpm worktree:teardown   # drop the worktree's database and target/, then remove the worktree
 pnpm worktree:prune      # drop databases of worktrees git no longer lists (--dry-run to preview)
-scripts/worktree.sh sweep  # Rust artifacts older than 14 days in every linked worktree (--dry-run)
-pnpm worktree:tidy       # this worktree: drop target/ once HEAD is a merged PR's head, else cap it at 10 GB (--dry-run)
+scripts/worktree.sh sweep  # drop target/ of every linked worktree with nothing built for 14 days (--dry-run)
+pnpm worktree:tidy       # this worktree: drop target/ once HEAD is a merged PR's head or it is over 10 GB (--dry-run)
 ```
 
 - Setup symlinks `.env` to the main checkout's, installs packages, creates `app_wt_<name>_<hash>`
@@ -179,8 +179,9 @@ pnpm worktree:tidy       # this worktree: drop target/ once HEAD is a merged PR'
   comes from sccache. The main checkout has no such file. Without `sccache` on `PATH`, setup warns
   and writes no wrapper.
 - Tidy asks GitHub whether HEAD is the head commit of a merged PR. Offline, without `gh`, or on an
-  unmerged HEAD it only runs `cargo sweep --maxsize 10GB`; without `cargo-sweep` it warns and
-  leaves `target/` alone.
+  unmerged HEAD it only applies the 10 GB cap. Tidy, sweep and teardown delete the whole
+  `target/` (the next build takes dependencies from sccache) and skip it while a cargo build in
+  that worktree holds its lock, e.g. a dev server rebuilding.
 
 ## Tenants and staff sign-in
 

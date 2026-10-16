@@ -107,7 +107,7 @@ teardown() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; it has no worktree database"
   drop "$(worktree_db "$ROOT")"
   rm -f .env.worktree.local .cargo/worktree.toml
-  rm -rf target
+  [[ ! -d target ]] || remove_target "$ROOT" "teardown"
 }
 
 this_clone_databases() {
@@ -127,38 +127,55 @@ prune() {
   done
 }
 
+gb() { awk -v b="$1" 'BEGIN { printf "%.1f GB", b / 1e9 }'; }
+
+remove_target() (
+  local target=$1/target lock fd
+  for lock in "$target"/*/.cargo-lock; do
+    [[ -e $lock ]] || continue
+    exec {fd}<"$lock"
+    flock -n "$fd" || { echo "worktree: a cargo build is running in $1, $target left as is"; exit 0; }
+  done
+  echo "worktree: $2, ${3:+would }remove $target ($(gb "$(du -sb "$target" | cut -f1)"))"
+  [[ -n ${3:-} ]] || rm -rf "$target"
+)
+
 sweep() {
-  command -v cargo-sweep >/dev/null || die "cargo-sweep not found (README, Prerequisites)"
   local dir
   while read -r dir; do
     [[ $dir != "$MAIN" && -d $dir/target ]] || continue
-    env -u CARGO_TARGET_DIR cargo sweep ${1:+"$1"} --time 14 "$dir"
+    [[ -z $(find "$dir/target" -newermt '14 days ago' -print -quit) ]] || continue
+    remove_target "$dir" "nothing built for 14 days" "$1"
   done < <(worktrees)
 }
 
 tidy() {
   [[ $ROOT != "$MAIN" ]] || die "this is the main checkout; tidy is for linked worktrees"
   [[ -d target ]] || return 0
-  local head pr=''
+  local head pr='' bytes
   head=$(git rev-parse HEAD)
   if command -v gh >/dev/null; then
     # A worktree on a main commit is linked to the PR squash-merged into it, so match the PR head.
     pr=$(timeout 10 gh api "repos/{owner}/{repo}/commits/$head/pulls" \
       --jq "[.[] | select(.merged_at != null and .head.sha == \"$head\")][0].number // empty" 2>/dev/null) ||
-      echo "worktree: GitHub not reachable, cannot tell whether HEAD is merged" >&2
+      { pr=''; echo "worktree: GitHub did not answer, cannot tell whether HEAD is merged" >&2; }
   fi
+  bytes=$(du -sb target | cut -f1)
   if [[ -n $pr ]]; then
-    echo "worktree: HEAD is the merged head of PR #$pr, ${1:+would }remove target/ ($(du -sh target | cut -f1))"
-    [[ -n ${1:-} ]] || rm -rf target
-  elif command -v cargo-sweep >/dev/null; then
-    env -u CARGO_TARGET_DIR cargo sweep ${1:+"$1"} --maxsize 10GB "$ROOT"
+    remove_target "$ROOT" "HEAD is the merged head of PR #$pr" "$1"
+  elif ((bytes > 10 * 10 ** 9)); then
+    remove_target "$ROOT" "target/ is over the 10 GB cap" "$1"
   else
-    echo "worktree: cargo-sweep not found, target/ left as is (README, Prerequisites)" >&2
+    echo "worktree: target/ is $(gb "$bytes"), under the 10 GB cap, kept"
   fi
 }
 
 case ${1:-} in
-  setup | teardown) in_checkout; "$1" ;;
+  setup | teardown)
+    [[ $# -eq 1 ]] || die "usage: scripts/worktree.sh $1"
+    in_checkout
+    "$1"
+    ;;
   prune | sweep | tidy)
     [[ -z ${2:-} || $2 == --dry-run ]] || die "usage: scripts/worktree.sh $1 [--dry-run]"
     in_checkout
