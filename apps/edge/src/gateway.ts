@@ -85,7 +85,10 @@ const SPECULATION_RULES = JSON.stringify({
           { href_matches: "/*" },
           {
             not: {
-              href_matches: PLATFORM_SEGMENTS.flatMap((s) => [`/${s}{/*}?`, `/*/${s}{/*}?`]),
+              href_matches: [
+                ...PLATFORM_SEGMENTS.flatMap((s) => [`/${s}{/*}?`, `/*/${s}{/*}?`]),
+                "/*%*",
+              ],
             },
           },
           { not: { selector_matches: "[rel~=nofollow], [data-no-prerender]" } },
@@ -1505,6 +1508,7 @@ ${
     }
     if (p.startsWith("/_p/") || p.startsWith("/_edge/"))
       return problem(404, "not_found", "unknown platform route");
+    if (isPlatformPath(p)) return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     if (p.startsWith("/media/")) {
@@ -1763,7 +1767,7 @@ ${
       return new Response(null, {
         status: 303,
         headers: {
-          location: `${clean.pathname}${clean.search}`,
+          location: `/${clean.pathname.replace(/^[/\\]+/, "")}${clean.search}`,
           "set-cookie": `${PREVIEW_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=${maxAge}`,
           "cache-control": "no-store",
           "referrer-policy": "no-referrer",

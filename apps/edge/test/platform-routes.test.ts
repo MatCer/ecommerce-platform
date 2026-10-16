@@ -2,6 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import cases from "../../../fixtures/platform-paths.json" with { type: "json" };
 import { createGateway, type Gateway } from "../src/gateway.ts";
 import { StaticResolver } from "../src/sites.ts";
 import { buildArtifact, checkoutWorker, fakeApi, site } from "./fixtures.ts";
@@ -127,6 +128,19 @@ describe("reserved platform namespace (C8)", () => {
       await expectPlatform404(`http://demo.localhost${p}`);
   });
 
+  test("any method on a reserved path gets the same 404", async () => {
+    for (const p of ["/checkout", "/%63heckout", "/_checkout/a.js", "/en/checkout"]) {
+      const res = await gw.fetch(
+        new Request(`http://demo.localhost${p}`, {
+          method: "POST",
+          body: "x",
+          headers: { host: "demo.localhost" },
+        }),
+      );
+      expect(res.status, p).toBe(404);
+    }
+  });
+
   test("other theme paths still render", async () => {
     for (const p of ["/", "/p/checkout", "/c/account", "/pages/consent", "/checkouts", "/en/p/x"]) {
       const res = await get(`http://demo.localhost${p}`);
@@ -159,7 +173,8 @@ test("speculation rules never prerender a platform path or its localized variant
     (excluded ?? []).some((p) =>
       new URLPattern(p, "http://demo.localhost/").test(`http://demo.localhost${path}`),
     );
-  for (const p of ["/checkout", "/checkout/x?y=1", "/en/checkout", "/_p/cart", "/o/abc"])
+  const caseVariant = (p: string) => /[A-Z]/.test(p.replace(/%[0-9a-f]{2}/gi, ""));
+  for (const p of [...cases.reserved.filter((p) => !caseVariant(p)), "/checkout/x?y=1"])
     expect(matches(p), p).toBe(true);
   for (const p of ["/", "/p/tricko", "/checkouts", "/c/obleceni"])
     expect(matches(p), p).toBe(false);
