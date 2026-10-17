@@ -1,9 +1,7 @@
-//! Checkout (spec §8.2, §10.3, A1, A4, A10, A12, C6). The edge maps `checkout.<shop>/_p/checkout/*`
-//! here with the checkout cart capability (`__Host-cart` → `X-Cart-Token`), the session and the
-//! client IP, and enforces same-origin JSON. A same-origin shop maps its own reads, shipping and
-//! payment here with `__Host-Http-cart`, and its contact and address forms to `/details`; that
-//! write and a placement with a note answer the replacing capability in `X-Cart-Token`, for the
-//! edge only. `/_p/fake-pay/*` (the fake gateway's page, `PAYMENTS_FAKE=1`) lands here too.
+//! Checkout (spec §8.2, §10.3, A1, A4, A10, A12), reached only from the checkout origin: the
+//! edge maps `checkout.<shop>/_p/checkout/*` here with the checkout cart capability
+//! (`__Host-cart` → `X-Cart-Token`), the session and the client IP, and enforces same-origin
+//! JSON. `/_p/fake-pay/*` (the fake gateway's page, `PAYMENTS_FAKE=1`) lands here too.
 
 use axum::Json;
 use axum::body::Bytes;

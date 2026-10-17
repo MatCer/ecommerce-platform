@@ -1129,7 +1129,6 @@ ${
   const sameOriginCartCookie = (token: string) =>
     `${SAME_ORIGIN_CART_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`;
 
-  /** A top-level form POST from the shop's own page (C4, C10): the form, or the refusal. */
   async function navigationForm(
     site: SameOriginSite,
     req: Request,

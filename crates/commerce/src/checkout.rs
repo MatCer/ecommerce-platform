@@ -286,10 +286,6 @@ async fn ship_to_countries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Strin
         .collect())
 }
 
-/// Isolated mode only (the JSON PUTs `checkout.<shop>` proxies): writes `details` on the open
-/// checkout behind `token`, which keeps its capability. `409 checkout_mode_changed` on a
-/// same-origin origin before the capability is looked up, so the refusal locks, refreshes and
-/// writes nothing.
 pub async fn set_details(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -301,10 +297,6 @@ pub async fn set_details(
     Ok(c)
 }
 
-/// C6, same-origin mode only: writes `details` on the open checkout behind `token` and replaces
-/// its capability in the same transaction; returns the new one. `409 checkout_mode_changed` on
-/// an isolated origin before the lookup; `404` when `token` opens nothing; the writes' `422`s.
-/// A failure after the write rolls the write and the replacement back together.
 pub async fn set_details_and_rotate(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -739,8 +731,6 @@ pub struct Placement {
     pub token: String,
     /// True when this was an idempotent replay of an earlier placement.
     pub replayed: bool,
-    /// The checkout's replacing capability when this placement wrote an order note on a
-    /// same-origin origin (C6); `None` for isolated origins, note-less placements and replays.
     pub checkout_token: Option<String>,
 }
 

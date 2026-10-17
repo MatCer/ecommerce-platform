@@ -1,4 +1,3 @@
-/** Builds the `POST /storefront/v1/checkout/details` body from a form's own fields. */
 export type CheckoutForm = (form: URLSearchParams) => unknown;
 
 const field = (f: URLSearchParams, name: string) => f.get(name) ?? "";
@@ -13,11 +12,6 @@ const address = (f: URLSearchParams, prefix: "billing" | "shipping") => ({
   phone: field(f, `${prefix}_phone`),
 });
 
-/**
- * The navigation forms that write customer details and rotate the checkout capability (C4, C6),
- * by exact path. A field outside a form's list is never forwarded, and no other path reaches the
- * API.
- */
 export const CHECKOUT_FORMS: ReadonlyMap<string, CheckoutForm> = new Map<string, CheckoutForm>([
   [
     "/checkout/contact",

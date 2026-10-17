@@ -210,8 +210,6 @@ pub async fn open(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartR
     Ok(guard(tx, ctx, &p, token, false, true).await?.0)
 }
 
-/// [`open`], only while the origin is in `mode`: `409 checkout_mode_changed` otherwise, before
-/// the capability is looked up.
 pub(crate) async fn open_in(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -255,9 +253,6 @@ async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(
     Ok(())
 }
 
-/// Converts the open checkout once its order is written and empties the snapshot's shop cart.
-/// C6: when the placement wrote an order note on a same-origin origin, the capability is
-/// replaced first, while the row is still open, and the new one returned; `None` otherwise.
 pub(crate) async fn convert(
     tx: &mut TenantTx,
     ctx: &Context,
