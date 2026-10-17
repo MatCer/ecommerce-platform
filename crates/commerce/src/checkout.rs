@@ -35,6 +35,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::cart::{self, CartView, Priced, VatRow};
+use crate::checkout_access;
 use crate::consent::{self, ConsentChoice, ConsentPurpose, Purposes, Source, Subject};
 use crate::customers::{self, AddressInput};
 use crate::idempotency;
@@ -718,7 +719,7 @@ pub async fn place_order(
     placer: &Placer<'_>,
 ) -> Result<Placement, Error> {
     idempotency::validate_key(key)?;
-    let (cart_ref, open) = cart::find_for_order(tx, ctx, token).await?;
+    let (cart_ref, open) = checkout_access::open_for_order(tx, ctx, token).await?;
     let op = format!("{PLACE_OP} cart:{}", cart_ref.id);
     if let Some(stored) = idempotency::begin(tx, &op, key, request_hash).await? {
         let s: StoredPlacement = serde_json::from_value(stored.body)

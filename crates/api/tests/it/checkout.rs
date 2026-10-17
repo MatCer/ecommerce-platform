@@ -84,6 +84,7 @@ async fn setup(db: PgPool) -> Ctx {
 fn sf<'a>(call: Call<'a>, shop: &Shop) -> Call<'a> {
     call.header("x-storefront-token", shop.token.clone())
         .header("x-market", shop.cz.to_string())
+        .header("x-shop-origin", shop.origin.as_str())
         .header("x-client-ip", "203.0.113.7")
 }
 
@@ -195,6 +196,35 @@ impl Ctx {
 
 fn token_of(url: &Value) -> String {
     url.as_str().unwrap().trim_start_matches("/o/").to_owned()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn checkout_calls_need_the_shop_origin(db: PgPool) {
+    let c = setup(db).await;
+    let cart = c.checkout_cart().await;
+    let call = || {
+        Call::get("/storefront/v1/checkout")
+            .header("x-storefront-token", c.shop.token.clone())
+            .header("x-market", c.shop.cz.to_string())
+            .header("x-cart-token", cart.clone())
+    };
+    let (status, body, _) = call().send(&c.s).await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::FORBIDDEN, Some("shop_origin_required"))
+    );
+    let (status, body, _) = call()
+        .header("x-shop-origin", "https://checkout.example/start")
+        .send(&c.s)
+        .await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::BAD_REQUEST, Some("invalid_shop_origin"))
+    );
+    let (status, body, _) = c
+        .checkout(&cart, Call::get("/storefront/v1/checkout"))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

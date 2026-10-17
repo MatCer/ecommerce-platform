@@ -26,7 +26,8 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::capability;
-use crate::cart::{self, Scope};
+use crate::cart;
+use crate::checkout_access;
 use crate::consent;
 use crate::markets::invalid;
 use crate::notifications::{self, Brand, Email, Template};
@@ -512,7 +513,7 @@ async fn after_sign_in(
     consent_subject: Option<&str>,
 ) -> Result<(), Error> {
     if let Some(token) = cart_token {
-        match cart::find(tx, ctx, token, Some(Scope::Checkout)).await {
+        match checkout_access::open(tx, ctx, token).await {
             Ok(c) => cart::attach_to_customer(tx, &c, customer_id).await?,
             // An expired or foreign cart capability just means there is nothing to attach.
             Err(Error::NotFound) => {}

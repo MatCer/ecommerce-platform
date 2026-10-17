@@ -7,11 +7,12 @@
 use std::sync::Arc;
 
 use chrono::{NaiveDate, Utc};
-use commerce::cart::{self, NewLine, Scope};
+use commerce::cart::{self, NewLine};
 use commerce::checkout::{
     self, AddressesInput, CheckoutAddress, ContactInput, PaymentInput, PlaceOrderInput, Placement,
     Placer, Settings, ShippingInput,
 };
+use commerce::checkout_access::{self, ShopOrigin};
 use commerce::inventory;
 use commerce::orders::{self, status::CodStatus};
 use commerce::payments::bank::{
@@ -88,9 +89,11 @@ impl Setup {
 }
 
 async fn ctx(tx: &mut TenantTx, market: Uuid) -> Context {
-    storefront::context(tx, &PublicUrls::default(), market, None, Utc::now())
+    let mut ctx = storefront::context(tx, &PublicUrls::default(), market, None, Utc::now())
         .await
-        .unwrap()
+        .unwrap();
+    ctx.origin = ShopOrigin::parse(&ctx.base_url);
+    ctx
 }
 
 /// A shop with home delivery (COD allowed) in CZ and SK, bank transfer, COD and Stripe
@@ -202,7 +205,7 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
     let mut tx = tenant_tx(runtime, s.shop.tenant).await.unwrap();
     let ctx = ctx(&mut tx, market).await;
     let (_, token) = cart::create(&mut tx, &ctx).await.unwrap();
-    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token).await.unwrap();
     cart::add_line(
         &mut tx,
         &ctx,
@@ -214,12 +217,14 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
     )
     .await
     .unwrap();
-    let h = cart::start_handoff(&mut tx, &c).await.unwrap();
-    let checkout_token = cart::redeem_handoff(&mut tx, market, &h)
+    let h = checkout_access::start_handoff(&mut tx, &ctx, &token)
+        .await
+        .unwrap();
+    let checkout_token = checkout_access::redeem_handoff(&mut tx, &ctx, &h)
         .await
         .unwrap()
         .unwrap();
-    let c = cart::find(&mut tx, &ctx, &checkout_token, Some(Scope::Checkout))
+    let c = checkout_access::open(&mut tx, &ctx, &checkout_token)
         .await
         .unwrap();
     checkout::set_contact(
@@ -270,7 +275,7 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
     )
     .await
     .unwrap();
-    let c = cart::find(&mut tx, &ctx, &checkout_token, Some(Scope::Checkout))
+    let c = checkout_access::open(&mut tx, &ctx, &checkout_token)
         .await
         .unwrap();
     let v = checkout::view(&mut tx, &ctx, &settings(), &c)

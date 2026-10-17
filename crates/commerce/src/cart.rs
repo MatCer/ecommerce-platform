@@ -1,11 +1,5 @@
 //! Carts (spec §7.3, §10.3, A1, A4, A12, A15).
 //!
-//! A cart is reached only through a capability token (256-bit, hashed at rest):
-//! - the **shop** capability lives in the shop origin's `cart` cookie and may read and edit;
-//! - at checkout handoff it is revoked and a single-use, 60 s handoff token is minted;
-//! - redeeming the handoff on the checkout origin mints the **checkout** capability (checkout
-//!   mutations and order placement, `commerce::checkout`).
-//!
 //! Totals are recomputed on every read by `pricing::price_cart` from the effective prices in the
 //! market's price list; the client never sends prices. VAT follows the tax profile for the
 //! cart's ship-to country, which defaults to the market's first country until checkout sets
@@ -20,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::capability;
 use crate::catalog::tax as tax_categories;
 use crate::markets::invalid;
 use crate::money::{Currency, MoneyView};
@@ -31,28 +24,18 @@ use crate::storefront::Context;
 use crate::storefront::cards::{self, StockState};
 use crate::storefront::images::Image;
 use crate::tax::{self, TaxRate};
+use crate::{capability, checkout_access};
 
 pub const MAX_LINES: i64 = 100;
 pub const MAX_LINE_QUANTITY: i32 = 999;
 /// Anonymous carts expire after 30 days without activity (§10.3).
 pub const IDLE_DAYS: i64 = 30;
-/// A1: handoff tokens are valid for 60 seconds.
-pub const HANDOFF_SECS: i64 = 60;
-const HANDOFF_SECS_F64: f64 = 60.0;
-
-/// Which capability a request presents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Scope {
-    Shop,
-    Checkout,
-}
 
 /// An open cart found by its capability.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CartRef {
     pub id: Uuid,
     pub market_id: Uuid,
-    pub scope: Scope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -169,24 +152,18 @@ pub async fn create(tx: &mut TenantTx, ctx: &Context) -> Result<(Uuid, String), 
     Ok((id, minted.token))
 }
 
-/// The open, non-expired cart of the context's market behind `token`, locked for the rest of
-/// the transaction. `scope` `None` accepts either capability (reads).
-pub async fn find(
-    tx: &mut TenantTx,
-    ctx: &Context,
-    token: &str,
-    scope: Option<Scope>,
-) -> Result<CartRef, Error> {
+/// The open, non-expired cart of the context's market behind the shop capability `token`,
+/// locked for the rest of the transaction.
+pub async fn find(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
     if !capability::well_formed(token) {
         return Err(cart_not_found());
     }
-    let hash = capability::hash(token);
+    checkout_access::fence(tx).await?;
     let row = sqlx::query!(
-        "SELECT id, market_id, coalesce(shop_token_hash = $1, false) AS \"shop!\" FROM carts
-         WHERE (shop_token_hash = $1 OR checkout_token_hash = $1)
-           AND status = 'open' AND last_activity_at > $2
+        "SELECT id, market_id FROM carts
+         WHERE shop_token_hash = $1 AND status = 'open' AND last_activity_at > $2
          FOR UPDATE",
-        hash,
+        capability::hash(token),
         Utc::now() - Duration::days(IDLE_DAYS)
     )
     .fetch_optional(&mut **tx)
@@ -195,14 +172,6 @@ pub async fn find(
     // A cart belongs to one market: a capability presented on another market's host is not
     // valid there (prices, currency and VAT would all be wrong).
     if row.market_id != ctx.market.id {
-        return Err(cart_not_found());
-    }
-    let found = if row.shop {
-        Scope::Shop
-    } else {
-        Scope::Checkout
-    };
-    if scope.is_some_and(|s| s != found) {
         return Err(cart_not_found());
     }
     // Expiry counts from the last use (§10.3), reads included; the content version stays.
@@ -215,7 +184,6 @@ pub async fn find(
     Ok(CartRef {
         id: row.id,
         market_id: row.market_id,
-        scope: found,
     })
 }
 
@@ -243,41 +211,6 @@ pub async fn product_ids(
     )
     .fetch_all(&mut **tx)
     .await?)
-}
-
-/// The cart behind a **checkout** capability for order placement, locked for the rest of the
-/// transaction (A12), whether still open or already converted (an idempotent replay of
-/// place-order must find it). Returns the cart and whether it is still open.
-pub async fn find_for_order(
-    tx: &mut TenantTx,
-    ctx: &Context,
-    token: &str,
-) -> Result<(CartRef, bool), Error> {
-    if !capability::well_formed(token) {
-        return Err(cart_not_found());
-    }
-    let row = sqlx::query!(
-        "SELECT id, market_id, status FROM carts
-         WHERE checkout_token_hash = $1 AND status IN ('open', 'converted')
-           AND last_activity_at > $2
-         FOR UPDATE",
-        capability::hash(token),
-        Utc::now() - Duration::days(IDLE_DAYS)
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    .ok_or_else(cart_not_found)?;
-    if row.market_id != ctx.market.id {
-        return Err(cart_not_found());
-    }
-    Ok((
-        CartRef {
-            id: row.id,
-            market_id: row.market_id,
-            scope: Scope::Checkout,
-        },
-        row.status == "open",
-    ))
 }
 
 pub(crate) async fn touch(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
@@ -501,86 +434,6 @@ pub async fn remove_coupon(tx: &mut TenantTx, cart: &CartRef, code: &str) -> Res
         ));
     }
     touch(tx, cart.id).await
-}
-
-// ---------------------------------------------------------------------------------------
-// Checkout handoff (A1, A4)
-
-/// Starts the handoff: revokes the shop capability and mints a single-use handoff token for
-/// the checkout origin. Only a shop capability of a non-empty cart can do this.
-pub async fn start_handoff(tx: &mut TenantTx, cart: &CartRef) -> Result<String, Error> {
-    if cart.scope != Scope::Shop {
-        return Err(cart_not_found());
-    }
-    let lines = sqlx::query_scalar!(
-        "SELECT count(*) AS \"n!\" FROM cart_lines WHERE cart_id = $1",
-        cart.id
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-    if lines == 0 {
-        return Err(Error::Conflict {
-            code: "cart_empty",
-            detail: "the cart is empty".into(),
-        });
-    }
-    sqlx::query!("DELETE FROM checkout_handoffs WHERE expires_at < now() - interval '1 day'")
-        .execute(&mut **tx)
-        .await?;
-    let minted = capability::mint();
-    sqlx::query!(
-        "INSERT INTO checkout_handoffs (token_hash, tenant_id, cart_id, market_id, expires_at)
-         VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5))",
-        minted.hash,
-        tx.tenant_id(),
-        cart.id,
-        cart.market_id,
-        HANDOFF_SECS_F64
-    )
-    .execute(&mut **tx)
-    .await?;
-    sqlx::query!(
-        "UPDATE carts SET shop_token_hash = NULL, updated_at = now() WHERE id = $1",
-        cart.id
-    )
-    .execute(&mut **tx)
-    .await?;
-    Ok(minted.token)
-}
-
-/// Redeems a handoff token for the market it was minted in: consumed atomically, and a new
-/// checkout capability replaces any earlier one. `None` for unknown, used or expired tokens.
-pub async fn redeem_handoff(
-    tx: &mut TenantTx,
-    market_id: Uuid,
-    token: &str,
-) -> Result<Option<String>, Error> {
-    if !capability::well_formed(token) {
-        return Ok(None);
-    }
-    let Some(cart_id) = sqlx::query_scalar!(
-        "UPDATE checkout_handoffs SET used_at = now()
-         WHERE token_hash = $1 AND market_id = $2 AND used_at IS NULL AND expires_at > now()
-         RETURNING cart_id",
-        capability::hash(token),
-        market_id
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    else {
-        return Ok(None);
-    };
-    let minted = capability::mint();
-    let updated = sqlx::query!(
-        "UPDATE carts SET checkout_token_hash = $2, last_activity_at = now(), updated_at = now()
-         WHERE id = $1 AND status = 'open'",
-        cart_id,
-        minted.hash
-    )
-    .execute(&mut **tx)
-    .await?
-    .rows_affected();
-    Ok((updated == 1).then_some(minted.token))
 }
 
 /// Sign-in on the checkout origin (A4): the cart being checked out is attached to the

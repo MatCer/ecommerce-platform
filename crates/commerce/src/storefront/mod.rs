@@ -142,6 +142,9 @@ pub struct Context {
     pub locale: String,
     pub base_url: String,
     pub now: DateTime<Utc>,
+    /// The exact shop origin the edge served (`X-Shop-Origin`); `None` outside storefront
+    /// requests, where checkout capability operations fail closed.
+    pub origin: Option<crate::checkout_access::ShopOrigin>,
 }
 
 /// The checkout origin (A1) of a shop base URL: `http://demo.localhost:8080` →
@@ -273,6 +276,7 @@ pub async fn context(
         locale,
         base_url,
         now,
+        origin: None,
     })
 }
 
@@ -435,6 +439,7 @@ mod tests {
             base_url: markets[0].base_url.clone().unwrap_or_default(),
             markets,
             now: Utc::now(),
+            origin: None,
         }
     }
 

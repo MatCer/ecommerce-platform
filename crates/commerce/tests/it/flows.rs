@@ -2,6 +2,7 @@
 //! double opt-in, review tokens and RLS isolation.
 
 use chrono::{Duration, Utc};
+use commerce::checkout_access;
 use commerce::consent::{self, ConsentPurpose, Subject};
 use commerce::flows::{self, WatchInput};
 use commerce::storefront::{self, PublicUrls};
@@ -735,8 +736,18 @@ async fn abandoned_cart_rechecks_consent_and_restore_is_single_use(db: PgPool) {
             .unwrap();
         assert_eq!(visible, 0, "{table} leaked across tenants");
     }
+    let mut ctx = storefront::context(
+        &mut alien,
+        &PublicUrls::default(),
+        other.cz,
+        None,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
+    ctx.origin = Some(other.origin.clone());
     assert!(
-        flows::restore_cart(&mut alien, other.cz, &restore, Utc::now())
+        checkout_access::restore_cart(&mut alien, &ctx, &restore)
             .await
             .unwrap()
             .is_none()
@@ -744,14 +755,18 @@ async fn abandoned_cart_rechecks_consent_and_restore_is_single_use(db: PgPool) {
     alien.commit().await.unwrap();
 
     let mut tx = tenant_tx(&rt, s.tenant).await.unwrap();
+    let mut ctx = storefront::context(&mut tx, &PublicUrls::default(), s.cz, None, Utc::now())
+        .await
+        .unwrap();
+    ctx.origin = Some(s.origin.clone());
     assert!(
-        flows::restore_cart(&mut tx, s.cz, &restore, Utc::now())
+        checkout_access::restore_cart(&mut tx, &ctx, &restore)
             .await
             .unwrap()
             .is_some()
     );
     assert!(
-        flows::restore_cart(&mut tx, s.cz, &restore, Utc::now())
+        checkout_access::restore_cart(&mut tx, &ctx, &restore)
             .await
             .unwrap()
             .is_none()

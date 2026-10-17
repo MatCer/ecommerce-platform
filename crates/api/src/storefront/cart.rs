@@ -7,7 +7,8 @@ use axum::extract::rejection::PathRejection;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use commerce::cart::{self, CartRef, CartView, CouponCode, LineUpdate, NewLine, Scope};
+use commerce::cart::{self, CartRef, CartView, CouponCode, LineUpdate, NewLine};
+use commerce::checkout_access;
 use commerce::idempotency;
 use commerce::storefront::Context;
 use platform::Error;
@@ -63,15 +64,10 @@ fn mutation(op: &'static str, request: &[u8]) -> Option<Mutation> {
     })
 }
 
-/// Finds the cart behind the capability (`scope`: required capability, `None` = either),
-/// runs `f` on it and answers with the recomputed cart. A mutation with an `Idempotency-Key`
-/// runs once per cart and key: a retry replays the stored response (`Idempotent-Replayed`),
-/// the same key with another request is `409 idempotency_conflict`.
 async fn with_cart(
     s: &AppState,
     shopper: &Shopper,
     headers: &HeaderMap,
-    scope: Option<Scope>,
     change: Option<Mutation>,
     f: impl AsyncFnOnce(&mut TenantTx, &Context, &CartRef) -> Result<(), Error>,
 ) -> Result<Response, Error> {
@@ -81,7 +77,7 @@ async fn with_cart(
         None => None,
     };
     let (view, replayed) = with_ctx(s, shopper, async |tx, ctx| {
-        let cart = cart::find(tx, ctx, &token, scope).await?;
+        let cart = cart::find(tx, ctx, &token).await?;
         // Keys are scoped to the cart: two carts never share an idempotency record.
         let op = change
             .as_ref()
@@ -123,7 +119,6 @@ async fn create_cart(shopper: Shopper, State(s): State<AppState>) -> Result<Resp
         let r = CartRef {
             id,
             market_id: ctx.market.id,
-            scope: Scope::Shop,
         };
         Ok((cart::view(tx, ctx, &r).await?, token))
     })
@@ -152,7 +147,13 @@ async fn get_cart(
     State(s): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Response, Error> {
-    with_cart(&s, &shopper, &headers, None, None, async |_, _, _| Ok(())).await
+    let token = token(&headers)?;
+    let view = with_ctx(&s, &shopper, async |tx, ctx| {
+        let c = checkout_access::open_any(tx, ctx, &token).await?;
+        cart::view(tx, ctx, &c).await
+    })
+    .await?;
+    Ok(no_store(Json(view).into_response()))
 }
 
 #[utoipa::path(
@@ -179,7 +180,6 @@ async fn add_line(
         &s,
         &shopper,
         &headers,
-        Some(Scope::Shop),
         mutation("POST /cart/lines", &body),
         async |tx, ctx, c| cart::add_line(tx, ctx, c, &line).await,
     )
@@ -245,7 +245,6 @@ async fn update_line(
         &s,
         &shopper,
         &headers,
-        Some(Scope::Shop),
         mutation(
             "PATCH /cart/lines",
             &[id.as_bytes().as_slice(), &body].concat(),
@@ -273,7 +272,6 @@ async fn remove_line(
         &s,
         &shopper,
         &headers,
-        Some(Scope::Shop),
         mutation("DELETE /cart/lines", id.as_bytes()),
         async |tx, _, c| cart::remove_line(tx, c, id).await,
     )
@@ -304,7 +302,6 @@ async fn apply_coupon(
         &s,
         &shopper,
         &headers,
-        Some(Scope::Shop),
         mutation("POST /cart/coupons", &body),
         async |tx, ctx, c| cart::apply_coupon(tx, ctx, c, &code.code).await,
     )
@@ -329,7 +326,6 @@ async fn remove_coupon(
         &s,
         &shopper,
         &headers,
-        Some(Scope::Shop),
         mutation("DELETE /cart/coupons", code.as_bytes()),
         async |tx, _, c| cart::remove_coupon(tx, c, &code).await,
     )
@@ -362,8 +358,7 @@ async fn start_handoff(
 ) -> Result<Response, Error> {
     let token = token(&headers)?;
     let handoff = with_ctx(&s, &shopper, async |tx, ctx| {
-        let c = cart::find(tx, ctx, &token, Some(Scope::Shop)).await?;
-        cart::start_handoff(tx, &c).await
+        checkout_access::start_handoff(tx, ctx, &token).await
     })
     .await?;
     track(
@@ -405,7 +400,7 @@ async fn redeem_handoff(
 ) -> Result<Response, Error> {
     let input: HandoffToken = parse_json(&body)?;
     let cart_token = with_ctx(&s, &shopper, async |tx, ctx| {
-        cart::redeem_handoff(tx, ctx.market.id, &input.token).await
+        checkout_access::redeem_handoff(tx, ctx, &input.token).await
     })
     .await?
     .ok_or_else(|| Error::BadRequest {

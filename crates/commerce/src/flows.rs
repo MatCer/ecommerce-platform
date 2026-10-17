@@ -754,28 +754,6 @@ async fn execute_review(
     finish(tx, id, "completed", "all_steps").await
 }
 
-/// A restore capability is consumed atomically; the returned checkout-cart capability is freshly
-/// minted and only valid for the market in which the cart was created.
-pub async fn restore_cart(
-    tx: &mut TenantTx,
-    market_id: Uuid,
-    token: &str,
-    now: DateTime<Utc>,
-) -> Result<Option<String>, Error> {
-    if !capability::well_formed(token) {
-        return Ok(None);
-    }
-    let cart_id: Option<Uuid> = sqlx::query_scalar("UPDATE flow_restore_tokens SET used_at=$3 WHERE token_hash=$1 AND used_at IS NULL AND expires_at>$3 AND cart_id IN (SELECT id FROM carts WHERE market_id=$2 AND status='open') RETURNING cart_id")
-        .bind(capability::hash(token)).bind(market_id).bind(now).fetch_optional(&mut **tx).await?;
-    let Some(cart_id) = cart_id else {
-        return Ok(None);
-    };
-    let fresh = capability::mint();
-    sqlx::query("UPDATE carts SET checkout_token_hash=$2,last_activity_at=now(),updated_at=now() WHERE id=$1")
-        .bind(cart_id).bind(&fresh.hash).execute(&mut **tx).await?;
-    Ok(Some(fresh.token))
-}
-
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WatchInput {

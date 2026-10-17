@@ -85,6 +85,7 @@ const CREDENTIAL_HEADERS = [
   "x-consent-subject",
   "x-client-ip",
   "x-experiment",
+  "x-shop-origin",
 ];
 
 // Encoded separators/dots would let a path smuggle segments past the allowlist.
@@ -192,7 +193,10 @@ export function restrictedBinding(opts: {
       "x-locale": ctx.site.locale,
       "x-storefront-token": ctx.site.storefront_token,
     });
-    if (ctx.cartToken) headers.set("x-cart-token", ctx.cartToken);
+    if (ctx.cartToken) {
+      headers.set("x-cart-token", ctx.cartToken);
+      if (ctx.site.shopOrigin) headers.set("x-shop-origin", ctx.site.shopOrigin);
+    }
     if (ctx.sessionToken) headers.set("x-customer-session", ctx.sessionToken);
     if (ctx.consentSubject) headers.set("x-consent-subject", ctx.consentSubject);
     if (ctx.site.clientIp) headers.set("x-client-ip", ctx.site.clientIp);

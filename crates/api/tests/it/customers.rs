@@ -39,6 +39,7 @@ async fn setup(db: PgPool) -> Ctx {
 fn sf<'a>(call: Call<'a>, shop: &Shop, market: Uuid) -> Call<'a> {
     call.header("x-storefront-token", shop.token.clone())
         .header("x-market", market.to_string())
+        .header("x-shop-origin", shop.origin_of(market).as_str())
         .header("x-client-ip", "203.0.113.7")
 }
 

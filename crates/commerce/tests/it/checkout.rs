@@ -3,11 +3,12 @@
 //! payments, guest linking and tenant isolation.
 
 use chrono::Utc;
-use commerce::cart::{self, CartRef, NewLine, Scope};
+use commerce::cart::{self, CartRef, NewLine};
 use commerce::checkout::{
     self, AddressesInput, CheckoutAddress, ContactInput, PaymentInput, PlaceOrderInput, Placement,
     Placer, Settings, ShippingInput,
 };
+use commerce::checkout_access::{self, ShopOrigin};
 use commerce::inventory::{self, Adjustment};
 use commerce::orders::{self, PickupPoint};
 use commerce::payments::{self, FakeGateway, MethodKind, Outcome, PaymentMethodInput, Payments};
@@ -33,9 +34,11 @@ fn settings() -> Settings {
 }
 
 async fn ctx(tx: &mut TenantTx, market: Uuid) -> Context {
-    storefront::context(tx, &PublicUrls::default(), market, None, Utc::now())
+    let mut ctx = storefront::context(tx, &PublicUrls::default(), market, None, Utc::now())
         .await
-        .unwrap()
+        .unwrap();
+    ctx.origin = ShopOrigin::parse(&ctx.base_url);
+    ctx
 }
 
 /// Shipping and payment methods of the CZ market: Packeta pickup (79 Kč, free over 1 500 Kč,
@@ -121,7 +124,7 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
     let ctx = ctx(&mut tx, shop.cz).await;
     let (_, token) = cart::create(&mut tx, &ctx).await.unwrap();
-    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token).await.unwrap();
     cart::add_line(
         &mut tx,
         &ctx,
@@ -133,12 +136,14 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     )
     .await
     .unwrap();
-    let h = cart::start_handoff(&mut tx, &c).await.unwrap();
-    let checkout = cart::redeem_handoff(&mut tx, shop.cz, &h)
+    let h = checkout_access::start_handoff(&mut tx, &ctx, &token)
+        .await
+        .unwrap();
+    let checkout = checkout_access::redeem_handoff(&mut tx, &ctx, &h)
         .await
         .unwrap()
         .unwrap();
-    let c = cart::find(&mut tx, &ctx, &checkout, Some(Scope::Checkout))
+    let c = checkout_access::open(&mut tx, &ctx, &checkout)
         .await
         .unwrap();
     checkout::set_contact(
@@ -189,9 +194,7 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
 }
 
 async fn cart_ref(tx: &mut TenantTx, ctx: &Context, token: &str) -> CartRef {
-    cart::find(tx, ctx, token, Some(Scope::Checkout))
-        .await
-        .unwrap()
+    checkout_access::open(tx, ctx, token).await.unwrap()
 }
 
 /// What the checkout page would send: the current version and total.

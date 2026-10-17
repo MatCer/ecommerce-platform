@@ -6,6 +6,7 @@ mod alt_texts;
 mod analytics;
 mod catalog;
 mod checkout;
+mod checkout_access;
 mod consent;
 mod customers;
 mod experiments;

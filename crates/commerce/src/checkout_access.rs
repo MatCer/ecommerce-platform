@@ -1,0 +1,406 @@
+use chrono::{Duration, Utc};
+use platform::Error;
+use platform::db::TenantTx;
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::capability;
+use crate::cart::{self, CartRef};
+use crate::storefront::Context;
+use crate::tenancy::{self, CheckoutMode};
+
+pub const HANDOFF_SECS: i64 = 60;
+pub const SAME_ORIGIN_IDLE_HOURS: i64 = 24;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShopOrigin(String);
+
+impl ShopOrigin {
+    /// `https://<host>[:port]`, or `http://` for `*.localhost` only; lowercase, no default
+    /// port, no path, query or userinfo.
+    pub fn parse(s: &str) -> Option<Self> {
+        let url = reqwest::Url::parse(s).ok()?;
+        let host = url.host_str()?;
+        let scheme_ok = match url.scheme() {
+            "https" => true,
+            "http" => host.ends_with(".localhost"),
+            _ => false,
+        };
+        (scheme_ok
+            && url.port() != Some(0)
+            && url.origin().ascii_serialization() == s
+            && tenancy::normalize_host(host).ok()? == host)
+            .then(|| Self(s.to_owned()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+struct Policy<'a> {
+    origin: &'a str,
+    generation: i64,
+    mode: CheckoutMode,
+}
+
+pub(crate) async fn fence(tx: &mut TenantTx) -> Result<(), Error> {
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock_shared(platform.checkout_fence_key($1))",
+        tx.tenant_id()
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn enter<'a>(tx: &mut TenantTx, ctx: &'a Context) -> Result<Policy<'a>, Error> {
+    let origin = ctx.origin.as_ref().ok_or(Error::Forbidden {
+        code: "shop_origin_required",
+    })?;
+    let row = sqlx::query!(
+        r#"SELECT generation AS "generation!", mode AS "mode!", origin_tenant, origin_market
+           FROM platform.enter_checkout_fence($1, $2)"#,
+        tx.tenant_id(),
+        origin.as_str()
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if row.origin_tenant.is_some_and(|t| t != tx.tenant_id())
+        || row.origin_market.is_some_and(|m| m != ctx.market.id)
+    {
+        return Err(Error::Forbidden {
+            code: "shop_origin_mismatch",
+        });
+    }
+    let mode = CheckoutMode::parse(&row.mode)
+        .ok_or_else(|| Error::Internal(format!("unknown checkout mode {}", row.mode)))?;
+    Ok(Policy {
+        origin: origin.as_str(),
+        generation: row.generation,
+        mode,
+    })
+}
+
+fn idle(mode: CheckoutMode) -> Duration {
+    match mode {
+        CheckoutMode::Isolated => Duration::days(cart::IDLE_DAYS),
+        CheckoutMode::SameOrigin => Duration::hours(SAME_ORIGIN_IDLE_HOURS),
+    }
+}
+
+/// Every condition sits in the locking `WHERE`, so a request queued behind a rotation
+/// re-checks the committed row and finds none.
+async fn guard(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    p: &Policy<'_>,
+    token: &str,
+    converted_too: bool,
+    refresh: bool,
+) -> Result<(CartRef, bool), Error> {
+    if !capability::well_formed(token) {
+        return Err(Error::NotFound);
+    }
+    let row = sqlx::query!(
+        r#"SELECT id, market_id, status = 'open' AS "open!" FROM carts
+           WHERE checkout_token_hash = $1
+             AND (status = 'open' OR ($2 AND status = 'converted'))
+             AND market_id = $3 AND checkout_origin = $4 AND checkout_generation = $5
+             AND last_activity_at > $6
+           FOR UPDATE"#,
+        capability::hash(token),
+        converted_too,
+        ctx.market.id,
+        p.origin,
+        p.generation,
+        Utc::now() - idle(p.mode)
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    if refresh {
+        sqlx::query!(
+            "UPDATE carts SET last_activity_at = now() WHERE id = $1",
+            row.id
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok((
+        CartRef {
+            id: row.id,
+            market_id: row.market_id,
+        },
+        row.open,
+    ))
+}
+
+async fn bind(tx: &mut TenantTx, cart_id: Uuid, p: &Policy<'_>) -> Result<Option<String>, Error> {
+    let minted = capability::mint();
+    let updated = sqlx::query!(
+        "UPDATE carts SET checkout_token_hash = $2, checkout_origin = $3, checkout_generation = $4,
+             last_activity_at = now(), updated_at = now()
+         WHERE id = $1 AND status = 'open'",
+        cart_id,
+        minted.hash,
+        p.origin,
+        p.generation
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    Ok((updated == 1).then_some(minted.token))
+}
+
+fn require_isolated(p: &Policy<'_>) -> Result<(), Error> {
+    if p.mode == CheckoutMode::Isolated {
+        Ok(())
+    } else {
+        Err(Error::Conflict {
+            code: "checkout_mode_changed",
+            detail: "the shop's checkout mode changed; start checkout again".into(),
+        })
+    }
+}
+
+/// The open checkout behind `token`, locked until commit; refreshes its idle expiry.
+pub async fn open(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
+    let p = enter(tx, ctx).await?;
+    Ok(guard(tx, ctx, &p, token, false, true).await?.0)
+}
+
+/// The shop capability's cart, else the checkout as in [`open`] (`GET /cart`).
+pub async fn open_any(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
+    match cart::find(tx, ctx, token).await {
+        Err(Error::NotFound) => open(tx, ctx, token).await,
+        found => found,
+    }
+}
+
+/// The narrow recovery of a converted checkout for placement and its idempotent replay
+/// (A12): open or converted, no refresh. Returns whether the cart is still open.
+pub async fn open_for_order(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<(CartRef, bool), Error> {
+    let p = enter(tx, ctx).await?;
+    guard(tx, ctx, &p, token, true, false).await
+}
+
+/// Replaces the capability `token` (re-authorized here) with a fresh one (C6, C10).
+pub async fn rotate(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<String, Error> {
+    let p = enter(tx, ctx).await?;
+    let (c, _) = guard(tx, ctx, &p, token, false, false).await?;
+    bind(tx, c.id, &p).await?.ok_or(Error::NotFound)
+}
+
+/// A1, isolated mode only: revokes the shop capability of a non-empty cart and mints a
+/// single-use handoff token bound to the origin and generation.
+pub async fn start_handoff(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    shop_token: &str,
+) -> Result<String, Error> {
+    let p = enter(tx, ctx).await?;
+    require_isolated(&p)?;
+    let c = cart::find(tx, ctx, shop_token).await?;
+    let lines = sqlx::query_scalar!(
+        "SELECT count(*) AS \"n!\" FROM cart_lines WHERE cart_id = $1",
+        c.id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if lines == 0 {
+        return Err(Error::Conflict {
+            code: "cart_empty",
+            detail: "the cart is empty".into(),
+        });
+    }
+    sqlx::query!("DELETE FROM checkout_handoffs WHERE expires_at < now() - interval '1 day'")
+        .execute(&mut **tx)
+        .await?;
+    let minted = capability::mint();
+    sqlx::query!(
+        "INSERT INTO checkout_handoffs
+             (token_hash, tenant_id, cart_id, market_id, expires_at, origin, generation)
+         VALUES ($1, $2, $3, $4, now() + make_interval(secs => $5), $6, $7)",
+        minted.hash,
+        tx.tenant_id(),
+        c.id,
+        c.market_id,
+        HANDOFF_SECS as f64,
+        p.origin,
+        p.generation
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE carts SET shop_token_hash = NULL, updated_at = now() WHERE id = $1",
+        c.id
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(minted.token)
+}
+
+/// A1, isolated mode only: consumes the handoff atomically and mints the checkout capability.
+/// `None` for unknown, used or expired tokens and for another origin, market or generation; a
+/// mismatch leaves the handoff unspent.
+pub async fn redeem_handoff(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<Option<String>, Error> {
+    let p = enter(tx, ctx).await?;
+    if p.mode != CheckoutMode::Isolated || !capability::well_formed(token) {
+        return Ok(None);
+    }
+    let Some(cart_id) = sqlx::query_scalar!(
+        "UPDATE checkout_handoffs SET used_at = now()
+         WHERE token_hash = $1 AND market_id = $2 AND origin = $3 AND generation = $4
+           AND used_at IS NULL AND expires_at > now()
+         RETURNING cart_id",
+        capability::hash(token),
+        ctx.market.id,
+        p.origin,
+        p.generation
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(None);
+    };
+    bind(tx, cart_id, &p).await
+}
+
+/// Isolated mode only: consumes an abandoned-cart restore link (WP19) and mints the checkout
+/// capability of its open cart in the context's market.
+pub async fn restore_cart(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<Option<String>, Error> {
+    let p = enter(tx, ctx).await?;
+    require_isolated(&p)?;
+    if !capability::well_formed(token) {
+        return Ok(None);
+    }
+    let Some(cart_id) = sqlx::query_scalar!(
+        "UPDATE flow_restore_tokens SET used_at = $3
+         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > $3
+           AND cart_id IN (SELECT id FROM carts WHERE market_id = $2 AND status = 'open')
+         RETURNING cart_id",
+        capability::hash(token),
+        ctx.market.id,
+        ctx.now
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    else {
+        return Ok(None);
+    };
+    bind(tx, cart_id, &p).await
+}
+
+/// Switches one origin of the tenant to `mode` in its own transaction, revoking every checkout
+/// capability and handoff of the tenant. Waits for in-flight capability transactions of the
+/// tenant. `false` when the origin already had `mode`; an unknown history refuses same-origin
+/// (`409 origin_history_unknown`).
+pub async fn switch_mode(
+    db: &PgPool,
+    tenant_id: Uuid,
+    origin: &ShopOrigin,
+    mode: CheckoutMode,
+) -> Result<bool, Error> {
+    let mut tx = db.begin().await?;
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(platform.checkout_fence_key($1))",
+        tenant_id
+    )
+    .execute(&mut *tx)
+    .await?;
+    let changed = sqlx::query!(
+        "UPDATE platform.checkout_origins SET mode = $3
+         WHERE origin = $1 AND tenant_id = $2 AND mode <> $3",
+        origin.as_str(),
+        tenant_id,
+        mode.as_str()
+    )
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        if e.as_database_error()
+            .is_some_and(|d| d.code().as_deref() == Some("23514"))
+        {
+            Error::Conflict {
+                code: "origin_history_unknown",
+                detail: "same-origin checkout needs a known hostname history".into(),
+            }
+        } else {
+            e.into()
+        }
+    })?
+    .rows_affected()
+        == 1;
+    if !changed {
+        sqlx::query_scalar!(
+            "SELECT 1 AS \"one!\" FROM platform.checkout_origins WHERE origin = $1 AND tenant_id = $2",
+            origin.as_str(),
+            tenant_id
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or(Error::NotFound)?;
+    }
+    tx.commit().await?;
+    Ok(changed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ShopOrigin;
+
+    #[test]
+    fn shop_origin_is_the_exact_browser_serialization() {
+        for ok in [
+            "https://shop.example.cz",
+            "https://shop.example.cz:8443",
+            "http://demo.localhost:8080",
+            "http://demo.localhost",
+            "https://demo.localhost",
+        ] {
+            assert_eq!(
+                ShopOrigin::parse(ok).map(|o| o.0),
+                Some(ok.to_owned()),
+                "{ok}"
+            );
+        }
+        for bad in [
+            "",
+            "shop.example.cz",
+            "http://shop.example.cz",
+            "ftp://shop.example.cz",
+            "HTTPS://shop.example.cz",
+            "https://Shop.example.cz",
+            "https://shop.example.cz.",
+            "https://shop.example.cz:443",
+            "http://demo.localhost:80",
+            "https://shop.example.cz:0",
+            "https://shop.example.cz:08443",
+            "https://shop.example.cz:+8443",
+            "https://shop.example.cz:",
+            "https://shop.example.cz:70000",
+            "https://shop.example.cz/",
+            "https://shop.example.cz/path",
+            "https://shop.example.cz?q=1",
+            "https://user@shop.example.cz",
+            "https://user:pw@shop.example.cz",
+            "https://localhost",
+            "https://shop example.cz",
+        ] {
+            assert_eq!(ShopOrigin::parse(bad), None, "{bad}");
+        }
+    }
+}

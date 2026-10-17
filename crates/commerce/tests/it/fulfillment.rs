@@ -8,11 +8,12 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use commerce::carriers::Carriers;
-use commerce::cart::{self, NewLine, Scope};
+use commerce::cart::{self, NewLine};
 use commerce::checkout::{
     self, AddressesInput, CheckoutAddress, ContactInput, PaymentInput, PlaceOrderInput, Placer,
     Settings, ShippingInput,
 };
+use commerce::checkout_access::{self, ShopOrigin};
 use commerce::content::legal::{self, LegalEntity};
 use commerce::fulfillment::{self, LabelInput, ShipmentStatus};
 use commerce::inventory;
@@ -68,9 +69,11 @@ struct Setup {
 }
 
 async fn ctx(tx: &mut TenantTx, market: Uuid) -> Context {
-    storefront::context(tx, &PublicUrls::default(), market, None, Utc::now())
+    let mut ctx = storefront::context(tx, &PublicUrls::default(), market, None, Utc::now())
         .await
-        .unwrap()
+        .unwrap();
+    ctx.origin = ShopOrigin::parse(&ctx.base_url);
+    ctx
 }
 
 /// Personal pickup (COD allowed) in CZ, bank transfer and COD, a receiving account and the
@@ -156,7 +159,7 @@ async fn place(runtime: &PgPool, s: &Setup, kind: MethodKind) -> (Uuid, Uuid) {
     let mut tx = tenant_tx(runtime, s.shop.tenant).await.unwrap();
     let ctx = ctx(&mut tx, market).await;
     let (_, token) = cart::create(&mut tx, &ctx).await.unwrap();
-    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token).await.unwrap();
     for (v, q) in [(s.shop.variants[0], 2), (s.shop.variants[1], 1)] {
         cart::add_line(
             &mut tx,
@@ -170,12 +173,14 @@ async fn place(runtime: &PgPool, s: &Setup, kind: MethodKind) -> (Uuid, Uuid) {
         .await
         .unwrap();
     }
-    let h = cart::start_handoff(&mut tx, &c).await.unwrap();
-    let checkout_token = cart::redeem_handoff(&mut tx, market, &h)
+    let h = checkout_access::start_handoff(&mut tx, &ctx, &token)
+        .await
+        .unwrap();
+    let checkout_token = checkout_access::redeem_handoff(&mut tx, &ctx, &h)
         .await
         .unwrap()
         .unwrap();
-    let c = cart::find(&mut tx, &ctx, &checkout_token, Some(Scope::Checkout))
+    let c = checkout_access::open(&mut tx, &ctx, &checkout_token)
         .await
         .unwrap();
     checkout::set_contact(
@@ -227,7 +232,7 @@ async fn place(runtime: &PgPool, s: &Setup, kind: MethodKind) -> (Uuid, Uuid) {
     )
     .await
     .unwrap();
-    let c = cart::find(&mut tx, &ctx, &checkout_token, Some(Scope::Checkout))
+    let c = checkout_access::open(&mut tx, &ctx, &checkout_token)
         .await
         .unwrap();
     let v = checkout::view(&mut tx, &ctx, &settings(), &c)
