@@ -6,7 +6,15 @@
  * order linked after an email-link sign-in (A5).
  */
 
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import {
+  type APIResponse,
+  expect,
+  type Locator,
+  type Page,
+  type Request,
+  request,
+  test,
+} from "@playwright/test";
 import { expectAccessible, magicLink, mailpit, run, sql, useEnglish } from "../admin/support";
 import { tabTo } from "../keyboard";
 import { testContext } from "../rate-client";
@@ -33,9 +41,11 @@ import {
   postDetails,
   receiptNumber,
   SK,
+  sameOriginReview,
   saveAddresses,
   saveContact,
   securityContext,
+  shopTab,
   startSameOriginCheckout,
   toCheckout,
 } from "./support";
@@ -44,6 +54,113 @@ declare global {
   interface Window {
     reportStorageWrite?: (entry: string) => void;
   }
+}
+
+const CART = "__Host-Http-cart";
+const CAPABILITY = /^[0-9a-f]{64}$/;
+const isPlacement = (r: Request) =>
+  r.method() === "POST" && new URL(r.url()).pathname === "/checkout/place-order";
+
+/** Records every storage, cache and broadcast write a document of `page` makes. */
+async function spyOnStorage(page: Page): Promise<string[]> {
+  const writes: string[] = [];
+  await page.exposeFunction("reportStorageWrite", (entry: string) => {
+    writes.push(entry);
+  });
+  await page.addInitScript(() => {
+    const report = (what: string) => window.reportStorageWrite?.(`${location.pathname} ${what}`);
+    const spy = (proto: object, name: string, label: (args: unknown[]) => string | null) => {
+      const original = Reflect.get(proto, name) as (...args: unknown[]) => unknown;
+      Reflect.set(proto, name, function (this: unknown, ...args: unknown[]) {
+        const what = label(args);
+        if (what) report(what);
+        return original.apply(this, args);
+      });
+    };
+    spy(Storage.prototype, "setItem", ([key]) => `setItem ${key}`);
+    spy(Storage.prototype, "removeItem", ([key]) => `removeItem ${key}`);
+    spy(Storage.prototype, "clear", () => "clear");
+    spy(IDBFactory.prototype, "open", ([name]) => `indexedDB.open ${name}`);
+    spy(IDBFactory.prototype, "deleteDatabase", ([name]) => `indexedDB.deleteDatabase ${name}`);
+    spy(IDBDatabase.prototype, "transaction", ([, mode]) =>
+      mode === "readwrite" ? "transaction readwrite" : null,
+    );
+    spy(CacheStorage.prototype, "open", ([name]) => `caches.open ${name}`);
+    spy(CacheStorage.prototype, "delete", ([name]) => `caches.delete ${name}`);
+    for (const name of ["put", "add", "addAll"]) spy(Cache.prototype, name, () => `Cache.${name}`);
+    const Channel = BroadcastChannel;
+    window.BroadcastChannel = class extends Channel {
+      constructor(name: string) {
+        super(name);
+        report(`BroadcastChannel ${name}`);
+      }
+    };
+  });
+  return writes;
+}
+
+/** Every spied write once on the theme page; leaves only localStorage's `spy` key behind. */
+async function controlStorageSpy(page: Page, writes: string[]) {
+  await page.goto(`${FRESH_HTTPS}/`);
+  await page.evaluate(async () => {
+    localStorage.setItem("spy", "1");
+    sessionStorage.setItem("spy", "1");
+    sessionStorage.removeItem("spy");
+    sessionStorage.clear();
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = indexedDB.open("spy");
+      open.onupgradeneeded = () => open.result.createObjectStore("spy");
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    db.transaction("spy", "readwrite");
+    db.close();
+    await new Promise((resolve, reject) => {
+      const deleted = indexedDB.deleteDatabase("spy");
+      deleted.onsuccess = resolve;
+      deleted.onerror = () => reject(deleted.error);
+    });
+    const cache = await caches.open("spy");
+    await cache.put("/spy", new Response("1"));
+    await cache.add("/favicon.svg");
+    await cache.addAll(["/favicon.svg"]);
+    await caches.delete("spy");
+    new BroadcastChannel("spy").close();
+  });
+  await expect
+    .poll(() => writes, "every spy sees its write on the theme page")
+    .toEqual(
+      expect.arrayContaining([
+        "/ setItem spy",
+        "/ removeItem spy",
+        "/ clear",
+        "/ indexedDB.open spy",
+        "/ transaction readwrite",
+        "/ indexedDB.deleteDatabase spy",
+        "/ caches.open spy",
+        "/ Cache.put",
+        "/ Cache.add",
+        "/ Cache.addAll",
+        "/ caches.delete spy",
+        "/ BroadcastChannel spy",
+      ]),
+    );
+}
+
+async function expectNothingStored(page: Page, writes: string[]) {
+  expect(
+    await page.evaluate(async () => ({
+      session: sessionStorage.length,
+      local: Object.keys(localStorage),
+      databases: (await indexedDB.databases()).map((d) => d.name),
+      caches: await caches.keys(),
+    })),
+    "what the shop origin holds on the receipt",
+  ).toEqual({ session: 0, local: ["spy"], databases: [], caches: [] });
+  expect(
+    writes.filter((w) => w.startsWith("/checkout")),
+    "platform storage writes",
+  ).toEqual([]);
 }
 
 /** Email-link sign-in on the checkout origin; lands on `next`. */
@@ -395,26 +512,7 @@ test("same-origin checkout in CZ: native forms, review and a cash-on-delivery or
 }) => {
   const context = await securityContext(browser);
   const page = await context.newPage();
-  const writes: string[] = [];
-  await page.exposeFunction("reportStorageWrite", (entry: string) => {
-    writes.push(entry);
-  });
-  await page.addInitScript(() => {
-    const { setItem, removeItem, clear } = Storage.prototype;
-    const report = (what: string) => window.reportStorageWrite?.(`${location.pathname} ${what}`);
-    Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
-      report(`setItem ${key}`);
-      setItem.call(this, key, value);
-    };
-    Storage.prototype.removeItem = function (this: Storage, key: string) {
-      report(`removeItem ${key}`);
-      removeItem.call(this, key);
-    };
-    Storage.prototype.clear = function (this: Storage) {
-      report("clear");
-      clear.call(this);
-    };
-  });
+  const writes = await spyOnStorage(page);
   const requests: { method: string; path: string; body: string | null }[] = [];
   page.on("request", (r) =>
     requests.push({ method: r.method(), path: new URL(r.url()).pathname, body: r.postData() }),
@@ -425,9 +523,7 @@ test("same-origin checkout in CZ: native forms, review and a cash-on-delivery or
   };
   const email = `so-${run}@example.test`;
 
-  await page.goto(`${FRESH_HTTPS}/`);
-  await page.evaluate(() => localStorage.setItem("spy", "1"));
-  await expect.poll(() => writes, "the storage spy sees a write").toContain("/ setItem spy");
+  await controlStorageSpy(page, writes);
   await startSameOriginCheckout(page, FRESH_HTTPS);
   const contact = detailsForm(page, "contact");
   await expect(contact).toBeVisible();
@@ -532,12 +628,38 @@ test("same-origin checkout in CZ: native forms, review and a cash-on-delivery or
   }
   const note = `Zazvoňte prosím ${run}`;
   await typeInto(page.getByRole("textbox", { name: /Poznámka k objednávce/ }), note);
+  const held = await cookieValue(context, CART);
+  const reviewToken = await pageTokenMeta(page).getAttribute("content");
   await tabTo(page, place);
-  await page.keyboard.press("Enter");
+  const [placed] = await Promise.all([
+    page.waitForRequest(isPlacement),
+    page.keyboard.press("Enter"),
+  ]);
   const number = await receiptNumber(page);
   await expect(page.getByRole("status", { name: "Děkujeme za objednávku!" })).toContainText(
     `Potvrzení pošleme na ${email}`,
   );
+  expect(
+    requests.filter((r) => r.method === "POST" && r.path === "/checkout/place-order"),
+    "exactly one placement post",
+  ).toHaveLength(1);
+  expect(placed.isNavigationRequest(), "the placement is a native form navigation").toBe(true);
+  expect(await placed.headerValue("content-type")).toBe("application/x-www-form-urlencoded");
+  expect(await placed.headerValue("idempotency-key"), "the browser sends no key").toBeNull();
+  const posted = new URLSearchParams(placed.postData() ?? "");
+  expect(posted.get("_pt"), "the review's page token").toBe(reviewToken);
+  expect(posted.get("notes")).toBe(note);
+  const answer = await placed.response();
+  expect(answer?.status(), "the placement answer").toBe(303);
+  expect(await answer?.headerValue("location")).toBe("/checkout");
+  const replaced = await cookieValue(context, CART);
+  expect(replaced, "the note replaced the capability").toMatch(CAPABILITY);
+  expect(replaced).not.toBe(held);
+  expect(await answer?.headerValue("set-cookie"), "set by the placement answer").toContain(
+    `${CART}=${replaced};`,
+  );
+  await expect(pageTokenMeta(page), "the receipt carries no page token").toHaveCount(0);
+  await expectAccessible(page, "same-origin receipt");
   await expectShopOnly(page);
   expect(
     sql(
@@ -545,10 +667,147 @@ test("same-origin checkout in CZ: native forms, review and a cash-on-delivery or
     ),
   ).toBe(`${note}|cod|${email}`);
   expect(requests.filter((r) => /^\/(o|_p\/fake-pay)\//.test(r.path))).toEqual([]);
+  await expectNothingStored(page, writes);
+  await context.close();
+});
+
+test("a placement whose answer is lost after the commit shows its receipt on reload and on every later visit", async ({
+  browser,
+}) => {
+  const context = await securityContext(browser);
+  const page = await context.newPage();
+  const writes = await spyOnStorage(page);
+  const paths: string[] = [];
+  page.on("request", (r) => paths.push(new URL(r.url()).pathname));
+  const email = `ztracena-${run}@example.test`;
+  await controlStorageSpy(page, writes);
+  await sameOriginReview(page, FRESH_HTTPS, email);
+  await chooseCashOnDelivery(page, /PPL – kurýr/, /Testovací platba/);
+  const note = `Ztracená odpověď ${run}`;
+  await page.getByRole("textbox", { name: /Poznámka k objednávce/ }).fill(note);
+  const held = (await cookieValue(context, CART)) ?? "";
+  expect(held).toMatch(CAPABILITY);
+
+  const replay = await request.newContext({ ignoreHTTPSErrors: true });
+  const lost: { answer?: APIResponse } = {};
+  await page.route(`${FRESH_HTTPS}/checkout/place-order`, async (route) => {
+    if (lost.answer) return route.continue();
+    const sent = route.request();
+    lost.answer = await replay.fetch(sent.url(), {
+      method: sent.method(),
+      headers: {
+        ...sent.headers(),
+        cookie: `${CART}=${held}`,
+        origin: FRESH_HTTPS,
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-dest": "document",
+      },
+      data: sent.postDataBuffer() ?? undefined,
+      maxRedirects: 0,
+    });
+    await route.abort("connectionreset");
+  });
+  const aborted = page.waitForEvent("requestfailed", isPlacement);
+  await acceptAndPlace(page);
+  await aborted;
+  expect(lost.answer?.status(), "the replayed placement commits").toBe(303);
+  expect(lost.answer?.headers().location).toBe("/checkout");
+  const replacement = new RegExp(`${CART}=([0-9a-f]{64});`).exec(
+    lost.answer?.headers()["set-cookie"] ?? "",
+  )?.[1];
+  expect(replacement, "the note replaced the capability in the replay's jar").toMatch(CAPABILITY);
+  expect(replacement).not.toBe(held);
+  await replay.dispose();
+  expect(await cookieValue(context, CART), "the browser still holds the replaced value").toBe(held);
+
+  const receipt = async () => {
+    const number = await receiptNumber(page);
+    const shown = page.getByRole("status", { name: "Děkujeme za objednávku!" });
+    await expect(shown).toContainText(`Potvrzení pošleme na ${email}`);
+    await expect(shown).toContainText("Objednávka je přijatá, ale platba online zatím neproběhla.");
+    return number;
+  };
+  const [resent] = await Promise.all([page.waitForRequest(isPlacement), page.reload()]);
+  expect((await resent.response())?.status(), "the reload resends the placement").toBe(303);
+  const number = await receipt();
+  const attempts = () =>
+    sql(`SELECT concat_ws('|', count(*), max(provider_ref)) FROM payment_attempts
+         WHERE order_id IN (SELECT id FROM orders WHERE email = '${email}')`);
+  const first = attempts();
+  expect(first, "one payment attempt, initialized at the fake gateway").toMatch(/^1\|.+/);
+  await page.goto(`${FRESH_HTTPS}/checkout`);
+  expect(await receipt(), "the receipt on a later visit").toBe(number);
+  await page.reload();
+  expect(await receipt(), "the receipt after a reload").toBe(number);
   expect(
-    writes.filter((w) => w.startsWith("/checkout")),
-    "platform storage writes",
+    sql(`SELECT concat_ws('|', string_agg(number::text, ','), string_agg(notes, ','))
+         FROM orders WHERE email = '${email}'`),
+    "exactly one order, with the note",
+  ).toBe(`${number}|${note}`);
+  expect(attempts(), "the receipt reads start no payment").toBe(first);
+  expect(
+    paths.filter((p) => /^\/(o|_p\/fake-pay)\//.test(p)),
+    "no order page, no gateway",
   ).toEqual([]);
+  await expectNothingStored(page, writes);
+  await context.close();
+});
+
+test("a placement refused because another tab changed the cart keeps the note and ticks; placing again orders once", async ({
+  browser,
+}) => {
+  const context = await securityContext(browser);
+  const page = await context.newPage();
+  const email = `zmena-${run}@example.test`;
+  await sameOriginReview(page, FRESH_HTTPS, email);
+  await chooseCashOnDelivery(page);
+  const labels = [
+    "Souhlasím s obchodními podmínkami",
+    "Beru na vědomí poučení o právu odstoupit od smlouvy",
+    "Chci dostávat novinky a akce e-mailem",
+  ];
+  const boxes = labels.map((name) => page.getByRole("checkbox", { name }));
+  for (const label of labels) await page.getByText(label, { exact: true }).click();
+  for (const box of boxes) await expect(box).toBeChecked();
+  const note = `Po změně košíku ${run}`;
+  const noteField = page.getByRole("textbox", { name: /Poznámka k objednávce/ });
+  await noteField.fill(note);
+
+  const other = await shopTab(context, `${FRESH_HTTPS}/checkout`);
+  await checkoutReady(other);
+  const [moved] = await Promise.all([
+    other.waitForResponse(
+      (r) =>
+        r.request().method() === "PUT" && new URL(r.url()).pathname === "/_p/checkout/shipping",
+    ),
+    other.getByRole("radio", { name: /Zásilkovna – na adresu/ }).check(),
+  ]);
+  expect(moved.status(), "the other tab's shipping change").toBe(200);
+  await other.close();
+
+  const [refused] = await Promise.all([
+    page.waitForRequest(isPlacement),
+    page.getByRole("button", { name: "Objednat s povinností platby" }).click(),
+  ]);
+  expect((await refused.response())?.status(), "the stale review's placement").toBe(409);
+  await expect(page).toHaveURL(`${FRESH_HTTPS}/checkout/place-order`);
+  const alert = page.getByRole("alert");
+  await expect(alert).toHaveText(
+    "Košík nebo ceny se mezitím změnily. Zkontrolujte souhrn a objednejte znovu.",
+  );
+  await expect(alert).toBeFocused();
+  await expect(noteField).toHaveValue(note);
+  for (const box of boxes) await expect(box, "the ticks are kept").toBeChecked();
+  expect(sql(`SELECT count(*) FROM orders WHERE email = '${email}'`), "no order yet").toBe("0");
+
+  await acceptAndPlace(page);
+  const number = await receiptNumber(page);
+  expect(
+    sql(`SELECT concat_ws('|', string_agg(number::text, ','), string_agg(notes, ','))
+         FROM orders WHERE email = '${email}'`),
+    "one order, with the kept note",
+  ).toBe(`${number}|${note}`);
   await context.close();
 });
 
@@ -591,11 +850,15 @@ test("same-origin checkout at phone and tablet widths", async ({ browser }) => {
   ]) {
     const context = await securityContext(browser, { viewport });
     const page = await context.newPage();
+    const noOverflow = async (what: string) =>
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+        `${what} at ${viewport.width}px: no horizontal overflow`,
+      ).toBe(0);
     const fits = async (target: Locator, what: string) => {
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow, `${what} at ${viewport.width}px: no horizontal overflow`).toBe(0);
+      await noOverflow(what);
       await tabTo(page, target);
       await expect(target).toBeInViewport();
       const height = (await target.boundingBox())?.height ?? 0;
@@ -608,6 +871,13 @@ test("same-origin checkout at phone and tablet widths", async ({ browser }) => {
     await saveAddresses(page);
     await checkoutReady(page);
     await fits(page.getByRole("button", { name: "Objednat s povinností platby" }), "review");
+    if (viewport.width === 390) {
+      await chooseCashOnDelivery(page);
+      await acceptAndPlace(page);
+      await receiptNumber(page);
+      await expect(page.getByRole("status", { name: "Děkujeme za objednávku!" })).toBeInViewport();
+      await noOverflow("receipt");
+    }
     await context.close();
   }
 });
