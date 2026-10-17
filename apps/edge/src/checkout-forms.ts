@@ -15,6 +15,25 @@ const address = (f: URLSearchParams, prefix: "billing" | "shipping") => ({
   phone: field(f, `${prefix}_phone`),
 });
 
+export const PLACE_ORDER_FORM = "/checkout/place-order";
+
+const whole = (f: URLSearchParams, name: string) => {
+  const value = field(f, name);
+  return /^\d{1,15}$/.test(value) ? Number(value) : null;
+};
+
+const ticked = (f: URLSearchParams, name: string) => f.get(name) === "1";
+
+export const placeOrderBody = (f: URLSearchParams) => ({
+  version: whole(f, "version"),
+  total_minor: whole(f, "total_minor"),
+  accept_terms: ticked(f, "accept_terms"),
+  accept_withdrawal: ticked(f, "accept_withdrawal"),
+  email_marketing: ticked(f, "email_marketing"),
+  review_invites: ticked(f, "review_invites"),
+  notes: f.get("notes") || null,
+});
+
 export const CHECKOUT_FORMS: ReadonlyMap<string, CheckoutForm> = new Map<string, CheckoutForm>([
   [
     "/checkout/contact",

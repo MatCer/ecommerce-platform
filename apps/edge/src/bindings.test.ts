@@ -161,3 +161,28 @@ test("the checkout binding sends the shop origin only with the cart capability",
   expect(seen[1]?.headers.get("x-cart-token")).toBeNull();
   expect(seen[1]?.headers.get("x-shop-origin")).toBeNull();
 });
+
+test("the checkout binding reads a converted checkout's receipt and places nothing", async () => {
+  const seen: Request[] = [];
+  const bindings = bindingPair(seen);
+  const ctx = bindings.registry.open(shopSite, "checkout", {
+    cartToken: "checkouttoken_000000000001",
+  });
+  const call = (method: string, path: string) =>
+    bindings.CHECKOUT(
+      new Request(`https://binding${path}`, { method, headers: { [CTX_HEADER]: ctx } }),
+    );
+
+  expect((await call("GET", "/checkout/order")).status).toBe(200);
+  expect(seen[0]?.method).toBe("GET");
+  expect(seen[0]?.url).toBe("http://api.test/storefront/v1/checkout/order");
+  expect(seen[0]?.headers.get("x-cart-token")).toBe("checkouttoken_000000000001");
+  expect(seen[0]?.headers.get("x-shop-origin")).toBe("http://demo.localhost:8280");
+  for (const [method, path] of [
+    ["POST", "/checkout/order"],
+    ["GET", "/checkout/order/1"],
+    ["POST", "/checkout/place-order"],
+  ] as const)
+    expect((await call(method, path)).status, `${method} ${path}`).toBe(404);
+  expect(seen).toHaveLength(1);
+});

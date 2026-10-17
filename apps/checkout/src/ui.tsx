@@ -210,6 +210,8 @@ export function Checkbox(props: {
   description?: string;
   disabled?: boolean;
   class?: string;
+  name?: string;
+  value?: string;
 }) {
   return (
     <KCheckbox
@@ -217,6 +219,8 @@ export function Checkbox(props: {
       checked={props.checked}
       onChange={props.onChange}
       disabled={props.disabled}
+      name={props.name}
+      value={props.value}
     >
       <KCheckbox.Input class="peer" />
       <KCheckbox.Control

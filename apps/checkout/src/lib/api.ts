@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import type {
   Address,
   Cart,
+  CheckoutReceipt,
   CheckoutView,
   ConsentState,
   Customer,
@@ -34,6 +35,7 @@ export function checkoutApi(request: Request) {
     consent: () => get<ConsentState>("/consent"),
     // WP10: the checkout of the handed-off cart, the order page, account orders.
     checkout: () => get<CheckoutView>("/checkout"),
+    receipt: () => get<CheckoutReceipt>("/checkout/order"),
     order: (token: string) =>
       /^[0-9a-f]{64}$/.test(token) ? get<Order>(`/orders/${token}`) : Promise.resolve(null),
     orders: async () => (await get<OrderPage>("/customer/orders"))?.items ?? [],
