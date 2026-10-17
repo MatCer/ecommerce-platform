@@ -215,9 +215,12 @@ pub async fn rotate(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<Str
 /// C10, same-origin mode only: copies the shop cart behind `shop_token` into a new checkout
 /// snapshot linked to it (lines in order, coupon, locale, currency; no contact, address,
 /// customer or selection) and returns the snapshot's capability, bound to the origin and
-/// generation. The shop cart and its capability stay. Starts on one shop cart serialize on
-/// its row lock, so the last to commit wins. `409 checkout_mode_changed` on an isolated
-/// origin, `409 cart_empty`, `404` for an unknown shop capability.
+/// generation. The shop cart and its capability stay. In the same transaction every
+/// capability of that shop cart's earlier checkouts and the browser's `previous` one on this
+/// origin are revoked; open ones become `abandoned`. `previous` is a revocation hint, never
+/// authorization: a malformed or unknown one revokes nothing. Starts on one shop cart
+/// serialize on its row lock, so the last to commit wins. `409 checkout_mode_changed` on an
+/// isolated origin, `409 cart_empty`, `404` for an unknown shop capability.
 pub async fn start(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -228,7 +231,23 @@ pub async fn start(
     require(&p, CheckoutMode::SameOrigin)?;
     let source = cart::find(tx, ctx, shop_token).await?;
     require_lines(tx, source.id).await?;
-    let _ = previous;
+    // `previous` only names a row its presenter already holds, so it needs no guard. Revoking
+    // before the copy keeps the coupon's KEY SHARE out of a wait on a placement's checkout row.
+    let previous = previous
+        .filter(|t| capability::well_formed(t))
+        .map(capability::hash);
+    sqlx::query!(
+        "UPDATE carts SET checkout_token_hash = NULL,
+             status = CASE WHEN status = 'open' THEN 'abandoned' ELSE status END,
+             updated_at = now()
+         WHERE checkout_token_hash IS NOT NULL
+           AND (source_cart_id = $1 OR (checkout_token_hash = $2 AND checkout_origin = $3))",
+        source.id,
+        previous,
+        p.origin
+    )
+    .execute(&mut **tx)
+    .await?;
     let snapshot = cart::snapshot(tx, &source).await?;
     bind(tx, snapshot.id, &p)
         .await?

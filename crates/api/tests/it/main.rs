@@ -23,6 +23,7 @@ mod pricing;
 mod recommendations;
 mod review_summaries;
 mod reviews;
+mod same_origin_checkout_start;
 mod search;
 mod staff;
 mod storefront;
