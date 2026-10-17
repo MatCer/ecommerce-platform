@@ -138,6 +138,7 @@ export function fakeApi() {
   const calls: { method: string; url: string; headers: Record<string, string>; body: string }[] =
     [];
   let carts = 0;
+  let starts = 0;
   // Handoff tokens (A1): single use, bound to the tenant + market that minted them.
   const handoffs = new Map<string, { tenant: string | null; market: string | null }>();
   const fn = async (req: Request): Promise<Response> => {
@@ -183,6 +184,8 @@ export function fakeApi() {
       handoffs.set(token, { tenant, market: req.headers.get("x-market") });
       return Response.json({ token });
     }
+    if (p === "/cart/checkout")
+      return Response.json({ cart_token: `sameorigintoken_${String(++starts).padStart(20, "0")}` });
     if (p === "/checkout/handoff") {
       const { token } = JSON.parse(calls.at(-1)?.body || "{}") as { token?: string };
       const h = token ? handoffs.get(token) : undefined;
