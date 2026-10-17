@@ -39,9 +39,17 @@ BEGIN
 END
 $$;
 
+CREATE FUNCTION platform.lock_theme_arms(tenant uuid) RETURNS void
+LANGUAGE sql SET search_path = '' AS $$
+    SELECT pg_advisory_xact_lock(hashtextextended('theme_arm:' || tenant::text, 0))
+$$;
+REVOKE ALL ON FUNCTION platform.lock_theme_arms(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION platform.lock_theme_arms(uuid) TO app_runtime;
+
 CREATE FUNCTION platform.experiments_theme_arm_gated() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN
+    PERFORM platform.lock_theme_arms(NEW.tenant_id);
     IF NOT EXISTS (
         SELECT 1 FROM public.theme_revisions
         WHERE tenant_id = NEW.tenant_id AND id = NEW.theme_revision_id

@@ -1,9 +1,14 @@
 use commerce::experiments::{ExperimentRef, ThemeArm};
+use commerce::themes::Maintenance;
 use commerce::{tenancy, themes};
 use platform::db::tenant_tx;
+use platform::storage::Storage;
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+use crate::tenancy::{db_code, wait_until_blocked};
 
 fn arms(keys: &[&str]) -> Value {
     keys.iter()
@@ -279,57 +284,82 @@ async fn a_theme_arm_is_the_one_other_arm_and_a_gated_revision_of_the_tenant(db:
     .unwrap();
 }
 
-#[sqlx::test(migrations = "../../migrations")]
-async fn a_running_theme_arm_keeps_its_artifact_through_gc(db: PgPool) {
-    let runtime = testkit::runtime_pool(&db, 3).await;
-    let storage = testkit::memory_storage();
-    let (tenant, _) = testkit::tenant(&runtime, "arm-gc").await;
-    let arm = "d0000000000000000000000000000001";
-    artifact(&db, arm).await;
-    let rev = revision(&runtime, tenant, 1, "ready", Some(arm)).await;
+async fn surplus_arm(db: &PgPool, runtime: &PgPool, slug: &str, arm: &str) -> (Uuid, Uuid) {
+    let (tenant, _) = testkit::tenant(runtime, slug).await;
+    artifact(db, arm).await;
+    let rev = revision(runtime, tenant, 1, "ready", Some(arm)).await;
     for n in 2..=6 {
-        let id = format!("d00000000000000000000000000000{n:02}");
-        artifact(&db, &id).await;
-        revision(&runtime, tenant, n, "ready", Some(&id)).await;
+        let id = format!("{}{n:02}", &arm[..30]);
+        artifact(db, &id).await;
+        revision(runtime, tenant, n, "ready", Some(&id)).await;
     }
-    let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     sqlx::query("UPDATE theme_revisions SET status_changed_at = now() - interval '30 days'")
         .execute(&mut *tx)
         .await
         .unwrap();
     tx.commit().await.unwrap();
     sqlx::query("UPDATE platform.theme_artifacts SET created_at = now() - interval '30 days'")
-        .execute(&db)
+        .execute(db)
         .await
         .unwrap();
-    let id = insert(
-        &runtime,
+    (tenant, rev)
+}
+
+async fn theme_arm_experiment(runtime: &PgPool, tenant: Uuid, rev: Uuid, status: &str) -> Uuid {
+    insert(
+        runtime,
         tenant,
         "whole-theme",
         &["control", "b"],
         Some("b"),
         Some(rev),
-        "running",
+        status,
     )
     .await
-    .unwrap();
-    let artifact_of = || async {
-        let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
-        sqlx::query_scalar::<_, Option<String>>(
-            "SELECT artifact_id FROM theme_revisions WHERE id = $1",
-        )
+    .unwrap()
+}
+
+async fn artifact_of(runtime: &PgPool, tenant: Uuid, rev: Uuid) -> Option<String> {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query_scalar("SELECT artifact_id FROM theme_revisions WHERE id = $1")
         .bind(rev)
         .fetch_one(&mut *tx)
         .await
         .unwrap()
-    };
+}
+
+async fn status_of(runtime: &PgPool, tenant: Uuid, id: Uuid) -> String {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query_scalar("SELECT status FROM experiments WHERE id = $1")
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap()
+}
+
+fn gc(runtime: &PgPool, storage: &Storage) -> JoinHandle<Maintenance> {
+    let (runtime, storage) = (runtime.clone(), storage.clone());
+    tokio::spawn(async move { themes::maintenance(&runtime, &storage).await.unwrap() })
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_running_theme_arm_keeps_its_artifact_through_gc(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 3).await;
+    let storage = testkit::memory_storage();
+    let arm = "d0000000000000000000000000000001";
+    let (tenant, rev) = surplus_arm(&db, &runtime, "arm-gc", arm).await;
+    let id = theme_arm_experiment(&runtime, tenant, rev, "running").await;
 
     let report = themes::maintenance(&runtime, &storage).await.unwrap();
     assert_eq!(
         report.released_revisions, 0,
         "the running arm's surplus ready revision stays"
     );
-    assert_eq!(artifact_of().await.as_deref(), Some(arm));
+    assert_eq!(
+        artifact_of(&runtime, tenant, rev).await.as_deref(),
+        Some(arm)
+    );
     assert!(themes::artifact_exists(&runtime, arm).await.unwrap());
 
     exec(
@@ -343,5 +373,89 @@ async fn a_running_theme_arm_keeps_its_artifact_through_gc(db: PgPool) {
     let report = themes::maintenance(&runtime, &storage).await.unwrap();
     assert_eq!(report.released_revisions, 1);
     assert_eq!(report.deleted_artifacts, vec![arm.to_owned()]);
-    assert_eq!(artifact_of().await, None);
+    assert_eq!(artifact_of(&runtime, tenant, rev).await, None);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn gc_racing_a_theme_arm_start_waits_and_keeps_the_arm_artifact(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let storage = testkit::memory_storage();
+    let arm = "e0000000000000000000000000000001";
+    let (tenant, rev) = surplus_arm(&db, &runtime, "arm-start-first", arm).await;
+    let id = theme_arm_experiment(&runtime, tenant, rev, "draft").await;
+
+    let mut start = tenant_tx(&runtime, tenant).await.unwrap();
+    sqlx::query("UPDATE experiments SET status = 'running' WHERE id = $1")
+        .bind(id)
+        .execute(&mut *start)
+        .await
+        .unwrap();
+    let maintenance = gc(&runtime, &storage);
+    wait_until_blocked(&db, &maintenance, 1).await;
+    start.commit().await.unwrap();
+    let report = maintenance.await.unwrap();
+
+    assert_eq!(status_of(&runtime, tenant, id).await, "running");
+    assert_eq!(
+        report.released_revisions, 0,
+        "GC sees the start once it commits"
+    );
+    assert_eq!(
+        artifact_of(&runtime, tenant, rev).await.as_deref(),
+        Some(arm)
+    );
+    assert!(themes::artifact_exists(&runtime, arm).await.unwrap());
+    let delete = sqlx::query("DELETE FROM platform.theme_artifacts WHERE id = $1")
+        .bind(arm)
+        .execute(&db)
+        .await
+        .unwrap_err();
+    assert_eq!(
+        db_code(&delete).as_deref(),
+        Some("23503"),
+        "the running arm's artifact cannot be deleted"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_theme_arm_start_racing_gc_of_its_revision_is_refused(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let storage = testkit::memory_storage();
+    let arm = "e1000000000000000000000000000001";
+    let (tenant, rev) = surplus_arm(&db, &runtime, "arm-gc-first", arm).await;
+    let id = theme_arm_experiment(&runtime, tenant, rev, "draft").await;
+
+    let mut held = tenant_tx(&runtime, tenant).await.unwrap();
+    sqlx::query("SELECT 1 FROM theme_revisions WHERE id = $1 FOR UPDATE")
+        .bind(rev)
+        .execute(&mut *held)
+        .await
+        .unwrap();
+    let maintenance = gc(&runtime, &storage);
+    wait_until_blocked(&db, &maintenance, 1).await;
+    let start = tokio::spawn({
+        let runtime = runtime.clone();
+        async move {
+            exec(
+                &runtime,
+                tenant,
+                "UPDATE experiments SET status = 'running' WHERE id = $1",
+                id,
+            )
+            .await
+        }
+    });
+    wait_until_blocked(&db, &start, 2).await;
+    held.rollback().await.unwrap();
+    let report = maintenance.await.unwrap();
+    let started = start.await.unwrap();
+
+    assert_eq!(
+        started.as_ref().err().and_then(db_code).as_deref(),
+        Some("23514"),
+        "the start that lost the race is refused: {started:?}"
+    );
+    assert_eq!(status_of(&runtime, tenant, id).await, "draft");
+    assert_eq!(report.released_revisions, 1);
+    assert_eq!(report.deleted_artifacts, vec![arm.to_owned()]);
 }

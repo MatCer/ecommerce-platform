@@ -1062,6 +1062,9 @@ pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, 
         .execute(&mut *tx)
         .await?
         .rows_affected();
+        sqlx::query!("SELECT platform.lock_theme_arms($1)", tenant)
+            .execute(&mut *tx)
+            .await?;
         out.released_revisions += sqlx::query!(
             "UPDATE theme_revisions r
              SET artifact_id = NULL, status = 'failed', status_changed_at = now(),

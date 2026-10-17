@@ -527,8 +527,11 @@ separate cache namespace, never cached (already bypassed by the policy).
   render the arm's artifact in the tenant's own instance, inside the pool's caps (§4, 28 theme
   instances, idle eviction).
 - **GC:** `themes.maintenance` does not release the revision of a running theme arm, and its
-  foreign key keeps the artifact. After the stop the 7-day rule applies again.
+  foreign key keeps the artifact. The start trigger and GC take one per-tenant advisory lock
+  before checking the revision, so a start racing GC either waits and is refused, or GC waits
+  and keeps the arm. After the stop the 7-day rule applies again.
 - **Assets:** `/_astro/*` is looked up in the active artifact, then the theme arm's, then the
   retained ones (content-hashed names). While a theme arm runs, unversioned public files
-  (`/favicon.svg`) come from the visitor's arm artifact, `private, max-age=300` for enrolled
-  visitors. Checkout `/_p/tokens.css` keeps following the active artifact.
+  (`/favicon.svg`) come from the visitor's arm artifact, `private, no-cache` for every visitor,
+  so no browser or shared cache reuses one arm's file for the other (consent can move a visitor
+  from control to an arm mid-visit). Checkout `/_p/tokens.css` keeps following the active artifact.
