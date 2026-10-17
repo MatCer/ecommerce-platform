@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { signInOwner, sql } from "./admin/support";
-import { FRESH } from "./checkout/support";
+import { FRESH, FRESH_HTTPS } from "./checkout/support";
 import { rateHeaders } from "./rate-client";
 
-test("seed a same-origin test origin of the demo shop", () => {
+test("seed the same-origin test origins of the demo shop", () => {
   const { hostname, port } = new URL(FRESH);
+  const httpsPort = new URL(FRESH_HTTPS).port;
   sql(`INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
          SELECT '${hostname}', id, true FROM platform.tenants WHERE slug = 'demo'
          ON CONFLICT (hostname) DO NOTHING;
@@ -15,14 +16,17 @@ test("seed a same-origin test origin of the demo shop", () => {
          ON CONFLICT (hostname) DO NOTHING;
        INSERT INTO platform.checkout_origins
            (scheme, hostname, port, tenant_id, market_id, history, mode)
-         SELECT 'http', hostname, ${Number(port || 80)}, tenant_id, market_id,
+         SELECT s.scheme, hostname, s.port, tenant_id, market_id,
                 'platform_never_reassigned', 'same_origin'
-         FROM platform.domains WHERE hostname = '${hostname}'
+         FROM platform.domains,
+              (VALUES ('http', ${Number(port || 80)}), ('https', ${Number(httpsPort || 443)}))
+                AS s (scheme, port)
+         WHERE hostname = '${hostname}'
          ON CONFLICT (origin) DO UPDATE SET history = EXCLUDED.history, mode = EXCLUDED.mode;`);
   expect(
-    sql(`SELECT string_agg(origin || ' ' || mode_generation, ',')
+    sql(`SELECT string_agg(origin || ' ' || mode_generation, ',' ORDER BY origin)
          FROM platform.checkout_origins WHERE mode = 'same_origin'`),
-  ).toBe(`${FRESH} 1`);
+  ).toBe(`${FRESH} 1,${FRESH_HTTPS} 1`);
 });
 
 test("provision stock for concurrent checkout fixtures", async ({ browser }) => {

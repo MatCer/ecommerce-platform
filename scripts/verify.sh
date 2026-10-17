@@ -203,13 +203,13 @@ if ((e2e)); then
   say "seed"
   make seed >>"$log" 2>&1 || fail "seed failed (log: $log)"
   bash scripts/seed-m2-perf-review.sh >>"$log" 2>&1 || fail "review fixture seed failed (log: $log)"
-  pnpm --filter @platform/e2e exec playwright install chromium firefox >/dev/null || fail "playwright install failed"
+  pnpm --filter @platform/e2e exec playwright install chromium firefox webkit >/dev/null || fail "playwright install failed"
   results="$wt/.verify"
   mkdir -p "$results"
   # Specs run per project with --no-deps: a file filter would otherwise pull in every spec of
   # the dependency projects. Order and per-project workers match the config's dependency chain.
   e2e_rc=0
-  for p in chromium-setup chromium firefox chromium-shared-state chromium-themes; do
+  for p in chromium-setup chromium firefox firefox-security webkit-security chromium-shared-state chromium-themes; do
     say "e2e: $p"
     # Own output dir per project (each run clears its own); CI=1 makes the config forbid .only.
     args=(--project "$p" --no-deps --pass-with-no-tests --reporter=list,json --output "$results/$p")
