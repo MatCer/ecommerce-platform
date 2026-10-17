@@ -261,7 +261,8 @@ async fn guest_checkout_pays_after_a_failed_attempt(db: PgPool) {
     assert_eq!(view["missing"], json!([]));
     assert_eq!(view["pickup_point"]["country"], "CZ");
     assert_eq!(view["totals"]["total"]["amount_minor"], 12_900 + 7900);
-    let body = Ctx::place_body(&view);
+    let mut body = Ctx::place_body(&view);
+    body["notes"] = json!("Zvonit dvakrát");
 
     let (status, problem, _) = c
         .checkout(
@@ -280,6 +281,10 @@ async fn guest_checkout_pays_after_a_failed_attempt(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::CREATED, "{placed}");
     assert!(res.headers().get("idempotent-replayed").is_none());
+    assert!(
+        res.headers().get("x-cart-token").is_none(),
+        "an isolated placement with a note keeps its capability"
+    );
     let attempt = placed["payment"]["attempt_id"].as_str().unwrap().to_owned();
     let token = token_of(&placed["confirmation_url"]);
     assert_eq!(

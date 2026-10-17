@@ -1,7 +1,9 @@
-//! Checkout (spec §8.2, §10.3, A1, A4, A10, A12), reached only from the checkout origin: the
-//! edge maps `checkout.<shop>/_p/checkout/*` here with the checkout cart capability
-//! (`__Host-cart` → `X-Cart-Token`), the session and the client IP, and enforces same-origin
-//! JSON. `/_p/fake-pay/*` (the fake gateway's page, `PAYMENTS_FAKE=1`) lands here too.
+//! Checkout (spec §8.2, §10.3, A1, A4, A10, A12, C6). The edge maps `checkout.<shop>/_p/checkout/*`
+//! here with the checkout cart capability (`__Host-cart` → `X-Cart-Token`), the session and the
+//! client IP, and enforces same-origin JSON. A same-origin shop maps its own reads, shipping and
+//! payment here with `__Host-Http-cart`, and its contact and address forms to `/details`; that
+//! write and a placement with a note answer the replacing capability in `X-Cart-Token`, for the
+//! edge only. `/_p/fake-pay/*` (the fake gateway's page, `PAYMENTS_FAKE=1`) lands here too.
 
 use axum::Json;
 use axum::body::Bytes;
@@ -12,8 +14,8 @@ use axum::response::{IntoResponse, Response};
 use chrono::Utc;
 use commerce::cart;
 use commerce::checkout::{
-    self, AddressesInput, CheckoutView, ContactInput, PaymentInput, PlaceOrderInput, Placer,
-    ShippingInput,
+    self, AddressesInput, CheckoutView, ContactInput, Details, PaymentInput, PlaceOrderInput,
+    Placer, ShippingInput,
 };
 use commerce::checkout_access;
 use commerce::customers;
@@ -41,6 +43,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(get_checkout))
         .routes(routes!(put_contact))
         .routes(routes!(put_addresses))
+        .routes(routes!(post_details))
         .routes(routes!(put_shipping))
         .routes(routes!(put_payment))
         .routes(routes!(place_order))
@@ -98,6 +101,7 @@ async fn get_checkout(
     request_body = ContactInput,
     responses(
         (status = 200, body = CheckoutView),
+        (status = 409, description = "checkout_mode_changed", body = platform::Problem, content_type = "application/problem+json"),
         (status = 422, description = "invalid_email | invalid_phone", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
@@ -108,10 +112,7 @@ async fn put_contact(
     body: Bytes,
 ) -> Result<Response, Error> {
     let input: ContactInput = parse_json(&body)?;
-    with_checkout(&s, &shopper, &headers, async |tx, _, c| {
-        checkout::set_contact(tx, c, &input).await
-    })
-    .await
+    put_details(&s, &shopper, &headers, Details::Contact(input)).await
 }
 
 /// Billing and delivery address. The delivery country must be one the market ships to and
@@ -124,6 +125,7 @@ async fn put_contact(
     request_body = AddressesInput,
     responses(
         (status = 200, body = CheckoutView),
+        (status = 409, description = "checkout_mode_changed", body = platform::Problem, content_type = "application/problem+json"),
         (status = 422, description = "invalid_address | ship_to_not_allowed", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
@@ -134,10 +136,59 @@ async fn put_addresses(
     body: Bytes,
 ) -> Result<Response, Error> {
     let input: AddressesInput = parse_json(&body)?;
-    with_checkout(&s, &shopper, &headers, async |tx, ctx, c| {
-        checkout::set_addresses(tx, ctx, c, &input).await
+    put_details(&s, &shopper, &headers, Details::Addresses(Box::new(input))).await
+}
+
+async fn put_details(
+    s: &AppState,
+    shopper: &Shopper,
+    headers: &HeaderMap,
+    details: Details,
+) -> Result<Response, Error> {
+    let token = cart_token(headers)?;
+    let view = with_ctx(s, shopper, async |tx, ctx| {
+        let c = checkout::set_details(tx, ctx, &token, &details).await?;
+        checkout::view(tx, ctx, &s.checkout, &c).await
     })
-    .await
+    .await?;
+    Ok(no_store(Json(view).into_response()))
+}
+
+/// C6, same-origin mode: writes contact or addresses and replaces the checkout capability in
+/// the same transaction. The new capability comes back only in `X-Cart-Token` (the edge sets
+/// it as the HttpOnly `__Host-Http-cart` cookie); the body is empty.
+#[utoipa::path(
+    post,
+    path = "/storefront/v1/checkout/details",
+    tag = "storefront",
+    params(StorefrontHeaders, CartHeader),
+    request_body = Details,
+    responses(
+        (status = 204, description = "Written", headers(("X-Cart-Token" = String, description = "The replacing checkout capability (for the edge only)"))),
+        (status = 403, description = "shop_origin_required | shop_origin_mismatch", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, description = "No open checkout behind the capability", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "checkout_mode_changed", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, description = "invalid_body | invalid_email | invalid_phone | invalid_address | ship_to_not_allowed", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn post_details(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, Error> {
+    let details: Details = parse_json(&body)?;
+    let token = cart_token(&headers)?;
+    let rotated = with_ctx(&s, &shopper, async |tx, ctx| {
+        checkout::set_details_and_rotate(tx, ctx, &token, &details).await
+    })
+    .await?;
+    let mut res = StatusCode::NO_CONTENT.into_response();
+    res.headers_mut().insert(
+        CART_HEADER,
+        HeaderValue::from_str(&rotated).map_err(|e| Error::Internal(e.to_string()))?,
+    );
+    Ok(no_store(res))
 }
 
 #[utoipa::path(
@@ -275,7 +326,7 @@ pub(crate) async fn start_payment(
     params(StorefrontHeaders, CartHeader, IdempotencyHeader),
     request_body = PlaceOrderInput,
     responses(
-        (status = 201, body = PlacedOrder),
+        (status = 201, body = PlacedOrder, headers(("X-Cart-Token" = String, description = "The replacing checkout capability when a same-origin placement wrote a note (C6; for the edge only)"))),
         (status = 400, description = "idempotency_key_required", body = platform::Problem, content_type = "application/problem+json"),
         (status = 404, description = "No checkout cart", body = platform::Problem, content_type = "application/problem+json"),
         (status = 409, description = "order_already_placed | cart_changed | price_changed | insufficient_stock | out_of_stock | cart_unavailable | coupon_* | idempotency_conflict", body = platform::Problem, content_type = "application/problem+json"),
@@ -343,6 +394,12 @@ async fn place_order(
     if placed.replayed {
         res.headers_mut()
             .insert(REPLAYED, HeaderValue::from_static("true"));
+    }
+    if let Some(k) = &placed.checkout_token {
+        res.headers_mut().insert(
+            CART_HEADER,
+            HeaderValue::from_str(k).map_err(|e| Error::Internal(e.to_string()))?,
+        );
     }
     Ok(no_store(res))
 }

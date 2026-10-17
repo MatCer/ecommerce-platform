@@ -872,6 +872,16 @@
               }
             }
           },
+          "409": {
+            "description": "checkout_mode_changed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "422": {
             "description": "invalid_address | ship_to_not_allowed",
             "content": {
@@ -953,8 +963,132 @@
               }
             }
           },
+          "409": {
+            "description": "checkout_mode_changed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "422": {
             "description": "invalid_email | invalid_phone",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/storefront/v1/checkout/details": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "C6, same-origin mode: writes contact or addresses and replaces the checkout capability in\nthe same transaction. The new capability comes back only in `X-Cart-Token` (the edge sets\nit as the HttpOnly `__Host-Http-cart` cookie); the body is empty.",
+        "operationId": "post_details",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Details"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Written",
+            "headers": {
+              "X-Cart-Token": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The replacing checkout capability (for the edge only)"
+              }
+            }
+          },
+          "403": {
+            "description": "shop_origin_required | shop_origin_mismatch",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No open checkout behind the capability",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "checkout_mode_changed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_body | invalid_email | invalid_phone | invalid_address | ship_to_not_allowed",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1410,6 +1544,14 @@
         },
         "responses": {
           "201": {
+            "headers": {
+              "X-Cart-Token": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The replacing checkout capability when a same-origin placement wrote a note (C6; for the edge only)"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -7633,6 +7775,33 @@
             "format": "date"
           }
         }
+      },
+      "Details": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "contact"
+            ],
+            "properties": {
+              "contact": {
+                "$ref": "#/components/schemas/ContactInput"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "addresses"
+            ],
+            "properties": {
+              "addresses": {
+                "$ref": "#/components/schemas/AddressesInput"
+              }
+            }
+          }
+        ],
+        "description": "Customer details a checkout write adds or changes (C6). The order note is written with the\nplacement (`PlaceOrderInput::notes`, ruling P2-4), never here."
       },
       "DocumentKind": {
         "type": "string",

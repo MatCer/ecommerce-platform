@@ -5,8 +5,8 @@
 use chrono::Utc;
 use commerce::cart::{self, CartRef, NewLine};
 use commerce::checkout::{
-    self, AddressesInput, CheckoutAddress, ContactInput, PaymentInput, PlaceOrderInput, Placement,
-    Placer, Settings, ShippingInput,
+    self, AddressesInput, CheckoutAddress, ContactInput, Details, PaymentInput, PlaceOrderInput,
+    Placement, Placer, Settings, ShippingInput,
 };
 use commerce::checkout_access::{self, ShopOrigin};
 use commerce::inventory::{self, Adjustment};
@@ -146,34 +146,47 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
         .await
         .unwrap()
         .unwrap();
-    fill(&mut tx, &ctx, m, &checkout, email).await;
+    let checkout = fill(&mut tx, &ctx, m, CheckoutMode::Isolated, &checkout, email).await;
     tx.commit().await.unwrap();
     checkout
 }
 
-async fn fill(tx: &mut TenantTx, ctx: &Context, m: &Methods, checkout: &str, email: &str) {
-    let c = checkout_access::open(tx, ctx, checkout).await.unwrap();
-    checkout::set_contact(
-        tx,
-        &c,
-        &ContactInput {
-            email: email.into(),
-            phone: Some("+420 777 123 456".into()),
-        },
-    )
-    .await
-    .unwrap();
-    checkout::set_addresses(
-        tx,
-        ctx,
-        &c,
-        &AddressesInput {
-            billing: address("CZ"),
-            shipping: None,
-        },
-    )
-    .await
-    .unwrap();
+async fn fill(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    m: &Methods,
+    mode: CheckoutMode,
+    checkout: &str,
+    email: &str,
+) -> String {
+    let contact = Details::Contact(ContactInput {
+        email: email.into(),
+        phone: Some("+420 777 123 456".into()),
+    });
+    let addresses = Details::Addresses(Box::new(AddressesInput {
+        billing: address("CZ"),
+        shipping: None,
+    }));
+    let checkout = match mode {
+        CheckoutMode::Isolated => {
+            checkout::set_details(tx, ctx, checkout, &contact)
+                .await
+                .unwrap();
+            checkout::set_details(tx, ctx, checkout, &addresses)
+                .await
+                .unwrap();
+            checkout.to_owned()
+        }
+        CheckoutMode::SameOrigin => {
+            let k = checkout::set_details_and_rotate(tx, ctx, checkout, &contact)
+                .await
+                .unwrap();
+            checkout::set_details_and_rotate(tx, ctx, &k, &addresses)
+                .await
+                .unwrap()
+        }
+    };
+    let c = checkout_access::open(tx, ctx, &checkout).await.unwrap();
     checkout::set_shipping(
         tx,
         ctx,
@@ -196,6 +209,7 @@ async fn fill(tx: &mut TenantTx, ctx: &Context, m: &Methods, checkout: &str, ema
     )
     .await
     .unwrap();
+    checkout
 }
 
 async fn cart_ref(tx: &mut TenantTx, ctx: &Context, token: &str) -> CartRef {
@@ -640,14 +654,14 @@ async fn ship_to_pickup_and_cod_rules(db: PgPool) {
     let ctx = ctx(&mut tx, shop.cz).await;
     let c = cart_ref(&mut tx, &ctx, &token).await;
     // A3: the CZ market ships to CZ only.
-    let e = checkout::set_addresses(
+    let e = checkout::set_details(
         &mut tx,
         &ctx,
-        &c,
-        &AddressesInput {
+        &token,
+        &Details::Addresses(Box::new(AddressesInput {
             billing: address("CZ"),
             shipping: Some(address("DE")),
-        },
+        })),
     )
     .await
     .unwrap_err();
@@ -1183,7 +1197,15 @@ async fn placement_empties_the_source_cart(db: PgPool) {
     let k = checkout_access::start(&mut tx, &sctx, &shop_token, None)
         .await
         .unwrap();
-    fill(&mut tx, &sctx, &m, &k, "jana@example.test").await;
+    let k = fill(
+        &mut tx,
+        &sctx,
+        &m,
+        CheckoutMode::SameOrigin,
+        &k,
+        "jana@example.test",
+    )
+    .await;
     tx.commit().await.unwrap();
     let input = summary(&runtime, &shop, &k).await;
     let before = shop_cart_view(&runtime, &shop, &shop_token).await;
