@@ -9,6 +9,7 @@ import {
   type BrowserContext,
   type BrowserContextOptions,
   expect,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { mailpit } from "../admin/support";
@@ -22,6 +23,10 @@ export const FRESH = new URL(`http://demo-fresh.localhost:${port}`).origin;
 /** WebKit drops `Secure` cookies over plain HTTP, so the security projects use this origin. */
 export const FRESH_HTTPS = new URL(
   `https://demo-fresh.localhost:${process.env.HTTPS_PORT ?? "8443"}`,
+).origin;
+export const FRESH_SK = new URL(`http://demo-fresh-sk.localhost:${port}`).origin;
+export const FRESH_SK_HTTPS = new URL(
+  `https://demo-fresh-sk.localhost:${process.env.HTTPS_PORT ?? "8443"}`,
 ).origin;
 export const checkoutOf = (shop: string) => shop.replace("://", "://checkout.");
 
@@ -43,7 +48,9 @@ export async function securityContext(
     extraHTTPHeaders: testRateHeaders(),
     ...options,
   });
-  await context.addCookies([{ name: "consent", value: "", url: FRESH_HTTPS }]);
+  await context.addCookies(
+    [FRESH_HTTPS, FRESH_SK_HTTPS].map((url) => ({ name: "consent", value: "", url })),
+  );
   return context;
 }
 
@@ -148,6 +155,87 @@ export async function startSameOriginCheckout(page: Page, shop: string, slug = "
   await page.goto(`${shop}/`);
   await addLine(page, shop, slug);
   await Promise.all([page.waitForURL(`${shop}/checkout`), submitStart(page)]);
+}
+
+type DetailsStep = "contact" | "addresses";
+export const detailsForm = (page: Page, step: DetailsStep) =>
+  page.locator(`form[action="/checkout/${step}"]`);
+
+export async function postDetails(
+  page: Page,
+  step: DetailsStep,
+  submit?: () => Promise<void>,
+): Promise<number> {
+  const posted = page.waitForRequest(
+    (r) => r.method() === "POST" && new URL(r.url()).pathname === `/checkout/${step}`,
+  );
+  const committed = page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame());
+  await (submit ? submit() : detailsForm(page, step).getByRole("button").click());
+  const status = (await (await posted).response())?.status() ?? 0;
+  await committed;
+  return status;
+}
+
+export interface AddressInput {
+  name: string;
+  street: string;
+  postal_code: string;
+  city: string;
+}
+export const JANA: AddressInput = {
+  name: "Jana Nováková",
+  street: "Dlouhá 12",
+  postal_code: "110 00",
+  city: "Praha",
+};
+
+export async function fillAddress(page: Page, prefix: "billing" | "shipping", a: AddressInput) {
+  const form = detailsForm(page, "addresses");
+  for (const [key, value] of Object.entries(a))
+    await form.locator(`[name="${prefix}_${key}"]`).fill(value);
+}
+
+export async function saveContact(page: Page, email: string) {
+  await detailsForm(page, "contact").locator('[name="email"]').fill(email);
+  expect(await postDetails(page, "contact"), "the contact post").toBe(303);
+}
+
+export async function saveAddresses(page: Page, billing = JANA) {
+  await fillAddress(page, "billing", billing);
+  expect(await postDetails(page, "addresses"), "the address post").toBe(303);
+}
+
+export async function sameOriginReview(page: Page, shop: string, email: string, slug?: string) {
+  await startSameOriginCheckout(page, shop, slug);
+  await saveContact(page, email);
+  await saveAddresses(page);
+  await checkoutReady(page);
+}
+
+export async function chooseCashOnDelivery(page: Page, shipping = /PPL – kurýr/, cod = /Dobírka/) {
+  const save = async (path: "shipping" | "payment", choice: Locator) => {
+    const [saved] = await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.request().method() === "PUT" && new URL(r.url()).pathname === `/_p/checkout/${path}`,
+      ),
+      choice.check(),
+    ]);
+    expect(saved.status(), `the ${path} save`).toBe(200);
+  };
+  await save("shipping", page.getByRole("radio", { name: shipping }));
+  const pay = page.getByRole("radio", { name: cod });
+  await expect(pay).toBeEnabled();
+  await save("payment", pay);
+  await expect(pay).toBeChecked();
+}
+
+export async function receiptNumber(page: Page, thanks = "Děkujeme za objednávku!") {
+  const receipt = page.getByRole("status", { name: thanks });
+  await expect(receipt).toBeFocused();
+  const number = /Objednávka (\S+)/.exec(await receipt.innerText())?.[1];
+  expect(number, "the receipt names the order").toBeTruthy();
+  return number ?? "";
 }
 
 /** Fills a shop cart through the edge (optionally with a coupon) and hands it to checkout. */

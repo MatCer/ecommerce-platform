@@ -14,7 +14,11 @@ const sharedState = [
   "admin/ai.spec.ts",
   "admin/ai-alt-texts.spec.ts",
 ];
-const security = ["checkout/platform-isolation.spec.ts", "checkout/same-origin-start.spec.ts"];
+const security = [
+  "checkout/platform-isolation.spec.ts",
+  "checkout/same-origin-start.spec.ts",
+  "checkout/fixation.spec.ts",
+];
 
 export default defineConfig({
   testDir: ".",
