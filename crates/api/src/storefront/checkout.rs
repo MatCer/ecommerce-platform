@@ -145,7 +145,7 @@ async fn put_details(
 ) -> Result<Response, Error> {
     let token = cart_token(headers)?;
     let view = with_ctx(s, shopper, async |tx, ctx| {
-        let c = checkout::set_details(tx, ctx, &token, &details).await?;
+        let c = checkout::set_isolated_details(tx, ctx, &token, &details).await?;
         checkout::view(tx, ctx, &s.checkout, &c).await
     })
     .await?;
@@ -178,7 +178,7 @@ async fn post_details(
     let details: Details = parse_json(&body)?;
     let token = cart_token(&headers)?;
     let rotated = with_ctx(&s, &shopper, async |tx, ctx| {
-        checkout::set_details_and_rotate(tx, ctx, &token, &details).await
+        checkout::set_same_origin_details(tx, ctx, &token, &details).await
     })
     .await?;
     let mut res = StatusCode::NO_CONTENT.into_response();
@@ -393,7 +393,7 @@ async fn place_order(
         res.headers_mut()
             .insert(REPLAYED, HeaderValue::from_static("true"));
     }
-    if let Some(k) = &placed.checkout_token {
+    if let Some(k) = &placed.rotated_capability {
         res.headers_mut().insert(
             CART_HEADER,
             HeaderValue::from_str(k).map_err(|e| Error::Internal(e.to_string()))?,

@@ -224,7 +224,7 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
         .await
         .unwrap()
         .unwrap();
-    let c = checkout::set_details(
+    let c = checkout::set_isolated_details(
         &mut tx,
         &ctx,
         &checkout_token,
@@ -239,7 +239,7 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
         M::Cz => "CZ",
         M::Sk => "SK",
     };
-    checkout::set_details(
+    checkout::set_isolated_details(
         &mut tx,
         &ctx,
         &checkout_token,

@@ -180,7 +180,7 @@ async fn place(runtime: &PgPool, s: &Setup, kind: MethodKind) -> (Uuid, Uuid) {
         .await
         .unwrap()
         .unwrap();
-    let c = checkout::set_details(
+    let c = checkout::set_isolated_details(
         &mut tx,
         &ctx,
         &checkout_token,
@@ -191,7 +191,7 @@ async fn place(runtime: &PgPool, s: &Setup, kind: MethodKind) -> (Uuid, Uuid) {
     )
     .await
     .unwrap();
-    checkout::set_details(
+    checkout::set_isolated_details(
         &mut tx,
         &ctx,
         &checkout_token,

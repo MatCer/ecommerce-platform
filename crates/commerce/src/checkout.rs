@@ -286,7 +286,7 @@ async fn ship_to_countries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Strin
         .collect())
 }
 
-pub async fn set_details(
+pub async fn set_isolated_details(
     tx: &mut TenantTx,
     ctx: &Context,
     token: &str,
@@ -297,7 +297,7 @@ pub async fn set_details(
     Ok(c)
 }
 
-pub async fn set_details_and_rotate(
+pub async fn set_same_origin_details(
     tx: &mut TenantTx,
     ctx: &Context,
     token: &str,
@@ -731,7 +731,7 @@ pub struct Placement {
     pub token: String,
     /// True when this was an idempotent replay of an earlier placement.
     pub replayed: bool,
-    pub checkout_token: Option<String>,
+    pub rotated_capability: Option<String>,
 }
 
 /// Who places the order.
@@ -775,7 +775,7 @@ pub async fn place_order(
             number: s.number,
             attempt_id: s.attempt_id,
             replayed: true,
-            checkout_token: None,
+            rotated_capability: None,
         });
     }
     if !open {
@@ -1126,7 +1126,7 @@ pub async fn place_order(
     let token = orders::issue_token(tx, order_id).await?;
     let view = orders::view(tx, order_id).await?;
     send_confirmation(tx, ctx, &view, &token).await?;
-    let checkout_token = checkout_access::convert(tx, ctx, &cart_ref, note_written).await?;
+    let rotated_capability = checkout_access::convert(tx, ctx, &cart_ref, note_written).await?;
     let stored = StoredPlacement {
         order_id,
         number: number.to_string(),
@@ -1139,7 +1139,7 @@ pub async fn place_order(
         attempt_id,
         token,
         replayed: false,
-        checkout_token,
+        rotated_capability,
     })
 }
 

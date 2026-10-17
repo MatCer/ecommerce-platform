@@ -466,7 +466,9 @@ async fn protected_read_queued_before_rotation_fails(db: PgPool) {
     let (attack, rotated, ()) =
         queued_behind_rotation(&db, &runtime, &here, &k, None, async |tx, ctx, _| {
             let victim = Details::Contact(contact("victim@example.cz"));
-            checkout::set_details(tx, ctx, &k, &victim).await.unwrap();
+            checkout::set_isolated_details(tx, ctx, &k, &victim)
+                .await
+                .unwrap();
         })
         .await;
     assert!(not_found(&attack), "no victim bytes: {attack:?}");
@@ -509,7 +511,9 @@ async fn protected_write_queued_before_rotation_fails(db: PgPool) {
         Some(method),
         async |tx, ctx, c| {
             let victim = Details::Contact(contact("victim@example.cz"));
-            checkout::set_details(tx, ctx, &k, &victim).await.unwrap();
+            checkout::set_isolated_details(tx, ctx, &k, &victim)
+                .await
+                .unwrap();
             sqlx::query_scalar::<_, i32>("SELECT version FROM carts WHERE id = $1")
                 .bind(c.id)
                 .fetch_one(&mut **tx)
@@ -550,7 +554,7 @@ async fn read_holding_lock_cannot_observe_later_write(db: PgPool) {
             let (mut tx, ctx) = here.tx(&runtime).await;
             pid_tx.send(pid(&mut tx).await).unwrap();
             let later = Details::Contact(contact("later@example.cz"));
-            checkout::set_details(&mut tx, &ctx, &k, &later).await?;
+            checkout::set_isolated_details(&mut tx, &ctx, &k, &later).await?;
             let rotated = checkout_access::rotate(&mut tx, &ctx, &k).await?;
             tx.commit().await?;
             Ok::<_, Error>(rotated)
@@ -632,7 +636,7 @@ async fn switch_orders_against_inflight_requests(db: PgPool) {
     });
     blocked_by(&db, switch_pid, request_pid).await;
     let first = Details::Contact(contact("first@example.cz"));
-    let k2 = checkout::set_details_and_rotate(&mut request, &rctx, &k2, &first)
+    let k2 = checkout::set_same_origin_details(&mut request, &rctx, &k2, &first)
         .await
         .unwrap();
     request.commit().await.unwrap();

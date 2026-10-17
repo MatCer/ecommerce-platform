@@ -237,7 +237,7 @@ async fn start_last_commit_wins(db: PgPool) {
     let k1 = checkout_access::start(&mut first, &ctx, &shop_token, None)
         .await
         .unwrap();
-    let k1 = commerce::checkout::set_details_and_rotate(
+    let k1 = commerce::checkout::set_same_origin_details(
         &mut first,
         &ctx,
         &k1,

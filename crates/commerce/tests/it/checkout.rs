@@ -169,19 +169,19 @@ async fn fill(
     }));
     let checkout = match mode {
         CheckoutMode::Isolated => {
-            checkout::set_details(tx, ctx, checkout, &contact)
+            checkout::set_isolated_details(tx, ctx, checkout, &contact)
                 .await
                 .unwrap();
-            checkout::set_details(tx, ctx, checkout, &addresses)
+            checkout::set_isolated_details(tx, ctx, checkout, &addresses)
                 .await
                 .unwrap();
             checkout.to_owned()
         }
         CheckoutMode::SameOrigin => {
-            let k = checkout::set_details_and_rotate(tx, ctx, checkout, &contact)
+            let k = checkout::set_same_origin_details(tx, ctx, checkout, &contact)
                 .await
                 .unwrap();
-            checkout::set_details_and_rotate(tx, ctx, &k, &addresses)
+            checkout::set_same_origin_details(tx, ctx, &k, &addresses)
                 .await
                 .unwrap()
         }
@@ -654,7 +654,7 @@ async fn ship_to_pickup_and_cod_rules(db: PgPool) {
     let ctx = ctx(&mut tx, shop.cz).await;
     let c = cart_ref(&mut tx, &ctx, &token).await;
     // A3: the CZ market ships to CZ only.
-    let e = checkout::set_details(
+    let e = checkout::set_isolated_details(
         &mut tx,
         &ctx,
         &token,

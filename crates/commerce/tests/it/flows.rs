@@ -1147,7 +1147,7 @@ async fn typed_checkout(rt: &PgPool, s: &Shop, email: &str) -> Typed {
         email: email.into(),
         phone: None,
     });
-    let checkout = checkout::set_details_and_rotate(&mut tx, &ctx, &checkout, &contact)
+    let checkout = checkout::set_same_origin_details(&mut tx, &ctx, &checkout, &contact)
         .await
         .unwrap();
     consent::record_server(
