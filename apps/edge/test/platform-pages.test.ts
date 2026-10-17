@@ -97,7 +97,6 @@ const get = (
   gateway = gw,
 ) => gateway.fetch(new Request(url, { ...init, headers: { host: new URL(url).host, ...headers } }));
 
-/** The C1/C2 header set every response on a same-origin platform page path carries. */
 function expectPlatformHeaders(res: Response, label: string) {
   expect(res.headers.get("cache-control"), label).toBe("no-store");
   expect(res.headers.get("referrer-policy"), label).toBe("strict-origin");

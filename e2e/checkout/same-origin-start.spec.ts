@@ -1,9 +1,3 @@
-/**
- * SHOP-119: two same-origin starts whose responses arrive in reverse order leave the first tab on
- * the superseded capability. It shows the restart notice, its form starts a new checkout, and
- * neither earlier capability opens again. Runs in `chromium` and `firefox-security`.
- */
-
 import { expect, type Page, type Route, test } from "@playwright/test";
 import {
   addLine,
@@ -29,15 +23,12 @@ async function hold(page: Page): Promise<Route> {
   return route;
 }
 
-/**
- * Chromium intercepts before it adds Fetch Metadata, so the replay states the admission headers.
- * The frozen shop cookie keeps a later start from presenting an earlier capability as `previous`.
- */
-async function replay(route: Route, shopCart: string) {
+/** Chromium intercepts before it adds Fetch Metadata, so the replay states the admission headers. */
+async function replay(route: Route, frozenShopCart: string) {
   const response = await route.fetch({
     maxRedirects: 0,
     headers: {
-      cookie: `cart=${shopCart}`,
+      cookie: `cart=${frozenShopCart}`,
       origin: FRESH_HTTPS,
       "sec-fetch-site": "same-origin",
       "sec-fetch-mode": "navigate",
@@ -66,13 +57,13 @@ test("a start answered after a newer one shows the restart notice; only a new st
   await first.goto(`${FRESH_HTTPS}/`);
   await addLine(first, FRESH_HTTPS, "tricko-basic");
   await second.goto(`${FRESH_HTTPS}/`);
-  const shopCart = (await cookieValue(context, "cart")) ?? "";
-  expect(shopCart).toMatch(CAPABILITY);
+  const frozenShopCart = (await cookieValue(context, "cart")) ?? "";
+  expect(frozenShopCart).toMatch(CAPABILITY);
 
   const startA = await hold(first);
   const startB = await hold(second);
-  const a = await replay(startA, shopCart);
-  const b = await replay(startB, shopCart);
+  const a = await replay(startA, frozenShopCart);
+  const b = await replay(startB, frozenShopCart);
   expect(b.cap).not.toBe(a.cap);
 
   await startB.fulfill({ response: b.response });

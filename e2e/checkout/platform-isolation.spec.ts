@@ -1,9 +1,3 @@
-/**
- * SHOP-119: platform HTML on a same-origin shop reaches only a top-level navigation, its page
- * token works only from that HTML, and COOP, CSP and the asset prefix hold. Runs in `chromium`,
- * `firefox-security` and `webkit-security` on the HTTPS fresh origin.
- */
-
 import { randomBytes } from "node:crypto";
 import {
   type Browser,
@@ -36,7 +30,6 @@ declare global {
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const CAPABILITY = /^[0-9a-f]{64}$/;
 
-/** An open same-origin checkout whose snapshot holds unique contact and address markers. */
 async function openCheckout(
   browser: Browser,
   shop = FRESH_HTTPS,
@@ -126,9 +119,9 @@ test("theme fetch and XHR of platform page paths get an empty 403", async ({ bro
   await page.context().close();
 });
 
-test("a frame of the platform page gets a 403 and the theme reads nothing", async ({ browser }) => {
-  // The theme CSP's `frame-src 'none'` stops the frame before any request; bypassing it leaves
-  // the edge's own refusal as the only barrier.
+test("with the theme CSP bypassed, a frame of the platform page gets a 403 and the theme reads nothing", async ({
+  browser,
+}) => {
   const { page, marker } = await openCheckout(browser, FRESH_HTTPS, { bypassCSP: true });
   const theme = await themePage(page);
   const framed = theme.waitForResponse(

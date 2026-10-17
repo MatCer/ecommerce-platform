@@ -1,16 +1,8 @@
-/**
- * Page tokens (C4, `docs/decisions/same-origin-checkout.md`): the edge mints one for the checkout
- * capability a platform page is rendered with and requires it back on that page's API calls.
- */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-/** Edge → checkout worker only; clients cannot send `x-platform-*` (`stripUntrusted`). */
-export const PAGE_TOKEN_HEADER = "x-platform-page-token";
+export const WORKER_PAGE_TOKEN_HEADER = "x-platform-page-token";
+export const CLIENT_PAGE_TOKEN_HEADER = "x-page-token";
 
-/**
- * `base64url(HMAC-SHA256(secret, "pt1|" + host + "|" + capability))`, `host` being the canonical
- * authority of `shopOrigin` (non-default port kept). No secret or no capability, no token.
- */
 export function pageToken(
   secret: string | undefined,
   shopOrigin: string,
@@ -22,10 +14,6 @@ export function pageToken(
     .digest("base64url");
 }
 
-/**
- * Constant-time check of a presented token against the request's own capability. It proves
- * possession only: the API still authorizes the capability in its transaction.
- */
 export function verifyPageToken(
   secret: string | undefined,
   shopOrigin: string,

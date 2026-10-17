@@ -33,7 +33,6 @@ export const restartButton = (page: Page) =>
   page.getByRole("button", { name: "Pokračovat k pokladně" });
 export const pageTokenMeta = (page: Page) => page.locator('meta[name="page-token"]');
 
-/** No `testContext` route layer: Fetch Metadata, Origin and cookies stay browser-native. */
 export async function securityContext(
   browser: Browser,
   options: BrowserContextOptions = {},
@@ -123,7 +122,6 @@ export async function addLine(page: Page, shop: string, slug: string, quantity =
   expect(added).toBe(200);
 }
 
-/** The theme's start button: a real form POST from the page. */
 export function submitStart(page: Page): Promise<void> {
   return page.evaluate(() => {
     const form = document.createElement("form");

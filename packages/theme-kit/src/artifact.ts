@@ -222,7 +222,6 @@ function refuseReservedAssets(kind: ArtifactKind, assets: Record<string, AssetEn
 
 const CHECKOUT_ASSET_RE = /^\/_checkout\/([0-9a-f]{16})\//;
 
-/** A checkout build loads only from its own `/_checkout/<build id>/`, which no theme can shadow (C8). */
 function refuseUnprefixedCheckout(
   kind: ArtifactKind,
   assets: Record<string, AssetEntry>,

@@ -23,8 +23,6 @@ const inputs = [
   "packages/storefront-sdk/package.json",
   "pnpm-lock.yaml",
 ].flatMap(files);
-// Derived from the sources, not the build output, so the asset prefix is known before
-// compilation and rebuilding unchanged sources packs the same artifact.
 const buildId = sha256(
   inputs
     .sort()

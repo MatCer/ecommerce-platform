@@ -7,10 +7,10 @@ interface Props {
   shop: ShopModel | null;
   view: CheckoutView;
   customerEmail?: string | undefined;
-  saved: Address[];
+  saved?: Address[];
   shopUrl: string;
 }
-const { shop, view, customerEmail, saved, shopUrl } = Astro.props;
+const { shop, view, customerEmail, saved = [], shopUrl } = Astro.props;
 const m = shop?.messages ?? {};
 ---
 

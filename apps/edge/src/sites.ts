@@ -78,7 +78,6 @@ export function checkoutPolicy(
 
 export type SameOriginSite = Site & { shopOrigin: string };
 
-/** The request's exact shop origin runs the same-origin checkout. Previews have no `shopOrigin`. */
 export function sameOriginShop(site: Site): site is SameOriginSite {
   return (
     site.shopOrigin !== undefined && checkoutPolicy(site, site.shopOrigin).mode === "same_origin"

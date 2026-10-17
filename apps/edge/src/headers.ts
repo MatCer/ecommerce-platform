@@ -92,16 +92,14 @@ export function contentSecurityPolicy(
 const PLATFORM_FALLBACK_CSP =
   "default-src 'none'; frame-ancestors 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'";
 
-/**
- * C1/C2 headers of every response on a same-origin platform page path, whatever its status:
- * `csp` is the checkout CSP of a render, else the fallback. `strict-origin`, not `no-referrer`,
- * keeps the page's own form and fetch POSTs from sending `Origin: null`.
- */
+/** `strict-origin`, not `no-referrer`, keeps the page's own form POSTs from sending `Origin: null`. */
+export const PLATFORM_REFERRER_POLICY = "strict-origin";
+
 export function platformPageHeaders(csp: string | null): Record<string, string> {
   return {
     ...securityHeaders("checkout", csp ?? PLATFORM_FALLBACK_CSP),
     "cache-control": "no-store",
-    "referrer-policy": "strict-origin",
+    "referrer-policy": PLATFORM_REFERRER_POLICY,
     "x-frame-options": "DENY",
   };
 }

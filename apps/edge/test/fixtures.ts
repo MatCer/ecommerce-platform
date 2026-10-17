@@ -89,11 +89,6 @@ export default {
 };
 `;
 
-/**
- * The same-origin `/checkout` page's contract with the edge: it reads the checkout
- * through the binding and renders the page token the edge sent only when that opens a checkout.
- * It lists its own request header names; `?slow`, `?throw` and `?huge` make it fail.
- */
 export const platformCheckoutWorker = `
 export default {
   async fetch(request, env) {
@@ -114,7 +109,6 @@ export default {
 };
 `;
 
-/** A checkout capability the fake API no longer opens (superseded, idle, revoked). */
 export const REVOKED_CAPABILITY = "sameorigintoken_revoked_00000000001";
 
 export async function buildArtifact(

@@ -1,22 +1,17 @@
-/**
- * Platform pages on a same-origin shop (C1, `docs/decisions/same-origin-checkout.md`): only a
- * top-level document navigation reaches one, decided from Fetch Metadata alone.
- */
 import { platformSegment } from "@platform/theme-kit";
 
 export type Admission = "navigation" | "refused" | "unsupported";
 
-/** A reserved page path (`/checkout`, `/o/…`, `/withdraw`, …) under any spelling the decoder knows. */
+const isNamespace = (segment: string) => segment.startsWith("_");
+
 export function isPlatformPagePath(pathname: string): boolean {
   const segment = platformSegment(pathname);
-  return segment !== null && !segment.startsWith("_");
+  return segment !== null && !isNamespace(segment);
 }
 
-/**
- * Prefetch and prerender would consume one-shot pages, and a browser without Fetch Metadata
- * cannot be told apart from a script fetch, so both fail closed. `Sec-Fetch-Site` is not checked:
- * email and payment-provider arrivals are cross-site navigations.
- */
+export const isSameOriginCheckoutPath = (pathname: string) =>
+  platformSegment(pathname) === "checkout";
+
 export function admitNavigation(headers: Headers): Admission {
   if (headers.has("sec-purpose")) return "refused";
   const mode = headers.get("sec-fetch-mode");

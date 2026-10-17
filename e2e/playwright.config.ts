@@ -14,7 +14,6 @@ const sharedState = [
   "admin/ai.spec.ts",
   "admin/ai-alt-texts.spec.ts",
 ];
-// Same-origin checkout isolation: Fetch Metadata, COOP, CSP and cookies differ per engine.
 const security = ["checkout/platform-isolation.spec.ts", "checkout/same-origin-start.spec.ts"];
 
 export default defineConfig({

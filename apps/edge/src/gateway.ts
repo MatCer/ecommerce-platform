@@ -5,7 +5,6 @@ import {
   type ArtifactManifest,
   isPlatformPath,
   PLATFORM_SEGMENTS,
-  platformSegment,
   readManifest,
   tokensToCss,
 } from "@platform/theme-kit";
@@ -27,14 +26,25 @@ import { type Counters, templateOf } from "./counters.ts";
 import type { Assignment, Enroller } from "./experiments.ts";
 import {
   contentSecurityPolicy,
+  PLATFORM_REFERRER_POLICY,
   platformPageHeaders,
   securityHeaders,
   stripUntrusted,
   workerRequestHeaders,
   workerResponseHeaders,
 } from "./headers.ts";
-import { PAGE_TOKEN_HEADER, pageToken, verifyPageToken } from "./page-token.ts";
-import { admitNavigation, isPlatformPagePath, UNSUPPORTED_BROWSER_PAGE } from "./platform-pages.ts";
+import {
+  CLIENT_PAGE_TOKEN_HEADER,
+  pageToken,
+  verifyPageToken,
+  WORKER_PAGE_TOKEN_HEADER,
+} from "./page-token.ts";
+import {
+  admitNavigation,
+  isPlatformPagePath,
+  isSameOriginCheckoutPath,
+  UNSUPPORTED_BROWSER_PAGE,
+} from "./platform-pages.ts";
 import { type NodeBinding, WorkerPool } from "./runtime.ts";
 import {
   CachedResolver,
@@ -84,7 +94,6 @@ export interface GatewayOptions {
   /** Signed rate identities for local Playwright contexts; never configured in production. */
   e2eRateSecret?: string;
   experiments?: Enroller;
-  /** `EDGE_PAGE_TOKEN_SECRET` (C4). Without it same-origin platform pages answer 503. */
   pageTokenSecret?: string;
 }
 
@@ -146,7 +155,6 @@ const CHECKOUT_OPS: { method: string; path: RegExp }[] = [
   { method: "POST", path: /^\/place-order$/ },
 ];
 
-/** The same-origin checkout's JSON operations on `<shop>` (C4): the island's non-PII calls. */
 const SAME_ORIGIN_CHECKOUT_OPS: { method: string; path: RegExp }[] = [
   { method: "GET", path: /^$/ },
   { method: "PUT", path: /^\/(shipping|payment)$/ },
@@ -411,7 +419,6 @@ export function createGateway(opts: GatewayOptions) {
     return null;
   }
 
-  /** `/_checkout/<build id>/*` of the checkout artifact on a same-origin shop (C8), never gated. */
   async function checkoutAsset(site: Site, req: Request, p: string): Promise<Response> {
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
@@ -420,7 +427,6 @@ export function createGateway(opts: GatewayOptions) {
     return asset ?? text(404, "Not found");
   }
 
-  /** The active theme's tokens (spec A6) as CSS for the checkout pages, on either origin. */
   async function tokensCss(site: Site): Promise<Response> {
     if (!site.theme_artifact) return text(404, "Not found");
     const m = await manifest(site.theme_artifact);
@@ -456,7 +462,7 @@ export function createGateway(opts: GatewayOptions) {
     try {
       const headers = workerRequestHeaders();
       headers.set(CTX_HEADER, ctxId);
-      if (extra.pageToken) headers.set(PAGE_TOKEN_HEADER, extra.pageToken);
+      if (extra.pageToken) headers.set(WORKER_PAGE_TOKEN_HEADER, extra.pageToken);
       if (extra.experiment && site.experiment)
         headers.set(ARM_HEADER, `${site.experiment.name}:${extra.experiment.arm}`);
       // One deadline and one byte cap for headers *and* body: a worker must not hold a request
@@ -787,13 +793,6 @@ export function createGateway(opts: GatewayOptions) {
     });
   }
 
-  /**
-   * `/_p/checkout/*` and `/_p/orders/*` (WP10) → the Storefront API. Same-origin JSON only for
-   * writes (CSRF, §14). The caller's credentials (`__Host-cart` and `__Host-sid` on the checkout
-   * origin, only `__Host-Http-cart` on a same-origin shop), the client IP and a validated
-   * `Idempotency-Key` go along as headers; the order routes are authorized by the order token in
-   * their path (A4).
-   */
   async function checkoutProxy(
     site: Site,
     req: Request,
@@ -1171,10 +1170,6 @@ ${
     });
   }
 
-  /**
-   * `/_p/checkout[/shipping|/payment]` on a same-origin shop (C4): only with the page token of
-   * the request's own `__Host-Http-cart`, checked before any body read or API call.
-   */
   async function sameOriginCheckoutApi(
     site: SameOriginSite,
     req: Request,
@@ -1184,7 +1179,7 @@ ${
     clientIp: string | undefined,
   ): Promise<Response> {
     const cart = capabilityCookie(req, SAME_ORIGIN_CART_COOKIE);
-    const presented = req.headers.get("x-page-token");
+    const presented = req.headers.get(CLIENT_PAGE_TOKEN_HEADER);
     if (!verifyPageToken(opts.pageTokenSecret, site.shopOrigin, cart, presented))
       return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
     return checkoutProxy(
@@ -1644,9 +1639,6 @@ ${
     return new Response(null, { status: 303, headers: { location, ...noStore } });
   }
 
-  // --- same-origin platform pages (C1, C4) ---------------------------------------------------
-
-  /** Every response on a platform page path, refusals and failures included, gets C1/C2 headers. */
   async function platformPage(site: SameOriginSite, req: Request, url: URL): Promise<Response> {
     const res = await platformPageResponse(site, req, url).catch((err: unknown) =>
       unavailable(err, req.url),
@@ -1946,8 +1938,7 @@ ${
     if (p === "/_p/tokens.css") return tokensCss(site);
     if (p.startsWith("/_p/") || p.startsWith("/_edge/"))
       return problem(404, "not_found", "unknown platform route");
-    // The artifact's `/checkout` is the same-origin shop's page; this origin's checkout is `/`.
-    if (platformSegment(p) === "checkout") return text(404, "Not found");
+    if (isSameOriginCheckoutPath(p)) return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     const checkoutArtifact = site.checkout_artifact ?? opts.checkoutArtifact;
@@ -2024,7 +2015,7 @@ ${
     const resolved = await resolver.resolve(origin.shopHost);
     if (!resolved) return text(404, "Unknown shop");
     // Local dev also serves the shops over TLS; Caddy sets X-Forwarded-Proto and drops client
-    // values. Production's scheme is https and never consults it.
+    // values.
     const requestScheme =
       scheme === "http" && request.headers.get("x-forwarded-proto") === "https" ? "https" : scheme;
     // A per-request copy: the resolver's cached object is shared between requests.
@@ -2102,11 +2093,10 @@ ${
 
   async function fetchHandler(request: Request): Promise<Response> {
     const response = await handle(request).catch((err: unknown) => unavailable(err, request.url));
-    // Even rejected requests and render failures must not leak a withdrawal capability. A
-    // same-origin platform page keeps `strict-origin` (C1).
+    // Even rejected requests and render failures must not leak a withdrawal capability.
     const path = new URL(request.url).pathname;
     if (path === "/withdraw" || path === "/_p/withdraw" || path.startsWith("/_p/withdraw/")) {
-      if (response.headers.get("referrer-policy") !== "strict-origin")
+      if (response.headers.get("referrer-policy") !== PLATFORM_REFERRER_POLICY)
         response.headers.set("referrer-policy", "no-referrer");
       response.headers.set("cache-control", "no-store");
     }

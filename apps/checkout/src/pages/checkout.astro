@@ -5,8 +5,6 @@ import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, pageToken, shopUrl } from "../lib/api";
 import { Button } from "../ui.tsx";
 
-// The same-origin checkout on the shop (C1, C4, C10); the edge renders it only there, and the
-// shop has no account session, so it never reads the customer.
 const api = checkoutApi(Astro.request);
 const [shop, view] = await Promise.all([api.shop(), api.checkout()]);
 const open = view !== null && view.cart.lines.length > 0;
@@ -26,7 +24,7 @@ const back = shopUrl(Astro.url);
   <h1 class="mb-4 font-display text-2xl font-bold">{t(m, "checkout.title")}</h1>
   {
     open ? (
-      <OpenCheckout shop={shop} view={view} saved={[]} shopUrl={back} />
+      <OpenCheckout shop={shop} view={view} shopUrl={back} />
     ) : (
       <div class="grid max-w-xl justify-items-start gap-4">
         <p role="status">{t(m, "checkout.restarted")}</p>
