@@ -39,8 +39,6 @@ BEGIN
 END
 $$;
 
--- A theme arm serves real visitors, so it must have passed the theme gates and still have its
--- artifact. While the experiment runs the theme GC keeps that artifact (themes::maintenance).
 CREATE FUNCTION platform.experiments_theme_arm_gated() RETURNS trigger
 LANGUAGE plpgsql SET search_path = '' AS $$
 BEGIN

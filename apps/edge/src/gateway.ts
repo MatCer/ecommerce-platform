@@ -484,7 +484,6 @@ export function createGateway(opts: GatewayOptions) {
     return undefined;
   }
 
-  /** The artifact of a whole-theme test's arm, for the visitors assigned to it (SHOP-100). */
   function armArtifact(site: Site, assignment: Assignment | undefined): string | undefined {
     const arm = site.experiment?.theme_arm;
     return arm && assignment?.arm === arm.arm ? arm.artifact : undefined;
@@ -1628,13 +1627,12 @@ ${
         )) ?? text(404, "Not found")
       );
     }
-    // Unversioned files differ between the arms of a whole-theme test.
     const assignment = arm ? await enrolment(site, req.headers) : undefined;
-    const own = armArtifact(site, assignment);
-    const pub = await serveAsset(own ? [own] : active, p, false);
-    if (pub && assignment) pub.headers.set("cache-control", "private, max-age=300");
-    if (pub) return pub;
-    return renderTheme(site, url, req, port);
+    const visitorArtifact = armArtifact(site, assignment) ?? site.theme_artifact;
+    const pub = visitorArtifact ? await serveAsset([visitorArtifact], p, false) : null;
+    if (!pub) return renderTheme(site, url, req, port);
+    if (assignment) pub.headers.set("cache-control", "private, max-age=300");
+    return pub;
   }
 
   async function checkout(
