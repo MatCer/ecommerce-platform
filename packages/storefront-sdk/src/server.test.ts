@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { createStorefront, StorefrontError } from "./server.ts";
+import { createStorefront, experimentArm, StorefrontError } from "./server.ts";
 
 const request = new Request("https://demo.localhost/p/x", {
   headers: { "x-platform-ctx": "ctx123" },
@@ -43,4 +43,14 @@ test("404 → null for optional pages, error otherwise", async () => {
     status: 500,
     code: "boom",
   });
+});
+
+test("experimentArm names the visitor's arm of one experiment, null otherwise", () => {
+  const as = (value?: string) =>
+    new Request("https://demo.localhost/", { headers: value ? { "x-platform-arm": value } : {} });
+  expect(experimentArm(as("buy-panel:b"), "buy-panel")).toBe("b");
+  expect(experimentArm(as("buy-panel:control"), "buy-panel")).toBe("control");
+  expect(experimentArm(as("buy-panel:b"), "hero")).toBeNull();
+  expect(experimentArm(as("buy-panel"), "buy-panel")).toBeNull();
+  expect(experimentArm(as(), "buy-panel")).toBeNull();
 });

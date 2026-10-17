@@ -94,12 +94,19 @@ test("the API resolver maps the running experiment (SHOP-96)", async () => {
       theme_artifact: null,
       retained_artifacts: [],
       checkout_artifact: null,
-      experiment: { id: "11111111-1111-4111-8111-111111111111", version: 3 },
+      experiment: {
+        id: "11111111-1111-4111-8111-111111111111",
+        version: 3,
+        name: "new-theme",
+        theme_arm: { arm: "next", artifact: "0123456789abcdef0123456789abcdef" },
+      },
     }),
   );
   expect((await r.resolve("demo.localhost"))?.experiment).toEqual({
     id: "11111111-1111-4111-8111-111111111111",
     version: 3,
+    name: "new-theme",
+    theme_arm: { arm: "next", artifact: "0123456789abcdef0123456789abcdef" },
   });
 });
 

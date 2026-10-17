@@ -508,3 +508,30 @@ separate cache namespace, never cached (already bypassed by the policy).
   `hero` when `x-experiment` names an arm of the tenant's running experiment at that version, so
   the arm renders server-side in the same artifact. Any other header, a stopped experiment, an
   unknown key or an invalid text serves control (an invalid config logs a warning).
+
+## 16. SHOP-100: code arms
+
+- **Code arms in one artifact (option b):** for an enrolled visitor the edge sets
+  `x-platform-arm: <experiment name>:<arm>` on the theme worker's request. The theme reads it
+  with `experimentArm(Astro.request, "<name>")` from `@platform/storefront-sdk/server` and
+  renders that arm's components; `null` (not enrolled, another experiment) renders control. The
+  edge builds every worker request, so no client header reaches the worker, and a theme cannot
+  choose its arm: the assignment, the HTML key and `x-experiment` on page-model calls come from
+  the edge.
+- **Whole-theme tests (option c):** `experiments.theme_arm` + `theme_revision_id` give one arm
+  of a two-arm experiment another revision of the tenant's own theme (composite foreign key);
+  the other arm is control, the active artifact. One running experiment per tenant, so a tenant
+  serves at most two artifacts. The revision must be `ready`, `published` or `superseded` with
+  its artifact when the experiment starts (trigger), and both columns are frozen with the arms.
+  `/internal/v1/resolve` carries `experiment.theme_arm: {arm, artifact}`; that arm's visitors
+  render the arm's artifact in the tenant's own instance, inside the pool's caps (§4, 28 theme
+  instances, idle eviction).
+- **GC:** `themes.maintenance` does not release the revision of a running theme arm, and its
+  foreign key keeps the artifact. The start trigger and GC take one per-tenant advisory lock
+  before checking the revision, so a start racing GC either waits and is refused, or GC waits
+  and keeps the arm. After the stop the 7-day rule applies again.
+- **Assets:** `/_astro/*` is looked up in the active artifact, then the theme arm's, then the
+  retained ones (content-hashed names). While a theme arm runs, unversioned public files
+  (`/favicon.svg`) come from the visitor's arm artifact, `private, no-cache` for every visitor,
+  so no browser or shared cache reuses one arm's file for the other (consent can move a visitor
+  from control to an arm mid-visit). Checkout `/_p/tokens.css` keeps following the active artifact.

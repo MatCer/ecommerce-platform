@@ -27740,12 +27740,28 @@
         "description": "The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.",
         "required": [
           "id",
-          "version"
+          "version",
+          "name"
         ],
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "What theme code names the experiment by when it renders an arm's components (SHOP-100)."
+          },
+          "theme_arm": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ThemeArm",
+                "description": "The arm that renders another revision of the theme (a whole-theme test, SHOP-100)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "version": {
             "type": "integer",
@@ -37079,6 +37095,22 @@
           "queued": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "ThemeArm": {
+        "type": "object",
+        "required": [
+          "arm",
+          "artifact"
+        ],
+        "properties": {
+          "arm": {
+            "type": "string"
+          },
+          "artifact": {
+            "type": "string",
+            "description": "The revision's artifact, which the edge renders for this arm's visitors."
           }
         }
       },

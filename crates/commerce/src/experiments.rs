@@ -19,10 +19,21 @@ use crate::storefront::Context;
 use crate::storefront::pages::HomePage;
 
 /// The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ExperimentRef {
     pub id: Uuid,
     pub version: i32,
+    /// What theme code names the experiment by when it renders an arm's components (SHOP-100).
+    pub name: String,
+    /// The arm that renders another revision of the theme (a whole-theme test, SHOP-100).
+    pub theme_arm: Option<ThemeArm>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ThemeArm {
+    pub arm: String,
+    /// The revision's artifact, which the edge renders for this arm's visitors.
+    pub artifact: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -174,20 +185,27 @@ pub async fn running(tx: &mut TenantTx) -> Result<Option<ExperimentRef>, Error> 
 async fn running_with_arms(
     tx: &mut TenantTx,
 ) -> Result<Option<(ExperimentRef, serde_json::Value)>, Error> {
-    Ok(
-        sqlx::query!("SELECT id, version, arms FROM experiments WHERE status = 'running'")
-            .fetch_optional(&mut **tx)
-            .await?
-            .map(|r| {
-                (
-                    ExperimentRef {
-                        id: r.id,
-                        version: r.version,
-                    },
-                    r.arms,
-                )
-            }),
+    Ok(sqlx::query!(
+        r#"SELECT e.id, e.version, e.name, e.arms, e.theme_arm, r.artifact_id AS "theme_artifact?"
+           FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id
+           WHERE e.status = 'running'"#
     )
+    .fetch_optional(&mut **tx)
+    .await?
+    .map(|r| {
+        (
+            ExperimentRef {
+                id: r.id,
+                version: r.version,
+                name: r.name,
+                theme_arm: r
+                    .theme_arm
+                    .zip(r.theme_artifact)
+                    .map(|(arm, artifact)| ThemeArm { arm, artifact }),
+            },
+            r.arms,
+        )
+    }))
 }
 
 pub async fn start(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Error> {

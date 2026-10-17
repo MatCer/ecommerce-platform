@@ -10,6 +10,7 @@ import {
 } from "@platform/theme-kit";
 import type { ArtifactFetcher } from "./artifacts.ts";
 import {
+  ARM_HEADER,
   assetsBinding,
   CHECKOUT_OPERATIONS,
   ContextRegistry,
@@ -417,6 +418,8 @@ export function createGateway(opts: GatewayOptions) {
     try {
       const headers = workerRequestHeaders();
       headers.set(CTX_HEADER, ctxId);
+      if (extra.experiment && site.experiment)
+        headers.set(ARM_HEADER, `${site.experiment.name}:${extra.experiment.arm}`);
       // One deadline and one byte cap for headers *and* body: a worker must not hold a request
       // context (or Node memory) open with a never-ending stream.
       const abort = new AbortController();
@@ -481,6 +484,11 @@ export function createGateway(opts: GatewayOptions) {
     return undefined;
   }
 
+  function armArtifact(site: Site, assignment: Assignment | undefined): string | undefined {
+    const arm = site.experiment?.theme_arm;
+    return arm && assignment?.arm === arm.arm ? arm.artifact : undefined;
+  }
+
   function themeHeaders(m: ArtifactManifest, site: Site, port: string): Record<string, string> {
     const csp = contentSecurityPolicy("theme", {
       scriptHashes: m.csp.script_hashes,
@@ -512,12 +520,8 @@ export function createGateway(opts: GatewayOptions) {
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     // A20: counted before the cache, without identifiers (template + day only). Not previews.
     if (req.method === "GET" && !site.preview) opts.counters?.page(site, templateOf(url.pathname));
-    const artifact = site.theme_artifact;
-    if (!artifact)
+    if (!site.theme_artifact)
       return text(503, "This shop has not been published yet", { "retry-after": "60" });
-    const m = await manifest(artifact);
-    // Theme workers get the theme bindings only; a checkout artifact never runs as a theme.
-    if (m.kind !== "theme") throw new Error(`artifact ${artifact} is not a theme`);
     const normalized = normalizeUrl(url);
     const verdict = requestVerdict({
       method: req.method,
@@ -527,6 +531,10 @@ export function createGateway(opts: GatewayOptions) {
       headers: req.headers,
     });
     const assignment = await enrolment(site, req.headers);
+    const artifact = armArtifact(site, assignment) ?? site.theme_artifact;
+    const m = await manifest(artifact);
+    // Theme workers get the theme bindings only; a checkout artifact never runs as a theme.
+    if (m.kind !== "theme") throw new Error(`artifact ${artifact} is not a theme`);
     const key = [
       site.tenant_id,
       site.market_id,
@@ -1609,15 +1617,22 @@ ${
       });
     }
     const active = site.theme_artifact ? [site.theme_artifact] : [];
+    const arm = site.experiment?.theme_arm?.artifact;
     if (p.startsWith("/_astro/")) {
       return (
-        (await serveAsset([...active, ...site.retained_artifacts], p, true)) ??
-        text(404, "Not found")
+        (await serveAsset(
+          [...active, ...(arm ? [arm] : []), ...site.retained_artifacts],
+          p,
+          true,
+        )) ?? text(404, "Not found")
       );
     }
-    const pub = await serveAsset(active, p, false);
-    if (pub) return pub;
-    return renderTheme(site, url, req, port);
+    const assignment = arm ? await enrolment(site, req.headers) : undefined;
+    const visitorArtifact = armArtifact(site, assignment) ?? site.theme_artifact;
+    const pub = visitorArtifact ? await serveAsset([visitorArtifact], p, false) : null;
+    if (!pub) return renderTheme(site, url, req, port);
+    if (arm) pub.headers.set("cache-control", "private, no-cache");
+    return pub;
   }
 
   async function checkout(

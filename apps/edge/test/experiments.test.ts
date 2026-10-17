@@ -7,7 +7,7 @@ import { createGateway, type Gateway } from "../src/gateway.ts";
 import { StaticResolver } from "../src/sites.ts";
 import { buildArtifact, fakeApi, hostileTheme, site } from "./fixtures.ts";
 
-const EXP = { id: "11111111-1111-4111-8111-111111111111", version: 3 };
+const EXP = { id: "11111111-1111-4111-8111-111111111111", version: 3, name: "homepage" };
 const ALICE = "a".repeat(32);
 
 describe("ApiEnroller", () => {

@@ -6490,6 +6490,9 @@ export interface components {
         ExperimentRef: {
             /** Format: uuid */
             id: string;
+            /** @description What theme code names the experiment by when it renders an arm's components (SHOP-100). */
+            name: string;
+            theme_arm?: components["schemas"]["ThemeArm"] | null;
             /** Format: int32 */
             version: number;
         };
@@ -9478,6 +9481,11 @@ export interface components {
         };
         TestSent: {
             queued: number;
+        };
+        ThemeArm: {
+            arm: string;
+            /** @description The revision's artifact, which the edge renders for this arm's visitors. */
+            artifact: string;
         };
         TokenInput: {
             token: string;

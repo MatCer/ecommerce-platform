@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT platform.lock_theme_arms($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lock_theme_arms",
+        "type_info": "Void",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ae5bf3192ed61bc4301ea0a29a9711a884ee59d3dd5d590d79c836a136769845"
+}

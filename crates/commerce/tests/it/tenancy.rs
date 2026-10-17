@@ -306,7 +306,7 @@ async fn idempotency_replays_conflicts_and_serializes_concurrent_requests(db: Pg
     );
 }
 
-fn db_code(e: &sqlx::Error) -> Option<String> {
+pub(crate) fn db_code(e: &sqlx::Error) -> Option<String> {
     e.as_database_error()
         .and_then(|d| d.code().map(|c| c.into_owned()))
 }
@@ -496,7 +496,11 @@ async fn mode_switch_moves_the_generation(db: PgPool) {
     assert_eq!(db_code(&err).as_deref(), Some("42501"));
 }
 
-async fn wait_until_blocked<T>(db: &PgPool, task: &tokio::task::JoinHandle<T>, waiters: i64) {
+pub(crate) async fn wait_until_blocked<T>(
+    db: &PgPool,
+    task: &tokio::task::JoinHandle<T>,
+    waiters: i64,
+) {
     while !task.is_finished() {
         let blocked: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM pg_stat_activity

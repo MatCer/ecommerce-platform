@@ -29,5 +29,6 @@ mod staff;
 mod storefront;
 mod tenancy;
 mod theme_ai;
+mod theme_arms;
 mod themes;
 mod webhooks;

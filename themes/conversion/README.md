@@ -117,6 +117,7 @@ Enforced by `theme-kit lint`, `astro check`, the edge runtime and `make perf`
 | Product page layout | `pages/p/[slug].astro`; gallery width ↔ `GALLERY_SIZES` |
 | Buttons / chips / surfaces | utilities `btn`, `btn-buy`, `btn-primary`, `btn-secondary`, `chip`, `surface`, `sheet` in `global.css` |
 | Cross-sell | `RecommendationSlot` renders whatever `sf.recommendations(...)` returns (WP17) |
+| An A/B code arm | keep both components and branch on `experimentArm(Astro.request, "<experiment name>")` from `@platform/storefront-sdk/server`; `null` renders control (SHOP-100) |
 
 ## Tokens (`theme.tokens.json`)
 

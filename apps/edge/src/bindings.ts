@@ -7,6 +7,8 @@ import type { Site } from "./sites.ts";
 
 /** Header carrying the per-request context id from the edge to the worker and back. */
 export const CTX_HEADER = "x-platform-ctx";
+/** `<experiment name>:<arm>` of an enrolled visitor, so the theme renders that arm (SHOP-100). */
+export const ARM_HEADER = "x-platform-arm";
 
 /** Server-side state of one in-flight storefront request. Workers only ever see the opaque id. */
 export interface RequestContext {
