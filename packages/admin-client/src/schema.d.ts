@@ -5838,10 +5838,6 @@ export interface components {
             /** @description As browsers serialize it: scheme, host and a non-default port (`https://shop.example`). */
             origin: string;
         };
-        /**
-         * @description What a converted checkout shows of its order (C7 recovery): never the note, an address, a line,
-         *     an amount or an order capability.
-         */
         CheckoutReceipt: {
             /** @description The checkout's own confirmation email, frozen at placement. */
             email: string;

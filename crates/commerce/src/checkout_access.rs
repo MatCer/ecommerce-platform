@@ -89,25 +89,28 @@ fn idle(mode: CheckoutMode) -> Duration {
     }
 }
 
-/// Which checkouts a presented capability reaches, and through which stored hash.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Reach {
-    /// Open checkouts through their capability: view, shipping, payment, details, rotate.
-    Open,
-    /// Open or converted, through their capability: placement and its idempotent replay (A12).
+    Open { refresh: bool },
     Placement,
-    /// Converted only, through their capability or the one their note placement replaced.
-    /// Reads the receipt; nothing using this reach writes, mints or refreshes.
     Receipt,
 }
 
 impl Reach {
     fn statuses(self) -> &'static [&'static str] {
         match self {
-            Reach::Open => &["open"],
+            Reach::Open { .. } => &["open"],
             Reach::Placement => &["open", "converted"],
             Reach::Receipt => &["converted"],
         }
+    }
+
+    fn through_replaced(self) -> bool {
+        self == Reach::Receipt
+    }
+
+    fn refreshes(self) -> bool {
+        self == Reach::Open { refresh: true }
     }
 }
 
@@ -119,13 +122,12 @@ async fn guard(
     p: &Policy<'_>,
     token: &str,
     reach: Reach,
-    refresh: bool,
 ) -> Result<(CartRef, bool), Error> {
     if !capability::well_formed(token) {
         return Err(Error::NotFound);
     }
     let hash = capability::hash(token);
-    let replaced = (reach == Reach::Receipt).then_some(hash.as_slice());
+    let replaced = reach.through_replaced().then_some(hash.as_slice());
     let row = sqlx::query!(
         r#"SELECT id, market_id, status = 'open' AS "open!" FROM carts
            WHERE (checkout_token_hash = $1 OR replaced_token_hash = $2)
@@ -145,7 +147,7 @@ async fn guard(
     .fetch_optional(&mut **tx)
     .await?
     .ok_or(Error::NotFound)?;
-    if refresh {
+    if reach.refreshes() {
         sqlx::query!(
             "UPDATE carts SET last_activity_at = now() WHERE id = $1",
             row.id
@@ -235,7 +237,9 @@ async fn revoke_earlier_checkouts(
 /// The open checkout behind `token`, locked until commit; refreshes its idle expiry.
 pub async fn open(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
     let p = enter(tx, ctx).await?;
-    Ok(guard(tx, ctx, &p, token, Reach::Open, true).await?.0)
+    Ok(guard(tx, ctx, &p, token, Reach::Open { refresh: true })
+        .await?
+        .0)
 }
 
 pub(crate) async fn open_in(
@@ -246,7 +250,9 @@ pub(crate) async fn open_in(
 ) -> Result<CartRef, Error> {
     let p = enter(tx, ctx).await?;
     require(&p, mode)?;
-    Ok(guard(tx, ctx, &p, token, Reach::Open, true).await?.0)
+    Ok(guard(tx, ctx, &p, token, Reach::Open { refresh: true })
+        .await?
+        .0)
 }
 
 /// The shop capability's cart, else the checkout as in [`open`] (`GET /cart`).
@@ -266,11 +272,9 @@ pub async fn open_for_order(
 ) -> Result<(CartRef, bool), Error> {
     let p = enter(tx, ctx).await?;
     lock_source_before_checkout(tx, token).await?;
-    guard(tx, ctx, &p, token, Reach::Placement, false).await
+    guard(tx, ctx, &p, token, Reach::Placement).await
 }
 
-/// C7 recovery, same-origin mode only: the converted checkout behind `token` or behind the
-/// capability its note placement replaced, locked until commit; no refresh.
 pub(crate) async fn converted(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -280,7 +284,7 @@ pub(crate) async fn converted(
     if p.mode != CheckoutMode::SameOrigin {
         return Err(Error::NotFound);
     }
-    Ok(guard(tx, ctx, &p, token, Reach::Receipt, false).await?.0)
+    Ok(guard(tx, ctx, &p, token, Reach::Receipt).await?.0)
 }
 
 async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(), Error> {
@@ -355,7 +359,7 @@ pub(crate) async fn convert(
 /// Replaces the capability `token` (re-authorized here) with a fresh one (C6, C10).
 pub async fn rotate(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<String, Error> {
     let p = enter(tx, ctx).await?;
-    let (c, _) = guard(tx, ctx, &p, token, Reach::Open, false).await?;
+    let (c, _) = guard(tx, ctx, &p, token, Reach::Open { refresh: false }).await?;
     bind(tx, c.id, &p).await?.ok_or(Error::NotFound)
 }
 

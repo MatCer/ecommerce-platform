@@ -1335,8 +1335,6 @@ pub async fn send_payment_reminders(
     Ok(sent)
 }
 
-/// What a converted checkout shows of its order (C7 recovery): never the note, an address, a line,
-/// an amount or an order capability.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct CheckoutReceipt {
     pub number: String,
@@ -1346,8 +1344,6 @@ pub struct CheckoutReceipt {
     pub payment_due: bool,
 }
 
-/// C7, same-origin mode only: the receipt of the order placed from the checkout behind
-/// `token`, which may also be the capability its note placement replaced. Reads only.
 pub async fn receipt(
     tx: &mut TenantTx,
     ctx: &Context,

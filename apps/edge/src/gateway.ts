@@ -1267,7 +1267,6 @@ ${
     return new Response(null, { status: 303, headers: { location } });
   }
 
-  /** The API's answer stays here: its body carries the order bearer (A4). */
   async function placeOrder(site: SameOriginSite, req: Request): Promise<Response> {
     const toCheckout = (headers: Record<string, string> = {}) =>
       new Response(null, { status: 303, headers: { location: "/checkout", ...headers } });

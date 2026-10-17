@@ -25703,7 +25703,6 @@
       },
       "CheckoutReceipt": {
         "type": "object",
-        "description": "What a converted checkout shows of its order (C7 recovery): never the note, an address, a line,\nan amount or an order capability.",
         "required": [
           "number",
           "email",

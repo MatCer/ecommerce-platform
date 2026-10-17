@@ -1452,10 +1452,6 @@ export interface components {
             /** @description Checkout-scoped cart capability (the edge sets it as the `__Host-cart` cookie). */
             cart_token: string;
         };
-        /**
-         * @description What a converted checkout shows of its order (C7 recovery): never the note, an address, a line,
-         *     an amount or an order capability.
-         */
         CheckoutReceipt: {
             /** @description The checkout's own confirmation email, frozen at placement. */
             email: string;
