@@ -153,8 +153,8 @@ async fn bind(tx: &mut TenantTx, cart_id: Uuid, p: &Policy<'_>) -> Result<Option
     Ok((updated == 1).then_some(minted.token))
 }
 
-fn require_isolated(p: &Policy<'_>) -> Result<(), Error> {
-    if p.mode == CheckoutMode::Isolated {
+fn require(p: &Policy<'_>, mode: CheckoutMode) -> Result<(), Error> {
+    if p.mode == mode {
         Ok(())
     } else {
         Err(Error::Conflict {
@@ -162,6 +162,22 @@ fn require_isolated(p: &Policy<'_>) -> Result<(), Error> {
             detail: "the shop's checkout mode changed; start checkout again".into(),
         })
     }
+}
+
+async fn require_lines(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
+    let lines = sqlx::query_scalar!(
+        "SELECT count(*) AS \"n!\" FROM cart_lines WHERE cart_id = $1",
+        cart_id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if lines == 0 {
+        return Err(Error::Conflict {
+            code: "cart_empty",
+            detail: "the cart is empty".into(),
+        });
+    }
+    Ok(())
 }
 
 /// The open checkout behind `token`, locked until commit; refreshes its idle expiry.
@@ -196,6 +212,29 @@ pub async fn rotate(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<Str
     bind(tx, c.id, &p).await?.ok_or(Error::NotFound)
 }
 
+/// C10, same-origin mode only: copies the shop cart behind `shop_token` into a new checkout
+/// snapshot linked to it (lines in order, coupon, locale, currency; no contact, address,
+/// customer or selection) and returns the snapshot's capability, bound to the origin and
+/// generation. The shop cart and its capability stay. Starts on one shop cart serialize on
+/// its row lock, so the last to commit wins. `409 checkout_mode_changed` on an isolated
+/// origin, `409 cart_empty`, `404` for an unknown shop capability.
+pub async fn start(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    shop_token: &str,
+    previous: Option<&str>,
+) -> Result<String, Error> {
+    let p = enter(tx, ctx).await?;
+    require(&p, CheckoutMode::SameOrigin)?;
+    let source = cart::find(tx, ctx, shop_token).await?;
+    require_lines(tx, source.id).await?;
+    let _ = previous;
+    let snapshot = cart::snapshot(tx, &source).await?;
+    bind(tx, snapshot.id, &p)
+        .await?
+        .ok_or_else(|| Error::Internal("a new snapshot is not open".into()))
+}
+
 /// A1, isolated mode only: revokes the shop capability of a non-empty cart and mints a
 /// single-use handoff token bound to the origin and generation.
 pub async fn start_handoff(
@@ -204,20 +243,9 @@ pub async fn start_handoff(
     shop_token: &str,
 ) -> Result<String, Error> {
     let p = enter(tx, ctx).await?;
-    require_isolated(&p)?;
+    require(&p, CheckoutMode::Isolated)?;
     let c = cart::find(tx, ctx, shop_token).await?;
-    let lines = sqlx::query_scalar!(
-        "SELECT count(*) AS \"n!\" FROM cart_lines WHERE cart_id = $1",
-        c.id
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-    if lines == 0 {
-        return Err(Error::Conflict {
-            code: "cart_empty",
-            detail: "the cart is empty".into(),
-        });
-    }
+    require_lines(tx, c.id).await?;
     sqlx::query!("DELETE FROM checkout_handoffs WHERE expires_at < now() - interval '1 day'")
         .execute(&mut **tx)
         .await?;
@@ -283,7 +311,7 @@ pub async fn restore_cart(
     token: &str,
 ) -> Result<Option<String>, Error> {
     let p = enter(tx, ctx).await?;
-    require_isolated(&p)?;
+    require(&p, CheckoutMode::Isolated)?;
     if !capability::well_formed(token) {
         return Ok(None);
     }

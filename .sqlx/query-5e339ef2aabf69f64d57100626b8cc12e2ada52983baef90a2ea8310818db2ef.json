@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO cart_lines (tenant_id, cart_id, variant_id, quantity, created_at)\n         SELECT tenant_id, $2, variant_id, quantity, created_at FROM cart_lines\n         WHERE cart_id = $1 ORDER BY created_at, id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5e339ef2aabf69f64d57100626b8cc12e2ada52983baef90a2ea8310818db2ef"
+}

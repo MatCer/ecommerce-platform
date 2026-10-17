@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO cart_coupons (tenant_id, cart_id, coupon_id)\n         SELECT tenant_id, $2, coupon_id FROM cart_coupons WHERE cart_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d2a40ea20bab2103cea2368fbe30e70eb3eeb7c8e0620f30aa923a291f550f3e"
+}
