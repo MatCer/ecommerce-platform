@@ -60,7 +60,9 @@ test("checkout has reserved capacity when theme admission is saturated", async (
     await buildArtifact(root, "theme", hostileTheme("capacity"), { "favicon.svg": "<svg/>" })
   ).id;
   const checkout = (
-    await buildArtifact(root, "checkout", checkoutWorker, { "favicon.svg": "<svg/>" })
+    await buildArtifact(root, "checkout", checkoutWorker, {
+      "_checkout/0123456789abcdef/favicon.svg": "<svg/>",
+    })
   ).id;
   const pool = new WorkerPool({
     artifactRoot: root,
