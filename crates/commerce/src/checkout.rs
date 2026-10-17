@@ -52,6 +52,7 @@ use crate::shipping::{self, Carrier, ShippingMethod};
 use crate::staff::normalize_email;
 use crate::storefront::{Context, messages};
 use crate::tax;
+use crate::tenancy::CheckoutMode;
 
 /// Idempotency operation of order placement (scoped to the cart).
 const PLACE_OP: &str = "POST /checkout/place-order";
@@ -109,6 +110,15 @@ pub struct AddressesInput {
     /// Delivery address; `null` = the billing address.
     #[serde(default)]
     pub shipping: Option<CheckoutAddress>,
+}
+
+/// Customer details a checkout write adds or changes (C6). The order note is written with the
+/// placement (`PlaceOrderInput::notes`, ruling P2-4), never here.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Details {
+    Contact(ContactInput),
+    Addresses(Box<AddressesInput>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -276,7 +286,41 @@ async fn ship_to_countries(tx: &mut TenantTx, ctx: &Context) -> Result<Vec<Strin
         .collect())
 }
 
-pub async fn set_contact(
+pub async fn set_isolated_details(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+    details: &Details,
+) -> Result<cart::CartRef, Error> {
+    let c = checkout_access::open_in(tx, ctx, token, CheckoutMode::Isolated).await?;
+    write_details(tx, ctx, &c, details).await?;
+    Ok(c)
+}
+
+pub async fn set_same_origin_details(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+    details: &Details,
+) -> Result<String, Error> {
+    let c = checkout_access::open_in(tx, ctx, token, CheckoutMode::SameOrigin).await?;
+    write_details(tx, ctx, &c, details).await?;
+    checkout_access::rotate(tx, ctx, token).await
+}
+
+async fn write_details(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    c: &cart::CartRef,
+    details: &Details,
+) -> Result<(), Error> {
+    match details {
+        Details::Contact(input) => set_contact(tx, c, input).await,
+        Details::Addresses(input) => set_addresses(tx, ctx, c, input).await,
+    }
+}
+
+async fn set_contact(
     tx: &mut TenantTx,
     cart: &cart::CartRef,
     input: &ContactInput,
@@ -296,7 +340,7 @@ pub async fn set_contact(
 
 /// Sets the addresses; the delivery country becomes the cart's ship-to country (VAT per
 /// destination, A3) and must be one the market ships to.
-pub async fn set_addresses(
+async fn set_addresses(
     tx: &mut TenantTx,
     ctx: &Context,
     cart: &cart::CartRef,
@@ -687,6 +731,7 @@ pub struct Placement {
     pub token: String,
     /// True when this was an idempotent replay of an earlier placement.
     pub replayed: bool,
+    pub rotated_capability: Option<String>,
 }
 
 /// Who places the order.
@@ -730,6 +775,7 @@ pub async fn place_order(
             number: s.number,
             attempt_id: s.attempt_id,
             replayed: true,
+            rotated_capability: None,
         });
     }
     if !open {
@@ -763,6 +809,7 @@ pub async fn place_order(
             "notes are at most 1000 characters",
         ));
     }
+    let note_written = notes.is_some();
 
     // Validation (A3, §10.3 step 1).
     let missing = |what: &str| invalid("checkout_incomplete", format!("{what} is missing"));
@@ -1079,7 +1126,7 @@ pub async fn place_order(
     let token = orders::issue_token(tx, order_id).await?;
     let view = orders::view(tx, order_id).await?;
     send_confirmation(tx, ctx, &view, &token).await?;
-    checkout_access::convert(tx, &cart_ref).await?;
+    let rotated_capability = checkout_access::convert(tx, ctx, &cart_ref, note_written).await?;
     let stored = StoredPlacement {
         order_id,
         number: number.to_string(),
@@ -1092,6 +1139,7 @@ pub async fn place_order(
         attempt_id,
         token,
         replayed: false,
+        rotated_capability,
     })
 }
 

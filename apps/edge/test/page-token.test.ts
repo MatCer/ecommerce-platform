@@ -238,6 +238,7 @@ describe("the same-origin checkout API takes the page token of the request's own
     ["PUT", "/contact"],
     ["PUT", "/addresses"],
     ["POST", "/place-order"],
+    ["POST", "/details"],
     ["GET", "/order"],
   ])("%s %s is not offered on the shop, even with a valid token", async (method, op) => {
     const res = await call(

@@ -210,6 +210,17 @@ pub async fn open(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartR
     Ok(guard(tx, ctx, &p, token, false, true).await?.0)
 }
 
+pub(crate) async fn open_in(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+    mode: CheckoutMode,
+) -> Result<CartRef, Error> {
+    let p = enter(tx, ctx).await?;
+    require(&p, mode)?;
+    Ok(guard(tx, ctx, &p, token, false, true).await?.0)
+}
+
 /// The shop capability's cart, else the checkout as in [`open`] (`GET /cart`).
 pub async fn open_any(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
     match cart::find(tx, ctx, token).await {
@@ -242,7 +253,25 @@ async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(
     Ok(())
 }
 
-pub(crate) async fn convert(tx: &mut TenantTx, checkout: &CartRef) -> Result<(), Error> {
+pub(crate) async fn convert(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    checkout: &CartRef,
+    note_written: bool,
+) -> Result<Option<String>, Error> {
+    let replaced = if note_written {
+        let p = enter(tx, ctx).await?;
+        match p.mode {
+            CheckoutMode::Isolated => None,
+            CheckoutMode::SameOrigin => Some(
+                bind(tx, checkout.id, &p)
+                    .await?
+                    .ok_or_else(|| Error::Internal("a placing checkout is not open".into()))?,
+            ),
+        }
+    } else {
+        None
+    };
     let source = sqlx::query_scalar!(
         "UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1
          RETURNING source_cart_id",
@@ -251,7 +280,7 @@ pub(crate) async fn convert(tx: &mut TenantTx, checkout: &CartRef) -> Result<(),
     .fetch_one(&mut **tx)
     .await?;
     let Some(source) = source else {
-        return Ok(());
+        return Ok(replaced);
     };
     let shop_cart = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM carts
@@ -264,7 +293,7 @@ pub(crate) async fn convert(tx: &mut TenantTx, checkout: &CartRef) -> Result<(),
     if shop_cart {
         cart::empty(tx, source).await?;
     }
-    Ok(())
+    Ok(replaced)
 }
 
 /// Replaces the capability `token` (re-authorized here) with a fresh one (C6, C10).

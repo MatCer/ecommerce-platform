@@ -3,7 +3,7 @@
 
 use chrono::{Duration, Utc};
 use commerce::cart::{self, NewLine};
-use commerce::checkout::{self, ContactInput, Settings};
+use commerce::checkout::{self, ContactInput, Details, Settings};
 use commerce::checkout_access;
 use commerce::consent::{self, ConsentPurpose, Subject};
 use commerce::flows::{self, WatchInput};
@@ -1143,11 +1143,11 @@ async fn typed_checkout(rt: &PgPool, s: &Shop, email: &str) -> Typed {
     let snapshot = checkout_access::open(&mut tx, &ctx, &checkout)
         .await
         .unwrap();
-    let contact = ContactInput {
+    let contact = Details::Contact(ContactInput {
         email: email.into(),
         phone: None,
-    };
-    checkout::set_contact(&mut tx, &snapshot, &contact)
+    });
+    let checkout = checkout::set_same_origin_details(&mut tx, &ctx, &checkout, &contact)
         .await
         .unwrap();
     consent::record_server(

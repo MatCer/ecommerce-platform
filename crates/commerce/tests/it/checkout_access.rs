@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use commerce::capability;
 use commerce::cart::{self, CartCoupon, NewLine};
-use commerce::checkout::{self, CheckoutView, ContactInput, Settings, ShippingInput};
+use commerce::checkout::{self, CheckoutView, ContactInput, Details, Settings, ShippingInput};
 use commerce::checkout_access::{self, ShopOrigin};
 use commerce::money::Currency;
 use commerce::payments::Payments;
@@ -464,8 +464,9 @@ async fn protected_read_queued_before_rotation_fails(db: PgPool) {
     let k = handed_off(&runtime, &here, &shop).await;
 
     let (attack, rotated, ()) =
-        queued_behind_rotation(&db, &runtime, &here, &k, None, async |tx, _, c| {
-            checkout::set_contact(tx, c, &contact("victim@example.cz"))
+        queued_behind_rotation(&db, &runtime, &here, &k, None, async |tx, ctx, _| {
+            let victim = Details::Contact(contact("victim@example.cz"));
+            checkout::set_isolated_details(tx, ctx, &k, &victim)
                 .await
                 .unwrap();
         })
@@ -502,9 +503,15 @@ async fn protected_write_queued_before_rotation_fails(db: PgPool) {
     let here = at(&shop, shop.cz, &shop.origin);
     let k = handed_off(&runtime, &here, &shop).await;
 
-    let (write, rotated, version) =
-        queued_behind_rotation(&db, &runtime, &here, &k, Some(method), async |tx, _, c| {
-            checkout::set_contact(tx, c, &contact("victim@example.cz"))
+    let (write, rotated, version) = queued_behind_rotation(
+        &db,
+        &runtime,
+        &here,
+        &k,
+        Some(method),
+        async |tx, ctx, c| {
+            let victim = Details::Contact(contact("victim@example.cz"));
+            checkout::set_isolated_details(tx, ctx, &k, &victim)
                 .await
                 .unwrap();
             sqlx::query_scalar::<_, i32>("SELECT version FROM carts WHERE id = $1")
@@ -512,8 +519,9 @@ async fn protected_write_queued_before_rotation_fails(db: PgPool) {
                 .fetch_one(&mut **tx)
                 .await
                 .unwrap()
-        })
-        .await;
+        },
+    )
+    .await;
     assert!(not_found(&write), "the queued write is refused: {write:?}");
     let sql = "SELECT shipping_method_id FROM carts WHERE checkout_token_hash = $1";
     let selected: Option<Uuid> = read(&runtime, shop.tenant, sql, &rotated).await;
@@ -545,8 +553,8 @@ async fn read_holding_lock_cannot_observe_later_write(db: PgPool) {
         async move {
             let (mut tx, ctx) = here.tx(&runtime).await;
             pid_tx.send(pid(&mut tx).await).unwrap();
-            let c = checkout_access::open(&mut tx, &ctx, &k).await?;
-            checkout::set_contact(&mut tx, &c, &contact("later@example.cz")).await?;
+            let later = Details::Contact(contact("later@example.cz"));
+            checkout::set_isolated_details(&mut tx, &ctx, &k, &later).await?;
             let rotated = checkout_access::rotate(&mut tx, &ctx, &k).await?;
             tx.commit().await?;
             Ok::<_, Error>(rotated)
@@ -613,7 +621,7 @@ async fn switch_orders_against_inflight_requests(db: PgPool) {
 
     let k2 = written(&runtime, &here, &shop, &shop.origin).await;
     let (mut request, rctx) = here.tx(&runtime).await;
-    let c = checkout_access::open(&mut request, &rctx, &k2)
+    checkout_access::open(&mut request, &rctx, &k2)
         .await
         .unwrap();
     let request_pid = pid(&mut request).await;
@@ -627,7 +635,8 @@ async fn switch_orders_against_inflight_requests(db: PgPool) {
         }
     });
     blocked_by(&db, switch_pid, request_pid).await;
-    checkout::set_contact(&mut request, &c, &contact("first@example.cz"))
+    let first = Details::Contact(contact("first@example.cz"));
+    let k2 = checkout::set_same_origin_details(&mut request, &rctx, &k2, &first)
         .await
         .unwrap();
     request.commit().await.unwrap();

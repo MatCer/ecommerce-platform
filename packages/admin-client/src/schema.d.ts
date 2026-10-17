@@ -3713,6 +3713,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/checkout/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * C6, same-origin mode: writes contact or addresses and replaces the checkout capability in
+         *     the same transaction. The new capability comes back only in `X-Cart-Token` (the edge sets
+         *     it as the HttpOnly `__Host-Http-cart` cookie); the body is empty.
+         */
+        post: operations["post_details"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/checkout/fake-pay/{attempt}": {
         parameters: {
             query?: never;
@@ -6347,6 +6368,15 @@ export interface components {
              * @description Pass as `cursor` for the next (older) page; absent on the last page.
              */
             next_cursor?: string | null;
+        };
+        /**
+         * @description Customer details a checkout write adds or changes (C6). The order note is written with the
+         *     placement (`PlaceOrderInput::notes`, ruling P2-4), never here.
+         */
+        Details: {
+            contact: components["schemas"]["ContactInput"];
+        } | {
+            addresses: components["schemas"]["AddressesInput"];
         };
         /** @description What a detector found, with every number behind the score. */
         Detection: {
@@ -19784,6 +19814,15 @@ export interface operations {
                     "application/json": components["schemas"]["CheckoutView"];
                 };
             };
+            /** @description checkout_mode_changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description invalid_address | ship_to_not_allowed */
             422: {
                 headers: {
@@ -19825,7 +19864,85 @@ export interface operations {
                     "application/json": components["schemas"]["CheckoutView"];
                 };
             };
+            /** @description checkout_mode_changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description invalid_email | invalid_phone */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    post_details: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Details"];
+            };
+        };
+        responses: {
+            /** @description Written */
+            204: {
+                headers: {
+                    /** @description The replacing checkout capability (for the edge only) */
+                    "X-Cart-Token"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description shop_origin_required | shop_origin_mismatch */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No open checkout behind the capability */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description checkout_mode_changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_body | invalid_email | invalid_phone | invalid_address | ship_to_not_allowed */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -20043,6 +20160,8 @@ export interface operations {
         responses: {
             201: {
                 headers: {
+                    /** @description The replacing checkout capability when a same-origin placement wrote a note (C6; for the edge only) */
+                    "X-Cart-Token"?: string;
                     [name: string]: unknown;
                 };
                 content: {

@@ -22,6 +22,7 @@ import {
   type Upstream,
 } from "./bindings.ts";
 import { HtmlCache, normalizeUrl, requestVerdict, responseVerdict } from "./cache.ts";
+import { CHECKOUT_FORMS, type CheckoutForm } from "./checkout-forms.ts";
 import { type Counters, templateOf } from "./counters.ts";
 import type { Assignment, Enroller } from "./experiments.ts";
 import {
@@ -43,6 +44,7 @@ import {
   admitNavigation,
   isPlatformPagePath,
   isSameOriginCheckoutPath,
+  STALE_CHECKOUT_PAGE,
   UNSUPPORTED_BROWSER_PAGE,
 } from "./platform-pages.ts";
 import { type NodeBinding, WorkerPool } from "./runtime.ts";
@@ -1124,7 +1126,13 @@ ${
     return new Response(null, { status: 303, headers });
   }
 
-  async function sameOriginStart(site: SameOriginSite, req: Request): Promise<Response> {
+  const sameOriginCartCookie = (token: string) =>
+    `${SAME_ORIGIN_CART_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`;
+
+  async function navigationForm(
+    site: SameOriginSite,
+    req: Request,
+  ): Promise<URLSearchParams | Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     const admitted =
       req.headers.get("origin") === site.shopOrigin &&
@@ -1135,8 +1143,14 @@ ${
     const media = (req.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase();
     if (media !== "application/x-www-form-urlencoded")
       return problem(415, "unsupported_media_type", "expected application/x-www-form-urlencoded");
-    if (!(await readCapped(req.body, MAX_JSON_BODY).catch(() => null)))
-      return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+    const raw = await readCapped(req.body, MAX_JSON_BODY).catch(() => null);
+    if (!raw) return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+    return new URLSearchParams(new TextDecoder().decode(raw));
+  }
+
+  async function sameOriginStart(site: SameOriginSite, req: Request): Promise<Response> {
+    const form = await navigationForm(site, req);
+    if (form instanceof Response) return form;
     const backToShop = () =>
       new Response(null, { status: 303, headers: { location: "/", "cache-control": "no-store" } });
     const shopCart = capabilityCookie(req, SHOP_CART_COOKIE);
@@ -1165,9 +1179,54 @@ ${
       headers: {
         location: "/checkout",
         "cache-control": "no-store",
-        "set-cookie": `${SAME_ORIGIN_CART_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`,
+        "set-cookie": sameOriginCartCookie(token),
       },
     });
+  }
+
+  async function checkoutForm(
+    site: SameOriginSite,
+    req: Request,
+    build: CheckoutForm,
+  ): Promise<Response> {
+    const form = await navigationForm(site, req);
+    if (form instanceof Response) return form;
+    const cart = capabilityCookie(req, SAME_ORIGIN_CART_COOKIE);
+    const names = [...form.keys()];
+    if (
+      !cart ||
+      new Set(names).size !== names.length ||
+      !verifyPageToken(opts.pageTokenSecret, site.shopOrigin, cart, form.get("_pt"))
+    )
+      return new Response(STALE_CHECKOUT_PAGE, {
+        status: 403,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/checkout/details`, {
+        method: "POST",
+        headers: apiHeaders(site, { "x-cart-token": cart, "content-type": "application/json" }),
+        body: JSON.stringify(build(form)),
+      }),
+    );
+    const rotated = res.headers.get("x-cart-token");
+    const problemCode =
+      res.status === 422
+        ? ((await res.json().catch(() => null)) as { code?: unknown } | null)?.code
+        : undefined;
+    await res.body?.cancel().catch(() => undefined);
+    if (res.status === 204 && rotated && TOKEN_RE.test(rotated))
+      return new Response(null, {
+        status: 303,
+        headers: { location: "/checkout", "set-cookie": sameOriginCartCookie(rotated) },
+      });
+    const code =
+      typeof problemCode === "string" && /^[a-z_]{1,40}$/.test(problemCode)
+        ? problemCode
+        : "failed";
+    const location =
+      res.status === 404 || res.status === 409 ? "/checkout" : `/checkout?error=${code}`;
+    return new Response(null, { status: 303, headers: { location } });
   }
 
   async function sameOriginCheckoutApi(
@@ -1660,6 +1719,8 @@ ${
         status: 400,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
+    const form = CHECKOUT_FORMS.get(url.pathname);
+    if (form) return checkoutForm(site, req, form);
     if (url.pathname !== "/checkout") return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });

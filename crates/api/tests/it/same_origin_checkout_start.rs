@@ -12,6 +12,8 @@ use uuid::Uuid;
 
 use crate::common::*;
 
+mod pii_rotation;
+
 #[derive(Clone)]
 struct Edge {
     token: String,
@@ -176,6 +178,38 @@ impl Ctx {
         }
         assert!(!text.contains(typed), "{what}: {text}");
     }
+
+    async fn details(&self, cart: &str, body: Value) -> (StatusCode, String, Option<String>) {
+        let (status, text, res) = self
+            .edge
+            .call(Call::post("/storefront/v1/checkout/details", body))
+            .header("x-cart-token", cart.to_owned())
+            .send_text(&self.s)
+            .await;
+        (status, text, replacement(&res))
+    }
+
+    async fn rotated(&self, cart: &str, body: Value) -> String {
+        let (status, text, k) = self.details(cart, body).await;
+        assert_eq!(status, StatusCode::NO_CONTENT, "{text}");
+        assert_eq!(text, "", "the replacing write answers no body");
+        let k = k.expect("the write replaced the capability");
+        assert!(
+            commerce::capability::well_formed(&k) && k != cart,
+            "a new capability"
+        );
+        k
+    }
+}
+
+fn replacement(res: &axum::response::Response) -> Option<String> {
+    res.headers()
+        .get("x-cart-token")
+        .map(|v| v.to_str().unwrap().to_owned())
+}
+
+fn code(text: &str) -> Value {
+    serde_json::from_str::<Value>(text).unwrap_or_default()["code"].clone()
 }
 
 fn line_count(checkout: &Value) -> usize {
@@ -203,14 +237,14 @@ async fn start_last_commit_wins(db: PgPool) {
     let k1 = checkout_access::start(&mut first, &ctx, &shop_token, None)
         .await
         .unwrap();
-    let held = checkout_access::open(&mut first, &ctx, &k1).await.unwrap();
-    commerce::checkout::set_contact(
+    let k1 = commerce::checkout::set_same_origin_details(
         &mut first,
-        &held,
-        &commerce::checkout::ContactInput {
+        &ctx,
+        &k1,
+        &commerce::checkout::Details::Contact(commerce::checkout::ContactInput {
             email: "first@example.cz".into(),
             phone: None,
-        },
+        }),
     )
     .await
     .unwrap();
@@ -254,15 +288,10 @@ async fn old_shop_cap_cannot_read_snapshot(db: PgPool) {
     let c = setup(db, CheckoutMode::SameOrigin).await;
     let shop_token = c.shop_cart().await;
     let k = c.started(&shop_token, None).await;
-    let (status, before) = c
-        .call(
-            Call::put(
-                "/storefront/v1/checkout/contact",
-                json!({ "email": "typed@example.cz" }),
-            ),
-            &k,
-        )
+    let k = c
+        .rotated(&k, json!({ "contact": { "email": "typed@example.cz" } }))
         .await;
+    let (status, before) = c.checkout(&k).await;
     assert_eq!(status, StatusCode::OK, "{before}");
 
     c.assert_restart(
@@ -271,16 +300,17 @@ async fn old_shop_cap_cannot_read_snapshot(db: PgPool) {
         "GET /checkout with the shop capability",
     )
     .await;
-    let (status, _) = c
-        .call(
-            Call::put(
-                "/storefront/v1/checkout/contact",
-                json!({ "email": "attacker@example.cz" }),
-            ),
+    let (status, text, replaced) = c
+        .details(
             &shop_token,
+            json!({ "contact": { "email": "attacker@example.cz" } }),
         )
         .await;
-    assert_eq!(status, StatusCode::NOT_FOUND, "contact write");
+    assert_eq!(
+        (status, replaced),
+        (StatusCode::NOT_FOUND, None),
+        "contact write: {text}"
+    );
     let (status, _) = c
         .call(
             Call::post(
@@ -402,8 +432,21 @@ async fn isolated_start_still_handoffs(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let k = body["cart_token"].as_str().unwrap().to_owned();
+    let (status, text, replaced) = c
+        .details(&k, json!({ "contact": { "email": "jana@example.cz" } }))
+        .await;
+    assert_eq!(
+        (status, code(&text)),
+        (StatusCode::CONFLICT, json!("checkout_mode_changed"))
+    );
+    assert_eq!(replaced, None, "an isolated capability is never replaced");
     let (status, checkout) = c.checkout(&k).await;
     assert_eq!(status, StatusCode::OK, "{checkout}");
     assert_eq!(checkout["cart"]["id"], before["id"], "checked out in place");
     assert_eq!(line_count(&checkout), 1);
+    assert_eq!(
+        checkout["email"],
+        Value::Null,
+        "the refused write wrote nothing"
+    );
 }

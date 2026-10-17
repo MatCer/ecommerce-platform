@@ -9,8 +9,8 @@ use std::sync::Arc;
 use chrono::{NaiveDate, Utc};
 use commerce::cart::{self, NewLine};
 use commerce::checkout::{
-    self, AddressesInput, CheckoutAddress, ContactInput, PaymentInput, PlaceOrderInput, Placement,
-    Placer, Settings, ShippingInput,
+    self, AddressesInput, CheckoutAddress, ContactInput, Details, PaymentInput, PlaceOrderInput,
+    Placement, Placer, Settings, ShippingInput,
 };
 use commerce::checkout_access::{self, ShopOrigin};
 use commerce::inventory;
@@ -224,16 +224,14 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
         .await
         .unwrap()
         .unwrap();
-    let c = checkout_access::open(&mut tx, &ctx, &checkout_token)
-        .await
-        .unwrap();
-    checkout::set_contact(
+    let c = checkout::set_isolated_details(
         &mut tx,
-        &c,
-        &ContactInput {
+        &ctx,
+        &checkout_token,
+        &Details::Contact(ContactInput {
             email: "jana@example.test".into(),
             phone: None,
-        },
+        }),
     )
     .await
     .unwrap();
@@ -241,14 +239,14 @@ async fn place(runtime: &PgPool, s: &Setup, m: M, kind: MethodKind) -> Placement
         M::Cz => "CZ",
         M::Sk => "SK",
     };
-    checkout::set_addresses(
+    checkout::set_isolated_details(
         &mut tx,
         &ctx,
-        &c,
-        &AddressesInput {
+        &checkout_token,
+        &Details::Addresses(Box::new(AddressesInput {
             billing: address(country),
             shipping: None,
-        },
+        })),
     )
     .await
     .unwrap();
