@@ -236,8 +236,6 @@ export default function CheckoutForm(
     }
     if (r.code === "stale_page") return;
     setPlacing(false);
-    // Lost response, gateway error or still running: the order may exist. The next click (or
-    // a reload) replays the same key and body; no step is saved before it, so nothing changes.
     pending = unknownOutcome(r) ? p : null;
     setError(checkoutProblem(m, r.code));
     if (r.code === "cart_changed" || r.code === "price_changed") {
