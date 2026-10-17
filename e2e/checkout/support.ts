@@ -11,6 +11,7 @@ import {
   expect,
   type Locator,
   type Page,
+  type Request,
 } from "@playwright/test";
 import { mailpit } from "../admin/support";
 import { tabTo } from "../keyboard";
@@ -296,6 +297,9 @@ export async function choosePickupPoint(page: Page, point: RegExp, keyboard = fa
   }
   await expect(page.getByTestId("pickup-point")).toContainText(point);
 }
+
+export const isPlacement = (r: Request) =>
+  r.method() === "POST" && new URL(r.url()).pathname === "/checkout/place-order";
 
 export async function acceptAndPlace(page: Page, placeLabel = "Objednat s povinností platby") {
   for (const label of [/^(Souhlasím|Súhlasím) s obchodn/, /^Ber(u|iem) na v[ěe]dom/]) {

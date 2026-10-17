@@ -6,15 +6,8 @@
  * order linked after an email-link sign-in (A5).
  */
 
-import {
-  type APIResponse,
-  expect,
-  type Locator,
-  type Page,
-  type Request,
-  request,
-  test,
-} from "@playwright/test";
+import { randomBytes } from "node:crypto";
+import { type APIResponse, expect, type Locator, type Page, request, test } from "@playwright/test";
 import { expectAccessible, magicLink, mailpit, run, sql, useEnglish } from "../admin/support";
 import { tabTo } from "../keyboard";
 import { testContext } from "../rate-client";
@@ -32,6 +25,7 @@ import {
   FRESH_SK,
   fakePay,
   fillContactAndAddress,
+  isPlacement,
   JANA,
   type MailSummary,
   mail,
@@ -58,8 +52,6 @@ declare global {
 
 const CART = "__Host-Http-cart";
 const CAPABILITY = /^[0-9a-f]{64}$/;
-const isPlacement = (r: Request) =>
-  r.method() === "POST" && new URL(r.url()).pathname === "/checkout/place-order";
 
 /** Records every storage, cache and broadcast write a document of `page` makes. */
 async function spyOnStorage(page: Page): Promise<string[]> {
@@ -679,7 +671,7 @@ test("a placement whose answer is lost after the commit shows its receipt on rel
   const writes = await spyOnStorage(page);
   const paths: string[] = [];
   page.on("request", (r) => paths.push(new URL(r.url()).pathname));
-  const email = `ztracena-${run}@example.test`;
+  const email = `ztracena-${randomBytes(6).toString("hex")}@example.test`;
   await controlStorageSpy(page, writes);
   await sameOriginReview(page, FRESH_HTTPS, email);
   await chooseCashOnDelivery(page, /PPL – kurýr/, /Testovací platba/);
@@ -759,7 +751,7 @@ test("a placement refused because another tab changed the cart keeps the note an
 }) => {
   const context = await securityContext(browser);
   const page = await context.newPage();
-  const email = `zmena-${run}@example.test`;
+  const email = `zmena-${randomBytes(6).toString("hex")}@example.test`;
   await sameOriginReview(page, FRESH_HTTPS, email);
   await chooseCashOnDelivery(page);
   const labels = [

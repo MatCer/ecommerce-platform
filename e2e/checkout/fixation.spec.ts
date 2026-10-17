@@ -83,9 +83,18 @@ async function plantedVictim(browser: Browser, planter: Holder): Promise<Page> {
   return page;
 }
 
-async function expectPlanterReadsNothing(attacker: Holder, pii: string) {
+async function expectPlanterReadsNothing(attacker: Holder, pii: string, placed?: string) {
   const html = (await (await attacker.page.goto(`${FRESH_HTTPS}/checkout`))?.text()) ?? "";
-  await expect(restartNotice(attacker.page)).toHaveText(RESTARTED);
+  if (placed) {
+    const receipt = attacker.page.getByRole("status", { name: "Děkujeme za objednávku!" });
+    await expect(
+      receipt,
+      "the planter's value reads the receipt of the order it planted",
+    ).toContainText(`Objednávka ${placed}`);
+    await expect(receipt, "which names only the planter's own email").toContainText(
+      `Potvrzení pošleme na ${attacker.email}`,
+    );
+  } else await expect(restartNotice(attacker.page)).toHaveText(RESTARTED);
   expect(html, "the planter's platform HTML").not.toContain(pii);
   const api = await attacker.page.evaluate(async (token) => {
     const res = await fetch("/_p/checkout", { headers: { "x-page-token": token } });
@@ -136,10 +145,11 @@ test("a capability planted before checkout reads nothing the customer enters", a
 });
 
 for (const edit of ["contact", "addresses", "note"] as const) {
-  test(`a planted filled checkout stops answering its planter at the customer's first edit: ${edit}`, async ({
-    browser,
-    browserName,
-  }) => {
+  const title =
+    edit === "note"
+      ? "a planted filled checkout placed with only a note shows its planter nothing but its own receipt"
+      : `a planted filled checkout stops answering its planter at the customer's first edit: ${edit}`;
+  test(title, async ({ browser, browserName }) => {
     test.skip(browserName !== "webkit", PLANTING);
     const attacker = await attackerCheckout(browser, true);
     const page = await plantedVictim(browser, attacker);
@@ -155,16 +165,18 @@ for (const edit of ["contact", "addresses", "note"] as const) {
     if (edit === "contact") {
       await page.getByRole("link", { name: "Upravit Kontakt" }).click();
       await saveContact(page, `${pii}@example.test`);
+      await expectPlanterReadsNothing(attacker, pii);
     } else if (edit === "addresses") {
       await page.getByRole("link", { name: "Upravit Adresa" }).click();
       await saveAddresses(page, { ...JANA, name: `${pii} Jana`, street: `${pii} 12` });
+      await expectPlanterReadsNothing(attacker, pii);
     } else {
       await page.getByRole("textbox", { name: /Poznámka k objednávce/ }).fill(`${pii} poznámka`);
       await acceptAndPlace(page);
       const number = await receiptNumber(page);
       expect(sql(`SELECT notes FROM orders WHERE number = '${number}'`)).toBe(`${pii} poznámka`);
+      await expectPlanterReadsNothing(attacker, pii, number);
     }
-    await expectPlanterReadsNothing(attacker, pii);
     await page.context().close();
     await attacker.context.close();
   });
@@ -310,30 +322,24 @@ test("theme code writes no details and gets no token", async ({ browser, browser
             notes: note,
           }),
         });
-        const body = await res.text();
-        return { status: res.status, read: readable(res, body), body };
+        return { status: res.status, read: readable(res, await res.text()) };
       },
       { token: attacker.token, note },
     ),
   ]);
-  expect(placed.status, "the planted capability places").toBe(201);
+  expect(placed.status, "the shop's JSON placement is closed, to the planted capability too").toBe(
+    404,
+  );
   const headers = await answer.allHeaders();
   expect(headers["content-type"], "the answer's headers are observed").toContain("json");
   expect(headers["x-cart-token"]).toBeUndefined();
   expect(placed.read).not.toMatch(/^x-cart-token:/m);
-  const body = JSON.parse(placed.body) as { confirmation_url: string; number: string };
-  expect(Object.keys(body).sort()).toEqual(["confirmation_url", "number", "order_id", "payment"]);
-  expect(placed.body.match(/[0-9a-f]{64}/g), "no hex token but the order page's").toEqual([
-    body.confirmation_url.replace(/^\/o\//, ""),
-  ]);
   expect(placed.read).not.toContain(attacker.cap);
   expect(placed.read).not.toContain(attacker.token);
-  expect(sql(`SELECT notes FROM orders WHERE number = '${body.number}'`)).toBe(note);
-  expect(
-    sql(`SELECT count(*) FROM carts WHERE ${snapshotOf(attacker.cap)}`),
-    "the note placement replaced the capability",
-  ).toBe("0");
-  expect(await jarOf(holder), "and the browser never received the new one").toEqual(plantedJar);
+  expect(sql(`SELECT count(*) FROM orders WHERE notes = '${note}'`), "no order with the note").toBe(
+    "0",
+  );
+  expect(await jarOf(holder), "the jar is unchanged").toEqual(plantedJar);
   await holder.close();
   await attacker.context.close();
 });
