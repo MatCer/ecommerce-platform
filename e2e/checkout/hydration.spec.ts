@@ -1,19 +1,25 @@
+import { randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { run } from "../admin/support";
+import { run, sql } from "../admin/support";
 import {
   acceptAndPlace,
   CZ,
   checkoutOf,
+  checkoutReady,
+  chooseCashOnDelivery,
   deferHydration,
   detailsForm,
   FRESH_HTTPS,
   fakePay,
   fillAddress,
   fillContactAndAddress,
+  isPlacement,
   JANA,
   newPage,
   pageTokenMeta,
   postDetails,
+  receiptNumber,
+  sameOriginReview,
   securityContext,
   startSameOriginCheckout,
   toCheckout,
@@ -57,6 +63,47 @@ test("the details forms post natively before hydration", async ({ browser }) => 
     release();
     await expect(place).toBeEnabled();
     await expect(ppl).toBeEnabled();
+  } finally {
+    release();
+    await context.close();
+  }
+});
+
+test("the review's place form posts nothing before hydration and places once after", async ({
+  browser,
+}) => {
+  const context = await securityContext(browser);
+  const page = await context.newPage();
+  const email = `pred-objednanim-${randomBytes(6).toString("hex")}@example.test`;
+  await sameOriginReview(page, FRESH_HTTPS, email);
+  await chooseCashOnDelivery(page);
+  const placements: string[] = [];
+  page.on("request", (r) => {
+    if (isPlacement(r)) placements.push(r.url());
+  });
+  const release = await deferHydration(page);
+  try {
+    await page.reload({ waitUntil: "commit" });
+    const place = page.getByRole("button", { name: "Objednat s povinností platby" });
+    const note = page.getByRole("textbox", { name: /Poznámka k objednávce/ });
+    await expect(place).toBeDisabled();
+    await expect(note).toBeDisabled();
+    await expect(page.locator("astro-island[ssr]"), "no island has hydrated").not.toHaveCount(0);
+    await place.click({ force: true });
+    await note.press("Enter");
+    await expect(page).toHaveURL(`${FRESH_HTTPS}/checkout`);
+    release();
+    await checkoutReady(page);
+    const typed = `Po hydrataci ${run}`;
+    await note.fill(typed);
+    await acceptAndPlace(page);
+    const number = await receiptNumber(page);
+    expect(placements, "one placement post, none before hydration").toHaveLength(1);
+    expect(
+      sql(`SELECT concat_ws('|', string_agg(number::text, ','), string_agg(notes, ','))
+           FROM orders WHERE email = '${email}'`),
+      "one order, with the note typed after hydration",
+    ).toBe(`${number}|${typed}`);
   } finally {
     release();
     await context.close();

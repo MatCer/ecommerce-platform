@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { readdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -22,7 +22,12 @@ import {
   type Upstream,
 } from "./bindings.ts";
 import { HtmlCache, normalizeUrl, requestVerdict, responseVerdict } from "./cache.ts";
-import { CHECKOUT_FORMS, type CheckoutForm } from "./checkout-forms.ts";
+import {
+  CHECKOUT_FORMS,
+  type CheckoutForm,
+  PLACE_ORDER_FORM,
+  placeOrderBody,
+} from "./checkout-forms.ts";
 import { type Counters, templateOf } from "./counters.ts";
 import type { Assignment, Enroller } from "./experiments.ts";
 import {
@@ -160,7 +165,6 @@ const CHECKOUT_OPS: { method: string; path: RegExp }[] = [
 const SAME_ORIGIN_CHECKOUT_OPS: { method: string; path: RegExp }[] = [
   { method: "GET", path: /^$/ },
   { method: "PUT", path: /^\/(shipping|payment)$/ },
-  { method: "POST", path: /^\/place-order$/ },
 ];
 
 /** The order page's operations (`/_p/orders/<order token>/*`, A4, A10). */
@@ -1195,11 +1199,10 @@ ${
     });
   }
 
-  async function checkoutForm(
+  async function checkoutNavigation(
     site: SameOriginSite,
     req: Request,
-    { step, build }: CheckoutForm,
-  ): Promise<Response> {
+  ): Promise<{ cart: string; form: URLSearchParams } | Response> {
     const form = await navigationForm(site, req);
     if (form instanceof Response) return form;
     const cart = capabilityCookie(req, SAME_ORIGIN_CART_COOKIE);
@@ -1213,6 +1216,36 @@ ${
         status: 403,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
+    return { cart, form };
+  }
+
+  async function draftPage(
+    site: SameOriginSite,
+    req: Request,
+    query: string,
+    form: URLSearchParams,
+    status: number,
+  ): Promise<Response> {
+    const page = await renderCheckout(
+      site,
+      req,
+      new URL(`/checkout?${query}`, site.shopOrigin),
+      form,
+    );
+    return new Response(page.body, {
+      status: page.ok ? status : page.status,
+      headers: page.headers,
+    });
+  }
+
+  async function checkoutForm(
+    site: SameOriginSite,
+    req: Request,
+    { step, build }: CheckoutForm,
+  ): Promise<Response> {
+    const posted = await checkoutNavigation(site, req);
+    if (posted instanceof Response) return posted;
+    const { cart, form } = posted;
     const res = await upstream(
       new Request(`${opts.apiOrigin}/storefront/v1/checkout/details`, {
         method: "POST",
@@ -1221,31 +1254,49 @@ ${
       }),
     );
     const rotated = res.headers.get("x-cart-token");
-    const problemCode =
-      res.status === 422
-        ? ((await res.json().catch(() => null)) as { code?: unknown } | null)?.code
-        : undefined;
+    const code = res.status === 422 ? await refusalCode(res) : undefined;
     await res.body?.cancel().catch(() => undefined);
     if (res.status === 204 && rotated && TOKEN_RE.test(rotated))
       return new Response(null, {
         status: 303,
         headers: { location: "/checkout", "set-cookie": sameOriginCartCookie(rotated) },
       });
-    if (res.status === 422) {
-      const code =
-        typeof problemCode === "string" && /^[a-z_]{1,40}$/.test(problemCode)
-          ? problemCode
-          : "failed";
-      const target = new URL(`/checkout?edit=${step}&error=${code}`, site.shopOrigin);
-      const page = await renderCheckout(site, req, target, form);
-      return new Response(page.body, {
-        status: page.ok ? 422 : page.status,
-        headers: page.headers,
-      });
-    }
+    if (code) return draftPage(site, req, `edit=${step}&error=${code}`, form, 422);
     const location =
       res.status === 404 || res.status === 409 ? "/checkout" : "/checkout?error=failed";
     return new Response(null, { status: 303, headers: { location } });
+  }
+
+  async function placeOrder(site: SameOriginSite, req: Request): Promise<Response> {
+    const toCheckout = (headers: Record<string, string> = {}) =>
+      new Response(null, { status: 303, headers: { location: "/checkout", ...headers } });
+    if (req.method === "GET" || req.method === "HEAD") return toCheckout();
+    const posted = await checkoutNavigation(site, req);
+    if (posted instanceof Response) return posted;
+    const { cart, form } = posted;
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/checkout/place-order`, {
+        method: "POST",
+        headers: apiHeaders(site, {
+          "x-cart-token": cart,
+          "content-type": "application/json",
+          "idempotency-key": randomUUID(),
+          ...consentSubject(req),
+        }),
+        body: JSON.stringify(placeOrderBody(form)),
+      }),
+    );
+    const rotated = res.headers.get("x-cart-token");
+    const refused = res.status === 409 || res.status === 422;
+    const code = refused ? await refusalCode(res) : "failed";
+    await res.body?.cancel().catch(() => undefined);
+    if (res.status === 201)
+      return toCheckout(
+        rotated && TOKEN_RE.test(rotated) ? { "set-cookie": sameOriginCartCookie(rotated) } : {},
+      );
+    if (res.status === 404 || (res.status === 409 && code === "order_already_placed"))
+      return toCheckout();
+    return draftPage(site, req, `error=${code}`, form, refused ? res.status : 502);
   }
 
   async function sameOriginCheckoutApi(
@@ -1738,6 +1789,7 @@ ${
         status: 400,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
+    if (url.pathname === PLACE_ORDER_FORM) return placeOrder(site, req);
     const form = CHECKOUT_FORMS.get(url.pathname);
     if (form) return checkoutForm(site, req, form);
     if (url.pathname !== "/checkout") return text(404, "Not found");
@@ -2346,6 +2398,11 @@ function consentSubject(req: Request): Record<string, string> {
   if (!subject || !CONSENT_ID_RE.test(subject)) return {};
   const ua = (req.headers.get("user-agent") ?? "").replace(/[^\x20-\x7e]/g, "").slice(0, 512);
   return { "x-consent-subject": subject, ...(ua ? { "x-client-user-agent": ua } : {}) };
+}
+
+async function refusalCode(res: Response): Promise<string> {
+  const code = ((await res.json().catch(() => null)) as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? code : "failed";
 }
 
 /** API answers keep a rate limit's `Retry-After` (spec §8.1) when proxied. */

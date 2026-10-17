@@ -2,6 +2,7 @@
 import { t } from "@platform/storefront-sdk/format";
 import AddressesForm from "../components/AddressesForm.astro";
 import ContactForm from "../components/ContactForm.astro";
+import Receipt from "../components/Receipt.astro";
 import CheckoutForm from "../islands/CheckoutForm";
 import DetailsSummary from "../islands/DetailsSummary";
 import SubmitOnce from "../islands/SubmitOnce";
@@ -12,6 +13,7 @@ import { Button } from "../ui.tsx";
 
 const api = checkoutApi(Astro.request);
 const [shop, view] = await Promise.all([api.shop(), api.checkout()]);
+const receipt = view === null ? await api.receipt() : null;
 const open = view !== null && view.cart.lines.length > 0;
 const m = shop?.messages ?? {};
 const locale = shop?.locale ?? "cs";
@@ -60,12 +62,13 @@ const notice = page?.problem?.step === null ? page.problem : null;
             "account.invalid_email",
             "legal.terms",
             "consent.email_marketing_hint",
-            "order.thanks",
-            "order.title",
           )}
           locale={locale}
           initial={view}
           shopUrl={back}
+          pageToken={token ?? ""}
+          choices={page.choices}
+          refusal={page.refusal}
         />
       ) : (
         <div class="grid max-w-2xl gap-5">
@@ -113,6 +116,8 @@ const notice = page?.problem?.step === null ? page.problem : null;
           <SubmitOnce client:load />
         </div>
       )
+    ) : receipt ? (
+      <Receipt m={m} receipt={receipt} shopUrl={back} />
     ) : (
       <div class="grid max-w-xl justify-items-start gap-4">
         <p role="status">{t(m, "checkout.restarted")}</p>

@@ -13,6 +13,7 @@ const DEMO = "http://demo.localhost:8280";
 const CAP = "sameorigintoken_00000000000000000042";
 const NEW_CAP = "sameorigintoken_00000000000000000077";
 const DETAILS_API = "http://api.test/storefront/v1/checkout/details";
+const PLACE_ORDER_API = "http://api.test/storefront/v1/checkout/place-order";
 const pageTokenOf = (host: string, capability: string) =>
   createHmac("sha256", SECRET).update(`pt1|${host}|${capability}`).digest("base64url");
 const TOKEN = pageTokenOf("fresh.localhost:8280", CAP);
@@ -54,6 +55,15 @@ const post = (
   );
 
 const detailCalls = () => api.calls.filter((c) => c.url === DETAILS_API);
+
+const seenByWorker = (html: string) =>
+  JSON.parse(/<pre id="request">(.*?)<\/pre>/s.exec(html)?.[1] ?? "null") as {
+    method: string;
+    url: string;
+    origin: string | null;
+    type: string | null;
+    form: [string, string][];
+  } | null;
 
 function expectPlatformHeaders(res: Response, label: string) {
   expect(res.headers.get("cache-control"), label).toBe("no-store");
@@ -361,14 +371,6 @@ describe("a draft the API refuses comes back as the checkout with what was typed
     ["ship_elsewhere", "1"],
     ["shipping_street", ""],
   ]).toString();
-  const seenByWorker = (html: string) =>
-    JSON.parse(/<pre id="request">(.*?)<\/pre>/s.exec(html)?.[1] ?? "null") as {
-      method: string;
-      url: string;
-      origin: string | null;
-      type: string | null;
-      form: [string, string][];
-    } | null;
 
   test.each([
     ["contact", "/checkout/contact", contact, () => problem(422, "invalid_phone"), "invalid_phone"],
@@ -455,11 +457,267 @@ describe("the API answer becomes a redirect back to the checkout, never forwarde
   });
 });
 
+describe("the place-order form places through the edge and answers by navigation (C4, C6, C7)", () => {
+  const ROUTE = "/checkout/place-order";
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const CONSENT_ID = "0123456789abcdef0123456789abcdef";
+  const placeForm = (fields: [string, string][]) =>
+    new URLSearchParams([["_pt", TOKEN], ...fields]).toString();
+  const PLACE = placeForm([
+    ["shipping", "11111111-1111-1111-1111-111111111111"],
+    ["payment", "bank_transfer"],
+    ["version", "3"],
+    ["total_minor", "12900"],
+    ["accept_terms", "1"],
+    ["accept_withdrawal", "1"],
+    ["review_invites", "1"],
+    ["notes", "Zvonit dvakrát"],
+    ["idempotency_key", "client-key-2"],
+    ["cart_token", "sameorigintoken_planted_000000000001"],
+  ]);
+  const NOTHING_TICKED = {
+    version: null,
+    total_minor: null,
+    accept_terms: false,
+    accept_withdrawal: false,
+    email_marketing: false,
+    review_invites: false,
+    notes: null,
+  };
+  const placeCalls = () => api.calls.filter((c) => c.url === PLACE_ORDER_API);
+  const placed =
+    (headers: Record<string, string> = { "x-cart-token": NEW_CAP }) =>
+    () =>
+      Response.json(
+        { order_id: "o1", number: "100001", confirmation_url: `/o/${"a".repeat(64)}` },
+        { status: 201, headers },
+      );
+
+  beforeEach(() => {
+    answers[PLACE_ORDER_API] = placed();
+  });
+
+  test("places once with the request's capability, an edge key and the allowlisted fields", async () => {
+    const res = await post(
+      ROUTE,
+      PLACE,
+      navigation({
+        cookie: `__Host-Http-cart=${CAP}; __Secure-consent_id=${CONSENT_ID}`,
+        "user-agent": "Mozilla/5.0 test",
+        "x-forwarded-for": "203.0.113.7",
+        "idempotency-key": "client-key-1",
+        "x-cart-token": NEW_CAP,
+      }),
+    );
+    await expectRotated(res);
+    expect(api.calls, "one API call").toHaveLength(1);
+    const [call] = placeCalls();
+    expect(call?.method).toBe("POST");
+    expect(call?.headers).toMatchObject({
+      "x-cart-token": CAP,
+      "x-shop-origin": FRESH,
+      "content-type": "application/json",
+      "x-consent-subject": CONSENT_ID,
+      "x-client-user-agent": "Mozilla/5.0 test",
+      "x-client-ip": "203.0.113.7",
+    });
+    expect(call?.headers["idempotency-key"], "minted by the edge").toMatch(UUID);
+    expect(JSON.parse(call?.body ?? ""), "only the placement's own fields").toEqual({
+      version: 3,
+      total_minor: 12900,
+      accept_terms: true,
+      accept_withdrawal: true,
+      email_marketing: false,
+      review_invites: true,
+      notes: "Zvonit dvakrát",
+    });
+    expect(JSON.stringify(api.calls), "the page token stays at the edge").not.toContain(TOKEN);
+  });
+
+  test("every placement gets a key of its own", async () => {
+    await post(ROUTE, PLACE);
+    await post(ROUTE, PLACE);
+    const keys = placeCalls().map((c) => c.headers["idempotency-key"]);
+    expect(keys).toHaveLength(2);
+    for (const key of keys) expect(key).toMatch(UUID);
+    expect(new Set(keys).size).toBe(2);
+  });
+
+  test.each([
+    ["nothing but the page token", [], NOTHING_TICKED],
+    [
+      "digits only, at most 15",
+      [
+        ["version", "007"],
+        ["total_minor", "999999999999999"],
+      ],
+      { ...NOTHING_TICKED, version: 7, total_minor: 999999999999999 },
+    ],
+    [
+      "not a whole number",
+      [
+        ["version", "3.0"],
+        ["total_minor", "-12900"],
+      ],
+      NOTHING_TICKED,
+    ],
+    [
+      "too long or empty",
+      [
+        ["version", ""],
+        ["total_minor", "1000000000000000"],
+      ],
+      NOTHING_TICKED,
+    ],
+    [
+      "ticks other than 1",
+      [
+        ["accept_terms", "on"],
+        ["accept_withdrawal", "true"],
+        ["email_marketing", "1"],
+        ["review_invites", ""],
+        ["notes", ""],
+      ],
+      { ...NOTHING_TICKED, email_marketing: true },
+    ],
+  ] as [string, [string, string][], unknown][])("the body for %s", async (_, fields, expected) => {
+    answers[PLACE_ORDER_API] = () => problem(422, "invalid_body");
+    await post(ROUTE, placeForm(fields));
+    expect(JSON.parse(placeCalls()[0]?.body ?? "")).toEqual(expected);
+  });
+
+  test.each([
+    ["201 without a capability", placed({})],
+    ["201 with a malformed capability", placed({ "x-cart-token": "short" })],
+    ["404", () => problem(404, "not_found")],
+    ["409 order_already_placed", () => problem(409, "order_already_placed")],
+  ])("%s answers 303 /checkout without a cookie", async (_, answer) => {
+    answers[PLACE_ORDER_API] = answer;
+    const res = await post(ROUTE, PLACE);
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/checkout");
+    expect(await res.text(), "the API's answer stays at the edge").toBe("");
+    expect(res.headers.getSetCookie()).toEqual([]);
+    expect(res.headers.get("x-cart-token")).toBeNull();
+    expect(placeCalls()).toHaveLength(1);
+    expectPlatformHeaders(res, "303");
+  });
+
+  test.each([
+    ["409 cart_changed", () => problem(409, "cart_changed"), 409, "cart_changed"],
+    ["409 price_changed", () => problem(409, "price_changed"), 409, "price_changed"],
+    ["409 insufficient_stock", () => problem(409, "insufficient_stock"), 409, "insufficient_stock"],
+    ["422 coupon_expired", () => problem(422, "coupon_expired"), 422, "coupon_expired"],
+    [
+      "422 legal_consent_required",
+      () => problem(422, "legal_consent_required"),
+      422,
+      "legal_consent_required",
+    ],
+    ["409 with a code that is not ours", () => problem(409, "<b>"), 409, "failed"],
+    ["422 with an overlong code", () => problem(422, "a".repeat(41)), 422, "failed"],
+    ["422 without a problem body", () => new Response("nope", { status: 422 }), 422, "failed"],
+    ["400", () => problem(400, "invalid_body"), 502, "failed"],
+    ["403", () => problem(403, "shop_origin_mismatch"), 502, "failed"],
+    ["429", () => problem(429, "rate_limited"), 502, "failed"],
+    ["500", () => problem(500, "internal"), 502, "failed"],
+    ["200", () => Response.json({ order_id: "o1" }), 502, "failed"],
+  ] as [string, () => Response, number, string][])(
+    "%s renders the review again from the posted form",
+    async (_, answer, status, code) => {
+      answers[PLACE_ORDER_API] = answer;
+      const res = await post(ROUTE, PLACE);
+      expect(res.status).toBe(status);
+      expect(res.headers.get("location"), "no redirect").toBeNull();
+      expect(res.headers.getSetCookie(), "no cookie: nothing was placed").toEqual([]);
+      expect(res.headers.get("x-cart-token")).toBeNull();
+      expectPlatformHeaders(res, String(status));
+      const html = await res.text();
+      expect(seenByWorker(html)).toEqual({
+        method: "POST",
+        url: `${FRESH}/checkout?error=${code}`,
+        origin: FRESH,
+        type: "application/x-www-form-urlencoded",
+        form: [...new URLSearchParams(PLACE)],
+      });
+      expect(html, "the token of the request's own capability").toContain(
+        `<meta name="page-token" content="${TOKEN}">`,
+      );
+      expect(html).not.toContain(NEW_CAP);
+      expect(placeCalls()).toHaveLength(1);
+    },
+  );
+
+  test("an unreachable API keeps the unavailable page", async () => {
+    answers[PLACE_ORDER_API] = () => {
+      throw new Error("connect ECONNREFUSED");
+    };
+    const res = await post(ROUTE, PLACE);
+    expect(res.status).toBe(502);
+    expect(await res.text()).toBe("Shop temporarily unavailable");
+    expect(res.headers.getSetCookie()).toEqual([]);
+    expectPlatformHeaders(res, "unavailable");
+  });
+
+  test.each(["GET", "HEAD"])(
+    "%s, a reload of a lost answer's URL, goes to the checkout",
+    async (method) => {
+      const typed = navigation({
+        origin: "missing",
+        "sec-fetch-site": "none",
+        "content-type": "missing",
+      });
+      const res = await post(ROUTE, null, typed, { method });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("location")).toBe("/checkout");
+      expect(res.headers.getSetCookie()).toEqual([]);
+      expect(api.calls).toEqual([]);
+      expectPlatformHeaders(res, method);
+    },
+  );
+
+  test.each([
+    ["Sec-Purpose", "POST", PLACE, navigation({ "sec-purpose": "prefetch" }), 403],
+    ["Sec-Purpose on a GET", "GET", null, navigation({ "sec-purpose": "prefetch" }), 403],
+    ["no Sec-Fetch-Mode", "POST", PLACE, navigation({ "sec-fetch-mode": "missing" }), 400],
+    [
+      "a fetch()",
+      "POST",
+      PLACE,
+      navigation({ "sec-fetch-mode": "cors", "sec-fetch-dest": "empty" }),
+      403,
+    ],
+    ["a frame", "POST", PLACE, navigation({ "sec-fetch-dest": "iframe" }), 403],
+    ["PUT", "PUT", PLACE, navigation(), 405],
+    ["another origin", "POST", PLACE, navigation({ origin: "http://evil.localhost:8280" }), 403],
+    ["no Origin", "POST", PLACE, navigation({ origin: "missing" }), 403],
+    ["a same-site page", "POST", PLACE, navigation({ "sec-fetch-site": "same-site" }), 403],
+    ["JSON", "POST", PLACE, navigation({ "content-type": "application/json" }), 415],
+    ["a body over 16 KiB", "POST", `${PLACE}&pad=${"x".repeat(16 * 1024)}`, navigation(), 413],
+  ] as [string, string, string | null, Record<string, string>, number][])(
+    "%s is refused with no API call",
+    async (_, method, body, headers, status) => {
+      const res = await post(ROUTE, body, headers, { method });
+      await expectRefused(res, status);
+      expectPlatformHeaders(res, "refusal");
+    },
+  );
+
+  test.each([
+    ["no cookie", PLACE, navigation({ cookie: "missing" })],
+    ["no _pt", PLACE.replace(`_pt=${TOKEN}&`, ""), navigation()],
+    ["another capability's _pt", PLACE, navigation({ cookie: `__Host-Http-cart=${NEW_CAP}` })],
+    ["a repeated name", `${PLACE}&notes=again`, navigation()],
+  ])("%s: 403 stale page, nothing placed", async (_, body, headers) => {
+    await expectStale(await post(ROUTE, body, headers));
+  });
+});
+
 describe("only the enumerated form paths reach the API", () => {
   test.each([
     "/checkout/shipping",
     "/checkout/payment",
-    "/checkout/place-order",
+    "/checkout/place-order/",
     "/checkout/note",
     "/checkout/details",
     "/checkout/contact/",
@@ -487,8 +745,6 @@ describe("only the enumerated form paths reach the API", () => {
 });
 
 describe("the legacy checkout host never hands out an internal capability", () => {
-  const PLACE_ORDER_API = "http://api.test/storefront/v1/checkout/place-order";
-
   test.each(["http://checkout.demo.localhost:8280", "http://checkout.fresh.localhost:8280"])(
     "%s strips x-cart-token from place-order and has no details route",
     async (base) => {

@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::common::*;
 
 mod pii_rotation;
+mod placement_recovery;
 
 #[derive(Clone)]
 struct Edge {

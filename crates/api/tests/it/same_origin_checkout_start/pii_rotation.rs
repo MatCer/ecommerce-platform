@@ -39,7 +39,7 @@ enum Write {
     Place(Value),
 }
 
-fn contact(email: &str) -> Value {
+pub(super) fn contact(email: &str) -> Value {
     json!({ "contact": { "email": email } })
 }
 
@@ -48,27 +48,27 @@ fn billing(name: &str) -> Value {
             "country": "CZ" })
 }
 
-fn addresses(name: &str) -> Value {
+pub(super) fn addresses(name: &str) -> Value {
     json!({ "addresses": { "billing": billing(name) } })
 }
 
-fn place_body(view: &Value, notes: &str) -> Value {
+pub(super) fn place_body(view: &Value, notes: &str) -> Value {
     json!({ "version": view["cart"]["version"],
             "total_minor": view["totals"]["total"]["amount_minor"],
             "accept_terms": true, "accept_withdrawal": true, "notes": notes })
 }
 
-fn cart_id(view: &Value) -> Uuid {
+pub(super) fn cart_id(view: &Value) -> Uuid {
     view["cart"]["id"].as_str().unwrap().parse().unwrap()
 }
 
-fn holds_a_capability(text: &str) -> bool {
+pub(super) fn holds_a_capability(text: &str) -> bool {
     text.split(|ch: char| !matches!(ch, '0'..='9' | 'a'..='f'))
         .any(|run| run.len() >= 64)
 }
 
 impl Ctx {
-    async fn placeable(&self) -> Uuid {
+    pub(super) async fn placeable(&self) -> Uuid {
         let mut tx = platform::db::tenant_tx(&self.runtime, self.shop.tenant)
             .await
             .unwrap();
@@ -111,7 +111,7 @@ impl Ctx {
         method
     }
 
-    async fn ready(&self, cart: &str, method: Uuid) -> Value {
+    pub(super) async fn ready(&self, cart: &str, method: Uuid) -> Value {
         let mut view = Value::Null;
         for step in [
             Call::put(
@@ -140,7 +140,7 @@ impl Ctx {
         view
     }
 
-    async fn place(
+    pub(super) async fn place(
         &self,
         cart: &str,
         key: &str,
@@ -153,7 +153,7 @@ impl Ctx {
             .await
     }
 
-    async fn read<T>(&self, sql: &'static str, id: Uuid) -> T
+    pub(super) async fn read<T>(&self, sql: &'static str, id: Uuid) -> T
     where
         T: for<'r> sqlx::Decode<'r, sqlx::Postgres> + sqlx::Type<sqlx::Postgres> + Send + Unpin,
     {
@@ -315,6 +315,26 @@ async fn prefilled_attacker_checkout_rotates_again(db: PgPool) {
     assert_eq!(
         view["cart"]["id"], planted["cart"]["id"],
         "the planted checkout, under a capability its planter never saw"
+    );
+
+    let view = c.ready(&kv2, method).await;
+    let (status, text, res) = c.place(&kv2, "p-1", &place_body(&view, "Zvonit")).await;
+    assert_eq!(status, StatusCode::CREATED, "{text}");
+    assert!(
+        replacement(&res).is_some(),
+        "the victim's note replaced KV2"
+    );
+    let (status, text) = c.receipt(&ka2).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the planted value reads no receipt: {text}"
+    );
+    let (status, text) = c.receipt(&kv2).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the victim's value finds the order: {text}"
     );
 }
 

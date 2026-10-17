@@ -126,7 +126,12 @@ describe("checkoutPage opens one editor from the view, edit and the draft", () =
   });
 
   test("both saved is the review", () => {
-    expect(checkoutPage(BOTH, at())).toEqual({ kind: "review", problem: null });
+    expect(checkoutPage(BOTH, at())).toEqual({
+      kind: "review",
+      problem: null,
+      choices: null,
+      refusal: null,
+    });
   });
 
   test("edit=contact opens the saved contact with a cancel", () => {
@@ -250,6 +255,8 @@ describe("checkoutPage opens one editor from the view, edit and the draft", () =
     expect(checkoutPage(BOTH, at("?error=invalid_email"))).toEqual({
       kind: "review",
       problem: { step: null, field: null, message: "account.invalid_email" },
+      choices: null,
+      refusal: null,
     });
     expect(checkoutPage(CONTACT, at("?error=invalid_phone"))).toMatchObject({
       kind: "addresses",
@@ -281,6 +288,68 @@ describe("checkoutPage opens one editor from the view, edit and the draft", () =
     checkoutPage(ELSEWHERE, at("?edit=addresses&error=invalid_address"), addressDraft(false));
     checkoutPage(ELSEWHERE, at("?edit=contact"), form([["email", "x@y.z"]]));
     expect(ELSEWHERE).toEqual(before);
+  });
+});
+
+describe("a placement the API refused is the review again with what was posted", () => {
+  const placed = form([
+    ["_pt", "token"],
+    ["shipping", HOME],
+    ["payment", "cod"],
+    ["version", "3"],
+    ["total_minor", "10000"],
+    ["accept_terms", "1"],
+    ["accept_withdrawal", "1"],
+    ["review_invites", "1"],
+    ["notes", " Zvonit dvakrát "],
+  ]);
+
+  test("keeps the ticks and the note and hands the refusal to the island", () => {
+    expect(checkoutPage(BOTH, at("?error=cart_changed"), placed)).toEqual({
+      kind: "review",
+      problem: null,
+      choices: {
+        acceptTerms: true,
+        acceptWithdrawal: true,
+        emailMarketing: false,
+        reviewInvites: true,
+        notes: " Zvonit dvakrát ",
+      },
+      refusal: "cart_changed",
+    });
+  });
+
+  test("only exactly 1 is a tick", () => {
+    const page = checkoutPage(
+      BOTH,
+      at("?error=failed"),
+      form([
+        ["accept_terms", "on"],
+        ["accept_withdrawal", "true"],
+        ["email_marketing", "1"],
+      ]),
+    );
+    expect(page).toEqual({
+      kind: "review",
+      problem: null,
+      choices: {
+        acceptTerms: false,
+        acceptWithdrawal: false,
+        emailMarketing: true,
+        reviewInvites: false,
+        notes: "",
+      },
+      refusal: "failed",
+    });
+  });
+
+  test("a GET review keeps the page-level notice and no choices", () => {
+    expect(checkoutPage(BOTH, at("?error=cart_changed"))).toEqual({
+      kind: "review",
+      problem: { step: null, field: null, message: "checkout.details_failed" },
+      choices: null,
+      refusal: null,
+    });
   });
 });
 

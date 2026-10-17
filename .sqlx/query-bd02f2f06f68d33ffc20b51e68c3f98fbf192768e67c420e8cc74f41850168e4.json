@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET checkout_token_hash = NULL,\n             status = CASE WHEN status = 'open' THEN 'abandoned' ELSE status END,\n             updated_at = now()\n         WHERE checkout_token_hash IS NOT NULL\n           AND (source_cart_id = $1\n                OR ((checkout_token_hash = $2 OR replaced_token_hash = $2)\n                    AND checkout_origin = $3))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bd02f2f06f68d33ffc20b51e68c3f98fbf192768e67c420e8cc74f41850168e4"
+}

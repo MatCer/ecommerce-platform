@@ -761,6 +761,7 @@ async fn access_and_erasure_of_a_data_subject(db: PgPool) {
     assert_eq!(doc["consents"].as_array().unwrap().len(), 2);
     assert_eq!(doc["carts"][0]["phone"], "+420 777 000 000");
     assert!(doc["carts"][0].get("shop_token_hash").is_none());
+    assert!(doc["carts"][0].get("replaced_token_hash").is_none());
     assert_eq!(doc["shipments"][0]["carrier"], "ppl");
     assert_eq!(doc["reviews"][0]["customer_name"], "Anna N.");
     assert!(doc["reviews"][0].get("ip_hash").is_none());

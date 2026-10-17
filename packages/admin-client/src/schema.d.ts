@@ -3776,6 +3776,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/checkout/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * C7, same-origin mode: the receipt of the order placed from the checkout behind the
+         *     capability, or behind the one its note placement replaced (a browser whose placement
+         *     answer was lost). Reads only: no payment start, no replay, no capability.
+         */
+        get: operations["get_order"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/checkout/payment": {
         parameters: {
             query?: never;
@@ -5816,6 +5837,13 @@ export interface components {
             mode_generation: number;
             /** @description As browsers serialize it: scheme, host and a non-default port (`https://shop.example`). */
             origin: string;
+        };
+        CheckoutReceipt: {
+            /** @description The checkout's own confirmation email, frozen at placement. */
+            email: string;
+            number: string;
+            /** @description An online payment (Stripe, the fake gateway) is not completed yet. */
+            payment_due: boolean;
         };
         CheckoutStart: {
             /** @description The browser's current checkout capability (`__Host-Http-cart`), revoked by the start. */
@@ -20084,6 +20112,52 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_order: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutReceipt"];
+                };
+            };
+            /** @description shop_origin_required | shop_origin_mismatch */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No converted checkout behind the capability */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

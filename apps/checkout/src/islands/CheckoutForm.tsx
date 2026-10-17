@@ -5,12 +5,11 @@ import type {
   CheckoutView,
   PaymentMethodKind,
   PickupPoint,
-  PlacedOrder,
   PlaceOrderInput,
   ShippingOption,
 } from "@platform/storefront-sdk/types";
 import { createSignal, For, type JSX, onMount, Show } from "solid-js";
-import { regionName, reviewFacts } from "../lib/checkout-steps";
+import { type ReviewChoices, regionName, reviewFacts } from "../lib/checkout-steps";
 import { call } from "../lib/client";
 import { loadPacketa, toPickupPoint } from "../lib/packeta";
 import {
@@ -91,22 +90,24 @@ const newKey = () =>
         b.toString(16).padStart(2, "0"),
       ).join("");
 
-interface Placed {
-  number: string;
-  email: string;
-  unpaid: boolean;
-}
-
 export default function CheckoutForm(
   props: { m: M; locale: string; initial: CheckoutView; shopUrl: string } & (
     | { mode: "isolated"; customerEmail?: string | undefined; saved: Address[] }
-    | { mode: "same-origin" }
+    | {
+        mode: "same-origin";
+        pageToken: string;
+        choices: ReviewChoices | null;
+        refusal: string | null;
+      }
   ),
 ) {
   const m = props.m;
   const isolated = props.mode === "isolated";
   const saved = props.mode === "isolated" ? props.saved : [];
   const customerEmail = props.mode === "isolated" ? props.customerEmail : undefined;
+  const pageToken = props.mode === "same-origin" ? props.pageToken : "";
+  const choices = props.mode === "same-origin" ? props.choices : null;
+  const refusal = props.mode === "same-origin" ? props.refusal : null;
   const [view, setView] = createSignal(props.initial);
   const firstCountry = () => props.initial.ship_to_countries[0] ?? "CZ";
   const savedDefault = saved.find((a) => a.is_default) ?? saved[0];
@@ -122,19 +123,21 @@ export default function CheckoutForm(
   const [delivery, setDelivery] = createSignal<CheckoutAddress>(
     props.initial.shipping_address ?? blank(firstCountry()),
   );
-  const [terms, setTerms] = createSignal(false);
-  const [withdrawal, setWithdrawal] = createSignal(false);
-  const [marketing, setMarketing] = createSignal(false);
-  const [reviews, setReviews] = createSignal(false);
-  const [note, setNote] = createSignal("");
+  const [terms, setTerms] = createSignal(choices?.acceptTerms ?? false);
+  const [withdrawal, setWithdrawal] = createSignal(choices?.acceptWithdrawal ?? false);
+  const [marketing, setMarketing] = createSignal(choices?.emailMarketing ?? false);
+  const [reviews, setReviews] = createSignal(choices?.reviewInvites ?? false);
+  const [note, setNote] = createSignal(choices?.notes ?? "");
   /** A pickup-point method the customer chose but has no point for yet. */
   const [pendingPickup, setPendingPickup] = createSignal<string | null>(null);
   const [saving, setSaving] = createSignal(false);
   const [placing, setPlacing] = createSignal(false);
-  const [error, setError] = createSignal("");
+  const [error, setError] = createSignal(refusal ? checkoutProblem(m, refusal) : "");
   const [notice, setNotice] = createSignal("");
   const [touched, setTouched] = createSignal(false);
-  const [placed, setPlaced] = createSignal<Placed | null>(null);
+  let errorAlert: HTMLParagraphElement | undefined;
+  if (refusal) onMount(() => errorAlert?.focus());
+  let sent = false;
   /** A placement whose outcome is unknown, replayed as is on the next click. */
   // An open cart means no order came of an earlier placement: nothing to resume (a converted
   // cart shows the empty page, whose ResumePlacement replays a kept placement).
@@ -219,19 +222,9 @@ export default function CheckoutForm(
 
   /** Sends a placement; an unknown outcome keeps it for an exact replay (A12). */
   async function submit(p: Placement) {
-    const r = isolated
-      ? await sendPlacement(p)
-      : await call<PlacedOrder>("POST", "/_p/checkout/place-order", p.body, {
-          "idempotency-key": p.key,
-        });
+    const r = await sendPlacement(p);
     if (r.ok && r.data) {
-      if (isolated) location.assign(nextUrl(r.data));
-      else
-        setPlaced({
-          number: r.data.number,
-          email: view().email ?? "",
-          unpaid: r.data.payment.action?.type !== "none",
-        });
+      location.assign(nextUrl(r.data));
       return;
     }
     if (r.code === "stale_page") return;
@@ -244,8 +237,33 @@ export default function CheckoutForm(
     }
   }
 
-  async function place(e: SubmitEvent) {
-    e.preventDefault();
+  function unplaceable(v: CheckoutView): string | null {
+    if (isolated && (!emailValid() || !addressesValid())) return t(m, "checkout.incomplete");
+    if (!v.shipping_method_id || !v.payment_method) return t(m, "checkout.incomplete");
+    if (pendingPickup() || (selectedMethod()?.needs_pickup_point && !v.pickup_point))
+      return t(m, "checkout.pickup_missing");
+    if (!terms() || !withdrawal()) return t(m, "checkout.required_legal");
+    return null;
+  }
+
+  function place(e: SubmitEvent) {
+    if (isolated) {
+      e.preventDefault();
+      void placeIsolated();
+      return;
+    }
+    if (sent || saving()) return e.preventDefault();
+    setError("");
+    const problem = unplaceable(view());
+    if (problem) {
+      e.preventDefault();
+      return setError(problem);
+    }
+    sent = true;
+    setPlacing(true);
+  }
+
+  async function placeIsolated() {
     setTouched(true);
     setError("");
     setNotice("");
@@ -253,16 +271,10 @@ export default function CheckoutForm(
       setPlacing(true);
       return submit(pending);
     }
-    const v = view();
-    if (isolated && (!emailValid() || !addressesValid()))
-      return setError(t(m, "checkout.incomplete"));
-    if (!v.shipping_method_id || !v.payment_method) return setError(t(m, "checkout.incomplete"));
-    if (pendingPickup() || (selectedMethod()?.needs_pickup_point && !v.pickup_point))
-      return setError(t(m, "checkout.pickup_missing"));
-    if (!terms() || !withdrawal()) return setError(t(m, "checkout.required_legal"));
+    const problem = unplaceable(view());
+    if (problem) return setError(problem);
     setPlacing(true);
-    if (!isolated) return submit({ key: newKey(), at: Date.now(), body: placement(v) });
-    const shown = v.totals.total.amount_minor;
+    const shown = view().totals.total.amount_minor;
     const ok =
       (await put("contact", { email: email().trim(), phone: phone().trim() || null })) &&
       (await put("addresses", {
@@ -368,8 +380,18 @@ export default function CheckoutForm(
     );
   };
 
-  const form = (
-    <form noValidate onSubmit={place}>
+  return (
+    <form
+      method={isolated ? undefined : "post"}
+      action={isolated ? undefined : "/checkout/place-order"}
+      noValidate
+      onSubmit={place}
+    >
+      <Show when={!isolated}>
+        <input type="hidden" name="_pt" value={pageToken} />
+        <input type="hidden" name="version" value={view().cart.version} />
+        <input type="hidden" name="total_minor" value={view().totals.total.amount_minor} />
+      </Show>
       <HydratedControls class="grid gap-6 md:grid-cols-[1fr_20rem] md:items-start">
         <div class="grid min-w-0 gap-5">
           <Show
@@ -584,6 +606,8 @@ export default function CheckoutForm(
               <div class="flex flex-wrap items-start gap-x-2">
                 <Checkbox
                   label={t(m, "checkout.accept_terms")}
+                  name="accept_terms"
+                  value="1"
                   checked={terms()}
                   onChange={setTerms}
                 />
@@ -599,6 +623,8 @@ export default function CheckoutForm(
               <div class="flex flex-wrap items-start gap-x-2">
                 <Checkbox
                   label={t(m, "checkout.accept_withdrawal")}
+                  name="accept_withdrawal"
+                  value="1"
                   checked={withdrawal()}
                   onChange={setWithdrawal}
                 />
@@ -618,17 +644,22 @@ export default function CheckoutForm(
                 <Checkbox
                   label={t(m, "checkout.marketing")}
                   description={t(m, "consent.email_marketing_hint")}
+                  name="email_marketing"
+                  value="1"
                   checked={marketing()}
                   onChange={setMarketing}
                 />
                 <Checkbox
                   label={t(m, "checkout.reviews")}
+                  name="review_invites"
+                  value="1"
                   checked={reviews()}
                   onChange={setReviews}
                 />
               </fieldset>
               <TextField
                 label={t(m, "checkout.note")}
+                name="notes"
                 multiline
                 rows={2}
                 maxLength={1000}
@@ -701,7 +732,12 @@ export default function CheckoutForm(
             </Show>
           </div>
           <Show when={error()}>
-            <p role="alert" class="mt-3 rounded-md border border-sale p-2 text-sm text-sale">
+            <p
+              ref={errorAlert}
+              role="alert"
+              tabIndex={-1}
+              class="mt-3 rounded-md border border-sale p-2 text-sm text-sale"
+            >
               {error()}
             </p>
           </Show>
@@ -729,40 +765,6 @@ export default function CheckoutForm(
         </aside>
       </HydratedControls>
     </form>
-  );
-
-  return (
-    <Show when={placed()} fallback={form}>
-      {(p) => <Receipt m={m} placed={p()} shopUrl={props.shopUrl} />}
-    </Show>
-  );
-}
-
-function Receipt(props: { m: M; placed: Placed; shopUrl: string }) {
-  let receipt: HTMLElement | undefined;
-  onMount(() => receipt?.focus());
-  return (
-    <section
-      ref={receipt}
-      role="status"
-      tabIndex={-1}
-      aria-labelledby="co-placed"
-      class={`${sectionClass} grid max-w-xl gap-3`}
-    >
-      <h2 id="co-placed" class={headingClass}>
-        {t(props.m, "order.thanks")}
-      </h2>
-      <p class="font-semibold">{t(props.m, "order.title", { number: props.placed.number })}</p>
-      <p class="[overflow-wrap:anywhere]">
-        {t(props.m, "checkout.confirmation_to", { email: props.placed.email })}
-      </p>
-      <Show when={props.placed.unpaid}>
-        <p>{t(props.m, "checkout.payment_not_completed")}</p>
-      </Show>
-      <a href={props.shopUrl} class="text-sm text-identity-ink underline">
-        {t(props.m, "checkout.back_to_shop")}
-      </a>
-    </section>
   );
 }
 

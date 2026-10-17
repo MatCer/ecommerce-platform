@@ -1,0 +1,26 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import type { CheckoutReceipt } from "@platform/storefront-sdk/types";
+import { headingClass, sectionClass } from "../ui.tsx";
+
+interface Props {
+  m: Record<string, string>;
+  receipt: CheckoutReceipt;
+  shopUrl: string;
+}
+const { m, receipt, shopUrl } = Astro.props;
+---
+
+<section
+  role="status"
+  tabindex="-1"
+  autofocus
+  aria-labelledby="co-placed"
+  class:list={[sectionClass, "grid max-w-xl gap-3"]}
+>
+  <h2 id="co-placed" class={headingClass}>{t(m, "order.thanks")}</h2>
+  <p class="font-semibold">{t(m, "order.title", { number: receipt.number })}</p>
+  <p class="[overflow-wrap:anywhere]">{t(m, "checkout.confirmation_to", { email: receipt.email })}</p>
+  {receipt.payment_due && <p>{t(m, "checkout.payment_not_completed")}</p>}
+  <a href={shopUrl} class="text-sm text-identity-ink underline">{t(m, "checkout.back_to_shop")}</a>
+</section>

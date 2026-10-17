@@ -29,10 +29,23 @@ export interface AddressValues {
   elsewhere: boolean;
 }
 
+export interface ReviewChoices {
+  readonly acceptTerms: boolean;
+  readonly acceptWithdrawal: boolean;
+  readonly emailMarketing: boolean;
+  readonly reviewInvites: boolean;
+  readonly notes: string;
+}
+
 export type CheckoutPage =
   | { kind: "contact"; values: ContactValues; problem: Problem | null; canCancel: boolean }
   | { kind: "addresses"; values: AddressValues; problem: Problem | null; canCancel: boolean }
-  | { kind: "review"; problem: Problem | null };
+  | {
+      kind: "review";
+      problem: Problem | null;
+      choices: ReviewChoices | null;
+      refusal: string | null;
+    };
 
 const blank = (country: string): CheckoutAddress => ({
   name: "",
@@ -56,6 +69,17 @@ const drafted = (draft: FormData, prefix: "billing" | "shipping"): CheckoutAddre
   };
 };
 
+const choices = (draft: FormData): ReviewChoices => {
+  const ticked = (name: string) => draft.get(name) === "1";
+  return {
+    acceptTerms: ticked("accept_terms"),
+    acceptWithdrawal: ticked("accept_withdrawal"),
+    emailMarketing: ticked("email_marketing"),
+    reviewInvites: ticked("review_invites"),
+    notes: String(draft.get("notes") ?? ""),
+  };
+};
+
 const saved: Record<DetailsStep, (view: CheckoutView) => boolean> = {
   contact: (view) => Boolean(view.email),
   addresses: (view) => view.billing_address != null,
@@ -73,10 +97,12 @@ export function checkoutPage(view: CheckoutView, url: URL, submitted?: FormData)
   const draft = edit ? submitted : undefined;
   const open = openStep(view, edit, draft !== undefined);
   const code = url.searchParams.get("error");
+  if (open === null && submitted && !edit)
+    return { kind: "review", problem: null, choices: choices(submitted), refusal: code };
   const known = code === null ? null : (Object.hasOwn(PROBLEMS, code) && PROBLEMS[code]) || FAILED;
   const problem: Problem | null =
     known && known.step !== open ? { step: null, field: null, message: known.message } : known;
-  if (open === null) return { kind: "review", problem };
+  if (open === null) return { kind: "review", problem, choices: null, refusal: null };
   const canCancel = saved[open](view);
   if (open === "contact")
     return {

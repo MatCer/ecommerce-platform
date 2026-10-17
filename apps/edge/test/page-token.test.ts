@@ -13,8 +13,6 @@ import { fakeApi, site } from "./fixtures.ts";
 const SECRET = "test-page-token-secret-0123456789abcdef";
 const CAP = "sameorigintoken_00000000000000000042";
 const OTHER_CAP = "sameorigintoken_00000000000000000043";
-const NOTE_CAP = "sameorigintoken_00000000000000000099";
-const PLACE_ORDER_API = "http://api.test/storefront/v1/checkout/place-order";
 const reference = (secret: string, host: string, capability: string) =>
   createHmac("sha256", secret).update(`pt1|${host}|${capability}`).digest("base64url");
 
@@ -98,7 +96,6 @@ const WRITE = { origin: FRESH, "content-type": "application/json" };
 let api: ReturnType<typeof fakeApi>;
 let gw: Gateway;
 let noSecret: Gateway;
-let answers: Record<string, () => Response>;
 
 const call = (
   gateway: Gateway,
@@ -130,10 +127,7 @@ beforeAll(async () => {
     mediaOrigin: "http://media.test",
     scheme: "http" as const,
     purgeToken: "purge-token-0123456789abcdef",
-    upstream: async (req: Request) => {
-      const res = await api.fn(req);
-      return answers[req.url]?.() ?? res;
-    },
+    upstream: api.fn,
   };
   gw = createGateway({ ...options, pageTokenSecret: SECRET });
   noSecret = createGateway(options);
@@ -141,7 +135,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   api.calls.length = 0;
-  answers = {};
 });
 
 afterAll(async () => {
@@ -235,15 +228,7 @@ describe("the same-origin checkout API takes the page token of the request's own
     expect(JSON.stringify(api.calls), "the API never receives the token").not.toContain(TOKEN);
   });
 
-  test("the placement is forwarded once and its answer leaves the capability behind", async () => {
-    answers[PLACE_ORDER_API] = () =>
-      Response.json(
-        { order_id: "o1", number: "100001", confirmation_url: `/o/${"a".repeat(64)}` },
-        {
-          status: 201,
-          headers: { "x-cart-token": NOTE_CAP, "set-cookie": `__Host-Http-cart=${NOTE_CAP}` },
-        },
-      );
+  test("the shop's JSON place-order is closed", async () => {
     const body = JSON.stringify({ version: 3, total_minor: 10000, notes: "Zvonit dvakrát" });
     const res = await call(
       gw,
@@ -251,19 +236,10 @@ describe("the same-origin checkout API takes the page token of the request's own
       { ...WRITE, cookie: COOKIE, "x-page-token": TOKEN, "idempotency-key": "key-1" },
       { method: "POST", body },
     );
-    expect(res.status).toBe(201);
-    expect(res.headers.get("x-cart-token")).toBeNull();
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ code: "not_found" });
     expect(res.headers.getSetCookie()).toEqual([]);
-    const placed = await res.text();
-    expect(JSON.parse(placed)).toMatchObject({ order_id: "o1", number: "100001" });
-    expect(placed).not.toContain(NOTE_CAP);
-    expect(api.calls).toHaveLength(1);
-    expect(api.calls[0]).toMatchObject({
-      method: "POST",
-      url: PLACE_ORDER_API,
-      body,
-      headers: { "x-cart-token": CAP, "idempotency-key": "key-1", "x-shop-origin": FRESH },
-    });
+    expect(api.calls, "nothing reaches the API").toEqual([]);
   });
 
   test("a write with a valid token still needs the shop's own Origin", async () => {
@@ -282,6 +258,7 @@ describe("the same-origin checkout API takes the page token of the request's own
     ["PUT", "/contact"],
     ["PUT", "/addresses"],
     ["POST", "/details"],
+    ["POST", "/place-order"],
     ["GET", "/order"],
   ])("%s %s is not offered on the shop, even with a valid token", async (method, op) => {
     const res = await call(

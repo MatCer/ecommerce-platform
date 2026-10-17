@@ -12,8 +12,8 @@ use axum::response::{IntoResponse, Response};
 use chrono::Utc;
 use commerce::cart;
 use commerce::checkout::{
-    self, AddressesInput, CheckoutView, ContactInput, Details, PaymentInput, PlaceOrderInput,
-    Placer, ShippingInput,
+    self, AddressesInput, CheckoutReceipt, CheckoutView, ContactInput, Details, PaymentInput,
+    PlaceOrderInput, Placer, ShippingInput,
 };
 use commerce::checkout_access;
 use commerce::customers;
@@ -39,6 +39,7 @@ use crate::admin::{IdempotencyHeader, REPLAYED, idempotency_key, parse_json};
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(get_checkout))
+        .routes(routes!(get_order))
         .routes(routes!(put_contact))
         .routes(routes!(put_addresses))
         .routes(routes!(post_details))
@@ -89,6 +90,33 @@ async fn get_checkout(
     headers: HeaderMap,
 ) -> Result<Response, Error> {
     with_checkout(&s, &shopper, &headers, async |_, _, _| Ok(())).await
+}
+
+/// C7, same-origin mode: the receipt of the order placed from the checkout behind the
+/// capability, or behind the one its note placement replaced (a browser whose placement
+/// answer was lost). Reads only: no payment start, no replay, no capability.
+#[utoipa::path(
+    get,
+    path = "/storefront/v1/checkout/order",
+    tag = "storefront",
+    params(StorefrontHeaders, CartHeader),
+    responses(
+        (status = 200, body = CheckoutReceipt),
+        (status = 403, description = "shop_origin_required | shop_origin_mismatch", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, description = "No converted checkout behind the capability", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn get_order(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Response, Error> {
+    let token = cart_token(&headers)?;
+    let receipt = with_ctx(&s, &shopper, async |tx, ctx| {
+        checkout::receipt(tx, ctx, &token).await
+    })
+    .await?;
+    Ok(no_store(Json(receipt).into_response()))
 }
 
 #[utoipa::path(

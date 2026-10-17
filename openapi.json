@@ -16933,6 +16933,88 @@
         }
       }
     },
+    "/storefront/v1/checkout/order": {
+      "get": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "C7, same-origin mode: the receipt of the order placed from the checkout behind the\ncapability, or behind the one its note placement replaced (a browser whose placement\nanswer was lost). Reads only: no payment start, no replay, no capability.",
+        "operationId": "get_order",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "shop_origin_required | shop_origin_mismatch",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No converted checkout behind the capability",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/checkout/payment": {
       "put": {
         "tags": [
@@ -25616,6 +25698,27 @@
           "origin": {
             "type": "string",
             "description": "As browsers serialize it: scheme, host and a non-default port (`https://shop.example`)."
+          }
+        }
+      },
+      "CheckoutReceipt": {
+        "type": "object",
+        "required": [
+          "number",
+          "email",
+          "payment_due"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The checkout's own confirmation email, frozen at placement."
+          },
+          "number": {
+            "type": "string"
+          },
+          "payment_due": {
+            "type": "boolean",
+            "description": "An online payment (Stripe, the fake gateway) is not completed yet."
           }
         }
       },
