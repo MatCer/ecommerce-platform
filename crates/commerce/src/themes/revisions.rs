@@ -1021,7 +1021,8 @@ pub struct Maintenance {
 
 /// Fails builds that have not moved for [`STUCK_AFTER_MINUTES`] and AI runs whose worker died
 /// (no progress for [`AI_RUN_STUCK_AFTER_MINUTES`]; they would block new runs), releases artifacts of failed
-/// and surplus ready revisions after [`GC_AFTER_DAYS`], then deletes theme artifacts no
+/// and surplus ready revisions after [`GC_AFTER_DAYS`] (except the theme arm of a running
+/// experiment, SHOP-100), then deletes theme artifacts no
 /// revision or channel references any more (published and superseded revisions keep theirs:
 /// rollback targets and retained `/_astro/*` assets, A22).
 pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, Error> {
@@ -1071,7 +1072,9 @@ pub async fn maintenance(db: &PgPool, storage: &Storage) -> Result<Maintenance, 
                AND (r.status = 'failed'
                     OR (r.status = 'ready' AND r.id NOT IN (
                         SELECT id FROM theme_revisions WHERE status = 'ready'
-                        ORDER BY number DESC LIMIT $2)))",
+                        ORDER BY number DESC LIMIT $2)))
+               AND r.id NOT IN (SELECT theme_revision_id FROM experiments
+                                WHERE status = 'running' AND theme_revision_id IS NOT NULL)",
             GC_AFTER_DAYS,
             KEEP_READY,
             expired

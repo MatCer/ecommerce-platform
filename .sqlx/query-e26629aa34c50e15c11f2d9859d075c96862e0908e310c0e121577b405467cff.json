@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT e.id, e.version, e.name, e.arms, e.theme_arm, r.artifact_id AS \"theme_artifact?\"\n           FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id\n           WHERE e.status = 'running'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "arms",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "arms"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "theme_arm",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "theme_arm"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "theme_artifact?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "artifact_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "e26629aa34c50e15c11f2d9859d075c96862e0908e310c0e121577b405467cff"
+}
