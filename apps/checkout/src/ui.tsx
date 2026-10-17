@@ -58,9 +58,11 @@ export const controlClass =
   "placeholder:text-faint-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground " +
   "aria-[invalid=true]:border-error-600 data-[invalid]:border-error-600";
 
-const labelClass = "text-xs font-medium text-muted-foreground";
+export const labelClass = "text-xs font-medium text-muted-foreground";
 const errorClass = "text-xs font-medium text-error-700";
-const hintClass = "text-xs text-faint-foreground";
+export const hintClass = "text-xs text-faint-foreground";
+export const sectionClass = "rounded-lg border border-border bg-card p-4 sm:p-5";
+export const headingClass = "font-display text-lg font-bold";
 
 export interface TextFieldProps {
   label: string;

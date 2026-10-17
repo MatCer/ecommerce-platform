@@ -1,18 +1,42 @@
 import { expect, test } from "@playwright/test";
 import { signInOwner, sql } from "./admin/support";
-import { FRESH, FRESH_HTTPS } from "./checkout/support";
+import { FRESH, FRESH_HTTPS, FRESH_SK, FRESH_SK_HTTPS } from "./checkout/support";
 import { rateHeaders } from "./rate-client";
 
 test("seed the same-origin test origins of the demo shop", () => {
-  const { hostname, port } = new URL(FRESH);
-  const httpsPort = new URL(FRESH_HTTPS).port;
+  const markets = [
+    {
+      shop: FRESH,
+      https: FRESH_HTTPS,
+      market: `SELECT m.id FROM markets m JOIN platform.tenants t ON t.id = m.tenant_id
+               WHERE t.slug = 'demo' AND m.is_default`,
+    },
+    {
+      shop: FRESH_SK,
+      https: FRESH_SK_HTTPS,
+      market: "SELECT market_id FROM platform.domains WHERE hostname = 'demo-sk.localhost'",
+    },
+  ];
+  for (const { shop, https, market } of markets) seedSameOrigin(shop, https, market);
+  expect(
+    sql(`SELECT string_agg(origin || ' ' || mode_generation, ',' ORDER BY origin COLLATE "C")
+         FROM platform.checkout_origins WHERE mode = 'same_origin'`),
+  ).toBe(
+    [FRESH, FRESH_HTTPS, FRESH_SK, FRESH_SK_HTTPS]
+      .sort()
+      .map((origin) => `${origin} 1`)
+      .join(","),
+  );
+});
+
+function seedSameOrigin(shop: string, https: string, market: string) {
+  const { hostname, port } = new URL(shop);
+  const httpsPort = new URL(https).port;
   sql(`INSERT INTO platform.hostname_claims (hostname, tenant_id, platform_issued)
          SELECT '${hostname}', id, true FROM platform.tenants WHERE slug = 'demo'
          ON CONFLICT (hostname) DO NOTHING;
        INSERT INTO platform.domains (hostname, tenant_id, market_id, verified_at)
-         SELECT '${hostname}', m.tenant_id, m.id, now()
-         FROM markets m JOIN platform.tenants t ON t.id = m.tenant_id
-         WHERE t.slug = 'demo' AND m.is_default
+         SELECT '${hostname}', m.tenant_id, m.id, now() FROM markets m WHERE m.id = (${market})
          ON CONFLICT (hostname) DO NOTHING;
        INSERT INTO platform.checkout_origins
            (scheme, hostname, port, tenant_id, market_id, history, mode)
@@ -23,11 +47,7 @@ test("seed the same-origin test origins of the demo shop", () => {
                 AS s (scheme, port)
          WHERE hostname = '${hostname}'
          ON CONFLICT (origin) DO UPDATE SET history = EXCLUDED.history, mode = EXCLUDED.mode;`);
-  expect(
-    sql(`SELECT string_agg(origin || ' ' || mode_generation, ',' ORDER BY origin)
-         FROM platform.checkout_origins WHERE mode = 'same_origin'`),
-  ).toBe(`${FRESH} 1,${FRESH_HTTPS} 1`);
-});
+}
 
 test("provision stock for concurrent checkout fixtures", async ({ browser }) => {
   // Carts do not reserve stock. Parallel specs can all add the last seeded unit,

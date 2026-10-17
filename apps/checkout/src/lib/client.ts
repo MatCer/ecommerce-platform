@@ -29,6 +29,10 @@ export async function call<T = unknown>(
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    if (pageToken && (res.status === 403 || res.status === 404)) {
+      location.assign("/checkout?error=stale_page");
+      return { ok: false, status: res.status, data: null, code: "stale_page" };
+    }
     const text = await res.text();
     let data: unknown = null;
     try {

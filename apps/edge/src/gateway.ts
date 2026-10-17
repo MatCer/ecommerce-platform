@@ -160,6 +160,7 @@ const CHECKOUT_OPS: { method: string; path: RegExp }[] = [
 const SAME_ORIGIN_CHECKOUT_OPS: { method: string; path: RegExp }[] = [
   { method: "GET", path: /^$/ },
   { method: "PUT", path: /^\/(shipping|payment)$/ },
+  { method: "POST", path: /^\/place-order$/ },
 ];
 
 /** The order page's operations (`/_p/orders/<order token>/*`, A4, A10). */
@@ -453,6 +454,7 @@ export function createGateway(opts: GatewayOptions) {
       scope?: string;
       experiment?: Assignment | undefined;
       pageToken?: string | undefined;
+      form?: URLSearchParams | undefined;
     } = {},
   ) {
     const ctxId = registry.open(site, artifactId, {
@@ -467,6 +469,10 @@ export function createGateway(opts: GatewayOptions) {
       if (extra.pageToken) headers.set(WORKER_PAGE_TOKEN_HEADER, extra.pageToken);
       if (extra.experiment && site.experiment)
         headers.set(ARM_HEADER, `${site.experiment.name}:${extra.experiment.arm}`);
+      if (extra.form) {
+        headers.set("content-type", "application/x-www-form-urlencoded");
+        headers.set("origin", url.origin);
+      }
       // One deadline and one byte cap for headers *and* body: a worker must not hold a request
       // context (or Node memory) open with a never-ending stream.
       const abort = new AbortController();
@@ -474,7 +480,12 @@ export function createGateway(opts: GatewayOptions) {
         (async () => {
           const res = await pool.fetch(
             artifactId,
-            new Request(url, { method: "GET", headers }),
+            new Request(
+              url,
+              extra.form
+                ? { method: "POST", headers, body: extra.form.toString() }
+                : { method: "GET", headers },
+            ),
             extra.scope,
           );
           return { res, body: await readCapped(res.body, MAX_RENDER_BYTES, abort.signal) };
@@ -1187,7 +1198,7 @@ ${
   async function checkoutForm(
     site: SameOriginSite,
     req: Request,
-    build: CheckoutForm,
+    { step, build }: CheckoutForm,
   ): Promise<Response> {
     const form = await navigationForm(site, req);
     if (form instanceof Response) return form;
@@ -1220,12 +1231,20 @@ ${
         status: 303,
         headers: { location: "/checkout", "set-cookie": sameOriginCartCookie(rotated) },
       });
-    const code =
-      typeof problemCode === "string" && /^[a-z_]{1,40}$/.test(problemCode)
-        ? problemCode
-        : "failed";
+    if (res.status === 422) {
+      const code =
+        typeof problemCode === "string" && /^[a-z_]{1,40}$/.test(problemCode)
+          ? problemCode
+          : "failed";
+      const target = new URL(`/checkout?edit=${step}&error=${code}`, site.shopOrigin);
+      const page = await renderCheckout(site, req, target, form);
+      return new Response(page.body, {
+        status: page.ok ? 422 : page.status,
+        headers: page.headers,
+      });
+    }
     const location =
-      res.status === 404 || res.status === 409 ? "/checkout" : `/checkout?error=${code}`;
+      res.status === 404 || res.status === 409 ? "/checkout" : "/checkout?error=failed";
     return new Response(null, { status: 303, headers: { location } });
   }
 
@@ -1724,6 +1743,15 @@ ${
     if (url.pathname !== "/checkout") return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
+    return renderCheckout(site, req, url);
+  }
+
+  async function renderCheckout(
+    site: SameOriginSite,
+    req: Request,
+    url: URL,
+    form?: URLSearchParams,
+  ): Promise<Response> {
     const artifact = site.checkout_artifact ?? opts.checkoutArtifact;
     if (!artifact || !opts.pageTokenSecret)
       return text(503, "Checkout is not available yet", { "retry-after": "60" });
@@ -1734,7 +1762,11 @@ ${
       artifact,
       normalizeUrl(new URL(`${url.pathname}${url.search}`, site.shopOrigin)),
       site,
-      { cartToken, pageToken: pageToken(opts.pageTokenSecret, site.shopOrigin, cartToken) },
+      {
+        cartToken,
+        pageToken: pageToken(opts.pageTokenSecret, site.shopOrigin, cartToken),
+        form,
+      },
     );
     const csp = contentSecurityPolicy("checkout", {
       scriptHashes: m.csp.script_hashes,

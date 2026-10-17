@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { createGateway, type Gateway } from "../src/gateway.ts";
 import { StaticResolver } from "../src/sites.ts";
-import { fakeApi, site } from "./fixtures.ts";
+import { buildArtifact, fakeApi, platformCheckoutWorker, site } from "./fixtures.ts";
 
 const SECRET = "test-page-token-secret-0123456789abcdef";
 const FRESH = "http://fresh.localhost:8280";
@@ -79,6 +79,9 @@ async function expectStale(res: Response) {
   const html = await res.text();
   expect(html, "one link back to the checkout").toContain('href="/checkout"');
   for (const secret of [TOKEN, CAP, NEW_CAP]) expect(html).not.toContain(secret);
+  expect(html, "reloads itself by navigation").toContain(
+    '<meta http-equiv="refresh" content="0;url=/checkout?error=stale_page">',
+  );
   expect(res.headers.getSetCookie(), "no cookie on a stale page").toEqual([]);
   expect(api.calls, "no API call on a stale page").toEqual([]);
   expectPlatformHeaders(res, "stale page");
@@ -96,8 +99,13 @@ async function expectRotated(res: Response) {
 
 beforeAll(async () => {
   api = fakeApi();
+  const artifactRoot = await mkdtemp(path.join(tmpdir(), "shop120-forms-"));
+  const checkout = await buildArtifact(artifactRoot, "checkout", platformCheckoutWorker, {
+    "_checkout/0123456789abcdef/app.js": "",
+  });
   const options = {
-    artifactRoot: await mkdtemp(path.join(tmpdir(), "shop120-forms-")),
+    artifactRoot,
+    checkoutArtifact: checkout.id,
     resolver: new StaticResolver({
       "demo.localhost": site(),
       "fresh.localhost": site({
@@ -334,12 +342,90 @@ describe("a form whose page token does not match the request's capability is sta
   });
 });
 
-describe("the API answer becomes a redirect back to the checkout, never forwarded", () => {
-  const problem = (status: number, code: unknown) =>
-    Response.json(
-      { code, detail: "jana@example.cz" },
-      { status, headers: { "x-cart-token": NEW_CAP } },
+const problem = (status: number, code: unknown) =>
+  Response.json(
+    { code, detail: "jana@example.cz" },
+    { status, headers: { "x-cart-token": NEW_CAP } },
+  );
+
+describe("a draft the API refuses comes back as the checkout with what was typed (422)", () => {
+  const contact = new URLSearchParams([
+    ["_pt", TOKEN],
+    ["email", " Eva@Example.test "],
+    ["phone", "abc <b>"],
+  ]).toString();
+  const addresses = new URLSearchParams([
+    ["_pt", TOKEN],
+    ["billing_name", "Jana"],
+    ["billing_street", "Dlouhá 1"],
+    ["ship_elsewhere", "1"],
+    ["shipping_street", ""],
+  ]).toString();
+  const seenByWorker = (html: string) =>
+    JSON.parse(/<pre id="request">(.*?)<\/pre>/s.exec(html)?.[1] ?? "null") as {
+      method: string;
+      url: string;
+      origin: string | null;
+      type: string | null;
+      form: [string, string][];
+    } | null;
+
+  test.each([
+    ["contact", "/checkout/contact", contact, () => problem(422, "invalid_phone"), "invalid_phone"],
+    [
+      "addresses",
+      "/checkout/addresses",
+      addresses,
+      () => problem(422, "invalid_address"),
+      "invalid_address",
+    ],
+    ["contact", "/checkout/contact", contact, () => problem(422, "<b>"), "failed"],
+    ["contact", "/checkout/contact", contact, () => problem(422, "a".repeat(41)), "failed"],
+    [
+      "addresses",
+      "/checkout/addresses",
+      addresses,
+      () => new Response("nope", { status: 422 }),
+      "failed",
+    ],
+  ])("%s: 422 at %s, rendered with the draft", async (step, route, body, answer, code) => {
+    answers[DETAILS_API] = answer;
+    const res = await post(route, body);
+    expect(res.status).toBe(422);
+    expect(res.headers.get("location"), "no redirect").toBeNull();
+    expect(res.headers.getSetCookie(), "no cookie: nothing rotated").toEqual([]);
+    expect(res.headers.get("x-cart-token")).toBeNull();
+    expectPlatformHeaders(res, "422");
+    const csp = res.headers.get("content-security-policy") ?? "";
+    expect(csp, "the checkout CSP").toContain("connect-src 'self' https://api.stripe.com");
+    expect(csp).toContain("form-action 'self'");
+    const html = await res.text();
+    expect(seenByWorker(html)).toEqual({
+      method: "POST",
+      url: `${FRESH}/checkout?edit=${step}&error=${code}`,
+      origin: FRESH,
+      type: "application/x-www-form-urlencoded",
+      form: [...new URLSearchParams(body)],
+    });
+    expect(html, "the token of the request's own capability").toContain(
+      `<meta name="page-token" content="${TOKEN}">`,
     );
+    const read = api.calls.find((c) => c.url === "http://api.test/storefront/v1/checkout");
+    expect(read?.headers["x-cart-token"]).toBe(CAP);
+    expect(detailCalls()).toHaveLength(1);
+  });
+
+  test("a render that fails keeps the worker's status and the platform headers", async () => {
+    answers[DETAILS_API] = () => problem(422, "invalid_email");
+    const res = await post("/checkout/contact", `${CONTACT}&throw=1`);
+    expect(res.status).toBe(500);
+    expect(res.headers.get("location")).toBeNull();
+    expectPlatformHeaders(res, "500");
+    expect(await res.text()).not.toContain(TOKEN);
+  });
+});
+
+describe("the API answer becomes a redirect back to the checkout, never forwarded", () => {
   const rotated =
     (headers: Record<string, string>, status = 204) =>
     () =>
@@ -348,10 +434,6 @@ describe("the API answer becomes a redirect back to the checkout, never forwarde
   test.each([
     ["404", "/checkout", () => problem(404, "not_found")],
     ["409", "/checkout", () => problem(409, "checkout_mode_changed")],
-    ["422 with a code", "/checkout?error=invalid_email", () => problem(422, "invalid_email")],
-    ["422 with markup for a code", "/checkout?error=failed", () => problem(422, "<b>")],
-    ["422 with a 41-letter code", "/checkout?error=failed", () => problem(422, "a".repeat(41))],
-    ["422 without JSON", "/checkout?error=failed", () => new Response("nope", { status: 422 })],
     ["500", "/checkout?error=failed", () => problem(500, "internal")],
     ["200 with a capability", "/checkout?error=failed", rotated({ "x-cart-token": NEW_CAP }, 200)],
     ["204 without a capability", "/checkout?error=failed", rotated({})],

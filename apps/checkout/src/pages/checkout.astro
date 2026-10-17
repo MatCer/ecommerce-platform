@@ -1,30 +1,118 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import OpenCheckout from "../components/OpenCheckout.astro";
+import AddressesForm from "../components/AddressesForm.astro";
+import ContactForm from "../components/ContactForm.astro";
+import CheckoutForm from "../islands/CheckoutForm";
+import DetailsSummary from "../islands/DetailsSummary";
+import SubmitOnce from "../islands/SubmitOnce";
 import Checkout from "../layouts/Checkout.astro";
-import { checkoutApi, pageToken, shopUrl } from "../lib/api";
+import { checkoutApi, messages, pageToken, shopUrl } from "../lib/api";
+import { checkoutPage } from "../lib/checkout-steps";
 import { Button } from "../ui.tsx";
 
 const api = checkoutApi(Astro.request);
 const [shop, view] = await Promise.all([api.shop(), api.checkout()]);
 const open = view !== null && view.cart.lines.length > 0;
 const m = shop?.messages ?? {};
+const locale = shop?.locale ?? "cs";
 const back = shopUrl(Astro.url);
+const token = open ? pageToken(Astro.request) : undefined;
+const draft = Astro.request.method === "POST" ? await Astro.request.formData() : undefined;
+const page = open ? checkoutPage(view, Astro.url, draft) : null;
+const notice = page?.problem?.step === null ? page.problem : null;
 ---
 
 <Checkout
   title={t(m, "checkout.title")}
   shopName={shop?.name ?? ""}
   shopUrl={back}
-  lang={shop?.locale ?? "cs"}
+  lang={locale}
   accountLabel={t(m, "account.nav")}
   wide
-  pageToken={open ? pageToken(Astro.request) : undefined}
+  pageToken={token}
+  platformLinks={false}
 >
   <h1 class="mb-4 font-display text-2xl font-bold">{t(m, "checkout.title")}</h1>
   {
-    open ? (
-      <OpenCheckout shop={shop} view={view} shopUrl={back} />
+    notice &&
+      (notice.message === "checkout.stale_page" ? (
+        <p role="status" class="mb-4 rounded-md bg-identity-wash p-3 text-sm">
+          {t(m, notice.message)}
+        </p>
+      ) : (
+        <p role="alert" class="mb-4 rounded-md border border-sale p-3 text-sm text-sale">
+          {t(m, notice.message)}
+        </p>
+      ))
+  }
+  {
+    view && page ? (
+      page.kind === "review" ? (
+        <CheckoutForm
+          client:load
+          mode="same-origin"
+          m={messages(
+            m,
+            "checkout.",
+            "cart.",
+            "address.",
+            "account.email",
+            "account.invalid_email",
+            "legal.terms",
+            "consent.email_marketing_hint",
+            "order.thanks",
+            "order.title",
+          )}
+          locale={locale}
+          initial={view}
+          shopUrl={back}
+        />
+      ) : (
+        <div class="grid max-w-2xl gap-5">
+          {page.kind === "addresses" && view.email && (
+            <DetailsSummary
+              m={m}
+              locale={locale}
+              view={view}
+              step="contact"
+              editHref="/checkout?edit=contact"
+            />
+          )}
+          {page.kind === "contact" ? (
+            <ContactForm
+              m={m}
+              pageToken={token ?? ""}
+              values={page.values}
+              problem={page.problem}
+              canCancel={page.canCancel}
+            />
+          ) : (
+            <AddressesForm
+              m={m}
+              locale={locale}
+              countries={view.ship_to_countries}
+              pageToken={token ?? ""}
+              values={page.values}
+              problem={page.problem}
+              canCancel={page.canCancel}
+            />
+          )}
+          {page.kind === "contact" && view.billing_address && (
+            <DetailsSummary
+              m={m}
+              locale={locale}
+              view={view}
+              step="addresses"
+              editHref="/checkout?edit=addresses"
+            />
+          )}
+          <p class="flex justify-between gap-2 rounded-lg border border-border bg-card p-4 font-bold">
+            <span>{t(m, "cart.total")}</span>
+            <span class="tabular-nums">{view.totals.total.formatted}</span>
+          </p>
+          <SubmitOnce client:load />
+        </div>
+      )
     ) : (
       <div class="grid max-w-xl justify-items-start gap-4">
         <p role="status">{t(m, "checkout.restarted")}</p>

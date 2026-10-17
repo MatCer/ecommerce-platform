@@ -5,9 +5,12 @@ import type {
   CheckoutView,
   PaymentMethodKind,
   PickupPoint,
+  PlacedOrder,
+  PlaceOrderInput,
   ShippingOption,
 } from "@platform/storefront-sdk/types";
 import { createSignal, For, type JSX, onMount, Show } from "solid-js";
+import { regionName, reviewFacts } from "../lib/checkout-steps";
 import { call } from "../lib/client";
 import { loadPacketa, toPickupPoint } from "../lib/packeta";
 import {
@@ -17,8 +20,8 @@ import {
   sendPlacement,
   unknownOutcome,
 } from "../lib/placement";
-import { Button, Checkbox, SelectField, TextField } from "../ui.tsx";
-
+import { Button, Checkbox, headingClass, SelectField, sectionClass, TextField } from "../ui.tsx";
+import DetailsSummary from "./DetailsSummary";
 import HydratedControls from "./HydratedControls";
 
 type M = Record<string, string>;
@@ -88,19 +91,26 @@ const newKey = () =>
         b.toString(16).padStart(2, "0"),
       ).join("");
 
-export default function CheckoutForm(props: {
-  m: M;
-  locale: string;
-  initial: CheckoutView;
-  customerEmail?: string | undefined;
-  saved: Address[];
-  shopUrl: string;
-}) {
+interface Placed {
+  number: string;
+  email: string;
+  unpaid: boolean;
+}
+
+export default function CheckoutForm(
+  props: { m: M; locale: string; initial: CheckoutView; shopUrl: string } & (
+    | { mode: "isolated"; customerEmail?: string | undefined; saved: Address[] }
+    | { mode: "same-origin" }
+  ),
+) {
   const m = props.m;
+  const isolated = props.mode === "isolated";
+  const saved = props.mode === "isolated" ? props.saved : [];
+  const customerEmail = props.mode === "isolated" ? props.customerEmail : undefined;
   const [view, setView] = createSignal(props.initial);
   const firstCountry = () => props.initial.ship_to_countries[0] ?? "CZ";
-  const savedDefault = props.saved.find((a) => a.is_default) ?? props.saved[0];
-  const [email, setEmail] = createSignal(props.initial.email ?? props.customerEmail ?? "");
+  const savedDefault = saved.find((a) => a.is_default) ?? saved[0];
+  const [email, setEmail] = createSignal(props.initial.email ?? customerEmail ?? "");
   const [phone, setPhone] = createSignal(props.initial.phone ?? "");
   const [billing, setBilling] = createSignal<CheckoutAddress>(
     props.initial.billing_address ??
@@ -124,22 +134,17 @@ export default function CheckoutForm(props: {
   const [error, setError] = createSignal("");
   const [notice, setNotice] = createSignal("");
   const [touched, setTouched] = createSignal(false);
+  const [placed, setPlaced] = createSignal<Placed | null>(null);
   /** A placement whose outcome is unknown, replayed as is on the next click. */
   // An open cart means no order came of an earlier placement: nothing to resume (a converted
   // cart shows the empty page, whose ResumePlacement replays a kept placement).
   let pending: Placement | null = null;
-  onMount(forgetPlacement);
+  if (isolated) onMount(forgetPlacement);
 
-  const regions = (() => {
-    try {
-      return new Intl.DisplayNames([props.locale], { type: "region" });
-    } catch {
-      return null;
-    }
-  })();
-  const countries = () =>
-    view().ship_to_countries.map((c) => ({ value: c, label: regions?.of(c) ?? c }));
+  const region = regionName(props.locale);
+  const countries = () => view().ship_to_countries.map((c) => ({ value: c, label: region(c) }));
   const shipCountry = () => (elsewhere() ? delivery() : billing()).country;
+  const facts = () => reviewFacts(view(), region);
   const selectedMethod = () =>
     view().shipping_methods.find((s) => s.id === view().shipping_method_id) ?? null;
 
@@ -153,7 +158,7 @@ export default function CheckoutForm(props: {
       setView(r.data);
       return true;
     }
-    setError(checkoutProblem(m, r.code));
+    if (r.code !== "stale_page") setError(checkoutProblem(m, r.code));
     return false;
   }
 
@@ -214,14 +219,23 @@ export default function CheckoutForm(props: {
 
   /** Sends a placement; an unknown outcome keeps it for an exact replay (A12). */
   async function submit(p: Placement) {
-    const r = await sendPlacement(p);
+    const r = isolated
+      ? await sendPlacement(p)
+      : await call<PlacedOrder>("POST", "/_p/checkout/place-order", p.body, {
+          "idempotency-key": p.key,
+        });
     if (r.ok && r.data) {
-      location.assign(nextUrl(r.data));
+      if (isolated) location.assign(nextUrl(r.data));
+      else
+        setPlaced({
+          number: r.data.number,
+          email: view().email ?? "",
+          unpaid: r.data.payment.action?.type !== "none",
+        });
       return;
     }
+    if (r.code === "stale_page") return;
     setPlacing(false);
-    // Lost response, gateway error or still running: the order may exist. The next click (or
-    // a reload) replays the same key and body; no step is saved before it, so nothing changes.
     pending = unknownOutcome(r) ? p : null;
     setError(checkoutProblem(m, r.code));
     if (r.code === "cart_changed" || r.code === "price_changed") {
@@ -240,12 +254,14 @@ export default function CheckoutForm(props: {
       return submit(pending);
     }
     const v = view();
-    if (!emailValid() || !addressesValid()) return setError(t(m, "checkout.incomplete"));
+    if (isolated && (!emailValid() || !addressesValid()))
+      return setError(t(m, "checkout.incomplete"));
     if (!v.shipping_method_id || !v.payment_method) return setError(t(m, "checkout.incomplete"));
     if (pendingPickup() || (selectedMethod()?.needs_pickup_point && !v.pickup_point))
       return setError(t(m, "checkout.pickup_missing"));
     if (!terms() || !withdrawal()) return setError(t(m, "checkout.required_legal"));
     setPlacing(true);
+    if (!isolated) return submit({ key: newKey(), at: Date.now(), body: placement(v) });
     const shown = v.totals.total.amount_minor;
     const ok =
       (await put("contact", { email: email().trim(), phone: phone().trim() || null })) &&
@@ -260,23 +276,21 @@ export default function CheckoutForm(props: {
       setPlacing(false);
       return setNotice(t(m, "checkout.price_updated"));
     }
-    await submit({
-      key: newKey(),
-      at: Date.now(),
-      body: {
-        version: now.cart.version,
-        total_minor: now.totals.total.amount_minor,
-        accept_terms: true,
-        accept_withdrawal: true,
-        email_marketing: marketing(),
-        review_invites: reviews(),
-        notes: note().trim() || null,
-      },
-    });
+    await submit({ key: newKey(), at: Date.now(), body: placement(now) });
   }
 
-  const section = "rounded-lg border border-border bg-card p-4 sm:p-5";
-  const h2 = "mb-3 font-display text-lg font-bold";
+  const placement = (v: CheckoutView): PlaceOrderInput => ({
+    version: v.cart.version,
+    total_minor: v.totals.total.amount_minor,
+    accept_terms: true,
+    accept_withdrawal: true,
+    email_marketing: marketing(),
+    review_invites: reviews(),
+    notes: note().trim() || null,
+  });
+
+  const section = sectionClass;
+  const h2 = `mb-3 ${headingClass}`;
   const option =
     "flex cursor-pointer items-start gap-3 rounded-md border border-border p-3 has-[:checked]:border-identity has-[:checked]:bg-identity-wash has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60";
 
@@ -354,89 +368,111 @@ export default function CheckoutForm(props: {
     );
   };
 
-  return (
+  const form = (
     <form noValidate onSubmit={place}>
       <HydratedControls class="grid gap-6 md:grid-cols-[1fr_20rem] md:items-start">
         <div class="grid min-w-0 gap-5">
-          <section aria-labelledby="co-contact" class={section}>
-            <h2 id="co-contact" class={h2}>
-              1. {t(m, "checkout.contact")}
-            </h2>
-            <Show
-              when={props.customerEmail}
-              fallback={
-                <p class="mb-3 text-sm">
-                  <a href="/account?next=/" class="text-identity-ink underline">
-                    {t(m, "checkout.have_account")}
-                  </a>
+          <Show
+            when={isolated}
+            fallback={
+              <>
+                <DetailsSummary
+                  m={m}
+                  locale={props.locale}
+                  view={view()}
+                  step="contact"
+                  editHref="/checkout?edit=contact"
+                />
+                <DetailsSummary
+                  m={m}
+                  locale={props.locale}
+                  view={view()}
+                  step="addresses"
+                  editHref="/checkout?edit=addresses"
+                />
+              </>
+            }
+          >
+            <section aria-labelledby="co-contact" class={section}>
+              <h2 id="co-contact" class={h2}>
+                1. {t(m, "checkout.contact")}
+              </h2>
+              <Show
+                when={customerEmail}
+                fallback={
+                  <p class="mb-3 text-sm">
+                    <a href="/account?next=/" class="text-identity-ink underline">
+                      {t(m, "checkout.have_account")}
+                    </a>
+                  </p>
+                }
+              >
+                <p class="mb-3 text-sm text-muted-foreground">
+                  {t(m, "checkout.signed_in", { email: customerEmail ?? "" })}
                 </p>
-              }
-            >
-              <p class="mb-3 text-sm text-muted-foreground">
-                {t(m, "checkout.signed_in", { email: props.customerEmail ?? "" })}
-              </p>
-            </Show>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <TextField
-                label={t(m, "account.email")}
-                type="email"
-                name="email"
-                autocomplete="email"
-                required
-                value={email()}
-                onChange={setEmail}
-                description={t(m, "checkout.email_hint")}
-                error={touched() && !emailValid() ? t(m, "account.invalid_email") : undefined}
-              />
-              <TextField
-                label={t(m, "address.phone")}
-                type="tel"
-                name="tel"
-                autocomplete="tel"
-                value={phone()}
-                onChange={setPhone}
-              />
-            </div>
-          </section>
+              </Show>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <TextField
+                  label={t(m, "account.email")}
+                  type="email"
+                  name="email"
+                  autocomplete="email"
+                  required
+                  value={email()}
+                  onChange={setEmail}
+                  description={t(m, "checkout.email_hint")}
+                  error={touched() && !emailValid() ? t(m, "account.invalid_email") : undefined}
+                />
+                <TextField
+                  label={t(m, "address.phone")}
+                  type="tel"
+                  name="tel"
+                  autocomplete="tel"
+                  value={phone()}
+                  onChange={setPhone}
+                />
+              </div>
+            </section>
 
-          <section aria-labelledby="co-address" class={section}>
-            <h2 id="co-address" class={h2}>
-              2. {t(m, "checkout.address")}
-            </h2>
-            <Show when={props.saved.length > 0}>
-              <SelectField
-                class="mb-3"
-                label={t(m, "checkout.saved_address")}
-                value=""
-                options={[
-                  { value: "", label: t(m, "checkout.saved_address_none") },
-                  ...props.saved.map((a) => ({
-                    value: a.id,
-                    label: `${a.name}, ${a.street}, ${a.city}`,
-                  })),
-                ]}
-                onChange={(id) => {
-                  const a = props.saved.find((s) => s.id === id);
-                  if (a) setBilling(fromSaved(a));
-                }}
+            <section aria-labelledby="co-address" class={section}>
+              <h2 id="co-address" class={h2}>
+                2. {t(m, "checkout.address")}
+              </h2>
+              <Show when={saved.length > 0}>
+                <SelectField
+                  class="mb-3"
+                  label={t(m, "checkout.saved_address")}
+                  value=""
+                  options={[
+                    { value: "", label: t(m, "checkout.saved_address_none") },
+                    ...saved.map((a) => ({
+                      value: a.id,
+                      label: `${a.name}, ${a.street}, ${a.city}`,
+                    })),
+                  ]}
+                  onChange={(id) => {
+                    const a = saved.find((s) => s.id === id);
+                    if (a) setBilling(fromSaved(a));
+                  }}
+                />
+              </Show>
+              {addressFields(billing, setBilling, "billing")}
+              <Checkbox
+                class="mt-4"
+                label={t(m, "checkout.ship_elsewhere")}
+                checked={elsewhere()}
+                onChange={setElsewhere}
               />
-            </Show>
-            {addressFields(billing, setBilling, "billing")}
-            <Checkbox
-              class="mt-4"
-              label={t(m, "checkout.ship_elsewhere")}
-              checked={elsewhere()}
-              onChange={setElsewhere}
-            />
-            <Show when={elsewhere()}>
-              <fieldset class="mt-4 border-t border-border pt-4">
-                <legend class="mb-2 text-sm font-semibold">
-                  {t(m, "checkout.delivery_address")}
-                </legend>
-                {addressFields(delivery, setDelivery, "shipping")}
-              </fieldset>
-            </Show>
-          </section>
+              <Show when={elsewhere()}>
+                <fieldset class="mt-4 border-t border-border pt-4">
+                  <legend class="mb-2 text-sm font-semibold">
+                    {t(m, "checkout.delivery_address")}
+                  </legend>
+                  {addressFields(delivery, setDelivery, "shipping")}
+                </fieldset>
+              </Show>
+            </section>
+          </Show>
 
           <section aria-labelledby="co-shipping" class={section}>
             <h2 id="co-shipping" class={h2}>
@@ -669,8 +705,21 @@ export default function CheckoutForm(props: {
               {error()}
             </p>
           </Show>
+          <Show when={!isolated}>
+            <dl id="co-facts" class="mt-3 grid gap-2 border-t border-border pt-3 text-sm">
+              <Fact label={t(m, "checkout.shipping")} value={facts().method} />
+              <Show when={facts().destination}>
+                {(d) => <Fact label={t(m, d().label)} value={d().line} />}
+              </Show>
+              <Fact label={t(m, "checkout.payment")} value={facts().payment} />
+            </dl>
+            <p id="co-confirmation" class="mt-3 text-sm font-semibold [overflow-wrap:anywhere]">
+              {t(m, "checkout.confirmation_to", { email: facts().email ?? "" })}
+            </p>
+          </Show>
           <button
             type="submit"
+            aria-describedby={isolated ? undefined : "co-confirmation co-facts"}
             class="mt-4 h-12 w-full rounded-md bg-buy px-4 font-display font-bold text-on-buy hover:bg-buy-hover disabled:cursor-not-allowed disabled:opacity-60"
             disabled={placing() || saving()}
             aria-busy={placing() || undefined}
@@ -680,6 +729,53 @@ export default function CheckoutForm(props: {
         </aside>
       </HydratedControls>
     </form>
+  );
+
+  return (
+    <Show when={placed()} fallback={form}>
+      {(p) => <Receipt m={m} placed={p()} shopUrl={props.shopUrl} />}
+    </Show>
+  );
+}
+
+function Receipt(props: { m: M; placed: Placed; shopUrl: string }) {
+  let receipt: HTMLElement | undefined;
+  onMount(() => receipt?.focus());
+  return (
+    <section
+      ref={receipt}
+      role="status"
+      tabIndex={-1}
+      aria-labelledby="co-placed"
+      class={`${sectionClass} grid max-w-xl gap-3`}
+    >
+      <h2 id="co-placed" class={headingClass}>
+        {t(props.m, "order.thanks")}
+      </h2>
+      <p class="font-semibold">{t(props.m, "order.title", { number: props.placed.number })}</p>
+      <p class="[overflow-wrap:anywhere]">
+        {t(props.m, "checkout.confirmation_to", { email: props.placed.email })}
+      </p>
+      <Show when={props.placed.unpaid}>
+        <p>{t(props.m, "checkout.payment_not_completed")}</p>
+      </Show>
+      <a href={props.shopUrl} class="text-sm text-identity-ink underline">
+        {t(props.m, "checkout.back_to_shop")}
+      </a>
+    </section>
+  );
+}
+
+function Fact(props: { label: string; value: string | null }) {
+  return (
+    <Show when={props.value}>
+      {(value) => (
+        <div class="grid gap-0.5">
+          <dt class="text-muted-foreground">{props.label}</dt>
+          <dd class="[overflow-wrap:anywhere]">{value()}</dd>
+        </div>
+      )}
+    </Show>
   );
 }
 

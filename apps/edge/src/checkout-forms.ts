@@ -1,4 +1,7 @@
-export type CheckoutForm = (form: URLSearchParams) => unknown;
+export interface CheckoutForm {
+  step: "contact" | "addresses";
+  build: (form: URLSearchParams) => unknown;
+}
 
 const field = (f: URLSearchParams, name: string) => f.get(name) ?? "";
 
@@ -15,15 +18,21 @@ const address = (f: URLSearchParams, prefix: "billing" | "shipping") => ({
 export const CHECKOUT_FORMS: ReadonlyMap<string, CheckoutForm> = new Map<string, CheckoutForm>([
   [
     "/checkout/contact",
-    (f) => ({ contact: { email: field(f, "email"), phone: field(f, "phone") } }),
+    {
+      step: "contact",
+      build: (f) => ({ contact: { email: field(f, "email"), phone: field(f, "phone") } }),
+    },
   ],
   [
     "/checkout/addresses",
-    (f) => ({
-      addresses: {
-        billing: address(f, "billing"),
-        shipping: f.get("ship_elsewhere") === "1" ? address(f, "shipping") : null,
-      },
-    }),
+    {
+      step: "addresses",
+      build: (f) => ({
+        addresses: {
+          billing: address(f, "billing"),
+          shipping: f.get("ship_elsewhere") === "1" ? address(f, "shipping") : null,
+        },
+      }),
+    },
   ],
 ]);

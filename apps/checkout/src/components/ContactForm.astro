@@ -1,0 +1,71 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import type { ContactValues, Problem } from "../lib/checkout-steps";
+import { Button, headingClass, sectionClass } from "../ui.tsx";
+import Field from "./Field.astro";
+
+interface Props {
+  m: Record<string, string>;
+  pageToken: string;
+  values: ContactValues;
+  problem: Problem | null;
+  canCancel: boolean;
+}
+const { m, pageToken, values, problem, canCancel } = Astro.props;
+const alertId = "contact-problem";
+const emailPattern = String.raw`[^\s@]+@[^\s@]+\.[^\s@]+`;
+const on = (field: "email" | "phone") => (problem?.field === field ? alertId : undefined);
+---
+
+<section aria-labelledby="co-contact" class={sectionClass}>
+  <h2 id="co-contact" class:list={["mb-3", headingClass]}>1. {t(m, "checkout.contact")}</h2>
+  <form method="post" action="/checkout/contact" data-details class="grid gap-4">
+    <input type="hidden" name="_pt" value={pageToken} />
+    {
+      problem && (
+        <p
+          id={alertId}
+          role="alert"
+          tabindex={problem.field ? undefined : "-1"}
+          autofocus={!problem.field}
+          class="rounded-md border border-sale p-2 text-sm text-sale"
+        >
+          {t(m, problem.message)}
+        </p>
+      )
+    }
+    <div class="grid gap-3 sm:grid-cols-2">
+      <Field
+        name="email"
+        type="email"
+        label={t(m, "account.email")}
+        value={values.email}
+        autocomplete="email"
+        required
+        maxlength={254}
+        pattern={emailPattern}
+        hint={t(m, "checkout.email_hint")}
+        problemId={on("email")}
+      />
+      <Field
+        name="phone"
+        type="tel"
+        label={t(m, "address.phone")}
+        value={values.phone}
+        autocomplete="tel"
+        maxlength={40}
+        problemId={on("phone")}
+      />
+    </div>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <Button type="submit" variant="primary">{t(m, "checkout.save_continue")}</Button>
+      {
+        canCancel && (
+          <a href="/checkout" class="inline-flex h-control items-center text-sm text-identity-ink underline">
+            {t(m, "address.cancel")}
+          </a>
+        )
+      }
+    </div>
+  </form>
+</section>

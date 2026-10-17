@@ -5,11 +5,63 @@ import {
   CZ,
   checkoutOf,
   deferHydration,
+  detailsForm,
+  FRESH_HTTPS,
   fakePay,
+  fillAddress,
   fillContactAndAddress,
+  JANA,
   newPage,
+  pageTokenMeta,
+  postDetails,
+  securityContext,
+  startSameOriginCheckout,
   toCheckout,
 } from "./support";
+
+test("the details forms post natively before hydration", async ({ browser }) => {
+  const context = await securityContext(browser);
+  const page = await context.newPage();
+  await startSameOriginCheckout(page, FRESH_HTTPS);
+  const release = await deferHydration(page);
+  try {
+    await page.reload({ waitUntil: "commit" });
+    const contact = detailsForm(page, "contact");
+    const email = contact.locator('[name="email"]');
+    await expect(email).toBeEnabled();
+    await expect(contact.locator('[name="phone"]')).toBeEnabled();
+    await expect(page.locator("astro-island[ssr]"), "no island has hydrated").not.toHaveCount(0);
+    const token = await pageTokenMeta(page).getAttribute("content");
+    const typed = `pred-hydrataci-${run}@example.test`;
+    await email.fill(typed);
+    const [posted, status] = await Promise.all([
+      page.waitForRequest(
+        (r) => r.method() === "POST" && new URL(r.url()).pathname === "/checkout/contact",
+      ),
+      postDetails(page, "contact", () => email.press("Enter")),
+    ]);
+    expect(status).toBe(303);
+    expect(await posted.headerValue("content-type")).toBe("application/x-www-form-urlencoded");
+    const body = new URLSearchParams(posted.postData() ?? "");
+    expect(body.get("_pt"), "the token of the platform HTML").toBe(token);
+    expect(body.get("email")).toBe(typed);
+
+    const city = detailsForm(page, "addresses").locator('[name="billing_city"]');
+    await expect(city).toBeEnabled();
+    await fillAddress(page, "billing", JANA);
+    expect(await postDetails(page, "addresses", () => city.press("Enter"))).toBe(303);
+    const place = page.getByRole("button", { name: "Objednat s povinností platby" });
+    const ppl = page.getByRole("radio", { name: /PPL – kurýr/ });
+    await expect(place).toBeDisabled();
+    await expect(ppl).toBeDisabled();
+    release();
+    await expect(place).toBeEnabled();
+    await expect(ppl).toBeEnabled();
+  } finally {
+    release();
+    await context.close();
+  }
+});
 
 test("checkout cannot lose contact input before hydration", async ({ browser }) => {
   const page = await newPage(browser);

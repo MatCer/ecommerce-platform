@@ -6,8 +6,8 @@
  * order linked after an email-link sign-in (A5).
  */
 
-import { expect, type Page, test } from "@playwright/test";
-import { expectAccessible, magicLink, mailpit, run, useEnglish } from "../admin/support";
+import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expectAccessible, magicLink, mailpit, run, sql, useEnglish } from "../admin/support";
 import { tabTo } from "../keyboard";
 import { testContext } from "../rate-client";
 import { hydrated } from "../storefront/support";
@@ -16,16 +16,35 @@ import {
   CZ,
   checkoutOf,
   checkoutReady,
+  chooseCashOnDelivery,
   choosePickupPoint,
+  cookieValue,
+  detailsForm,
+  FRESH_HTTPS,
+  FRESH_SK,
   fakePay,
   fillContactAndAddress,
+  JANA,
   type MailSummary,
   mail,
   newPage,
   order,
+  pageTokenMeta,
+  postDetails,
+  receiptNumber,
   SK,
+  saveAddresses,
+  saveContact,
+  securityContext,
+  startSameOriginCheckout,
   toCheckout,
 } from "./support";
+
+declare global {
+  interface Window {
+    reportStorageWrite?: (entry: string) => void;
+  }
+}
 
 /** Email-link sign-in on the checkout origin; lands on `next`. */
 async function signIn(page: Page, shop: string, email: string, next: string) {
@@ -359,4 +378,281 @@ test("the admin lists the order and shows its detail; shipping and payment setti
   await expect(page.getByText("Test payment").first()).toBeVisible();
   await expectAccessible(page, "admin payments");
   await ctx.close();
+});
+
+const literal = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+async function expectShopOnly(page: Page) {
+  const paths = await page.evaluate(() =>
+    Array.from(document.links, (a) => new URL(a.href).pathname),
+  );
+  expect(paths.filter((p) => /^\/(account|withdraw)(\/|$)/.test(p))).toEqual([]);
+  await expect(page.locator('input[type="password"]')).toHaveCount(0);
+}
+
+test("same-origin checkout in CZ: native forms, review and a cash-on-delivery order", async ({
+  browser,
+}) => {
+  const context = await securityContext(browser);
+  const page = await context.newPage();
+  const writes: string[] = [];
+  await page.exposeFunction("reportStorageWrite", (entry: string) => {
+    writes.push(entry);
+  });
+  await page.addInitScript(() => {
+    const { setItem, removeItem, clear } = Storage.prototype;
+    const report = (what: string) => window.reportStorageWrite?.(`${location.pathname} ${what}`);
+    Storage.prototype.setItem = function (this: Storage, key: string, value: string) {
+      report(`setItem ${key}`);
+      setItem.call(this, key, value);
+    };
+    Storage.prototype.removeItem = function (this: Storage, key: string) {
+      report(`removeItem ${key}`);
+      removeItem.call(this, key);
+    };
+    Storage.prototype.clear = function (this: Storage) {
+      report("clear");
+      clear.call(this);
+    };
+  });
+  const requests: { method: string; path: string; body: string | null }[] = [];
+  page.on("request", (r) =>
+    requests.push({ method: r.method(), path: new URL(r.url()).pathname, body: r.postData() }),
+  );
+  const typeInto = async (field: Locator, value: string) => {
+    await tabTo(page, field);
+    await page.keyboard.type(value);
+  };
+  const email = `so-${run}@example.test`;
+
+  await page.goto(`${FRESH_HTTPS}/`);
+  await page.evaluate(() => localStorage.setItem("spy", "1"));
+  await expect.poll(() => writes, "the storage spy sees a write").toContain("/ setItem spy");
+  await startSameOriginCheckout(page, FRESH_HTTPS);
+  const contact = detailsForm(page, "contact");
+  await expect(contact).toBeVisible();
+  await expect(detailsForm(page, "addresses")).toHaveCount(0);
+  await expectAccessible(page, "same-origin contact");
+  await expectShopOnly(page);
+  const emailInput = contact.getByRole("textbox", { name: "E-mail", exact: true });
+  await typeInto(emailInput, `so-${run}@example`);
+  await page.keyboard.press("Enter");
+  await expect(emailInput).toBeFocused();
+  expect(
+    await emailInput.evaluate((el: HTMLInputElement) => el.validity.patternMismatch),
+    "the browser refuses an email without a dot",
+  ).toBe(true);
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.type(email);
+  const cap = await cookieValue(context, "__Host-Http-cart");
+  const token = await pageTokenMeta(page).getAttribute("content");
+  expect(await postDetails(page, "contact", () => page.keyboard.press("Enter"))).toBe(303);
+  const contactPosts = requests.filter(
+    (r) => r.method === "POST" && r.path === "/checkout/contact",
+  );
+  expect(contactPosts, "one contact post, none for the refused email").toHaveLength(1);
+  expect(new URLSearchParams(contactPosts[0]?.body ?? "").get("email")).toBe(email);
+  const addresses = detailsForm(page, "addresses");
+  await expect(addresses).toBeVisible();
+  await expect(page.getByRole("region", { name: "1. Kontakt" })).toContainText(email);
+  expect(
+    await cookieValue(context, "__Host-Http-cart"),
+    "the save rotated the capability",
+  ).not.toBe(cap);
+  await expect(pageTokenMeta(page), "and the page token").not.toHaveAttribute(
+    "content",
+    token ?? "",
+  );
+
+  const field = (name: string) => addresses.locator(`[name="${name}"]`);
+  for (const [key, value] of Object.entries(JANA)) await typeInto(field(`billing_${key}`), value);
+  const elsewhere = addresses.getByRole("checkbox", { name: "Doručit na jinou adresu" });
+  await tabTo(page, elsewhere);
+  await page.keyboard.press("Space");
+  await expect(elsewhere).toBeChecked();
+  const delivery = { name: "Petr Novák", postal_code: "120 00", city: "Praha" };
+  for (const [key, value] of Object.entries(delivery))
+    await typeInto(field(`shipping_${key}`), value);
+  await tabTo(page, addresses.getByRole("button", { name: "Uložit a pokračovat" }));
+  expect(
+    await postDetails(page, "addresses", () => page.keyboard.press("Enter")),
+    "a delivery address without a street",
+  ).toBe(422);
+  await expect(page).toHaveURL(`${FRESH_HTTPS}/checkout/addresses`);
+  const alert = page.getByRole("alert");
+  await expect(alert).toHaveText("Zkontrolujte vyplněné údaje.");
+  await expect(alert).toBeFocused();
+  for (const [key, value] of Object.entries(JANA))
+    await expect(field(`billing_${key}`)).toHaveValue(value);
+  await expect(elsewhere).toBeChecked();
+  for (const [key, value] of Object.entries(delivery))
+    await expect(field(`shipping_${key}`)).toHaveValue(value);
+  await expect(field("shipping_street")).toHaveValue("");
+  await expectAccessible(page, "same-origin addresses with a rejected delivery address");
+  await expectShopOnly(page);
+  await typeInto(field("shipping_street"), "Krátká 3");
+  expect(await postDetails(page, "addresses", () => page.keyboard.press("Enter"))).toBe(303);
+
+  await checkoutReady(page);
+  await tabTo(page, page.getByRole("radio", { name: /Zásilkovna – výdejní místo/ }));
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("radio", { name: /Zásilkovna – na adresu/ })).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  const ppl = page.getByRole("radio", { name: /PPL – kurýr/ });
+  await expect(ppl).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(ppl).toBeChecked();
+  const cod = page.getByRole("radio", { name: /Dobírka/ });
+  await expect(cod).toBeEnabled();
+  await tabTo(page, page.getByRole("radio", { name: /Testovací platba/ }));
+  for (let i = 0; i < 5 && !(await cod.evaluate((el) => el === document.activeElement)); i++) {
+    const previous = await page.locator('input[name="payment"]:focus').inputValue();
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() => page.locator('input[name="payment"]:focus').inputValue())
+      .not.toBe(previous);
+  }
+  await expect(cod).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(cod).toBeChecked();
+  const place = page.getByRole("button", { name: "Objednat s povinností platby" });
+  await expect(place).toHaveAccessibleDescription(
+    new RegExp(
+      `^Potvrzení pošleme na ${literal(email)}.*PPL – kurýr.*Doručovací adresa.*Petr Novák, Krátká 3, 120 00 Praha, Česko.*Dobírka`,
+    ),
+  );
+  await expectAccessible(page, "same-origin review");
+  await expectShopOnly(page);
+
+  for (const name of [/^Souhlasím s obchodn/, /^Beru na vědom/]) {
+    const checkbox = page.getByRole("checkbox", { name });
+    await tabTo(page, checkbox);
+    await page.keyboard.press("Space");
+    await expect(checkbox).toBeChecked();
+  }
+  const note = `Zazvoňte prosím ${run}`;
+  await typeInto(page.getByRole("textbox", { name: /Poznámka k objednávce/ }), note);
+  await tabTo(page, place);
+  await page.keyboard.press("Enter");
+  const number = await receiptNumber(page);
+  await expect(page.getByRole("status", { name: "Děkujeme za objednávku!" })).toContainText(
+    `Potvrzení pošleme na ${email}`,
+  );
+  await expectShopOnly(page);
+  expect(
+    sql(
+      `SELECT concat_ws('|', notes, payment_method, email) FROM orders WHERE number = '${number}'`,
+    ),
+  ).toBe(`${note}|cod|${email}`);
+  expect(requests.filter((r) => /^\/(o|_p\/fake-pay)\//.test(r.path))).toEqual([]);
+  expect(
+    writes.filter((w) => w.startsWith("/checkout")),
+    "platform storage writes",
+  ).toEqual([]);
+  await context.close();
+});
+
+test("a server-rejected contact keeps what was typed", async ({ browser }) => {
+  const context = await securityContext(browser);
+  const page = await context.newPage();
+  await startSameOriginCheckout(page, FRESH_HTTPS);
+  const email = `odmitnuto-${run}@example.test`;
+  const contact = detailsForm(page, "contact");
+  const emailInput = contact.locator('[name="email"]');
+  const phone = contact.locator('[name="phone"]');
+  await emailInput.fill(email);
+  await phone.fill("abc");
+  expect(await postDetails(page, "contact"), "a phone only the server refuses").toBe(422);
+  await expect(page).toHaveURL(`${FRESH_HTTPS}/checkout/contact`);
+  await expect(phone).toHaveValue("abc");
+  await expect(emailInput).toHaveValue(email);
+  await expect(phone).toHaveAttribute("aria-invalid", "true");
+  await expect(phone).toBeFocused();
+  await expect(phone).toHaveAccessibleDescription("Zkontrolujte vyplněné údaje.");
+  await expect(emailInput).not.toHaveAttribute("aria-invalid", "true");
+
+  const refused = `odmitnuto-${run}@example`;
+  await phone.fill("");
+  await emailInput.evaluate((el) => el.removeAttribute("pattern"));
+  await emailInput.fill(refused);
+  expect(await postDetails(page, "contact"), "an email only the server refuses").toBe(422);
+  await expect(emailInput).toHaveValue(refused);
+  await expect(emailInput).toHaveAttribute("aria-invalid", "true");
+  await expect(emailInput).toBeFocused();
+  await expect(emailInput).toHaveAccessibleDescription(/^Zadejte platný e-mail\./);
+  await expect(phone).not.toHaveAttribute("aria-invalid", "true");
+  await context.close();
+});
+
+test("same-origin checkout at phone and tablet widths", async ({ browser }) => {
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 768, height: 1024 },
+  ]) {
+    const context = await securityContext(browser, { viewport });
+    const page = await context.newPage();
+    const fits = async (target: Locator, what: string) => {
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `${what} at ${viewport.width}px: no horizontal overflow`).toBe(0);
+      await tabTo(page, target);
+      await expect(target).toBeInViewport();
+      const height = (await target.boundingBox())?.height ?? 0;
+      expect(height, `${what} at ${viewport.width}px: a 44 px target`).toBeGreaterThanOrEqual(44);
+    };
+    await startSameOriginCheckout(page, FRESH_HTTPS);
+    await fits(detailsForm(page, "contact").getByRole("button"), "contact");
+    await saveContact(page, `so-${viewport.width}-${run}@example.test`);
+    await fits(detailsForm(page, "addresses").getByRole("button"), "addresses");
+    await saveAddresses(page);
+    await checkoutReady(page);
+    await fits(page.getByRole("button", { name: "Objednat s povinností platby" }), "review");
+    await context.close();
+  }
+});
+
+test("same-origin checkout in Slovak", async ({ browser }) => {
+  const context = await securityContext(browser, { locale: "sk-SK" });
+  const page = await context.newPage();
+  const noRawKeys = async () =>
+    expect(await page.locator("body").innerText()).not.toMatch(
+      /\b(checkout|address|account|order|cart|legal|consent)\.[a-z_]+/,
+    );
+  const email = `so-sk-${run}@example.test`;
+  await startSameOriginCheckout(page, FRESH_SK, "tricko-oversize");
+  await expect(page.getByRole("heading", { level: 1, name: "Pokladňa" })).toBeVisible();
+  const contact = detailsForm(page, "contact");
+  await expect(contact.getByRole("textbox", { name: "Telefón (nepovinné)" })).toBeVisible();
+  await expect(contact.getByRole("button", { name: "Uložiť a pokračovať" })).toBeVisible();
+  await noRawKeys();
+  await saveContact(page, email);
+  const addresses = detailsForm(page, "addresses");
+  for (const label of ["Meno a priezvisko", "Ulica a číslo domu", "PSČ", "Mesto"])
+    await expect(addresses.getByRole("textbox", { name: label, exact: true })).toBeVisible();
+  await expect(addresses.getByRole("combobox", { name: "Krajina" })).toBeVisible();
+  await expect(addresses.getByRole("checkbox", { name: "Doručiť na inú adresu" })).toBeVisible();
+  await expect(addresses.getByRole("button", { name: "Uložiť a pokračovať" })).toBeVisible();
+  await noRawKeys();
+  await saveAddresses(page, {
+    name: "Ján Novák",
+    street: "Hlavná 1",
+    postal_code: "811 01",
+    city: "Bratislava",
+  });
+  await checkoutReady(page);
+  await chooseCashOnDelivery(page, /Packeta – na adresu/, /Dobierka/);
+  await expect(page.locator("#co-confirmation")).toHaveText(`Potvrdenie pošleme na ${email}`);
+  await expect(
+    page.getByRole("button", { name: "Objednať s povinnosťou platby" }),
+  ).toHaveAccessibleDescription(new RegExp(`^Potvrdenie pošleme na ${literal(email)}.*Dobierka`));
+  await noRawKeys();
+  await acceptAndPlace(page, "Objednať s povinnosťou platby");
+  const number = await receiptNumber(page, "Ďakujeme za objednávku!");
+  await noRawKeys();
+  expect(
+    sql(`SELECT concat_ws('|', payment_method, currency, email) FROM orders
+         WHERE number = '${number}'`),
+  ).toBe(`cod|EUR|${email}`);
+  await context.close();
 });

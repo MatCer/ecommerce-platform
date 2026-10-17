@@ -93,8 +93,9 @@ export const platformCheckoutWorker = `
 export default {
   async fetch(request, env) {
     const q = new URL(request.url).searchParams;
+    const form = request.method === "POST" ? new URLSearchParams(await request.text()) : new URLSearchParams();
     if (q.has("slow")) await new Promise((r) => setTimeout(r, 5000));
-    if (q.has("throw")) throw new Error("checkout render failed");
+    if (q.has("throw") || form.has("throw")) throw new Error("checkout render failed");
     if (q.has("huge")) return new Response("x".repeat(6 * 1024 * 1024));
     const view = await env.CHECKOUT.fetch("https://checkout/checkout", { headers: { "x-platform-ctx": request.headers.get("x-platform-ctx") } });
     const token = request.headers.get("x-platform-page-token");
@@ -102,7 +103,11 @@ export default {
     const meta = open && token ? '<meta name="page-token" content="' + token + '">' : "";
     const main = open ? "<pre>" + (await view.text()) + "</pre>" : '<p role="status">restarted</p>';
     const names = '<p id="headers">' + [...request.headers.keys()].join(",") + "</p>";
-    return new Response("<!doctype html><html><head>" + meta + "</head><body>" + main + names + "</body></html>", {
+    const json = (value) => JSON.stringify(value).replace(/[<>&]/g, (c) => "\\\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+    const seen = request.method === "POST"
+      ? '<pre id="request">' + json({ method: request.method, url: request.url, origin: request.headers.get("origin"), type: request.headers.get("content-type"), form: [...form] }) + "</pre>"
+      : "";
+    return new Response("<!doctype html><html><head>" + meta + "</head><body>" + main + names + seen + "</body></html>", {
       headers: { "content-type": "text/html" },
     });
   },
