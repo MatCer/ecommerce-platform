@@ -187,8 +187,6 @@ pub async fn find(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartR
     })
 }
 
-/// A new open cart linked to `source` (`source_cart_id`) with its market, locale, currency,
-/// lines (in cart order) and coupon; no capability, contact, address, customer or selection.
 pub(crate) async fn snapshot(tx: &mut TenantTx, source: &CartRef) -> Result<CartRef, Error> {
     let id = sqlx::query_scalar!(
         "INSERT INTO carts (tenant_id, market_id, locale, currency, source_cart_id)
@@ -221,8 +219,6 @@ pub(crate) async fn snapshot(tx: &mut TenantTx, source: &CartRef) -> Result<Cart
     })
 }
 
-/// Removes every line and the coupon of a cart its caller holds locked; the cart and its shop
-/// capability stay.
 pub(crate) async fn empty(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
     sqlx::query!("DELETE FROM cart_lines WHERE cart_id = $1", cart_id)
         .execute(&mut **tx)

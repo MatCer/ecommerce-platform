@@ -839,9 +839,8 @@ pub async fn place_order(
     }
 
     // Stock and coupon first, number and rows after: the per-tenant number row lock is
-    // held only for the rest of the transaction. Lock order everywhere: shop cart (a
-    // snapshot's source), checkout cart, stock levels (by variant), coupon, order number, so
-    // concurrent placements cannot deadlock.
+    // held only for the rest of the transaction. Lock order everywhere: cart, stock levels
+    // (by variant), coupon, order number, so concurrent placements cannot deadlock.
     let order_id = crate::id::new_id();
     let now = Utc::now();
     let coupon = match &c.priced.coupon {

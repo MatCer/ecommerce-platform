@@ -1,6 +1,5 @@
-//! Cart, checkout handoff and same-origin checkout start (spec §8.2, §10.3, A1, A4, C10). The
-//! edge maps the shop origin's `/_p/cart/*` to these endpoints and turns the `cart` cookie into
-//! `X-Cart-Token`.
+//! Cart and checkout handoff (spec §8.2, §10.3, A1, A4). The edge maps the shop origin's
+//! `/_p/cart/*` to these endpoints and turns the `cart` cookie into `X-Cart-Token`.
 
 use axum::Json;
 use axum::body::Bytes;

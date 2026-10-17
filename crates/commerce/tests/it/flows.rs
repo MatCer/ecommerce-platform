@@ -1128,8 +1128,6 @@ struct Typed {
     snapshot: Uuid,
 }
 
-/// A same-origin start from a one-line shop cart, then the email typed into the checkout with
-/// an email-marketing grant; every cart idle for two hours.
 async fn typed_checkout(rt: &PgPool, s: &Shop, email: &str) -> Typed {
     let (mut tx, ctx) = shop_tx(rt, s).await;
     let (_, shop_token) = cart::create(&mut tx, &ctx).await.unwrap();

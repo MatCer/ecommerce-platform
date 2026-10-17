@@ -151,7 +151,6 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     checkout
 }
 
-/// Every checkout step of the checkout behind `checkout`: pickup point, fake payment.
 async fn fill(tx: &mut TenantTx, ctx: &Context, m: &Methods, checkout: &str, email: &str) {
     let c = checkout_access::open(tx, ctx, checkout).await.unwrap();
     checkout::set_contact(

@@ -1,6 +1,3 @@
-//! The same-origin checkout start (C10) through the router: last commit wins, the retained shop
-//! capability never reaches the snapshot, and the isolated handoff stays as it was.
-
 use std::time::Duration;
 
 use axum::http::StatusCode;
@@ -15,7 +12,6 @@ use uuid::Uuid;
 
 use crate::common::*;
 
-/// The headers the edge sends for the shop's CZ market on its shop origin.
 #[derive(Clone)]
 struct Edge {
     token: String,
@@ -125,7 +121,6 @@ impl Ctx {
         (status, body)
     }
 
-    /// A shop cart with one unit of variant 0; returns its shop capability.
     async fn shop_cart(&self) -> String {
         let (status, _, res) = self
             .edge
@@ -166,7 +161,6 @@ impl Ctx {
         self.call(Call::get("/storefront/v1/checkout"), cart).await
     }
 
-    /// The restart answer: a plain 404 with no checkout data and none of `typed`.
     async fn assert_restart(&self, cart: &str, typed: &str, what: &str) {
         let (status, text, _) = self
             .edge

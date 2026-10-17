@@ -166,9 +166,7 @@ const MAX_EVENTS_BODY = 64 * 1024;
 const MAX_RECOMMENDATIONS_QUERY = 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
-/** The checkout capability on a same-origin shop (C10), set only by `/_p/checkout/start`. */
 const SAME_ORIGIN_CART_COOKIE = "__Host-Http-cart";
-/** A top-level form navigation from the shop's own page (C1); anything else is refused. */
 const START_NAVIGATION = {
   "sec-fetch-site": "same-origin",
   "sec-fetch-mode": "navigate",

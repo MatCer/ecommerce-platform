@@ -180,6 +180,30 @@ async fn require_lines(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
     Ok(())
 }
 
+async fn revoke_earlier_checkouts(
+    tx: &mut TenantTx,
+    p: &Policy<'_>,
+    source: &CartRef,
+    previous: Option<&str>,
+) -> Result<(), Error> {
+    let previous = previous
+        .filter(|t| capability::well_formed(t))
+        .map(capability::hash);
+    sqlx::query!(
+        "UPDATE carts SET checkout_token_hash = NULL,
+             status = CASE WHEN status = 'open' THEN 'abandoned' ELSE status END,
+             updated_at = now()
+         WHERE checkout_token_hash IS NOT NULL
+           AND (source_cart_id = $1 OR (checkout_token_hash = $2 AND checkout_origin = $3))",
+        source.id,
+        previous,
+        p.origin
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 /// The open checkout behind `token`, locked until commit; refreshes its idle expiry.
 pub async fn open(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
     let p = enter(tx, ctx).await?;
@@ -195,16 +219,18 @@ pub async fn open_any(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<C
 }
 
 /// The narrow recovery of a converted checkout for placement and its idempotent replay
-/// (A12): open or converted, no refresh. Returns whether the cart is still open. Locks the
-/// shop cart a snapshot was started from before the snapshot, as [`start`] does.
+/// (A12): open or converted, no refresh. Returns whether the cart is still open.
 pub async fn open_for_order(
     tx: &mut TenantTx,
     ctx: &Context,
     token: &str,
 ) -> Result<(CartRef, bool), Error> {
     let p = enter(tx, ctx).await?;
-    // `source_cart_id` never changes once written (except to NULL), so the inner read needs no
-    // lock; a start that revoked the snapshot meanwhile makes the guard miss.
+    lock_source_before_checkout(tx, token).await?;
+    guard(tx, ctx, &p, token, true, false).await
+}
+
+async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(), Error> {
     sqlx::query!(
         "SELECT 1 AS one FROM carts
          WHERE id = (SELECT source_cart_id FROM carts WHERE checkout_token_hash = $1)
@@ -213,11 +239,9 @@ pub async fn open_for_order(
     )
     .fetch_optional(&mut **tx)
     .await?;
-    guard(tx, ctx, &p, token, true, false).await
+    Ok(())
 }
 
-/// Placement's last cart write (A12): the checkout becomes `converted`, and the shop cart it
-/// was started from, while still a shop cart, is emptied (P2-7).
 pub(crate) async fn convert(tx: &mut TenantTx, checkout: &CartRef) -> Result<(), Error> {
     let source = sqlx::query_scalar!(
         "UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1
@@ -269,23 +293,7 @@ pub async fn start(
     require(&p, CheckoutMode::SameOrigin)?;
     let source = cart::find(tx, ctx, shop_token).await?;
     require_lines(tx, source.id).await?;
-    // `previous` only names a row its presenter already holds, so it needs no guard. Revoking
-    // before the copy keeps the coupon's KEY SHARE out of a wait on a placement's checkout row.
-    let previous = previous
-        .filter(|t| capability::well_formed(t))
-        .map(capability::hash);
-    sqlx::query!(
-        "UPDATE carts SET checkout_token_hash = NULL,
-             status = CASE WHEN status = 'open' THEN 'abandoned' ELSE status END,
-             updated_at = now()
-         WHERE checkout_token_hash IS NOT NULL
-           AND (source_cart_id = $1 OR (checkout_token_hash = $2 AND checkout_origin = $3))",
-        source.id,
-        previous,
-        p.origin
-    )
-    .execute(&mut **tx)
-    .await?;
+    revoke_earlier_checkouts(tx, &p, &source, previous).await?;
     let snapshot = cart::snapshot(tx, &source).await?;
     bind(tx, snapshot.id, &p)
         .await?
