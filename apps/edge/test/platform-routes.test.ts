@@ -32,7 +32,7 @@ beforeAll(async () => {
     "favicon.svg": "<svg/>",
   });
   const checkout = await buildArtifact(root, "checkout", checkoutWorker, {
-    "_astro/checkout.js": "1",
+    "_checkout/0123456789abcdef/checkout.js": "1",
   });
   api = fakeApi();
   gw = createGateway({
@@ -66,7 +66,7 @@ describe("service workers (C3)", () => {
       "http://demo.localhost/_p/speculation-rules.json",
       "http://demo.localhost/en/",
       "http://checkout.demo.localhost/",
-      "http://checkout.demo.localhost/_astro/checkout.js",
+      "http://checkout.demo.localhost/_checkout/0123456789abcdef/checkout.js",
       "http://preview-1--demo.localhost/",
       "http://unknown.localhost/sw.js",
     ]) {

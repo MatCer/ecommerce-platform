@@ -58,7 +58,9 @@ beforeAll(async () => {
     })
   ).id;
   checkoutId = (
-    await buildArtifact(root, "checkout", checkoutWorker, { "_astro/checkout.js": "1" })
+    await buildArtifact(root, "checkout", checkoutWorker, {
+      "_checkout/0123456789abcdef/checkout.js": "1",
+    })
   ).id;
   resolver = new StaticResolver({
     "demo.localhost": site({ theme_artifact: v1 }),

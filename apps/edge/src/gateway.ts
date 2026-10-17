@@ -26,21 +26,36 @@ import { type Counters, templateOf } from "./counters.ts";
 import type { Assignment, Enroller } from "./experiments.ts";
 import {
   contentSecurityPolicy,
+  PLATFORM_REFERRER_POLICY,
+  platformPageHeaders,
   securityHeaders,
   stripUntrusted,
   workerRequestHeaders,
   workerResponseHeaders,
 } from "./headers.ts";
+import {
+  CLIENT_PAGE_TOKEN_HEADER,
+  pageToken,
+  verifyPageToken,
+  WORKER_PAGE_TOKEN_HEADER,
+} from "./page-token.ts";
+import {
+  admitNavigation,
+  isPlatformPagePath,
+  isSameOriginCheckoutPath,
+  UNSUPPORTED_BROWSER_PAGE,
+} from "./platform-pages.ts";
 import { type NodeBinding, WorkerPool } from "./runtime.ts";
 import {
   CachedResolver,
-  checkoutPolicy,
   classifyHost,
   normalizeHost,
   PREVIEW_HOST_RE,
   type PreviewResolver,
+  type SameOriginSite,
   type Site,
   type SiteResolver,
+  sameOriginShop,
   splitLocale,
 } from "./sites.ts";
 
@@ -79,6 +94,7 @@ export interface GatewayOptions {
   /** Signed rate identities for local Playwright contexts; never configured in production. */
   e2eRateSecret?: string;
   experiments?: Enroller;
+  pageTokenSecret?: string;
 }
 
 const SPECULATION_RULES = JSON.stringify({
@@ -139,6 +155,11 @@ const CHECKOUT_OPS: { method: string; path: RegExp }[] = [
   { method: "POST", path: /^\/place-order$/ },
 ];
 
+const SAME_ORIGIN_CHECKOUT_OPS: { method: string; path: RegExp }[] = [
+  { method: "GET", path: /^$/ },
+  { method: "PUT", path: /^\/(shipping|payment)$/ },
+];
+
 /** The order page's operations (`/_p/orders/<order token>/*`, A4, A10). */
 const WITHDRAW_OPS: { method: string; path: RegExp }[] = [
   { method: "POST", path: /^$/ },
@@ -167,11 +188,6 @@ const MAX_RECOMMENDATIONS_QUERY = 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
 const SAME_ORIGIN_CART_COOKIE = "__Host-Http-cart";
-const START_NAVIGATION = {
-  "sec-fetch-site": "same-origin",
-  "sec-fetch-mode": "navigate",
-  "sec-fetch-dest": "document",
-};
 /**
  * Binds a checkout handoff to the browser that started it (WP26). Scoped to the shop host so
  * `checkout.<shop_host>` receives it; a cross-site page cannot plant it, so a link carrying an
@@ -403,6 +419,25 @@ export function createGateway(opts: GatewayOptions) {
     return null;
   }
 
+  async function checkoutAsset(site: Site, req: Request, p: string): Promise<Response> {
+    if (req.method !== "GET" && req.method !== "HEAD")
+      return text(405, "Method not allowed", { allow: "GET, HEAD" });
+    const artifact = site.checkout_artifact ?? opts.checkoutArtifact;
+    const asset = artifact ? await serveAsset([artifact], p, true) : null;
+    return asset ?? text(404, "Not found");
+  }
+
+  async function tokensCss(site: Site): Promise<Response> {
+    if (!site.theme_artifact) return text(404, "Not found");
+    const m = await manifest(site.theme_artifact);
+    return new Response(m.tokens ? tokensToCss(m.tokens) : "", {
+      headers: {
+        "content-type": "text/css; charset=utf-8",
+        "cache-control": "public, max-age=300",
+      },
+    });
+  }
+
   // --- worker rendering ----------------------------------------------------------------------
 
   async function render(
@@ -415,6 +450,7 @@ export function createGateway(opts: GatewayOptions) {
       consentSubject?: string | undefined;
       scope?: string;
       experiment?: Assignment | undefined;
+      pageToken?: string | undefined;
     } = {},
   ) {
     const ctxId = registry.open(site, artifactId, {
@@ -426,6 +462,7 @@ export function createGateway(opts: GatewayOptions) {
     try {
       const headers = workerRequestHeaders();
       headers.set(CTX_HEADER, ctxId);
+      if (extra.pageToken) headers.set(WORKER_PAGE_TOKEN_HEADER, extra.pageToken);
       if (extra.experiment && site.experiment)
         headers.set(ARM_HEADER, `${site.experiment.name}:${extra.experiment.arm}`);
       // One deadline and one byte cap for headers *and* body: a worker must not hold a request
@@ -756,12 +793,6 @@ export function createGateway(opts: GatewayOptions) {
     });
   }
 
-  /**
-   * `/_p/checkout/*` and `/_p/orders/*` on the checkout origin (WP10) → the Storefront API.
-   * Same-origin JSON only for writes (CSRF, §14). The checkout cart capability, the session,
-   * the client IP and a validated `Idempotency-Key` go along as headers; the order routes are
-   * authorized by the order token in their path (A4).
-   */
   async function checkoutProxy(
     site: Site,
     req: Request,
@@ -771,6 +802,7 @@ export function createGateway(opts: GatewayOptions) {
     host: string,
     port: string,
     clientIp: string | undefined,
+    credentials: { cart?: string | undefined; session?: string | undefined },
   ): Promise<Response> {
     if (!ops.some((o) => o.method === req.method && o.path.test(rest)))
       return problem(404, "not_found", "unknown checkout operation");
@@ -785,8 +817,7 @@ export function createGateway(opts: GatewayOptions) {
       if (b instanceof Response) return b;
       body = b;
     }
-    const cart = capabilityCookie(req, CHECKOUT_CART_COOKIE);
-    const session = capabilityCookie(req, SESSION_COOKIE);
+    const { cart, session } = credentials;
     // A20: place-order links a consented visitor's purchase to their analytics session and
     // (WP20) to the ad platforms; the API resolves both consents from its records.
     const res = await upstream(
@@ -1093,12 +1124,12 @@ ${
     return new Response(null, { status: 303, headers });
   }
 
-  async function sameOriginStart(site: Site, req: Request): Promise<Response> {
+  async function sameOriginStart(site: SameOriginSite, req: Request): Promise<Response> {
     if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
     const admitted =
       req.headers.get("origin") === site.shopOrigin &&
-      Object.entries(START_NAVIGATION).every(([k, v]) => req.headers.get(k) === v) &&
-      !req.headers.has("sec-purpose");
+      req.headers.get("sec-fetch-site") === "same-origin" &&
+      admitNavigation(req.headers) === "navigation";
     if (!admitted)
       return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
     const media = (req.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase();
@@ -1137,6 +1168,31 @@ ${
         "set-cookie": `${SAME_ORIGIN_CART_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`,
       },
     });
+  }
+
+  async function sameOriginCheckoutApi(
+    site: SameOriginSite,
+    req: Request,
+    rest: string,
+    host: string,
+    port: string,
+    clientIp: string | undefined,
+  ): Promise<Response> {
+    const cart = capabilityCookie(req, SAME_ORIGIN_CART_COOKIE);
+    const presented = req.headers.get(CLIENT_PAGE_TOKEN_HEADER);
+    if (!verifyPageToken(opts.pageTokenSecret, site.shopOrigin, cart, presented))
+      return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
+    return checkoutProxy(
+      site,
+      req,
+      "/checkout",
+      rest,
+      SAME_ORIGIN_CHECKOUT_OPS,
+      host,
+      port,
+      clientIp,
+      { cart },
+    );
   }
 
   async function publicProxy(site: Site, req: Request, url: URL, rest: string): Promise<Response> {
@@ -1583,6 +1639,55 @@ ${
     return new Response(null, { status: 303, headers: { location, ...noStore } });
   }
 
+  async function platformPage(site: SameOriginSite, req: Request, url: URL): Promise<Response> {
+    const res = await platformPageResponse(site, req, url).catch((err: unknown) =>
+      unavailable(err, req.url),
+    );
+    const csp = res.headers.get("content-security-policy");
+    for (const [k, v] of Object.entries(platformPageHeaders(csp))) res.headers.set(k, v);
+    return res;
+  }
+
+  async function platformPageResponse(
+    site: SameOriginSite,
+    req: Request,
+    url: URL,
+  ): Promise<Response> {
+    const admission = admitNavigation(req.headers);
+    if (admission === "refused") return new Response(null, { status: 403 });
+    if (admission === "unsupported")
+      return new Response(UNSUPPORTED_BROWSER_PAGE, {
+        status: 400,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    if (url.pathname !== "/checkout") return text(404, "Not found");
+    if (req.method !== "GET" && req.method !== "HEAD")
+      return text(405, "Method not allowed", { allow: "GET, HEAD" });
+    const artifact = site.checkout_artifact ?? opts.checkoutArtifact;
+    if (!artifact || !opts.pageTokenSecret)
+      return text(503, "Checkout is not available yet", { "retry-after": "60" });
+    const m = await manifest(artifact);
+    if (m.kind !== "checkout") throw new Error(`artifact ${artifact} is not a checkout`);
+    const cartToken = capabilityCookie(req, SAME_ORIGIN_CART_COOKIE);
+    const r = await render(
+      artifact,
+      normalizeUrl(new URL(`${url.pathname}${url.search}`, site.shopOrigin)),
+      site,
+      { cartToken, pageToken: pageToken(opts.pageTokenSecret, site.shopOrigin, cartToken) },
+    );
+    const csp = contentSecurityPolicy("checkout", {
+      scriptHashes: m.csp.script_hashes,
+      styleHashes: m.csp.style_hashes,
+      widgetOrigin,
+      stripe: true,
+    });
+    r.headers.set("content-security-policy", csp);
+    return new Response(req.method === "HEAD" ? null : r.body, {
+      status: r.status,
+      headers: r.headers,
+    });
+  }
+
   // --- origins -------------------------------------------------------------------------------
 
   async function shop(
@@ -1594,6 +1699,21 @@ ${
     clientIp: string | undefined,
   ): Promise<Response> {
     const p = url.pathname;
+    const sameOrigin = sameOriginShop(site);
+    if (sameOrigin) {
+      if (isPlatformPagePath(p)) return platformPage(site, req, url);
+      if (p.startsWith("/_checkout/")) return checkoutAsset(site, req, p);
+      if (p === "/_p/tokens.css") return tokensCss(site);
+      if (p === "/_p/checkout" || (p.startsWith("/_p/checkout/") && p !== "/_p/checkout/start"))
+        return sameOriginCheckoutApi(
+          site,
+          req,
+          p.slice("/_p/checkout".length),
+          host,
+          port,
+          clientIp,
+        );
+    }
     if (p === "/_p/consent") return consentProxy(site, req, host, port, clientIp, undefined);
     // `/<locale>/…` of a non-default market locale (spec §9.1): theme pages and island reads
     // render in that locale from the unprefixed path. The locale is part of the cache key; the
@@ -1626,9 +1746,7 @@ ${
       if (p === "/_p/e" || p === "/_p/newsletter") return new Response(null, { status: 204 });
     }
     if (p === "/_p/checkout/start")
-      return site.shopOrigin && checkoutPolicy(site, site.shopOrigin).mode === "same_origin"
-        ? sameOriginStart(site, req)
-        : checkoutStart(site, req, host, port);
+      return sameOrigin ? sameOriginStart(site, req) : checkoutStart(site, req, host, port);
     if (p.startsWith("/_p/public/"))
       return publicProxy(site, req, url, p.slice("/_p/public".length));
     if (p === "/_p/recommendations") return recommendationsProxy(site, req, url);
@@ -1701,19 +1819,53 @@ ${
     clientIp: string | undefined,
   ): Promise<Response> {
     const p = url.pathname;
+    const credentials = {
+      cart: capabilityCookie(req, CHECKOUT_CART_COOKIE),
+      session: capabilityCookie(req, SESSION_COOKIE),
+    };
     if (p.startsWith("/_p/account/"))
       return accountProxy(site, req, p.slice("/_p/account".length), host, port, clientIp);
     if (p === "/_p/withdraw" || p.startsWith("/_p/withdraw/")) {
       const rest = p.slice("/_p/withdraw".length);
-      return checkoutProxy(site, req, "/withdrawals", rest, WITHDRAW_OPS, host, port, clientIp);
+      return checkoutProxy(
+        site,
+        req,
+        "/withdrawals",
+        rest,
+        WITHDRAW_OPS,
+        host,
+        port,
+        clientIp,
+        credentials,
+      );
     }
     if (p === "/_p/checkout" || p.startsWith("/_p/checkout/")) {
       const rest = p.slice("/_p/checkout".length);
-      return checkoutProxy(site, req, "/checkout", rest, CHECKOUT_OPS, host, port, clientIp);
+      return checkoutProxy(
+        site,
+        req,
+        "/checkout",
+        rest,
+        CHECKOUT_OPS,
+        host,
+        port,
+        clientIp,
+        credentials,
+      );
     }
     if (p.startsWith("/_p/orders/")) {
       const rest = p.slice("/_p/orders".length);
-      return checkoutProxy(site, req, "/orders", rest, ORDER_OPS, host, port, clientIp);
+      return checkoutProxy(
+        site,
+        req,
+        "/orders",
+        rest,
+        ORDER_OPS,
+        host,
+        port,
+        clientIp,
+        credentials,
+      );
     }
     if (p.startsWith("/_p/fake-pay/"))
       return fakePay(site, req, url, p.slice("/_p/fake-pay/".length), host, port);
@@ -1783,24 +1935,16 @@ ${
       if (clearBinding) headers.append("set-cookie", clearBinding);
       return new Response(null, { status: 303, headers });
     }
-    if (p === "/_p/tokens.css") {
-      if (!site.theme_artifact) return text(404, "Not found");
-      const m = await manifest(site.theme_artifact);
-      return new Response(m.tokens ? tokensToCss(m.tokens) : "", {
-        headers: {
-          "content-type": "text/css; charset=utf-8",
-          "cache-control": "public, max-age=300",
-        },
-      });
-    }
+    if (p === "/_p/tokens.css") return tokensCss(site);
     if (p.startsWith("/_p/") || p.startsWith("/_edge/"))
       return problem(404, "not_found", "unknown platform route");
+    if (isSameOriginCheckoutPath(p)) return text(404, "Not found");
     if (req.method !== "GET" && req.method !== "HEAD")
       return text(405, "Method not allowed", { allow: "GET, HEAD" });
     const checkoutArtifact = site.checkout_artifact ?? opts.checkoutArtifact;
     if (!checkoutArtifact)
       return text(503, "Checkout is not available yet", { "retry-after": "60" });
-    const asset = await serveAsset([checkoutArtifact], p, p.startsWith("/_astro/"));
+    const asset = await serveAsset([checkoutArtifact], p, p.startsWith("/_checkout/"));
     if (asset) return asset;
 
     const m = await manifest(checkoutArtifact);
@@ -1870,11 +2014,15 @@ ${
     const origin = classifyHost(host);
     const resolved = await resolver.resolve(origin.shopHost);
     if (!resolved) return text(404, "Unknown shop");
+    // Local dev also serves the shops over TLS; Caddy sets X-Forwarded-Proto and drops client
+    // values.
+    const requestScheme =
+      scheme === "http" && request.headers.get("x-forwarded-proto") === "https" ? "https" : scheme;
     // A per-request copy: the resolver's cached object is shared between requests.
     const site: Site = {
       ...resolved,
       clientIp,
-      shopOrigin: new URL(`${scheme}://${origin.shopHost}${port}`).origin,
+      shopOrigin: new URL(`${requestScheme}://${origin.shopHost}${port}`).origin,
     };
     return origin.kind === "shop"
       ? shop(site, req, publicUrl, host, port, clientIp)
@@ -1932,24 +2080,24 @@ ${
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   }
 
+  function unavailable(err: unknown, requestUrl: string): Response {
+    // An upstream error may quote its request URL or a theme-controlled token.
+    log({
+      level: "error",
+      msg: "request failed",
+      path: safePath(requestUrl),
+      error: err instanceof TimeoutError ? "timeout" : "upstream",
+    });
+    return text(err instanceof TimeoutError ? 504 : 502, "Shop temporarily unavailable");
+  }
+
   async function fetchHandler(request: Request): Promise<Response> {
-    let response: Response;
-    try {
-      response = await handle(request);
-    } catch (err) {
-      // An upstream error may quote its request URL or a theme-controlled token.
-      log({
-        level: "error",
-        msg: "request failed",
-        path: safePath(request.url),
-        error: err instanceof TimeoutError ? "timeout" : "upstream",
-      });
-      response = text(err instanceof TimeoutError ? 504 : 502, "Shop temporarily unavailable");
-    }
+    const response = await handle(request).catch((err: unknown) => unavailable(err, request.url));
     // Even rejected requests and render failures must not leak a withdrawal capability.
     const path = new URL(request.url).pathname;
     if (path === "/withdraw" || path === "/_p/withdraw" || path.startsWith("/_p/withdraw/")) {
-      response.headers.set("referrer-policy", "no-referrer");
+      if (response.headers.get("referrer-policy") !== PLATFORM_REFERRER_POLICY)
+        response.headers.set("referrer-policy", "no-referrer");
       response.headers.set("cache-control", "no-store");
     }
     return response;

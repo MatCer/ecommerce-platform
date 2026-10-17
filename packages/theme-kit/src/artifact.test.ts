@@ -103,8 +103,9 @@ test("a theme cannot publish files at reserved platform paths", async () => {
   expect(Object.keys(theme.assets)).toEqual(["/_astro/a.js", "/checkout.svg", "/p/checkout"]);
 
   const platform = await dist({
-    "server/entry.mjs": "export default {}",
-    "client/_checkout/a.js": "1",
+    "server/entry.mjs": 'export default "/_checkout/0123456789abcdef/a.js"',
+    "client/_checkout/0123456789abcdef/a.js": "1",
+    "client/_checkout/0123456789abcdef/chunks/b.css": "2",
   });
   const checkout = await packArtifact({
     dist: platform,
@@ -112,7 +113,87 @@ test("a theme cannot publish files at reserved platform paths", async () => {
     kind: "checkout",
     projectDir: PROJECT,
   });
-  expect(Object.keys(checkout.assets)).toEqual(["/_checkout/a.js"]);
+  expect(Object.keys(checkout.assets)).toEqual([
+    "/_checkout/0123456789abcdef/a.js",
+    "/_checkout/0123456789abcdef/chunks/b.css",
+  ]);
+  expect((await verifyArtifact(out, checkout.id)).id).toBe(checkout.id);
+});
+
+const NON_CONFORMING_CHECKOUTS: [string, Record<string, string>, RegExp][] = [
+  [
+    "/_astro/a.js",
+    { "client/_astro/a.js": "1" },
+    /outside \/_checkout\/<build id>\/: \/_astro\/a.js/,
+  ],
+  [
+    "/favicon.svg",
+    { "client/favicon.svg": "<svg/>" },
+    /outside \/_checkout\/<build id>\/: \/favicon.svg/,
+  ],
+  [
+    "two build ids",
+    {
+      "client/_checkout/0123456789abcdef/a.js": "1",
+      "client/_checkout/fedcba9876543210/b.js": "2",
+    },
+    /more than one build id/,
+  ],
+  [
+    "a server module referencing /_astro/",
+    {
+      "server/entry.mjs": 'export default "/_astro/a.js"',
+      "client/_checkout/0123456789abcdef/a.js": "1",
+    },
+    /server module server\/entry.mjs references \/_astro\//,
+  ],
+];
+
+test.each(NON_CONFORMING_CHECKOUTS)(
+  "a checkout build with %s is refused",
+  async (_, files, error) => {
+    const d = await dist({ "server/entry.mjs": "export default {}", ...files });
+    const out = await mkdtemp(path.join(tmpdir(), "shop119-out-"));
+    await expect(
+      packArtifact({ dist: d, outRoot: out, kind: "checkout", projectDir: PROJECT }),
+    ).rejects.toThrow(error);
+  },
+);
+
+test("a theme keeps /_astro/ assets, root files and /_astro/ references", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "shop119-out-"));
+  const d = await dist({
+    "server/entry.mjs": 'export default "/_astro/a.js"',
+    "client/_astro/a.js": "1",
+    "client/favicon.svg": "<svg/>",
+  });
+  const m = await packArtifact({ dist: d, outRoot: out, kind: "theme", projectDir: PROJECT });
+  expect((await verifyArtifact(out, m.id)).id).toBe(m.id);
+});
+
+test("verify refuses a checkout manifest edited to a non-conforming build", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "shop119-out-"));
+  const d = await dist({
+    "server/entry.mjs": "export default {}",
+    "client/_checkout/0123456789abcdef/a.js": "1",
+  });
+  const m = await packArtifact({ dist: d, outRoot: out, kind: "checkout", projectDir: PROJECT });
+  const manifest = path.join(out, m.id, "manifest.json");
+  const forged = (extra: string) => ({
+    ...m,
+    assets: { ...m.assets, [extra]: { sha256: "0".repeat(64), size: 1 } },
+  });
+  for (const [extra, error] of [
+    ["/favicon.svg", /outside \/_checkout\/<build id>\/: \/favicon.svg/],
+    ["/_astro/a.js", /outside \/_checkout\/<build id>\/: \/_astro\/a.js/],
+    ["/_checkout/fedcba9876543210/b.js", /more than one build id/],
+  ] as const) {
+    await writeFile(manifest, JSON.stringify(forged(extra)));
+    await expect(verifyArtifact(out, m.id), extra).rejects.toThrow(error);
+  }
+  await writeFile(manifest, JSON.stringify(m));
+  await writeFile(path.join(out, m.id, "server/entry.mjs"), 'export default "/_astro/a.js"');
+  await expect(verifyArtifact(out, m.id)).rejects.toThrow(/references \/_astro\//);
 });
 
 test("a theme manifest naming a reserved asset is refused on publish and loads without it", async () => {

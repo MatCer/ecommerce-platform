@@ -112,6 +112,8 @@
   "checkout.placing": "Placing the order…",
   "checkout.price_updated": "The total changed with the address. Review the summary and confirm the order again.",
   "checkout.required_legal": "To place the order, accept the terms and acknowledge the withdrawal information.",
+  "checkout.restart": "Continue to checkout",
+  "checkout.restarted": "This checkout was restarted or has expired. Continue with your current cart.",
   "checkout.resuming": "Completing your order…",
   "checkout.review": "Review and order",
   "checkout.reviews": "You may ask me to review my purchase",

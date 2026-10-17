@@ -14,6 +14,7 @@ const sharedState = [
   "admin/ai.spec.ts",
   "admin/ai-alt-texts.spec.ts",
 ];
+const security = ["checkout/platform-isolation.spec.ts", "checkout/same-origin-start.spec.ts"];
 
 export default defineConfig({
   testDir: ".",
@@ -50,6 +51,18 @@ export default defineConfig({
       testMatch: "checkout/handoff.spec.ts",
       dependencies: ["chromium-setup"],
       use: { ...devices["Desktop Firefox"], viewport: { width: 1280, height: 860 } },
+    },
+    {
+      name: "firefox-security",
+      testMatch: security,
+      dependencies: ["chromium-setup"],
+      use: { ...devices["Desktop Firefox"], viewport: { width: 1280, height: 860 } },
+    },
+    {
+      name: "webkit-security",
+      testMatch: security,
+      dependencies: ["chromium-setup"],
+      use: { ...devices["Desktop Safari"], viewport: { width: 1280, height: 860 } },
     },
     {
       name: "chromium-shared-state",

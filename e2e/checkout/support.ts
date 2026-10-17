@@ -4,16 +4,67 @@
  * order, the fake gateway and the order model.
  */
 
-import { type Browser, expect, type Page } from "@playwright/test";
+import {
+  type Browser,
+  type BrowserContext,
+  type BrowserContextOptions,
+  expect,
+  type Page,
+} from "@playwright/test";
 import { mailpit } from "../admin/support";
 import { tabTo } from "../keyboard";
-import { rateHeaders, testContext } from "../rate-client";
+import { rateHeaders, testContext, testRateHeaders } from "../rate-client";
 
 const port = process.env.HTTP_PORT ?? "8080";
 export const CZ = `http://demo.localhost:${port}`;
 export const SK = `http://demo-sk.localhost:${port}`;
 export const FRESH = new URL(`http://demo-fresh.localhost:${port}`).origin;
+/** WebKit drops `Secure` cookies over plain HTTP, so the security projects use this origin. */
+export const FRESH_HTTPS = new URL(
+  `https://demo-fresh.localhost:${process.env.HTTPS_PORT ?? "8443"}`,
+).origin;
 export const checkoutOf = (shop: string) => shop.replace("://", "://checkout.");
+
+export const RESTARTED =
+  "Pokladna byla mezitím spuštěna znovu nebo vypršela. Pokračujte s aktuálním košíkem.";
+export const restartNotice = (page: Page) =>
+  page.getByRole("status").filter({ hasText: "Pokladna byla mezitím spuštěna znovu" });
+export const restartButton = (page: Page) =>
+  page.getByRole("button", { name: "Pokračovat k pokladně" });
+export const pageTokenMeta = (page: Page) => page.locator('meta[name="page-token"]');
+
+export async function securityContext(
+  browser: Browser,
+  options: BrowserContextOptions = {},
+): Promise<BrowserContext> {
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    locale: "cs-CZ",
+    extraHTTPHeaders: testRateHeaders(),
+    ...options,
+  });
+  await context.addCookies([{ name: "consent", value: "", url: FRESH_HTTPS }]);
+  return context;
+}
+
+/**
+ * Another tab on a shop the context already shows. Playwright's Firefox driver can drop the commit
+ * of a new tab whose first navigation is a COOP page joining the shop's process, which hangs
+ * `goto` at every waitUntil; landing on a COOP-less file of the shop first avoids that swap.
+ */
+export async function shopTab(context: BrowserContext, url: string): Promise<Page> {
+  const tab = await context.newPage();
+  await tab.goto(`${new URL(url).origin}/favicon.svg`);
+  await tab.goto(url);
+  return tab;
+}
+
+export async function cookieValue(
+  context: BrowserContext,
+  name: string,
+): Promise<string | undefined> {
+  return (await context.cookies()).find((c) => c.name === name)?.value;
+}
 
 /** SSR controls are visible before the checkout island attaches its event handlers. */
 export async function checkoutReady(page: Page): Promise<void> {
@@ -62,15 +113,7 @@ export async function newPage(browser: Browser, locale = "cs-CZ"): Promise<Page>
   return ctx.newPage();
 }
 
-/** Fills a shop cart through the edge (optionally with a coupon) and hands it to checkout. */
-export async function toCheckout(
-  page: Page,
-  shop: string,
-  slug: string,
-  quantity = 1,
-  coupon?: string,
-): Promise<CartModel> {
-  await page.goto(`${shop}/`);
+export async function addLine(page: Page, shop: string, slug: string, quantity = 1) {
   const model = (await (
     await page.request.get(`${shop}/_p/public/pages/product/${slug}`, {
       headers: rateHeaders(page),
@@ -89,6 +132,34 @@ export async function toCheckout(
     if (added !== 409) break;
   }
   expect(added).toBe(200);
+}
+
+export function submitStart(page: Page): Promise<void> {
+  return page.evaluate(() => {
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = "/_p/checkout/start";
+    document.body.append(form);
+    form.submit();
+  });
+}
+
+export async function startSameOriginCheckout(page: Page, shop: string, slug = "tricko-basic") {
+  await page.goto(`${shop}/`);
+  await addLine(page, shop, slug);
+  await Promise.all([page.waitForURL(`${shop}/checkout`), submitStart(page)]);
+}
+
+/** Fills a shop cart through the edge (optionally with a coupon) and hands it to checkout. */
+export async function toCheckout(
+  page: Page,
+  shop: string,
+  slug: string,
+  quantity = 1,
+  coupon?: string,
+): Promise<CartModel> {
+  await page.goto(`${shop}/`);
+  await addLine(page, shop, slug, quantity);
   if (coupon) {
     const applied = await page.request.post(`${shop}/_p/cart/coupons`, {
       headers: { origin: shop, ...rateHeaders(page) },
@@ -99,16 +170,7 @@ export async function toCheckout(
   const cart = (await (
     await page.request.get(`${shop}/_p/cart`, { headers: rateHeaders(page) })
   ).json()) as CartModel;
-  await Promise.all([
-    page.waitForURL(`${checkoutOf(shop)}/`),
-    page.evaluate(() => {
-      const form = document.createElement("form");
-      form.method = "post";
-      form.action = "/_p/checkout/start";
-      document.body.append(form);
-      form.submit();
-    }),
-  ]);
+  await Promise.all([page.waitForURL(`${checkoutOf(shop)}/`), submitStart(page)]);
   await checkoutReady(page);
   return cart;
 }

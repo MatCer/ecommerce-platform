@@ -5,6 +5,9 @@
 	auto_https disable_redirects
 	skip_install_trust
 	admin off
+	servers {
+		protocols h1 h2
+	}
 }
 
 # Service-to-service endpoints stay on the compose network: /internal/* is never proxied.

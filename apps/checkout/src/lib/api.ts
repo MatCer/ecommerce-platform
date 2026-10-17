@@ -15,11 +15,6 @@ import type {
   WithdrawalForm,
 } from "@platform/storefront-sdk/types";
 
-/**
- * CHECKOUT binding calls. The edge injects tenant, market, the checkout-scoped cart capability
- * (`__Host-cart`), the customer session (`__Host-sid`) and the consent subject; this app never
- * sees credentials.
- */
 export function checkoutApi(request: Request) {
   const ctx = request.headers.get("x-platform-ctx") ?? "";
   const get = async <T>(path: string): Promise<T | null> => {
@@ -78,6 +73,9 @@ export function checkoutApi(request: Request) {
 }
 
 const TOKEN = /^[0-9a-f]{64}$/;
+
+export const pageToken = (request: Request) =>
+  request.headers.get("x-platform-page-token") ?? undefined;
 
 /** The shop origin of this checkout origin (`checkout.demo.localhost` → `demo.localhost`). */
 export function shopUrl(url: URL): string {

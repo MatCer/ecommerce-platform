@@ -163,6 +163,11 @@ export async function packArtifact(opts: {
     assets[`/${f}`] = await hashFile(path.join(clientDir, f), `client/${f}`);
 
   refuseReservedAssets(opts.kind, assets);
+  refuseUnprefixedCheckout(
+    opts.kind,
+    assets,
+    [...contents].filter(([label]) => label.startsWith("server/")),
+  );
 
   const tokens = opts.tokensFile
     ? validateTokens(JSON.parse(await readFile(opts.tokensFile, "utf8")))
@@ -215,6 +220,28 @@ function refuseReservedAssets(kind: ArtifactKind, assets: Record<string, AssetEn
   if (reserved) throw new Error(`artifact: theme file at reserved platform path ${reserved}`);
 }
 
+const CHECKOUT_ASSET_RE = /^\/_checkout\/([0-9a-f]{16})\//;
+
+function refuseUnprefixedCheckout(
+  kind: ArtifactKind,
+  assets: Record<string, AssetEntry>,
+  modules: [string, Buffer][],
+) {
+  if (kind !== "checkout") return;
+  const ids = new Set<string>();
+  for (const p of Object.keys(assets)) {
+    const id = CHECKOUT_ASSET_RE.exec(p)?.[1];
+    if (!id) throw new Error(`artifact: checkout asset outside /_checkout/<build id>/: ${p}`);
+    ids.add(id);
+  }
+  if (ids.size > 1)
+    throw new Error(
+      `artifact: checkout assets under more than one build id: ${[...ids].join(", ")}`,
+    );
+  const legacy = modules.find(([, body]) => body.includes("/_astro/"));
+  if (legacy) throw new Error(`artifact: checkout server module ${legacy[0]} references /_astro/`);
+}
+
 /**
  * Checks what the content address does not cover: the manifest's runtime section must be the
  * platform's (A22). The id covers every module and asset, the tokens, the CSP hashes and the
@@ -256,10 +283,14 @@ export async function verifyArtifact(root: string, id: string): Promise<Artifact
   const present = new Set(await listFiles(dir));
   const expected = new Set(["manifest.json"]);
   const server: [string, string][] = [];
+  const modules: [string, Buffer][] = [];
   for (const mod of m.runtime.modules) {
     expected.add(`server/${mod}`);
-    server.push([mod, sha256(await readFile(path.join(dir, "server", mod)))]);
+    const body = await readFile(path.join(dir, "server", mod));
+    server.push([mod, sha256(body)]);
+    modules.push([`server/${mod}`, body]);
   }
+  refuseUnprefixedCheckout(m.kind, m.assets, modules);
   for (const [p, entry] of Object.entries(m.assets)) {
     expected.add(`client${p}`);
     const body = await readFile(path.join(dir, "client", p));

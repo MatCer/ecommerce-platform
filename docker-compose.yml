@@ -186,6 +186,7 @@ services:
       PUBLIC_SCHEME: http
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-api-token-0123456789abcdef}
       EDGE_PURGE_TOKEN: ${EDGE_PURGE_TOKEN:-local-edge-purge-token-0123456789}
+      EDGE_PAGE_TOKEN_SECRET: ${EDGE_PAGE_TOKEN_SECRET:-local-edge-page-token-secret-0123456789abcdef}
       # WP23: theme previews may be framed by the admin only (A21).
       ADMIN_ORIGIN: http://admin.localhost:${HTTP_PORT:-8080}
       # The widget origin is allowed in the checkout CSP (script + frame source) only.

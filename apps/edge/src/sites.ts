@@ -76,6 +76,14 @@ export function checkoutPolicy(
   );
 }
 
+export type SameOriginSite = Site & { shopOrigin: string };
+
+export function sameOriginShop(site: Site): site is SameOriginSite {
+  return (
+    site.shopOrigin !== undefined && checkoutPolicy(site, site.shopOrigin).mode === "same_origin"
+  );
+}
+
 export interface SiteResolver {
   resolve(shopHost: string): Promise<Site | null>;
 }

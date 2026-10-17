@@ -149,7 +149,7 @@ backup-drill: ## A29 drill: backup, wipe volumes, make up, restore, verify (need
 	scripts/backup-drill.sh
 
 e2e: ## Playwright suites against the running stack (`make up` first; at most 4 workers)
-	HTTP_PORT=$(or $(HTTP_PORT),8080) pnpm --filter @platform/e2e exec playwright test $(args)
+	HTTP_PORT=$(or $(HTTP_PORT),8080) HTTPS_PORT=$(or $(HTTPS_PORT),8443) pnpm --filter @platform/e2e exec playwright test $(args)
 
 perf: ## Lab budget + axe gate (spec §9.6/A26) against the running stack over HTTPS/h2
 	node packages/theme-kit/src/measure.ts --base https://demo.localhost:$(HTTPS_PORT) --runs 3

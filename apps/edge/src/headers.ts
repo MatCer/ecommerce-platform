@@ -89,6 +89,21 @@ export function contentSecurityPolicy(
   ].join("; ");
 }
 
+const PLATFORM_FALLBACK_CSP =
+  "default-src 'none'; frame-ancestors 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'";
+
+/** `strict-origin`, not `no-referrer`, keeps the page's own form POSTs from sending `Origin: null`. */
+export const PLATFORM_REFERRER_POLICY = "strict-origin";
+
+export function platformPageHeaders(csp: string | null): Record<string, string> {
+  return {
+    ...securityHeaders("checkout", csp ?? PLATFORM_FALLBACK_CSP),
+    "cache-control": "no-store",
+    "referrer-policy": PLATFORM_REFERRER_POLICY,
+    "x-frame-options": "DENY",
+  };
+}
+
 export function securityHeaders(profile: CspProfile, csp: string): Record<string, string> {
   return {
     "content-security-policy": csp,

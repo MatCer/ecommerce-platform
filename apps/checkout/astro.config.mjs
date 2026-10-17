@@ -1,7 +1,34 @@
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cloudflare from "@astrojs/cloudflare";
 import solid from "@astrojs/solid-js";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
+
+const repo = fileURLToPath(new URL("../..", import.meta.url));
+const sha256 = (data) => createHash("sha256").update(data).digest("hex");
+const files = (rel) =>
+  statSync(path.join(repo, rel)).isDirectory()
+    ? readdirSync(path.join(repo, rel), { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => path.relative(repo, path.join(e.parentPath, e.name)))
+    : [rel];
+const inputs = [
+  "apps/checkout/src",
+  "apps/checkout/astro.config.mjs",
+  "apps/checkout/package.json",
+  "packages/storefront-sdk/src",
+  "packages/storefront-sdk/package.json",
+  "pnpm-lock.yaml",
+].flatMap(files);
+const buildId = sha256(
+  inputs
+    .sort()
+    .map((f) => `${f}\0${sha256(readFileSync(path.join(repo, f)))}\n`)
+    .join(""),
+).slice(0, 16);
 
 // Platform-owned checkout app (spec §9.4, A1): one artifact for all tenants, served by the edge
 // on `checkout.<shop-host>` with the CHECKOUT binding. Styled by the tenant's tokens
@@ -11,7 +38,7 @@ export default defineConfig({
   adapter: cloudflare({ imageService: "passthrough" }),
   session: false,
   integrations: [solid()],
-  build: { inlineStylesheets: "never" },
+  build: { assets: `_checkout/${buildId}`, inlineStylesheets: "never" },
   prefetch: false,
   vite: { plugins: [tailwindcss()] },
 });
