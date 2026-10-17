@@ -18,11 +18,13 @@ export async function call<T = unknown>(
   extraHeaders: Record<string, string> = {},
 ): Promise<Result<T>> {
   try {
+    const pageToken = document.querySelector<HTMLMetaElement>('meta[name="page-token"]')?.content;
     const res = await fetch(path, {
       method,
       credentials: "same-origin",
       headers: {
         ...(body === undefined ? {} : { "content-type": "application/json" }),
+        ...(pageToken ? { "x-page-token": pageToken } : {}),
         ...extraHeaders,
       },
       body: body === undefined ? undefined : JSON.stringify(body),

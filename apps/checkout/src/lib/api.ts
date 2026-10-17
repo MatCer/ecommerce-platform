@@ -17,8 +17,8 @@ import type {
 
 /**
  * CHECKOUT binding calls. The edge injects tenant, market, the checkout-scoped cart capability
- * (`__Host-cart`), the customer session (`__Host-sid`) and the consent subject; this app never
- * sees credentials.
+ * (`__Host-cart`, `__Host-Http-cart` on a same-origin shop), the customer session (`__Host-sid`)
+ * and the consent subject; this app never sees credentials.
  */
 export function checkoutApi(request: Request) {
   const ctx = request.headers.get("x-platform-ctx") ?? "";
@@ -78,6 +78,12 @@ export function checkoutApi(request: Request) {
 }
 
 const TOKEN = /^[0-9a-f]{64}$/;
+
+/** The page token (C4) the edge minted for this render, for `<meta name="page-token">`. */
+export function pageToken(request: Request): string | undefined {
+  const token = request.headers.get("x-platform-page-token");
+  return token !== null && /^[A-Za-z0-9_-]{43}$/.test(token) ? token : undefined;
+}
 
 /** The shop origin of this checkout origin (`checkout.demo.localhost` → `demo.localhost`). */
 export function shopUrl(url: URL): string {

@@ -1,6 +1,6 @@
 ---
 import { t } from "@platform/storefront-sdk/format";
-import CheckoutForm from "../islands/CheckoutForm";
+import OpenCheckout from "../components/OpenCheckout.astro";
 import ResumePlacement from "../islands/ResumePlacement";
 import Checkout from "../layouts/Checkout.astro";
 import { checkoutApi, messages, shopUrl } from "../lib/api";
@@ -31,24 +31,7 @@ const back = shopUrl(Astro.url);
       </p>
       </>
     ) : (
-      <CheckoutForm
-        client:load
-        m={messages(
-          m,
-          "checkout.",
-          "cart.",
-          "address.",
-          "account.email",
-          "account.invalid_email",
-          "legal.terms",
-          "consent.email_marketing_hint",
-        )}
-        locale={shop?.locale ?? "cs"}
-        initial={view}
-        customerEmail={me?.email}
-        saved={saved}
-        shopUrl={back}
-      />
+      <OpenCheckout shop={shop} view={view} customerEmail={me?.email} saved={saved} shopUrl={back} />
     )
   }
 </Checkout>

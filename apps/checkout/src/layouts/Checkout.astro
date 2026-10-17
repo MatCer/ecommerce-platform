@@ -11,6 +11,7 @@ interface Props {
   withdrawalLabel?: string;
   /** The two-column checkout needs more room than the account pages. */
   wide?: boolean;
+  pageToken?: string;
 }
 const {
   title,
@@ -20,6 +21,7 @@ const {
   accountLabel = "Můj účet",
   withdrawalLabel = "Odstoupení od smlouvy",
   wide = false,
+  pageToken,
 } = Astro.props;
 const width = wide ? "max-w-5xl" : "max-w-3xl";
 ---
@@ -30,6 +32,7 @@ const width = wide ? "max-w-5xl" : "max-w-3xl";
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
+    {pageToken && <meta name="page-token" content={pageToken} />}
     <title>{title} – {shopName}</title>
     <!-- Tenant design tokens (theme.tokens.json → CSS), served by the edge. -->
     <link rel="stylesheet" href="/_p/tokens.css" />

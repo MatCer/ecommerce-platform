@@ -1,0 +1,34 @@
+---
+import type { Address, CheckoutView, ShopModel } from "@platform/storefront-sdk/types";
+import CheckoutForm from "../islands/CheckoutForm";
+import { messages } from "../lib/api";
+
+interface Props {
+  shop: ShopModel | null;
+  view: CheckoutView;
+  customerEmail?: string | undefined;
+  saved: Address[];
+  shopUrl: string;
+}
+const { shop, view, customerEmail, saved, shopUrl } = Astro.props;
+const m = shop?.messages ?? {};
+---
+
+<CheckoutForm
+  client:load
+  m={messages(
+    m,
+    "checkout.",
+    "cart.",
+    "address.",
+    "account.email",
+    "account.invalid_email",
+    "legal.terms",
+    "consent.email_marketing_hint",
+  )}
+  locale={shop?.locale ?? "cs"}
+  initial={view}
+  customerEmail={customerEmail}
+  saved={saved}
+  shopUrl={shopUrl}
+/>

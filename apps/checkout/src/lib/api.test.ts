@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 const binding = vi.hoisted(() => ({ fetch: vi.fn<typeof fetch>() }));
 vi.mock("cloudflare:workers", () => ({ env: { CHECKOUT: binding } }));
 
-import { checkoutApi } from "./api";
+import { checkoutApi, pageToken } from "./api";
 
 const api = checkoutApi(
   new Request("https://checkout.example/", { headers: { "x-platform-ctx": "context" } }),
@@ -44,4 +44,24 @@ test("expired withdrawal links return null; upstream failures are not presented 
   await expect(api.withdrawalForm(token)).resolves.toBeNull();
   binding.fetch.mockResolvedValueOnce(new Response(null, { status: 503 }));
   await expect(api.withdrawalForm(token)).rejects.toThrow("checkout API 503");
+});
+
+test("pageToken takes only a well-formed token from the edge's request header", () => {
+  const minted = "Ab-_9".repeat(8).concat("xyz");
+  const read = (value?: string) =>
+    pageToken(
+      new Request("https://fresh.example/checkout", {
+        headers: value === undefined ? {} : { "x-platform-page-token": value },
+      }),
+    );
+  expect(read(minted)).toBe(minted);
+  for (const bad of [
+    undefined,
+    "",
+    minted.slice(1),
+    `${minted}x`,
+    `${minted.slice(1)}=`,
+    `${minted.slice(1)}+`,
+  ])
+    expect(read(bad), bad).toBeUndefined();
 });

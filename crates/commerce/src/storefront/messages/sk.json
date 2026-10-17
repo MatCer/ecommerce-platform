@@ -112,6 +112,8 @@
   "checkout.placing": "Odosielam objednávku…",
   "checkout.price_updated": "Celková cena sa podľa adresy zmenila. Skontrolujte zhrnutie a potvrďte objednávku znova.",
   "checkout.required_legal": "Na odoslanie objednávky potvrďte obchodné podmienky a poučenie o odstúpení.",
+  "checkout.restart": "Pokračovať do pokladne",
+  "checkout.restarted": "Pokladňa bola medzitým spustená znova alebo vypršala. Pokračujte s aktuálnym košíkom.",
   "checkout.resuming": "Dokončujeme vašu objednávku…",
   "checkout.review": "Zhrnutie a odoslanie",
   "checkout.reviews": "Po nákupe ma môžete požiadať o hodnotenie",

@@ -1,0 +1,41 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import OpenCheckout from "../components/OpenCheckout.astro";
+import Checkout from "../layouts/Checkout.astro";
+import { checkoutApi, pageToken, shopUrl } from "../lib/api";
+import { Button } from "../ui.tsx";
+
+// The same-origin checkout on the shop (C1, C4, C10); the edge renders it only there, and the
+// shop has no account session, so it never reads the customer.
+const api = checkoutApi(Astro.request);
+const [shop, view] = await Promise.all([api.shop(), api.checkout()]);
+const open = view !== null && view.cart.lines.length > 0;
+const m = shop?.messages ?? {};
+const back = shopUrl(Astro.url);
+---
+
+<Checkout
+  title={t(m, "checkout.title")}
+  shopName={shop?.name ?? ""}
+  shopUrl={back}
+  lang={shop?.locale ?? "cs"}
+  accountLabel={t(m, "account.nav")}
+  wide
+  pageToken={open ? pageToken(Astro.request) : undefined}
+>
+  <h1 class="mb-4 font-display text-2xl font-bold">{t(m, "checkout.title")}</h1>
+  {
+    open ? (
+      <OpenCheckout shop={shop} view={view} saved={[]} shopUrl={back} />
+    ) : (
+      <div class="grid max-w-xl justify-items-start gap-4">
+        <p role="status">{t(m, "checkout.restarted")}</p>
+        <form method="post" action="/_p/checkout/start">
+          <Button type="submit" variant="primary">
+            {t(m, "checkout.restart")}
+          </Button>
+        </form>
+      </div>
+    )
+  }
+</Checkout>
