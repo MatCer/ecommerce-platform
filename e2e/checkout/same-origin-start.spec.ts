@@ -53,10 +53,10 @@ test("a start answered after a newer one shows the restart notice; only a new st
   );
   const context = await securityContext(browser);
   const first = await context.newPage();
-  const second = await context.newPage();
-  await first.goto(`${FRESH_HTTPS}/`);
+  await first.goto(`${FRESH_HTTPS}/`, { waitUntil: "domcontentloaded" });
   await addLine(first, FRESH_HTTPS, "tricko-basic");
-  await second.goto(`${FRESH_HTTPS}/`);
+  const second = await context.newPage();
+  await second.goto(`${FRESH_HTTPS}/`, { waitUntil: "domcontentloaded" });
   const frozenShopCart = (await cookieValue(context, "cart")) ?? "";
   expect(frozenShopCart).toMatch(CAPABILITY);
 
@@ -67,10 +67,10 @@ test("a start answered after a newer one shows the restart notice; only a new st
   expect(b.cap).not.toBe(a.cap);
 
   await startB.fulfill({ response: b.response });
-  await second.waitForURL(`${FRESH_HTTPS}/checkout`);
+  await second.waitForURL(`${FRESH_HTTPS}/checkout`, { waitUntil: "domcontentloaded" });
   await expect(pageTokenMeta(second), "the newer start opens").toHaveCount(1);
   await startA.fulfill({ response: a.response });
-  await first.waitForURL(`${FRESH_HTTPS}/checkout`);
+  await first.waitForURL(`${FRESH_HTTPS}/checkout`, { waitUntil: "domcontentloaded" });
   expect(await cookieValue(context, "__Host-Http-cart"), "tab 1 presents A").toBe(a.cap);
   await expect(restartNotice(first)).toHaveText(RESTARTED);
   await expect(pageTokenMeta(first)).toHaveCount(0);

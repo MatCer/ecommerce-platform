@@ -127,18 +127,23 @@ test("with the theme CSP bypassed, a frame of the platform page gets a 403 and t
   const framed = theme.waitForResponse(
     (r) => r.url() === `${FRESH_HTTPS}/checkout` && r.frame() !== theme.mainFrame(),
   );
-  const read = await theme.evaluate(
-    () =>
-      new Promise<string>((resolve) => {
-        const frame = document.createElement("iframe");
-        frame.onload = () => resolve(frame.contentDocument?.documentElement?.outerHTML ?? "");
-        frame.src = "/checkout";
-        document.body.append(frame);
-      }),
-  );
+  await theme.evaluate(() => {
+    const frame = document.createElement("iframe");
+    frame.id = "probe-frame";
+    frame.src = "/checkout";
+    document.body.append(frame);
+  });
   const response = await framed;
   expect(await response.request().headerValue("sec-fetch-dest")).toBe("iframe");
   expect(response.status()).toBe(403);
+  const read = await theme.evaluate(() => {
+    const frame = document.getElementById("probe-frame") as HTMLIFrameElement | null;
+    try {
+      return frame?.contentDocument?.documentElement?.outerHTML ?? "";
+    } catch {
+      return "";
+    }
+  });
   expect(read).not.toContain(marker);
   await page.context().close();
 });
@@ -287,15 +292,9 @@ test("service worker registration fails on theme and platform pages", async ({ b
     [page, "/_checkout/"],
   ] as const) {
     const outcome = await on.evaluate(async (prefix) => {
-      const script = performance
-        .getEntriesByType("resource")
-        .map((e) => new URL(e.name))
-        .find(
-          (u) =>
-            u.origin === location.origin &&
-            u.pathname.startsWith(prefix) &&
-            u.pathname.endsWith(".js"),
-        )?.href;
+      const script = Array.from(document.querySelectorAll("astro-island[component-url]"))
+        .map((island) => new URL(island.getAttribute("component-url") ?? "", location.href))
+        .find((u) => u.origin === location.origin && u.pathname.startsWith(prefix))?.href;
       if (!script) return { script };
       const blocked = new Promise<string>((resolve) =>
         document.addEventListener("securitypolicyviolation", (e) => {
