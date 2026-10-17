@@ -107,3 +107,20 @@ export function createStorefront({
 }
 
 export type Storefront = ReturnType<typeof createStorefront>;
+
+/**
+ * The visitor's arm of the running A/B experiment `name` (SHOP-100). One artifact holds every
+ * arm's components and the server renders only this one; `null` (not enrolled, or another
+ * experiment runs) renders control. The edge decides the arm, a theme only reads it.
+ *
+ * ```astro
+ * ---
+ * const BuyPanel = experimentArm(Astro.request, "buy-panel") === "b" ? BuyPanelB : BuyPanelA;
+ * ---
+ * <BuyPanel product={page.product} />
+ * ```
+ */
+export function experimentArm(request: Request, name: string): string | null {
+  const [experiment, arm] = (request.headers.get("x-platform-arm") ?? "").split(":");
+  return experiment === name && arm ? arm : null;
+}

@@ -34,7 +34,16 @@ export interface Site {
    * artifact; nothing is cached, counted or handed to the checkout.
    */
   preview?: { revision: number; expiresAt: number };
-  experiment?: { id: string; version: number } | null;
+  experiment?: RunningExperiment | null;
+}
+
+/** `commerce::experiments::ExperimentRef`. */
+export interface RunningExperiment {
+  id: string;
+  version: number;
+  name: string;
+  /** A whole-theme test: this arm's visitors get another revision's artifact (SHOP-100). */
+  theme_arm?: { arm: string; artifact: string } | null;
 }
 
 export type CheckoutMode = "isolated" | "same_origin";
@@ -130,7 +139,7 @@ interface Resolved {
   retained_artifacts: string[];
   checkout_artifact: string | null;
   checkout_origins: CheckoutPolicy[];
-  experiment?: { id: string; version: number } | null;
+  experiment?: RunningExperiment | null;
 }
 
 /**
