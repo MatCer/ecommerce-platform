@@ -1,0 +1,81 @@
+---
+import { controlClass, hintClass, labelClass } from "../ui.tsx";
+
+export interface Props {
+  name: string;
+  label: string;
+  value: string;
+  autocomplete: string;
+  type?: "text" | "email" | "tel";
+  required?: boolean;
+  ariaRequired?: boolean;
+  maxlength?: number;
+  pattern?: string;
+  hint?: string;
+  problemId?: string | undefined;
+  options?: readonly { value: string; label: string }[];
+  class?: string;
+}
+const {
+  name,
+  label,
+  value,
+  autocomplete,
+  type = "text",
+  required = false,
+  ariaRequired = false,
+  maxlength,
+  pattern,
+  hint,
+  problemId,
+  options,
+  class: className = "",
+} = Astro.props;
+const id = `co-${name}`;
+const hintId = hint ? `${id}-hint` : undefined;
+const describedBy = [problemId, hintId].filter(Boolean).join(" ") || undefined;
+const control = {
+  id,
+  name,
+  autocomplete,
+  required,
+  "aria-required": ariaRequired ? ("true" as const) : undefined,
+  "aria-invalid": problemId ? ("true" as const) : undefined,
+  "aria-describedby": describedBy,
+  autofocus: Boolean(problemId),
+};
+---
+
+<div class:list={["flex flex-col gap-1", className]}>
+  <label for={id} class={labelClass}>
+    {label}
+    {(required || ariaRequired) && <span aria-hidden="true"> *</span>}
+  </label>
+  {
+    options ? (
+      <select {...control} class={`${controlClass} pr-7`}>
+        {options.map((o) => (
+          <option value={o.value} selected={o.value === value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        {...control}
+        type={type}
+        value={value}
+        maxlength={maxlength}
+        pattern={pattern}
+        class={controlClass}
+      />
+    )
+  }
+  {
+    hint && (
+      <p id={hintId} class={hintClass}>
+        {hint}
+      </p>
+    )
+  }
+</div>

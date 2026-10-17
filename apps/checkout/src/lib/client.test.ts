@@ -12,29 +12,75 @@ function page(token: string | null) {
 }
 
 function answer(status: number) {
-  const fetch = vi.fn(async () => new Response(null, { status }));
+  const fetch = vi.fn(async () =>
+    status === 200
+      ? Response.json({ ok: true })
+      : Response.json({ code: `code_${status}` }, { status }),
+  );
   vi.stubGlobal("fetch", fetch);
   return fetch;
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
-test("a platform page whose token the edge refuses reloads /checkout and sends the call once", async () => {
-  const assign = page("page-token");
-  const fetch = answer(403);
-  const r = await call("PUT", "/_p/checkout/shipping", { method_id: "m" });
-  expect(fetch).toHaveBeenCalledTimes(1);
-  expect(assign).toHaveBeenCalledTimes(1);
-  expect(new URL(assign.mock.calls[0]?.[0] as string, "https://shop.test").pathname).toBe(
-    "/checkout",
-  );
-  expect(r.ok).toBe(false);
-});
+const calls: [string, "GET" | "PUT" | "POST", string, unknown, Record<string, string>][] = [
+  ["a read", "GET", "/_p/checkout", undefined, {}],
+  ["a choice", "PUT", "/_p/checkout/shipping", { method_id: "m" }, {}],
+  [
+    "the placement",
+    "POST",
+    "/_p/checkout/place-order",
+    { version: 1 },
+    { "idempotency-key": "key-1" },
+  ],
+];
 
-test("a page without a page token keeps a refusal as an error and stays", async () => {
-  const assign = page(null);
-  answer(403);
+test.each(
+  calls.flatMap(([label, ...rest]) =>
+    [403, 404].map((status) => [label, status, ...rest] as const),
+  ),
+)(
+  "%s refused with %i on a page with a token reloads the stale checkout once and sends nothing more",
+  async (_, status, method, path, body, headers) => {
+    const assign = page("page-token");
+    const fetch = answer(status);
+    const r = await call(method, path, body, headers);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(assign.mock.calls).toEqual([["/checkout?error=stale_page"]]);
+    expect(r).toEqual({ ok: false, status, data: null, code: "stale_page" });
+  },
+);
+
+test.each([200, 409, 422])("a %i on a page with a token stays on the page", async (status) => {
+  const assign = page("page-token");
+  answer(status);
   const r = await call("PUT", "/_p/checkout/shipping", { method_id: "m" });
   expect(assign).not.toHaveBeenCalled();
-  expect(r).toMatchObject({ ok: false, status: 403 });
+  expect(r).toMatchObject({ ok: status === 200, status });
+  if (status !== 200) expect(r.code).toBe(`code_${status}`);
 });
+
+test("a network error on a page with a token stays on the page", async () => {
+  const assign = page("page-token");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new TypeError("offline");
+    }),
+  );
+  const r = await call("PUT", "/_p/checkout/shipping", { method_id: "m" });
+  expect(assign).not.toHaveBeenCalled();
+  expect(r).toEqual({ ok: false, status: 0, data: null, code: "network" });
+});
+
+test.each([403, 404])(
+  "a page without a page token keeps a %i as an error and stays",
+  async (status) => {
+    const assign = page(null);
+    answer(status);
+    const r = await call("PUT", "/_p/checkout/shipping", { method_id: "m" });
+    expect(assign).not.toHaveBeenCalled();
+    expect(r).toEqual({ ok: false, status, data: null, code: `code_${status}` });
+  },
+);

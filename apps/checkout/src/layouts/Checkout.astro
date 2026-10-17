@@ -12,6 +12,7 @@ interface Props {
   /** The two-column checkout needs more room than the account pages. */
   wide?: boolean;
   pageToken?: string;
+  platformLinks?: boolean;
 }
 const {
   title,
@@ -22,6 +23,7 @@ const {
   withdrawalLabel = "Odstoupení od smlouvy",
   wide = false,
   pageToken,
+  platformLinks = true,
 } = Astro.props;
 const width = wide ? "max-w-5xl" : "max-w-3xl";
 ---
@@ -41,16 +43,24 @@ const width = wide ? "max-w-5xl" : "max-w-3xl";
     <header class="border-b border-border bg-card">
       <div class:list={["mx-auto flex h-14 items-center justify-between px-4", width]}>
         <a href={shopUrl} class="font-display font-extrabold">{shopName}</a>
-        <nav aria-label={accountLabel} class="flex gap-4 text-sm">
-          <a href="/account" class="underline-offset-4 hover:underline">{accountLabel}</a>
-        </nav>
+        {
+          platformLinks && (
+            <nav aria-label={accountLabel} class="flex gap-4 text-sm">
+              <a href="/account" class="underline-offset-4 hover:underline">{accountLabel}</a>
+            </nav>
+          )
+        }
       </div>
     </header>
     <main class:list={["mx-auto px-4 py-6", width]}>
       <slot />
     </main>
-    <footer class:list={["mx-auto px-4 py-6 text-sm text-muted-foreground", width]}>
-      <a href="/withdraw" class="underline">{withdrawalLabel}</a>
-    </footer>
+    {
+      platformLinks && (
+        <footer class:list={["mx-auto px-4 py-6 text-sm text-muted-foreground", width]}>
+          <a href="/withdraw" class="underline">{withdrawalLabel}</a>
+        </footer>
+      )
+    }
   </body>
 </html>

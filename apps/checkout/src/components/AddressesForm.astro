@@ -1,0 +1,136 @@
+---
+import { t } from "@platform/storefront-sdk/format";
+import { type AddressValues, type Problem, regionName } from "../lib/checkout-steps";
+import { Button, headingClass, sectionClass } from "../ui.tsx";
+import Field from "./Field.astro";
+
+interface Props {
+  m: Record<string, string>;
+  locale: string;
+  countries: readonly string[];
+  pageToken: string;
+  values: AddressValues;
+  problem: Problem | null;
+  canCancel: boolean;
+}
+const { m, locale, countries, pageToken, values, problem, canCancel } = Astro.props;
+const region = regionName(locale);
+
+const TEXT_FIELDS = [
+  { key: "name", label: "address.name", max: 200, token: "name", needed: true, wide: true },
+  {
+    key: "company",
+    label: "address.company",
+    max: 200,
+    token: "organization",
+    needed: false,
+    wide: true,
+  },
+  {
+    key: "street",
+    label: "address.street",
+    max: 200,
+    token: "street-address",
+    needed: true,
+    wide: true,
+  },
+  {
+    key: "postal_code",
+    label: "address.postal_code",
+    max: 20,
+    token: "postal-code",
+    needed: true,
+    wide: false,
+  },
+  {
+    key: "city",
+    label: "address.city",
+    max: 100,
+    token: "address-level2",
+    needed: true,
+    wide: false,
+  },
+] as const;
+
+const fields = (prefix: "billing" | "shipping") => {
+  const a = values[prefix];
+  const billing = prefix === "billing";
+  const autocomplete = (token: string) => (billing ? token : `shipping ${token}`);
+  const options = countries.map((c) => ({ value: c, label: region(c) }));
+  if (a.country && !countries.includes(a.country))
+    options.push({ value: a.country, label: region(a.country) });
+  return [
+    ...TEXT_FIELDS.map((f) => ({
+      name: `${prefix}_${f.key}`,
+      label: t(m, f.label),
+      value: a[f.key] ?? "",
+      autocomplete: autocomplete(f.token),
+      maxlength: f.max,
+      required: billing && f.needed,
+      ariaRequired: !billing && f.needed,
+      class: f.wide ? "sm:col-span-2" : "",
+    })),
+    {
+      name: `${prefix}_country`,
+      label: t(m, "address.country"),
+      value: a.country,
+      autocomplete: autocomplete("country"),
+      required: billing,
+      options,
+      class: "sm:col-span-2",
+    },
+  ];
+};
+---
+
+<section aria-labelledby="co-address" class={sectionClass}>
+  <h2 id="co-address" class:list={["mb-3", headingClass]}>2. {t(m, "checkout.address")}</h2>
+  <form method="post" action="/checkout/addresses" data-details class="grid gap-4">
+    <input type="hidden" name="_pt" value={pageToken} />
+    {
+      problem && (
+        <p
+          id="addresses-problem"
+          role="alert"
+          tabindex="-1"
+          autofocus
+          class="rounded-md border border-sale p-2 text-sm text-sale"
+        >
+          {t(m, problem.message)}
+        </p>
+      )
+    }
+    <div class="grid gap-3 sm:grid-cols-2">
+      {fields("billing").map((f) => <Field {...f} />)}
+    </div>
+    <div class="flex flex-wrap items-center gap-x-2">
+      <input
+        type="checkbox"
+        id="ship_elsewhere"
+        name="ship_elsewhere"
+        value="1"
+        checked={values.elsewhere}
+        class="peer size-4 accent-[var(--color-identity)]"
+      />
+      <label for="ship_elsewhere" class="inline-flex min-h-control items-center text-sm">
+        {t(m, "checkout.ship_elsewhere")}
+      </label>
+      <fieldset class="hidden w-full border-t border-border pt-4 peer-checked:block">
+        <legend class="mb-2 text-sm font-semibold">{t(m, "checkout.delivery_address")}</legend>
+        <div class="grid gap-3 sm:grid-cols-2">
+          {fields("shipping").map((f) => <Field {...f} />)}
+        </div>
+      </fieldset>
+    </div>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <Button type="submit" variant="primary">{t(m, "checkout.save_continue")}</Button>
+      {
+        canCancel && (
+          <a href="/checkout" class="inline-flex h-control items-center text-sm text-identity-ink underline">
+            {t(m, "address.cancel")}
+          </a>
+        )
+      }
+    </div>
+  </form>
+</section>
