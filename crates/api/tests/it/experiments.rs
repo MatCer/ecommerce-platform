@@ -15,15 +15,25 @@ use crate::common::*;
 const ENROL: &str = "/internal/v1/experiments/enrol";
 const SUBJECT: &str = "0123456789abcdef0123456789abcdef";
 
+fn two_empty_arms() -> serde_json::Value {
+    json!([
+        {"key": "control", "weight": 50, "config": {}},
+        {"key": "b", "weight": 50, "config": {}},
+    ])
+}
+
 async fn draft(runtime: &PgPool, tenant: Uuid) -> Uuid {
+    draft_with(runtime, tenant, two_empty_arms()).await
+}
+
+async fn draft_with(runtime: &PgPool, tenant: Uuid, arms: serde_json::Value) -> Uuid {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO experiments (tenant_id, name, version, arms)
-           VALUES ($1, 'homepage', 1,
-                   '[{"key":"control","weight":50,"config":{}},{"key":"b","weight":50,"config":{}}]')
-           RETURNING id"#,
+        "INSERT INTO experiments (tenant_id, name, version, arms)
+         VALUES ($1, 'homepage', 1, $2) RETURNING id",
     )
     .bind(tenant)
+    .bind(arms)
     .fetch_one(&mut *tx)
     .await
     .unwrap();
@@ -32,6 +42,10 @@ async fn draft(runtime: &PgPool, tenant: Uuid) -> Uuid {
 }
 
 async fn start(runtime: &PgPool, tenant: Uuid) -> Uuid {
+    start_with(runtime, tenant, two_empty_arms()).await
+}
+
+async fn start_with(runtime: &PgPool, tenant: Uuid, arms: serde_json::Value) -> Uuid {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let installed = legal::install(
         &mut tx,
@@ -49,7 +63,7 @@ async fn start(runtime: &PgPool, tenant: Uuid) -> Uuid {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    let id = draft(runtime, tenant).await;
+    let id = draft_with(runtime, tenant, arms).await;
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     experiments::start(&mut tx, "test", id).await.unwrap();
     tx.commit().await.unwrap();
@@ -308,5 +322,100 @@ async fn a_recorded_choice_tells_the_edge_whether_its_analytics_grant_covers_exp
         [Some("1".into()), None, None, None, None, None,],
         "analytics granted under the experiments wording, then the old wording; a later choice \
          without analytics keeps the old analytics record; withdrawal"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_edges_arm_overrides_the_home_hero_in_the_page_model(db: PgPool) {
+    let jwks = jwks_server(json!([jwk("a", X_A)])).await;
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "exp-hero").await;
+    let s = state(runtime.clone(), &jwks, Duration::from_secs(30));
+    let id = start_with(
+        &runtime,
+        shop.tenant,
+        json!([
+            {"key": "control", "weight": 1, "config": {}},
+            {"key": "b", "weight": 1, "config": {"hero": {
+                "title": {"cs": "Nová kolekce je tady", "sk": "Nová kolekcia je tu"},
+                "subtitle": {"cs": "Doprava zdarma nad 1 500 Kč"},
+                "cta": {"cs": "Prohlédnout kolekci"},
+            }}},
+            {"key": "title-only", "weight": 1, "config": {"hero": {"title": {"cs": "Jen titulek"}}}},
+            {"key": "unknown-key", "weight": 1, "config": {"tokens": {"color": "red"}}},
+            {"key": "too-long", "weight": 1, "config": {"hero": {"title": {"cs": "x".repeat(201)}}}},
+            {"key": "blank", "weight": 1, "config": {"hero": {"title": {"cs": "  "}}}},
+        ]),
+    )
+    .await;
+    let home = async |market: Uuid, experiment: Option<String>| {
+        let mut call = Call::get("/storefront/v1/pages/home")
+            .header("x-storefront-token", shop.token.clone())
+            .header("x-market", market.to_string());
+        if let Some(e) = experiment {
+            call = call.header("x-experiment", e);
+        }
+        let (status, body, _) = call.send(&s).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        body["hero"].clone()
+    };
+
+    let control = home(shop.cz, None).await;
+    let b = home(shop.cz, Some(format!("{id}:1:b"))).await;
+    assert_eq!(b["title"], "Nová kolekce je tady");
+    assert_eq!(b["subtitle"], "Doprava zdarma nad 1 500 Kč");
+    assert_eq!(b["cta"]["label"], "Prohlédnout kolekci");
+    assert_eq!(b["cta"]["href"], control["cta"]["href"]);
+    assert_eq!(b["image"], control["image"]);
+
+    let sk_control = home(shop.sk, None).await;
+    let sk_b = home(shop.sk, Some(format!("{id}:1:b"))).await;
+    assert_eq!(sk_b["title"], "Nová kolekcia je tu");
+    assert_eq!(
+        sk_b["subtitle"], "Doprava zdarma nad 1 500 Kč",
+        "a field without the locale falls back like other i18n texts"
+    );
+
+    let title_only = home(shop.cz, Some(format!("{id}:1:title-only"))).await;
+    assert_eq!(title_only["title"], "Jen titulek");
+    assert_eq!(title_only["subtitle"], control["subtitle"]);
+    assert_eq!(title_only["cta"], control["cta"]);
+
+    let other = Uuid::now_v7();
+    for (header, why) in [
+        (format!("{id}:1:control"), "the control arm"),
+        (format!("{id}:2:b"), "another version"),
+        (format!("{other}:1:b"), "another experiment"),
+        (format!("{id}:1:nope"), "no such arm"),
+        (
+            format!("{id}:1:unknown-key"),
+            "a config key the page model does not know",
+        ),
+        (format!("{id}:1:too-long"), "a title over 200 characters"),
+        (format!("{id}:1:blank"), "a blank title"),
+        ("garbage".to_owned(), "a malformed header"),
+    ] {
+        assert_eq!(
+            home(shop.cz, Some(header)).await,
+            control,
+            "{why} renders control"
+        );
+    }
+    assert_eq!(
+        home(shop.sk, Some(format!("{id}:1:control"))).await,
+        sk_control
+    );
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("UPDATE experiments SET status = 'stopped' WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        home(shop.cz, Some(format!("{id}:1:b"))).await,
+        control,
+        "a stopped experiment renders control"
     );
 }
