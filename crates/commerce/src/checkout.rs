@@ -839,8 +839,9 @@ pub async fn place_order(
     }
 
     // Stock and coupon first, number and rows after: the per-tenant number row lock is
-    // held only for the rest of the transaction. Lock order everywhere: cart, stock levels
-    // (by variant), coupon, order number, so concurrent placements cannot deadlock.
+    // held only for the rest of the transaction. Lock order everywhere: shop cart (a
+    // snapshot's source), checkout cart, stock levels (by variant), coupon, order number, so
+    // concurrent placements cannot deadlock.
     let order_id = crate::id::new_id();
     let now = Utc::now();
     let coupon = match &c.priced.coupon {
@@ -1079,12 +1080,7 @@ pub async fn place_order(
     let token = orders::issue_token(tx, order_id).await?;
     let view = orders::view(tx, order_id).await?;
     send_confirmation(tx, ctx, &view, &token).await?;
-    sqlx::query!(
-        "UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1",
-        cart_ref.id
-    )
-    .execute(&mut **tx)
-    .await?;
+    checkout_access::convert(tx, &cart_ref).await?;
     let stored = StoredPlacement {
         order_id,
         number: number.to_string(),

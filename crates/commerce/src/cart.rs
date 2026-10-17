@@ -221,6 +221,18 @@ pub(crate) async fn snapshot(tx: &mut TenantTx, source: &CartRef) -> Result<Cart
     })
 }
 
+/// Removes every line and the coupon of a cart its caller holds locked; the cart and its shop
+/// capability stay.
+pub(crate) async fn empty(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
+    sqlx::query!("DELETE FROM cart_lines WHERE cart_id = $1", cart_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query!("DELETE FROM cart_coupons WHERE cart_id = $1", cart_id)
+        .execute(&mut **tx)
+        .await?;
+    touch(tx, cart_id).await
+}
+
 /// The products in the open shop cart behind `token`, for cross-sell (WP17). Read-only: no
 /// lock and no activity bump, so a recommendation read never extends or blocks a cart. An
 /// unknown, expired or other-market capability reads as an empty cart.

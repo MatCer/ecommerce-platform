@@ -143,11 +143,16 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
         .await
         .unwrap()
         .unwrap();
-    let c = checkout_access::open(&mut tx, &ctx, &checkout)
-        .await
-        .unwrap();
+    fill(&mut tx, &ctx, m, &checkout, email).await;
+    tx.commit().await.unwrap();
+    checkout
+}
+
+/// Every checkout step of the checkout behind `checkout`: pickup point, fake payment.
+async fn fill(tx: &mut TenantTx, ctx: &Context, m: &Methods, checkout: &str, email: &str) {
+    let c = checkout_access::open(tx, ctx, checkout).await.unwrap();
     checkout::set_contact(
-        &mut tx,
+        tx,
         &c,
         &ContactInput {
             email: email.into(),
@@ -157,8 +162,8 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     .await
     .unwrap();
     checkout::set_addresses(
-        &mut tx,
-        &ctx,
+        tx,
+        ctx,
         &c,
         &AddressesInput {
             billing: address("CZ"),
@@ -168,8 +173,8 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     .await
     .unwrap();
     checkout::set_shipping(
-        &mut tx,
-        &ctx,
+        tx,
+        ctx,
         &c,
         &ShippingInput {
             method_id: m.pickup,
@@ -179,8 +184,8 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     .await
     .unwrap();
     checkout::set_payment(
-        &mut tx,
-        &ctx,
+        tx,
+        ctx,
         &settings(),
         &c,
         &PaymentInput {
@@ -189,8 +194,6 @@ async fn ready_cart(runtime: &PgPool, shop: &Shop, m: &Methods, qty: i32, email:
     )
     .await
     .unwrap();
-    tx.commit().await.unwrap();
-    checkout
 }
 
 async fn cart_ref(tx: &mut TenantTx, ctx: &Context, token: &str) -> CartRef {
@@ -1126,4 +1129,173 @@ async fn orders_and_methods_are_tenant_isolated(db: PgPool) {
     .execute(&mut *tx)
     .await;
     assert!(e.is_err());
+}
+
+async fn pid(tx: &mut TenantTx) -> i32 {
+    sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut **tx)
+        .await
+        .unwrap()
+}
+
+async fn blocked_by(db: &PgPool, waiter: i32, blocker: i32) {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            let blockers: Vec<i32> = sqlx::query_scalar("SELECT pg_blocking_pids($1)")
+                .bind(waiter)
+                .fetch_one(db)
+                .await
+                .unwrap();
+            if blockers.contains(&blocker) {
+                return;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("backend {waiter} never waited on {blocker}"));
+}
+
+async fn shop_cart_view(runtime: &PgPool, shop: &Shop, shop_token: &str) -> cart::CartView {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    let ctx = ctx(&mut tx, shop.cz).await;
+    let c = cart::find(&mut tx, &ctx, shop_token).await.unwrap();
+    let view = cart::view(&mut tx, &ctx, &c).await.unwrap();
+    tx.commit().await.unwrap();
+    view
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn placement_empties_the_source_cart(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 8).await;
+    let shop = testkit::storefront::shop(&runtime, "placesnap").await;
+    let m = methods(&runtime, &shop).await;
+    sqlx::query(
+        "UPDATE platform.checkout_origins SET history = 'merchant_attested_never_served',
+             attested_by = 'user-owner', attested_at = now(), attestation_version = 1
+         WHERE origin = $1",
+    )
+    .bind(shop.origin.as_str())
+    .execute(&runtime)
+    .await
+    .unwrap();
+    assert!(
+        checkout_access::switch_mode(
+            &runtime,
+            shop.tenant,
+            &shop.origin,
+            commerce::tenancy::CheckoutMode::SameOrigin
+        )
+        .await
+        .unwrap()
+    );
+    let line = NewLine {
+        variant_id: shop.variants[0],
+        quantity: 1,
+    };
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let sctx = ctx(&mut tx, shop.cz).await;
+    coupons::create(
+        &mut tx,
+        ACTOR,
+        &CouponInput {
+            code: "SOURCE10".into(),
+            discount: commerce::pricing::cart::CouponDiscount::Percent { basis_points: 1000 },
+            currency: None,
+            min_subtotal_minor: None,
+            starts_at: None,
+            ends_at: None,
+            usage_limit: None,
+            per_customer_limit: None,
+            published: false,
+        },
+    )
+    .await
+    .unwrap();
+    let (_, shop_token) = cart::create(&mut tx, &sctx).await.unwrap();
+    let source = cart::find(&mut tx, &sctx, &shop_token).await.unwrap();
+    cart::add_line(&mut tx, &sctx, &source, &line)
+        .await
+        .unwrap();
+    cart::apply_coupon(&mut tx, &sctx, &source, "SOURCE10")
+        .await
+        .unwrap();
+    let k = checkout_access::start(&mut tx, &sctx, &shop_token, None)
+        .await
+        .unwrap();
+    fill(&mut tx, &sctx, &m, &k, "jana@example.test").await;
+    tx.commit().await.unwrap();
+    let input = summary(&runtime, &shop, &k).await;
+    let before = shop_cart_view(&runtime, &shop, &shop_token).await;
+    assert!(before.coupon.is_some());
+
+    let mut placing = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let pctx = ctx(&mut placing, shop.cz).await;
+    checkout_access::open_for_order(&mut placing, &pctx, &k)
+        .await
+        .unwrap();
+    let placing_pid = pid(&mut placing).await;
+    let (pid_tx, pid_rx) = tokio::sync::oneshot::channel();
+    let queued = tokio::spawn({
+        let (runtime, tenant, market, shop_token) =
+            (runtime.clone(), shop.tenant, shop.cz, shop_token.clone());
+        async move {
+            let mut tx = tenant_tx(&runtime, tenant).await.unwrap();
+            let ctx = ctx(&mut tx, market).await;
+            pid_tx.send(pid(&mut tx).await).unwrap();
+            let r = checkout_access::start(&mut tx, &ctx, &shop_token, None).await;
+            tx.commit().await.unwrap();
+            r
+        }
+    });
+    blocked_by(&db, pid_rx.await.unwrap(), placing_pid).await;
+    let hash = serde_json::to_string(&input).unwrap();
+    checkout::place_order(
+        &mut placing,
+        &pctx,
+        &settings(),
+        &k,
+        "k1",
+        &hash,
+        &input,
+        &Placer::default(),
+    )
+    .await
+    .unwrap();
+    placing.commit().await.unwrap();
+    let r = queued.await.unwrap();
+    assert!(
+        matches!(&r, Err(Error::Conflict { code, .. }) if *code == "cart_empty"),
+        "the start queued behind the placement finds the cart empty: {r:?}"
+    );
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let octx = ctx(&mut tx, shop.cz).await;
+    let (ordered, open) = checkout_access::open_for_order(&mut tx, &octx, &k)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(!open, "the snapshot is converted");
+    assert_ne!(ordered.id, source.id, "the order's cart is the snapshot");
+    let emptied = shop_cart_view(&runtime, &shop, &shop_token).await;
+    assert_eq!(
+        emptied.id, source.id,
+        "the shop capability still opens the source"
+    );
+    assert!(emptied.lines.is_empty() && emptied.coupon.is_none());
+    assert!(emptied.version > before.version);
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let sctx = ctx(&mut tx, shop.cz).await;
+    let again = cart::find(&mut tx, &sctx, &shop_token).await.unwrap();
+    cart::add_line(&mut tx, &sctx, &again, &line).await.unwrap();
+    checkout_access::start(&mut tx, &sctx, &shop_token, Some(&k))
+        .await
+        .unwrap();
+    let r = checkout_access::open_for_order(&mut tx, &sctx, &k).await;
+    tx.commit().await.unwrap();
+    assert!(
+        matches!(r, Err(Error::NotFound)),
+        "a later start revokes the converted checkout's capability: {r:?}"
+    );
 }

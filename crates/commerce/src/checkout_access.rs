@@ -195,14 +195,52 @@ pub async fn open_any(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<C
 }
 
 /// The narrow recovery of a converted checkout for placement and its idempotent replay
-/// (A12): open or converted, no refresh. Returns whether the cart is still open.
+/// (A12): open or converted, no refresh. Returns whether the cart is still open. Locks the
+/// shop cart a snapshot was started from before the snapshot, as [`start`] does.
 pub async fn open_for_order(
     tx: &mut TenantTx,
     ctx: &Context,
     token: &str,
 ) -> Result<(CartRef, bool), Error> {
     let p = enter(tx, ctx).await?;
+    // `source_cart_id` never changes once written (except to NULL), so the inner read needs no
+    // lock; a start that revoked the snapshot meanwhile makes the guard miss.
+    sqlx::query!(
+        "SELECT 1 AS one FROM carts
+         WHERE id = (SELECT source_cart_id FROM carts WHERE checkout_token_hash = $1)
+         FOR UPDATE",
+        capability::hash(token)
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
     guard(tx, ctx, &p, token, true, false).await
+}
+
+/// Placement's last cart write (A12): the checkout becomes `converted`, and the shop cart it
+/// was started from, while still a shop cart, is emptied (P2-7).
+pub(crate) async fn convert(tx: &mut TenantTx, checkout: &CartRef) -> Result<(), Error> {
+    let source = sqlx::query_scalar!(
+        "UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1
+         RETURNING source_cart_id",
+        checkout.id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let Some(source) = source else {
+        return Ok(());
+    };
+    let shop_cart = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM carts
+                          WHERE id = $1 AND status = 'open' AND shop_token_hash IS NOT NULL)
+           AS "shop_cart!""#,
+        source
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if shop_cart {
+        cart::empty(tx, source).await?;
+    }
+    Ok(())
 }
 
 /// Replaces the capability `token` (re-authorized here) with a fresh one (C6, C10).
