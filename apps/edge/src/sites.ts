@@ -30,6 +30,12 @@ export interface Site {
    */
   clientIp?: string | undefined;
   /**
+   * Request-scoped, set by the gateway (never by the resolver): the exact shop origin of the
+   * request (scheme, host, non-default port), the same on `<shop>` and `checkout.<shop>`.
+   * Forwarded as `X-Shop-Origin`; the API binds checkout capabilities to it.
+   */
+  shopOrigin?: string | undefined;
+  /**
    * Set on `preview-<n>--<shop>` hosts (WP23, A21): the site carries the previewed revision's
    * artifact; nothing is cached, counted or handed to the checkout.
    */

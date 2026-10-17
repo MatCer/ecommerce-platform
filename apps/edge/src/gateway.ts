@@ -363,6 +363,7 @@ export function createGateway(opts: GatewayOptions) {
     "x-locale": site.locale,
     "x-storefront-token": site.storefront_token,
     ...(site.clientIp ? { "x-client-ip": site.clientIp } : {}),
+    ...(site.shopOrigin ? { "x-shop-origin": site.shopOrigin } : {}),
     ...extra,
   });
 
@@ -1814,7 +1815,11 @@ ${
     const resolved = await resolver.resolve(origin.shopHost);
     if (!resolved) return text(404, "Unknown shop");
     // A per-request copy: the resolver's cached object is shared between requests.
-    const site: Site = { ...resolved, clientIp };
+    const site: Site = {
+      ...resolved,
+      clientIp,
+      shopOrigin: new URL(`${scheme}://${origin.shopHost}${port}`).origin,
+    };
     return origin.kind === "shop"
       ? shop(site, req, publicUrl, host, port, clientIp)
       : checkout(site, req, publicUrl, host, port, clientIp);

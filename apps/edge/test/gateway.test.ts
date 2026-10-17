@@ -599,6 +599,7 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
       url: "http://api.test/storefront/v1/cart/handoff",
     });
     expect(api.calls.at(-1)?.headers["x-cart-token"]).toBe("carttoken_00000000000000000001");
+    expect(api.calls.at(-1)?.headers["x-shop-origin"]).toBe(shop);
     expect(start.headers.get("cache-control")).toBe("no-store");
     const setCookies = start.headers.getSetCookie();
     expect(setCookies[0]).toMatch(/^cart=; Path=\/_p; .*Max-Age=0$/); // rotated
@@ -627,6 +628,10 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     // Firefox sends no (or a `cross-site`) Sec-Fetch-Site on the shop's 303: the cookie decides.
     const exchanged = await get(location, bound);
     expect(exchanged.status).toBe(303);
+    expect(api.calls.at(-1)).toMatchObject({
+      url: "http://api.test/storefront/v1/checkout/handoff",
+    });
+    expect(api.calls.at(-1)?.headers["x-shop-origin"]).toBe(shop);
     expect(exchanged.headers.get("location")).toBe("/");
     expect(exchanged.headers.getSetCookie()).toEqual([
       "__Host-cart=checkouttoken_000000000001; Path=/; HttpOnly; Secure; SameSite=Lax",
@@ -653,6 +658,7 @@ describe("cart capability and checkout handoff (A1, A4)", () => {
     });
     expect(account.headers.get("content-security-policy")).not.toContain("stripe.com");
     expect(api.calls[0]?.headers["x-cart-token"]).toBe("checkouttoken_000000000001");
+    expect(api.calls[0]?.headers["x-shop-origin"]).toBe(shop);
   });
 
   test("handoffs are bound per token: interleaved tabs both redeem, stale links clear nothing else", async () => {
@@ -923,7 +929,7 @@ describe("checkout, order page and fake gateway (WP10)", () => {
     api.calls.length = 0;
     const res = await get(
       `${checkout}/_p/checkout/place-order`,
-      { ...json, cookie, "idempotency-key": "k-1" },
+      { ...json, cookie, "idempotency-key": "k-1", "x-shop-origin": "https://evil.example" },
       { method: "POST", body: JSON.stringify({ version: 1 }) },
     );
     expect(res.status).toBe(201);
@@ -937,6 +943,7 @@ describe("checkout, order page and fake gateway (WP10)", () => {
       "x-customer-session": "sessiontoken_000000000001",
       "idempotency-key": "k-1",
       "x-tenant": "t-demo",
+      "x-shop-origin": "http://demo.localhost:8280",
     });
     const view = await get(`${checkout}/_p/checkout`, { cookie });
     expect(await view.json()).toMatchObject({ cart_seen: "checkouttoken_000000000001" });
