@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT o.number::text AS \"number!\", c.email AS \"email!\",\n                  (o.payment_method IN ('stripe', 'fake')\n                   AND o.payment_status IN ('unpaid', 'failed', 'expired')) AS \"payment_due!\"\n           FROM orders o JOIN carts c ON c.id = o.cart_id\n           WHERE o.cart_id = $1 AND c.email IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "number!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "email!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "carts",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "payment_due!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      true,
+      null
+    ]
+  },
+  "hash": "64af2a3279f66264f9c33850532f5033a9917af33b1675bae0f5ed5c7b210798"
+}

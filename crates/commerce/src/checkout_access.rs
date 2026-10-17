@@ -89,6 +89,28 @@ fn idle(mode: CheckoutMode) -> Duration {
     }
 }
 
+/// Which checkouts a presented capability reaches, and through which stored hash.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Reach {
+    /// Open checkouts through their capability: view, shipping, payment, details, rotate.
+    Open,
+    /// Open or converted, through their capability: placement and its idempotent replay (A12).
+    Placement,
+    /// Converted only, through their capability or the one their note placement replaced.
+    /// Reads the receipt; nothing using this reach writes, mints or refreshes.
+    Receipt,
+}
+
+impl Reach {
+    fn statuses(self) -> &'static [&'static str] {
+        match self {
+            Reach::Open => &["open"],
+            Reach::Placement => &["open", "converted"],
+            Reach::Receipt => &["converted"],
+        }
+    }
+}
+
 /// Every condition sits in the locking `WHERE`, so a request queued behind a rotation
 /// re-checks the committed row and finds none.
 async fn guard(
@@ -96,21 +118,25 @@ async fn guard(
     ctx: &Context,
     p: &Policy<'_>,
     token: &str,
-    converted_too: bool,
+    reach: Reach,
     refresh: bool,
 ) -> Result<(CartRef, bool), Error> {
     if !capability::well_formed(token) {
         return Err(Error::NotFound);
     }
+    let hash = capability::hash(token);
+    let replaced = (reach == Reach::Receipt).then_some(hash.as_slice());
     let row = sqlx::query!(
         r#"SELECT id, market_id, status = 'open' AS "open!" FROM carts
-           WHERE checkout_token_hash = $1
-             AND (status = 'open' OR ($2 AND status = 'converted'))
-             AND market_id = $3 AND checkout_origin = $4 AND checkout_generation = $5
-             AND last_activity_at > $6
+           WHERE (checkout_token_hash = $1 OR replaced_token_hash = $2)
+             AND checkout_token_hash IS NOT NULL
+             AND status = ANY($3)
+             AND market_id = $4 AND checkout_origin = $5 AND checkout_generation = $6
+             AND last_activity_at > $7
            FOR UPDATE"#,
-        capability::hash(token),
-        converted_too,
+        hash.as_slice(),
+        replaced,
+        reach.statuses() as &[&str],
         ctx.market.id,
         p.origin,
         p.generation,
@@ -194,7 +220,9 @@ async fn revoke_earlier_checkouts(
              status = CASE WHEN status = 'open' THEN 'abandoned' ELSE status END,
              updated_at = now()
          WHERE checkout_token_hash IS NOT NULL
-           AND (source_cart_id = $1 OR (checkout_token_hash = $2 AND checkout_origin = $3))",
+           AND (source_cart_id = $1
+                OR ((checkout_token_hash = $2 OR replaced_token_hash = $2)
+                    AND checkout_origin = $3))",
         source.id,
         previous,
         p.origin
@@ -207,7 +235,7 @@ async fn revoke_earlier_checkouts(
 /// The open checkout behind `token`, locked until commit; refreshes its idle expiry.
 pub async fn open(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartRef, Error> {
     let p = enter(tx, ctx).await?;
-    Ok(guard(tx, ctx, &p, token, false, true).await?.0)
+    Ok(guard(tx, ctx, &p, token, Reach::Open, true).await?.0)
 }
 
 pub(crate) async fn open_in(
@@ -218,7 +246,7 @@ pub(crate) async fn open_in(
 ) -> Result<CartRef, Error> {
     let p = enter(tx, ctx).await?;
     require(&p, mode)?;
-    Ok(guard(tx, ctx, &p, token, false, true).await?.0)
+    Ok(guard(tx, ctx, &p, token, Reach::Open, true).await?.0)
 }
 
 /// The shop capability's cart, else the checkout as in [`open`] (`GET /cart`).
@@ -238,7 +266,21 @@ pub async fn open_for_order(
 ) -> Result<(CartRef, bool), Error> {
     let p = enter(tx, ctx).await?;
     lock_source_before_checkout(tx, token).await?;
-    guard(tx, ctx, &p, token, true, false).await
+    guard(tx, ctx, &p, token, Reach::Placement, false).await
+}
+
+/// C7 recovery, same-origin mode only: the converted checkout behind `token` or behind the
+/// capability its note placement replaced, locked until commit; no refresh.
+pub(crate) async fn converted(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<CartRef, Error> {
+    let p = enter(tx, ctx).await?;
+    if p.mode != CheckoutMode::SameOrigin {
+        return Err(Error::NotFound);
+    }
+    Ok(guard(tx, ctx, &p, token, Reach::Receipt, false).await?.0)
 }
 
 async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(), Error> {
@@ -253,6 +295,24 @@ async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(
     Ok(())
 }
 
+async fn replace_keeping_receipt(tx: &mut TenantTx, cart_id: Uuid) -> Result<String, Error> {
+    let minted = capability::mint();
+    let updated = sqlx::query!(
+        "UPDATE carts SET replaced_token_hash = checkout_token_hash, checkout_token_hash = $2,
+             last_activity_at = now(), updated_at = now()
+         WHERE id = $1 AND status = 'open'",
+        cart_id,
+        minted.hash
+    )
+    .execute(&mut **tx)
+    .await?
+    .rows_affected();
+    if updated != 1 {
+        return Err(Error::Internal("a placing checkout is not open".into()));
+    }
+    Ok(minted.token)
+}
+
 pub(crate) async fn convert(
     tx: &mut TenantTx,
     ctx: &Context,
@@ -263,11 +323,7 @@ pub(crate) async fn convert(
         let p = enter(tx, ctx).await?;
         match p.mode {
             CheckoutMode::Isolated => None,
-            CheckoutMode::SameOrigin => Some(
-                bind(tx, checkout.id, &p)
-                    .await?
-                    .ok_or_else(|| Error::Internal("a placing checkout is not open".into()))?,
-            ),
+            CheckoutMode::SameOrigin => Some(replace_keeping_receipt(tx, checkout.id).await?),
         }
     } else {
         None
@@ -299,7 +355,7 @@ pub(crate) async fn convert(
 /// Replaces the capability `token` (re-authorized here) with a fresh one (C6, C10).
 pub async fn rotate(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<String, Error> {
     let p = enter(tx, ctx).await?;
-    let (c, _) = guard(tx, ctx, &p, token, false, false).await?;
+    let (c, _) = guard(tx, ctx, &p, token, Reach::Open, false).await?;
     bind(tx, c.id, &p).await?.ok_or(Error::NotFound)
 }
 

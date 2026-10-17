@@ -205,7 +205,7 @@ pub async fn access(tx: &mut TenantTx, actor: &str, raw_email: &str) -> Result<V
     .await?;
     let carts = sqlx::query_scalar!(
         r#"SELECT coalesce(jsonb_agg(to_jsonb(c) - 'shop_token_hash' - 'checkout_token_hash'
-                   ORDER BY c.created_at), '[]') AS "v!"
+                   - 'replaced_token_hash' ORDER BY c.created_at), '[]') AS "v!"
            FROM carts c
            WHERE lower(btrim(c.email)) = $1 OR c.customer_id = $2
               OR c.id IN (SELECT o.cart_id FROM orders o WHERE o.id = ANY($3))"#,

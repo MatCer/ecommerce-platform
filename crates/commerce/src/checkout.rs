@@ -1335,6 +1335,39 @@ pub async fn send_payment_reminders(
     Ok(sent)
 }
 
+/// What a converted checkout shows of its order (C7 recovery): never the note, an address, a line,
+/// an amount or an order capability.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CheckoutReceipt {
+    pub number: String,
+    /// The checkout's own confirmation email, frozen at placement.
+    pub email: String,
+    /// An online payment (Stripe, the fake gateway) is not completed yet.
+    pub payment_due: bool,
+}
+
+/// C7, same-origin mode only: the receipt of the order placed from the checkout behind
+/// `token`, which may also be the capability its note placement replaced. Reads only.
+pub async fn receipt(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    token: &str,
+) -> Result<CheckoutReceipt, Error> {
+    let c = checkout_access::converted(tx, ctx, token).await?;
+    sqlx::query_as!(
+        CheckoutReceipt,
+        r#"SELECT o.number::text AS "number!", c.email AS "email!",
+                  (o.payment_method IN ('stripe', 'fake')
+                   AND o.payment_status IN ('unpaid', 'failed', 'expired')) AS "payment_due!"
+           FROM orders o JOIN carts c ON c.id = o.cart_id
+           WHERE o.cart_id = $1 AND c.email IS NOT NULL"#,
+        c.id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)
+}
+
 /// The order behind a capability token (the `/o/<token>` page).
 pub async fn order_by_token(tx: &mut TenantTx, token: &str) -> Result<OrderView, Error> {
     let id = orders::by_token(tx, token).await?;

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, market_id, status = 'open' AS \"open!\" FROM carts\n           WHERE checkout_token_hash = $1\n             AND (status = 'open' OR ($2 AND status = 'converted'))\n             AND market_id = $3 AND checkout_origin = $4 AND checkout_generation = $5\n             AND last_activity_at > $6\n           FOR UPDATE",
+  "query": "SELECT id, market_id, status = 'open' AS \"open!\" FROM carts\n           WHERE (checkout_token_hash = $1 OR replaced_token_hash = $2)\n             AND checkout_token_hash IS NOT NULL\n             AND status = ANY($3)\n             AND market_id = $4 AND checkout_origin = $5 AND checkout_generation = $6\n             AND last_activity_at > $7\n           FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,8 @@
     "parameters": {
       "Left": [
         "Bytea",
-        "Bool",
+        "Bytea",
+        "TextArray",
         "Uuid",
         "Text",
         "Int8",
@@ -48,5 +49,5 @@
       null
     ]
   },
-  "hash": "0c2853554e2de28b53242f11b85de05c0de91805142fed4e6952f547661a03e8"
+  "hash": "69eafbb63bc6ac81f29251e69260ed84039fd98e81bc195daf01f7505c66fcd2"
 }

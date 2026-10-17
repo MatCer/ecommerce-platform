@@ -58,7 +58,7 @@ pub(super) fn place_body(view: &Value, notes: &str) -> Value {
             "accept_terms": true, "accept_withdrawal": true, "notes": notes })
 }
 
-fn cart_id(view: &Value) -> Uuid {
+pub(super) fn cart_id(view: &Value) -> Uuid {
     view["cart"]["id"].as_str().unwrap().parse().unwrap()
 }
 
@@ -153,7 +153,7 @@ impl Ctx {
             .await
     }
 
-    async fn read<T>(&self, sql: &'static str, id: Uuid) -> T
+    pub(super) async fn read<T>(&self, sql: &'static str, id: Uuid) -> T
     where
         T: for<'r> sqlx::Decode<'r, sqlx::Postgres> + sqlx::Type<sqlx::Postgres> + Send + Unpin,
     {
@@ -315,6 +315,26 @@ async fn prefilled_attacker_checkout_rotates_again(db: PgPool) {
     assert_eq!(
         view["cart"]["id"], planted["cart"]["id"],
         "the planted checkout, under a capability its planter never saw"
+    );
+
+    let view = c.ready(&kv2, method).await;
+    let (status, text, res) = c.place(&kv2, "p-1", &place_body(&view, "Zvonit")).await;
+    assert_eq!(status, StatusCode::CREATED, "{text}");
+    assert!(
+        replacement(&res).is_some(),
+        "the victim's note replaced KV2"
+    );
+    let (status, text) = c.receipt(&ka2).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the planted value reads no receipt: {text}"
+    );
+    let (status, text) = c.receipt(&kv2).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the victim's value finds the order: {text}"
     );
 }
 

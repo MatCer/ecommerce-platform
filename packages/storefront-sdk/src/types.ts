@@ -98,6 +98,7 @@ export type PickupPoint = S["PickupPoint"];
 export type PacketaWidget = S["PacketaWidget"];
 export type PlaceOrderInput = S["PlaceOrderInput"];
 export type PlacedOrder = S["PlacedOrder"];
+export type CheckoutReceipt = S["CheckoutReceipt"];
 export type PaymentStart = S["PaymentStart"];
 export type NextAction = S["NextAction"];
 export type Order = S["OrderView"];
