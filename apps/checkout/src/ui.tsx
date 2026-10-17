@@ -4,7 +4,15 @@
 import { Button as KButton } from "@kobalte/core/button";
 import { Checkbox as KCheckbox } from "@kobalte/core/checkbox";
 import { TextField as KTextField } from "@kobalte/core/text-field";
-import { type ComponentProps, createUniqueId, For, type JSX, Show, splitProps } from "solid-js";
+import {
+  type ComponentProps,
+  createUniqueId,
+  For,
+  type JSX,
+  onMount,
+  Show,
+  splitProps,
+} from "solid-js";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -93,6 +101,11 @@ export function TextField(props: TextFieldProps) {
   // Explicit ids: Kobalte leaves the label without `for`, and autofill (password managers)
   // reads the field's label through that association.
   const id = createUniqueId();
+  let area: HTMLTextAreaElement | undefined;
+  // Server rendering writes a textarea's value as an attribute, which HTML ignores.
+  onMount(() => {
+    if (area && area.value !== props.value) area.value = props.value;
+  });
   return (
     <KTextField
       id={id}
@@ -128,6 +141,7 @@ export function TextField(props: TextFieldProps) {
       >
         <KTextField.TextArea
           id={`${id}-input`}
+          ref={area}
           rows={props.rows ?? 3}
           placeholder={props.placeholder}
           maxLength={props.maxLength}
