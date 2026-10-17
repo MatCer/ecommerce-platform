@@ -52,8 +52,8 @@ declare global {
 
 const CART = "__Host-Http-cart";
 const CAPABILITY = /^[0-9a-f]{64}$/;
+const THEME_PROBE = "spy";
 
-/** Records every storage, cache and broadcast write a document of `page` makes. */
 async function spyOnStorage(page: Page): Promise<string[]> {
   const writes: string[] = [];
   await page.exposeFunction("reportStorageWrite", (entry: string) => {
@@ -91,50 +91,49 @@ async function spyOnStorage(page: Page): Promise<string[]> {
   return writes;
 }
 
-/** Every spied write once on the theme page; leaves only localStorage's `spy` key behind. */
 async function controlStorageSpy(page: Page, writes: string[]) {
   await page.goto(`${FRESH_HTTPS}/`);
-  await page.evaluate(async () => {
-    localStorage.setItem("spy", "1");
-    sessionStorage.setItem("spy", "1");
-    sessionStorage.removeItem("spy");
+  await page.evaluate(async (probe) => {
+    localStorage.setItem(probe, "1");
+    sessionStorage.setItem(probe, "1");
+    sessionStorage.removeItem(probe);
     sessionStorage.clear();
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const open = indexedDB.open("spy");
-      open.onupgradeneeded = () => open.result.createObjectStore("spy");
+      const open = indexedDB.open(probe);
+      open.onupgradeneeded = () => open.result.createObjectStore(probe);
       open.onsuccess = () => resolve(open.result);
       open.onerror = () => reject(open.error);
     });
-    db.transaction("spy", "readwrite");
+    db.transaction(probe, "readwrite");
     db.close();
     await new Promise((resolve, reject) => {
-      const deleted = indexedDB.deleteDatabase("spy");
+      const deleted = indexedDB.deleteDatabase(probe);
       deleted.onsuccess = resolve;
       deleted.onerror = () => reject(deleted.error);
     });
-    const cache = await caches.open("spy");
-    await cache.put("/spy", new Response("1"));
+    const cache = await caches.open(probe);
+    await cache.put(`/${probe}`, new Response("1"));
     await cache.add("/favicon.svg");
     await cache.addAll(["/favicon.svg"]);
-    await caches.delete("spy");
-    new BroadcastChannel("spy").close();
-  });
+    await caches.delete(probe);
+    new BroadcastChannel(probe).close();
+  }, THEME_PROBE);
   await expect
     .poll(() => writes, "every spy sees its write on the theme page")
     .toEqual(
       expect.arrayContaining([
-        "/ setItem spy",
-        "/ removeItem spy",
+        `/ setItem ${THEME_PROBE}`,
+        `/ removeItem ${THEME_PROBE}`,
         "/ clear",
-        "/ indexedDB.open spy",
+        `/ indexedDB.open ${THEME_PROBE}`,
         "/ transaction readwrite",
-        "/ indexedDB.deleteDatabase spy",
-        "/ caches.open spy",
+        `/ indexedDB.deleteDatabase ${THEME_PROBE}`,
+        `/ caches.open ${THEME_PROBE}`,
         "/ Cache.put",
         "/ Cache.add",
         "/ Cache.addAll",
-        "/ caches.delete spy",
-        "/ BroadcastChannel spy",
+        `/ caches.delete ${THEME_PROBE}`,
+        `/ BroadcastChannel ${THEME_PROBE}`,
       ]),
     );
 }
@@ -148,7 +147,7 @@ async function expectNothingStored(page: Page, writes: string[]) {
       caches: await caches.keys(),
     })),
     "what the shop origin holds on the receipt",
-  ).toEqual({ session: 0, local: ["spy"], databases: [], caches: [] });
+  ).toEqual({ session: 0, local: [THEME_PROBE], databases: [], caches: [] });
   expect(
     writes.filter((w) => w.startsWith("/checkout")),
     "platform storage writes",
