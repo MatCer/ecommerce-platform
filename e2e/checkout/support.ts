@@ -47,6 +47,18 @@ export async function securityContext(
   return context;
 }
 
+/**
+ * Another tab on a shop the context already shows. Playwright's Firefox driver can drop the commit
+ * of a new tab whose first navigation is a COOP page joining the shop's process, which hangs
+ * `goto` at every waitUntil; landing on a COOP-less file of the shop first avoids that swap.
+ */
+export async function shopTab(context: BrowserContext, url: string): Promise<Page> {
+  const tab = await context.newPage();
+  await tab.goto(`${new URL(url).origin}/favicon.svg`);
+  await tab.goto(url);
+  return tab;
+}
+
 export async function cookieValue(
   context: BrowserContext,
   name: string,

@@ -18,6 +18,7 @@ import {
   restartButton,
   restartNotice,
   securityContext,
+  shopTab,
   startSameOriginCheckout,
 } from "./support";
 
@@ -64,11 +65,7 @@ async function openCheckout(
   return { page, cap, token, marker };
 }
 
-async function themePage(page: Page): Promise<Page> {
-  const theme = await page.context().newPage();
-  await theme.goto(`${FRESH_HTTPS}/`);
-  return theme;
-}
+const themePage = (page: Page) => shopTab(page.context(), `${FRESH_HTTPS}/`);
 
 /** A click on an injected button, so the opener has a user activation. */
 async function openByClick(page: Page, url: string): Promise<Page> {

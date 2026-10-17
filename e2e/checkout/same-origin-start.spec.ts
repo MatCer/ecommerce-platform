@@ -8,6 +8,7 @@ import {
   restartButton,
   restartNotice,
   securityContext,
+  shopTab,
   submitStart,
 } from "./support";
 
@@ -55,8 +56,7 @@ test("a start answered after a newer one shows the restart notice; only a new st
   const first = await context.newPage();
   await first.goto(`${FRESH_HTTPS}/`, { waitUntil: "domcontentloaded" });
   await addLine(first, FRESH_HTTPS, "tricko-basic");
-  const second = await context.newPage();
-  await second.goto(`${FRESH_HTTPS}/`, { waitUntil: "domcontentloaded" });
+  const second = await shopTab(context, `${FRESH_HTTPS}/`);
   const frozenShopCart = (await cookieValue(context, "cart")) ?? "";
   expect(frozenShopCart).toMatch(CAPABILITY);
 
