@@ -138,19 +138,18 @@ describe("code variant arms (SHOP-100)", () => {
     const immutable = "public, max-age=31536000, immutable";
     expect(await asset("/_astro/app.v1.js")).toEqual([200, "control()", immutable]);
     expect(await asset("/_astro/app.v2.js")).toEqual([200, "next()", immutable]);
-    const favicon = async (cookie?: string) => {
-      const res = await get("/favicon.svg", cookie);
-      return [await res.text(), res.headers.get("cache-control")];
-    };
-    expect(await favicon(consented(subject("a")))).toEqual([
-      "<svg>next</svg>",
-      "private, max-age=300",
-    ]);
-    expect(await favicon(consented(subject("b")))).toEqual([
-      "<svg>control</svg>",
-      "private, max-age=300",
-    ]);
-    expect(await favicon()).toEqual(["<svg>control</svg>", "public, max-age=300"]);
+    const favicon = async (cookie?: string) => (await get("/favicon.svg", cookie)).text();
+    expect(await favicon(consented(subject("a")))).toBe("<svg>next</svg>");
+    expect(await favicon(consented(subject("b")))).toBe("<svg>control</svg>");
+    expect(await favicon()).toBe("<svg>control</svg>");
+  });
+
+  test("no browser or shared cache reuses a public file across arms", async () => {
+    const visitors = [consented(subject("a")), consented(subject("b")), undefined];
+    const cacheControl = await Promise.all(
+      visitors.map(async (c) => (await get("/favicon.svg", c)).headers.get("cache-control")),
+    );
+    expect(cacheControl).toEqual(Array(3).fill("private, no-cache"));
   });
 
   test("without a theme arm, public files never enrol (SHOP-96 is unchanged)", async () => {

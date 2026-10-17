@@ -1631,7 +1631,7 @@ ${
     const visitorArtifact = armArtifact(site, assignment) ?? site.theme_artifact;
     const pub = visitorArtifact ? await serveAsset([visitorArtifact], p, false) : null;
     if (!pub) return renderTheme(site, url, req, port);
-    if (assignment) pub.headers.set("cache-control", "private, max-age=300");
+    if (arm) pub.headers.set("cache-control", "private, no-cache");
     return pub;
   }
 
