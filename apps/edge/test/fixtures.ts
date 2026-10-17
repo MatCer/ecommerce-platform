@@ -89,6 +89,34 @@ export default {
 };
 `;
 
+/**
+ * The same-origin `/checkout` page's contract with the edge: it reads the checkout
+ * through the binding and renders the page token the edge sent only when that opens a checkout.
+ * It lists its own request header names; `?slow`, `?throw` and `?huge` make it fail.
+ */
+export const platformCheckoutWorker = `
+export default {
+  async fetch(request, env) {
+    const q = new URL(request.url).searchParams;
+    if (q.has("slow")) await new Promise((r) => setTimeout(r, 5000));
+    if (q.has("throw")) throw new Error("checkout render failed");
+    if (q.has("huge")) return new Response("x".repeat(6 * 1024 * 1024));
+    const view = await env.CHECKOUT.fetch("https://checkout/checkout", { headers: { "x-platform-ctx": request.headers.get("x-platform-ctx") } });
+    const token = request.headers.get("x-platform-page-token");
+    const open = view.status === 200;
+    const meta = open && token ? '<meta name="page-token" content="' + token + '">' : "";
+    const main = open ? "<pre>" + (await view.text()) + "</pre>" : '<p role="status">restarted</p>';
+    const names = '<p id="headers">' + [...request.headers.keys()].join(",") + "</p>";
+    return new Response("<!doctype html><html><head>" + meta + "</head><body>" + main + names + "</body></html>", {
+      headers: { "content-type": "text/html" },
+    });
+  },
+};
+`;
+
+/** A checkout capability the fake API no longer opens (superseded, idle, revoked). */
+export const REVOKED_CAPABILITY = "sameorigintoken_revoked_00000000001";
+
 export async function buildArtifact(
   root: string,
   kind: ArtifactKind,
@@ -237,6 +265,8 @@ export function fakeApi() {
         amount: { formatted: "10 Kč" },
         status: "pending",
       });
+    if (p === "/checkout" && req.headers.get("x-cart-token") === REVOKED_CAPABILITY)
+      return Response.json({ code: "not_found" }, { status: 404 });
     if (p.startsWith("/checkout") || p.startsWith("/orders/"))
       return Response.json({ path: p, cart_seen: req.headers.get("x-cart-token") });
     // WP18: newsletter links (token "a…a" is valid, anything else is not).

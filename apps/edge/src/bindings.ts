@@ -15,7 +15,10 @@ export interface RequestContext {
   site: Site;
   /** Artifact that is allowed to use this context (a worker cannot borrow another's). */
   artifactId: string;
-  /** Checkout origin only: the checkout-scoped cart capability from the `__Host-cart` cookie. */
+  /**
+   * The checkout capability: `__Host-cart` on the checkout origin, `__Host-Http-cart` on a
+   * same-origin shop.
+   */
   cartToken?: string | undefined;
   /** Checkout origin only: the customer session from the `__Host-sid` cookie (WP9). */
   sessionToken?: string | undefined;
