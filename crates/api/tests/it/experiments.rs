@@ -255,7 +255,10 @@ async fn resolve_names_the_running_experiment(db: PgPool) {
 
     let id = start(&runtime, shop.tenant).await;
     let (_, body, _) = Call::get(uri).token(SERVICE_TOKEN).send(&s).await;
-    assert_eq!(body["experiment"], json!({"id": id, "version": 1}));
+    assert_eq!(
+        body["experiment"],
+        json!({"id": id, "version": 1, "name": "homepage", "theme_arm": null})
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
