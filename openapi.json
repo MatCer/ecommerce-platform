@@ -15683,6 +15683,118 @@
         }
       }
     },
+    "/storefront/v1/cart/checkout": {
+      "post": {
+        "tags": [
+          "storefront"
+        ],
+        "summary": "C10, same-origin mode: starts checkout from the shop cart behind `X-Cart-Token`, which keeps\nits capability, and returns the new checkout capability (the edge sets it as the HttpOnly\n`__Host-Http-cart` cookie). Earlier checkouts of that cart and `previous` are revoked.",
+        "operationId": "start_checkout",
+        "parameters": [
+          {
+            "name": "X-Storefront-Token",
+            "in": "header",
+            "description": "The tenant's public storefront token.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Market",
+            "in": "header",
+            "description": "Market id resolved from the shop host by the edge.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Locale",
+            "in": "header",
+            "description": "Locale hint (one of the market's locales).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "X-Cart-Token",
+            "in": "header",
+            "description": "Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutCart"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "shop_origin_required | shop_origin_mismatch",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or expired shop cart",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "cart_empty | checkout_mode_changed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_body",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/storefront/v1/cart/coupons": {
       "post": {
         "tags": [
@@ -25364,6 +25476,19 @@
             "description": "As browsers serialize it: scheme, host and a non-default port (`https://shop.example`)."
           }
         }
+      },
+      "CheckoutStart": {
+        "type": "object",
+        "properties": {
+          "previous": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The browser's current checkout capability (`__Host-Http-cart`), revoked by the start."
+          }
+        },
+        "additionalProperties": false
       },
       "CheckoutView": {
         "type": "object",

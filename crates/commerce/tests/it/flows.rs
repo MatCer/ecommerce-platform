@@ -2,15 +2,22 @@
 //! double opt-in, review tokens and RLS isolation.
 
 use chrono::{Duration, Utc};
+use commerce::cart::{self, NewLine};
+use commerce::checkout::{self, ContactInput, Settings};
 use commerce::checkout_access;
 use commerce::consent::{self, ConsentPurpose, Subject};
 use commerce::flows::{self, WatchInput};
-use commerce::storefront::{self, PublicUrls};
-use platform::db::tenant_tx;
+use commerce::payments::Payments;
+use commerce::storefront::{self, Context, PublicUrls};
+use commerce::tenancy::CheckoutMode;
+use platform::Error;
+use platform::db::{TenantTx, tenant_tx};
 use serde_json::json;
 use sqlx::{PgPool, Row};
-use testkit::storefront::{raw_order, shop};
+use testkit::storefront::{Shop, raw_order, shop};
 use uuid::Uuid;
+
+use crate::checkout_access::{attest, switch};
 
 fn token_in(body: &str, marker: &str) -> String {
     let at = body.find(marker).unwrap() + marker.len();
@@ -1103,4 +1110,158 @@ async fn poison_step_stops_after_three_attempts(db: PgPool) {
     .unwrap();
     assert_eq!(messages, 0);
     tx.commit().await.unwrap();
+}
+
+async fn shop_tx(rt: &PgPool, s: &Shop) -> (TenantTx, Context) {
+    let mut tx = tenant_tx(rt, s.tenant).await.unwrap();
+    let mut ctx = storefront::context(&mut tx, &PublicUrls::default(), s.cz, None, Utc::now())
+        .await
+        .unwrap();
+    ctx.origin = Some(s.origin.clone());
+    (tx, ctx)
+}
+
+struct Typed {
+    shop_token: String,
+    checkout: String,
+    source: Uuid,
+    snapshot: Uuid,
+}
+
+async fn typed_checkout(rt: &PgPool, s: &Shop, email: &str) -> Typed {
+    let (mut tx, ctx) = shop_tx(rt, s).await;
+    let (_, shop_token) = cart::create(&mut tx, &ctx).await.unwrap();
+    let source = cart::find(&mut tx, &ctx, &shop_token).await.unwrap();
+    let line = NewLine {
+        variant_id: s.variants[0],
+        quantity: 1,
+    };
+    cart::add_line(&mut tx, &ctx, &source, &line).await.unwrap();
+    let checkout = checkout_access::start(&mut tx, &ctx, &shop_token, None)
+        .await
+        .unwrap();
+    let snapshot = checkout_access::open(&mut tx, &ctx, &checkout)
+        .await
+        .unwrap();
+    let contact = ContactInput {
+        email: email.into(),
+        phone: None,
+    };
+    checkout::set_contact(&mut tx, &snapshot, &contact)
+        .await
+        .unwrap();
+    consent::record_server(
+        &mut tx,
+        &Subject::Email(email.into()),
+        ConsentPurpose::EmailMarketing,
+        true,
+        consent::TEXT_VERSION,
+        "checkout",
+        None,
+    )
+    .await
+    .unwrap();
+    sqlx::query("UPDATE carts SET last_activity_at = now() - interval '2 hours'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Typed {
+        shop_token,
+        checkout,
+        source: source.id,
+        snapshot: snapshot.id,
+    }
+}
+
+async fn abandoned_cart_mails(rt: &PgPool, tenant: Uuid) -> Vec<String> {
+    let mut tx = tenant_tx(rt, tenant).await.unwrap();
+    sqlx::query_scalar("SELECT body_text FROM email_messages WHERE template = 'abandoned_cart'")
+        .fetch_all(&mut *tx)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn abandoned_checkout_targets_the_snapshot(db: PgPool) {
+    let rt = testkit::runtime_pool(&db, 4).await;
+    let s = shop(&rt, "flowsnap").await;
+    attest(&rt, &s.origin).await;
+    switch(&rt, &s, &s.origin, CheckoutMode::SameOrigin).await;
+    let t = typed_checkout(&rt, &s, "buyer@example.com").await;
+
+    let mut tx = tenant_tx(&rt, s.tenant).await.unwrap();
+    flows::enroll_due(&mut tx, Utc::now()).await.unwrap();
+    let enrolled: Vec<Uuid> =
+        sqlx::query_scalar("SELECT source_id FROM flow_runs WHERE source_kind = 'cart'")
+            .fetch_all(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(enrolled, [t.snapshot], "the snapshot, never the source");
+    assert_ne!(t.snapshot, t.source);
+
+    let (mut tx, ctx) = shop_tx(&rt, &s).await;
+    checkout_access::start(&mut tx, &ctx, &t.shop_token, Some(&t.checkout))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let mut tx = tenant_tx(&rt, s.tenant).await.unwrap();
+    flows::execute_due(&mut tx, &PublicUrls::default(), Utc::now())
+        .await
+        .unwrap();
+    let exit: (String, Option<String>) =
+        sqlx::query_as("SELECT status, exit_reason FROM flow_runs WHERE source_id = $1")
+            .bind(t.snapshot)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(exit, ("cancelled".into(), Some("cart_closed".into())));
+    assert_eq!(abandoned_cart_mails(&rt, s.tenant).await.len(), 0);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn restore_cart_targets_the_snapshot(db: PgPool) {
+    let rt = testkit::runtime_pool(&db, 4).await;
+    let s = shop(&rt, "flowrestore").await;
+    attest(&rt, &s.origin).await;
+    switch(&rt, &s, &s.origin, CheckoutMode::SameOrigin).await;
+    let t = typed_checkout(&rt, &s, "buyer@example.com").await;
+    let mut tx = tenant_tx(&rt, s.tenant).await.unwrap();
+    flows::enroll_due(&mut tx, Utc::now()).await.unwrap();
+    flows::execute_due(&mut tx, &PublicUrls::default(), Utc::now())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let mails = abandoned_cart_mails(&rt, s.tenant).await;
+    assert_eq!(mails.len(), 1);
+    let restore = token_in(&mails[0], "token=");
+
+    let (mut tx, ctx) = shop_tx(&rt, &s).await;
+    let r = checkout_access::restore_cart(&mut tx, &ctx, &restore).await;
+    tx.commit().await.unwrap();
+    assert!(
+        matches!(&r, Err(Error::Conflict { code, .. }) if *code == "checkout_mode_changed"),
+        "{r:?}"
+    );
+
+    switch(&rt, &s, &s.origin, CheckoutMode::Isolated).await;
+    let (mut tx, ctx) = shop_tx(&rt, &s).await;
+    let k = checkout_access::restore_cart(&mut tx, &ctx, &restore)
+        .await
+        .unwrap()
+        .expect("the refused link was left unused");
+    let c = checkout_access::open(&mut tx, &ctx, &k).await.unwrap();
+    let settings = Settings {
+        payments: Payments::default(),
+        packeta: None,
+    };
+    let v = checkout::view(&mut tx, &ctx, &settings, &c).await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(
+        (c.id, v.email.as_deref()),
+        (t.snapshot, Some("buyer@example.com"))
+    );
 }

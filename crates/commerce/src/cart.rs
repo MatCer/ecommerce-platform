@@ -187,6 +187,48 @@ pub async fn find(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<CartR
     })
 }
 
+pub(crate) async fn snapshot(tx: &mut TenantTx, source: &CartRef) -> Result<CartRef, Error> {
+    let id = sqlx::query_scalar!(
+        "INSERT INTO carts (tenant_id, market_id, locale, currency, source_cart_id)
+         SELECT tenant_id, market_id, locale, currency, id FROM carts WHERE id = $1
+         RETURNING id",
+        source.id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    sqlx::query!(
+        "INSERT INTO cart_lines (tenant_id, cart_id, variant_id, quantity, created_at)
+         SELECT tenant_id, $2, variant_id, quantity, created_at FROM cart_lines
+         WHERE cart_id = $1 ORDER BY created_at, id",
+        source.id,
+        id
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query!(
+        "INSERT INTO cart_coupons (tenant_id, cart_id, coupon_id)
+         SELECT tenant_id, $2, coupon_id FROM cart_coupons WHERE cart_id = $1",
+        source.id,
+        id
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(CartRef {
+        id,
+        market_id: source.market_id,
+    })
+}
+
+pub(crate) async fn empty(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
+    sqlx::query!("DELETE FROM cart_lines WHERE cart_id = $1", cart_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query!("DELETE FROM cart_coupons WHERE cart_id = $1", cart_id)
+        .execute(&mut **tx)
+        .await?;
+    touch(tx, cart_id).await
+}
+
 /// The products in the open shop cart behind `token`, for cross-sell (WP17). Read-only: no
 /// lock and no activity bump, so a recommendation read never extends or blocks a cart. An
 /// unknown, expired or other-market capability reads as an empty cart.

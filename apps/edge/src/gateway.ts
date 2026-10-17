@@ -34,6 +34,7 @@ import {
 import { type NodeBinding, WorkerPool } from "./runtime.ts";
 import {
   CachedResolver,
+  checkoutPolicy,
   classifyHost,
   normalizeHost,
   PREVIEW_HOST_RE,
@@ -165,6 +166,12 @@ const MAX_EVENTS_BODY = 64 * 1024;
 const MAX_RECOMMENDATIONS_QUERY = 1024;
 const SHOP_CART_COOKIE = "cart";
 const CHECKOUT_CART_COOKIE = "__Host-cart";
+const SAME_ORIGIN_CART_COOKIE = "__Host-Http-cart";
+const START_NAVIGATION = {
+  "sec-fetch-site": "same-origin",
+  "sec-fetch-mode": "navigate",
+  "sec-fetch-dest": "document",
+};
 /**
  * Binds a checkout handoff to the browser that started it (WP26). Scoped to the shop host so
  * `checkout.<shop_host>` receives it; a cross-site page cannot plant it, so a link carrying an
@@ -1086,6 +1093,52 @@ ${
     return new Response(null, { status: 303, headers });
   }
 
+  async function sameOriginStart(site: Site, req: Request): Promise<Response> {
+    if (req.method !== "POST") return text(405, "Method not allowed", { allow: "POST" });
+    const admitted =
+      req.headers.get("origin") === site.shopOrigin &&
+      Object.entries(START_NAVIGATION).every(([k, v]) => req.headers.get(k) === v) &&
+      !req.headers.has("sec-purpose");
+    if (!admitted)
+      return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
+    const media = (req.headers.get("content-type") ?? "").split(";")[0]?.trim().toLowerCase();
+    if (media !== "application/x-www-form-urlencoded")
+      return problem(415, "unsupported_media_type", "expected application/x-www-form-urlencoded");
+    if (!(await readCapped(req.body, MAX_JSON_BODY).catch(() => null)))
+      return problem(413, "payload_too_large", `body over ${MAX_JSON_BODY} bytes`);
+    const backToShop = () =>
+      new Response(null, { status: 303, headers: { location: "/", "cache-control": "no-store" } });
+    const shopCart = capabilityCookie(req, SHOP_CART_COOKIE);
+    if (!shopCart) return backToShop();
+    const previous = capabilityCookie(req, SAME_ORIGIN_CART_COOKIE);
+    const res = await upstream(
+      new Request(`${opts.apiOrigin}/storefront/v1/cart/checkout`, {
+        method: "POST",
+        headers: apiHeaders(site, {
+          "x-cart-token": shopCart,
+          "content-type": "application/json",
+          ...consentSubject(req),
+        }),
+        body: JSON.stringify(previous ? { previous } : {}),
+      }),
+    );
+    if (!res.ok) {
+      await res.body?.cancel();
+      return backToShop();
+    }
+    const token = ((await res.json().catch(() => null)) as { cart_token?: unknown } | null)
+      ?.cart_token;
+    if (typeof token !== "string" || !TOKEN_RE.test(token)) return backToShop();
+    return new Response(null, {
+      status: 303,
+      headers: {
+        location: "/checkout",
+        "cache-control": "no-store",
+        "set-cookie": `${SAME_ORIGIN_CART_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`,
+      },
+    });
+  }
+
   async function publicProxy(site: Site, req: Request, url: URL, rest: string): Promise<Response> {
     if (req.method !== "GET") return text(405, "Method not allowed", { allow: "GET" });
     if (!STOREFRONT_OPERATIONS.some((o) => o.path.test(rest)))
@@ -1572,7 +1625,10 @@ ${
         });
       if (p === "/_p/e" || p === "/_p/newsletter") return new Response(null, { status: 204 });
     }
-    if (p === "/_p/checkout/start") return checkoutStart(site, req, host, port);
+    if (p === "/_p/checkout/start")
+      return site.shopOrigin && checkoutPolicy(site, site.shopOrigin).mode === "same_origin"
+        ? sameOriginStart(site, req)
+        : checkoutStart(site, req, host, port);
     if (p.startsWith("/_p/public/"))
       return publicProxy(site, req, url, p.slice("/_p/public".length));
     if (p === "/_p/recommendations") return recommendationsProxy(site, req, url);

@@ -1079,12 +1079,7 @@ pub async fn place_order(
     let token = orders::issue_token(tx, order_id).await?;
     let view = orders::view(tx, order_id).await?;
     send_confirmation(tx, ctx, &view, &token).await?;
-    sqlx::query!(
-        "UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1",
-        cart_ref.id
-    )
-    .execute(&mut **tx)
-    .await?;
+    checkout_access::convert(tx, &cart_ref).await?;
     let stored = StoredPlacement {
         order_id,
         number: number.to_string(),

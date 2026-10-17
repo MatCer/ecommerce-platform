@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM carts\n                          WHERE id = $1 AND status = 'open' AND shop_token_hash IS NOT NULL)\n           AS \"shop_cart!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shop_cart!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "921b4d31d7a04c2b4a2c3758dad40dfd92f1b96f1735d5fc567d55930fa7e400"
+}

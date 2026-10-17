@@ -3547,6 +3547,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/storefront/v1/cart/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * C10, same-origin mode: starts checkout from the shop cart behind `X-Cart-Token`, which keeps
+         *     its capability, and returns the new checkout capability (the edge sets it as the HttpOnly
+         *     `__Host-Http-cart` cookie). Earlier checkouts of that cart and `previous` are revoked.
+         */
+        post: operations["start_checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/storefront/v1/cart/coupons": {
         parameters: {
             query?: never;
@@ -5774,6 +5795,10 @@ export interface components {
             mode_generation: number;
             /** @description As browsers serialize it: scheme, host and a non-default port (`https://shop.example`). */
             origin: string;
+        };
+        CheckoutStart: {
+            /** @description The browser's current checkout capability (`__Host-Http-cart`), revoked by the start. */
+            previous?: string | null;
         };
         /** @description Everything the one-page checkout renders. Recomputed on every read. */
         CheckoutView: {
@@ -19384,6 +19409,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CartView"];
+                };
+            };
+        };
+    };
+    start_checkout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant's public storefront token. */
+                "X-Storefront-Token": string;
+                /** @description Market id resolved from the shop host by the edge. */
+                "X-Market": string;
+                /** @description Locale hint (one of the market's locales). */
+                "X-Locale"?: string | null;
+                /** @description Cart capability from the `cart` cookie (shop) or `__Host-cart` (checkout origin). */
+                "X-Cart-Token": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutStart"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutCart"];
+                };
+            };
+            /** @description shop_origin_required | shop_origin_mismatch */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or expired shop cart */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description cart_empty | checkout_mode_changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_body */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

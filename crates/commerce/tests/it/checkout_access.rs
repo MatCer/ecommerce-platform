@@ -2,15 +2,19 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use commerce::capability;
-use commerce::cart::{self, NewLine};
+use commerce::cart::{self, CartCoupon, NewLine};
 use commerce::checkout::{self, CheckoutView, ContactInput, Settings, ShippingInput};
 use commerce::checkout_access::{self, ShopOrigin};
+use commerce::money::Currency;
 use commerce::payments::Payments;
+use commerce::pricing::cart::CouponDiscount;
+use commerce::promotions::coupons::{self, CouponInput};
 use commerce::shipping::{self, Carrier, ShippingMethodInput};
 use commerce::storefront::{self, Context, PublicUrls};
 use commerce::tenancy::CheckoutMode;
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
+use serde_json::json;
 use sqlx::{PgConnection, PgPool};
 use testkit::storefront::{Shop, shop};
 use tokio::sync::oneshot;
@@ -94,6 +98,18 @@ async fn start(runtime: &PgPool, at: &At, shop_token: &str) -> Result<String, Er
     .await
 }
 
+async fn same_origin_start(
+    runtime: &PgPool,
+    at: &At,
+    shop_token: &str,
+    previous: Option<&str>,
+) -> Result<String, Error> {
+    at.run(runtime, async |tx, ctx| {
+        checkout_access::start(tx, ctx, shop_token, previous).await
+    })
+    .await
+}
+
 async fn redeem(runtime: &PgPool, at: &At, handoff: &str) -> Option<String> {
     at.run(runtime, async |tx, ctx| {
         checkout_access::redeem_handoff(tx, ctx, handoff)
@@ -170,7 +186,7 @@ async fn alias(runtime: &PgPool, shop: &Shop, host: &str) -> ShopOrigin {
     ShopOrigin::parse(&format!("https://{host}")).unwrap()
 }
 
-async fn attest(runtime: &PgPool, origin: &ShopOrigin) {
+pub(crate) async fn attest(runtime: &PgPool, origin: &ShopOrigin) {
     sqlx::query(
         "UPDATE platform.checkout_origins SET history = 'merchant_attested_never_served',
              attested_by = 'user-owner', attested_at = now(), attestation_version = 1
@@ -182,7 +198,7 @@ async fn attest(runtime: &PgPool, origin: &ShopOrigin) {
     .unwrap();
 }
 
-async fn switch(runtime: &PgPool, shop: &Shop, origin: &ShopOrigin, mode: CheckoutMode) {
+pub(crate) async fn switch(runtime: &PgPool, shop: &Shop, origin: &ShopOrigin, mode: CheckoutMode) {
     let changed = checkout_access::switch_mode(runtime, shop.tenant, origin, mode)
         .await
         .unwrap();
@@ -234,14 +250,14 @@ async fn live_without_lock(tx: &mut PgConnection, token: &str) -> bool {
         .unwrap()
 }
 
-async fn pid(conn: &mut PgConnection) -> i32 {
+pub(crate) async fn pid(conn: &mut PgConnection) -> i32 {
     sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(conn)
         .await
         .unwrap()
 }
 
-async fn blocked_by(db: &PgPool, waiter: i32, blocker: i32) {
+pub(crate) async fn blocked_by(db: &PgPool, waiter: i32, blocker: i32) {
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             let blockers: Vec<i32> = sqlx::query_scalar("SELECT pg_blocking_pids($1)")
@@ -786,5 +802,168 @@ async fn switch_does_not_wait_for_fenceless_cart_writers(db: PgPool) {
     assert!(
         not_found(&open(&runtime, &here, &k).await),
         "the capability on the locked cart is dead"
+    );
+}
+
+async fn same_origin_shop(runtime: &PgPool, slug: &str) -> (Shop, At) {
+    let shop = shop(runtime, slug).await;
+    attest(runtime, &shop.origin).await;
+    switch(runtime, &shop, &shop.origin, CheckoutMode::SameOrigin).await;
+    let here = at(&shop, shop.cz, &shop.origin);
+    (shop, here)
+}
+
+async fn checkout_view(runtime: &PgPool, at: &At, token: &str) -> CheckoutView {
+    at.run(runtime, async |tx, ctx| {
+        let c = checkout_access::open(tx, ctx, token).await.unwrap();
+        checkout::view(tx, ctx, &settings(), &c).await.unwrap()
+    })
+    .await
+}
+
+async fn shop_view(runtime: &PgPool, at: &At, shop_token: &str) -> Result<cart::CartView, Error> {
+    at.run(runtime, async |tx, ctx| {
+        let c = cart::find(tx, ctx, shop_token).await?;
+        cart::view(tx, ctx, &c).await
+    })
+    .await
+}
+
+fn lines(view: &cart::CartView) -> Vec<(Uuid, u32)> {
+    view.lines
+        .iter()
+        .map(|l| (l.variant_id, l.quantity))
+        .collect()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn start_links_the_snapshot_to_its_source(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (shop, here) = same_origin_shop(&runtime, "snap").await;
+    let shop_token = shop_cart(&runtime, &here, &shop).await;
+    here.run(&runtime, async |tx, ctx| {
+        coupons::create(
+            tx,
+            "test",
+            &CouponInput {
+                code: "SNAP10".into(),
+                discount: CouponDiscount::Percent { basis_points: 1000 },
+                currency: None,
+                min_subtotal_minor: None,
+                starts_at: None,
+                ends_at: None,
+                usage_limit: None,
+                per_customer_limit: None,
+                published: false,
+            },
+        )
+        .await
+        .unwrap();
+        let c = cart::find(tx, ctx, &shop_token).await.unwrap();
+        let line = NewLine {
+            variant_id: shop.variants[1],
+            quantity: 2,
+        };
+        cart::add_line(tx, ctx, &c, &line).await.unwrap();
+        cart::apply_coupon(tx, ctx, &c, "SNAP10").await.unwrap();
+    })
+    .await;
+    here.run(&runtime, async |tx, _| {
+        sqlx::query(
+            "UPDATE carts SET email = 'planted@example.cz', phone = '+420 600 000 000',
+                 billing_address = $2, shipping_address = $2, ship_to_country = 'SK'
+             WHERE shop_token_hash = $1",
+        )
+        .bind(capability::hash(&shop_token))
+        .bind(
+            json!({"name": "Planted", "street": "Tajná 1", "city": "Brno",
+                     "postal_code": "602 00", "country": "SK"}),
+        )
+        .execute(&mut **tx)
+        .await
+        .unwrap();
+    })
+    .await;
+    let source = shop_view(&runtime, &here, &shop_token).await.unwrap();
+    assert_eq!(
+        lines(&source),
+        [(shop.variants[0], 1), (shop.variants[1], 2)]
+    );
+
+    let k = same_origin_start(&runtime, &here, &shop_token, None)
+        .await
+        .unwrap();
+    let v = checkout_view(&runtime, &here, &k).await;
+    assert_ne!(v.cart.id, source.id, "the checkout is its own row");
+    assert_eq!(lines(&v.cart), lines(&source), "the lines, in order");
+    assert_eq!(
+        v.cart.coupon,
+        Some(CartCoupon {
+            code: "SNAP10".into(),
+            applied: true,
+            reason: None,
+        })
+    );
+    assert_eq!(v.cart.currency, Currency::Czk);
+    let sql = "SELECT locale || ' ' || currency FROM carts WHERE checkout_token_hash = $1";
+    assert_eq!(
+        read::<String>(&runtime, shop.tenant, sql, &k).await,
+        "cs CZK"
+    );
+    assert_eq!(
+        (&v.email, &v.phone, &v.billing_address, &v.shipping_address),
+        (&None, &None, &None, &None),
+        "no contact or address is copied"
+    );
+    assert_eq!(v.cart.ship_to_country, "CZ", "nor the ship-to country");
+
+    here.run(&runtime, async |tx, _| {
+        sqlx::query(
+            "UPDATE carts SET last_activity_at = now() - interval '31 days'
+             WHERE shop_token_hash = $1",
+        )
+        .bind(capability::hash(&shop_token))
+        .execute(&mut **tx)
+        .await
+        .unwrap();
+    })
+    .await;
+    let (deleted, _) = commerce::ops::expired_carts(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    assert_eq!(deleted, 1, "the expiry job deletes the idle source");
+    assert!(not_found(&shop_view(&runtime, &here, &shop_token).await));
+    let kept = checkout_view(&runtime, &here, &k).await;
+    assert_eq!(
+        lines(&kept.cart),
+        lines(&source),
+        "the snapshot outlives its source"
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn start_capability_is_bound_to_its_origin_and_idles_out(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 2).await;
+    let (shop, here) = same_origin_shop(&runtime, "snapidle").await;
+    let alias = alias(&runtime, &shop, "snapidle-alias.localhost").await;
+    let there = at(&shop, shop.cz, &alias);
+    let shop_token = shop_cart(&runtime, &here, &shop).await;
+    let k = same_origin_start(&runtime, &here, &shop_token, None)
+        .await
+        .unwrap();
+
+    assert!(
+        not_found(&open(&runtime, &there, &k).await),
+        "an alias of the same market cannot open it"
+    );
+    set_activity(&runtime, shop.tenant, &k, "23 hours").await;
+    assert!(
+        open(&runtime, &here, &k).await.is_ok(),
+        "passes at 23 h idle"
+    );
+    set_activity(&runtime, shop.tenant, &k, "24 hours 1 minute").await;
+    assert!(
+        not_found(&open(&runtime, &here, &k).await),
+        "refused at 24 h 1 min idle"
     );
 }

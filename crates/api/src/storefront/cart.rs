@@ -33,6 +33,7 @@ pub fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(remove_coupon))
         .routes(routes!(start_handoff))
         .routes(routes!(redeem_handoff))
+        .routes(routes!(start_checkout))
         .routes(routes!(events))
 }
 
@@ -407,6 +408,53 @@ async fn redeem_handoff(
         code: "invalid_handoff",
         detail: "the checkout link expired or was already used".into(),
     })?;
+    Ok(no_store(Json(CheckoutCart { cart_token }).into_response()))
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CheckoutStart {
+    /// The browser's current checkout capability (`__Host-Http-cart`), revoked by the start.
+    #[serde(default)]
+    pub previous: Option<String>,
+}
+
+/// C10, same-origin mode: starts checkout from the shop cart behind `X-Cart-Token`, which keeps
+/// its capability, and returns the new checkout capability (the edge sets it as the HttpOnly
+/// `__Host-Http-cart` cookie). Earlier checkouts of that cart and `previous` are revoked.
+#[utoipa::path(
+    post,
+    path = "/storefront/v1/cart/checkout",
+    tag = "storefront",
+    params(StorefrontHeaders, CartHeader),
+    request_body = CheckoutStart,
+    responses(
+        (status = 200, body = CheckoutCart),
+        (status = 403, description = "shop_origin_required | shop_origin_mismatch", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 404, description = "Unknown or expired shop cart", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 409, description = "cart_empty | checkout_mode_changed", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, description = "invalid_body", body = platform::Problem, content_type = "application/problem+json"),
+    )
+)]
+async fn start_checkout(
+    shopper: Shopper,
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, Error> {
+    let input: CheckoutStart = parse_json(&body)?;
+    let token = token(&headers)?;
+    let cart_token = with_ctx(&s, &shopper, async |tx, ctx| {
+        checkout_access::start(tx, ctx, &token, input.previous.as_deref()).await
+    })
+    .await?;
+    track(
+        &s,
+        &shopper,
+        &headers,
+        &json!({ "type": "begin_checkout", "template": "other" }),
+    )
+    .await;
     Ok(no_store(Json(CheckoutCart { cart_token }).into_response()))
 }
 

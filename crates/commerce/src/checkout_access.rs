@@ -153,8 +153,8 @@ async fn bind(tx: &mut TenantTx, cart_id: Uuid, p: &Policy<'_>) -> Result<Option
     Ok((updated == 1).then_some(minted.token))
 }
 
-fn require_isolated(p: &Policy<'_>) -> Result<(), Error> {
-    if p.mode == CheckoutMode::Isolated {
+fn require(p: &Policy<'_>, mode: CheckoutMode) -> Result<(), Error> {
+    if p.mode == mode {
         Ok(())
     } else {
         Err(Error::Conflict {
@@ -162,6 +162,46 @@ fn require_isolated(p: &Policy<'_>) -> Result<(), Error> {
             detail: "the shop's checkout mode changed; start checkout again".into(),
         })
     }
+}
+
+async fn require_lines(tx: &mut TenantTx, cart_id: Uuid) -> Result<(), Error> {
+    let lines = sqlx::query_scalar!(
+        "SELECT count(*) AS \"n!\" FROM cart_lines WHERE cart_id = $1",
+        cart_id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if lines == 0 {
+        return Err(Error::Conflict {
+            code: "cart_empty",
+            detail: "the cart is empty".into(),
+        });
+    }
+    Ok(())
+}
+
+async fn revoke_earlier_checkouts(
+    tx: &mut TenantTx,
+    p: &Policy<'_>,
+    source: &CartRef,
+    previous: Option<&str>,
+) -> Result<(), Error> {
+    let previous = previous
+        .filter(|t| capability::well_formed(t))
+        .map(capability::hash);
+    sqlx::query!(
+        "UPDATE carts SET checkout_token_hash = NULL,
+             status = CASE WHEN status = 'open' THEN 'abandoned' ELSE status END,
+             updated_at = now()
+         WHERE checkout_token_hash IS NOT NULL
+           AND (source_cart_id = $1 OR (checkout_token_hash = $2 AND checkout_origin = $3))",
+        source.id,
+        previous,
+        p.origin
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }
 
 /// The open checkout behind `token`, locked until commit; refreshes its idle expiry.
@@ -186,7 +226,45 @@ pub async fn open_for_order(
     token: &str,
 ) -> Result<(CartRef, bool), Error> {
     let p = enter(tx, ctx).await?;
+    lock_source_before_checkout(tx, token).await?;
     guard(tx, ctx, &p, token, true, false).await
+}
+
+async fn lock_source_before_checkout(tx: &mut TenantTx, token: &str) -> Result<(), Error> {
+    sqlx::query!(
+        "SELECT 1 AS one FROM carts
+         WHERE id = (SELECT source_cart_id FROM carts WHERE checkout_token_hash = $1)
+         FOR UPDATE",
+        capability::hash(token)
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn convert(tx: &mut TenantTx, checkout: &CartRef) -> Result<(), Error> {
+    let source = sqlx::query_scalar!(
+        "UPDATE carts SET status = 'converted', updated_at = now() WHERE id = $1
+         RETURNING source_cart_id",
+        checkout.id
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    let Some(source) = source else {
+        return Ok(());
+    };
+    let shop_cart = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM carts
+                          WHERE id = $1 AND status = 'open' AND shop_token_hash IS NOT NULL)
+           AS "shop_cart!""#,
+        source
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    if shop_cart {
+        cart::empty(tx, source).await?;
+    }
+    Ok(())
 }
 
 /// Replaces the capability `token` (re-authorized here) with a fresh one (C6, C10).
@@ -194,6 +272,32 @@ pub async fn rotate(tx: &mut TenantTx, ctx: &Context, token: &str) -> Result<Str
     let p = enter(tx, ctx).await?;
     let (c, _) = guard(tx, ctx, &p, token, false, false).await?;
     bind(tx, c.id, &p).await?.ok_or(Error::NotFound)
+}
+
+/// C10, same-origin mode only: copies the shop cart behind `shop_token` into a new checkout
+/// snapshot linked to it (lines in order, coupon, locale, currency; no contact, address,
+/// customer or selection) and returns the snapshot's capability, bound to the origin and
+/// generation. The shop cart and its capability stay. In the same transaction every
+/// capability of that shop cart's earlier checkouts and the browser's `previous` one on this
+/// origin are revoked; open ones become `abandoned`. `previous` is a revocation hint, never
+/// authorization: a malformed or unknown one revokes nothing. Starts on one shop cart
+/// serialize on its row lock, so the last to commit wins. `409 checkout_mode_changed` on an
+/// isolated origin, `409 cart_empty`, `404` for an unknown shop capability.
+pub async fn start(
+    tx: &mut TenantTx,
+    ctx: &Context,
+    shop_token: &str,
+    previous: Option<&str>,
+) -> Result<String, Error> {
+    let p = enter(tx, ctx).await?;
+    require(&p, CheckoutMode::SameOrigin)?;
+    let source = cart::find(tx, ctx, shop_token).await?;
+    require_lines(tx, source.id).await?;
+    revoke_earlier_checkouts(tx, &p, &source, previous).await?;
+    let snapshot = cart::snapshot(tx, &source).await?;
+    bind(tx, snapshot.id, &p)
+        .await?
+        .ok_or_else(|| Error::Internal("a new snapshot is not open".into()))
 }
 
 /// A1, isolated mode only: revokes the shop capability of a non-empty cart and mints a
@@ -204,20 +308,9 @@ pub async fn start_handoff(
     shop_token: &str,
 ) -> Result<String, Error> {
     let p = enter(tx, ctx).await?;
-    require_isolated(&p)?;
+    require(&p, CheckoutMode::Isolated)?;
     let c = cart::find(tx, ctx, shop_token).await?;
-    let lines = sqlx::query_scalar!(
-        "SELECT count(*) AS \"n!\" FROM cart_lines WHERE cart_id = $1",
-        c.id
-    )
-    .fetch_one(&mut **tx)
-    .await?;
-    if lines == 0 {
-        return Err(Error::Conflict {
-            code: "cart_empty",
-            detail: "the cart is empty".into(),
-        });
-    }
+    require_lines(tx, c.id).await?;
     sqlx::query!("DELETE FROM checkout_handoffs WHERE expires_at < now() - interval '1 day'")
         .execute(&mut **tx)
         .await?;
@@ -283,7 +376,7 @@ pub async fn restore_cart(
     token: &str,
 ) -> Result<Option<String>, Error> {
     let p = enter(tx, ctx).await?;
-    require_isolated(&p)?;
+    require(&p, CheckoutMode::Isolated)?;
     if !capability::well_formed(token) {
         return Ok(None);
     }
