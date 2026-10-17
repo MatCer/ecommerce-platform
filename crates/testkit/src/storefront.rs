@@ -2,6 +2,7 @@
 //! (EUR, sk) market, verified domains, a storefront token, a CZ tax profile (destination VAT),
 //! price lists, one category and a product with two variants in stock.
 
+use commerce::checkout_access::ShopOrigin;
 use commerce::inventory::{self, Adjustment};
 use commerce::markets::{self, NewMarket, TaxMode};
 use commerce::money::Currency;
@@ -25,6 +26,21 @@ pub struct Shop {
     pub variants: [Uuid; 2],
     /// cs slug of the product.
     pub slug: String,
+    /// `https://<slug>.localhost`, the CZ market's shop origin.
+    pub origin: ShopOrigin,
+    /// `https://<slug>-sk.localhost`.
+    pub sk_origin: ShopOrigin,
+}
+
+impl Shop {
+    /// The shop origin the edge serves `market` on (the CZ one for a market not of this shop).
+    pub fn origin_of(&self, market: Uuid) -> &ShopOrigin {
+        if market == self.sk {
+            &self.sk_origin
+        } else {
+            &self.origin
+        }
+    }
 }
 
 /// Creates the shop `slug` (hosts `<slug>.localhost`, `<slug>-sk.localhost`).
@@ -152,6 +168,8 @@ pub async fn shop(runtime: &PgPool, slug: &str) -> Shop {
         product: product.id,
         variants,
         slug: "tee-cs".into(),
+        origin: ShopOrigin::parse(&format!("https://{slug}.localhost")).unwrap(),
+        sk_origin: ShopOrigin::parse(&format!("https://{slug}-sk.localhost")).unwrap(),
     }
 }
 

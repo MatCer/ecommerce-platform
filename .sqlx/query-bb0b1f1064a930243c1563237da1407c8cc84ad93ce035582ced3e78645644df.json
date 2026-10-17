@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, market_id, coalesce(shop_token_hash = $1, false) AS \"shop!\" FROM carts\n         WHERE (shop_token_hash = $1 OR checkout_token_hash = $1)\n           AND status = 'open' AND last_activity_at > $2\n         FOR UPDATE",
+  "query": "SELECT id, market_id FROM carts\n         WHERE shop_token_hash = $1 AND status = 'open' AND last_activity_at > $2\n         FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -24,12 +24,6 @@
             "name": "market_id"
           }
         }
-      },
-      {
-        "ordinal": 2,
-        "name": "shop!",
-        "type_info": "Bool",
-        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -40,9 +34,8 @@
     },
     "nullable": [
       false,
-      false,
-      null
+      false
     ]
   },
-  "hash": "53f5831a7c18fde04e93f852cccfbc8f9c3b957cf3256a7d78fdee17a0e30aae"
+  "hash": "bb0b1f1064a930243c1563237da1407c8cc84ad93ce035582ced3e78645644df"
 }

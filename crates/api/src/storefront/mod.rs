@@ -7,7 +7,9 @@
 //! market is loaded inside that tenant's RLS scope, so a market of another tenant is refused
 //! (`403 market_mismatch`). A client `X-Tenant` header that disagrees with the token is
 //! refused as well. Cart calls add the cart capability (`X-Cart-Token`), customer calls the
-//! session (`X-Customer-Session`, checkout origin only).
+//! session (`X-Customer-Session`, checkout origin only). `X-Shop-Origin` is the exact shop
+//! origin the edge served (the same on `<shop>` and `checkout.<shop>`); checkout capability
+//! calls without it are `403 shop_origin_required`, a malformed one is `400`.
 
 mod cart;
 mod checkout;
@@ -25,6 +27,7 @@ mod withdrawals;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use chrono::Utc;
+use commerce::checkout_access::ShopOrigin;
 use commerce::storefront::{self, Context};
 use commerce::tenancy;
 use platform::Error;
@@ -40,6 +43,7 @@ pub const MARKET_HEADER: &str = "x-market";
 pub const TENANT_HEADER: &str = "x-tenant";
 pub const LOCALE_HEADER: &str = "x-locale";
 pub const CART_HEADER: &str = "x-cart-token";
+pub const SHOP_ORIGIN_HEADER: &str = "x-shop-origin";
 
 pub fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
@@ -71,6 +75,7 @@ pub struct Shopper {
     pub tenant_id: Uuid,
     pub market_id: Uuid,
     pub locale: Option<String>,
+    pub origin: Option<ShopOrigin>,
 }
 
 impl FromRequestParts<AppState> for Shopper {
@@ -101,10 +106,19 @@ impl FromRequestParts<AppState> for Shopper {
         let locale = header(parts, LOCALE_HEADER)
             .filter(|l| l.len() <= 8)
             .map(str::to_owned);
+        let origin = header(parts, SHOP_ORIGIN_HEADER)
+            .map(|o| {
+                ShopOrigin::parse(o).ok_or_else(|| Error::BadRequest {
+                    code: "invalid_shop_origin",
+                    detail: "X-Shop-Origin must be the exact shop origin the edge served".into(),
+                })
+            })
+            .transpose()?;
         Ok(Self {
             tenant_id,
             market_id,
             locale,
+            origin,
         })
     }
 }
@@ -116,7 +130,7 @@ pub(crate) async fn with_ctx<T>(
     f: impl AsyncFnOnce(&mut TenantTx, &Context) -> Result<T, Error>,
 ) -> Result<T, Error> {
     let mut tx = tenant_tx(&s.db, shopper.tenant_id).await?;
-    let ctx = storefront::context(
+    let mut ctx = storefront::context(
         &mut tx,
         &s.public_urls,
         shopper.market_id,
@@ -124,6 +138,7 @@ pub(crate) async fn with_ctx<T>(
         Utc::now(),
     )
     .await?;
+    ctx.origin = shopper.origin.clone();
     let out = f(&mut tx, &ctx).await?;
     tx.commit().await?;
     Ok(out)

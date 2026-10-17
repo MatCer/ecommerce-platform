@@ -13,6 +13,7 @@ pub mod carriers;
 pub mod cart;
 pub mod catalog;
 pub mod checkout;
+pub mod checkout_access;
 pub mod consent;
 pub mod content;
 pub mod customers;

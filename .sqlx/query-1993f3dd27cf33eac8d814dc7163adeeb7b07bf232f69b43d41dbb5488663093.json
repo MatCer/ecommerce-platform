@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE flow_restore_tokens SET used_at = $3\n         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > $3\n           AND cart_id IN (SELECT id FROM carts WHERE market_id = $2 AND status = 'open')\n         RETURNING cart_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cart_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "flow_restore_tokens",
+            "name": "cart_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1993f3dd27cf33eac8d814dc7163adeeb7b07bf232f69b43d41dbb5488663093"
+}

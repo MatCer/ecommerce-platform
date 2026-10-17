@@ -366,11 +366,18 @@ pub enum CheckoutMode {
 }
 
 impl CheckoutMode {
-    fn parse(s: &str) -> Option<Self> {
+    pub(crate) fn parse(s: &str) -> Option<Self> {
         match s {
             "isolated" => Some(Self::Isolated),
             "same_origin" => Some(Self::SameOrigin),
             _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Isolated => "isolated",
+            Self::SameOrigin => "same_origin",
         }
     }
 }

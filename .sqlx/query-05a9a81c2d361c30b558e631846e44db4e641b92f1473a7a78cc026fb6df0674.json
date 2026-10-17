@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE platform.checkout_origins SET mode = $3\n         WHERE origin = $1 AND tenant_id = $2 AND mode <> $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "05a9a81c2d361c30b558e631846e44db4e641b92f1473a7a78cc026fb6df0674"
+}

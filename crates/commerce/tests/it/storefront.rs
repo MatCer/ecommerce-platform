@@ -3,6 +3,7 @@
 
 use chrono::Utc;
 use commerce::cart::{self, NewLine};
+use commerce::checkout_access;
 use commerce::redirects::{self, RedirectInput};
 use commerce::storefront::{self, PublicUrls};
 use commerce::{tenancy, themes};
@@ -338,11 +339,12 @@ async fn fill(runtime: &PgPool, shop: &Shop, artifact: &str) {
     )
     .await
     .unwrap();
-    let ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
+    let mut ctx = storefront::context(&mut tx, &PublicUrls::default(), shop.cz, None, Utc::now())
         .await
         .unwrap();
+    ctx.origin = Some(shop.origin.clone());
     let (id, token) = cart::create(&mut tx, &ctx).await.unwrap();
-    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token).await.unwrap();
     assert_eq!(c.id, id);
     cart::add_line(
         &mut tx,
@@ -369,7 +371,9 @@ async fn fill(runtime: &PgPool, shop: &Shop, artifact: &str) {
         .execute(&mut *tx)
         .await
         .unwrap();
-    cart::start_handoff(&mut tx, &c).await.unwrap();
+    checkout_access::start_handoff(&mut tx, &ctx, &token)
+        .await
+        .unwrap();
     themes::activate_default(&mut tx, "t", artifact)
         .await
         .unwrap();
@@ -443,7 +447,7 @@ async fn tenants_cannot_reach_each_others_storefront_rows(db: PgPool) {
         .await
         .unwrap();
     let (_, token) = cart::create(&mut tx, &ctx).await.unwrap();
-    let c = cart::find(&mut tx, &ctx, &token, None).await.unwrap();
+    let c = cart::find(&mut tx, &ctx, &token).await.unwrap();
     let err = cart::add_line(
         &mut tx,
         &ctx,

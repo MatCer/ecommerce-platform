@@ -41,6 +41,7 @@ impl Ctx {
     async fn sf(&self, call: Call<'_>) -> (StatusCode, Value, axum::response::Response) {
         call.header("x-storefront-token", self.shop.token.clone())
             .header("x-market", self.shop.cz.to_string())
+            .header("x-shop-origin", self.shop.origin.as_str())
             .send(&self.s)
             .await
     }

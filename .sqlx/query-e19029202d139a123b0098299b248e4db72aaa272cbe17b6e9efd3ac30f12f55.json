@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE carts SET checkout_token_hash = $2, checkout_origin = $3, checkout_generation = $4,\n             last_activity_at = now(), updated_at = now()\n         WHERE id = $1 AND status = 'open'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e19029202d139a123b0098299b248e4db72aaa272cbe17b6e9efd3ac30f12f55"
+}

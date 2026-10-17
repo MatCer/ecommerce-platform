@@ -10,11 +10,12 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use chrono::Utc;
-use commerce::cart::{self, Scope};
+use commerce::cart;
 use commerce::checkout::{
     self, AddressesInput, CheckoutView, ContactInput, PaymentInput, PlaceOrderInput, Placer,
     ShippingInput,
 };
+use commerce::checkout_access;
 use commerce::customers;
 use commerce::idempotency;
 use commerce::money::MoneyView;
@@ -61,7 +62,7 @@ async fn with_checkout(
 ) -> Result<Response, Error> {
     let token = cart_token(headers)?;
     let view = with_ctx(s, shopper, async |tx, ctx| {
-        let c = cart::find(tx, ctx, &token, Some(Scope::Checkout)).await?;
+        let c = checkout_access::open(tx, ctx, &token).await?;
         f(tx, ctx, &c).await?;
         checkout::view(tx, ctx, &s.checkout, &c).await
     })

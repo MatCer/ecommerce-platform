@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE checkout_handoffs SET used_at = now()\n         WHERE token_hash = $1 AND market_id = $2 AND used_at IS NULL AND expires_at > now()\n         RETURNING cart_id",
+  "query": "UPDATE checkout_handoffs SET used_at = now()\n         WHERE token_hash = $1 AND market_id = $2 AND origin = $3 AND generation = $4\n           AND used_at IS NULL AND expires_at > now()\n         RETURNING cart_id",
   "describe": {
     "columns": [
       {
@@ -18,12 +18,14 @@
     "parameters": {
       "Left": [
         "Bytea",
-        "Uuid"
+        "Uuid",
+        "Text",
+        "Int8"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "9096a6f11b26659c8617104675da01b75f1131880542448faa5d0f99d45dd540"
+  "hash": "9882d0a45b5f266c6a29f1482961a22659965fe81cfbbcdd0df54d1262f2f64b"
 }

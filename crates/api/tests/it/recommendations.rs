@@ -37,6 +37,7 @@ async fn setup(db: PgPool) -> Ctx {
 fn sf<'a>(call: Call<'a>, shop: &Shop) -> Call<'a> {
     call.header("x-storefront-token", shop.token.clone())
         .header("x-market", shop.cz.to_string())
+        .header("x-shop-origin", shop.origin.as_str())
 }
 
 async fn grant(c: &Ctx, subject: &str, personalization: bool) {

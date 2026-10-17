@@ -4,6 +4,7 @@ use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
+use commerce::checkout_access;
 use commerce::flows::{self, WatchInput, WatchStatus};
 use platform::Error;
 use serde::{Deserialize, Serialize};
@@ -124,7 +125,7 @@ async fn restore_cart(
 ) -> Result<Response, Error> {
     let input: TokenInput = parse_json(&body)?;
     let token = with_ctx(&s, &shopper, async |tx, ctx| {
-        flows::restore_cart(tx, ctx.market.id, &input.token, chrono::Utc::now()).await
+        checkout_access::restore_cart(tx, ctx, &input.token).await
     })
     .await?
     .ok_or(Error::NotFound)?;
