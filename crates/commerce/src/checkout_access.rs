@@ -19,24 +19,17 @@ impl ShopOrigin {
     /// `https://<host>[:port]`, or `http://` for `*.localhost` only; lowercase, no default
     /// port, no path, query or userinfo.
     pub fn parse(s: &str) -> Option<Self> {
-        let (scheme, rest) = s.split_once("://")?;
-        let (host, port) = match rest.split_once(':') {
-            Some((host, p)) => (
-                host,
-                Some(
-                    p.parse::<u16>()
-                        .ok()
-                        .filter(|n| *n != 0 && n.to_string() == p)?,
-                ),
-            ),
-            None => (rest, None),
+        let url = reqwest::Url::parse(s).ok()?;
+        let host = url.host_str()?;
+        let scheme_ok = match url.scheme() {
+            "https" => true,
+            "http" => host.ends_with(".localhost"),
+            _ => false,
         };
-        let default = match scheme {
-            "https" => 443,
-            "http" if host.ends_with(".localhost") => 80,
-            _ => return None,
-        };
-        (port != Some(default) && tenancy::normalize_host(host).ok()? == host)
+        (scheme_ok
+            && url.port() != Some(0)
+            && url.origin().ascii_serialization() == s
+            && tenancy::normalize_host(host).ok()? == host)
             .then(|| Self(s.to_owned()))
     }
 
