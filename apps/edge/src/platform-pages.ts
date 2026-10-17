@@ -28,6 +28,7 @@ export const UNSUPPORTED_BROWSER_PAGE = `<!doctype html><html lang="cs"><meta ch
 <p lang="en">This browser is too old for checkout. Please open it in a current version of Chrome, Firefox, Safari or Edge.</p></main></html>`;
 
 export const STALE_CHECKOUT_PAGE = `<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0;url=/checkout?error=stale_page">
 <title>Zastaralá stránka pokladny</title>
 <main><h1>Zastaralá stránka pokladny</h1>
 <p>Tato stránka pokladny už není aktuální a nic se neuložilo. <a href="/checkout">Otevřete pokladnu znovu</a>.</p>
