@@ -15,11 +15,14 @@ use commerce::payments::{self, FakeGateway, MethodKind, Outcome, PaymentMethodIn
 use commerce::promotions::coupons::{self, CouponInput};
 use commerce::shipping::{self, Carrier, ShippingMethodInput};
 use commerce::storefront::{self, Context, PublicUrls};
+use commerce::tenancy::CheckoutMode;
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
 use sqlx::PgPool;
 use testkit::storefront::Shop;
 use uuid::Uuid;
+
+use crate::checkout_access::{attest, blocked_by, pid, switch};
 
 const ACTOR: &str = "test";
 
@@ -1131,31 +1134,6 @@ async fn orders_and_methods_are_tenant_isolated(db: PgPool) {
     assert!(e.is_err());
 }
 
-async fn pid(tx: &mut TenantTx) -> i32 {
-    sqlx::query_scalar("SELECT pg_backend_pid()")
-        .fetch_one(&mut **tx)
-        .await
-        .unwrap()
-}
-
-async fn blocked_by(db: &PgPool, waiter: i32, blocker: i32) {
-    tokio::time::timeout(std::time::Duration::from_secs(10), async {
-        loop {
-            let blockers: Vec<i32> = sqlx::query_scalar("SELECT pg_blocking_pids($1)")
-                .bind(waiter)
-                .fetch_one(db)
-                .await
-                .unwrap();
-            if blockers.contains(&blocker) {
-                return;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .unwrap_or_else(|_| panic!("backend {waiter} never waited on {blocker}"));
-}
-
 async fn shop_cart_view(runtime: &PgPool, shop: &Shop, shop_token: &str) -> cart::CartView {
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
     let ctx = ctx(&mut tx, shop.cz).await;
@@ -1170,25 +1148,8 @@ async fn placement_empties_the_source_cart(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 8).await;
     let shop = testkit::storefront::shop(&runtime, "placesnap").await;
     let m = methods(&runtime, &shop).await;
-    sqlx::query(
-        "UPDATE platform.checkout_origins SET history = 'merchant_attested_never_served',
-             attested_by = 'user-owner', attested_at = now(), attestation_version = 1
-         WHERE origin = $1",
-    )
-    .bind(shop.origin.as_str())
-    .execute(&runtime)
-    .await
-    .unwrap();
-    assert!(
-        checkout_access::switch_mode(
-            &runtime,
-            shop.tenant,
-            &shop.origin,
-            commerce::tenancy::CheckoutMode::SameOrigin
-        )
-        .await
-        .unwrap()
-    );
+    attest(&runtime, &shop.origin).await;
+    switch(&runtime, &shop, &shop.origin, CheckoutMode::SameOrigin).await;
     let line = NewLine {
         variant_id: shop.variants[0],
         quantity: 1,

@@ -186,7 +186,7 @@ async fn alias(runtime: &PgPool, shop: &Shop, host: &str) -> ShopOrigin {
     ShopOrigin::parse(&format!("https://{host}")).unwrap()
 }
 
-async fn attest(runtime: &PgPool, origin: &ShopOrigin) {
+pub(crate) async fn attest(runtime: &PgPool, origin: &ShopOrigin) {
     sqlx::query(
         "UPDATE platform.checkout_origins SET history = 'merchant_attested_never_served',
              attested_by = 'user-owner', attested_at = now(), attestation_version = 1
@@ -198,7 +198,7 @@ async fn attest(runtime: &PgPool, origin: &ShopOrigin) {
     .unwrap();
 }
 
-async fn switch(runtime: &PgPool, shop: &Shop, origin: &ShopOrigin, mode: CheckoutMode) {
+pub(crate) async fn switch(runtime: &PgPool, shop: &Shop, origin: &ShopOrigin, mode: CheckoutMode) {
     let changed = checkout_access::switch_mode(runtime, shop.tenant, origin, mode)
         .await
         .unwrap();
@@ -250,14 +250,14 @@ async fn live_without_lock(tx: &mut PgConnection, token: &str) -> bool {
         .unwrap()
 }
 
-async fn pid(conn: &mut PgConnection) -> i32 {
+pub(crate) async fn pid(conn: &mut PgConnection) -> i32 {
     sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(conn)
         .await
         .unwrap()
 }
 
-async fn blocked_by(db: &PgPool, waiter: i32, blocker: i32) {
+pub(crate) async fn blocked_by(db: &PgPool, waiter: i32, blocker: i32) {
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             let blockers: Vec<i32> = sqlx::query_scalar("SELECT pg_blocking_pids($1)")

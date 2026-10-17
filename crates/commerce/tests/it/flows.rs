@@ -17,6 +17,8 @@ use sqlx::{PgPool, Row};
 use testkit::storefront::{Shop, raw_order, shop};
 use uuid::Uuid;
 
+use crate::checkout_access::{attest, switch};
+
 fn token_in(body: &str, marker: &str) -> String {
     let at = body.find(marker).unwrap() + marker.len();
     body[at..at + 64].to_owned()
@@ -1119,23 +1121,6 @@ async fn shop_tx(rt: &PgPool, s: &Shop) -> (TenantTx, Context) {
     (tx, ctx)
 }
 
-async fn switch(rt: &PgPool, s: &Shop, mode: CheckoutMode) {
-    sqlx::query(
-        "UPDATE platform.checkout_origins SET history = 'merchant_attested_never_served',
-             attested_by = 'user-owner', attested_at = now(), attestation_version = 1
-         WHERE origin = $1",
-    )
-    .bind(s.origin.as_str())
-    .execute(rt)
-    .await
-    .unwrap();
-    assert!(
-        checkout_access::switch_mode(rt, s.tenant, &s.origin, mode)
-            .await
-            .unwrap()
-    );
-}
-
 struct Typed {
     shop_token: String,
     checkout: String,
@@ -1203,7 +1188,8 @@ async fn abandoned_cart_mails(rt: &PgPool, tenant: Uuid) -> Vec<String> {
 async fn abandoned_checkout_targets_the_snapshot(db: PgPool) {
     let rt = testkit::runtime_pool(&db, 4).await;
     let s = shop(&rt, "flowsnap").await;
-    switch(&rt, &s, CheckoutMode::SameOrigin).await;
+    attest(&rt, &s.origin).await;
+    switch(&rt, &s, &s.origin, CheckoutMode::SameOrigin).await;
     let t = typed_checkout(&rt, &s, "buyer@example.com").await;
 
     let mut tx = tenant_tx(&rt, s.tenant).await.unwrap();
@@ -1242,7 +1228,8 @@ async fn abandoned_checkout_targets_the_snapshot(db: PgPool) {
 async fn restore_cart_targets_the_snapshot(db: PgPool) {
     let rt = testkit::runtime_pool(&db, 4).await;
     let s = shop(&rt, "flowrestore").await;
-    switch(&rt, &s, CheckoutMode::SameOrigin).await;
+    attest(&rt, &s.origin).await;
+    switch(&rt, &s, &s.origin, CheckoutMode::SameOrigin).await;
     let t = typed_checkout(&rt, &s, "buyer@example.com").await;
     let mut tx = tenant_tx(&rt, s.tenant).await.unwrap();
     flows::enroll_due(&mut tx, Utc::now()).await.unwrap();
@@ -1262,7 +1249,7 @@ async fn restore_cart_targets_the_snapshot(db: PgPool) {
         "{r:?}"
     );
 
-    switch(&rt, &s, CheckoutMode::Isolated).await;
+    switch(&rt, &s, &s.origin, CheckoutMode::Isolated).await;
     let (mut tx, ctx) = shop_tx(&rt, &s).await;
     let k = checkout_access::restore_cart(&mut tx, &ctx, &restore)
         .await
