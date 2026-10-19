@@ -11,6 +11,9 @@ wrong.
   In a linked worktree, run `pnpm worktree:tidy` after the merge to free its `target/`.
 - Never start, stop or seed the compose stack from a worktree. The Makefile refuses; do not work
   around it by calling `docker compose` directly.
+- Name a new migration `migrations/$(scripts/next-migration-version)_<name>.sql`, not with
+  `sqlx migrate add`: main's versions are future days, so a real timestamp sorts before them. CI
+  (`scripts/check-migrations.sh`) refuses a version that collides or sorts before the base's latest.
 - `make test-rust` may wait for another checkout's run to finish (one sqlx test run per Postgres
   at a time). Waiting is expected; do not kill it or point it at another database.
 

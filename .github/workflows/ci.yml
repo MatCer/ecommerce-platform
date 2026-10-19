@@ -81,6 +81,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Migration versions are unique and sort after the base's
+        env:
+          BASE: ${{ github.base_ref || 'main' }}
+        run: scripts/check-migrations.sh "origin/$BASE"
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
