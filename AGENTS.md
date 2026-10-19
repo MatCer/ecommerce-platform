@@ -11,6 +11,9 @@ wrong.
   In a linked worktree, run `pnpm worktree:tidy` after the merge to free its `target/`.
 - Never start, stop or seed the compose stack from a worktree. The Makefile refuses; do not work
   around it by calling `docker compose` directly.
+- Name a new migration `migrations/$(scripts/next-migration-version)_<name>.sql`, not with
+  `sqlx migrate add`: main's versions are future days, so a real timestamp sorts before them. CI
+  (`scripts/check-migrations.sh`) refuses a version that collides or sorts before the base's latest.
 - Clippy denies `unwrap()` outside tests, Biome denies `any`, and
   `every_public_table_is_tenant_scoped_with_forced_rls` (`crates/platform/tests/it/tenancy.rs`)
   fails any `public` table without `tenant_id`, forced RLS and a `tenant_isolation` policy.

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+latest="$(git ls-tree --name-only origin/main migrations/ | sed -n 's|^migrations/\([0-9]*\)_.*\.sql$|\1|p' | sort -n | tail -n 1)"
+echo $((10#$latest + 100))
