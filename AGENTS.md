@@ -11,6 +11,9 @@ wrong.
   In a linked worktree, run `pnpm worktree:tidy` after the merge to free its `target/`.
 - Never start, stop or seed the compose stack from a worktree. The Makefile refuses; do not work
   around it by calling `docker compose` directly.
+- Clippy denies `unwrap()` outside tests, Biome denies `any`, and
+  `every_public_table_is_tenant_scoped_with_forced_rls` (`crates/platform/tests/it/tenancy.rs`)
+  fails any `public` table without `tenant_id`, forced RLS and a `tenant_isolation` policy.
 - `make test-rust` may wait for another checkout's run to finish (one sqlx test run per Postgres
   at a time). Waiting is expected; do not kill it or point it at another database.
 
@@ -25,6 +28,9 @@ Flag only issues this PR introduces that a real caller or input reaches in norma
 Do not flag edge cases normal use does not reach, hardening or defense in depth, validation of data
 from our own services, refactors, naming, style, or issues main already has. Do not suggest adding
 code unless a P0 or P1 needs it. Most PRs should get no comments.
+
+Do not flag a gap the PR body already names as deliberate ("Deliberately left out", or an omission
+or recovery path under "Merge Danger") or assigns to a later slice.
 
 Operating context: pre-launch, one app instance and one worker. Rollback, deploy windows, replicas
 and outage handling are not normal use.
