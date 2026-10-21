@@ -20,6 +20,14 @@ export type I18n = Record<string, string>;
 export const CONTENT_LOCALES = ["cs", "sk", "en"] as const;
 export type ContentLocale = (typeof CONTENT_LOCALES)[number];
 
+export function altTextLocales(marketLocales: readonly string[], alt: I18n): string[] {
+  const content: readonly string[] = CONTENT_LOCALES;
+  const extra = new Set(
+    [...marketLocales, ...Object.keys(alt)].filter((l) => !content.includes(l)),
+  );
+  return [...content, ...[...extra].sort()];
+}
+
 export interface TranslationDraft {
   name: string;
   slug: string;
