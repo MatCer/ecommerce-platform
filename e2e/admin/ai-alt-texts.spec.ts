@@ -135,3 +135,38 @@ test("switch on → upload with a cs alt text → AI sk alt text survives a save
 
   await admin.context().close();
 });
+
+test("a save still checking for AI alt texts writes the product it started on", async ({
+  browser,
+}) => {
+  const productId = sql(`SELECT ${PRODUCT}`);
+  const otherId = sql(`SELECT product_id FROM product_translations
+    WHERE tenant_id = ${DEMO} AND locale = 'cs' AND name = 'Batoh Mini'`);
+  const admin = await signInOwner(browser);
+  const name = admin
+    .getByRole("tabpanel", { name: "Czech" })
+    .getByRole("textbox", { name: "Name", exact: true });
+  await admin.goto(`/products/${productId}`);
+  await expect(name).toHaveValue(NAME);
+
+  await admin.route(`**/admin/v1/products/${productId}`, async (r) => {
+    if (r.request().method() === "GET") await new Promise((done) => setTimeout(done, 3_000));
+    await r.continue();
+  });
+  const puts: string[] = [];
+  await admin.route("**/admin/v1/products/*", async (r) => {
+    if (r.request().method() !== "PUT") return r.fallback();
+    puts.push(new URL(r.request().url()).pathname);
+    await r.abort();
+  });
+
+  await admin.getByRole("button", { name: "Save product" }).click();
+  await admin.evaluate((url) => {
+    history.pushState(null, "", url);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, `/products/${otherId}`);
+  await expect(name).toHaveValue("Batoh Mini");
+  await expect.poll(() => puts, { timeout: 10_000 }).toEqual([`/admin/v1/products/${productId}`]);
+
+  await admin.context().close();
+});
