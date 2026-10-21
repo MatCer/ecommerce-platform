@@ -441,12 +441,12 @@ pub(crate) async fn market_locales(tx: &mut TenantTx) -> Result<Vec<String>, Err
 
 static CONTACT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r"\b(?:https?|ftps?|mailto|tel|sms|javascript):",
-        r"|\b[\p{L}\p{N}-]{2,}(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/",
+        r"(?i:\b(?:https?|ftps?|mailto|tel|sms|javascript):)",
+        r"|(?i:\b[\p{L}\p{N}-]{2,}(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/)",
         r"|\b[\p{L}\p{N}-]{2,}(?:\.[\p{L}\p{N}-]+)*\.",
         r"(?:com|net|org|info|eu|cz|sk|de|at|pl|hu|uk|shop|store|online|io)\b",
-        r"|\+\d(?:[ .-]?\d){7,14}",
-        r"|\b\d{3}[ .-]\d{3}[ .-]\d{3}\b",
+        r"|\+\d(?:[ .()-]{0,2}\d){7,14}",
+        r"|\b0\d{2,3}(?:[ .-]\d{2,4}){2,3}\b",
     ))
     .unwrap_or_else(|_| unreachable!())
 });
@@ -465,7 +465,7 @@ pub(crate) fn safe_text(
         )));
     }
     let lower = text.to_lowercase();
-    if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) || CONTACT.is_match(&lower) {
+    if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) || CONTACT.is_match(&text) {
         return Err(CallError::output(format!(
             "{what} contains a link, contact details or markup"
         )));
