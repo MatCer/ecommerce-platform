@@ -454,6 +454,50 @@ mod tests {
     }
 
     #[test]
+    fn contact_details_are_rejected() {
+        for bad in [
+            "Akce na shop.cz/akce.",
+            "Více na Obchod.CZ/vyprodej",
+            "Objednávejte na zbozi-levne.cz.",
+            "Recenze najdete na s.Oliver.de",
+            "Viz eshop.com",
+            "Viz https:/shop.cz",
+            "Viz https:shop.cz",
+            "Volejte tel:777123456",
+            "Volejte +420 777 123 456.",
+            "Volejte +420777123456",
+            "Volejte (+421) 905-123-456",
+            "Volejte 777 123 456.",
+            "Volejte 777-123-456",
+            "Volejte 777.123.456",
+        ] {
+            let e = validate(out(&[("cs", bad), ("sk", "B")]), &locales()).unwrap_err();
+            assert_eq!(e.code(), "ai_invalid_output", "{bad}");
+        }
+    }
+
+    #[test]
+    fn dotted_brands_sizes_dates_codes_and_prices_pass() {
+        for ok in [
+            "Tričko s.Oliver sedí, vel. M i L.",
+            "Boty s.Oliver/Tommy Hilfiger chválí.",
+            "Vyrobeno v U.K. a E.U.",
+            "Velikost EU 42 i 38.5 sedí.",
+            "Doručeno 12.10.2026, tj. 12. 10. 2026.",
+            "EAN 8594001234567 odpovídá.",
+            "Cena 1 299 Kč, dříve 12 999,90 Kč.",
+            "Hodnocení 4,6 z 5, tedy +12 % proti loňsku.",
+            "Poměr cena:výkon chválí, vel. XL/XXL.",
+            "Výdrž 3.5 h, rozměr 120 x 60 cm, s.r.o. dodává.",
+        ] {
+            assert!(
+                validate(out(&[("cs", ok), ("sk", "B")]), &locales()).is_ok(),
+                "{ok}"
+            );
+        }
+    }
+
+    #[test]
     fn a_hash_in_plain_prose_passes() {
         let got = validate(
             out(&[("cs", "Customers prefer shade #2."), ("sk", "B")]),
