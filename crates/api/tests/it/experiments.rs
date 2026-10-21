@@ -328,6 +328,37 @@ async fn a_recorded_choice_tells_the_edge_whether_its_analytics_grant_covers_exp
     );
 }
 
+async fn replace_running(
+    runtime: &PgPool,
+    tenant: Uuid,
+    version: i32,
+    b: serde_json::Value,
+) -> Uuid {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query(
+        "UPDATE experiments SET status = 'stopped', stop_reason = 'manual'
+         WHERE status = 'running'",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    let id = sqlx::query_scalar(
+        "INSERT INTO experiments (tenant_id, name, version, arms, status, started_at)
+         VALUES ($1, 'homepage', $2, $3, 'running', now()) RETURNING id",
+    )
+    .bind(tenant)
+    .bind(version)
+    .bind(json!([
+        {"key": "control", "weight": 1, "config": {}},
+        {"key": "b", "weight": 1, "config": b},
+    ]))
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    id
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_edges_arm_overrides_the_home_hero_in_the_page_model(db: PgPool) {
     let jwks = jwks_server(json!([jwk("a", X_A)])).await;
@@ -344,10 +375,6 @@ async fn the_edges_arm_overrides_the_home_hero_in_the_page_model(db: PgPool) {
                 "subtitle": {"cs": "Doprava zdarma nad 1 500 Kč"},
                 "cta": {"cs": "Prohlédnout kolekci"},
             }}},
-            {"key": "title-only", "weight": 1, "config": {"hero": {"title": {"cs": "Jen titulek"}}}},
-            {"key": "unknown-key", "weight": 1, "config": {"tokens": {"color": "red"}}},
-            {"key": "too-long", "weight": 1, "config": {"hero": {"title": {"cs": "x".repeat(201)}}}},
-            {"key": "blank", "weight": 1, "config": {"hero": {"title": {"cs": "  "}}}},
         ]),
     )
     .await;
@@ -379,23 +406,12 @@ async fn the_edges_arm_overrides_the_home_hero_in_the_page_model(db: PgPool) {
         "a field without the locale falls back like other i18n texts"
     );
 
-    let title_only = home(shop.cz, Some(format!("{id}:1:title-only"))).await;
-    assert_eq!(title_only["title"], "Jen titulek");
-    assert_eq!(title_only["subtitle"], control["subtitle"]);
-    assert_eq!(title_only["cta"], control["cta"]);
-
     let other = Uuid::now_v7();
     for (header, why) in [
         (format!("{id}:1:control"), "the control arm"),
         (format!("{id}:2:b"), "another version"),
         (format!("{other}:1:b"), "another experiment"),
         (format!("{id}:1:nope"), "no such arm"),
-        (
-            format!("{id}:1:unknown-key"),
-            "a config key the page model does not know",
-        ),
-        (format!("{id}:1:too-long"), "a title over 200 characters"),
-        (format!("{id}:1:blank"), "a blank title"),
         ("garbage".to_owned(), "a malformed header"),
     ] {
         assert_eq!(
@@ -409,16 +425,41 @@ async fn the_edges_arm_overrides_the_home_hero_in_the_page_model(db: PgPool) {
         sk_control
     );
 
-    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-    sqlx::query("UPDATE experiments SET status = 'stopped' WHERE id = $1")
-        .bind(id)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
+    let title_only = replace_running(
+        &runtime,
+        shop.tenant,
+        2,
+        json!({"hero": {"title": {"cs": "Jen titulek"}}}),
+    )
+    .await;
+    let page = home(shop.cz, Some(format!("{title_only}:2:b"))).await;
+    assert_eq!(page["title"], "Jen titulek");
+    assert_eq!(page["subtitle"], control["subtitle"]);
+    assert_eq!(page["cta"], control["cta"]);
     assert_eq!(
         home(shop.cz, Some(format!("{id}:1:b"))).await,
         control,
         "a stopped experiment renders control"
     );
+
+    for (version, config, why) in [
+        (
+            3,
+            json!({"tokens": {"color": "red"}}),
+            "a config key the page model does not know",
+        ),
+        (
+            4,
+            json!({"hero": {"title": {"cs": "x".repeat(201)}}}),
+            "a title over 200 characters",
+        ),
+        (5, json!({"hero": {"title": {"cs": "  "}}}), "a blank title"),
+    ] {
+        let id = replace_running(&runtime, shop.tenant, version, config).await;
+        assert_eq!(
+            home(shop.cz, Some(format!("{id}:{version}:b"))).await,
+            control,
+            "{why} renders control"
+        );
+    }
 }

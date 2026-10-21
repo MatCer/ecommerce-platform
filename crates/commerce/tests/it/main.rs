@@ -9,6 +9,7 @@ mod checkout;
 mod checkout_access;
 mod consent;
 mod customers;
+mod experiment_lifecycle;
 mod experiments;
 mod feeds;
 mod flows;
