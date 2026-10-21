@@ -7,9 +7,10 @@ import {
   eanValid,
   emptyDraft,
   move,
-  pickUpAltTexts,
   type Product,
+  type ProductMedia,
   type ProductOption,
+  pickUpAltTexts,
   settleOptions,
   slugify,
   variantMatrix,
@@ -240,17 +241,17 @@ describe("settleOptions", () => {
 });
 
 describe("pickUpAltTexts", () => {
-  const loaded = [
+  const loaded: ProductMedia[] = [
     { asset_id: "a1", alt_i18n: { cs: "Tričko" } },
     { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
   ];
-  const stored = [
+  const stored: ProductMedia[] = [
     { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "AI sk", en: "AI en" } },
     { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
   ];
 
   it("fills alt texts written since the form loaded into fields that are still empty", () => {
-    const draft = [
+    const draft: ProductMedia[] = [
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: " " } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
     ];
@@ -261,7 +262,7 @@ describe("pickUpAltTexts", () => {
   });
 
   it("keeps the merchant's own text and a text the merchant cleared", () => {
-    const draft = [
+    const draft: ProductMedia[] = [
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "Moje" } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "" } },
     ];

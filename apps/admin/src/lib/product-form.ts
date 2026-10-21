@@ -349,6 +349,27 @@ export function eanValid(ean: string): boolean {
   return (10 - (sum % 10)) % 10 === check;
 }
 
+/**
+ * Alt texts stored since the form loaded (the AI alt text job) for the draft's fields that are
+ * still blank and were blank at load; the merchant's text and a loaded text they cleared stay.
+ */
+export function pickUpAltTexts(
+  draft: ProductMedia[],
+  loaded: ProductMedia[],
+  stored: ProductMedia[],
+): ProductMedia[] {
+  const blank = (s: string | undefined) => !s?.trim();
+  const alts = (list: ProductMedia[], id: string): I18n =>
+    list.find((m) => m.asset_id === id)?.alt_i18n ?? {};
+  return draft.map((m) => {
+    const before = alts(loaded, m.asset_id);
+    const picked = Object.entries(alts(stored, m.asset_id)).filter(
+      ([l, v]) => !blank(v) && blank(m.alt_i18n?.[l]) && blank(before[l]),
+    );
+    return picked.length ? { ...m, alt_i18n: { ...m.alt_i18n, ...Object.fromEntries(picked) } } : m;
+  });
+}
+
 /** Moves the item at `from` by `delta` positions (clamped); returns a new array. */
 export function move<T>(items: readonly T[], from: number, delta: number): T[] {
   const to = Math.max(0, Math.min(items.length - 1, from + delta));

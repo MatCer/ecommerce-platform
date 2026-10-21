@@ -123,6 +123,11 @@ test("switch on → upload with a cs alt text → AI sk alt text survives a save
   await expect(sk).toHaveValue(EDITED_ALT);
   await expect(sk).not.toHaveAccessibleDescription(AI_LABEL);
 
+  await sk.fill("");
+  await admin.getByRole("button", { name: "Save product" }).click();
+  await expect(admin.getByText("Changes saved").last()).toBeVisible();
+  expect(storedSk()).toBe("");
+
   await image.getByRole("button", { name: `Remove: Image ${before + 1}` }).click();
   await admin.getByRole("button", { name: "Save product" }).click();
   await expect(admin.getByText("Changes saved").last()).toBeVisible();
