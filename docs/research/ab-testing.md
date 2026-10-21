@@ -1,7 +1,8 @@
 # Research: A/B testing for storefront themes (SHOP-35)
 
 Status: research spike, 2026-10-10, revised after an independent review (see "Review notes").
-No decision has been recorded yet; see "Open decisions".
+Open decision 7 was answered on 2026-10-22 (SHOP-99: self-build). This doc records no other
+decision; see "Open decisions".
 
 Evidence tags:
 - **[code]** verified in this repo (file:line);
@@ -299,6 +300,21 @@ The cost is not small either way. Decide after slices 1-2. [inf]
    order counts?
 6. **Offer and shipping arms:** in scope? They need cart persistence and pricing-law review.
 7. **Stats and admin:** self-build the readout, or self-host GrowthBook?
+   **Answered 2026-10-22 (SHOP-99): self-build.** The readout, calibration, guardrails and admin
+   live in the existing API, worker and admin app.
+   - Self-hosted GrowthBook is one more container (Next.js front end, Express API, Python stats
+     engine) plus a MongoDB or MongoDB-compatible database [src]
+     https://docs.growthbook.io/self-host (read 2026-10-22). The platform runs one app instance
+     and one worker.
+   - Separate organizations in one instance need multi-tenant mode, which is part of GrowthBook
+     Enterprise [src] https://docs.growthbook.io/using/security (read 2026-10-22). Without it,
+     merchants could not use GrowthBook's UI, so the merchant admin is ours either way and
+     GrowthBook would only be a stats engine behind it.
+   - Its warehouse queries would need a cross-tenant read role over `experiment_assignments`,
+     `events` and `orders`, outside the forced-RLS model that every public table follows.
+   - Edge assignment, exposure, cache rules and arm plumbing are already ours (SHOP-96,
+     SHOP-98, SHOP-100). The missing part was a two-arm Beta-Binomial readout, which is small.
+   - Revisit if bandits, CUPED or many concurrent experiments per tenant become requirements.
 
 ## Proposed implementation slices
 
