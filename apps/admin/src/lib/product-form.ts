@@ -143,7 +143,7 @@ export function draftFromProduct(p: Product): ProductDraft {
     })),
     category_ids: p.category_ids,
     parameters: p.parameters,
-    media: p.media,
+    media: p.media.map((m) => ({ ...m, alt_i18n: { ...m.alt_i18n } })),
     manufacturer: party(p.gpsr.manufacturer),
     eu_responsible_person: party(p.gpsr.eu_responsible_person),
     safety_info: perLocale((l) => p.gpsr.safety_info?.[l] ?? ""),
@@ -347,6 +347,23 @@ export function eanValid(ean: string): boolean {
   const check = digits.pop() as number;
   const sum = digits.reverse().reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0);
   return (10 - (sum % 10)) % 10 === check;
+}
+
+export function fillAltTextsLeftBlank(
+  draft: ProductMedia[],
+  loaded: ProductMedia[],
+  stored: ProductMedia[],
+): ProductMedia[] {
+  const blank = (s: string | undefined) => !s?.trim();
+  const alts = (list: ProductMedia[], id: string): I18n =>
+    list.find((m) => m.asset_id === id)?.alt_i18n ?? {};
+  return draft.map((m) => {
+    const before = alts(loaded, m.asset_id);
+    const picked = Object.entries(alts(stored, m.asset_id)).filter(
+      ([l, v]) => !blank(v) && blank(m.alt_i18n?.[l]) && blank(before[l]),
+    );
+    return picked.length ? { ...m, alt_i18n: { ...m.alt_i18n, ...Object.fromEntries(picked) } } : m;
+  });
 }
 
 /** Moves the item at `from` by `delta` positions (clamped); returns a new array. */

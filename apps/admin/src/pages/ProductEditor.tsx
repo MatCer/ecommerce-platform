@@ -33,8 +33,11 @@ import {
   draftFromProduct,
   draftToInput,
   emptyDraft,
+  fillAltTextsLeftBlank,
   type PartyDraft,
+  type Product,
   type ProductDraft,
+  type ProductMedia,
   type ProductOption,
   type ProductStatus,
   slugify,
@@ -160,24 +163,27 @@ export default function ProductEditor() {
   const parameters = useParameters();
   const taxCategories = useTaxCategories();
 
+  let loadedMedia: ProductMedia[] = [];
+  const load = (p: Product) => {
+    loadedMedia = p.media;
+    setDraft(reconcile(draftFromProduct(p)));
+    setLoaded(p.id);
+  };
+
   // Load the product into the working copy once per id (later refetches keep local edits).
   createEffect(() => {
     if (isNew() && loaded() !== "new") {
       setDraft(reconcile(emptyDraft()));
       setLoaded("new");
     } else if (product.data && loaded() !== product.data.id) {
-      setDraft(reconcile(draftFromProduct(product.data)));
-      setLoaded(product.data.id);
+      load(product.data);
     }
   });
 
   /** After AI fields were saved: the stored product replaces the working copy. */
   const reloadProduct = async () => {
     const r = await product.refetch();
-    if (r.data && alive) {
-      setDraft(reconcile(draftFromProduct(r.data)));
-      setLoaded(r.data.id);
-    }
+    if (r.data && alive) load(r.data);
   };
 
   const skus = () => draft.variants.map((v) => v.sku).filter((s) => s.trim() !== "");
@@ -196,11 +202,18 @@ export default function ProductEditor() {
       const route = params.id;
       const created = isNew();
       const header = created ? creation.header(body) : tenantHeader();
+      if (!created) {
+        const loadedAt = loadedMedia;
+        const stored = await unwrap(
+          api.GET("/admin/v1/products/{id}", { params: { header, path: { id: route as string } } }),
+        );
+        body.media = fillAltTextsLeftBlank(body.media ?? [], loadedAt, stored.media);
+      }
       const product = await (created
         ? unwrap(api.POST("/admin/v1/products", { params: { header }, body }))
         : unwrap(
             api.PUT("/admin/v1/products/{id}", {
-              params: { header, path: { id: params.id as string } },
+              params: { header, path: { id: route as string } },
               body,
             }),
           ));
@@ -215,8 +228,7 @@ export default function ProductEditor() {
       if (!alive || route !== params.id || JSON.stringify(base) !== JSON.stringify(tenantKey()))
         return;
       setSaveError(undefined);
-      setDraft(reconcile(draftFromProduct(p)));
-      setLoaded(p.id);
+      load(p);
       showToast({
         title: created ? t("editor.created") : t("common.saved"),
         closeLabel: t("common.close"),

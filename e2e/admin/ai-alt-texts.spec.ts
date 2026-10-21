@@ -44,7 +44,7 @@ test.afterAll(() => {
   cleanUp();
 });
 
-test("switch on → upload with a cs alt text → AI sk alt text labelled until edited", async ({
+test("switch on → upload with a cs alt text → AI sk alt text survives a save from the open form, labelled until edited", async ({
   browser,
 }) => {
   test.setTimeout(300_000);
@@ -83,15 +83,18 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
   const cs = altText(image, "cs");
   const sk = altText(image, "sk");
   const unsold = altText(image, "en");
-  await expect
-    .poll(
-      async () => {
-        await admin.goto(productUrl);
-        return sk.inputValue();
-      },
-      { timeout: 180_000, intervals: [2_000, 5_000] },
-    )
-    .toBe(AI_ALT);
+  const storedSk = () =>
+    sql(`SELECT coalesce(alt_i18n ->> 'sk', '') FROM product_media
+      WHERE tenant_id = ${DEMO} AND asset_id IN ${UPLOADS}`);
+  await expect.poll(storedSk, { timeout: 180_000, intervals: [2_000, 5_000] }).toBe(AI_ALT);
+  await expect(sk).toHaveValue("");
+  await admin.getByRole("button", { name: "Save product" }).click();
+  await expect(admin.getByText("Changes saved").last()).toBeVisible();
+  expect(storedSk()).toBe(AI_ALT);
+  await expect(sk).toHaveValue(AI_ALT);
+  await expect(sk).toHaveAccessibleDescription(AI_LABEL);
+  await admin.goto(productUrl);
+  await expect(sk).toHaveValue(AI_ALT);
   await expect(sk).toHaveAccessibleDescription(AI_LABEL);
   await expect(cs).toHaveValue(MERCHANT_ALT);
   await expect(cs).not.toHaveAccessibleDescription(AI_LABEL);
@@ -120,10 +123,50 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
   await expect(sk).toHaveValue(EDITED_ALT);
   await expect(sk).not.toHaveAccessibleDescription(AI_LABEL);
 
+  await sk.fill("");
+  await admin.getByRole("button", { name: "Save product" }).click();
+  await expect(admin.getByText("Changes saved").last()).toBeVisible();
+  expect(storedSk()).toBe("");
+
   await image.getByRole("button", { name: `Remove: Image ${before + 1}` }).click();
   await admin.getByRole("button", { name: "Save product" }).click();
   await expect(admin.getByText("Changes saved").last()).toBeVisible();
   await expect(image).toHaveCount(0);
+
+  await admin.context().close();
+});
+
+test("a save still checking for AI alt texts writes the product it started on", async ({
+  browser,
+}) => {
+  const productId = sql(`SELECT ${PRODUCT}`);
+  const otherId = sql(`SELECT product_id FROM product_translations
+    WHERE tenant_id = ${DEMO} AND locale = 'cs' AND name = 'Batoh Mini'`);
+  const admin = await signInOwner(browser);
+  const name = admin
+    .getByRole("tabpanel", { name: "Czech" })
+    .getByRole("textbox", { name: "Name", exact: true });
+  await admin.goto(`/products/${productId}`);
+  await expect(name).toHaveValue(NAME);
+
+  await admin.route(`**/admin/v1/products/${productId}`, async (r) => {
+    if (r.request().method() === "GET") await new Promise((done) => setTimeout(done, 3_000));
+    await r.continue();
+  });
+  const puts: string[] = [];
+  await admin.route("**/admin/v1/products/*", async (r) => {
+    if (r.request().method() !== "PUT") return r.fallback();
+    puts.push(new URL(r.request().url()).pathname);
+    await r.abort();
+  });
+
+  await admin.getByRole("button", { name: "Save product" }).click();
+  await admin.evaluate((url) => {
+    history.pushState(null, "", url);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, `/products/${otherId}`);
+  await expect(name).toHaveValue("Batoh Mini");
+  await expect.poll(() => puts, { timeout: 10_000 }).toEqual([`/admin/v1/products/${productId}`]);
 
   await admin.context().close();
 });
