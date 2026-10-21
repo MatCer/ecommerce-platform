@@ -213,7 +213,7 @@ export default function ProductEditor() {
         ? unwrap(api.POST("/admin/v1/products", { params: { header }, body }))
         : unwrap(
             api.PUT("/admin/v1/products/{id}", {
-              params: { header, path: { id: params.id as string } },
+              params: { header, path: { id: route as string } },
               body,
             }),
           ));
