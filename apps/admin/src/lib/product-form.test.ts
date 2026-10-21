@@ -7,6 +7,7 @@ import {
   eanValid,
   emptyDraft,
   move,
+  pickUpAltTexts,
   type Product,
   type ProductOption,
   settleOptions,
@@ -235,5 +236,38 @@ describe("settleOptions", () => {
     ];
     const typed = settleOptions(options, (v) => Object.keys(v.name_i18n).join("+"));
     expect(typed[0]?.values).toEqual([{ code: "cs+sk", name_i18n: { sk: "Modrá" } }]);
+  });
+});
+
+describe("pickUpAltTexts", () => {
+  const loaded = [
+    { asset_id: "a1", alt_i18n: { cs: "Tričko" } },
+    { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
+  ];
+  const stored = [
+    { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "AI sk", en: "AI en" } },
+    { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
+  ];
+
+  it("fills alt texts written since the form loaded into fields that are still empty", () => {
+    const draft = [
+      { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: " " } },
+      { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
+    ];
+    expect(pickUpAltTexts(draft, loaded, stored)).toEqual([
+      { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "AI sk", en: "AI en" } },
+      { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
+    ]);
+  });
+
+  it("keeps the merchant's own text and a text the merchant cleared", () => {
+    const draft = [
+      { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "Moje" } },
+      { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "" } },
+    ];
+    expect(pickUpAltTexts(draft, loaded, stored)).toEqual([
+      { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "Moje", en: "AI en" } },
+      { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "" } },
+    ]);
   });
 });

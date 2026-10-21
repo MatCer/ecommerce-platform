@@ -44,7 +44,7 @@ test.afterAll(() => {
   cleanUp();
 });
 
-test("switch on → upload with a cs alt text → AI sk alt text labelled until edited", async ({
+test("switch on → upload with a cs alt text → AI sk alt text survives a save from the open form, labelled until edited", async ({
   browser,
 }) => {
   test.setTimeout(300_000);
@@ -83,15 +83,18 @@ test("switch on → upload with a cs alt text → AI sk alt text labelled until 
   const cs = altText(image, "cs");
   const sk = altText(image, "sk");
   const unsold = altText(image, "en");
-  await expect
-    .poll(
-      async () => {
-        await admin.goto(productUrl);
-        return sk.inputValue();
-      },
-      { timeout: 180_000, intervals: [2_000, 5_000] },
-    )
-    .toBe(AI_ALT);
+  const storedSk = () =>
+    sql(`SELECT coalesce(alt_i18n ->> 'sk', '') FROM product_media
+      WHERE tenant_id = ${DEMO} AND asset_id IN ${UPLOADS}`);
+  await expect.poll(storedSk, { timeout: 180_000, intervals: [2_000, 5_000] }).toBe(AI_ALT);
+  await expect(sk).toHaveValue("");
+  await admin.getByRole("button", { name: "Save product" }).click();
+  await expect(admin.getByText("Changes saved").last()).toBeVisible();
+  expect(storedSk()).toBe(AI_ALT);
+  await expect(sk).toHaveValue(AI_ALT);
+  await expect(sk).toHaveAccessibleDescription(AI_LABEL);
+  await admin.goto(productUrl);
+  await expect(sk).toHaveValue(AI_ALT);
   await expect(sk).toHaveAccessibleDescription(AI_LABEL);
   await expect(cs).toHaveValue(MERCHANT_ALT);
   await expect(cs).not.toHaveAccessibleDescription(AI_LABEL);
