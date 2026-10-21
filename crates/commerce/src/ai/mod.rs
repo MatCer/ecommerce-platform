@@ -15,13 +15,14 @@ pub mod review_summary;
 pub mod settings;
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use platform::Error;
 use platform::ai::{AiError, Client, Failure, PriceTable, Request};
 use platform::config::{AiConfig, AiProvider};
 use platform::db::{TenantTx, tenant_tx};
+use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
 use sqlx::PgPool;
@@ -438,6 +439,18 @@ pub(crate) async fn market_locales(tx: &mut TenantTx) -> Result<Vec<String>, Err
     Ok(locales)
 }
 
+static CONTACT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(concat!(
+        r"\b(?:https?|ftps?|mailto|tel|sms|javascript):",
+        r"|\b[\p{L}\p{N}-]{2,}(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}/",
+        r"|\b[\p{L}\p{N}-]{2,}(?:\.[\p{L}\p{N}-]+)*\.",
+        r"(?:com|net|org|info|eu|cz|sk|de|at|pl|hu|uk|shop|store|online|io)\b",
+        r"|\+\d(?:[ .-]?\d){7,14}",
+        r"|\b\d{3}[ .-]\d{3}[ .-]\d{3}\b",
+    ))
+    .unwrap_or_else(|_| unreachable!())
+});
+
 pub(crate) fn safe_text(
     raw: &str,
     chars: std::ops::RangeInclusive<usize>,
@@ -452,7 +465,7 @@ pub(crate) fn safe_text(
         )));
     }
     let lower = text.to_lowercase();
-    if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) {
+    if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) || CONTACT.is_match(&lower) {
         return Err(CallError::output(format!(
             "{what} contains a link, an email address or markup"
         )));
