@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT hero FROM home_settings",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "hero",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "home_settings",
+            "name": "hero"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "aa14001e8c4b96551eca6d4b9056e067924b53450bda99963c18755f33a21ee1"
+}

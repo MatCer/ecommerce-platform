@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use hmac::{Hmac, KeyInit, Mac};
 use platform::Error;
 use platform::db::{TenantTx, tenant_tx};
@@ -10,13 +8,11 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::audit;
-use crate::catalog::check_text;
-use crate::checkout::i18n_text;
 use crate::consent::{self, Subject};
 use crate::content::legal;
 use crate::markets::invalid;
 use crate::storefront::Context;
-use crate::storefront::pages::HomePage;
+use crate::storefront::pages::{HeroCopy, HomePage};
 
 /// The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -55,53 +51,27 @@ impl Assignment {
     }
 }
 
-type I18n = BTreeMap<String, String>;
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArmConfig {
-    hero: Option<HeroOverride>,
+    hero: Option<HeroCopy>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct HeroOverride {
-    title: Option<I18n>,
-    subtitle: Option<I18n>,
-    cta: Option<I18n>,
-}
-
-const CONFIG: &str = "invalid_experiment_config";
+pub(crate) const CONFIG: &str = "invalid_experiment_config";
 
 impl ArmConfig {
     fn parse(config: &serde_json::Value) -> Result<Self, Error> {
         let c: Self =
             serde_json::from_value(config.clone()).map_err(|e| invalid(CONFIG, e.to_string()))?;
         if let Some(h) = &c.hero {
-            for (field, texts) in [
-                ("hero title", &h.title),
-                ("hero subtitle", &h.subtitle),
-                ("hero cta", &h.cta),
-            ] {
-                for text in texts.iter().flat_map(BTreeMap::values) {
-                    check_text(field, CONFIG, text, 1, 200)?;
-                }
-            }
+            h.validate()?;
         }
         Ok(c)
     }
 
     pub fn apply_home(&self, ctx: &Context, home: &mut HomePage) {
-        let Some(h) = &self.hero else { return };
-        let text = |t: &Option<I18n>| t.as_ref().and_then(|t| i18n_text(ctx, t));
-        if let Some(t) = text(&h.title) {
-            home.hero.title = t;
-        }
-        if let Some(t) = text(&h.subtitle) {
-            home.hero.subtitle = t;
-        }
-        if let Some(t) = text(&h.cta) {
-            home.hero.cta.label = t;
+        if let Some(h) = &self.hero {
+            h.apply(ctx, home);
         }
     }
 }

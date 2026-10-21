@@ -1,6 +1,10 @@
 use chrono::{DateTime, Utc};
+use commerce::storefront::pages::{self, Hero};
+use commerce::storefront::{self, PublicUrls};
 use platform::db::tenant_tx;
+use serde_json::json;
 use sqlx::PgPool;
+use testkit::storefront::Shop;
 use uuid::Uuid;
 
 use crate::experiments::{arms, draft, running, set_status, setup, update};
@@ -200,4 +204,44 @@ async fn experiments_stopped_before_the_migration_count_as_stopped_manually(db: 
         Some("manual")
     );
     assert_eq!(reason_of(&runtime, tenant, live).await, None);
+}
+
+async fn home_hero(runtime: &PgPool, shop: &Shop, market: Uuid) -> Hero {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    let ctx = storefront::context(&mut tx, &PublicUrls::default(), market, None, Utc::now())
+        .await
+        .unwrap();
+    pages::home(&mut tx, &ctx).await.unwrap().hero
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_home_page_shows_the_stored_hero_copy(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "life-home").await;
+    let default = home_hero(&runtime, &shop, shop.cz).await;
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    sqlx::query("INSERT INTO home_settings (tenant_id, hero) VALUES ($1, $2)")
+        .bind(shop.tenant)
+        .bind(json!({
+            "title": {"cs": "Podzimní výprodej", "sk": "Jesenný výpredaj"},
+            "cta": {"cs": "Vybrat si"},
+        }))
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let cz = home_hero(&runtime, &shop, shop.cz).await;
+    assert_eq!(cz.title, "Podzimní výprodej");
+    assert_eq!(cz.cta.label, "Vybrat si");
+    assert_eq!(cz.subtitle, default.subtitle, "a field the copy lacks");
+    assert_eq!(cz.cta.href, default.cta.href);
+    assert_eq!(cz.image, default.image);
+    let sk = home_hero(&runtime, &shop, shop.sk).await;
+    assert_eq!(sk.title, "Jesenný výpredaj");
+    assert_eq!(
+        sk.cta.label, "Vybrat si",
+        "a text without the locale falls back like other i18n texts"
+    );
 }
