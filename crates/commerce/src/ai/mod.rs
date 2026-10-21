@@ -467,7 +467,7 @@ pub(crate) fn safe_text(
     let lower = text.to_lowercase();
     if ["//", "www.", "@", "<"].iter().any(|p| lower.contains(p)) || CONTACT.is_match(&lower) {
         return Err(CallError::output(format!(
-            "{what} contains a link, an email address or markup"
+            "{what} contains a link, contact details or markup"
         )));
     }
     Ok(text)
