@@ -618,6 +618,21 @@ mod tests {
     }
 
     #[test]
+    fn the_model_never_gets_a_side_over_8000_px() {
+        let sized = |width, height| AssetVariant {
+            height,
+            ..variant(width, "webp", 10)
+        };
+        let key = |v: &[AssetVariant]| pick(v).map(|(v, _)| v.key.clone());
+        assert_eq!(key(&[sized(100, 12_000)]), None);
+        assert_eq!(key(&[sized(8001, 100)]), None);
+        assert_eq!(
+            key(&[sized(1024, 8001), sized(640, 8000)]),
+            Some("640.webp".into())
+        );
+    }
+
+    #[test]
     fn product_and_asset_events_debounce_per_target_and_mode() {
         let (t, p, a) = (Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7());
         let now = Utc.with_ymd_and_hms(2026, 10, 16, 12, 1, 10).unwrap();
