@@ -12,7 +12,7 @@ use axum::http::{HeaderMap, StatusCode, header};
 use base64::Engine;
 use chrono::Utc;
 use commerce::marketing::deliverability::{self, Applied};
-use commerce::marketing::sns::{self, SnsEnvelope};
+use commerce::marketing::sns::SnsEnvelope;
 use commerce::payments::{self, FakeEvent, stripe};
 use platform::Error;
 use platform::db::tenant_tx;
@@ -190,12 +190,7 @@ async fn ses_webhook(
     }
     match envelope.kind.as_str() {
         "Notification" => {
-            if sns::already_processed(&s.db, &envelope).await? {
-                return Ok(Json(MailEventReceived { applied: false }));
-            }
-            let event = deliverability::parse_ses(&envelope.message)?;
-            let applied = deliverability::apply(&s.db, &event).await?;
-            sns::mark_processed(&s.db, &envelope).await?;
+            let applied = deliverability::apply_notification(&s.db, &envelope).await?;
             tracing::info!(sns = %envelope.message_id, ?applied, "email event");
             Ok(Json(MailEventReceived {
                 applied: matches!(applied, Applied::Suppressed(n) if n > 0),

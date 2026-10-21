@@ -134,9 +134,6 @@ fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
     Ok(ai)
 }
 
-/// `MAIL_EVENTS_SECRET` (at least 32 characters): the HTTP Basic password SNS sends with SES
-/// bounce/complaint notifications; unset = the endpoint is off. `MAIL_EVENTS_TOPIC_ARNS`
-/// (comma-separated SNS topic ARNs) turns on SNS signature verification; production requires it.
 fn mail_events_from_env(env: AppEnv) -> anyhow::Result<Option<api::MailEvents>> {
     let secret = std::env::var("MAIL_EVENTS_SECRET").ok();
     let topics = std::env::var("MAIL_EVENTS_TOPIC_ARNS").ok();

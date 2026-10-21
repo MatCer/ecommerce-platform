@@ -27,6 +27,7 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::sns::{self, SnsEnvelope};
 use super::subscribers::{self, Status};
 use crate::notifications::{self, SuppressionReason};
 
@@ -144,6 +145,17 @@ pub enum Applied {
     /// Suppressed addresses (0 or 1: only the message's own recipient).
     Suppressed(usize),
     Ignored(&'static str),
+}
+
+/// Parses and applies an SNS notification once: a replay or redelivery of an applied one is
+/// `Ignored`, and a failed apply records nothing, so SNS can retry it.
+pub async fn apply_notification(db: &PgPool, envelope: &SnsEnvelope) -> Result<Applied, Error> {
+    if sns::already_processed(db, envelope).await? {
+        return Ok(Applied::Ignored("already processed"));
+    }
+    let applied = apply(db, &parse_ses(&envelope.message)?).await?;
+    sns::mark_processed(db, envelope).await?;
+    Ok(applied)
 }
 
 /// Applies a bounce/complaint: suppression, subscriber status, campaign send flags. Idempotent

@@ -74,7 +74,6 @@ similar = "3.2.0"
 csv = "1.4.0"
 tempfile = "3.27.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
-# SHOP-8 SNS signature verification (already in the tree through rustls); aws-lc-rs signs test messages.
 rustls-webpki = { version = "0.103.15", default-features = false, features = ["alloc", "aws-lc-rs"] }
 rustls-pki-types = { version = "1.15.1", features = ["alloc"] }
 aws-lc-rs = "1.18.1"

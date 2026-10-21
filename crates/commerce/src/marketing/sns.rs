@@ -62,6 +62,7 @@ impl TopicArn {
         let mut parts = rest.split(':');
         let (region, account, name) = (parts.next()?, parts.next()?, parts.next()?);
         let valid = parts.next().is_none()
+            && arn.len() <= 256
             && !region.is_empty()
             && region
                 .bytes()
@@ -171,7 +172,6 @@ impl SnsVerifier {
     }
 }
 
-/// `https://sns.<region>.amazonaws.com/SimpleNotificationService-<alphanumeric>.pem`, nothing else.
 fn is_sns_cert_url(raw: &str, region: &str) -> bool {
     let Ok(url) = Url::parse(raw) else {
         return false;
@@ -232,8 +232,7 @@ fn string_to_sign(env: &SnsEnvelope) -> Result<String, Error> {
         })
 }
 
-/// Whether this notification was already applied (a replay or an SNS redelivery).
-pub async fn already_processed(db: &PgPool, env: &SnsEnvelope) -> Result<bool, Error> {
+pub(super) async fn already_processed(db: &PgPool, env: &SnsEnvelope) -> Result<bool, Error> {
     Ok(sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM platform.sns_messages
                           WHERE topic_arn = $1 AND message_id = $2) AS "seen!""#,
@@ -244,9 +243,7 @@ pub async fn already_processed(db: &PgPool, env: &SnsEnvelope) -> Result<bool, E
     .await?)
 }
 
-/// Records an applied notification; only call it after the apply succeeded, so a failed apply
-/// stays retryable.
-pub async fn mark_processed(db: &PgPool, env: &SnsEnvelope) -> Result<(), Error> {
+pub(super) async fn mark_processed(db: &PgPool, env: &SnsEnvelope) -> Result<(), Error> {
     sqlx::query!(
         "INSERT INTO platform.sns_messages (topic_arn, message_id) VALUES ($1, $2)
          ON CONFLICT DO NOTHING",
@@ -402,5 +399,10 @@ mod tests {
         ] {
             assert!(TopicArn::parse(bad).is_none(), "{bad}");
         }
+        let longest = format!("arn:aws:sns:eu-central-1:123456789012:{}", "t".repeat(256));
+        assert!(
+            TopicArn::parse(&longest).is_none(),
+            "longer than sns_messages.topic_arn"
+        );
     }
 }
