@@ -1,8 +1,9 @@
 //! Provider webhooks. Payments (spec §10.4, A10, A11): the fake gateway's (`PAYMENTS_FAKE=1`)
 //! and Stripe Connect's. Both verify the signature over the raw body before parsing. Stripe
 //! events are stored before the 200 and processed by a job (`payments.provider_event`).
-//! Email (WP18): SES bounce/complaint notifications via SNS, HTTP Basic authenticated (see
-//! `commerce::marketing::deliverability` for the production signature-verification design).
+//! Email (WP18): SES bounce/complaint notifications via SNS, HTTP Basic authenticated and, with
+//! `MAIL_EVENTS_TOPIC_ARNS` set (required in production), SNS-signature verified
+//! (`commerce::marketing::sns`).
 
 use axum::Json;
 use axum::body::Bytes;
@@ -10,7 +11,8 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, header};
 use base64::Engine;
 use chrono::Utc;
-use commerce::marketing::deliverability::{self, Applied, SnsEnvelope};
+use commerce::marketing::deliverability::{self, Applied};
+use commerce::marketing::sns::SnsEnvelope;
 use commerce::payments::{self, FakeEvent, stripe};
 use platform::Error;
 use platform::db::tenant_tx;
@@ -149,9 +151,12 @@ fn basic_password(headers: &HeaderMap) -> Option<String> {
 }
 
 /// SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic
-/// credentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). A permanent bounce suppresses
-/// the message's recipient for every stream, a complaint for marketing; subscription messages
-/// are logged for the operator and never followed. `404` when not configured.
+/// credentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). With `MAIL_EVENTS_TOPIC_ARNS`
+/// set, every message must come from an allowlisted topic, be fresh (one hour) and carry a valid
+/// SNS signature (`SignatureVersion` 2). A permanent bounce suppresses the message's recipient
+/// for every stream, a complaint for marketing; a notification already applied is not applied
+/// again. Subscription messages are logged for the operator and never followed. `404` when not
+/// configured.
 #[utoipa::path(
     post,
     path = "/webhooks/ses",
@@ -159,9 +164,11 @@ fn basic_password(headers: &HeaderMap) -> Option<String> {
     request_body(content = String, content_type = "text/plain", description = "An SNS message (JSON) carrying an SES notification"),
     responses(
         (status = 200, body = MailEventReceived),
-        (status = 401, description = "invalid_credentials", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 401, description = "invalid_credentials or invalid_signature", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 403, description = "unknown_topic", body = platform::Problem, content_type = "application/problem+json"),
         (status = 404, body = platform::Problem, content_type = "application/problem+json"),
-        (status = 422, description = "invalid_event", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 422, description = "invalid_event or stale_event", body = platform::Problem, content_type = "application/problem+json"),
+        (status = 503, description = "The SNS signing certificate could not be fetched; SNS retries", body = platform::Problem, content_type = "application/problem+json"),
     )
 )]
 async fn ses_webhook(
@@ -169,19 +176,21 @@ async fn ses_webhook(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<MailEventReceived>, Error> {
-    let secret = s.mail_events.as_ref().ok_or(Error::NotFound)?;
+    let mail = s.mail_events.as_ref().ok_or(Error::NotFound)?;
     let ok = basic_password(&headers)
-        .is_some_and(|p| crate::auth::ServiceToken::new(&p).matches(secret));
+        .is_some_and(|p| crate::auth::ServiceToken::new(&p).matches(&mail.secret));
     if !ok {
         return Err(Error::Unauthorized {
             code: "invalid_credentials",
         });
     }
     let envelope: SnsEnvelope = parse_json(&body)?;
+    if let Some(verifier) = &mail.sns {
+        verifier.verify(&envelope, Utc::now()).await?;
+    }
     match envelope.kind.as_str() {
         "Notification" => {
-            let event = deliverability::parse_ses(&envelope.message)?;
-            let applied = deliverability::apply(&s.db, &event).await?;
+            let applied = deliverability::apply_notification(&s.db, &envelope).await?;
             tracing::info!(sns = %envelope.message_id, ?applied, "email event");
             Ok(Json(MailEventReceived {
                 applied: matches!(applied, Applied::Suppressed(n) if n > 0),

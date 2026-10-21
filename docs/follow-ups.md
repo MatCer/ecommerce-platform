@@ -16,7 +16,7 @@
 | WP8 | `checkout.<host>/withdraw` is a placeholder page (the withdrawal flow, A19) | WP12 |
 | WP8 | ~~Payment/carrier marks in `/shop` are generic catalog text~~: `trust.payment_methods`/`trust.carriers` list what checkout offers in the market (text marks, no logos). Still open: the checkout links the Czech legal slugs `/pages/obchodni-podminky`, `/pages/odstoupeni-od-smlouvy` for every locale | WP12 |
 | WP8 | PDP JS headroom is 2.5 kB (27.5 kB gz first visit, 28.0 kB with every consent + the RUM sample); keep islands lean | WP8 successors / WP23 gates |
-| WP9/WP18/WP25 | Local SES/SNS fixture ingestion is Basic-authenticated. Production boot refuses `MAIL_EVENTS_SECRET` until signature, certificate URL, authorized topic, freshness and replay checks exist. Confirmation URLs are not logged. | deferred: mail integration owner, before SES launch |
+| WP9/WP18/WP25 | ~~SES/SNS ingestion is only Basic-authenticated~~: with `MAIL_EVENTS_TOPIC_ARNS` set (required in production) every SNS message must carry a SignatureVersion 2 signature from a certificate on `sns.<topic region>.amazonaws.com`, an allowlisted TopicArn and a timestamp within an hour; processed MessageIds are deduplicated for a day. Confirmation URLs are not logged. | done (SHOP-8) |
 | WP10 | Stripe and bank transfer are configurable but not offered at checkout (no adapter); the order email has a bank-transfer placeholder | WP11 |
 | WP10 | COD cash rounding is not applied at placement (the tender is unknown until collection, A16) | WP11 |
 | WP10 | The Packeta widget key is a platform setting (`PACKETA_API_KEY`); per-tenant carrier credentials and verifying the chosen point against the Packeta API | WP12 |

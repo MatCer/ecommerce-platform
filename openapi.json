@@ -22173,7 +22173,7 @@
         "tags": [
           "webhooks"
         ],
-        "summary": "SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic\ncredentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). A permanent bounce suppresses\nthe message's recipient for every stream, a complaint for marketing; subscription messages\nare logged for the operator and never followed. `404` when not configured.",
+        "summary": "SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic\ncredentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). With `MAIL_EVENTS_TOPIC_ARNS`\nset, every message must come from an allowlisted topic, be fresh (one hour) and carry a valid\nSNS signature (`SignatureVersion` 2). A permanent bounce suppresses the message's recipient\nfor every stream, a complaint for marketing; a notification already applied is not applied\nagain. Subscription messages are logged for the operator and never followed. `404` when not\nconfigured.",
         "operationId": "ses_webhook",
         "requestBody": {
           "description": "An SNS message (JSON) carrying an SES notification",
@@ -22197,7 +22197,17 @@
             }
           },
           "401": {
-            "description": "invalid_credentials",
+            "description": "invalid_credentials or invalid_signature",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "unknown_topic",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -22216,7 +22226,17 @@
             }
           },
           "422": {
-            "description": "invalid_event",
+            "description": "invalid_event or stale_event",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The SNS signing certificate could not be fetched; SNS retries",
             "content": {
               "application/problem+json": {
                 "schema": {

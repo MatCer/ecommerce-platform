@@ -100,9 +100,8 @@ pub struct AppState {
     pub ads: Option<commerce::adtracking::AdTracking>,
     /// Storefront API rate limits (§8.1).
     pub rate_limit: Arc<rate_limit::StorefrontLimiter>,
-    /// Digest of `MAIL_EVENTS_SECRET` (HTTP Basic password of the SES/SNS bounce endpoint);
-    /// `None` = the endpoint answers 404.
-    pub mail_events: Option<auth::ServiceToken>,
+    /// The SES/SNS bounce endpoint; `None` (no `MAIL_EVENTS_SECRET`) = it answers 404.
+    pub mail_events: Option<MailEvents>,
     /// WP23: preview tokens + per-tenant `ASTRO_KEY` (`THEME_SECRET`); `None` = theme builder
     /// features answer 503.
     pub themes: Option<commerce::themes::ThemeKeys>,
@@ -112,6 +111,14 @@ pub struct AppState {
     /// Packeta/PPL (WP12); `None` in tools and tests without carrier endpoints.
     pub carriers: Option<commerce::carriers::Carriers>,
     pub experiments: Option<commerce::experiments::ExperimentKey>,
+}
+
+#[derive(Clone)]
+pub struct MailEvents {
+    /// Digest of `MAIL_EVENTS_SECRET`, the HTTP Basic password SNS sends.
+    pub secret: auth::ServiceToken,
+    /// SNS signature verification (`MAIL_EVENTS_TOPIC_ARNS`); `None` = unsigned, dev only.
+    pub sns: Option<Arc<commerce::marketing::sns::SnsVerifier>>,
 }
 
 #[derive(OpenApi)]

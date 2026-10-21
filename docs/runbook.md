@@ -197,7 +197,7 @@ answers `503` and `/readyz` reports `degraded`; everything else works.
 |---|---|
 | Sending | `marketing.campaign_batch` jobs: 500 recipients per batch, at most 500 marketing messages per tenant and minute (`email_settings` window). A stuck campaign shows as `sending` with a dead batch job in the superadmin job view; retrying the job is safe (one send per campaign and subscriber). |
 | Re-checks | Status, `email_marketing` consent (address or linked customer, latest wins) and suppression are checked when a batch runs and again right before SMTP; a withdrawal between the two marks the message `failed` (`not_subscribed` / `no_consent`). Marketing mail with an uncertain SMTP outcome is never resent (A14). |
-| Bounces | `POST /webhooks/ses` (HTTP Basic, `MAIL_EVENTS_SECRET`, unset = off). Permanent bounce: suppressed for every stream, subscriber `bounced`; complaint: suppressed for marketing, subscriber `complained` + consent withdrawal. Only the recipient of the referenced message is ever suppressed. Staff can remove a suppression in Admin → Emails (audited). |
+| Bounces | `POST /webhooks/ses` (HTTP Basic, `MAIL_EVENTS_SECRET`, unset = off; SNS signature, `MAIL_EVENTS_TOPIC_ARNS` allowlist, 1 h freshness and MessageId dedup when the topics are set, which production requires). Permanent bounce: suppressed for every stream, subscriber `bounced`; complaint: suppressed for marketing, subscriber `complained` + consent withdrawal. Only the recipient of the referenced message is ever suppressed. Staff can remove a suppression in Admin → Emails (audited). |
 | Links | Unsubscribe/preference/click links carry a per-recipient token (hashed at rest); click targets are HMAC-signed per campaign, so the redirect is never open. |
 
 ## 6c. Data import, export and GDPR requests (WP13b)
@@ -307,9 +307,9 @@ M1 is verified locally against mocks (spec §17). Before a real shop launches:
 - [ ] **SES**: domain verified with DKIM, SPF, DMARC; production access granted; a
       configuration set per stream publishes Bounce + Complaint to an SNS topic with an HTTPS
       subscription `https://ses:<MAIL_EVENTS_SECRET>@api.<domain>/webhooks/ses` (confirm the
-      subscription by hand; confirmation URLs are never logged). Production boot refuses
-      `MAIL_EVENTS_SECRET` until SNS signature, pinned certificate URL, authorized TopicArn,
-      freshness and MessageId replay checks are implemented. Verify:
+      subscription by hand; confirmation URLs are never logged). Set `MAIL_EVENTS_TOPIC_ARNS`
+      to the topic ARNs (production refuses `MAIL_EVENTS_SECRET` without them) and keep the
+      topics on SNS signature version 2 (`SignatureVersion` attribute = 2). Verify:
       mail-tester score, a bounce to `bounce@simulator.amazonses.com` shows in Admin → Emails →
       Suppressions; a campaign to Gmail shows the one-click "Unsubscribe" (RFC 8058).
 - [ ] **QR payments**: SPAYD and PAY by square codes scanned with several CZ/SK banking apps

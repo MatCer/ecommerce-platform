@@ -74,6 +74,9 @@ similar = "3.2.0"
 csv = "1.4.0"
 tempfile = "3.27.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+rustls-webpki = { version = "0.103.15", default-features = false, features = ["alloc", "aws-lc-rs"] }
+rustls-pki-types = { version = "1.15.1", features = ["alloc"] }
+aws-lc-rs = "1.18.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

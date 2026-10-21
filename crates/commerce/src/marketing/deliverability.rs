@@ -15,39 +15,21 @@
 //!
 //! Authentication (API layer): the SNS subscription URL carries HTTP Basic credentials
 //! (`https://ses:<MAIL_EVENTS_SECRET>@api.example/webhooks/ses`, a documented SNS feature), and
-//! the endpoint is off without the secret. Production refuses to start with the secret until
-//! full SNS verification is implemented: accept only
-//! `SignatureVersion` 2 (RSA-SHA256), fetch `SigningCertURL` only when it is
-//! `https://sns.<region>.amazonaws.com/...pem` (through the SSRF-safe client, cached per URL),
-//! verify the signature over the canonical string of the message type, check `TopicArn`
-//! against the configured topic, and reject messages older than an hour. Subscription
+//! the endpoint is off without the secret. With `MAIL_EVENTS_TOPIC_ARNS` (required in
+//! production) every message must also pass the SNS signature, topic and freshness checks of
+//! [`super::sns`]; applied notifications are deduplicated in both modes. Subscription
 //! confirmations are never followed automatically; subscription URLs are never logged.
 
 use platform::Error;
 use platform::db::tenant_tx;
 use platform::mail::Stream;
-use serde::Deserialize;
 use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::sns::{self, SnsEnvelope};
 use super::subscribers::{self, Status};
 use crate::notifications::{self, SuppressionReason};
-
-/// The SNS HTTPS envelope (fields we use).
-#[derive(Debug, Clone, Deserialize)]
-pub struct SnsEnvelope {
-    #[serde(rename = "Type")]
-    pub kind: String,
-    #[serde(rename = "MessageId")]
-    pub message_id: String,
-    #[serde(rename = "TopicArn", default)]
-    pub topic_arn: String,
-    #[serde(rename = "Message", default)]
-    pub message: String,
-    #[serde(rename = "SubscribeURL", default)]
-    pub subscribe_url: Option<String>,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Notice {
@@ -163,6 +145,17 @@ pub enum Applied {
     /// Suppressed addresses (0 or 1: only the message's own recipient).
     Suppressed(usize),
     Ignored(&'static str),
+}
+
+/// Parses and applies an SNS notification once: a replay or redelivery of an applied one is
+/// `Ignored`, and a failed apply records nothing, so SNS can retry it.
+pub async fn apply_notification(db: &PgPool, envelope: &SnsEnvelope) -> Result<Applied, Error> {
+    if sns::already_processed(db, envelope).await? {
+        return Ok(Applied::Ignored("already processed"));
+    }
+    let applied = apply(db, &parse_ses(&envelope.message)?).await?;
+    sns::mark_processed(db, envelope).await?;
+    Ok(applied)
 }
 
 /// Applies a bounce/complaint: suppression, subscriber status, campaign send flags. Idempotent

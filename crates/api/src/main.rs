@@ -134,33 +134,54 @@ fn ai_helpers() -> anyhow::Result<commerce::ai::Ai> {
     Ok(ai)
 }
 
-/// `MAIL_EVENTS_SECRET` (at least 32 characters): the HTTP Basic password SNS sends with SES
-/// bounce/complaint notifications. Unset: the endpoint is off.
-fn mail_events_secret(
-    env: platform::config::AppEnv,
-) -> anyhow::Result<Option<api::auth::ServiceToken>> {
-    let raw = std::env::var("MAIL_EVENTS_SECRET").ok();
-    mail_events_token(env, raw.as_deref())
+fn mail_events_from_env(env: AppEnv) -> anyhow::Result<Option<api::MailEvents>> {
+    let secret = std::env::var("MAIL_EVENTS_SECRET").ok();
+    let topics = std::env::var("MAIL_EVENTS_TOPIC_ARNS").ok();
+    mail_events(env, secret.as_deref(), topics.as_deref())
 }
 
-fn mail_events_token(
-    env: platform::config::AppEnv,
-    raw: Option<&str>,
-) -> anyhow::Result<Option<api::auth::ServiceToken>> {
-    match raw {
-        Some(v) if v.trim().is_empty() => Ok(None),
-        Some(v) if v.len() < 32 => {
-            anyhow::bail!("MAIL_EVENTS_SECRET must be at least 32 characters")
-        }
-        Some(_) if env == platform::config::AppEnv::Prod => anyhow::bail!(
-            "SES/SNS ingestion is disabled in production until signature, topic, freshness and replay verification is implemented"
-        ),
-        Some(v) => Ok(Some(api::auth::ServiceToken::new(v))),
-        None => {
-            tracing::warn!("MAIL_EVENTS_SECRET not set: bounce/complaint ingestion is off");
-            Ok(None)
-        }
+fn mail_events(
+    env: AppEnv,
+    secret: Option<&str>,
+    topics: Option<&str>,
+) -> anyhow::Result<Option<api::MailEvents>> {
+    use commerce::marketing::sns::{SnsVerifier, TopicArn};
+    let topics = topics
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(|t| {
+            TopicArn::parse(t).with_context(|| {
+                format!(
+                    "MAIL_EVENTS_TOPIC_ARNS: {t:?} is not an arn:aws:sns:<region>:<account>:<topic>"
+                )
+            })
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let Some(secret) = secret.filter(|v| !v.trim().is_empty()) else {
+        tracing::warn!("MAIL_EVENTS_SECRET not set: bounce/complaint ingestion is off");
+        return Ok(None);
+    };
+    if secret.len() < 32 {
+        anyhow::bail!("MAIL_EVENTS_SECRET must be at least 32 characters");
     }
+    let secret = api::auth::ServiceToken::new(secret);
+    let sns = if topics.is_empty() {
+        if env == AppEnv::Prod {
+            anyhow::bail!(
+                "MAIL_EVENTS_TOPIC_ARNS must name the SES event topics: production accepts only SNS-signed messages"
+            );
+        }
+        tracing::warn!(
+            "MAIL_EVENTS_TOPIC_ARNS not set: SES events are accepted unsigned (dev only)"
+        );
+        None
+    } else {
+        let http = platform::http::SafeClient::new(Vec::<String>::new())?;
+        Some(Arc::new(SnsVerifier::new(topics, http)))
+    };
+    Ok(Some(api::MailEvents { secret, sns }))
 }
 
 fn init_tracing() -> anyhow::Result<()> {
@@ -263,7 +284,7 @@ async fn serve() -> anyhow::Result<()> {
         )?),
         checkout,
         ai: ai_helpers()?,
-        mail_events: mail_events_secret(cfg.env)?,
+        mail_events: mail_events_from_env(cfg.env)?,
         themes: theme_cfg
             .secret
             .as_deref()
@@ -337,19 +358,42 @@ async fn healthcheck() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod mail_events_tests {
-    use super::mail_events_token;
+    use super::mail_events;
     use platform::config::AppEnv;
 
+    const SECRET: &str = "local-mail-events-secret-0123456789abcdef";
+    const TOPICS: &str =
+        "arn:aws:sns:eu-central-1:123456789012:ses-events, arn:aws:sns:eu-west-1:123456789012:ses";
+
     #[test]
-    fn production_refuses_unsigned_sns_even_with_a_long_shared_secret() {
-        let secret = "local-mail-events-secret-0123456789abcdef";
-        assert!(
-            mail_events_token(AppEnv::Dev, Some(secret))
-                .unwrap()
-                .is_some()
-        );
-        let err = mail_events_token(AppEnv::Prod, Some(secret)).err().unwrap();
-        assert!(err.to_string().contains("disabled in production"));
-        assert!(mail_events_token(AppEnv::Prod, None).unwrap().is_none());
+    fn production_needs_topics_to_accept_sns_events() {
+        let err = mail_events(AppEnv::Prod, Some(SECRET), None).err().unwrap();
+        assert!(err.to_string().contains("MAIL_EVENTS_TOPIC_ARNS"), "{err}");
+        let prod = mail_events(AppEnv::Prod, Some(SECRET), Some(TOPICS))
+            .unwrap()
+            .unwrap();
+        assert!(prod.sns.is_some());
+        let dev = mail_events(AppEnv::Dev, Some(SECRET), Some(TOPICS))
+            .unwrap()
+            .unwrap();
+        assert!(dev.sns.is_some());
+        let unsigned = mail_events(AppEnv::Dev, Some(SECRET), None)
+            .unwrap()
+            .unwrap();
+        assert!(unsigned.sns.is_none());
+        assert!(mail_events(AppEnv::Prod, None, None).unwrap().is_none());
+    }
+
+    #[test]
+    fn malformed_topics_and_short_secrets_refuse_to_boot() {
+        let err = mail_events(
+            AppEnv::Dev,
+            Some(SECRET),
+            Some("arn:aws:sns:eu-central-1:1:ses"),
+        )
+        .err()
+        .unwrap();
+        assert!(err.to_string().contains("MAIL_EVENTS_TOPIC_ARNS"), "{err}");
+        assert!(mail_events(AppEnv::Dev, Some("short"), None).is_err());
     }
 }
