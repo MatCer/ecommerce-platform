@@ -33,13 +33,13 @@ import {
   draftFromProduct,
   draftToInput,
   emptyDraft,
+  fillAltTextsLeftBlank,
   type PartyDraft,
   type Product,
   type ProductDraft,
   type ProductMedia,
   type ProductOption,
   type ProductStatus,
-  pickUpAltTexts,
   slugify,
   type UnitMeasure,
 } from "../lib/product-form.ts";
@@ -163,10 +163,9 @@ export default function ProductEditor() {
   const parameters = useParameters();
   const taxCategories = useTaxCategories();
 
-  // The draft store writes edits into the objects it loaded, so the loaded alt texts are copied.
   let loadedMedia: ProductMedia[] = [];
   const load = (p: Product) => {
-    loadedMedia = p.media.map((m) => ({ ...m, alt_i18n: { ...m.alt_i18n } }));
+    loadedMedia = p.media;
     setDraft(reconcile(draftFromProduct(p)));
     setLoaded(p.id);
   };
@@ -208,7 +207,7 @@ export default function ProductEditor() {
         const stored = await unwrap(
           api.GET("/admin/v1/products/{id}", { params: { header, path: { id: route as string } } }),
         );
-        body.media = pickUpAltTexts(body.media ?? [], loadedAt, stored.media);
+        body.media = fillAltTextsLeftBlank(body.media ?? [], loadedAt, stored.media);
       }
       const product = await (created
         ? unwrap(api.POST("/admin/v1/products", { params: { header }, body }))

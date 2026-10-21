@@ -143,7 +143,7 @@ export function draftFromProduct(p: Product): ProductDraft {
     })),
     category_ids: p.category_ids,
     parameters: p.parameters,
-    media: p.media,
+    media: p.media.map((m) => ({ ...m, alt_i18n: { ...m.alt_i18n } })),
     manufacturer: party(p.gpsr.manufacturer),
     eu_responsible_person: party(p.gpsr.eu_responsible_person),
     safety_info: perLocale((l) => p.gpsr.safety_info?.[l] ?? ""),
@@ -349,11 +349,7 @@ export function eanValid(ean: string): boolean {
   return (10 - (sum % 10)) % 10 === check;
 }
 
-/**
- * Alt texts stored since the form loaded (the AI alt text job) for the draft's fields that are
- * still blank and were blank at load; the merchant's text and a loaded text they cleared stay.
- */
-export function pickUpAltTexts(
+export function fillAltTextsLeftBlank(
   draft: ProductMedia[],
   loaded: ProductMedia[],
   stored: ProductMedia[],

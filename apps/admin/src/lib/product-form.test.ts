@@ -6,11 +6,11 @@ import {
   draftToInput,
   eanValid,
   emptyDraft,
+  fillAltTextsLeftBlank,
   move,
   type Product,
   type ProductMedia,
   type ProductOption,
-  pickUpAltTexts,
   settleOptions,
   slugify,
   variantMatrix,
@@ -240,7 +240,7 @@ describe("settleOptions", () => {
   });
 });
 
-describe("pickUpAltTexts", () => {
+describe("fillAltTextsLeftBlank", () => {
   const loaded: ProductMedia[] = [
     { asset_id: "a1", alt_i18n: { cs: "Tričko" } },
     { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
@@ -255,7 +255,7 @@ describe("pickUpAltTexts", () => {
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: " " } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
     ];
-    expect(pickUpAltTexts(draft, loaded, stored)).toEqual([
+    expect(fillAltTextsLeftBlank(draft, loaded, stored)).toEqual([
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "AI sk", en: "AI en" } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "Mikina" } },
     ]);
@@ -266,7 +266,7 @@ describe("pickUpAltTexts", () => {
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "Moje" } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "" } },
     ];
-    expect(pickUpAltTexts(draft, loaded, stored)).toEqual([
+    expect(fillAltTextsLeftBlank(draft, loaded, stored)).toEqual([
       { asset_id: "a1", alt_i18n: { cs: "Tričko", sk: "Moje", en: "AI en" } },
       { asset_id: "a2", alt_i18n: { cs: "Mikina", sk: "" } },
     ]);
