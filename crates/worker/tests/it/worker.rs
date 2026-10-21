@@ -1262,6 +1262,119 @@ async fn image_events_queue_and_run_alt_text_jobs(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn switching_alt_texts_off_stops_model_calls_for_the_remaining_images(db: PgPool) {
+    use commerce::ai::fields::product_input;
+    use commerce::ai::settings::{self, AiSettingsChange};
+    use commerce::ai::{Ai, alt_text};
+    use commerce::catalog::products::{self, ProductMedia};
+    use object_store::{ObjectStoreExt, PutPayload, path::Path};
+    use platform::ai::{Anthropic, Client};
+
+    async fn switch(runtime: &PgPool, tenant: uuid::Uuid, on: bool) {
+        let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+        settings::put(
+            &mut tx,
+            "owner",
+            &AiSettingsChange {
+                alt_texts: Some(on),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "alt-off").await;
+    switch(&runtime, shop.tenant, true).await;
+
+    let storage = testkit::memory_storage();
+    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
+        .await
+        .unwrap();
+    let mut input = product_input(&products::get(&mut tx, shop.product).await.unwrap());
+    for _ in 0..3 {
+        let asset = uuid::Uuid::now_v7();
+        let key = format!("media/{}/{asset}/a.webp", shop.tenant);
+        storage
+            .public
+            .put(&Path::from(key.as_str()), PutPayload::from_static(b"RIFF"))
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO assets (id, tenant_id, status, key, variants)
+             VALUES ($1, $2, 'ready', $3, $4)",
+        )
+        .bind(asset)
+        .bind(shop.tenant)
+        .bind(format!("originals/{}/{asset}", shop.tenant))
+        .bind(json!([{"width": 1024, "height": 768, "format": "webp", "key": key, "bytes": 4}]))
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        input.media.push(ProductMedia {
+            asset_id: asset,
+            variant_sku: None,
+            alt_i18n: Default::default(),
+        });
+    }
+    products::replace(&mut tx, "clerk", shop.product, &input)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let calls = Arc::new(AtomicU32::new(0));
+    let app = axum::Router::new().route(
+        "/v1/messages",
+        axum::routing::post({
+            let (calls, runtime, tenant) = (calls.clone(), runtime.clone(), shop.tenant);
+            move || {
+                let (calls, runtime) = (calls.clone(), runtime.clone());
+                async move {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    switch(&runtime, tenant, false).await;
+                    let text = json!({ "cs": "Modré tričko", "sk": "Modré tričko" });
+                    axum::Json(json!({
+                        "model": "claude-sonnet-5", "stop_reason": "end_turn",
+                        "content": [{ "type": "text", "text": text.to_string() }],
+                        "usage": { "input_tokens": 100, "output_tokens": 20 }
+                    }))
+                }
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/", listener.local_addr().unwrap())
+        .parse()
+        .unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let client = Anthropic::new(&url, "sk-test".into(), Duration::from_secs(10), 0).unwrap();
+    let mut extra = worker::handlers::Extra::disabled().unwrap();
+    extra.ai = Ai::fake_with_client(Some(Client::Anthropic(Arc::new(client))));
+
+    let mut job = NewJob::new(alt_text::JOB, json!({ "product_id": shop.product }));
+    job.queue = alt_text::QUEUE;
+    job.tenant_id = Some(shop.tenant);
+    let id = queue::enqueue(&runtime, &job).await.unwrap();
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(storage, testkit::dead_meili(), None, None, extra),
+        fast_config(),
+    );
+    wait_for_status(&db, id, "done").await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "no model call after the switch went off"
+    );
+    runtime.close().await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn insights_fan_out_once_a_day_to_every_tenant(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let (a, _) = testkit::tenant(&runtime, "ins-a").await;

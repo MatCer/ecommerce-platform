@@ -29,6 +29,8 @@ pub const DEBOUNCE_SECS: i64 = 60;
 /// The Messages API limit for one image.
 const IMAGE_MAX_BYTES: u64 = 5 * 1024 * 1024;
 const IMAGE_WIDTH: u32 = 1024;
+/// The Messages API rejects an image with a longer side.
+const IMAGE_MAX_SIDE: u32 = 8000;
 const ACTOR: &str = "system";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,7 +170,7 @@ pub async fn backfill(tx: &mut TenantTx, ai: &Ai) -> Result<Backfill, Error> {
 fn pick(variants: &[AssetVariant]) -> Option<(&AssetVariant, &'static str)> {
     variants
         .iter()
-        .filter(|v| v.bytes <= IMAGE_MAX_BYTES)
+        .filter(|v| v.bytes <= IMAGE_MAX_BYTES && v.width.max(v.height) <= IMAGE_MAX_SIDE)
         .filter_map(|v| {
             let media_type = match v.format.as_str() {
                 "jpeg" => "image/jpeg",
@@ -411,6 +413,12 @@ impl Job<'_> {
             }
             Err(e) => return Err(e.into()),
         };
+        let mut tx = tenant_tx(self.db, self.tenant).await?;
+        let switched_off = since(&mut tx).await? != Some(self.since);
+        tx.commit().await?;
+        if switched_off {
+            return Ok(Step::Stop(Outcome::Done));
+        }
         let existing = filled(&image.alt);
         let task = format!(
             "Write the alt text of this product photo in these languages: {}.",
@@ -615,6 +623,21 @@ mod tests {
             Some(("320.png".into(), "image/png"))
         );
         assert_eq!(key(&[variant(1024, "avif", 10)]), None);
+    }
+
+    #[test]
+    fn the_model_never_gets_a_side_over_8000_px() {
+        let sized = |width, height| AssetVariant {
+            height,
+            ..variant(width, "webp", 10)
+        };
+        let key = |v: &[AssetVariant]| pick(v).map(|(v, _)| v.key.clone());
+        assert_eq!(key(&[sized(100, 12_000)]), None);
+        assert_eq!(key(&[sized(8001, 100)]), None);
+        assert_eq!(
+            key(&[sized(1024, 8001), sized(640, 8000)]),
+            Some("640.webp".into())
+        );
     }
 
     #[test]
