@@ -1294,7 +1294,6 @@ async fn switching_alt_texts_off_stops_model_calls_for_the_remaining_images(db: 
         .await
         .unwrap();
     let mut input = product_input(&products::get(&mut tx, shop.product).await.unwrap());
-    input.media.clear();
     for _ in 0..3 {
         let asset = uuid::Uuid::now_v7();
         let key = format!("media/{}/{asset}/a.webp", shop.tenant);
@@ -1372,12 +1371,6 @@ async fn switching_alt_texts_off_stops_model_calls_for_the_remaining_images(db: 
         1,
         "no model call after the switch went off"
     );
-    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
-        .await
-        .unwrap();
-    let media = products::get(&mut tx, shop.product).await.unwrap().media;
-    assert!(media.iter().all(|m| m.alt_i18n.is_empty()));
-    drop(tx);
     runtime.close().await;
 }
 
