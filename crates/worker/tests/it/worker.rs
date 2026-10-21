@@ -1377,6 +1377,8 @@ async fn switching_alt_texts_off_stops_model_calls_for_the_remaining_images(db: 
         .unwrap();
     let media = products::get(&mut tx, shop.product).await.unwrap().media;
     assert!(media.iter().all(|m| m.alt_i18n.is_empty()));
+    drop(tx);
+    runtime.close().await;
 }
 
 #[sqlx::test(migrations = "../../migrations")]
