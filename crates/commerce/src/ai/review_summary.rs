@@ -467,9 +467,11 @@ mod tests {
             "Volejte +420 777 123 456.",
             "Volejte +420777123456",
             "Volejte (+421) 905-123-456",
-            "Volejte 777 123 456.",
-            "Volejte 777-123-456",
-            "Volejte 777.123.456",
+            "Volejte +420 (777) 123 456.",
+            "Volejte +421 (905) 123 456.",
+            "Call +1 (212) 555-0123.",
+            "Volajte na 0905 123 456.",
+            "Volajte na 0905-123-456.",
         ] {
             let e = validate(out(&[("cs", bad), ("sk", "B")]), &locales()).unwrap_err();
             assert_eq!(e.code(), "ai_invalid_output", "{bad}");
@@ -485,6 +487,11 @@ mod tests {
             "Velikost EU 42 i 38.5 sedí.",
             "Doručeno 12.10.2026, tj. 12. 10. 2026.",
             "EAN 8594001234567 odpovídá.",
+            "EAN 0012345678905 odpovídá, doručeno 01.10.2026.",
+            "Velikosti 110-116-122 jsou dostupné.",
+            "Veľkosti 128 134 140 sedia dobre.",
+            "Available in sizes 128 134 140.",
+            "The ASP.NET programming book explains the topic clearly.",
             "Cena 1 299 Kč, dříve 12 999,90 Kč.",
             "Hodnocení 4,6 z 5, tedy +12 % proti loňsku.",
             "Poměr cena:výkon chválí, vel. XL/XXL.",
