@@ -401,6 +401,14 @@ async fn only_one_cron_leader_and_one_job_per_slot(db: PgPool) {
 #[sqlx::test(migrations = "../../migrations")]
 async fn cleanup_job_runs_end_to_end(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
+    sqlx::query(
+        "INSERT INTO platform.sns_messages (topic_arn, message_id, received_at) VALUES
+         ('arn:aws:sns:eu-central-1:123456789012:ses', 'old', now() - interval '25 hours'),
+         ('arn:aws:sns:eu-central-1:123456789012:ses', 'fresh', now() - interval '23 hours')",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
     let id = queue::enqueue(&runtime, &NewJob::new("maintenance.cleanup", json!({})))
         .await
         .unwrap();
@@ -419,6 +427,11 @@ async fn cleanup_job_runs_end_to_end(db: PgPool) {
     stop.send(true).unwrap();
     task.await.unwrap();
     assert_eq!(attempts, 1);
+    let kept: Vec<String> = sqlx::query_scalar("SELECT message_id FROM platform.sns_messages")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(kept, ["fresh"]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

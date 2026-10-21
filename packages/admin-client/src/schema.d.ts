@@ -4763,9 +4763,12 @@ export interface paths {
         put?: never;
         /**
          * SES bounce and complaint notifications delivered by SNS (HTTPS subscription with HTTP Basic
-         *     credentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). A permanent bounce suppresses
-         *     the message's recipient for every stream, a complaint for marketing; subscription messages
-         *     are logged for the operator and never followed. `404` when not configured.
+         *     credentials `ses:<MAIL_EVENTS_SECRET>` in the endpoint URL). With `MAIL_EVENTS_TOPIC_ARNS`
+         *     set, every message must come from an allowlisted topic, be fresh (one hour) and carry a valid
+         *     SNS signature (`SignatureVersion` 2). A permanent bounce suppresses the message's recipient
+         *     for every stream, a complaint for marketing; a notification already applied is not applied
+         *     again. Subscription messages are logged for the operator and never followed. `404` when not
+         *     configured.
          */
         post: operations["ses_webhook"];
         delete?: never;
@@ -22800,8 +22803,17 @@ export interface operations {
                     "application/json": components["schemas"]["MailEventReceived"];
                 };
             };
-            /** @description invalid_credentials */
+            /** @description invalid_credentials or invalid_signature */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description unknown_topic */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22817,8 +22829,17 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description invalid_event */
+            /** @description invalid_event or stale_event */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The SNS signing certificate could not be fetched; SNS retries */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

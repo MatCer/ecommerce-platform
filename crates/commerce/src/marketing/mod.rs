@@ -6,6 +6,7 @@
 //!   preview/test sends, scheduling, throttled idempotent batch sending, click tracking and the
 //!   recipient's token actions (unsubscribe, preferences).
 //! - [`deliverability`]: bounce/complaint notifications (SES via SNS) → suppression.
+//! - [`sns`]: SNS signature, topic, freshness and replay checks for those notifications.
 //!
 //! Marketing mail uses the `marketing` stream of the mail pipeline: it is never resent after an
 //! uncertain SMTP outcome (A14), and the recipient's status, consent and suppression are checked
@@ -14,4 +15,5 @@
 pub mod campaigns;
 pub mod deliverability;
 pub mod segments;
+pub mod sns;
 pub mod subscribers;

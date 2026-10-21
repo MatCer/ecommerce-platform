@@ -682,6 +682,8 @@ dependencies = [
  "ravif",
  "regex",
  "reqwest",
+ "rustls-pki-types",
+ "rustls-webpki",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -3820,10 +3822,13 @@ dependencies = [
 name = "testkit"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
+ "base64 0.23.1",
  "commerce",
  "object_store",
  "platform",
  "reqwest",
+ "serde_json",
  "sqlx",
  "tokio",
  "uuid",

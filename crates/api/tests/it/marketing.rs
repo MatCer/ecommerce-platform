@@ -508,3 +508,89 @@ async fn ses_bounces_need_the_secret_and_suppress(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn signed_ses_bounces_suppress_once_and_unsigned_ones_are_refused(db: PgPool) {
+    use commerce::marketing::sns::{SnsVerifier, TopicArn};
+    use testkit::sns::{CERT_PEM, CERT_URL, TOPIC, sign as signed};
+
+    let mut c = setup(db).await;
+    let verifier = SnsVerifier::new(
+        vec![TopicArn::parse(TOPIC).unwrap()],
+        platform::http::SafeClient::new(Vec::<String>::new()).unwrap(),
+    )
+    .with_certificate(CERT_URL, CERT_PEM)
+    .unwrap();
+    c.s.mail_events = Some(api::MailEvents {
+        secret: api::auth::ServiceToken::new(MAIL_EVENTS_SECRET),
+        sns: Some(std::sync::Arc::new(verifier)),
+    });
+    sf(
+        Call::post(
+            "/storefront/v1/newsletter/subscribe",
+            json!({ "email": "gone@example.com" }),
+        ),
+        &c.shop,
+    )
+    .send(&c.s)
+    .await;
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    let message: uuid::Uuid = sqlx::query_scalar("SELECT id FROM email_messages")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let ses = json!({
+        "notificationType": "Bounce",
+        "bounce": {"bounceType": "Permanent", "bouncedRecipients": [{"emailAddress": "gone@example.com"}]},
+        "mail": {"commonHeaders": {"messageId": format!("<{message}@mail.test>")}}
+    });
+    let notification = |topic: &str| {
+        json!({
+            "Type": "Notification",
+            "MessageId": "7f0c2b8e-3d9a-4f6b-9a51-0d6c2f1e4b7a",
+            "TopicArn": topic,
+            "Message": ses.to_string(),
+            "Timestamp": chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        })
+    };
+    let post = |body: serde_json::Value| {
+        Call::post_raw("/webhooks/ses", body.to_string(), "text/plain").header(
+            "authorization",
+            format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD
+                    .encode(format!("ses:{MAIL_EVENTS_SECRET}"))
+            ),
+        )
+    };
+
+    let (status, _, _) = post(notification(TOPIC)).send(&c.s).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "unsigned");
+    let other = "arn:aws:sns:eu-central-1:123456789012:someone-else";
+    let (status, _, _) = post(signed(notification(other))).send(&c.s).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "unknown topic");
+
+    let message = signed(notification(TOPIC));
+    let (status, body, _) = post(message.clone()).send(&c.s).await;
+    assert_eq!(
+        (status, body["applied"].as_bool()),
+        (StatusCode::OK, Some(true))
+    );
+    let boss = sign(&claims("boss"));
+    let (_, list, _) = Call::get("/admin/v1/email-suppressions")
+        .tenant(c.shop.tenant)
+        .token(&boss)
+        .send(&c.s)
+        .await;
+    assert_eq!(list["items"][0]["email"], "gone@example.com");
+
+    let (status, body, _) = post(message).send(&c.s).await;
+    assert_eq!(
+        (status, body["applied"].as_bool()),
+        (StatusCode::OK, Some(false)),
+        "a replay applies nothing"
+    );
+}

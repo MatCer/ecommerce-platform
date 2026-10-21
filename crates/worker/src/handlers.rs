@@ -31,7 +31,7 @@ use crate::runner::{Ctx, Handlers, JobError};
 pub const EVENTS_LOG: &str = "events.log";
 /// Hourly retention: finished jobs, dispatched events, expired idempotency keys (A12),
 /// zero-result search queries older than 90 days (A20), expired customer sessions and sign-in
-/// links, day-old rate-limit rows and IP salts (§14).
+/// links, day-old rate-limit rows and IP salts (§14), day-old processed SNS message ids.
 pub const MAINTENANCE_CLEANUP: &str = "maintenance.cleanup";
 
 const JOB_RETENTION: Duration = Duration::from_secs(7 * 86_400);
@@ -866,6 +866,12 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
     let ad_deliveries = sqlx::query_scalar!(r#"SELECT platform.purge_ad_deliveries() AS "n!""#)
         .fetch_one(&ctx.db)
         .await?;
+    let sns_messages = sqlx::query!(
+        "DELETE FROM platform.sns_messages WHERE received_at < now() - interval '1 day'"
+    )
+    .execute(&ctx.db)
+    .await?
+    .rows_affected();
     // A14: deliveries whose job died (or whose worker died mid-send) get a new job.
     let stalled = notifications::reconcile_jobs(&ctx.db)
         .await
@@ -881,6 +887,7 @@ async fn maintenance_cleanup(ctx: Ctx, _job: Job) -> Result<(), JobError> {
         customer_auth,
         flow_watch_quotas,
         ad_deliveries,
+        sns_messages,
         "cleanup done"
     );
     Ok(())

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM platform.sns_messages WHERE received_at < now() - interval '1 day'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "b3dc6b3ac7db3d31b50ceaf6c5157deeec662ed63c2a25abcf23dc0dd891d998"
+}
