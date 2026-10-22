@@ -137,8 +137,6 @@ impl TryFrom<Row> for Insight {
     }
 }
 
-/// Open signals, and resolved ones a published theme change came from. `today` decides which
-/// readout windows are over.
 pub async fn list(tx: &mut TenantTx, today: NaiveDate) -> Result<Vec<Insight>, Error> {
     select(tx, None, today).await
 }
