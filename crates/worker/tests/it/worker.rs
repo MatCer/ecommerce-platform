@@ -1151,111 +1151,6 @@ async fn drain(db: &PgPool, runtime: &PgPool, tenant: uuid::Uuid) {
     panic!("tenant {tenant} still has work after 10 s");
 }
 
-#[sqlx::test(migrations = "../../migrations")]
-async fn re_enabling_review_summaries_summarizes_every_qualifying_product(db: PgPool) {
-    let runtime = testkit::runtime_pool(&db, 6).await;
-    let shop = testkit::storefront::shop(&runtime, "re-enable").await;
-    let second = testkit::catalog::product(&runtime, shop.tenant, "B", 1)
-        .await
-        .id;
-    let mut products = vec![shop.product, second];
-    products.sort();
-    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
-        .await
-        .unwrap();
-    for product in &products {
-        for rating in [5, 4, 5, 4, 5] {
-            sqlx::query(
-                "INSERT INTO reviews (tenant_id, product_id, customer_name, rating, body,
-                                      verified, locale, status, published_at)
-                 VALUES ($1, $2, 'Jana', $3, 'Sedí.', true, 'cs', 'published', now())",
-            )
-            .bind(shop.tenant)
-            .bind(product)
-            .bind(rating)
-            .execute(&mut *tx)
-            .await
-            .unwrap();
-        }
-    }
-    tx.commit().await.unwrap();
-    let summarized = || async {
-        let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
-            .await
-            .unwrap();
-        let rows: Vec<(uuid::Uuid, String)> = sqlx::query_as(
-            "SELECT product_id, locale FROM review_summaries ORDER BY product_id, locale",
-        )
-        .fetch_all(&mut *tx)
-        .await
-        .unwrap();
-        let calls: i64 =
-            sqlx::query_scalar("SELECT count(*) FROM ai_usage WHERE feature = 'review_summary'")
-                .fetch_one(&mut *tx)
-                .await
-                .unwrap();
-        (rows, calls)
-    };
-
-    switch_review_summaries(&runtime, shop.tenant, true).await;
-    switch_review_summaries(&runtime, shop.tenant, false).await;
-    let (stop, task) = start(
-        &runtime,
-        worker::handlers::all(
-            testkit::memory_storage(),
-            testkit::dead_meili(),
-            None,
-            None,
-            worker::handlers::Extra::disabled().unwrap(),
-        ),
-        fast_config(),
-    );
-    drain(&db, &runtime, shop.tenant).await;
-    assert_eq!(
-        summarized().await,
-        (vec![], 0),
-        "the backfill ran while the switch was off"
-    );
-
-    switch_review_summaries(&runtime, shop.tenant, true).await;
-    drain(&db, &runtime, shop.tenant).await;
-    let every_product: Vec<(uuid::Uuid, String)> = products
-        .iter()
-        .flat_map(|p| [(*p, "cs".to_owned()), (*p, "sk".to_owned())])
-        .collect();
-    assert_eq!(
-        summarized().await,
-        (every_product.clone(), 2),
-        "the re-enable summarizes each product once"
-    );
-
-    for on in [false, true, false, true] {
-        switch_review_summaries(&runtime, shop.tenant, on).await;
-    }
-    drain(&db, &runtime, shop.tenant).await;
-    stop.send(true).unwrap();
-    task.await.unwrap();
-    assert_eq!(
-        summarized().await,
-        (every_product, 2),
-        "toggling with current summaries calls no model"
-    );
-    let (per_product, backfills): (i64, i64) = sqlx::query_as(
-        "SELECT count(*) FILTER (WHERE kind = 'ai.review_summary'),
-                count(*) FILTER (WHERE kind = 'ai.review_summary_backfill')
-         FROM queue.jobs WHERE tenant_id = $1",
-    )
-    .bind(shop.tenant)
-    .fetch_one(&db)
-    .await
-    .unwrap();
-    assert_eq!(per_product, 0, "toggles queue no per-product job");
-    assert!(
-        backfills <= 4,
-        "one backfill per switch-on at most: {backfills}"
-    );
-}
-
 async fn verified_reviews(runtime: &PgPool, tenant: uuid::Uuid, product: uuid::Uuid, n: usize) {
     let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
     for _ in 0..n {
@@ -1279,6 +1174,90 @@ async fn summary_calls(runtime: &PgPool, tenant: uuid::Uuid) -> i64 {
         .fetch_one(&mut *tx)
         .await
         .unwrap()
+}
+
+async fn summarized(runtime: &PgPool, tenant: uuid::Uuid) -> (Vec<(uuid::Uuid, String)>, i64) {
+    let mut tx = platform::db::tenant_tx(runtime, tenant).await.unwrap();
+    let rows = sqlx::query_as(
+        "SELECT product_id, locale FROM review_summaries ORDER BY product_id, locale",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+    drop(tx);
+    (rows, summary_calls(runtime, tenant).await)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn re_enabling_review_summaries_summarizes_every_qualifying_product(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 6).await;
+    let shop = testkit::storefront::shop(&runtime, "re-enable").await;
+    let second = testkit::catalog::product(&runtime, shop.tenant, "B", 1)
+        .await
+        .id;
+    let mut products = vec![shop.product, second];
+    products.sort();
+    for product in &products {
+        verified_reviews(&runtime, shop.tenant, *product, 5).await;
+    }
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    switch_review_summaries(&runtime, shop.tenant, false).await;
+    let (stop, task) = start(
+        &runtime,
+        worker::handlers::all(
+            testkit::memory_storage(),
+            testkit::dead_meili(),
+            None,
+            None,
+            worker::handlers::Extra::disabled().unwrap(),
+        ),
+        fast_config(),
+    );
+    drain(&db, &runtime, shop.tenant).await;
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (vec![], 0),
+        "the backfill ran while the switch was off"
+    );
+
+    switch_review_summaries(&runtime, shop.tenant, true).await;
+    drain(&db, &runtime, shop.tenant).await;
+    let every_product: Vec<(uuid::Uuid, String)> = products
+        .iter()
+        .flat_map(|p| [(*p, "cs".to_owned()), (*p, "sk".to_owned())])
+        .collect();
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (every_product.clone(), 2),
+        "the re-enable summarizes each product once"
+    );
+
+    for on in [false, true, false, true] {
+        switch_review_summaries(&runtime, shop.tenant, on).await;
+    }
+    drain(&db, &runtime, shop.tenant).await;
+    stop.send(true).unwrap();
+    task.await.unwrap();
+    assert_eq!(
+        summarized(&runtime, shop.tenant).await,
+        (every_product, 2),
+        "toggling with current summaries calls no model"
+    );
+    let (per_product, backfills): (i64, i64) = sqlx::query_as(
+        "SELECT count(*) FILTER (WHERE kind = 'ai.review_summary'),
+                count(*) FILTER (WHERE kind = 'ai.review_summary_backfill')
+         FROM queue.jobs WHERE tenant_id = $1",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(per_product, 0, "toggles queue no per-product job");
+    assert!(
+        backfills <= 4,
+        "one backfill per switch-on at most: {backfills}"
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1426,22 +1405,12 @@ async fn toggles_while_a_backfill_pass_runs_end_with_current_summaries(db: PgPoo
     drain(&db, &runtime, shop.tenant).await;
     stop.send(true).unwrap();
     task.await.unwrap();
-    let mut tx = platform::db::tenant_tx(&runtime, shop.tenant)
-        .await
-        .unwrap();
-    let rows: Vec<(uuid::Uuid, String)> = sqlx::query_as(
-        "SELECT product_id, locale FROM review_summaries ORDER BY product_id, locale",
-    )
-    .fetch_all(&mut *tx)
-    .await
-    .unwrap();
-    drop(tx);
     let every_product: Vec<(uuid::Uuid, String)> = products
         .iter()
         .flat_map(|p| [(*p, "cs".to_owned()), (*p, "sk".to_owned())])
         .collect();
     assert_eq!(
-        (rows, summary_calls(&runtime, shop.tenant).await),
+        summarized(&runtime, shop.tenant).await,
         (every_product, 2),
         "the last switch-on summarizes each product once"
     );
