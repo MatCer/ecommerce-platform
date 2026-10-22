@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT e.id, e.name, e.version, e.arms, e.status, e.stop_reason, e.promoted_at,\n                  e.theme_revision_id, r.number AS \"revision_number?\", e.created_at, e.started_at,\n                  e.stopped_at\n           FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id\n           ORDER BY e.created_at DESC, e.id DESC LIMIT 100",
+  "query": "SELECT e.id, e.name, e.version, e.arms, e.status, e.stop_reason, e.promoted_at,\n                  e.theme_arm, e.theme_revision_id, r.number AS \"revision_number?\", e.created_at,\n                  e.started_at, e.stopped_at\n           FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id\n           ORDER BY e.created_at DESC, e.id DESC LIMIT 100",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "theme_arm",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiments",
+            "name": "theme_arm"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "theme_revision_id",
         "type_info": "Uuid",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "revision_number?",
         "type_info": "Int4",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "started_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "stopped_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -148,11 +159,12 @@
       true,
       true,
       true,
+      true,
       false,
       false,
       true,
       true
     ]
   },
-  "hash": "bb9b73ac58aad48b0fb292a2df9505297180e09aaf5c0afe4bf1e3a02bb2f83b"
+  "hash": "2170dfeb06cdf733418d3a68dc475ea01513fddca8a4df7d7c2cba5fd137d5fd"
 }

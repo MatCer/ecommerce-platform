@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH a AS (\n               SELECT anon_id, arm, assigned_at,\n                      assigned_at <= $2::timestamptz - interval '7 days' AS mature\n               FROM experiment_assignments\n               WHERE experiment_id = $1 AND assigned_at >= $3::timestamptz\n                 AND assigned_at < $2::timestamptz\n                 AND ($4::timestamptz IS NULL OR assigned_at <= $4::timestamptz)\n           ), converted AS MATERIALIZED (\n               SELECT DISTINCT a.anon_id FROM a\n               JOIN events e ON e.anon_id = a.anon_id AND e.type = 'purchase'\n                AND e.at > a.assigned_at AND e.at <= a.assigned_at + interval '7 days'\n               JOIN orders o ON o.id = (e.props ->> 'order_id')::uuid\n               WHERE a.mature AND e.at >= $3::timestamptz AND e.at <= $2::timestamptz\n                 AND o.status <> 'cancelled' AND o.payment_status <> 'refunded'\n           )\n           SELECT a.arm AS \"arm!\", count(*) AS \"assigned!\",\n                  count(*) FILTER (WHERE a.mature) AS \"subjects!\",\n                  count(c.anon_id) AS \"converters!\"\n           FROM a LEFT JOIN converted c USING (anon_id) GROUP BY a.arm",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "arm!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "experiment_assignments",
+            "name": "arm"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "assigned!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "subjects!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "converters!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "466ff6abad8cc14ec9451f767e9b7097a11fedafe779a760c30ea67005589951"
+}

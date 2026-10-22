@@ -19,14 +19,15 @@ use crate::storefront::Context;
 use crate::storefront::pages::{self, HeroCopy, HomePage};
 use crate::themes;
 
+mod readout;
 #[cfg_attr(
     not(test),
-    expect(
-        dead_code,
-        reason = "the readout and guardrails call it from the next pass"
-    )
+    expect(dead_code, reason = "the guardrails call it from the next commit")
 )]
 mod stats;
+
+pub use stats::{Basis, Need, ReadoutState, Side};
+use stats::{Pair, Snapshot};
 
 /// The tenant's running experiment, as the edge sees it in `/internal/v1/resolve`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -144,19 +145,19 @@ impl ExperimentKey {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 struct Arm {
     key: String,
-    weight: u64,
+    weight: u32,
 }
 
 fn pick(arms: &[Arm], hash: u64) -> Option<&str> {
-    let total: u64 = arms.iter().map(|a| a.weight).sum();
+    let total: u64 = arms.iter().map(|a| u64::from(a.weight)).sum();
     let mut point = hash.checked_rem(total)?;
     arms.iter()
         .find(|a| {
-            let inside = point < a.weight;
-            point = point.saturating_sub(a.weight);
+            let inside = point < u64::from(a.weight);
+            point = point.saturating_sub(u64::from(a.weight));
             inside
         })
         .map(|a| a.key.as_str())
@@ -231,6 +232,8 @@ pub struct Experiment {
     pub created_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub stopped_at: Option<DateTime<Utc>>,
+    #[serde(skip)]
+    arms: Pair<Arm>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
@@ -311,6 +314,7 @@ struct Row {
     status: String,
     stop_reason: Option<String>,
     promoted_at: Option<DateTime<Utc>>,
+    theme_arm: Option<String>,
     theme_revision_id: Option<Uuid>,
     revision_number: Option<i32>,
     created_at: DateTime<Utc>,
@@ -332,6 +336,19 @@ impl TryFrom<Row> for Experiment {
                 _ => Change::Component,
             },
         };
+        let [first, second]: [Arm; 2] = serde_json::from_value(r.arms)
+            .map_err(|e| Error::Internal(format!("experiment {} arms: {e}", r.id)))?;
+        let arms = if r.theme_arm.as_deref() == Some(first.key.as_str()) {
+            Pair {
+                control: second,
+                variant: first,
+            }
+        } else {
+            Pair {
+                control: first,
+                variant: second,
+            }
+        };
         Ok(Self {
             id: r.id,
             name: r.name,
@@ -347,6 +364,7 @@ impl TryFrom<Row> for Experiment {
             created_at: r.created_at,
             started_at: r.started_at,
             stopped_at: r.stopped_at,
+            arms,
         })
     }
 }
@@ -355,8 +373,8 @@ async fn fetch(tx: &mut TenantTx, id: Uuid) -> Result<Experiment, Error> {
     sqlx::query_as!(
         Row,
         r#"SELECT e.id, e.name, e.version, e.arms, e.status, e.stop_reason, e.promoted_at,
-                  e.theme_revision_id, r.number AS "revision_number?", e.created_at, e.started_at,
-                  e.stopped_at
+                  e.theme_arm, e.theme_revision_id, r.number AS "revision_number?", e.created_at,
+                  e.started_at, e.stopped_at
            FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id
            WHERE e.id = $1"#,
         id
@@ -367,13 +385,116 @@ async fn fetch(tx: &mut TenantTx, id: Uuid) -> Result<Experiment, Error> {
     .try_into()
 }
 
+/// An experiment and its readout; a draft has none.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct ExperimentDetail {
+    pub experiment: Experiment,
+    pub readout: Option<Readout>,
+}
+
+/// The daily snapshot of a started experiment.
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct Readout {
+    /// The UTC midnight the snapshot counts up to; once stopped, at most the stop plus 7 days.
+    pub as_of: DateTime<Utc>,
+    /// The first snapshot that can name a winner or no difference.
+    pub decides_from: DateTime<Utc>,
+    /// Stopped, and every attribution window has closed.
+    #[serde(rename = "final")]
+    pub final_: bool,
+    /// The converters each arm needs before the readout decides.
+    pub min_converters: u64,
+    pub state: ReadoutState,
+    pub control: ArmReadout,
+    pub variant: ArmReadout,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct ArmReadout {
+    /// Subjects assigned before the snapshot.
+    pub assigned: u64,
+    /// Assigned subjects whose 7-day attribution window has closed; only they are counted.
+    pub subjects: u64,
+    /// Counted subjects who bought within 7 days of their assignment.
+    pub converters: u64,
+    /// `converters / subjects`; null without subjects.
+    pub conversion_rate: Option<f64>,
+    /// The chance that this arm converts best.
+    pub p_best: f64,
+    /// The conversion rate lost, in expectation, by keeping this arm.
+    pub expected_loss: f64,
+}
+
+impl ArmReadout {
+    fn new(c: stats::Counts, a: stats::ArmStats) -> Self {
+        Self {
+            assigned: c.assigned,
+            subjects: c.subjects,
+            converters: c.converters,
+            conversion_rate: (c.subjects > 0).then(|| c.converters as f64 / c.subjects as f64),
+            p_best: a.p_best,
+            expected_loss: a.expected_loss,
+        }
+    }
+}
+
+pub async fn get(
+    tx: &mut TenantTx,
+    id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<ExperimentDetail, Error> {
+    let experiment = fetch(tx, id).await?;
+    let readout = snapshot(tx, &experiment, now).await?.map(|(w, s)| {
+        let v = stats::readout(&s);
+        Readout {
+            as_of: w.as_of,
+            decides_from: w.decides_from,
+            final_: w.final_,
+            min_converters: stats::RULE.min_converters,
+            state: v.state,
+            control: ArmReadout::new(s.counts.control, v.arms.control),
+            variant: ArmReadout::new(s.counts.variant, v.arms.variant),
+        }
+    });
+    Ok(ExperimentDetail {
+        experiment,
+        readout,
+    })
+}
+
+async fn snapshot(
+    tx: &mut TenantTx,
+    e: &Experiment,
+    now: DateTime<Utc>,
+) -> Result<Option<(stats::Window, Snapshot)>, Error> {
+    let Some(started_at) = e.started_at else {
+        return Ok(None);
+    };
+    let w = stats::window(started_at, e.stopped_at, now);
+    let counts = readout::counts(tx, e, started_at, w.as_of).await?;
+    Ok(Some((
+        w,
+        Snapshot {
+            counts,
+            weights: Pair {
+                control: e.arms.control.weight,
+                variant: e.arms.variant.weight,
+            },
+            mature_days: w.mature_days,
+            running_days: w.running_days,
+            final_: w.final_,
+            trusted: e.stop_reason != Some(StopReason::Srm),
+        },
+    )))
+}
+
 /// The newest 100 experiments.
 pub async fn list(tx: &mut TenantTx) -> Result<Vec<Experiment>, Error> {
     sqlx::query_as!(
         Row,
         r#"SELECT e.id, e.name, e.version, e.arms, e.status, e.stop_reason, e.promoted_at,
-                  e.theme_revision_id, r.number AS "revision_number?", e.created_at, e.started_at,
-                  e.stopped_at
+                  e.theme_arm, e.theme_revision_id, r.number AS "revision_number?", e.created_at,
+                  e.started_at, e.stopped_at
            FROM experiments e LEFT JOIN theme_revisions r ON r.id = e.theme_revision_id
            ORDER BY e.created_at DESC, e.id DESC LIMIT 100"#
     )
@@ -725,7 +846,7 @@ mod tests {
         }
     }
 
-    fn arms(weights: &[(&str, u64)]) -> Vec<Arm> {
+    fn arms(weights: &[(&str, u32)]) -> Vec<Arm> {
         weights
             .iter()
             .map(|(k, w)| Arm {
