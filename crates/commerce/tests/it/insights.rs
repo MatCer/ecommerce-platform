@@ -312,6 +312,44 @@ async fn detects_ranks_and_lists_signals_idempotently(db: PgPool) {
     assert_eq!(usage(&runtime, &shop).await, 0, "the switch is off");
 }
 
+async fn scores(runtime: &PgPool, tenant: Uuid) -> Vec<(String, NaiveDate, f64)> {
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query_as(
+        "SELECT s.subject, h.day, h.score FROM insight_scores h
+         JOIN insight_signals s ON s.id = h.signal_id ORDER BY s.subject, h.day",
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn each_run_keeps_the_days_score_and_a_rerun_overwrites_it(db: PgPool) {
+    let (runtime, shop) = setup(&db, "hist").await;
+    let day = yesterday();
+    let before = day - Days::new(1);
+    vitals(&runtime, &shop, before, ("home", "LCP", 5000.0, 60, 2000)).await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    assert_eq!(
+        scores(&runtime, shop.tenant).await,
+        vec![("home:LCP".into(), before, 50.0), ("home:LCP".into(), day, 50.0)]
+    );
+
+    vitals(&runtime, &shop, day, ("home", "LCP", 5000.0, 60, 2000)).await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    run(&runtime, &Ai::fake(), &shop, before).await;
+    assert_eq!(
+        scores(&runtime, shop.tenant).await,
+        vec![("home:LCP".into(), before, 50.0), ("home:LCP".into(), day, 100.0)]
+    );
+    assert_eq!(
+        ranked(&runtime, shop.tenant).await,
+        vec![row("slow_page", "home:LCP", 100.0, None, before, day)],
+        "a late run of an older day keeps the newer score"
+    );
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_run_rolls_up_its_day_before_detecting(db: PgPool) {
     let (runtime, shop) = setup(&db, "roll").await;
