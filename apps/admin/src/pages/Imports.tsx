@@ -16,19 +16,28 @@ import {
   TextField,
   type Tone,
 } from "@platform/ui";
-import { A, useNavigate, useParams } from "@solidjs/router";
+import { A, useLocation, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createSignal, createUniqueId, For, onCleanup, Show } from "solid-js";
 import { ImportReport } from "../components/ImportReport.tsx";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
-import { formatDateTime, t } from "../i18n/index.ts";
+import { StoreFindings } from "../components/StoreFindings.tsx";
+import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
 import { contentError } from "../lib/content-api.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
 import { useMarkets } from "../lib/queries.ts";
+import { type FeedSource, feedPrefill, shopUrl } from "../lib/store-import.ts";
 import { putFile } from "../lib/upload.ts";
 
-const SOURCES = { heureka: "Heureka XML", google: "Google Merchant XML" };
+const FEED_SOURCES: Record<FeedSource, string> = {
+  heureka: "Heureka XML",
+  google: "Google Merchant XML",
+};
+const sourceLabel = (s: Schemas["Source"]): string =>
+  s === "store" ? t("content.storeSource") : FEED_SOURCES[s];
+const defaultMarketId = (items: Schemas["Market"][] | undefined): string =>
+  items?.find((m) => m.is_default)?.id || items?.[0]?.id || "";
 const PROGRESS = [
   "done",
   "total",
@@ -99,7 +108,7 @@ function RunDetail() {
             <div role="status" class="flex flex-wrap items-center gap-2">
               <Badge tone={runTone(run.status)}>{t(`content.${run.status}`)}</Badge>
               <span class="text-sm text-muted-foreground">
-                {SOURCES[run.source]} · {formatDateTime(run.created_at)}
+                {sourceLabel(run.source)} · {formatDateTime(run.created_at)}
               </span>
             </div>
             <Show when={run.error}>
@@ -115,6 +124,9 @@ function RunDetail() {
                   value={run.progress.done}
                 />
               </div>
+            </Show>
+            <Show when={run.report?.site}>
+              {(site) => <StoreFindings site={site()} runId={run.id} />}
             </Show>
             <Show when={run.report}>{(report) => <ImportReport report={report()} />}</Show>
             <Show when={run.status === "applied" || run.status === "failed"}>
@@ -167,6 +179,79 @@ function RunDetail() {
     </>
   );
 }
+function StoreImportCard() {
+  const navigate = useNavigate(),
+    qc = useQueryClient(),
+    markets = useMarkets();
+  const [url, setUrl] = createSignal(""),
+    [market, setMarket] = createSignal(""),
+    [error, setError] = createSignal<string>();
+  const marketId = () => market() || defaultMarketId(markets.data?.items);
+  const manyMarkets = () => (markets.data?.items.length ?? 0) > 1;
+  const start = createMutation(() => ({
+    mutationFn: () => {
+      setError(undefined);
+      return unwrap(
+        api.POST("/admin/v1/imports", {
+          params: { header: tenantHeader() },
+          body: { source: "store", market_id: marketId(), url: shopUrl(url()) },
+        }),
+      );
+    },
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: tenantKey("imports") });
+      navigate(`/imports/${created.run.id}`);
+    },
+    onError: (e: unknown) => setError(errorMessage(e)),
+  }));
+  return (
+    <Card class="mb-6 max-w-2xl" title={t("content.storeImport")}>
+      <form
+        class="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          start.mutate();
+        }}
+      >
+        <p class="text-sm text-muted-foreground">{t("content.storeImportHint")}</p>
+        <fieldset
+          disabled={start.isPending}
+          class="grid min-w-0 gap-4"
+          classList={{ "sm:grid-cols-2": manyMarkets() }}
+        >
+          <TextField
+            label={t("content.storeUrl")}
+            placeholder="https://www.vas-obchod.cz"
+            inputMode="url"
+            autocomplete="url"
+            required
+            value={url()}
+            onChange={setUrl}
+          />
+          <Show when={manyMarkets()}>
+            <SelectField
+              label={t("content.market")}
+              value={marketId()}
+              onChange={setMarket}
+              options={(markets.data?.items ?? []).map((m) => ({
+                value: m.id,
+                label: m.code.toUpperCase(),
+              }))}
+            />
+          </Show>
+        </fieldset>
+        <Show when={error()}>
+          <Alert tone="error">{error()}</Alert>
+        </Show>
+        <div class="border-t border-border pt-4">
+          <Button type="submit" variant="confirm" disabled={!marketId()} loading={start.isPending}>
+            {t("content.startStoreImport")}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
 function ImportList() {
   let alive = true;
   onCleanup(() => {
@@ -178,19 +263,16 @@ function ImportList() {
     queryKey: tenantKey("imports"),
     queryFn: () => unwrap(api.GET("/admin/v1/imports", { params: { header: tenantHeader() } })),
   }));
-  const [source, setSource] = createSignal<Schemas["Source"]>("heureka"),
+  const prefill = feedPrefill(useLocation().search);
+  const [source, setSource] = createSignal<FeedSource>(prefill?.source ?? "heureka"),
     [market, setMarket] = createSignal(""),
-    [mode, setMode] = createSignal("file"),
+    [mode, setMode] = createSignal(prefill ? "url" : "file"),
     [file, setFile] = createSignal<File>(),
-    [url, setUrl] = createSignal(""),
+    [url, setUrl] = createSignal(prefill?.url ?? ""),
     [activate, setActivate] = createSignal(false),
     [progress, setProgress] = createSignal(0),
     [error, setError] = createSignal<string>();
-  const marketId = () =>
-    market() ||
-    markets.data?.items.find((m) => m.is_default)?.id ||
-    markets.data?.items[0]?.id ||
-    "";
+  const marketId = () => market() || defaultMarketId(markets.data?.items);
   const qc = useQueryClient();
   const fileId = createUniqueId();
   const start = createMutation(() => ({
@@ -234,6 +316,7 @@ function ImportList() {
   return (
     <>
       <PageHeader title={t("content.imports")} />
+      <StoreImportCard />
       <Card class="mb-6 max-w-2xl" title={t("content.newImport")}>
         <form
           class="flex flex-col gap-4"
@@ -247,7 +330,7 @@ function ImportList() {
               <SelectField
                 label={t("content.source")}
                 value={source()}
-                options={Object.entries(SOURCES).map(([value, label]) => ({ value, label }))}
+                options={Object.entries(FEED_SOURCES).map(([value, label]) => ({ value, label }))}
                 onChange={(v) => setSource(v === "google" ? "google" : "heureka")}
               />
               <QueryState query={markets}>
@@ -365,7 +448,7 @@ function ImportList() {
                               {formatDateTime(run.created_at)}
                             </A>
                           </td>
-                          <td class={tdClass}>{SOURCES[run.source]}</td>
+                          <td class={tdClass}>{sourceLabel(run.source)}</td>
                           <td class={tdClass}>
                             <Badge tone={runTone(run.status)}>{t(`content.${run.status}`)}</Badge>
                           </td>

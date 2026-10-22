@@ -2,7 +2,6 @@ import type { Schemas } from "./api.ts";
 
 export type FeedSource = Exclude<Schemas["Source"], "store">;
 
-/** `stara-kocka.cz` -> `https://stara-kocka.cz`; an explicit scheme is kept (the API refuses http). */
 export function shopUrl(raw: string): string {
   const v = raw.trim();
   return v.includes("://") ? v : `https://${v}`;
