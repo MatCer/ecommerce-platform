@@ -45,6 +45,11 @@ const lcp: Schemas["Detection"] = {
   samples: 412,
   requests: 9000,
 };
+const search: Schemas["Detection"] = {
+  kind: "zero_result_search",
+  query: "pink dress",
+  searches: 1234,
+};
 
 describe("insight sentences", () => {
   it("states a funnel drop with both rates and the counts behind them", () => {
@@ -76,6 +81,18 @@ describe("insight sentences", () => {
       "CLS p75 is 0.23, above the good limit of 0.1 (412 measurements in the last 14 days).",
     );
   });
+
+  it("counts a search term's searches without results across all languages", () => {
+    expect(sentence(search, "en")).toBe(
+      "1,234 searches in the last 14 days found no products (all languages together).",
+    );
+    expect(sentence(search, "cs")).toBe(
+      "1 234 hledání za posledních 14 dní nenašlo žádný produkt (všechny jazyky dohromady).",
+    );
+    expect(sentence(search, "sk")).toBe(
+      "1 234 vyhľadávaní za posledných 14 dní nenašlo žiadny produkt (všetky jazyky spolu).",
+    );
+  });
 });
 
 describe("before/after measures", () => {
@@ -102,6 +119,16 @@ describe("before/after measures", () => {
     );
     expect(measure({ ...lcp, metric: "CLS" }, { value: 0.234, samples: 412 }, "sk")).toBe(
       "p75 0,23 z 412 meraní",
+    );
+  });
+
+  it("states a search term's searches without results as a count, zero included", () => {
+    expect(measure(search, { value: 1234, samples: 1234 }, "en")).toBe(
+      "Searches without results: 1,234",
+    );
+    expect(measure(search, { value: 0, samples: 0 }, "cs")).toBe("Hledání bez výsledků: 0");
+    expect(measure(search, { value: 12, samples: 12 }, "sk")).toBe(
+      "Vyhľadávania bez výsledkov: 12",
     );
   });
 

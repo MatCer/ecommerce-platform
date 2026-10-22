@@ -252,7 +252,7 @@ export const en = {
       "Products with at least 5 published verified reviews get a short AI summary on the product page, in each market's language and labelled as AI-generated. Every summary uses AI tokens.",
     insights: "Insight hypotheses",
     insightsDesc:
-      "Each night AI writes a possible cause and a draft for the AI theme editor for up to 3 new insights, labelled as AI-generated. They appear after the next nightly run, not right away. Insights are detected either way. Every hypothesis uses AI tokens.",
+      "Each night AI writes a possible cause and a draft for the AI theme editor for up to 3 insights, labelled as AI-generated: for new insights, and again for ones whose affected visits grew by half or fell by a third since their hypothesis was written. They appear after the next nightly run, not right away. Insights are detected either way. Every hypothesis uses AI tokens.",
     adminOnly: "Only owners and admins can change these settings.",
     altTexts: "Alt texts for new product images",
     altTextsDesc:
@@ -2379,16 +2379,20 @@ export const en = {
     list: "Insights",
     empty: "Nothing stands out in the last 14 days.",
     emptyHint:
-      "Insights need enough traffic: 100 sessions a week for a checkout step, 200 views for a product and 50 speed measurements for a page type.",
+      "Insights need enough traffic: 100 sessions a week for a checkout step, 200 views for a product, 50 speed measurements for a page type and 10 searches without results for a search term in 14 days.",
     affected: "Affected visits: ~{{n}} a week",
     since: "Detected since {{date}}",
     resolved: "No longer detected",
     lastDetected: "Last detected on {{date}}",
     deletedProduct: "Deleted product",
+    searchHeading: "Search for “{{query}}”",
+    reopened: "Reopened",
+    reopenedDetail: "Back since {{date}}, up from ~{{n}} a week when dismissed",
     slowHeading: "{{template}}: {{metric}}",
     hypothesis: "Possible cause",
     draft: "Draft for the AI theme editor",
     model: "Model: {{model}}",
+    written: "Written on {{date}}",
     dismiss: "Dismiss",
     dismissed: "Insight dismissed",
     openInEditor: "Open in AI theme editor",
@@ -2402,6 +2406,7 @@ export const en = {
       funnel_drop: "{{value}} of {{samples}} sessions",
       low_add_to_cart: "{{value}} of {{samples}} views",
       slow_page: "p75 {{value}} from {{samples}} measurements",
+      zero_result_search: "Searches without results: {{value}}",
     },
     transitions: {
       sessions_to_view_item: "Visits that reach a product",
@@ -2415,6 +2420,8 @@ export const en = {
       "Added to cart on {{rate}} of views in the last 14 days, against {{shopRate}} across the shop ({{adds}} of {{views}} views).",
     slow_page:
       "{{metric}} p75 is {{p75}}, above the good limit of {{bound}} ({{samples}} measurements in the last 14 days).",
+    zero_result_search:
+      "{{searches}} searches in the last 14 days found no products (all languages together).",
   },
 };
 
