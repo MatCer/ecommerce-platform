@@ -2,6 +2,9 @@ use chrono::{DateTime, Duration, NaiveTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
 
+#[cfg(test)]
+mod simulation;
+
 pub(super) const WINDOW_DAYS: i64 = 7;
 pub(super) const MIN_MATURE_DAYS: f64 = 14.0;
 pub(super) const MAX_DAYS: f64 = 56.0;
@@ -9,11 +12,11 @@ pub(super) const HARM_P: f64 = 0.99;
 pub(super) const SRM_MIN_ASSIGNED: u64 = 100;
 /// The upper 0.001 quantile of chi-square with 1 df, so SRM at p < 0.001 needs no CDF.
 pub(super) const SRM_CHI2_P001: f64 = 10.827_566_170_662_733;
-/// Provisional until the seeded simulation calibrates it.
+/// Picked by `simulation::calibration_grid`; docs/research/ab-testing.md §9 has the evidence.
 pub(super) const RULE: Rule = Rule {
-    floor: 0.997,
+    floor: 0.996,
     epsilon: 0.02,
-    min_converters: 50,
+    min_converters: 100,
 };
 
 const WINDOW: Duration = Duration::days(WINDOW_DAYS);
