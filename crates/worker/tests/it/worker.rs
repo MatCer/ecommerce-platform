@@ -1070,18 +1070,13 @@ async fn review_changes_queue_and_run_summary_jobs(db: PgPool) {
     .fetch_all(&db)
     .await
     .unwrap();
-    let payload = json!({ "product_id": shop.product });
-    assert_eq!(
-        jobs,
-        vec![(payload.clone(), 3, false), (payload.clone(), 3, true)]
-    );
+    assert_eq!(jobs, vec![(json!({ "product_id": shop.product }), 3, true)]);
 
-    let backfill: i64 = sqlx::query_scalar(
-        "SELECT id FROM queue.jobs WHERE kind = 'ai.review_summary' ORDER BY id LIMIT 1",
-    )
-    .fetch_one(&db)
-    .await
-    .unwrap();
+    let backfill: i64 =
+        sqlx::query_scalar("SELECT id FROM queue.jobs WHERE kind = 'ai.review_summary_backfill'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
     let (stop, task) = start(
         &runtime,
         worker::handlers::all(
@@ -1244,6 +1239,20 @@ async fn re_enabling_review_summaries_summarizes_every_qualifying_product(db: Pg
         summarized().await,
         (every_product, 2),
         "toggling with current summaries calls no model"
+    );
+    let (per_product, backfills): (i64, i64) = sqlx::query_as(
+        "SELECT count(*) FILTER (WHERE kind = 'ai.review_summary'),
+                count(*) FILTER (WHERE kind = 'ai.review_summary_backfill')
+         FROM queue.jobs WHERE tenant_id = $1",
+    )
+    .bind(shop.tenant)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(per_product, 0, "toggles queue no per-product job");
+    assert!(
+        backfills <= 4,
+        "one backfill per switch-on at most: {backfills}"
     );
 }
 

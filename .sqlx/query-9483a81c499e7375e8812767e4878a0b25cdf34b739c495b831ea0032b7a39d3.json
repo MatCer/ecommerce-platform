@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT review_summaries_version FROM ai_settings WHERE review_summaries",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "review_summaries_version",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "ai_settings",
+            "name": "review_summaries_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9483a81c499e7375e8812767e4878a0b25cdf34b739c495b831ea0032b7a39d3"
+}
