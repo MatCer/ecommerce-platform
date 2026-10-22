@@ -1,8 +1,8 @@
 use std::time::Instant;
 
 use super::{
-    Basis, Counts, Guardrail, Pair, RULE, ReadoutState, Rule, Side, Snapshot, WINDOW_DAYS, guard,
-    posterior,
+    Basis, Counts, Guardrail, Pair, Phase, RULE, ReadoutState, Rule, Side, Snapshot, WINDOW_DAYS,
+    guard, posterior,
 };
 
 struct SplitMix64(u64);
@@ -128,7 +128,7 @@ struct Stops {
 
 #[derive(Debug, PartialEq)]
 struct Outcome {
-    winners: u32,
+    runs_with_a_winner: u32,
     variant_winners: u32,
     median_first_win_day: Option<f64>,
     first_wins_after_stop: u32,
@@ -146,7 +146,7 @@ struct Run {
 
 #[derive(Default)]
 struct Tally {
-    winners: u32,
+    runs_with_a_winner: u32,
     first_wins: Vec<u32>,
     first_wins_after_stop: u32,
     equivalent_at_end: u32,
@@ -173,7 +173,7 @@ impl Tally {
 
     fn end_run(&mut self, stop_day: u32) {
         let run = std::mem::take(&mut self.run);
-        self.winners += u32::from(run.won);
+        self.runs_with_a_winner += u32::from(run.won);
         if let Some(day) = run.first_variant_win {
             self.first_wins.push(day);
             self.first_wins_after_stop += u32::from(day > stop_day);
@@ -186,7 +186,7 @@ impl Tally {
         self.first_wins.sort_unstable();
         let n = self.first_wins.len();
         Outcome {
-            winners: self.winners,
+            runs_with_a_winner: self.runs_with_a_winner,
             variant_winners: n as u32,
             median_first_win_day: (n > 0)
                 .then(|| f64::from(self.first_wins[(n - 1) / 2] + self.first_wins[n / 2]) / 2.0),
@@ -239,8 +239,14 @@ fn simulate(scenario: Scenario, rules: &[Rule]) -> (Stops, Vec<Outcome>) {
                     variant: 50,
                 },
                 mature_days: f64::from(mature_days),
-                running_days: stop.is_none().then_some(f64::from(day)),
-                final_: stop.is_some_and(|(stop_day, _)| day == stop_day + window),
+                phase: match stop {
+                    None => Phase::Running {
+                        days: f64::from(day),
+                    },
+                    Some((stop_day, _)) => Phase::Stopped {
+                        final_: day == stop_day + window,
+                    },
+                },
                 trusted: !matches!(stop, Some((_, Guardrail::Srm { .. }))),
             };
             let arms = posterior(&snapshot.counts);
@@ -250,7 +256,7 @@ fn simulate(scenario: Scenario, rules: &[Rule]) -> (Stops, Vec<Outcome>) {
             if stop.is_none() {
                 stop = guard(&snapshot, &arms).map(|g| (day, g));
             }
-            if snapshot.final_ {
+            if snapshot.phase.is_final() {
                 break;
             }
         }
@@ -325,7 +331,7 @@ const PINNED: [(Scenario, Stops, Outcome); 6] = [
             max_duration: 3775,
         },
         Outcome {
-            winners: 0,
+            runs_with_a_winner: 0,
             variant_winners: 0,
             median_first_win_day: None,
             first_wins_after_stop: 0,
@@ -341,7 +347,7 @@ const PINNED: [(Scenario, Stops, Outcome); 6] = [
             max_duration: 3757,
         },
         Outcome {
-            winners: 131,
+            runs_with_a_winner: 131,
             variant_winners: 73,
             median_first_win_day: Some(33.0),
             first_wins_after_stop: 4,
@@ -357,7 +363,7 @@ const PINNED: [(Scenario, Stops, Outcome); 6] = [
             max_duration: 3751,
         },
         Outcome {
-            winners: 148,
+            runs_with_a_winner: 148,
             variant_winners: 77,
             median_first_win_day: Some(29.0),
             first_wins_after_stop: 9,
@@ -373,7 +379,7 @@ const PINNED: [(Scenario, Stops, Outcome); 6] = [
             max_duration: 3797,
         },
         Outcome {
-            winners: 0,
+            runs_with_a_winner: 0,
             variant_winners: 0,
             median_first_win_day: None,
             first_wins_after_stop: 0,
@@ -389,7 +395,7 @@ const PINNED: [(Scenario, Stops, Outcome); 6] = [
             max_duration: 3784,
         },
         Outcome {
-            winners: 153,
+            runs_with_a_winner: 153,
             variant_winners: 85,
             median_first_win_day: Some(30.0),
             first_wins_after_stop: 9,
@@ -405,7 +411,7 @@ const PINNED: [(Scenario, Stops, Outcome); 6] = [
             max_duration: 1975,
         },
         Outcome {
-            winners: 1056,
+            runs_with_a_winner: 1056,
             variant_winners: 1056,
             median_first_win_day: Some(37.0),
             first_wins_after_stop: 123,
@@ -423,14 +429,14 @@ fn the_stopping_rule_keeps_a_a_false_winners_under_five_percent() {
         let o = &outcomes[0];
         let runs = scenario.runs;
         if scenario.lift_pct == 0 {
-            let upper = wilson_upper(o.winners, runs);
+            let upper = wilson_upper(o.runs_with_a_winner, runs);
             eprintln!(
                 "A/A {}/day at {} bp: false winners {} of {runs} ({:.4}, Wilson upper {upper:.4}), \
                  SRM stops {:.4}, harm stops {:.4}",
                 scenario.daily,
                 scenario.base_bp,
-                o.winners,
-                share(o.winners, runs),
+                o.runs_with_a_winner,
+                share(o.runs_with_a_winner, runs),
                 share(stops.srm, runs),
                 share(stops.harm, runs)
             );
@@ -517,7 +523,7 @@ fn calibration_grid() {
             rule.min_converters,
             aa.iter()
                 .zip(AA)
-                .map(|((_, o), s)| format!("{:.4}", wilson_upper(o[i].winners, s.runs)))
+                .map(|((_, o), s)| format!("{:.4}", wilson_upper(o[i].runs_with_a_winner, s.runs)))
                 .collect::<Vec<_>>()
                 .join(" "),
             power
@@ -537,7 +543,7 @@ fn calibration_grid() {
             .flat_map(|i| {
                 aa.iter()
                     .zip(AA)
-                    .map(move |((_, o), s)| wilson_upper(o[i].winners, s.runs))
+                    .map(move |((_, o), s)| wilson_upper(o[i].runs_with_a_winner, s.runs))
             })
             .fold(0.0, f64::max)
     };
@@ -591,8 +597,8 @@ fn calibration_grid() {
         println!(
             "chosen {scenario:?}: winners {:.4} (upper {:.4}), variant winners {:.4}, median first \
              win day {:?}, first wins after the stop {:.4} of runs, {o:?}",
-            share(o.winners, scenario.runs),
-            wilson_upper(o.winners, scenario.runs),
+            share(o.runs_with_a_winner, scenario.runs),
+            wilson_upper(o.runs_with_a_winner, scenario.runs),
             share(o.variant_winners, scenario.runs),
             o.median_first_win_day,
             share(o.first_wins_after_stop, scenario.runs)

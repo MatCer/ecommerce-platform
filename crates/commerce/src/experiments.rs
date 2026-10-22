@@ -448,7 +448,7 @@ pub async fn get(
         Readout {
             as_of: w.as_of,
             decides_from: w.decides_from,
-            final_: w.final_,
+            final_: w.phase.is_final(),
             min_converters: stats::RULE.min_converters,
             state: v.state,
             control: ArmReadout::new(s.counts.control, v.arms.control),
@@ -480,8 +480,7 @@ async fn snapshot(
                 variant: e.arms.variant.weight,
             },
             mature_days: w.mature_days,
-            running_days: w.running_days,
-            final_: w.final_,
+            phase: w.phase,
             trusted: e.stop_reason != Some(StopReason::Srm),
         },
     )))
@@ -669,7 +668,7 @@ pub async fn promote(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Experim
             ("revision_id", json!(revision_id))
         }
         Change::Hero { hero } => {
-            pages::save_hero(tx, hero).await?;
+            pages::merge_hero(tx, hero).await?;
             ("hero", json!(hero))
         }
     };

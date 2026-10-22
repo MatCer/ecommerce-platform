@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::experiments::draft;
 
-pub(crate) fn t0() -> DateTime<Utc> {
+pub(crate) fn tomorrow() -> DateTime<Utc> {
     (Utc::now() + Duration::days(1))
         .date_naive()
         .and_time(NaiveTime::MIN)
@@ -19,12 +19,18 @@ pub(crate) fn day(d: f64) -> Duration {
     Duration::seconds((d * 86_400.0) as i64)
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct Stop<'a> {
+    pub at: DateTime<Utc>,
+    pub reason: &'a str,
+}
+
 pub(crate) async fn experiment(
     runtime: &PgPool,
     tenant: Uuid,
     name: &str,
     started_at: DateTime<Utc>,
-    stopped: Option<(DateTime<Utc>, &str)>,
+    stopped: Option<Stop<'_>>,
 ) -> Uuid {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let id = sqlx::query_scalar(
@@ -43,9 +49,9 @@ pub(crate) async fn experiment(
     } else {
         "running"
     })
-    .bind(stopped.map(|s| s.1))
+    .bind(stopped.map(|s| s.reason))
     .bind(started_at)
-    .bind(stopped.map(|s| s.0))
+    .bind(stopped.map(|s| s.at))
     .fetch_one(&mut *tx)
     .await
     .unwrap();
@@ -157,13 +163,16 @@ async fn the_readout_counts_purchases_in_the_week_after_a_mature_assignment(db: 
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "readout-window").await;
     let paid = order(&runtime, &shop, "confirmed", "paid").await;
-    let t = t0();
+    let t = tomorrow();
     let other = experiment(
         &runtime,
         shop.tenant,
         "older",
         t,
-        Some((t + day(1.0), "manual")),
+        Some(Stop {
+            at: t + day(1.0),
+            reason: "manual",
+        }),
     )
     .await;
     let id = experiment(&runtime, shop.tenant, "homepage", t, None).await;
@@ -215,7 +224,7 @@ async fn the_readout_counts_purchases_in_the_week_after_a_mature_assignment(db: 
 async fn cancelled_and_refunded_orders_do_not_convert(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "readout-orders").await;
-    let t = t0();
+    let t = tomorrow();
     let id = experiment(&runtime, shop.tenant, "homepage", t, None).await;
     let subjects = assign(&runtime, shop.tenant, id, "control", 5, t + day(1.0)).await;
     for (subject, status, payment) in [
@@ -256,9 +265,19 @@ async fn a_stopped_readout_ends_a_week_after_the_stop_and_is_final_from_the_next
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "readout-stop").await;
     let paid = order(&runtime, &shop, "confirmed", "paid").await;
-    let t = t0();
+    let t = tomorrow();
     let stop = t + day(20.5);
-    let id = experiment(&runtime, shop.tenant, "homepage", t, Some((stop, "manual"))).await;
+    let id = experiment(
+        &runtime,
+        shop.tenant,
+        "homepage",
+        t,
+        Some(Stop {
+            at: stop,
+            reason: "manual",
+        }),
+    )
+    .await;
     let before = assign(&runtime, shop.tenant, id, "control", 1, t + day(20.25)).await;
     buy(&runtime, shop.tenant, &before, t + day(26.0), paid).await;
     let after = assign(&runtime, shop.tenant, id, "control", 1, t + day(21.0)).await;
@@ -309,7 +328,7 @@ async fn the_readout_matches_the_reference_posterior(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "readout-numbers").await;
     let paid = order(&runtime, &shop, "confirmed", "paid").await;
-    let t = t0();
+    let t = tomorrow();
     let id = experiment(&runtime, shop.tenant, "homepage", t, None).await;
     cohort(&runtime, &shop, id, "control", (100, 10), t, paid).await;
     cohort(&runtime, &shop, id, "variant", (100, 15), t, paid).await;
@@ -339,7 +358,7 @@ async fn a_clear_winner_is_named_unless_the_experiment_stopped_for_srm(db: PgPoo
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "readout-winner").await;
     let paid = order(&runtime, &shop, "confirmed", "paid").await;
-    let t = t0();
+    let t = tomorrow();
     let mut states = vec![];
     for (name, reason) in [("manual", "manual"), ("broken", "srm")] {
         let id = experiment(
@@ -347,7 +366,10 @@ async fn a_clear_winner_is_named_unless_the_experiment_stopped_for_srm(db: PgPoo
             shop.tenant,
             name,
             t,
-            Some((t + day(20.0), reason)),
+            Some(Stop {
+                at: t + day(20.0),
+                reason,
+            }),
         )
         .await;
         cohort(&runtime, &shop, id, "control", (1000, 100), t, paid).await;

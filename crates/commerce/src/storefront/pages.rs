@@ -387,7 +387,7 @@ impl HeroCopy {
     }
 }
 
-pub(crate) async fn save_hero(tx: &mut TenantTx, hero: &HeroCopy) -> Result<(), Error> {
+pub(crate) async fn merge_hero(tx: &mut TenantTx, hero: &HeroCopy) -> Result<(), Error> {
     let hero = serde_json::to_value(hero).map_err(|e| Error::Internal(e.to_string()))?;
     sqlx::query!(
         "INSERT INTO home_settings (tenant_id, hero) VALUES ($1, $2)

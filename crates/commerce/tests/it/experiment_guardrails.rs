@@ -5,25 +5,26 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::experiment_readout::{assign, cohort, day, experiment, order, t0};
+use crate::experiment_readout::{assign, cohort, day, experiment, order, tomorrow};
 
 async fn run(runtime: &PgPool, now: DateTime<Utc>) -> GuardrailReport {
     experiments::guardrails(runtime, now).await.unwrap()
 }
 
-async fn outcome(
-    db: &PgPool,
-    runtime: &PgPool,
-    tenant: Uuid,
-    id: Uuid,
-) -> (Option<String>, Vec<(String, Value)>, i64) {
+struct Outcome {
+    stop_reason: Option<String>,
+    stop_audits: Vec<(String, Value)>,
+    changed_events: i64,
+}
+
+async fn outcome(db: &PgPool, runtime: &PgPool, tenant: Uuid, id: Uuid) -> Outcome {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
-    let reason = sqlx::query_scalar("SELECT stop_reason FROM experiments WHERE id = $1")
+    let stop_reason = sqlx::query_scalar("SELECT stop_reason FROM experiments WHERE id = $1")
         .bind(id)
         .fetch_one(&mut *tx)
         .await
         .unwrap();
-    let audits = sqlx::query_as(
+    let stop_audits = sqlx::query_as(
         "SELECT actor, diff FROM audit_log
          WHERE action = 'experiment.stopped' AND entity_id = $1 ORDER BY id",
     )
@@ -31,21 +32,25 @@ async fn outcome(
     .fetch_all(&mut *tx)
     .await
     .unwrap();
-    let changed =
+    let changed_events =
         sqlx::query_scalar("SELECT count(*) FROM queue.outbox WHERE tenant_id = $1 AND type = $2")
             .bind(tenant)
             .bind(experiments::CHANGED_EVENT)
             .fetch_one(db)
             .await
             .unwrap();
-    (reason, audits, changed)
+    Outcome {
+        stop_reason,
+        stop_audits,
+        changed_events,
+    }
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_sample_ratio_mismatch_stops_the_experiment_once(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let (tenant, _) = testkit::tenant(&runtime, "guard-srm").await;
-    let t = t0();
+    let t = tomorrow();
     let id = experiment(&runtime, tenant, "homepage", t, None).await;
     assign(&runtime, tenant, id, "control", 110, t + day(0.1)).await;
     assign(&runtime, tenant, id, "variant", 40, t + day(0.1)).await;
@@ -54,11 +59,11 @@ async fn a_sample_ratio_mismatch_stops_the_experiment_once(db: PgPool) {
         run(&runtime, t + day(2.0)).await,
         GuardrailReport { stopped: 1 }
     );
-    let (reason, audits, changed) = outcome(&db, &runtime, tenant, id).await;
-    assert_eq!(reason.as_deref(), Some("srm"));
-    assert_eq!(changed, 1);
-    let [(actor, diff)] = audits.as_slice() else {
-        panic!("{audits:?}");
+    let o = outcome(&db, &runtime, tenant, id).await;
+    assert_eq!(o.stop_reason.as_deref(), Some("srm"));
+    assert_eq!(o.changed_events, 1);
+    let [(actor, diff)] = o.stop_audits.as_slice() else {
+        panic!("{:?}", o.stop_audits);
     };
     assert_eq!(actor, experiments::GUARDRAIL_ACTOR);
     assert_eq!(diff["reason"], "srm");
@@ -70,9 +75,13 @@ async fn a_sample_ratio_mismatch_stops_the_experiment_once(db: PgPool) {
         GuardrailReport { stopped: 0 },
         "a second run changes nothing"
     );
-    let (reason, audits, changed) = outcome(&db, &runtime, tenant, id).await;
+    let o = outcome(&db, &runtime, tenant, id).await;
     assert_eq!(
-        (reason.as_deref(), audits.len(), changed),
+        (
+            o.stop_reason.as_deref(),
+            o.stop_audits.len(),
+            o.changed_events
+        ),
         (Some("srm"), 1, 1)
     );
 }
@@ -82,7 +91,7 @@ async fn a_clearly_worse_variant_stops_after_14_mature_days(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let shop = testkit::storefront::shop(&runtime, "guard-harm").await;
     let paid = order(&runtime, &shop, "confirmed", "paid").await;
-    let t = t0();
+    let t = tomorrow();
     let id = experiment(&runtime, shop.tenant, "homepage", t, None).await;
     cohort(
         &runtime,
@@ -105,11 +114,12 @@ async fn a_clearly_worse_variant_stops_after_14_mature_days(db: PgPool) {
         run(&runtime, t + day(21.0)).await,
         GuardrailReport { stopped: 1 }
     );
-    let (reason, audits, _) = outcome(&db, &runtime, shop.tenant, id).await;
-    assert_eq!(reason.as_deref(), Some("harm"));
+    let o = outcome(&db, &runtime, shop.tenant, id).await;
+    assert_eq!(o.stop_reason.as_deref(), Some("harm"));
     assert!(
-        audits[0].1["p_worse"].as_f64().unwrap() > 0.99,
-        "{audits:?}"
+        o.stop_audits[0].1["p_worse"].as_f64().unwrap() > 0.99,
+        "{:?}",
+        o.stop_audits
     );
 }
 
@@ -117,7 +127,7 @@ async fn a_clearly_worse_variant_stops_after_14_mature_days(db: PgPool) {
 async fn an_experiment_stops_after_56_days(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let (tenant, _) = testkit::tenant(&runtime, "guard-duration").await;
-    let t = t0();
+    let t = tomorrow();
     let id = experiment(&runtime, tenant, "homepage", t, None).await;
 
     assert_eq!(
@@ -128,9 +138,13 @@ async fn an_experiment_stops_after_56_days(db: PgPool) {
         run(&runtime, t + day(57.0)).await,
         GuardrailReport { stopped: 1 }
     );
-    let (reason, audits, changed) = outcome(&db, &runtime, tenant, id).await;
+    let o = outcome(&db, &runtime, tenant, id).await;
     assert_eq!(
-        (reason.as_deref(), audits.len(), changed),
+        (
+            o.stop_reason.as_deref(),
+            o.stop_audits.len(),
+            o.changed_events
+        ),
         (Some("max_duration"), 1, 1)
     );
 }
@@ -139,7 +153,7 @@ async fn an_experiment_stops_after_56_days(db: PgPool) {
 async fn an_experiment_the_admin_stopped_first_is_left_alone(db: PgPool) {
     let runtime = testkit::runtime_pool(&db, 4).await;
     let (tenant, _) = testkit::tenant(&runtime, "guard-manual").await;
-    let t = t0();
+    let t = tomorrow();
     let id = experiment(&runtime, tenant, "homepage", t, None).await;
     assign(&runtime, tenant, id, "control", 110, t + day(0.1)).await;
     assign(&runtime, tenant, id, "variant", 40, t + day(0.1)).await;
@@ -151,10 +165,14 @@ async fn an_experiment_the_admin_stopped_first_is_left_alone(db: PgPool) {
         run(&runtime, t + day(57.0)).await,
         GuardrailReport { stopped: 0 }
     );
-    let (reason, audits, changed) = outcome(&db, &runtime, tenant, id).await;
+    let o = outcome(&db, &runtime, tenant, id).await;
     assert_eq!(
-        (reason.as_deref(), audits.len(), changed),
+        (
+            o.stop_reason.as_deref(),
+            o.stop_audits.len(),
+            o.changed_events
+        ),
         (Some("manual"), 1, 1)
     );
-    assert_eq!(audits[0].0, "admin");
+    assert_eq!(o.stop_audits[0].0, "admin");
 }

@@ -24,7 +24,10 @@ const state = (key: StateKey, params: Record<string, string> = {}): Message => (
 const snapshotDay = (iso: string, locale: string) =>
   new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(iso));
 
-export const chance = (p: number, locale: string) =>
+const localDay = (iso: string, locale: string) =>
+  new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(iso));
+
+export const flooredChance = (p: number, locale: string) =>
   formatPercent(Math.floor(p * 1000) / 1000, locale);
 
 export const points = (rate: number, locale: string) =>
@@ -55,12 +58,13 @@ export function readoutMessage(detail: Schemas["ExperimentDetail"], locale: stri
   if (!r) return state("draft");
   const s = r.state;
   switch (s.state) {
-    case "collecting":
-      return r.final || (s.need === "time" && detail.experiment.status === "stopped")
-        ? state("notEnough")
-        : COLLECTING[s.need](r, locale);
+    case "collecting": {
+      const willNeverDecide =
+        r.final || (s.need === "time" && detail.experiment.status === "stopped");
+      return willNeverDecide ? state("notEnough") : COLLECTING[s.need](r, locale);
+    }
     case "winner":
-      return state(WINNER[s.arm], { chance: chance(r[s.arm].p_best, locale) });
+      return state(WINNER[s.arm], { chance: flooredChance(r[s.arm].p_best, locale) });
     case "no_difference":
       return state(NO_DIFFERENCE[s.basis]);
   }
@@ -76,10 +80,7 @@ const STOP_KEYS: Record<Schemas["StopReason"], StopKey> = {
 
 export function stopMessage(e: Schemas["Experiment"], locale: string): Message | undefined {
   if (!e.stop_reason || !e.stopped_at) return undefined;
-  const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
-    new Date(e.stopped_at),
-  );
-  return { key: STOP_KEYS[e.stop_reason], params: { date } };
+  return { key: STOP_KEYS[e.stop_reason], params: { date: localDay(e.stopped_at, locale) } };
 }
 
 export function changeMessage(e: Schemas["Experiment"]): Message {

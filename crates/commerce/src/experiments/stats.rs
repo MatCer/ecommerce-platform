@@ -45,9 +45,20 @@ pub(super) struct Snapshot {
     pub counts: Pair<Counts>,
     pub weights: Pair<u32>,
     pub mature_days: f64,
-    pub running_days: Option<f64>,
-    pub final_: bool,
+    pub phase: Phase,
     pub trusted: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) enum Phase {
+    Running { days: f64 },
+    Stopped { final_: bool },
+}
+
+impl Phase {
+    pub fn is_final(self) -> bool {
+        matches!(self, Self::Stopped { final_: true })
+    }
 }
 
 /// An arm of a two-arm experiment.
@@ -113,8 +124,7 @@ pub(super) struct Window {
     pub as_of: DateTime<Utc>,
     pub decides_from: DateTime<Utc>,
     pub mature_days: f64,
-    pub running_days: Option<f64>,
-    pub final_: bool,
+    pub phase: Phase,
 }
 
 pub(super) fn window(
@@ -135,8 +145,14 @@ pub(super) fn window(
         as_of,
         decides_from,
         mature_days: days(mature_until - started_at).max(0.0),
-        running_days: stopped_at.is_none().then(|| days(now - started_at)),
-        final_: stopped_at.is_some_and(|s| today >= s + WINDOW),
+        phase: match stopped_at {
+            None => Phase::Running {
+                days: days(now - started_at),
+            },
+            Some(s) => Phase::Stopped {
+                final_: today >= s + WINDOW,
+            },
+        },
     }
 }
 
@@ -195,7 +211,7 @@ impl Rule {
             ),
             (p_leader >= self.floor, Winner { arm: leader }),
             (
-                s.final_,
+                s.phase.is_final(),
                 NoDifference {
                     basis: Basis::Ended,
                 },
@@ -210,7 +226,9 @@ impl Rule {
 }
 
 fn guard(s: &Snapshot, arms: &Pair<ArmStats>) -> Option<Guardrail> {
-    let running_days = s.running_days?;
+    let Phase::Running { days: running_days } = s.phase else {
+        return None;
+    };
     let assigned = s.counts.control.assigned + s.counts.variant.assigned;
     let chi2 = srm_chi2(s);
     let p_worse = arms.control.p_best;
@@ -289,10 +307,13 @@ fn posterior(c: &Pair<Counts>) -> Pair<ArmStats> {
 }
 
 fn losses(lead: Beta, trail: Beta) -> (f64, f64) {
-    let lead_loss = (trail.mean() * exceed(trail.plus(), lead).0
-        - lead.mean() * exceed(trail, lead.plus()).0)
-        .max(0.0);
+    let lead_loss = leader_loss(lead, trail);
     (lead_loss, lead_loss + lead.mean() - trail.mean())
+}
+
+fn leader_loss(lead: Beta, trail: Beta) -> f64 {
+    (trail.mean() * exceed(trail.plus(), lead).0 - lead.mean() * exceed(trail, lead.plus()).0)
+        .max(0.0)
 }
 
 fn exceed(x: Beta, y: Beta) -> (f64, f64) {
@@ -307,41 +328,50 @@ fn exceed_within(x: Beta, y: Beta, tolerance: f64) -> (f64, f64) {
     let (nxf, nyf, kf) = (nx as f64, ny as f64, k as f64);
     let up = |h: f64| (nxf - h) / (h + 1.0) * ((kf - h) / (nyf - kf + h + 1.0));
     let down = |h: f64| h / (nxf - h + 1.0) * ((nyf - kf + h) / (kf - h + 1.0));
-    let mut tails = [Sum::default(); 2];
-    tails[usize::from(mode >= x.a)].add(1.0);
-    let mut mass = 1.0;
-
-    let (mut h, mut w) = (mode, 1.0);
-    while h < hi {
-        let r = up(h as f64);
-        if r < 1.0 && w * r / (1.0 - r) <= tolerance * mass {
-            break;
-        }
-        (h, w) = (h + 1, w * r);
-        mass += w;
-        tails[usize::from(h >= x.a)].add(w);
-    }
-    let (mut h, mut w) = (mode, 1.0);
-    while h > lo {
-        let r = down(h as f64);
-        if r < 1.0 && w * r / (1.0 - r) <= tolerance * mass {
-            break;
-        }
-        (h, w) = (h - 1, w * r);
-        mass += w;
-        tails[usize::from(h >= x.a)].add(w);
-    }
-    let [below, above] = tails.map(Sum::value);
+    let mut tails = Tails {
+        split: x.a,
+        mass: 0.0,
+        sums: [NeumaierSum::default(); 2],
+    };
+    tails.add(mode, 1.0);
+    tails.walk_out(mode, hi, up, tolerance);
+    tails.walk_out(mode, lo, down, tolerance);
+    let [below, above] = tails.sums.map(NeumaierSum::value);
     (below / (below + above), above / (below + above))
 }
 
+struct Tails {
+    split: u64,
+    mass: f64,
+    sums: [NeumaierSum; 2],
+}
+
+impl Tails {
+    fn add(&mut self, h: u64, w: f64) {
+        self.mass += w;
+        self.sums[usize::from(h >= self.split)].add(w);
+    }
+
+    fn walk_out(&mut self, mode: u64, end: u64, ratio: impl Fn(f64) -> f64, tolerance: f64) {
+        let (mut h, mut w) = (mode, 1.0);
+        while h != end {
+            let r = ratio(h as f64);
+            if r < 1.0 && w * r / (1.0 - r) <= tolerance * self.mass {
+                break;
+            }
+            (h, w) = (if end > h { h + 1 } else { h - 1 }, w * r);
+            self.add(h, w);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
-struct Sum {
+struct NeumaierSum {
     sum: f64,
     carry: f64,
 }
 
-impl Sum {
+impl NeumaierSum {
     fn add(&mut self, x: f64) {
         let t = self.sum + x;
         self.carry += if self.sum >= x {
@@ -381,8 +411,7 @@ mod tests {
                 variant: 50,
             },
             mature_days: 30.0,
-            running_days: Some(37.0),
-            final_: false,
+            phase: Phase::Running { days: 37.0 },
             trusted: true,
         }
     }
@@ -438,7 +467,7 @@ mod tests {
         let within_margin = stats(0.97, 0.000_09, 0.03, 0.000_01);
         let unclear = stats(0.2, 0.000_02, 0.8, 0.000_2);
         let ended = Snapshot {
-            final_: true,
+            phase: Phase::Stopped { final_: true },
             ..ready
         };
         for (s, arms, expected, why) in [
@@ -576,8 +605,7 @@ mod tests {
         );
         let srm = Snapshot {
             trusted: false,
-            running_days: None,
-            final_: true,
+            phase: Phase::Stopped { final_: true },
             ..s
         };
         assert_eq!(
@@ -601,7 +629,7 @@ mod tests {
                 },
             },
             mature_days: 0.0,
-            running_days: Some(1.0),
+            phase: Phase::Running { days: 1.0 },
             ..snapshot(Counts::default(), Counts::default())
         }
     }
@@ -653,8 +681,8 @@ mod tests {
 
     #[test]
     fn max_duration_stops_at_56_running_days() {
-        let s = |running_days| Snapshot {
-            running_days: Some(running_days),
+        let s = |days| Snapshot {
+            phase: Phase::Running { days },
             ..snapshot(arm(10_000, 200), arm(10_000, 200))
         };
         assert_eq!(guardrail(&s(55.99)), None);
@@ -664,7 +692,7 @@ mod tests {
     #[test]
     fn guardrails_rank_srm_then_harm_then_max_duration_and_skip_a_stopped_experiment() {
         let harmful = Snapshot {
-            running_days: Some(60.0),
+            phase: Phase::Running { days: 60.0 },
             ..snapshot(arm(10_000, 300), arm(10_000, 200))
         };
         let mut broken = harmful;
@@ -678,7 +706,7 @@ mod tests {
             "harm outranks the duration"
         );
         let stopped = Snapshot {
-            running_days: None,
+            phase: Phase::Stopped { final_: false },
             ..broken
         };
         assert_eq!(
@@ -697,8 +725,10 @@ mod tests {
         let w = window(at("2026-10-01T06:00:00Z"), None, at("2026-10-29T15:30:00Z"));
         assert_eq!(w.as_of, at("2026-10-29T00:00:00Z"));
         assert_eq!(w.mature_days, 20.75, "mature until 22 October, 00:00");
-        close(w.running_days.unwrap(), 28.0 + 9.5 / 24.0, 1e-12);
-        assert!(!w.final_);
+        let Phase::Running { days } = w.phase else {
+            panic!("{:?} is not running", w.phase);
+        };
+        close(days, 28.0 + 9.5 / 24.0, 1e-12);
         assert_eq!(
             w.decides_from,
             at("2026-10-23T00:00:00Z"),
@@ -724,13 +754,21 @@ mod tests {
         let stop = at("2026-10-20T12:00:00Z");
         let w = window(start, Some(stop), at("2026-10-22T08:00:00Z"));
         assert_eq!(
-            (w.as_of, w.mature_days, w.running_days, w.final_),
-            (at("2026-10-22T00:00:00Z"), 14.0, None, false)
+            (w.as_of, w.mature_days, w.phase),
+            (
+                at("2026-10-22T00:00:00Z"),
+                14.0,
+                Phase::Stopped { final_: false }
+            )
         );
         let w = window(start, Some(stop), at("2026-11-02T08:00:00Z"));
         assert_eq!(
-            (w.as_of, w.mature_days, w.final_),
-            (at("2026-10-27T12:00:00Z"), 19.5, true),
+            (w.as_of, w.mature_days, w.phase),
+            (
+                at("2026-10-27T12:00:00Z"),
+                19.5,
+                Phase::Stopped { final_: true }
+            ),
             "the snapshot stops at stop + 7 days and no subject after the stop matures"
         );
     }
@@ -739,11 +777,18 @@ mod tests {
     fn final_flips_exactly_at_stop_plus_seven_days() {
         let start = at("2026-10-01T00:00:00Z");
         let stop = at("2026-10-20T00:00:00Z");
-        assert!(!window(start, Some(stop), at("2026-10-26T23:59:59Z")).final_);
+        assert_eq!(
+            window(start, Some(stop), at("2026-10-26T23:59:59Z")).phase,
+            Phase::Stopped { final_: false }
+        );
         let w = window(start, Some(stop), at("2026-10-27T00:00:00Z"));
         assert_eq!(
-            (w.as_of, w.mature_days, w.final_),
-            (at("2026-10-27T00:00:00Z"), 19.0, true)
+            (w.as_of, w.mature_days, w.phase),
+            (
+                at("2026-10-27T00:00:00Z"),
+                19.0,
+                Phase::Stopped { final_: true }
+            )
         );
     }
 

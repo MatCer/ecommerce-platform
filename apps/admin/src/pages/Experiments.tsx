@@ -24,8 +24,8 @@ import { errorMessage, formatDateTime, locale, t } from "../i18n/index.ts";
 import { formatNumber, formatPercent } from "../lib/analytics.ts";
 import { ApiError, api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import {
-  chance,
   changeMessage,
+  flooredChance,
   HERO_FIELDS,
   type HeroFields,
   heroCopy,
@@ -637,7 +637,7 @@ function ReadoutCard(props: { detail: Detail }) {
                               {rate(a().conversion_rate)}
                             </td>
                             <td class={`${tdClass} figures text-right`}>
-                              {chance(a().p_best, locale())}
+                              {flooredChance(a().p_best, locale())}
                             </td>
                             <td class={`${tdClass} figures text-right whitespace-nowrap`}>
                               {t("experiments.readout.points", {

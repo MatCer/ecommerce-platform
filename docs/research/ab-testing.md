@@ -342,7 +342,7 @@ window does not matter. The peek at day D sees:
 
 - assignments through day min(D, stop);
 - mature cohorts through day min(D - 7, stop), which is also `mature_days`;
-- `running_days` = D while the experiment runs;
+- `Phase::Running { days: D }` while the experiment runs;
 - the final readout at D = stop + 7;
 - an untrusted split after an SRM stop.
 
@@ -452,7 +452,7 @@ because the platform has not launched.
 - A subject is mature once assigned at least 7 days before `as_of`. Subjects assigned after the
   stop never count.
 - `mature_days` runs from the start to min(`as_of` - 7 days, stop).
-- `running_days` is real time since the start and drives the 56-day limit.
+- `Phase::Running` carries `days`, real time since the start, which drives the 56-day limit.
 - `final` holds from the first midnight at or after stop + 7 days.
 - `decides_from` is the first midnight at or after start + 21 days, which is 14 mature days plus
   the 7-day window.
