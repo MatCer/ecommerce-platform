@@ -5,7 +5,7 @@ use chrono::{Days, NaiveDate, Utc};
 use commerce::ai::settings::{self, AiSettingsChange};
 use commerce::ai::{Ai, Outcome};
 use commerce::insights::detect::{Detection, Pair, Transition, Vital};
-use commerce::insights::{self, Insight, Measure, Status, ThemeChange, Window};
+use commerce::insights::{self, Insight, Measure, Reopened, Status, ThemeChange, Window};
 use commerce::themes::{self, RevisionSummary};
 use platform::ai::{Client, Fake};
 use platform::db::tenant_tx;
@@ -471,6 +471,74 @@ async fn dismissed_stays_dismissed_and_gone_signals_resolve_and_reopen(db: PgPoo
             ("slow_page".into(), "dismissed".into()),
         ]
     );
+}
+
+async fn reopens(runtime: &PgPool, shop: &Shop, id: Uuid) -> Vec<String> {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    sqlx::query_scalar(
+        "SELECT actor FROM audit_log WHERE action = 'insight.reopened' AND entity_id = $1",
+    )
+    .bind(id.to_string())
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap()
+}
+
+async fn dismiss(runtime: &PgPool, shop: &Shop, id: Uuid) -> Insight {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    let dismissed = insights::dismiss(&mut tx, "clerk", id, Utc::now().date_naive())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    dismissed
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_dismissed_signal_reopens_at_one_and_a_half_times_its_dismissal_score(db: PgPool) {
+    let (runtime, shop) = setup(&db, "reopen").await;
+    let d = |n: u64| yesterday() - Days::new(6) + Days::new(n);
+    let requests = async |n: u64, requests: i64| {
+        vitals(&runtime, &shop, d(n), ("home", "LCP", 5000.0, 60, requests)).await;
+        run(&runtime, &Ai::fake(), &shop, d(n)).await;
+    };
+    let listed = async || -> Vec<(Uuid, f64, Option<Reopened>)> {
+        list(&runtime, shop.tenant)
+            .await
+            .into_iter()
+            .map(|i| (i.id, i.score, i.reopened))
+            .collect()
+    };
+
+    requests(0, 2000).await;
+    let id = list(&runtime, shop.tenant).await[0].id;
+    dismiss(&runtime, &shop, id).await;
+    requests(1, 999).await;
+    assert_eq!(listed().await, vec![], "74.975 is below 1.5 times 50");
+
+    requests(2, 1).await;
+    let first = Some(Reopened {
+        on: d(2),
+        dismissed_score: 50.0,
+    });
+    assert_eq!(listed().await, vec![(id, 75.0, first)]);
+    assert_eq!(reopens(&runtime, &shop, id).await, vec!["system"]);
+
+    run(&runtime, &Ai::fake(), &shop, d(2)).await;
+    requests(3, 1000).await;
+    assert_eq!(listed().await, vec![(id, 100.0, first)]);
+    assert_eq!(reopens(&runtime, &shop, id).await, vec!["system"]);
+
+    let again = dismiss(&runtime, &shop, id).await;
+    assert_eq!((again.status, again.reopened), (Status::Dismissed, None));
+    requests(4, 1999).await;
+    assert_eq!(listed().await, vec![], "149.975 is below 1.5 times 100");
+    requests(5, 1).await;
+    let second = Some(Reopened {
+        on: d(5),
+        dismissed_score: 100.0,
+    });
+    assert_eq!(listed().await, vec![(id, 150.0, second)]);
+    assert_eq!(reopens(&runtime, &shop, id).await, vec!["system", "system"]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
