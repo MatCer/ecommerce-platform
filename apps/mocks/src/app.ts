@@ -85,10 +85,6 @@ app.get("/images/demo/:name", async (c) => {
   }
 });
 
-/**
- * Demo old shop (SHOP-43 store import): homepage, sitemaps and product pages whose absolute
- * URLs already point at `http://mocks:4010`. Fixed file names only.
- */
 const STORE_SITEMAPS = new Set(["sitemap.xml", "sitemap-products.xml", "sitemap-pages.xml"]);
 const STORE_PAGES = new Set([
   "tricko-basic",

@@ -1,5 +1,3 @@
-/** SHOP-43: import a merchant's current shop (the mocks fixture shop) as drafts and apply its brand. */
-
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { testContext } from "../rate-client";
 import { createTenant, expectAccessible, magicLink, run, sql, useEnglish } from "./support.ts";

@@ -423,7 +423,7 @@ pub async fn create(
     )
     .execute(&mut **tx)
     .await
-    .map_err(run_error)?;
+    .map_err(busy_or_db_error)?;
     let upload = if input.url.is_some() {
         queue::enqueue(&mut **tx, &job(tenant_id, id, "analyze")).await?;
         None
@@ -480,8 +480,7 @@ fn check_shop_url(fetch: &SafeClient, url: &str) -> Result<(), Error> {
     }
 }
 
-/// The one-store-import index as a conflict.
-fn run_error(e: sqlx::Error) -> Error {
+fn busy_or_db_error(e: sqlx::Error) -> Error {
     if e.as_database_error().and_then(|d| d.constraint()) == Some(ONE_STORE_IMPORT) {
         return Error::Conflict {
             code: "import_busy",
@@ -578,7 +577,7 @@ async fn set_status(
     )
     .execute(&mut **tx)
     .await
-    .map_err(run_error)?;
+    .map_err(busy_or_db_error)?;
     Ok(())
 }
 
@@ -1308,16 +1307,14 @@ fn options(
 }
 
 impl ApplyCtx<'_> {
-    /// Image assets for `urls` (`(url, item id for problems)`), downloaded once per URL and
-    /// tenant.
     async fn images(
         &self,
-        urls: &[(&str, &str)],
+        url_items: &[(&str, &str)],
         progress: &mut Progress,
         report: &mut ImportReport,
     ) -> Result<HashMap<String, Uuid>, Error> {
         let mut out = HashMap::new();
-        for &(url, item_id) in urls {
+        for &(url, item_id) in url_items {
             if out.contains_key(url) || out.len() >= MAX_IMAGES * 2 {
                 continue;
             }
@@ -1371,7 +1368,6 @@ impl ApplyCtx<'_> {
         Ok(out)
     }
 
-    /// The crawl as the run's snapshot, with its logo imported as an asset.
     async fn store_snapshot(&self, mut crawl: store::Crawl) -> Result<Vec<u8>, Error> {
         if let Some(logo) = crawl.site.logo_url.clone() {
             let mut report = ImportReport::default();

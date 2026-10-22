@@ -1,6 +1,3 @@
-//! Store imports (SHOP-43) end to end against Postgres (runtime role), in-memory storage and
-//! the fixture shop served on a local port.
-
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
@@ -37,15 +34,13 @@ fn fixture(name: &str) -> String {
     .unwrap()
 }
 
-/// Small enough that `media::process` re-encodes it quickly.
-fn jpeg() -> Vec<u8> {
+fn small_jpeg() -> Vec<u8> {
     let img = image::RgbImage::from_fn(32, 32, |x, y| image::Rgb([x as u8 * 8, y as u8 * 8, 90]));
     let mut buf = std::io::Cursor::new(Vec::new());
     img.write_to(&mut buf, image::ImageFormat::Jpeg).unwrap();
     buf.into_inner()
 }
 
-/// A PNG whose header declares 100 000 x 100 000 pixels.
 fn huge_png() -> Vec<u8> {
     let mut ihdr = b"IHDR".to_vec();
     ihdr.extend(100_000u32.to_be_bytes());
@@ -130,7 +125,7 @@ async fn serve(State(f): State<Fixture>, uri: Uri) -> Response {
             )
                 .into_response()
         }
-        p if p.starts_with("/images/demo/") => jpeg().into_response(),
+        p if p.starts_with("/images/demo/") => small_jpeg().into_response(),
         p if p.starts_with("/p") && page[1..].parse::<u32>().is_ok() => {
             html(product_page(&format!("SK-{page}"), "/images/demo/x.jpg"))
         }

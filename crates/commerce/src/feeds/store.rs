@@ -141,8 +141,6 @@ impl Crawl {
     }
 }
 
-/// Page URLs from `/sitemap.xml` (index aware), in sitemap order, deduped, same-site, at most
-/// [`MAX_PRODUCT_PAGES`]; `product_urls` counts every same-site loc read.
 async fn page_urls(fetch: &SafeClient, site: &Url, deadline: Instant, c: &mut Crawl) -> Vec<Url> {
     let mut queue: VecDeque<Url> = site.join("/sitemap.xml").into_iter().collect();
     let mut pages = Vec::new();
@@ -213,8 +211,6 @@ enum Sitemap {
     Urls(Vec<String>),
 }
 
-/// The `loc`s of `<sitemapindex><sitemap><loc>` or `<urlset><url><loc>` (namespace prefixes
-/// ignored, at most `MAX_LOCS`); other elements, `image:loc` included, never count.
 fn parse_sitemap(bytes: &[u8]) -> Result<Sitemap, String> {
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().expand_empty_elements = true;
@@ -288,7 +284,6 @@ fn parse_sitemap(bytes: &[u8]) -> Result<Sitemap, String> {
     }
 }
 
-/// Same scheme, same port, same host ignoring a leading `www.`.
 fn same_site(u: &Url, site: &Url) -> bool {
     let host = |u: &Url| {
         u.host_str()
@@ -300,19 +295,15 @@ fn same_site(u: &Url, site: &Url) -> bool {
         && host(u) == host(site)
 }
 
-/// What one tokenizer pass keeps of a page. No DOM is built.
 #[derive(Debug, Default)]
 struct Scan {
     json_ld: Vec<String>,
     title: Option<String>,
     og_site_name: Option<String>,
-    /// `a[href]` and `link[href]` as written.
     hrefs: Vec<String>,
-    /// `img[src]` whose src, class, id or alt mentions "logo", in order.
     logo_srcs: Vec<String>,
 }
 
-/// html5ever's spec tokenizer: entities decoded, script and style contents read as raw text.
 fn scan_html(bytes: &[u8]) -> Scan {
     let text = String::from_utf8_lossy(bytes);
     let tokenizer = Tokenizer::new(Sink::default(), TokenizerOpts::default());
@@ -422,9 +413,6 @@ impl TokenSink for Sink {
     }
 }
 
-/// The page's product: the first `Product` node of a JSON-LD block, its top-level array or its
-/// `@graph`, but not deeper (a category's `ItemList` of products is not the page's). `Err`: a
-/// block is not valid JSON and no other block had a product.
 fn product_from_page(html: &[u8], page: &Url) -> Result<Option<FeedItem>, String> {
     let scan = scan_html(html);
     let mut bad = None;
@@ -434,7 +422,7 @@ fn product_from_page(html: &[u8], page: &Url) -> Result<Option<FeedItem>, String
                 bad.get_or_insert(e.to_string());
             }
             Ok(v) => {
-                if let Some(p) = nodes(&v).find(|n| has_type(n, &["Product"])) {
+                if let Some(p) = top_level_nodes(&v).find(|n| has_type(n, &["Product"])) {
                     return Ok(Some(product_item(p, page)));
                 }
             }
@@ -443,8 +431,7 @@ fn product_from_page(html: &[u8], page: &Url) -> Result<Option<FeedItem>, String
     bad.map_or(Ok(None), Err)
 }
 
-/// `v` (or the members of a top-level array) and the members of their `@graph`.
-fn nodes(v: &Value) -> impl Iterator<Item = &Value> {
+fn top_level_nodes(v: &Value) -> impl Iterator<Item = &Value> {
     let top: Vec<&Value> = match v {
         Value::Array(a) => a.iter().collect(),
         v => vec![v],
@@ -459,7 +446,6 @@ fn nodes(v: &Value) -> impl Iterator<Item = &Value> {
     })
 }
 
-/// `@type` names one of `types` (or is an array containing one), schema.org prefixes ignored.
 fn has_type(n: &Value, types: &[&str]) -> bool {
     let is = |t: &Value| {
         t.as_str().is_some_and(|t| {
@@ -491,7 +477,7 @@ fn product_item(p: &Value, page: &Url) -> FeedItem {
     FeedItem {
         item_id: sku
             .or_else(|| gtin.clone())
-            .unwrap_or_else(|| page_id(page)),
+            .unwrap_or_else(|| fallback_sku(page)),
         name: text(&p["name"]).map(|n| clean_name(&n)).unwrap_or_default(),
         description: text(&p["description"]).unwrap_or_default(),
         url: Some(page.to_string()),
@@ -504,8 +490,6 @@ fn product_item(p: &Value, page: &Url) -> FeedItem {
     }
 }
 
-/// The offer's `price` as given: a string or number with `.` as the decimal separator and at
-/// most 2 decimals. A range without `price` is no price.
 fn price_of(offer: &Value) -> (Option<i64>, Option<String>) {
     let raw = match &offer["price"] {
         Value::String(s) => Some(s.trim().to_owned()),
@@ -530,8 +514,6 @@ fn strict_price(s: &str) -> Option<i64> {
         .checked_add(cents)
 }
 
-/// `image`: a URL, an `ImageObject`, or an array of either; resolved against the page, http(s)
-/// only, deduped, at most `MAX_IMAGES`, main first.
 fn images(v: &Value, page: &Url) -> Vec<String> {
     let all: Vec<&Value> = match v {
         Value::Array(a) => a.iter().collect(),
@@ -560,15 +542,13 @@ fn resolve(base: &Url, raw: &str) -> Option<Url> {
         .filter(|u| matches!(u.scheme(), "http" | "https"))
 }
 
-/// A readable SKU for a product page without `sku` or GTIN, stable across re-crawls.
-fn page_id(page: &Url) -> String {
+fn fallback_sku(page: &Url) -> String {
     slugify(
         &page.path().replace(|c: char| !c.is_alphanumeric(), " "),
         64,
     )
 }
 
-/// A JSON-LD text value: a string, a number, or the first string of an array; trimmed.
 fn text(v: &Value) -> Option<String> {
     let s = match v {
         Value::String(s) => s.clone(),
@@ -580,7 +560,6 @@ fn text(v: &Value) -> Option<String> {
     (!s.is_empty()).then(|| s.to_owned())
 }
 
-/// Plain text: control characters dropped, whitespace collapsed, at most 200 characters.
 fn clean_name(raw: &str) -> String {
     raw.split_whitespace()
         .map(|w| w.chars().filter(|c| !c.is_control()).collect::<String>())
@@ -594,15 +573,16 @@ fn clean_name(raw: &str) -> String {
 
 const ORG_TYPES: &[&str] = &["Organization", "Store", "OnlineStore", "LocalBusiness"];
 
-/// The shop's name (Organization > `og:site_name` > `<title>`) and logo (Organization `logo` >
-/// the first image that says "logo").
 fn shop_brand(scan: &Scan, home: &Url) -> (Option<String>, Option<Url>) {
     let orgs: Vec<Value> = scan
         .json_ld
         .iter()
         .filter_map(|b| serde_json::from_str::<Value>(b.trim()).ok())
         .collect();
-    let org = orgs.iter().flat_map(nodes).find(|n| has_type(n, ORG_TYPES));
+    let org = orgs
+        .iter()
+        .flat_map(top_level_nodes)
+        .find(|n| has_type(n, ORG_TYPES));
     let name = org
         .and_then(|o| text(&o["name"]))
         .into_iter()
@@ -616,9 +596,6 @@ fn shop_brand(scan: &Scan, home: &Url) -> (Option<String>, Option<Url>) {
     (name, logo)
 }
 
-/// A same-site link that names a comparison feed (`heureka`, `zbozi` -> Heureka; `google`,
-/// `merchant` -> Google) and looks like a file (`.xml`, `feed`, `export`). No fetch: the feed
-/// importer's own analysis is the check.
 fn feed_hint(scan: &Scan, home: &Url) -> Option<FeedHint> {
     scan.hrefs.iter().find_map(|h| {
         let u = resolve(home, h).filter(|u| same_site(u, home))?;

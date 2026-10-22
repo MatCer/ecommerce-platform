@@ -1,6 +1,3 @@
--- SHOP-43: imports from the merchant's current shop reuse the feed import runs and mappings
--- with source 'store'. A store import only creates drafts, and a tenant runs one at a time.
-
 ALTER TABLE import_runs
     DROP CONSTRAINT import_runs_source_check,
     ADD CONSTRAINT import_runs_source_check CHECK (source IN ('heureka', 'google', 'store')),
