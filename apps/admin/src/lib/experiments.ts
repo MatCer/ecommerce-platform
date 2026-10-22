@@ -1,3 +1,4 @@
+import type { Tone } from "@platform/ui";
 import type { en } from "../i18n/en.ts";
 import { formatNumber, formatPercent } from "./analytics.ts";
 import type { Schemas } from "./api.ts";
@@ -14,6 +15,12 @@ export interface Message {
     | "experiments.form.heroMissing";
   params: Record<string, string>;
 }
+
+export const STATUS_TONE: Record<Schemas["ExperimentStatus"], Tone> = {
+  draft: "neutral",
+  running: "info",
+  stopped: "neutral",
+};
 
 type Readout = Schemas["Readout"];
 type Pending = Readout & { decides_from: string };

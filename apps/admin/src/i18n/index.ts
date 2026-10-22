@@ -1,6 +1,7 @@
 import * as i18n from "@solid-primitives/i18n";
 import { createEffect, createMemo, createRoot, createSignal } from "solid-js";
 import { ApiError } from "../lib/authed-fetch.ts";
+import type { Message } from "../lib/experiments.ts";
 import { DraftError } from "../lib/product-form.ts";
 import { SignedOutError } from "../lib/session.ts";
 import { cs } from "./cs.ts";
@@ -48,6 +49,8 @@ export const t = i18n.translator(flat, i18n.resolveTemplate);
 export function contentLocales(): string[] {
   return [locale(), ...LOCALES.filter((l) => l !== locale())];
 }
+
+export const say = (m: Message) => t(m.key, m.params);
 
 /** A user-facing message for any error thrown by the API layer. */
 export function errorMessage(err: unknown): string {

@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use chrono::{Days, Utc};
 use commerce::ai::Ai;
+use commerce::experiments::{self, Change};
 use commerce::insights::{self, Measure, ThemeChange, Window};
 use commerce::themes::ai_edit::{self, Limits, NewRun};
 use commerce::themes::archive::{self, Source};
@@ -1120,6 +1121,135 @@ async fn a_run_started_from_an_insight_links_the_revision_it_publishes(db: PgPoo
             },
         })
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn promoting_an_insights_experiment_records_its_change_as_a_publish_does(db: PgPool) {
+    let (runtime, storage, shop) = setup(&db).await;
+    let ai = Ai::fake();
+    let builder = spawn_builder(
+        runtime.clone(),
+        storage.clone(),
+        shop.tenant,
+        Arc::new(|_, _| true),
+    );
+    let from = insight(&runtime, shop.tenant).await;
+    let run = start_from(
+        &runtime,
+        &ai,
+        shop.tenant,
+        "Make the product page faster",
+        Some(from),
+    )
+    .await
+    .unwrap();
+    ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, fast())
+        .await
+        .unwrap();
+    builder.abort();
+    let rev = detail(&runtime, shop.tenant, run.id)
+        .await
+        .run
+        .revision_id
+        .unwrap();
+    crate::experiments::published_cookie_page(&runtime, shop.tenant).await;
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    ai_edit::accept(&mut tx, "owner", run.id).await.unwrap();
+    let e = insights::revision_experiment(&mut tx, "owner", from, rev)
+        .await
+        .unwrap();
+    experiments::start(&mut tx, "owner", e.id).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let today = Utc::now().date_naive();
+    assert_eq!(
+        insights::list(&mut tx, today).await.unwrap()[0].theme_change,
+        None
+    );
+    let promoted = experiments::promote(&mut tx, "owner", e.id).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let change = insights::list(&mut tx, today).await.unwrap()[0]
+        .theme_change
+        .clone()
+        .unwrap();
+    assert_eq!(change.revision_id, rev);
+    assert_eq!(Some(change.published_at), promoted.promoted_at);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_accepted_insight_revision_is_tested_once_as_a_draft_theme_experiment(db: PgPool) {
+    let (runtime, storage, shop) = setup(&db).await;
+    let ai = Ai::fake();
+    let builder = spawn_builder(
+        runtime.clone(),
+        storage.clone(),
+        shop.tenant,
+        Arc::new(|_, _| true),
+    );
+    let from = insight(&runtime, shop.tenant).await;
+    let run = start_from(
+        &runtime,
+        &ai,
+        shop.tenant,
+        "Make the product page faster",
+        Some(from),
+    )
+    .await
+    .unwrap();
+    ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, fast())
+        .await
+        .unwrap();
+    builder.abort();
+    let summary = detail(&runtime, shop.tenant, run.id).await.run;
+    assert_eq!(summary.insight_id, Some(from));
+    let (rev, number) = (
+        summary.revision_id.unwrap(),
+        summary.revision_number.unwrap(),
+    );
+    let test = async |insight, revision| {
+        let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+        let e = insights::revision_experiment(&mut tx, "owner", insight, revision).await;
+        tx.commit().await.unwrap();
+        e
+    };
+
+    let err = test(from, rev).await.unwrap_err();
+    assert_eq!(err.code(), "ai_run_not_accepted");
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    ai_edit::accept(&mut tx, "owner", run.id).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let e = test(from, rev).await.unwrap();
+    assert_eq!(
+        (e.status, e.name.as_str(), &e.change),
+        (
+            experiments::Status::Draft,
+            format!("insight-slow-page-r{number}").as_str(),
+            &Change::Theme {
+                revision_id: rev,
+                revision_number: number
+            }
+        )
+    );
+    assert_eq!(test(from, rev).await.unwrap().id, e.id);
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    assert_eq!(experiments::list(&mut tx).await.unwrap().len(), 1);
+    assert_eq!(
+        insights::list(&mut tx, Utc::now().date_naive())
+            .await
+            .unwrap()[0]
+            .experiment_id,
+        Some(e.id)
+    );
+    drop(tx);
+
+    for (insight, revision) in [(from, run.base_revision_id), (from, Uuid::now_v7())] {
+        let err = test(insight, revision).await.unwrap_err();
+        assert!(matches!(err, Error::NotFound), "{revision}: {err:?}");
+    }
 }
 
 #[sqlx::test(migrations = "../../migrations")]

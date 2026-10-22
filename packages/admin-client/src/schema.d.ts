@@ -1497,6 +1497,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/insights/{id}/experiments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepares a draft experiment testing the insight's accepted AI theme revision against the
+         *     active theme, or returns the experiment that already tests it (owner/admin). Start it
+         *     through the experiments API.
+         */
+        post: operations["test_insight_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/inventory": {
         parameters: {
             query?: never;
@@ -5214,6 +5235,11 @@ export interface components {
             finished_at?: string | null;
             /** Format: uuid */
             id: string;
+            /**
+             * Format: uuid
+             * @description The insight whose draft the run started from.
+             */
+            insight_id?: string | null;
             model?: string | null;
             prompt: string;
             /**
@@ -7219,6 +7245,12 @@ export interface components {
         /** @description A ranked signal as staff see it. */
         Insight: {
             detection: components["schemas"]["Detection"];
+            /**
+             * Format: uuid
+             * @description The newest experiment testing the final revision of an AI theme edit started from this
+             *     insight's draft (`null` when none, and for staff: experiments are owner/admin).
+             */
+            experiment_id?: string | null;
             /** Format: date */
             first_detected_on: string;
             hypothesis?: components["schemas"]["Hypothesis"] | null;
@@ -7238,16 +7270,16 @@ export interface components {
              */
             score: number;
             /**
-             * @description `resolved` once the detector stopped firing; such insights are listed only with a
-             *     `theme_change`.
+             * @description `resolved` once the detector stopped firing; such insights are listed only while a theme
+             *     change published from their draft or an experiment testing it exists.
              */
             status: components["schemas"]["InsightStatus"];
             theme_change?: components["schemas"]["InsightThemeChange"] | null;
         };
         InsightList: {
             /**
-             * @description Open signals, and resolved ones a published theme change came from; most affected
-             *     visits first (at most 50).
+             * @description Open signals, and resolved ones a published theme change came from or an experiment
+             *     tests; most affected visits first (at most 50).
              */
             items: components["schemas"]["Insight"][];
         };
@@ -7266,6 +7298,13 @@ export interface components {
              *     without results. `null` without data.
              */
             value?: number | null;
+        };
+        InsightNewExperiment: {
+            /**
+             * Format: uuid
+             * @description The final revision of an accepted AI theme edit started from the insight's draft.
+             */
+            revision_id: string;
         };
         InsightReopened: {
             /**
@@ -14094,6 +14133,69 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    test_insight_revision: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The tenant to act in; the caller must be a member. */
+                "X-Tenant-Id": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsightNewExperiment"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Experiment"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description unknown insight, or not the final revision of an AI theme edit started from it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description ai_run_not_accepted */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description invalid_body, theme_revision_not_ready */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

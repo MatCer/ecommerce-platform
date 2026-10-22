@@ -997,6 +997,11 @@ async fn signal(runtime: &PgPool, shop: &Shop, d: &Detection, status: &str) -> U
 }
 
 async fn publish_from(runtime: &PgPool, shop: &Shop, insight: Option<Uuid>) -> RevisionSummary {
+    let rev = accepted_from(runtime, shop, insight).await;
+    republish(runtime, shop, rev).await
+}
+
+async fn accepted_from(runtime: &PgPool, shop: &Shop, insight: Option<Uuid>) -> Uuid {
     let artifact = "a0000000000000000000000000000001";
     let (run, rev) = (Uuid::now_v7(), Uuid::now_v7());
     let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
@@ -1050,7 +1055,7 @@ async fn publish_from(runtime: &PgPool, shop: &Shop, insight: Option<Uuid>) -> R
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    republish(runtime, shop, rev).await
+    rev
 }
 
 async fn republish(runtime: &PgPool, shop: &Shop, rev: Uuid) -> RevisionSummary {
@@ -1413,6 +1418,31 @@ async fn a_resolved_insight_stays_listed_while_a_change_from_it_is_published(db:
             (linked, Status::Resolved, true)
         ]
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_resolved_insight_stays_listed_while_an_experiment_tests_it(db: PgPool) {
+    let (runtime, shop) = setup(&db, "tested").await;
+    let tested = signal(
+        &runtime,
+        &shop,
+        &funnel_drop(Transition::ViewItemToAddToCart),
+        "resolved",
+    )
+    .await;
+    let rev = accepted_from(&runtime, &shop, Some(tested)).await;
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let e = insights::revision_experiment(&mut tx, "owner", tested, rev)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let listed: Vec<(Uuid, Status, Option<Uuid>)> = list(&runtime, shop.tenant)
+        .await
+        .into_iter()
+        .map(|i| (i.id, i.status, i.experiment_id))
+        .collect();
+    assert_eq!(listed, vec![(tested, Status::Resolved, Some(e.id))]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

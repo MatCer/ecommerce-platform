@@ -883,6 +883,7 @@ export const sk: Dictionary = {
       accepted:
         "Prijaté. Revíziu #{{ number }} teraz môžete v zozname vyššie zobraziť a publikovať.",
       showRevision: "Zobraziť revíziu #{{ number }}",
+      testIt: "Otestovať",
       discarded: "Zahodené. Jej revízie nemožno publikovať.",
       showChanges: "Zobraziť zmeny oproti predchádzajúcej revízii",
       usage: "{{ tokens }} tokenov",
@@ -2453,6 +2454,10 @@ export const sk: Dictionary = {
     dismiss: "Skryť",
     dismissed: "Postreh skrytý",
     openInEditor: "Otvoriť v AI úpravách vzhľadu",
+    experiment: {
+      title: "Najnovší experiment",
+      open: "Otvoriť experiment",
+    },
     change: {
       title: "Pred zmenou vzhľadu a po nej",
       published: "Revízia vzhľadu #{{number}} zverejnená {{date}}",

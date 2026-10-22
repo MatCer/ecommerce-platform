@@ -41,7 +41,7 @@ async fn draft_with(runtime: &PgPool, tenant: Uuid, arms: serde_json::Value) -> 
     id
 }
 
-async fn start(runtime: &PgPool, tenant: Uuid) -> Uuid {
+pub(crate) async fn start(runtime: &PgPool, tenant: Uuid) -> Uuid {
     start_with(runtime, tenant, two_empty_arms()).await
 }
 

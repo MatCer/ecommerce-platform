@@ -879,6 +879,7 @@ export const en = {
       accepted:
         "Accepted. Revision #{{ number }} can now be previewed and published in the list above.",
       showRevision: "Show revision #{{ number }}",
+      testIt: "Test it",
       discarded: "Discarded. Its revisions cannot be published.",
       showChanges: "Show changes against the previous revision",
       usage: "{{ tokens }} tokens",
@@ -2442,6 +2443,10 @@ export const en = {
     dismiss: "Dismiss",
     dismissed: "Insight dismissed",
     openInEditor: "Open in AI theme editor",
+    experiment: {
+      title: "Latest experiment",
+      open: "Open experiment",
+    },
     change: {
       title: "Before and after the theme change",
       published: "Theme revision #{{number}} published on {{date}}",

@@ -880,6 +880,7 @@ export const cs: Dictionary = {
       discard: "Zahodit",
       accepted: "Přijato. Revizi #{{ number }} teď můžete v seznamu výše zobrazit a publikovat.",
       showRevision: "Zobrazit revizi #{{ number }}",
+      testIt: "Otestovat",
       discarded: "Zahozeno. Její revize nelze publikovat.",
       showChanges: "Zobrazit změny oproti předchozí revizi",
       usage: "{{ tokens }} tokenů",
@@ -2450,6 +2451,10 @@ export const cs: Dictionary = {
     dismiss: "Skrýt",
     dismissed: "Postřeh skryt",
     openInEditor: "Otevřít v AI úpravách vzhledu",
+    experiment: {
+      title: "Nejnovější experiment",
+      open: "Otevřít experiment",
+    },
     change: {
       title: "Před změnou vzhledu a po ní",
       published: "Revize vzhledu #{{number}} zveřejněna {{date}}",

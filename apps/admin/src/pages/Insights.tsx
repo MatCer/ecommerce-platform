@@ -3,9 +3,10 @@ import { A, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { For, type JSX, Show } from "solid-js";
 import { PageHeader, QueryState } from "../components/Page.tsx";
-import { errorMessage, locale, t } from "../i18n/index.ts";
+import { errorMessage, locale, say, t } from "../i18n/index.ts";
 import { templateLabel } from "../lib/analytics.ts";
 import { api, type Schemas, tenantHeader, unwrap } from "../lib/api.ts";
+import { readoutMessage, STATUS_TONE, stopMessage } from "../lib/experiments.ts";
 import { detectionParams, measureText } from "../lib/insights.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
 
@@ -47,8 +48,53 @@ function Heading(props: { insight: Insight }) {
   return <>{content()}</>;
 }
 
+function InsightExperiment(props: { id: string; labelId: string }) {
+  const detail = createQuery(() => ({
+    queryKey: tenantKey("experiment", props.id),
+    queryFn: () =>
+      unwrap(
+        api.GET("/admin/v1/experiments/{id}", {
+          params: { header: tenantHeader(), path: { id: props.id } },
+        }),
+      ),
+  }));
+  return (
+    <section
+      aria-labelledby={props.labelId}
+      class="flex flex-col gap-2 rounded-md border border-border bg-subtle p-3"
+    >
+      <div class="flex flex-wrap items-center gap-2">
+        <h3 id={props.labelId} class="text-sm font-semibold text-heading">
+          {t("insights.experiment.title")}
+        </h3>
+        <Show when={detail.data?.experiment.status}>
+          {(status) => (
+            <Badge tone={STATUS_TONE[status()]}>{t(`experiments.status.${status()}`)}</Badge>
+          )}
+        </Show>
+      </div>
+      <Show when={detail.data} fallback={<QueryState query={detail}>{() => null}</QueryState>}>
+        {(d) => (
+          <>
+            <p aria-live="polite" class="text-sm text-foreground">
+              {say(readoutMessage(d(), locale()))}
+            </p>
+            <Show when={stopMessage(d().experiment, locale())}>
+              {(m) => <p class="text-xs text-muted-foreground">{say(m())}</p>}
+            </Show>
+            <A href={`/experiments/${props.id}`} class={`${linkClass} w-fit text-sm`}>
+              {t("insights.experiment.open")}
+            </A>
+          </>
+        )}
+      </Show>
+    </section>
+  );
+}
+
 function InsightCard(props: {
   insight: Insight;
+  admin: boolean;
   dismissing: boolean;
   onDismiss: () => void;
   onOpenEditor?: (prompt: string, insightId: string) => void;
@@ -138,6 +184,9 @@ function InsightCard(props: {
               </p>
             </section>
           )}
+        </Show>
+        <Show when={props.admin && props.insight.experiment_id}>
+          {(id) => <InsightExperiment id={id()} labelId={`${headingId()}-experiment`} />}
         </Show>
         <Show when={props.insight.theme_change}>
           {(c) => (
@@ -235,6 +284,7 @@ export default function Insights() {
                   <li>
                     <InsightCard
                       insight={insight}
+                      admin={can("admin")}
                       dismissing={dismiss.isPending && dismiss.variables === insight.id}
                       onDismiss={() => dismiss.mutate(insight.id)}
                       onOpenEditor={can("admin") ? openEditor : undefined}

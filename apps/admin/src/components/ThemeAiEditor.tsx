@@ -15,7 +15,7 @@ import {
   Spinner,
   TextField,
 } from "@platform/ui";
-import { A } from "@solidjs/router";
+import { A, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 import { errorMessage, formatDateTime, t } from "../i18n/index.ts";
@@ -95,6 +95,7 @@ export function ThemeAiEditor(props: {
   onStarted: () => void;
 }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const initialPrompt = props.initialPrompt ?? "";
   const [prompt, setPrompt] = createSignal(initialPrompt);
   const [insightId, setInsightId] = createSignal(props.insightId);
@@ -167,6 +168,24 @@ export function ThemeAiEditor(props: {
     },
     onMutate: () => setError(undefined),
     onSuccess: refresh,
+    onError: (e: unknown) => setError(e),
+  }));
+  const test = createMutation(() => ({
+    mutationFn: (v: { insight: string; revision: string }) =>
+      unwrap(
+        api.POST("/admin/v1/insights/{id}/experiments", {
+          params: { header: tenantHeader(), path: { id: v.insight } },
+          body: { revision_id: v.revision },
+        }),
+      ),
+    onMutate: () => setError(undefined),
+    onSuccess: async (e: Schemas["Experiment"]) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: tenantKey("insights") }),
+        qc.invalidateQueries({ queryKey: tenantKey("experiments") }),
+      ]);
+      navigate(`/experiments/${e.id}`);
+    },
     onError: (e: unknown) => setError(e),
   }));
   const quotaExceeded = () => {
@@ -292,6 +311,8 @@ export function ThemeAiEditor(props: {
                 pending={act.isPending}
                 onAction={(action) => act.mutate({ id: d.run.id, action })}
                 onShowRevision={props.onShowRevision}
+                testing={test.isPending}
+                onTest={(insight, revision) => test.mutate({ insight, revision })}
               />
             )}
           </QueryState>
@@ -307,6 +328,8 @@ function RunView(props: {
   pending: boolean;
   onAction: (a: "cancel" | "accept" | "discard") => void;
   onShowRevision: (id: string) => void;
+  testing: boolean;
+  onTest: (insightId: string, revisionId: string) => void;
 }) {
   const run = () => props.detail.run;
   const report = createMemo(() => parseReport(props.detail.report ?? {}));
@@ -411,9 +434,18 @@ function RunView(props: {
             live
             tone="success"
             actions={
-              <Button onClick={() => props.onShowRevision(id())}>
-                {t("themes.ai.showRevision", { number: run().revision_number ?? 0 })}
-              </Button>
+              <>
+                <Button onClick={() => props.onShowRevision(id())}>
+                  {t("themes.ai.showRevision", { number: run().revision_number ?? 0 })}
+                </Button>
+                <Show when={props.canEdit && run().insight_id}>
+                  {(insight) => (
+                    <Button loading={props.testing} onClick={() => props.onTest(insight(), id())}>
+                      {t("themes.ai.testIt")}
+                    </Button>
+                  )}
+                </Show>
+              </>
             }
           >
             {t("themes.ai.accepted", { number: run().revision_number ?? 0 })}

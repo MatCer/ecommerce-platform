@@ -368,7 +368,7 @@ impl TryFrom<Row> for Experiment {
     }
 }
 
-async fn fetch(tx: &mut TenantTx, id: Uuid) -> Result<Experiment, Error> {
+pub(crate) async fn fetch(tx: &mut TenantTx, id: Uuid) -> Result<Experiment, Error> {
     sqlx::query_as!(
         Row,
         r#"SELECT e.id, e.name, e.version, e.arms, e.status, e.stop_reason, e.promoted_at,
