@@ -28600,7 +28600,7 @@
         ],
         "properties": {
           "change": {
-            "$ref": "#/components/schemas/Change"
+            "$ref": "#/components/schemas/ExperimentChange"
           },
           "created_at": {
             "type": "string",
@@ -28629,7 +28629,7 @@
             "format": "date-time"
           },
           "status": {
-            "$ref": "#/components/schemas/Status"
+            "$ref": "#/components/schemas/ExperimentStatus"
           },
           "stop_reason": {
             "oneOf": [
@@ -28654,6 +28654,67 @@
             "format": "int32"
           }
         }
+      },
+      "ExperimentChange": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "hero",
+              "kind"
+            ],
+            "properties": {
+              "hero": {
+                "$ref": "#/components/schemas/HeroCopy"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "hero"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "revision_id",
+              "revision_number",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "theme"
+                ]
+              },
+              "revision_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "revision_number": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Theme code renders the arm (`experimentArm()`); it can be stopped, not promoted.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "component"
+                ]
+              }
+            }
+          }
+        ]
       },
       "ExperimentDetail": {
         "type": "object",
@@ -28724,6 +28785,14 @@
             "format": "int32"
           }
         }
+      },
+      "ExperimentStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "running",
+          "stopped"
+        ]
       },
       "Explained": {
         "type": "object",

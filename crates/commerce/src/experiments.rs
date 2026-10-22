@@ -235,6 +235,7 @@ pub struct Experiment {
 
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+#[schema(as = ExperimentChange)]
 pub enum Change {
     Hero {
         hero: HeroCopy,
@@ -249,6 +250,7 @@ pub enum Change {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = ExperimentStatus)]
 pub enum Status {
     Draft,
     Running,

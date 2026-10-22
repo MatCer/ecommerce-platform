@@ -159,6 +159,50 @@ async fn openapi_lists_health_routes() {
     assert!(spec["components"]["schemas"]["Problem"].is_object());
 }
 
+#[tokio::test]
+async fn openapi_names_experiment_status_and_change_apart_from_their_namesakes() {
+    let res = get(app(state(dead_db()), false), "/openapi.json").await;
+    let schemas = json(res).await["components"]["schemas"].take();
+    let experiment = &schemas["Experiment"]["properties"];
+    assert_eq!(
+        experiment["status"]["$ref"],
+        "#/components/schemas/ExperimentStatus"
+    );
+    assert_eq!(
+        schemas["ExperimentStatus"]["enum"],
+        serde_json::json!(["draft", "running", "stopped"])
+    );
+    assert_eq!(
+        experiment["change"]["$ref"],
+        "#/components/schemas/ExperimentChange"
+    );
+    let kinds: Vec<&Value> = schemas["ExperimentChange"]["oneOf"]
+        .as_array()
+        .expect("ExperimentChange is a oneOf")
+        .iter()
+        .map(|variant| &variant["properties"]["kind"]["enum"][0])
+        .collect();
+    assert_eq!(kinds, ["hero", "theme", "component"]);
+
+    let mut proposal_fields: Vec<&String> = schemas["Change"]["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .collect();
+    proposal_fields.sort();
+    assert_eq!(proposal_fields, ["after", "before", "field", "locale"]);
+    assert_eq!(
+        schemas["Status"]["enum"],
+        serde_json::json!([
+            "pending",
+            "subscribed",
+            "unsubscribed",
+            "bounced",
+            "complained"
+        ])
+    );
+}
+
 #[test]
 fn openapi_operation_ids_are_unique() {
     // Generated clients key operations by id: a duplicate silently retypes another endpoint

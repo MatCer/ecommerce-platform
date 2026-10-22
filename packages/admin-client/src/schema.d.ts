@@ -6707,7 +6707,7 @@ export interface components {
             email: string;
         };
         Experiment: {
-            change: components["schemas"]["Change"];
+            change: components["schemas"]["ExperimentChange"];
             /** Format: date-time */
             created_at: string;
             /** Format: uuid */
@@ -6720,12 +6720,27 @@ export interface components {
             promoted_at?: string | null;
             /** Format: date-time */
             started_at?: string | null;
-            status: components["schemas"]["Status"];
+            status: components["schemas"]["ExperimentStatus"];
             stop_reason?: components["schemas"]["StopReason"] | null;
             /** Format: date-time */
             stopped_at?: string | null;
             /** Format: int32 */
             version: number;
+        };
+        ExperimentChange: {
+            hero: components["schemas"]["HeroCopy"];
+            /** @enum {string} */
+            kind: "hero";
+        } | {
+            /** @enum {string} */
+            kind: "theme";
+            /** Format: uuid */
+            revision_id: string;
+            /** Format: int32 */
+            revision_number: number;
+        } | {
+            /** @enum {string} */
+            kind: "component";
         };
         /** @description An experiment and its readout; a draft has none. */
         ExperimentDetail: {
@@ -6745,6 +6760,8 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        /** @enum {string} */
+        ExperimentStatus: "draft" | "running" | "stopped";
         Explained: {
             /** @description The strategies tried, in order. */
             chain: components["schemas"]["Strategy"][];
