@@ -812,8 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn the_readout_matches_reference_values_at_shop_scale() {
-        // Exact rational sums with Python big integers; scipy quadrature agrees to 1e-13.
+    fn the_readout_matches_exact_rational_sums_at_shop_scale() {
         for (control, variant, p_variant, loss_control, loss_variant) in [
             (
                 arm(100, 10),
@@ -884,7 +883,7 @@ mod tests {
     }
 
     #[test]
-    fn the_readout_stays_finite_and_exact_at_100k_converters_on_5m_subjects() {
+    fn the_readout_stays_finite_and_matches_a_40_digit_sum_at_100k_converters_on_5m_subjects() {
         let a = arms(arm(5_000_000, 100_000), arm(5_000_000, 101_000));
         for v in [
             a.control.p_best,
@@ -894,7 +893,6 @@ mod tests {
         ] {
             assert!(v.is_finite() && v >= 0.0, "{a:?}");
         }
-        // A full-support sum at 40 digits (mpmath); scipy's quadrature is off by 1e-12 here.
         close(a.variant.p_best, 0.987_878_526_882_486_4, 1e-14);
         close(a.control.p_best + a.variant.p_best, 1.0, 1e-15);
     }
