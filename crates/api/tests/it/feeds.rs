@@ -218,3 +218,158 @@ async fn synonyms_are_saved_and_queued_for_the_indexes(db: PgPool) {
         .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+impl Ctx {
+    async fn as_user(&self, token: &str, call: Call<'_>) -> (StatusCode, Value) {
+        let (s, b, _) = call
+            .token(token)
+            .tenant(self.shop.tenant)
+            .send(&self.s)
+            .await;
+        (s, b)
+    }
+
+    async fn count(&self, sql: &'static str) -> i64 {
+        let mut tx = platform::db::tenant_tx(&self.runtime, self.shop.tenant)
+            .await
+            .unwrap();
+        sqlx::query_scalar(sql).fetch_one(&mut *tx).await.unwrap()
+    }
+
+    async fn sql(&self, sql: &'static str) {
+        let mut tx = platform::db::tenant_tx(&self.runtime, self.shop.tenant)
+            .await
+            .unwrap();
+        sqlx::query(sql).execute(&mut *tx).await.unwrap();
+        tx.commit().await.unwrap();
+    }
+}
+
+fn store(c: &Ctx, url: &str) -> Value {
+    json!({ "source": "store", "market_id": c.shop.cz, "url": url })
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn store_imports_are_owner_admin_only_https_and_audited(db: PgPool) {
+    let c = setup(db).await;
+    testkit::staff(&c.runtime, c.shop.tenant, "manager", "admin").await;
+    let manager = sign(&claims("manager"));
+    let shop = store(&c, "https://shop.example/");
+
+    let (status, _) = c
+        .as_user(&c.clerk, Call::post("/admin/v1/imports", shop.clone()))
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(c.count("SELECT count(*) FROM import_runs").await, 0);
+    assert_eq!(
+        c.count("SELECT count(*) FROM audit_log WHERE entity = 'import_run'")
+            .await,
+        0
+    );
+
+    let (status, created) = c
+        .as_user(&manager, Call::post("/admin/v1/imports", shop.clone()))
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    assert_eq!(created["run"]["source"], "store");
+    assert_eq!(created["run"]["status"], "analyzing");
+    let (status, busy) = c.admin(Call::post("/admin/v1/imports", shop.clone())).await;
+    assert_eq!(
+        (status, busy["code"].as_str()),
+        (StatusCode::CONFLICT, Some("import_busy"))
+    );
+    c.sql("UPDATE import_runs SET status = 'failed'").await;
+    let (status, _) = c.admin(Call::post("/admin/v1/imports", shop)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        c.count(
+            "SELECT count(*) FROM audit_log WHERE action = 'import.created'
+             AND entity = 'import_run' AND diff ->> 'source' = 'store'"
+        )
+        .await,
+        2
+    );
+
+    for (url, code) in [
+        ("http://shop.example/", "https_required"),
+        ("https://127.0.0.1/", "blocked_url"),
+        ("https://[::1]/", "blocked_url"),
+    ] {
+        let (status, body) = c
+            .admin(Call::post("/admin/v1/imports", store(&c, url)))
+            .await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::UNPROCESSABLE_ENTITY, Some(code)),
+            "{url}"
+        );
+    }
+    let mut drafts = store(&c, "https://shop.example/");
+    drafts["activate"] = json!(true);
+    let (status, body) = c.admin(Call::post("/admin/v1/imports", drafts)).await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("store_drafts_only"))
+    );
+    assert_eq!(c.count("SELECT count(*) FROM import_runs").await, 2);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn brand_needs_admin_and_a_suggestion(db: PgPool) {
+    let c = setup(db).await;
+    let (_, created) = c
+        .admin(Call::post(
+            "/admin/v1/imports",
+            store(&c, "https://shop.example/"),
+        ))
+        .await;
+    let id = created["run"]["id"].as_str().unwrap().to_owned();
+    let brand = format!("/admin/v1/imports/{id}/brand");
+
+    let (status, _) = c
+        .as_user(&c.clerk, Call::post(&brand, json!({ "name": true })))
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, body) = c.admin(Call::post(&brand, json!({}))).await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::UNPROCESSABLE_ENTITY, Some("nothing_to_apply"))
+    );
+    let (status, body) = c.admin(Call::post(&brand, json!({ "name": true }))).await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::CONFLICT, Some("no_brand_suggestion")),
+        "the analysis has not run yet"
+    );
+
+    let report = commerce::feeds::import::ImportReport {
+        site: Some(commerce::feeds::store::SiteReport {
+            name: Some("Nová Kočka".into()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut tx = platform::db::tenant_tx(&c.runtime, c.shop.tenant)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE import_runs SET status = 'analyzed', report = $1")
+        .bind(serde_json::to_value(&report).unwrap())
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let (status, body) = c.admin(Call::post(&brand, json!({ "logo": true }))).await;
+    assert_eq!(
+        (status, body["code"].as_str()),
+        (StatusCode::CONFLICT, Some("no_brand_suggestion")),
+        "no logo was found"
+    );
+    let (status, body) = c.admin(Call::post(&brand, json!({ "name": true }))).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, json!({ "name": "Nová Kočka", "logo_asset_id": null }));
+    assert_eq!(
+        c.count("SELECT count(*) FROM audit_log WHERE action = 'import.brand_applied'")
+            .await,
+        1
+    );
+}
