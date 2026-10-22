@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use chrono::{Days, Utc};
 use commerce::ai::Ai;
+use commerce::experiments::{self, NewChange, NewExperiment};
 use commerce::insights::{self, Measure, ThemeChange, Window};
 use commerce::themes::ai_edit::{self, Limits, NewRun};
 use commerce::themes::archive::{self, Source};
@@ -1120,6 +1121,69 @@ async fn a_run_started_from_an_insight_links_the_revision_it_publishes(db: PgPoo
             },
         })
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn promoting_an_insights_experiment_records_its_change_as_a_publish_does(db: PgPool) {
+    let (runtime, storage, shop) = setup(&db).await;
+    let ai = Ai::fake();
+    let builder = spawn_builder(
+        runtime.clone(),
+        storage.clone(),
+        shop.tenant,
+        Arc::new(|_, _| true),
+    );
+    let from = insight(&runtime, shop.tenant).await;
+    let run = start_from(
+        &runtime,
+        &ai,
+        shop.tenant,
+        "Make the product page faster",
+        Some(from),
+    )
+    .await
+    .unwrap();
+    ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, fast())
+        .await
+        .unwrap();
+    builder.abort();
+    let rev = detail(&runtime, shop.tenant, run.id)
+        .await
+        .run
+        .revision_id
+        .unwrap();
+    crate::experiments::published_cookie_page(&runtime, shop.tenant).await;
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    ai_edit::accept(&mut tx, "owner", run.id).await.unwrap();
+    let e = experiments::create(
+        &mut tx,
+        "owner",
+        &NewExperiment {
+            name: "faster-product-page".into(),
+            change: NewChange::Theme { revision_id: rev },
+        },
+    )
+    .await
+    .unwrap();
+    experiments::start(&mut tx, "owner", e.id).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let today = Utc::now().date_naive();
+    assert_eq!(
+        insights::list(&mut tx, today).await.unwrap()[0].theme_change,
+        None
+    );
+    let promoted = experiments::promote(&mut tx, "owner", e.id).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let change = insights::list(&mut tx, today).await.unwrap()[0]
+        .theme_change
+        .clone()
+        .unwrap();
+    assert_eq!(change.revision_id, rev);
+    assert_eq!(Some(change.published_at), promoted.promoted_at);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
