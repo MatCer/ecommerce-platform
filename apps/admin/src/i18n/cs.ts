@@ -2451,6 +2451,10 @@ export const cs: Dictionary = {
     dismiss: "Skrýt",
     dismissed: "Postřeh skryt",
     openInEditor: "Otevřít v AI úpravách vzhledu",
+    experiment: {
+      title: "Nejnovější experiment",
+      open: "Otevřít experiment",
+    },
     change: {
       title: "Před změnou vzhledu a po ní",
       published: "Revize vzhledu #{{number}} zveřejněna {{date}}",

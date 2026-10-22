@@ -14,13 +14,12 @@ import {
   SelectField,
   showToast,
   TextField,
-  type Tone,
 } from "@platform/ui";
 import { A, useNavigate, useParams } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createSignal, createUniqueId, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
-import { errorMessage, formatDateTime, locale, t } from "../i18n/index.ts";
+import { errorMessage, formatDateTime, locale, say, t } from "../i18n/index.ts";
 import { formatNumber, formatPercent } from "../lib/analytics.ts";
 import { ApiError, api, type Schemas, submission, tenantHeader, unwrap } from "../lib/api.ts";
 import {
@@ -29,9 +28,9 @@ import {
   HERO_FIELDS,
   type HeroFields,
   heroCopy,
-  type Message,
   points,
   readoutMessage,
+  STATUS_TONE,
   stopMessage,
 } from "../lib/experiments.ts";
 import { tenantKey, useMembership } from "../lib/me.ts";
@@ -41,13 +40,6 @@ type Experiment = Schemas["Experiment"];
 type Detail = Schemas["ExperimentDetail"];
 type Action = "start" | "stop" | "promote";
 
-const say = (m: Message) => t(m.key, m.params);
-
-const STATUS_TONE: Record<Schemas["ExperimentStatus"], Tone> = {
-  draft: "neutral",
-  running: "info",
-  stopped: "neutral",
-};
 const HERO_LABEL = {
   title: "experiments.form.heroTitle",
   subtitle: "experiments.form.heroSubtitle",
@@ -408,6 +400,7 @@ function ExperimentDetail(props: { id: string }) {
         qc.invalidateQueries({ queryKey: tenantKey("experiments") }),
         qc.invalidateQueries({ queryKey: key() }),
         a === "promote" && qc.invalidateQueries({ queryKey: tenantKey("theme-revisions") }),
+        a === "promote" && qc.invalidateQueries({ queryKey: tenantKey("insights") }),
       ]);
     },
   }));

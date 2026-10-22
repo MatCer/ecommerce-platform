@@ -2443,6 +2443,10 @@ export const en = {
     dismiss: "Dismiss",
     dismissed: "Insight dismissed",
     openInEditor: "Open in AI theme editor",
+    experiment: {
+      title: "Latest experiment",
+      open: "Open experiment",
+    },
     change: {
       title: "Before and after the theme change",
       published: "Theme revision #{{number}} published on {{date}}",
