@@ -30501,7 +30501,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/InsightStatus",
-            "description": "`resolved` once the detector stopped firing; such insights are listed only with a\n`theme_change` or an `experiment_id`."
+            "description": "`resolved` once the detector stopped firing; such insights are listed only while a theme\nchange published from their draft or an experiment testing it exists."
           },
           "theme_change": {
             "oneOf": [

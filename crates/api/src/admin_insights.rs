@@ -123,7 +123,7 @@ async fn test_insight_revision(
     let actor = &staff.user.user_id;
     Ok(Json(
         in_tx(&s, staff.tenant_id, async |tx| {
-            insights::test_revision(tx, actor, id, input.revision_id).await
+            insights::revision_experiment(tx, actor, id, input.revision_id).await
         })
         .await?,
     ))

@@ -1155,7 +1155,7 @@ async fn promoting_an_insights_experiment_records_its_change_as_a_publish_does(d
     crate::experiments::published_cookie_page(&runtime, shop.tenant).await;
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
     ai_edit::accept(&mut tx, "owner", run.id).await.unwrap();
-    let e = insights::test_revision(&mut tx, "owner", from, rev)
+    let e = insights::revision_experiment(&mut tx, "owner", from, rev)
         .await
         .unwrap();
     experiments::start(&mut tx, "owner", e.id).await.unwrap();
@@ -1211,7 +1211,7 @@ async fn an_accepted_insight_revision_is_tested_once_as_a_draft_theme_experiment
     );
     let test = async |insight, revision| {
         let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-        let e = insights::test_revision(&mut tx, "owner", insight, revision).await;
+        let e = insights::revision_experiment(&mut tx, "owner", insight, revision).await;
         tx.commit().await.unwrap();
         e
     };

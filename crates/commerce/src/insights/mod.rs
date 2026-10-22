@@ -44,8 +44,8 @@ pub fn job(tenant: Uuid, day: NaiveDate) -> NewJob<'static> {
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct Insight {
     pub id: Uuid,
-    /// `resolved` once the detector stopped firing; such insights are listed only with a
-    /// `theme_change` or an `experiment_id`.
+    /// `resolved` once the detector stopped firing; such insights are listed only while a theme
+    /// change published from their draft or an experiment testing it exists.
     pub status: Status,
     pub detection: Detection,
     /// Affected visits per week; the list is ordered by it.
@@ -268,10 +268,7 @@ pub async fn dismiss(
         .ok_or(Error::NotFound)
 }
 
-/// A draft experiment testing the accepted AI theme revision `revision_id`, the final revision
-/// of a run started from this insight's draft, against the active theme; or the newest
-/// experiment that already tests it.
-pub async fn test_revision(
+pub async fn revision_experiment(
     tx: &mut TenantTx,
     actor: &str,
     insight_id: Uuid,

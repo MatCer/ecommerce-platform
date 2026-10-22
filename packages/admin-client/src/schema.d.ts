@@ -7270,8 +7270,8 @@ export interface components {
              */
             score: number;
             /**
-             * @description `resolved` once the detector stopped firing; such insights are listed only with a
-             *     `theme_change` or an `experiment_id`.
+             * @description `resolved` once the detector stopped firing; such insights are listed only while a theme
+             *     change published from their draft or an experiment testing it exists.
              */
             status: components["schemas"]["InsightStatus"];
             theme_change?: components["schemas"]["InsightThemeChange"] | null;

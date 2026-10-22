@@ -1432,7 +1432,7 @@ async fn a_resolved_insight_stays_listed_while_an_experiment_tests_it(db: PgPool
     .await;
     let rev = accepted_from(&runtime, &shop, Some(tested)).await;
     let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
-    let e = insights::test_revision(&mut tx, "owner", tested, rev)
+    let e = insights::revision_experiment(&mut tx, "owner", tested, rev)
         .await
         .unwrap();
     tx.commit().await.unwrap();
