@@ -11,7 +11,7 @@ import {
   showToast,
   TextField,
 } from "@platform/ui";
-import { useLocation } from "@solidjs/router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import { createMutation, createQuery, useQueryClient } from "@tanstack/solid-query";
 import { createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { PageHeader, QueryState, Th, tableClass, tdClass } from "../components/Page.tsx";
@@ -47,14 +47,22 @@ function reasons(e: unknown): string {
  * (A21), publish and rollback, reset to the default theme, archive upload/download for power
  * users, the design-token editor (a token-only revision, fast-path gates) and AI edits (WP24).
  */
-function aiPromptFromHistory(state: Partial<{ aiPrompt: unknown }> | null): string | undefined {
-  return typeof state?.aiPrompt === "string" ? state.aiPrompt : undefined;
+function aiDraftFromHistory(state: Partial<{ aiPrompt: unknown; insightId: unknown }> | null): {
+  prompt?: string;
+  insightId?: string;
+} {
+  return {
+    prompt: typeof state?.aiPrompt === "string" ? state.aiPrompt : undefined,
+    insightId: typeof state?.insightId === "string" ? state.insightId : undefined,
+  };
 }
 
 export default function Themes() {
   const qc = useQueryClient();
   const { can } = useMembership();
-  const location = useLocation<{ aiPrompt: unknown }>();
+  const location = useLocation<{ aiPrompt: unknown; insightId: unknown }>();
+  const navigate = useNavigate();
+  const aiDraft = () => aiDraftFromHistory(location.state);
   const [selected, setSelected] = createSignal<string>();
   const [error, setError] = createSignal<string>();
   const [publishing, setPublishing] = createSignal<Revision>();
@@ -375,7 +383,9 @@ export default function Themes() {
       <Show when={list.data?.items.length}>
         <ThemeAiEditor
           canEdit={can("admin")}
-          initialPrompt={aiPromptFromHistory(location.state)}
+          initialPrompt={aiDraft().prompt}
+          insightId={aiDraft().insightId}
+          onStarted={() => navigate("/themes", { replace: true, scroll: false })}
           onShowRevision={(id) => {
             setSelected(id);
             document.getElementById("revisions-h")?.scrollIntoView({ behavior: "smooth" });

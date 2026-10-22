@@ -46,7 +46,7 @@ function InsightCard(props: {
   insight: Insight;
   dismissing: boolean;
   onDismiss: () => void;
-  onOpenEditor?: (prompt: string) => void;
+  onOpenEditor?: (prompt: string, insightId: string) => void;
 }) {
   const headingId = () => `insight-${props.insight.id}`;
   const d = () => props.insight.detection;
@@ -61,7 +61,7 @@ function InsightCard(props: {
               <Button
                 size="small"
                 aria-describedby={headingId()}
-                onClick={() => props.onOpenEditor?.(h().theme_prompt)}
+                onClick={() => props.onOpenEditor?.(h().theme_prompt, props.insight.id)}
               >
                 {t("insights.openInEditor")}
               </Button>
@@ -148,7 +148,8 @@ export default function Insights() {
     onError: (e: unknown) =>
       showToast({ title: errorMessage(e), tone: "error", closeLabel: t("common.close") }),
   }));
-  const openEditor = (aiPrompt: string) => navigate("/themes", { state: { aiPrompt } });
+  const openEditor = (aiPrompt: string, insightId: string) =>
+    navigate("/themes", { state: { aiPrompt, insightId } });
 
   return (
     <>

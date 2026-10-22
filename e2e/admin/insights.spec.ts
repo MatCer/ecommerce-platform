@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 import {
   enqueueJob,
@@ -178,13 +179,53 @@ test("detected insights are ranked, labelled, handed to the theme editor and dis
   await expectAccessible(admin, "insights (desktop)");
   await screenshot(admin, "insights-desktop");
 
+  const starts: unknown[] = [];
+  await admin.route("**/admin/v1/themes/ai-runs", (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = route.request().postDataJSON() as { prompt: string };
+    starts.push(body);
+    const now = new Date().toISOString();
+    return route.fulfill({
+      status: 202,
+      json: {
+        id: randomUUID(),
+        base_revision_id: randomUUID(),
+        prompt: body.prompt,
+        status: "queued",
+        cancel_requested: false,
+        turns: 0,
+        checks_run: 0,
+        tokens: 0,
+        cost_micros: 0,
+        created_by: "owner@lnen.example",
+        created_at: now,
+        updated_at: now,
+      },
+    });
+  });
+  const slowId = sql(`SELECT id FROM insight_signals WHERE tenant_id = ${DEMO}
+                      AND kind = 'slow_page' AND subject = 'blog:INP'`);
+
   await slow.getByRole("button", { name: "Open in AI theme editor" }).click();
   await expect(admin).toHaveURL(/\/themes$/);
-  const prompt = admin
-    .getByRole("region", { name: /Edit with AI/ })
-    .getByRole("textbox", { name: "What should change?" });
+  const editor = admin.getByRole("region", { name: /Edit with AI/ });
+  const prompt = editor.getByRole("textbox", { name: "What should change?" });
   await expect(prompt).toHaveValue(draft);
   await expect(prompt).toBeFocused();
+  await editor.getByRole("button", { name: "Start AI edit" }).click();
+  await expect(prompt).toHaveValue("");
+  expect(starts, "the run carries the insight it came from").toEqual([
+    { prompt: draft, insight_id: slowId },
+  ]);
+
+  await prompt.fill("Make the header sticky.");
+  await editor.getByRole("button", { name: "Start AI edit" }).click();
+  await expect(prompt).toHaveValue("");
+  expect(starts[1], "a later manual run is not linked").toEqual({
+    prompt: "Make the header sticky.",
+  });
+  await admin.reload();
+  await expect(prompt, "a reload does not restore the insight's draft").toHaveValue("");
   expect(sql(`SELECT count(*) FROM ai_theme_runs WHERE tenant_id = ${DEMO}`)).toBe(runsBefore);
 
   await admin.goBack();

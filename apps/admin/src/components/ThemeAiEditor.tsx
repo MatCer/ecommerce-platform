@@ -91,10 +91,13 @@ export function ThemeAiEditor(props: {
   canEdit: boolean;
   onShowRevision: (id: string) => void;
   initialPrompt?: string;
+  insightId?: string;
+  onStarted: () => void;
 }) {
   const qc = useQueryClient();
   const initialPrompt = props.initialPrompt ?? "";
   const [prompt, setPrompt] = createSignal(initialPrompt);
+  const [insightId, setInsightId] = createSignal(props.insightId);
   const [selected, setSelected] = createSignal<string>();
   const [error, setError] = createSignal<unknown>();
 
@@ -140,12 +143,14 @@ export function ThemeAiEditor(props: {
       unwrap(
         api.POST("/admin/v1/themes/ai-runs", {
           params: { header: tenantHeader() },
-          body: { prompt: prompt().trim() },
+          body: { prompt: prompt().trim(), insight_id: insightId() },
         }),
       ),
     onMutate: () => setError(undefined),
     onSuccess: async (r: Run) => {
       setPrompt("");
+      setInsightId(undefined);
+      props.onStarted();
       setSelected(r.id);
       await refresh();
     },
