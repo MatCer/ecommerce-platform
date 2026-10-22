@@ -11,7 +11,6 @@ async fn run(runtime: &PgPool, now: DateTime<Utc>) -> GuardrailReport {
     experiments::guardrails(runtime, now).await.unwrap()
 }
 
-/// `(stop_reason, [(actor, diff)] of the stop audits, experiment.changed events)`
 async fn outcome(
     db: &PgPool,
     runtime: &PgPool,

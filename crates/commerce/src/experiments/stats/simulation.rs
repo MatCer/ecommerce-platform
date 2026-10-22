@@ -20,7 +20,6 @@ impl SplitMix64 {
         (self.next() >> 11) as f64 / (1u64 << 53) as f64
     }
 
-    /// Binomial(n, 1/2): every random bit is one fair coin.
     fn coins(&mut self, n: u64) -> u64 {
         let words: u64 = (0..n / 64)
             .map(|_| u64::from(self.next().count_ones()))
@@ -34,7 +33,6 @@ impl SplitMix64 {
         words + tail
     }
 
-    /// Binomial(n, p) by inversion from k = 0 with the pmf recurrence.
     fn binomial(&mut self, n: u64, p: f64) -> u64 {
         let u = self.uniform();
         let odds = p / (1.0 - p);
@@ -130,7 +128,6 @@ struct Stops {
 
 #[derive(Debug, PartialEq)]
 struct Outcome {
-    /// Runs with a winner, either arm, at any peek.
     winners: u32,
     variant_winners: u32,
     median_first_win_day: Option<f64>,
@@ -200,9 +197,6 @@ impl Tally {
     }
 }
 
-/// Daily peeks at `scenario.runs` seeded experiments, each read by every rule on the same runs.
-/// A peek reads the readout first and runs the guardrails second, as the hourly job does once the
-/// day's snapshot exists; peeks go on for the 7 days after a stop.
 fn simulate(scenario: Scenario, rules: &[Rule]) -> (Stops, Vec<Outcome>) {
     let window = WINDOW_DAYS as u32;
     let rates = scenario.rates();
@@ -275,7 +269,6 @@ fn simulate(scenario: Scenario, rules: &[Rule]) -> (Stops, Vec<Outcome>) {
     (stops, tallies.into_iter().map(Tally::outcome).collect())
 }
 
-/// The upper end of the Wilson 95% interval for `k` of `n`.
 fn wilson_upper(k: u32, n: u32) -> f64 {
     const Z: f64 = 1.959_963_984_540_054;
     let (k, n) = (f64::from(k), f64::from(n));
@@ -473,8 +466,6 @@ const MIN_CONVERTERS: [u64; 4] = [0, 25, 50, 100];
 const POWER: [Scenario; 3] = [Scenario::lift(300, 20), SMB_POWER, Scenario::lift(1200, 20)];
 const SMALL_LIFT: Scenario = Scenario::lift(1500, 10);
 
-/// Picks each constant in turn, checked at every value of the constants not yet picked, so a
-/// later pick cannot break an earlier criterion.
 #[test]
 #[ignore = "calibration: run once in release; docs/research/ab-testing.md §9 records the output"]
 fn calibration_grid() {

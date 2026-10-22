@@ -8,7 +8,6 @@ use uuid::Uuid;
 
 use crate::experiments::draft;
 
-/// The next UTC midnight, so every fixture time is in the event partitions ahead of today.
 pub(crate) fn t0() -> DateTime<Utc> {
     (Utc::now() + Duration::days(1))
         .date_naive()
@@ -20,8 +19,6 @@ pub(crate) fn day(d: f64) -> Duration {
     Duration::seconds((d * 86_400.0) as i64)
 }
 
-/// A control/variant experiment, running from `started_at` or stopped at `stopped.0` for the
-/// reason `stopped.1`.
 pub(crate) async fn experiment(
     runtime: &PgPool,
     tenant: Uuid,
@@ -56,7 +53,6 @@ pub(crate) async fn experiment(
     id
 }
 
-/// `n` new subjects assigned to `arm` at `at`.
 pub(crate) async fn assign(
     runtime: &PgPool,
     tenant: Uuid,
@@ -85,7 +81,6 @@ pub(crate) async fn assign(
     anons
 }
 
-/// A purchase of `order` at `at` by each of `anons`, as `analytics::link_purchase` records it.
 pub(crate) async fn buy(
     runtime: &PgPool,
     tenant: Uuid,
@@ -109,7 +104,6 @@ pub(crate) async fn buy(
     tx.commit().await.unwrap();
 }
 
-/// `n` subjects of `arm` assigned at `at`, the first `buyers` of them buying a day later.
 pub(crate) async fn cohort(
     runtime: &PgPool,
     shop: &Shop,

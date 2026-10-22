@@ -1,12 +1,8 @@
--- SHOP-99: why and when an experiment stopped, when it was promoted, two-arm experiments only,
--- and the promoted home hero copy.
-
 ALTER TABLE experiments
     ADD COLUMN stop_reason text
         CHECK (stop_reason IN ('manual', 'promoted', 'srm', 'harm', 'max_duration')),
     ADD COLUMN promoted_at timestamptz;
 
--- Before the new freeze rules, and under a temporary policy: forced RLS applies to the owner.
 CREATE POLICY shop99_backfill ON experiments TO app_owner USING (true) WITH CHECK (true);
 UPDATE experiments SET stop_reason = 'manual' WHERE status = 'stopped';
 DROP POLICY shop99_backfill ON experiments;

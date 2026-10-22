@@ -10,9 +10,7 @@ pub(super) const MIN_MATURE_DAYS: f64 = 14.0;
 pub(super) const MAX_DAYS: f64 = 56.0;
 pub(super) const HARM_P: f64 = 0.99;
 pub(super) const SRM_MIN_ASSIGNED: u64 = 100;
-/// The upper 0.001 quantile of chi-square with 1 df, so SRM at p < 0.001 needs no CDF.
 pub(super) const SRM_CHI2_P001: f64 = 10.827_566_170_662_733;
-/// Picked by `simulation::calibration_grid`; docs/research/ab-testing.md §9 has the evidence.
 pub(super) const RULE: Rule = Rule {
     floor: 0.996,
     epsilon: 0.02,
@@ -47,11 +45,8 @@ pub(super) struct Snapshot {
     pub counts: Pair<Counts>,
     pub weights: Pair<u32>,
     pub mature_days: f64,
-    /// Real days since the start while running, for the duration limit; `None` once stopped.
     pub running_days: Option<f64>,
-    /// Stopped, and every attribution window has closed.
     pub final_: bool,
-    /// False once stopped for SRM: the split is broken, so no arm can win.
     pub trusted: bool,
 }
 
@@ -234,7 +229,6 @@ fn guard(s: &Snapshot, arms: &Pair<ArmStats>) -> Option<Guardrail> {
     .find_map(|(hit, guardrail)| hit.then_some(guardrail))
 }
 
-/// Pearson's chi-square of all assignments against the configured weights.
 fn srm_chi2(s: &Snapshot) -> f64 {
     let (c, w) = (&s.counts, &s.weights);
     let n = (c.control.assigned + c.variant.assigned) as f64;
@@ -294,8 +288,6 @@ fn posterior(c: &Pair<Counts>) -> Pair<ArmStats> {
     }
 }
 
-/// The leader's loss `E[max(trail - lead, 0)]` comes from the small tails where the trailing arm
-/// wins, so it never cancels two large numbers; the trailing loss adds the mean difference.
 fn losses(lead: Beta, trail: Beta) -> (f64, f64) {
     let lead_loss = (trail.mean() * exceed(trail.plus(), lead).0
         - lead.mean() * exceed(trail, lead.plus()).0)
@@ -307,9 +299,6 @@ fn exceed(x: Beta, y: Beta) -> (f64, f64) {
     exceed_within(x, y, TAIL_TOLERANCE)
 }
 
-/// `(P(X > Y), P(Y > X))`, each summed over its own tail of H ~ Hypergeometric(nx + ny, nx, k),
-/// since X > Y exactly when H < x.a. The walk starts at the mode with weight 1 and stops a
-/// direction once its remaining mass is certified below `tolerance` of the mass so far.
 fn exceed_within(x: Beta, y: Beta, tolerance: f64) -> (f64, f64) {
     let (nx, ny, k) = (x.a + x.b - 1, y.a + y.b - 1, x.a + y.a - 1);
     let (lo, hi) = (k.saturating_sub(ny), k.min(nx));
@@ -346,7 +335,6 @@ fn exceed_within(x: Beta, y: Beta, tolerance: f64) -> (f64, f64) {
     (below / (below + above), above / (below + above))
 }
 
-/// Neumaier's compensated sum of non-negative terms.
 #[derive(Debug, Clone, Copy, Default)]
 struct Sum {
     sum: f64,

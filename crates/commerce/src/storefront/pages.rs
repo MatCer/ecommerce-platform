@@ -387,8 +387,6 @@ impl HeroCopy {
     }
 }
 
-/// Merges `hero` into the tenant's stored copy field by field: its fields replace the stored ones,
-/// the others stay.
 pub(crate) async fn save_hero(tx: &mut TenantTx, hero: &HeroCopy) -> Result<(), Error> {
     let hero = serde_json::to_value(hero).map_err(|e| Error::Internal(e.to_string()))?;
     sqlx::query!(

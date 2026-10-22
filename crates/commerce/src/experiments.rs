@@ -487,7 +487,6 @@ async fn snapshot(
     )))
 }
 
-/// The newest 100 experiments.
 pub async fn list(tx: &mut TenantTx) -> Result<Vec<Experiment>, Error> {
     sqlx::query_as!(
         Row,
@@ -504,7 +503,6 @@ pub async fn list(tx: &mut TenantTx) -> Result<Vec<Experiment>, Error> {
     .collect()
 }
 
-/// A draft with a 50/50 split between `control` and `variant`, as the next version of its name.
 pub async fn create(
     tx: &mut TenantTx,
     actor: &str,
@@ -642,14 +640,11 @@ pub async fn start(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Error
     Ok(())
 }
 
-/// Stops a running experiment by hand; an experiment that already stopped stays as it is.
 pub async fn stop(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<(), Error> {
     stop_locked(tx, actor, id, StopReason::Manual, serde_json::Map::new()).await?;
     Ok(())
 }
 
-/// Makes the variant the shop's own: publishes its theme revision or stores its hero copy, and
-/// stops the experiment if it still runs. An experiment promoted before is returned as it is.
 pub async fn promote(tx: &mut TenantTx, actor: &str, id: Uuid) -> Result<Experiment, Error> {
     lock(tx, id).await?;
     let e = fetch(tx, id).await?;
@@ -718,7 +713,6 @@ enum Stopped {
     Already,
 }
 
-/// The only writer of `stop_reason`.
 async fn stop_locked(
     tx: &mut TenantTx,
     actor: &str,
@@ -763,9 +757,6 @@ pub struct GuardrailReport {
     pub stopped: u64,
 }
 
-/// Stops each tenant's running experiment whose split is broken, whose variant is clearly
-/// worse, or that ran too long. A failing tenant does not stop the others; it fails the run
-/// afterwards so the job retries, which is harmless because a stop happens once.
 pub async fn guardrails(db: &PgPool, now: DateTime<Utc>) -> Result<GuardrailReport, Error> {
     let tenants = sqlx::query_scalar!("SELECT id FROM platform.tenants ORDER BY id")
         .fetch_all(db)
