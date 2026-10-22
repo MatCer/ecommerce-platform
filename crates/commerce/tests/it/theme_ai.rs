@@ -6,8 +6,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{Days, Utc};
 use commerce::ai::Ai;
+use commerce::insights::{self, Measure, ThemeChange, Window};
 use commerce::themes::ai_edit::{self, Limits, NewRun};
 use commerce::themes::archive::{self, Source};
 use commerce::themes::{self, StatusUpdate, ThemeKeys};
@@ -213,6 +214,16 @@ async fn start(
     tenant: Uuid,
     prompt: &str,
 ) -> Result<ai_edit::RunSummary, Error> {
+    start_from(runtime, ai, tenant, prompt, None).await
+}
+
+async fn start_from(
+    runtime: &PgPool,
+    ai: &Ai,
+    tenant: Uuid,
+    prompt: &str,
+    insight_id: Option<Uuid>,
+) -> Result<ai_edit::RunSummary, Error> {
     let mut tx = tenant_tx(runtime, tenant).await.unwrap();
     let r = ai_edit::start(
         &mut tx,
@@ -221,6 +232,7 @@ async fn start(
         &NewRun {
             prompt: prompt.into(),
             base_revision_id: None,
+            insight_id,
         },
     )
     .await;
@@ -228,6 +240,27 @@ async fn start(
         tx.commit().await.unwrap();
     }
     r
+}
+
+async fn insight(runtime: &PgPool, tenant: Uuid) -> Uuid {
+    let id = Uuid::now_v7();
+    let mut tx = tenant_tx(runtime, tenant).await.unwrap();
+    sqlx::query(
+        "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score,
+                                      first_detected_on, last_detected_on)
+         VALUES ($1, $2, 'slow_page', 'product:LCP', $3, 1, current_date, current_date)",
+    )
+    .bind(tenant)
+    .bind(id)
+    .bind(
+        json!({ "kind": "slow_page", "template": "product", "metric": "LCP",
+                  "p75": 4000.0, "samples": 60, "requests": 20000 }),
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    id
 }
 
 /// SQL as the tenant (the owner role is bound by FORCE RLS too).
@@ -1025,4 +1058,91 @@ async fn runs_are_part_of_the_tenant_export(db: PgPool) {
         .expect("exported");
     assert!(runs.dropped.is_empty(), "{:?}", runs.dropped);
     assert!(!commerce::portability::export::SKIPPED_TABLES.contains(&"ai_theme_runs"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_run_started_from_an_insight_links_the_revision_it_publishes(db: PgPool) {
+    let (runtime, storage, shop) = setup(&db).await;
+    let ai = Ai::fake();
+    let builder = spawn_builder(
+        runtime.clone(),
+        storage.clone(),
+        shop.tenant,
+        Arc::new(|_, _| true),
+    );
+    let from = insight(&runtime, shop.tenant).await;
+    let run = start_from(
+        &runtime,
+        &ai,
+        shop.tenant,
+        "Make the product page faster",
+        Some(from),
+    )
+    .await
+    .unwrap();
+    ai_edit::run(&runtime, &storage, &ai, shop.tenant, run.id, fast())
+        .await
+        .unwrap();
+    builder.abort();
+    let rev = detail(&runtime, shop.tenant, run.id)
+        .await
+        .run
+        .revision_id
+        .unwrap();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    ai_edit::accept(&mut tx, "owner", run.id).await.unwrap();
+    let published = themes::publish(&mut tx, "owner", rev).await.unwrap();
+    tx.commit().await.unwrap();
+
+    let published_at = published.published_at.unwrap();
+    let d = published_at.date_naive();
+    let mut tx = tenant_tx(&runtime, shop.tenant).await.unwrap();
+    let listed = insights::list(&mut tx, d).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(
+        listed[0].theme_change,
+        Some(ThemeChange {
+            revision_id: rev,
+            revision_number: published.number,
+            published_at,
+            before: Window {
+                from: d - Days::new(14),
+                to: d - Days::new(1),
+                measure: Some(Measure {
+                    value: None,
+                    samples: 0
+                }),
+            },
+            after: Window {
+                from: d + Days::new(1),
+                to: d + Days::new(14),
+                measure: None,
+            },
+        })
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_run_cannot_start_from_an_unknown_or_foreign_insight(db: PgPool) {
+    let (runtime, _storage, shop) = setup(&db).await;
+    let other = testkit::storefront::shop(&runtime, "beta").await;
+    let ai = Ai::fake();
+    let foreign = insight(&runtime, other.tenant).await;
+    for id in [Uuid::now_v7(), foreign] {
+        let err = start_from(&runtime, &ai, shop.tenant, "faster", Some(id))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::NotFound), "{err:?}");
+    }
+    assert_eq!(
+        ai_edit::list(&mut tenant_tx(&runtime, shop.tenant).await.unwrap())
+            .await
+            .unwrap()
+            .len(),
+        0
+    );
+    let own = insight(&runtime, shop.tenant).await;
+    start_from(&runtime, &ai, shop.tenant, "faster", Some(own))
+        .await
+        .unwrap();
 }

@@ -2376,12 +2376,14 @@ export const en = {
     title: "Insights",
     description:
       "Where the shop loses visits, from the last weeks of analytics. Ranked by affected visits: an estimate of how many visits a week would have gone further at the shop's usual rate or on a fast page.",
-    list: "Open insights",
+    list: "Insights",
     empty: "Nothing stands out in the last 14 days.",
     emptyHint:
       "Insights need enough traffic: 100 sessions a week for a checkout step, 200 views for a product and 50 speed measurements for a page type.",
     affected: "Affected visits: ~{{n}} a week",
     since: "Detected since {{date}}",
+    resolved: "No longer detected",
+    lastDetected: "Last detected on {{date}}",
     deletedProduct: "Deleted product",
     slowHeading: "{{template}}: {{metric}}",
     hypothesis: "Possible cause",
@@ -2390,6 +2392,17 @@ export const en = {
     dismiss: "Dismiss",
     dismissed: "Insight dismissed",
     openInEditor: "Open in AI theme editor",
+    change: {
+      title: "Before and after the theme change",
+      published: "Theme revision #{{number}} published on {{date}}",
+      before: "Before ({{from}} – {{to}})",
+      after: "After ({{from}} – {{to}})",
+      collecting: "Collecting until {{date}}",
+      noData: "No data",
+      funnel_drop: "{{value}} of {{samples}} sessions",
+      low_add_to_cart: "{{value}} of {{samples}} views",
+      slow_page: "p75 {{value}} from {{samples}} measurements",
+    },
     transitions: {
       sessions_to_view_item: "Visits that reach a product",
       view_item_to_add_to_cart: "Product viewers who add to cart",

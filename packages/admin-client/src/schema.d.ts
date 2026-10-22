@@ -5061,6 +5061,11 @@ export interface components {
              * @description The revision to start from; default: the active one. Must have passed the checks.
              */
             base_revision_id?: string | null;
+            /**
+             * Format: uuid
+             * @description The insight whose draft the run starts from; unknown or another shop's: 404.
+             */
+            insight_id?: string | null;
             /** @description What the merchant wants changed (1–4000 characters). */
             prompt: string;
         };
@@ -6995,7 +7000,7 @@ export interface components {
             /** Format: int32 */
             settings_version: number;
         };
-        /** @description A ranked open signal as staff see it. */
+        /** @description A ranked signal as staff see it. */
         Insight: {
             detection: components["schemas"]["Detection"];
             /** Format: date */
@@ -7015,10 +7020,55 @@ export interface components {
              * @description Affected visits per week; the list is ordered by it.
              */
             score: number;
+            /**
+             * @description `resolved` once the detector stopped firing; such insights are listed only with a
+             *     `theme_change`.
+             */
+            status: components["schemas"]["InsightStatus"];
+            theme_change?: components["schemas"]["InsightThemeChange"] | null;
         };
         InsightList: {
-            /** @description Open signals, most affected visits first (at most 50). */
+            /**
+             * @description Open signals, and resolved ones a published theme change came from; most affected
+             *     visits first (at most 50).
+             */
             items: components["schemas"]["Insight"][];
+        };
+        /** @description The detector's own metric over one window. */
+        InsightMeasure: {
+            /**
+             * Format: int64
+             * @description What the value rests on: sessions at the from-step, product views, or measurements.
+             */
+            samples: number;
+            /**
+             * Format: double
+             * @description Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);
+             *     slow page: the vital's p75 (ms; CLS unitless). `null` without data.
+             */
+            value?: number | null;
+        };
+        /** @enum {string} */
+        InsightStatus: "open" | "dismissed" | "resolved";
+        /** @description The latest theme revision published from an AI run started on this insight's draft. */
+        InsightThemeChange: {
+            /** @description The 14 full UTC days after the publish day. */
+            after: components["schemas"]["InsightWindow"];
+            /** @description The 14 full UTC days before the publish day. */
+            before: components["schemas"]["InsightWindow"];
+            /** Format: date-time */
+            published_at: string;
+            /** Format: uuid */
+            revision_id: string;
+            /** Format: int32 */
+            revision_number: number;
+        };
+        InsightWindow: {
+            /** Format: date */
+            from: string;
+            measure?: components["schemas"]["InsightMeasure"] | null;
+            /** Format: date */
+            to: string;
         };
         InstallInput: {
             /**

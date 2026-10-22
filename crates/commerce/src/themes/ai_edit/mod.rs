@@ -103,6 +103,8 @@ pub struct NewRun {
     pub prompt: String,
     /// The revision to start from; default: the active one. Must have passed the checks.
     pub base_revision_id: Option<Uuid>,
+    /// The insight whose draft the run starts from; unknown or another shop's: 404.
+    pub insight_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -251,17 +253,30 @@ pub async fn start(
         })?,
     };
     ensure_validated_base(tx, base).await?;
+    if let Some(insight) = input.insight_id {
+        let known = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM insight_signals WHERE id = $1) AS "ok!""#,
+            insight
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+        if !known {
+            return Err(Error::NotFound);
+        }
+    }
     let id = Uuid::now_v7();
     // One active run per tenant: the partial unique index decides, also for concurrent starts.
     let inserted = sqlx::query!(
-        "INSERT INTO ai_theme_runs (id, tenant_id, base_revision_id, prompt, created_by)
-         VALUES ($1, $2, $3, $4, $5)
+        "INSERT INTO ai_theme_runs (id, tenant_id, base_revision_id, prompt, created_by,
+                                    insight_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (tenant_id) WHERE status IN ('queued', 'running') DO NOTHING",
         id,
         tx.tenant_id(),
         base,
         prompt,
-        actor
+        actor,
+        input.insight_id
     )
     .execute(&mut **tx)
     .await?

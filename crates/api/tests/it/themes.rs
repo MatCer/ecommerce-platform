@@ -404,6 +404,41 @@ async fn uploads_and_token_edits_are_validated(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn an_ai_run_cannot_start_from_another_shops_insight(db: PgPool) {
+    let c = setup(db).await;
+    let mut insights = Vec::new();
+    for tenant in [c.other.tenant, c.shop.tenant] {
+        let id = uuid::Uuid::now_v7();
+        let mut tx = platform::db::tenant_tx(&c.s.db, tenant).await.unwrap();
+        sqlx::query(
+            "INSERT INTO insight_signals (tenant_id, id, kind, subject, detection, score,
+                                          first_detected_on, last_detected_on)
+             VALUES ($1, $2, 'funnel_drop', 'view_item_to_add_to_cart', '{}', 1,
+                     current_date, current_date)",
+        )
+        .bind(tenant)
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        insights.push(id);
+    }
+    let start = |insight_id: &str| {
+        Call::post(
+            "/admin/v1/themes/ai-runs",
+            json!({ "prompt": "Make the add to cart button larger", "insight_id": insight_id }),
+        )
+        .token(&c.owner)
+        .tenant(c.shop.tenant)
+    };
+    let (st, body, _) = start(&insights[0].to_string()).send(&c.s).await;
+    assert_eq!(st, StatusCode::NOT_FOUND, "{body}");
+    let (st, body, _) = start(&insights[1].to_string()).send(&c.s).await;
+    assert_eq!(st, StatusCode::ACCEPTED, "{body}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn ai_runs_are_admin_only_and_tenant_scoped(db: PgPool) {
     let c = setup(db).await;
     let t = c.shop.tenant;

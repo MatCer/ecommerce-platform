@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::analytics::FUNNEL_METRICS;
+
 pub mod rules {
     pub const FUNNEL_RECENT_DAYS: u64 = 7;
     pub const FUNNEL_BASELINE_DAYS: u64 = 21;
@@ -46,6 +48,11 @@ impl Transition {
             Self::AddToCartToBeginCheckout => "add_to_cart_to_begin_checkout",
             Self::BeginCheckoutToPurchase => "begin_checkout_to_purchase",
         }
+    }
+
+    pub(crate) fn steps(self) -> (&'static str, &'static str) {
+        let i = self as usize;
+        (FUNNEL_METRICS[i], FUNNEL_METRICS[i + 1])
     }
 }
 
