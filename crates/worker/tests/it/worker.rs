@@ -1129,7 +1129,6 @@ async fn switch_review_summaries(runtime: &PgPool, tenant: uuid::Uuid, on: bool)
     tx.commit().await.unwrap();
 }
 
-/// Dispatches events and waits until `tenant` has no due job left to run.
 async fn drain(db: &PgPool, runtime: &PgPool, tenant: uuid::Uuid) {
     for _ in 0..500 {
         let dispatched = outbox::dispatch_batch(runtime).await.unwrap();
