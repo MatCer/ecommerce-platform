@@ -16,6 +16,7 @@ export interface Message {
 }
 
 type Readout = Schemas["Readout"];
+type Pending = Readout & { decides_from: string };
 
 const state = (key: StateKey, params: Record<string, string> = {}): Message => ({
   key: `experiments.state.${key}`,
@@ -34,7 +35,7 @@ export const flooredChance = (p: number, locale: string) =>
 export const points = (rate: number, locale: string) =>
   new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(rate * 100);
 
-const COLLECTING: Record<Schemas["Need"], (r: Readout, locale: string) => Message> = {
+const COLLECTING: Record<Schemas["Need"], (r: Pending, locale: string) => Message> = {
   time: (r, locale) => state("tooEarly", { date: snapshotDay(r.decides_from, locale) }),
   converters: (r, locale) =>
     state("fewBuyers", {
@@ -60,9 +61,9 @@ export function readoutMessage(detail: Schemas["ExperimentDetail"], locale: stri
   const s = r.state;
   switch (s.state) {
     case "collecting": {
-      const willNeverDecide =
-        r.final || (s.need === "time" && detail.experiment.status === "stopped");
-      return willNeverDecide ? state("notEnough") : COLLECTING[s.need](r, locale);
+      const { decides_from } = r;
+      if (r.final || !decides_from) return state("notEnough");
+      return COLLECTING[s.need]({ ...r, decides_from }, locale);
     }
     case "winner":
       return state(WINNER[s.arm], { chance: flooredChance(r[s.arm].p_best, locale) });

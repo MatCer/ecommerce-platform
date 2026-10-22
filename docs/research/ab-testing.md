@@ -455,7 +455,9 @@ because the platform has not launched.
 - `Phase::Running` carries `days`, real time since the start, which drives the 56-day limit.
 - `final` holds from the first midnight at or after stop + 7 days.
 - `decides_from` is the first midnight at or after start + 21 days, which is 14 mature days plus
-  the 7-day window.
+  the 7-day window. It is null when the experiment stopped less than 14 days after its start,
+  because `mature_days` can then never reach 14. A later stop still decides once the subjects
+  assigned before it mature.
 
 The cohort cutoff is daily, but the readout reads order status live. A cancellation or a full
 refund can still change a count within the day and after `final`. "Final" means every attribution

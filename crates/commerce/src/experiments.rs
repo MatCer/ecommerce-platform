@@ -397,7 +397,7 @@ pub struct Readout {
     /// The UTC midnight the snapshot counts up to; once stopped, at most the stop plus 7 days.
     pub as_of: DateTime<Utc>,
     /// The first snapshot that can name a winner or no difference.
-    pub decides_from: DateTime<Utc>,
+    pub decides_from: Option<DateTime<Utc>>,
     /// Stopped, and every attribution window has closed.
     #[serde(rename = "final")]
     pub final_: bool,

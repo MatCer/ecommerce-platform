@@ -8827,7 +8827,7 @@ export interface components {
              * Format: date-time
              * @description The first snapshot that can name a winner or no difference.
              */
-            decides_from: string;
+            decides_from?: string | null;
             /** @description Stopped, and every attribution window has closed. */
             final: boolean;
             /**

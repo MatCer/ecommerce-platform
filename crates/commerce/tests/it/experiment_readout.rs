@@ -197,7 +197,7 @@ async fn the_readout_counts_purchases_in_the_week_after_a_mature_assignment(db: 
         .unwrap();
     assert_eq!(
         (r.as_of, r.decides_from, r.final_, r.min_converters),
-        (t + day(30.0), t + day(21.0), false, 100)
+        (t + day(30.0), Some(t + day(21.0)), false, 100)
     );
     assert_eq!(
         counts(&r.control),
@@ -392,4 +392,47 @@ async fn a_clear_winner_is_named_unless_the_experiment_stopped_for_srm(db: PgPoo
             },
         ]
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_experiment_stopped_after_two_weeks_still_decides_once_its_subjects_mature(db: PgPool) {
+    let runtime = testkit::runtime_pool(&db, 4).await;
+    let shop = testkit::storefront::shop(&runtime, "readout-stopped-time").await;
+    let paid = order(&runtime, &shop, "confirmed", "paid").await;
+    let t = tomorrow();
+    let stopped_on = |days: f64| {
+        Some(Stop {
+            at: t + day(days),
+            reason: "manual",
+        })
+    };
+    let late = experiment(&runtime, shop.tenant, "late", t, stopped_on(20.0)).await;
+    cohort(&runtime, &shop, late, "control", (2000, 100), t, paid).await;
+    cohort(&runtime, &shop, late, "variant", (2000, 160), t, paid).await;
+
+    let r = readout(&runtime, shop.tenant, late, t + day(20.0))
+        .await
+        .unwrap();
+    assert_eq!(
+        (r.state, r.decides_from, r.final_),
+        (
+            ReadoutState::Collecting { need: Need::Time },
+            Some(t + day(21.0)),
+            false
+        )
+    );
+    let r = readout(&runtime, shop.tenant, late, t + day(21.0))
+        .await
+        .unwrap();
+    assert_eq!(
+        r.state,
+        ReadoutState::Winner { arm: Side::Variant },
+        "the subjects assigned before the stop reach 14 mature days"
+    );
+
+    let early = experiment(&runtime, shop.tenant, "early", t, stopped_on(10.0)).await;
+    let r = readout(&runtime, shop.tenant, early, t + day(10.0))
+        .await
+        .unwrap();
+    assert_eq!(r.decides_from, None);
 }

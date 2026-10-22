@@ -122,7 +122,7 @@ pub(super) enum Guardrail {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct Window {
     pub as_of: DateTime<Utc>,
-    pub decides_from: DateTime<Utc>,
+    pub decides_from: Option<DateTime<Utc>>,
     pub mature_days: f64,
     pub phase: Phase,
 }
@@ -136,11 +136,15 @@ pub(super) fn window(
     let as_of = stopped_at.map_or(today, |s| today.min(s + WINDOW));
     let mature_until = stopped_at.map_or(as_of - WINDOW, |s| (as_of - WINDOW).min(s));
     let decidable = started_at + WINDOW + Duration::days(MIN_MATURE_DAYS as i64);
-    let decides_from = if midnight(decidable) < decidable {
-        midnight(decidable) + Duration::days(1)
-    } else {
-        decidable
-    };
+    let decides_from = stopped_at
+        .is_none_or(|s| days(s - started_at) >= MIN_MATURE_DAYS)
+        .then(|| {
+            if midnight(decidable) < decidable {
+                midnight(decidable) + Duration::days(1)
+            } else {
+                decidable
+            }
+        });
     Window {
         as_of,
         decides_from,
@@ -731,7 +735,7 @@ mod tests {
         close(days, 28.0 + 9.5 / 24.0, 1e-12);
         assert_eq!(
             w.decides_from,
-            at("2026-10-23T00:00:00Z"),
+            Some(at("2026-10-23T00:00:00Z")),
             "the first midnight after the start plus 21 days"
         );
     }
@@ -745,7 +749,36 @@ mod tests {
         );
         let w = window(start, None, at("2026-10-22T00:00:00Z"));
         assert_eq!(w.mature_days, MIN_MATURE_DAYS);
-        assert_eq!(w.decides_from, w.as_of, "start + 21 days is a midnight");
+        assert_eq!(
+            w.decides_from,
+            Some(w.as_of),
+            "start + 21 days is a midnight"
+        );
+    }
+
+    #[test]
+    fn only_a_stop_before_two_weeks_rules_out_a_decision() {
+        let start = at("2026-10-01T00:00:00Z");
+        let decides_from = |stop: Option<&str>| {
+            window(start, stop.map(at), at("2026-10-22T08:00:00Z")).decides_from
+        };
+        let day_21 = Some(at("2026-10-22T00:00:00Z"));
+        assert_eq!(decides_from(None), day_21, "running");
+        assert_eq!(
+            decides_from(Some("2026-10-21T00:00:00Z")),
+            day_21,
+            "stopped on day 20"
+        );
+        assert_eq!(
+            decides_from(Some("2026-10-15T00:00:00Z")),
+            day_21,
+            "stopped on day 14"
+        );
+        assert_eq!(
+            decides_from(Some("2026-10-11T00:00:00Z")),
+            None,
+            "stopped on day 10"
+        );
     }
 
     #[test]

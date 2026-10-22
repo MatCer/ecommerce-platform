@@ -185,8 +185,17 @@ describe("readout sentences of a stopped experiment", () => {
     }
   });
 
-  it("says at once that it stopped before there was enough time", () => {
+  it("still names the first possible result of an experiment stopped after two weeks", () => {
     const d = stopped("manual", { state: "collecting", need: "time" });
+    expect(sentences((l) => readoutMessage(d, l))).toEqual({
+      en: "Collecting data. The first result is possible on Oct 23, 2026.",
+      cs: "Sbírají se data. První výsledek bude k dispozici nejdříve 23. 10. 2026.",
+      sk: "Zbierajú sa údaje. Prvý výsledok bude k dispozícii najskôr 23. 10. 2026.",
+    });
+  });
+
+  it("says at once that it stopped too early for any result", () => {
+    const d = stopped("manual", { state: "collecting", need: "time" }, { decides_from: null });
     expect(sentences((l) => readoutMessage(d, l))).toEqual({
       en: "The experiment stopped before there was enough data for a decision.",
       cs: "Experiment skončil bez dostatku dat pro rozhodnutí.",
