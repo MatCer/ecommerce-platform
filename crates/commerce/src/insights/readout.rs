@@ -38,9 +38,11 @@ pub struct Window {
 #[schema(as = InsightMeasure)]
 pub struct Measure {
     /// Funnel drop: the step's rate; low add-to-cart: the product's add-to-cart rate (0-1);
-    /// slow page: the vital's p75 (ms; CLS unitless). `null` without data.
+    /// slow page: the vital's p75 (ms; CLS unitless); zero-result search: the term's searches
+    /// without results. `null` without data.
     pub value: Option<f64>,
-    /// What the value rests on: sessions at the from-step, product views, or measurements.
+    /// What the value rests on: sessions at the from-step, product views, measurements, or
+    /// searches.
     pub samples: i64,
 }
 
@@ -107,6 +109,21 @@ async fn measure(
             Ok(Measure {
                 value: hit.map(|r| r.p75),
                 samples: hit.map_or(0, |r| r.samples),
+            })
+        }
+        Detection::ZeroResultSearch { query, .. } => {
+            let n = sqlx::query_scalar!(
+                r#"SELECT coalesce(sum(count), 0)::bigint AS "n!" FROM search_zero_results
+                   WHERE query = $1 AND day BETWEEN $2 AND $3"#,
+                query,
+                from,
+                to
+            )
+            .fetch_one(&mut **tx)
+            .await?;
+            Ok(Measure {
+                value: Some(n as f64),
+                samples: n,
             })
         }
     }

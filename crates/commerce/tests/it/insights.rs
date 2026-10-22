@@ -817,6 +817,17 @@ async fn the_model_sees_only_aggregates_in_the_shop_language(db: PgPool) {
         .hypothesis
         .clone()
         .unwrap();
+    let searching = testkit::storefront::shop(&runtime, "agg-search").await;
+    switch(&runtime, &searching, true).await;
+    zero_results(&runtime, &searching, &[(day, "sk", "modre tricko", 10)]).await;
+    run(&runtime, &ai, &searching, day).await;
+    let search_call = seen.lock().unwrap()[3]["messages"][0]["content"].to_string();
+    for fact in [
+        r#"\"query\":\"modre tricko\""#,
+        r#"\"searches_without_results\":10"#,
+    ] {
+        assert!(search_call.contains(fact), "{search_call}");
+    }
     assert_eq!(
         (
             hyp.text.as_str(),
@@ -1080,6 +1091,78 @@ async fn product_and_slow_page_insights_read_out_their_own_metric(db: PgPool) {
     assert_eq!(
         change(&runtime, &shop, slow, days(d, 15)).await,
         readout(&rev, measure(Some(3500.0), 40), measure(Some(2000.0), 10))
+    );
+}
+
+async fn zero_results(runtime: &PgPool, shop: &Shop, rows: &[(NaiveDate, &str, &str, i32)]) {
+    let mut tx = tenant_tx(runtime, shop.tenant).await.unwrap();
+    for (day, locale, query, count) in rows {
+        sqlx::query(
+            "INSERT INTO search_zero_results (tenant_id, day, locale, query, count)
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(shop.tenant)
+        .bind(day)
+        .bind(locale)
+        .bind(query)
+        .bind(count)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    }
+    tx.commit().await.unwrap();
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn zero_result_searches_become_a_signal_with_a_before_after_readout(db: PgPool) {
+    let (runtime, shop) = setup(&db, "zero").await;
+    let day = yesterday() - Days::new(30);
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (days(day, -14), "cs", "modre tricko", 50),
+            (days(day, -13), "cs", "modre tricko", 6),
+            (day, "sk", "modre tricko", 4),
+            (day, "cs", "cervene saty", 9),
+        ],
+    )
+    .await;
+    run(&runtime, &Ai::fake(), &shop, day).await;
+    let found = list(&runtime, shop.tenant).await;
+    assert_eq!(
+        found
+            .iter()
+            .map(|i| (&i.detection, i.score))
+            .collect::<Vec<_>>(),
+        vec![(
+            &Detection::ZeroResultSearch {
+                query: "modre tricko".into(),
+                searches: 10
+            },
+            5.0
+        )]
+    );
+
+    let rev = publish_from(&runtime, &shop, Some(found[0].id)).await;
+    let d = rev.published_at.unwrap().date_naive();
+    zero_results(
+        &runtime,
+        &shop,
+        &[
+            (days(d, -15), "cs", "modre tricko", 90),
+            (days(d, -14), "cs", "modre tricko", 3),
+            (days(d, -1), "sk", "modre tricko", 4),
+            (days(d, -5), "cs", "cervene saty", 20),
+            (d, "cs", "modre tricko", 100),
+            (days(d, 15), "cs", "modre tricko", 90),
+        ],
+    )
+    .await;
+    assert_eq!(
+        change(&runtime, &shop, found[0].id, days(d, 15)).await,
+        readout(&rev, measure(Some(7.0), 7), measure(Some(0.0), 0)),
+        "no search without results after the change is a real zero"
     );
 }
 

@@ -4,6 +4,9 @@
 {%- elif data.kind == "low_add_to_cart" -%}
 {%- set h = "Demo AI: " ~ data.product ~ " is viewed often but added to the cart at rate " ~ data.rate ~ " against " ~ data.shop_rate ~ " in the shop." -%}
 {%- set p = "Make the add to cart button and the price on the product page of " ~ data.product ~ " more prominent." -%}
+{%- elif data.kind == "zero_result_search" -%}
+{%- set h = "Demo AI: shoppers searched for " ~ data.query ~ " " ~ data.searches_without_results ~ " times in " ~ data.days ~ " days and found nothing." -%}
+{%- set p = "Make the no-results state of the search page helpful with links to the main categories and a short search tip." -%}
 {%- else -%}
 {%- set h = "Demo AI: the " ~ data.template ~ " pages are slow, " ~ data.metric ~ " p75 " ~ data.p75 ~ " against a good bound of " ~ data.good_bound ~ "." -%}
 {%- set p = "Make the " ~ data.template ~ " template lighter with smaller images and fewer blocks above the fold." -%}

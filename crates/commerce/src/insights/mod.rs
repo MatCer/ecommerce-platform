@@ -15,7 +15,9 @@ use uuid::Uuid;
 use crate::ai::{self, Ai, Call, CallError, Outcome, prompts, settings};
 use crate::{analytics, audit};
 use detect::Detection;
-use detect::rules::{FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS};
+use detect::rules::{
+    FUNNEL_BASELINE_DAYS, FUNNEL_RECENT_DAYS, PRODUCT_DAYS, VITALS_DAYS, ZERO_RESULT_DAYS,
+};
 pub use readout::{Measure, ThemeChange, Window};
 
 pub const JOB: &str = "insights.run";
@@ -409,6 +411,11 @@ fn facts(d: &Detection, product: Option<&str>, locale: &str) -> Value {
             "samples": samples,
             "page_requests": requests,
             "days": VITALS_DAYS,
+        }),
+        Detection::ZeroResultSearch { query, searches } => json!({
+            "query": query,
+            "searches_without_results": searches,
+            "days": ZERO_RESULT_DAYS,
         }),
     };
     v["kind"] = json!(d.kind());
