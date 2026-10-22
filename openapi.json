@@ -23737,6 +23737,14 @@
             "type": "string",
             "format": "uuid"
           },
+          "insight_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The insight whose draft the run started from."
+          },
           "model": {
             "type": [
               "string",
@@ -30342,6 +30350,14 @@
           "detection": {
             "$ref": "#/components/schemas/Detection"
           },
+          "experiment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The newest experiment testing the final revision of an AI theme edit started from this\ninsight's draft (`null` when none)."
+          },
           "first_detected_on": {
             "type": "string",
             "format": "date"
@@ -30390,7 +30406,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/InsightStatus",
-            "description": "`resolved` once the detector stopped firing; such insights are listed only with a\n`theme_change`."
+            "description": "`resolved` once the detector stopped firing; such insights are listed only with a\n`theme_change` or an `experiment_id`."
           },
           "theme_change": {
             "oneOf": [

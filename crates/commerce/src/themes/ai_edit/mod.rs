@@ -130,6 +130,8 @@ pub struct RunSummary {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
+    /// The insight whose draft the run started from.
+    pub insight_id: Option<Uuid>,
 }
 
 /// One tool call of the agent, as shown in the admin.
@@ -180,7 +182,7 @@ macro_rules! select_run {
             "SELECT r.id, r.prompt, r.status, r.cancel_requested, r.base_revision_id,
                     r.revision_id, v.number AS revision_number, r.model, r.turns, r.checks_run,
                     r.tokens, r.cost_micros, r.error, r.created_by, r.created_at, r.updated_at,
-                    r.finished_at, r.summary, r.steps, r.diff, r.report
+                    r.finished_at, r.insight_id, r.summary, r.steps, r.diff, r.report
              FROM ai_theme_runs r LEFT JOIN theme_revisions v ON v.id = r.revision_id ",
             $tail
         )
@@ -208,6 +210,7 @@ fn row(r: &sqlx::postgres::PgRow) -> Result<Row, sqlx::Error> {
             created_at: r.try_get("created_at")?,
             updated_at: r.try_get("updated_at")?,
             finished_at: r.try_get("finished_at")?,
+            insight_id: r.try_get("insight_id")?,
         },
         summary_text: r.try_get("summary")?,
         steps: r.try_get("steps")?,

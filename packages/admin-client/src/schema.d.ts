@@ -5214,6 +5214,11 @@ export interface components {
             finished_at?: string | null;
             /** Format: uuid */
             id: string;
+            /**
+             * Format: uuid
+             * @description The insight whose draft the run started from.
+             */
+            insight_id?: string | null;
             model?: string | null;
             prompt: string;
             /**
@@ -7219,6 +7224,12 @@ export interface components {
         /** @description A ranked signal as staff see it. */
         Insight: {
             detection: components["schemas"]["Detection"];
+            /**
+             * Format: uuid
+             * @description The newest experiment testing the final revision of an AI theme edit started from this
+             *     insight's draft (`null` when none).
+             */
+            experiment_id?: string | null;
             /** Format: date */
             first_detected_on: string;
             hypothesis?: components["schemas"]["Hypothesis"] | null;
@@ -7239,7 +7250,7 @@ export interface components {
             score: number;
             /**
              * @description `resolved` once the detector stopped firing; such insights are listed only with a
-             *     `theme_change`.
+             *     `theme_change` or an `experiment_id`.
              */
             status: components["schemas"]["InsightStatus"];
             theme_change?: components["schemas"]["InsightThemeChange"] | null;

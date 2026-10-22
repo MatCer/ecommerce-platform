@@ -13,6 +13,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::ai::{self, Ai, Call, CallError, Outcome, prompts, settings};
+use crate::experiments::{self, Experiment, NewChange, NewExperiment};
 use crate::{analytics, audit};
 use detect::Detection;
 use detect::rules::{
@@ -44,7 +45,7 @@ pub fn job(tenant: Uuid, day: NaiveDate) -> NewJob<'static> {
 pub struct Insight {
     pub id: Uuid,
     /// `resolved` once the detector stopped firing; such insights are listed only with a
-    /// `theme_change`.
+    /// `theme_change` or an `experiment_id`.
     pub status: Status,
     pub detection: Detection,
     /// Affected visits per week; the list is ordered by it.
@@ -58,6 +59,9 @@ pub struct Insight {
     pub hypothesis: Option<Hypothesis>,
     /// The latest theme change published from this insight's draft (`null` when none).
     pub theme_change: Option<ThemeChange>,
+    /// The newest experiment testing the final revision of an AI theme edit started from this
+    /// insight's draft (`null` when none).
+    pub experiment_id: Option<Uuid>,
     /// Set when a dismissed signal came back with at least 1.5 times its score at dismissal.
     pub reopened: Option<Reopened>,
 }
@@ -106,6 +110,7 @@ struct Row {
     revision_id: Option<Uuid>,
     revision_number: Option<i32>,
     published_at: Option<DateTime<Utc>>,
+    experiment_id: Option<Uuid>,
 }
 
 fn parse_detection(v: Value) -> Result<Detection, Error> {
@@ -161,6 +166,7 @@ impl TryFrom<Row> for Insight {
             last_detected_on: r.last_detected_on,
             hypothesis,
             theme_change: None,
+            experiment_id: r.experiment_id,
             reopened,
         })
     }
@@ -184,7 +190,7 @@ async fn select(
                        THEN insight_product_name((s.detection->>'product_id')::uuid) END
                       AS product_name,
                   p.id AS "revision_id?", p.number AS "revision_number?",
-                  p.published_at AS "published_at?"
+                  p.published_at AS "published_at?", x.id AS "experiment_id?"
            FROM insight_signals s
            LEFT JOIN LATERAL (
                SELECT v.id, v.number, v.published_at
@@ -192,8 +198,15 @@ async fn select(
                WHERE r.insight_id = s.id AND v.published_at IS NOT NULL
                ORDER BY v.published_at DESC LIMIT 1
            ) p ON true
+           LEFT JOIN LATERAL (
+               SELECT e.id
+               FROM ai_theme_runs r JOIN experiments e ON e.theme_revision_id = r.revision_id
+               WHERE r.insight_id = s.id
+               ORDER BY e.created_at DESC, e.id DESC LIMIT 1
+           ) x ON true
            WHERE CASE WHEN $1::uuid IS NULL
-                      THEN s.status = 'open' OR (s.status = 'resolved' AND p.id IS NOT NULL)
+                      THEN s.status = 'open'
+                           OR (s.status = 'resolved' AND (p.id IS NOT NULL OR x.id IS NOT NULL))
                       ELSE s.id = $1 END
            ORDER BY s.score DESC, s.kind COLLATE "C", s.subject COLLATE "C" LIMIT $2"#,
         id,
@@ -253,6 +266,54 @@ pub async fn dismiss(
         .await?
         .pop()
         .ok_or(Error::NotFound)
+}
+
+/// A draft experiment testing the accepted AI theme revision `revision_id`, the final revision
+/// of a run started from this insight's draft, against the active theme; or the newest
+/// experiment that already tests it.
+pub async fn test_revision(
+    tx: &mut TenantTx,
+    actor: &str,
+    insight_id: Uuid,
+    revision_id: Uuid,
+) -> Result<Experiment, Error> {
+    let r = sqlx::query!(
+        "SELECT r.status, s.kind, v.number
+         FROM theme_revisions v
+         JOIN ai_theme_runs r ON r.id = v.ai_run_id AND r.revision_id = v.id
+         JOIN insight_signals s ON s.id = r.insight_id
+         WHERE s.id = $1 AND v.id = $2 FOR UPDATE OF v",
+        insight_id,
+        revision_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    if r.status != "accepted" {
+        return Err(Error::Conflict {
+            code: "ai_run_not_accepted",
+            detail: "the AI edit was not accepted; review and accept it first".into(),
+        });
+    }
+    let tested = sqlx::query_scalar!(
+        "SELECT id FROM experiments WHERE theme_revision_id = $1
+         ORDER BY created_at DESC, id DESC LIMIT 1",
+        revision_id
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    if let Some(id) = tested {
+        return experiments::fetch(tx, id).await;
+    }
+    experiments::create(
+        tx,
+        actor,
+        &NewExperiment {
+            name: format!("insight-{}-r{}", r.kind.replace('_', "-"), r.number),
+            change: NewChange::Theme { revision_id },
+        },
+    )
+    .await
 }
 
 async fn lock_tenant_run(db: &PgPool, tenant: Uuid) -> Result<Option<PgConnection>, Error> {

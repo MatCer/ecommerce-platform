@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.status, s.kind, v.number\n         FROM theme_revisions v\n         JOIN ai_theme_runs r ON r.id = v.ai_run_id AND r.revision_id = v.id\n         JOIN insight_signals s ON s.id = r.insight_id\n         WHERE s.id = $1 AND v.id = $2 FOR UPDATE OF v",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "ai_theme_runs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "insight_signals",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "number",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "theme_revisions",
+            "name": "number"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9ad6e2747af2ca5c9109ca0cefb6663e7c79e488e0d4e4e6ca9f411c16754cca"
+}
